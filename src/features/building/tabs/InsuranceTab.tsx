@@ -49,9 +49,10 @@ interface Props {
   store: ReturnType<typeof useBuildingStore.getState>;
   openAdd: () => void;
   openEdit: (id: string, data: Record<string, string>) => void;
+  isBoard: boolean;
 }
 
-export default function InsuranceTab({ store, openAdd, openEdit }: Props) {
+export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Props) {
   const policies = store.insurance;
   const state = store.address.state;
 

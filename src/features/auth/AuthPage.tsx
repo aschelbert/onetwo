@@ -10,9 +10,9 @@ const Logo = () => (
       <rect x="7" y="13.5" width="18" height="5" rx="1" fill="white" />
     </svg>
     <h1 className="font-display text-2xl font-bold text-ink-900">
-      <span className="font-bold">ONE two</span> HOA GovOps
+      <span className="font-bold">ONE two</span> HOA
     </h1>
-    <p className="text-sm text-ink-400 mt-1">Governance made simple</p>
+    <p className="text-sm text-ink-400 mt-1">HOA compliance made simple</p>
   </div>
 );
 

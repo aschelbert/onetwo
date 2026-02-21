@@ -135,7 +135,7 @@ export default function BuildingPage() {
 
           {/* LEGAL */}
           {tab === 'legal' && (
-            <LegalBylawsTab
+            <LegalBylawsTab isBoard={isBoard}
               store={store}
               openAdd={() => { resetForm(); setModal('addDoc'); }}
               openEdit={(id, data) => openEdit('editDoc', id, data)}
@@ -144,7 +144,7 @@ export default function BuildingPage() {
 
           {/* INSURANCE */}
           {tab === 'insurance' && (
-            <InsuranceTab
+            <InsuranceTab isBoard={isBoard}
               store={store}
               openAdd={() => { resetForm(); setModal('addIns'); }}
               openEdit={(id, data) => openEdit('editIns', id, data)}

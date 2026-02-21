@@ -30,9 +30,10 @@ interface Props {
   store: ReturnType<typeof useBuildingStore.getState>;
   openAdd: () => void;
   openEdit: (id: string, data: Record<string, string>) => void;
+  isBoard: boolean;
 }
 
-export default function LegalBylawsTab({ store, openAdd, openEdit }: Props) {
+export default function LegalBylawsTab({ store, openAdd, openEdit, isBoard }: Props) {
   const docs = store.legalDocuments;
   const state = store.address.state;
 
