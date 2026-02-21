@@ -1,9 +1,14 @@
 import { create } from 'zustand';
 
+export interface FilingAttachment {
+  name: string; size: string; uploadedAt: string;
+}
+
 export interface RegulatoryFiling {
   id: string; name: string; category: string; dueDate: string; status: 'pending' | 'filed';
   filedDate: string | null; confirmationNum: string; notes: string;
   responsible: string; recurrence: string; legalRef: string;
+  attachments: FilingAttachment[];
 }
 
 export interface OwnerCommunication {
@@ -19,9 +24,11 @@ interface ComplianceState {
   toggleItem: (id: string) => void;
   setCompletion: (id: string, val: boolean) => void;
 
-  addFiling: (f: Omit<RegulatoryFiling, 'id' | 'status' | 'filedDate' | 'confirmationNum'>) => void;
+  addFiling: (f: Omit<RegulatoryFiling, 'id' | 'status' | 'filedDate' | 'confirmationNum' | 'attachments'>) => void;
   markFilingComplete: (id: string, filedDate: string, confirmationNum: string) => void;
   deleteFiling: (id: string) => void;
+  addFilingAttachment: (id: string, att: FilingAttachment) => void;
+  removeFilingAttachment: (id: string, attName: string) => void;
 
   addCommunication: (c: Omit<OwnerCommunication, 'id'>) => void;
   deleteCommunication: (id: string) => void;
@@ -34,12 +41,12 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
   },
 
   filings: [
-    { id: 'rf1', name: 'DC Biennial Report', category: 'government', dueDate: '2026-04-01', status: 'pending', filedDate: null, confirmationNum: '', notes: 'File with DCRA. $80 fee.', responsible: 'President', recurrence: 'biennial', legalRef: 'DC Code § 29-102.11' },
-    { id: 'rf2', name: 'Form 1120-H (Federal Tax Return)', category: 'tax', dueDate: '2026-03-15', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Form 1120-H for exempt function income. Due March 15. Extension available.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'IRS Code § 528' },
-    { id: 'rf3', name: 'DC Personal Property Tax Return', category: 'tax', dueDate: '2026-07-31', status: 'pending', filedDate: null, confirmationNum: '', notes: 'If HOA owns tangible personal property >$225K.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'DC Code § 47-1508' },
-    { id: 'rf4', name: 'Annual Fire Safety Inspection', category: 'inspection', dueDate: '2026-06-30', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Schedule with DC Fire and EMS.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Fire Code' },
-    { id: 'rf5', name: 'Elevator Inspection Certificate', category: 'inspection', dueDate: '2026-08-15', status: 'filed', filedDate: '2025-08-20', confirmationNum: 'ELEV-2025-8842', notes: 'Annual inspection by certified inspector.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Code § 1-303.43' },
-    { id: 'rf6', name: 'Annual Financial Audit', category: 'financial', dueDate: '2026-06-30', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Independent CPA review of HOA financials.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'DC Code § 29-1135.05' },
+    { id: 'rf1', name: 'DC Biennial Report', category: 'government', dueDate: '2026-04-01', status: 'pending', filedDate: null, confirmationNum: '', notes: 'File with DCRA. $80 fee.', responsible: 'President', recurrence: 'biennial', legalRef: 'DC Code § 29-102.11', attachments: [] },
+    { id: 'rf2', name: 'Form 1120-H (Federal Tax Return)', category: 'tax', dueDate: '2026-03-15', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Form 1120-H for exempt function income. Due March 15. Extension available.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'IRS Code § 528', attachments: [] },
+    { id: 'rf3', name: 'DC Personal Property Tax Return', category: 'tax', dueDate: '2026-07-31', status: 'pending', filedDate: null, confirmationNum: '', notes: 'If HOA owns tangible personal property >$225K.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'DC Code § 47-1508', attachments: [] },
+    { id: 'rf4', name: 'Annual Fire Safety Inspection', category: 'inspection', dueDate: '2026-06-30', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Schedule with DC Fire and EMS.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Fire Code', attachments: [] },
+    { id: 'rf5', name: 'Elevator Inspection Certificate', category: 'inspection', dueDate: '2026-08-15', status: 'filed', filedDate: '2025-08-20', confirmationNum: 'ELEV-2025-8842', notes: 'Annual inspection by certified inspector.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Code § 1-303.43', attachments: [{ name: 'elevator-cert-2025.pdf', size: '245 KB', uploadedAt: '2025-08-20' }] },
+    { id: 'rf6', name: 'Annual Financial Audit', category: 'financial', dueDate: '2026-06-30', status: 'pending', filedDate: null, confirmationNum: '', notes: 'Independent CPA review of HOA financials.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'DC Code § 29-1135.05', attachments: [] },
   ],
 
   communications: [
@@ -54,10 +61,13 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
   toggleItem: (id) => set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } })),
   setCompletion: (id, val) => set(s => ({ completions: { ...s.completions, [id]: val } })),
 
-  addFiling: (f) => set(s => ({ filings: [...s.filings, { id: 'rf' + Date.now(), status: 'pending', filedDate: null, confirmationNum: '', ...f }] })),
+  addFiling: (f) => set(s => ({ filings: [...s.filings, { id: 'rf' + Date.now(), status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f }] })),
   markFilingComplete: (id, filedDate, confirmationNum) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, status: 'filed', filedDate, confirmationNum } : f) })),
   deleteFiling: (id) => set(s => ({ filings: s.filings.filter(f => f.id !== id) })),
+  addFilingAttachment: (id, att) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: [...f.attachments, att] } : f) })),
+  removeFilingAttachment: (id, attName) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: f.attachments.filter(a => a.name !== attName) } : f) })),
 
   addCommunication: (c) => set(s => ({ communications: [{ id: 'oc' + Date.now(), ...c }, ...s.communications] })),
   deleteCommunication: (id) => set(s => ({ communications: s.communications.filter(c => c.id !== id) })),
 }));
+

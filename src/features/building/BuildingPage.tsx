@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { getInitials } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 import TheUnitsTab from './tabs/TheUnitsTab';
@@ -15,6 +16,7 @@ type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 
 export default function BuildingPage() {
   const store = useBuildingStore();
   const { currentRole } = useAuthStore();
+  const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const [tab, setTab] = useState<typeof TABS[number]>('details');
   const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units');
@@ -70,11 +72,16 @@ export default function BuildingPage() {
             { label: 'Legal & Bylaws', score: legalScore, detail: `${currentDocs}/${totalDocs}`, tab: 'legal' as typeof TABS[number] },
             { label: 'Insurance', score: insScore, detail: `${activePolicies}/${totalPolicies}`, tab: 'insurance' as typeof TABS[number] },
             { label: 'Governance', score: govScore, detail: `Board ${store.board.length}`, tab: 'contacts' as typeof TABS[number] },
-            { label: 'Documentation', score: totalDocs > 0 ? Math.round(((docsWithFiles + policiesWithDocs) / (totalDocs + totalPolicies)) * 100) : 0, detail: `${docsWithFiles + policiesWithDocs}/${totalDocs + totalPolicies}`, tab: 'legal' as typeof TABS[number] },
+            (() => {
+              const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
+              const delinqUnits = occupiedUnits.filter(u => u.balance > 0);
+              const delinqRate = occupiedUnits.length > 0 ? Math.round((delinqUnits.length / occupiedUnits.length) * 100) : 0;
+              return { label: 'Delinquency Rate', score: 100 - delinqRate, detail: `${delinqUnits.length}/${occupiedUnits.length} units`, tab: 'units' as typeof TABS[number], displayScore: delinqRate };
+            })(),
           ].map(m => (
             <div key={m.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(m.tab)}>
               <p className="text-[11px] text-accent-100 leading-tight">{m.label}</p>
-              <p className={`text-sm font-bold mt-1 ${m.score >= 80 ? 'text-green-300' : m.score >= 60 ? 'text-yellow-300' : 'text-red-300'}`}>{m.score}%</p>
+              <p className={`text-sm font-bold mt-1 ${m.label === 'Delinquency Rate' ? ((m as any).displayScore <= 10 ? 'text-green-300' : (m as any).displayScore <= 25 ? 'text-yellow-300' : 'text-red-300') : (m.score >= 80 ? 'text-green-300' : m.score >= 60 ? 'text-yellow-300' : 'text-red-300')}`}>{m.label === 'Delinquency Rate' ? `${(m as any).displayScore}%` : `${m.score}%`}</p>
               <p className="text-[10px] text-accent-300">{m.detail}</p>
             </div>
           ))}
@@ -116,10 +123,8 @@ export default function BuildingPage() {
             </div>
           </div>)}
 
-          {/* UNITS */}
+          {/* THE UNITS (combined units + payments) */}
           {tab === 'units' && isBoard && <TheUnitsTab />}
-
-          {/* DETAILS */}
           {tab === 'details' && (<div className="space-y-6">
             <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
               <div className="flex items-center justify-between mb-4"><h3 className="font-display text-xl font-bold text-ink-900">Property Details</h3><div className="flex gap-2"><button onClick={() => { setForm({ street: store.address.street, city: store.address.city, state: store.address.state, zip: store.address.zip }); setModal('editAddress'); }} className="text-sm text-accent-600 font-medium">Edit Address</button><button onClick={() => { setForm({ yearBuilt: store.details.yearBuilt, totalUnits: String(store.details.totalUnits), floors: String(store.details.floors), type: store.details.type, sqft: store.details.sqft, lotSize: store.details.lotSize, parking: store.details.parking, architect: store.details.architect, contractor: store.details.contractor, amenities: store.details.amenities.join(', ') }); setModal('editDetails'); }} className="text-sm text-accent-600 font-medium">Edit Details</button></div></div>
@@ -129,11 +134,11 @@ export default function BuildingPage() {
             <div><p className="text-sm font-bold text-ink-900 mb-2">Amenities</p><div className="flex flex-wrap gap-2">{store.details.amenities.map(a => <span key={a} className="px-3 py-1 bg-accent-100 text-accent-700 rounded-full text-xs font-medium">✓ {a}</span>)}</div></div>
           </div>)}
 
-
           {/* LEGAL */}
           {tab === 'legal' && (
-            <LegalBylawsTab isBoard={isBoard}
+            <LegalBylawsTab
               store={store}
+              isBoard={isBoard}
               openAdd={() => { resetForm(); setModal('addDoc'); }}
               openEdit={(id, data) => openEdit('editDoc', id, data)}
             />
@@ -141,8 +146,9 @@ export default function BuildingPage() {
 
           {/* INSURANCE */}
           {tab === 'insurance' && (
-            <InsuranceTab isBoard={isBoard}
+            <InsuranceTab
               store={store}
+              isBoard={isBoard}
               openAdd={() => { resetForm(); setModal('addIns'); }}
               openEdit={(id, data) => openEdit('editIns', id, data)}
             />
@@ -174,3 +180,4 @@ export default function BuildingPage() {
     </div>
   );
 }
+

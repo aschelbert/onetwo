@@ -8,6 +8,7 @@ import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import BuildingPage from '@/features/building/BuildingPage';
 import CompliancePage from '@/features/compliance/CompliancePage';
+import ArchivesPage from '@/features/archives/ArchivesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
 import UserManagementPage from '@/features/user-management/UserManagementPage';
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/building" element={<BuildingPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/archives" element={<ArchivesPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
@@ -72,3 +74,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

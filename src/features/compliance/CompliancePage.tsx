@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore, type Meeting, type MeetingVote } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useArchiveStore } from '@/store/useArchiveStore';
+import type { ArchiveSnapshot } from '@/store/useArchiveStore';
 import Modal from '@/components/ui/Modal';
 
 // ─── Compliance categories ────────────────────────────────
@@ -59,13 +63,16 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote';
+type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote' | 'addFilingAtt' | 'archiveYear';
 type TabId = 'runbook' | 'filings' | 'meetings' | 'communications';
 
 export default function CompliancePage() {
   const comp = useComplianceStore();
   const mtg = useMeetingsStore();
-  const { board, address, legalDocuments } = useBuildingStore();
+  const { board, address, legalDocuments, insurance, name: buildingName } = useBuildingStore();
+  const finStore = useFinancialStore();
+  const { currentUser } = useAuthStore();
+  const archiveStore = useArchiveStore();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState<TabId>('runbook');
@@ -178,6 +185,7 @@ export default function CompliancePage() {
             <p className="text-accent-200 text-sm mt-1">Runbook, meetings, filings & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p>
           </div>
           <div className="flex items-center gap-6">
+            <button onClick={() => { setForm({ archiveYear: String(new Date().getFullYear() - 1) }); setModal('archiveYear'); }} className="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 text-white rounded-lg text-sm font-medium border border-white border-opacity-20 transition-colors">📦 Create Archive</button>
             <div className="text-center">
               <div className="text-4xl font-bold text-white">{grade}</div>
               <div className="text-accent-200 text-xs">Health {healthIndex}%</div>
@@ -285,6 +293,17 @@ export default function CompliancePage() {
                       <p className="text-xs text-ink-500 mt-1">Due: {fi.dueDate} · {fi.responsible}{fi.filedDate ? ` · Filed: ${fi.filedDate}` : ''}{fi.confirmationNum ? ` · Ref: ${fi.confirmationNum}` : ''}</p>
                       {fi.notes && <p className="text-xs text-ink-400 mt-1">{fi.notes}</p>}
                       {fi.legalRef && <p className="text-xs text-ink-300 font-mono mt-0.5">{fi.legalRef}</p>}
+                      {/* Attachments */}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {fi.attachments.map(att => (
+                          <span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1">
+                            <span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span>
+                            <span className="text-[10px] text-ink-400">{att.size}</span>
+                            <button onClick={() => comp.removeFilingAttachment(fi.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
+                          </span>
+                        ))}
+                        <button onClick={() => { setTargetId(fi.id); setModal('addFilingAtt'); }} className="text-[11px] text-accent-600 font-medium hover:text-accent-700 border border-dashed border-accent-300 rounded-lg px-2.5 py-1 hover:bg-accent-50">+ Attach proof</button>
+                      </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       {fi.status === 'pending' && <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Mark Filed</button>}
@@ -445,6 +464,74 @@ export default function CompliancePage() {
           </div>
         </Modal>
       )}
+
+      {/* Filing Attachment Modal */}
+      {modal === 'addFilingAtt' && (
+        <Modal title="Attach Proof of Filing" onClose={() => setModal(null)} onSave={() => {
+          if (!f('attName')) return alert('Enter a file name.');
+          comp.addFilingAttachment(targetId, { name: f('attName'), size: f('attSize') || 'N/A', uploadedAt: new Date().toISOString().split('T')[0] });
+          setModal(null); setForm({});
+        }} saveLabel="Attach">
+          <div className="space-y-3">
+            <p className="text-xs text-ink-500 bg-mist-50 rounded-lg p-3 border border-mist-100">Attach a document as proof of completion. In production, this uploads the file to secure storage.</p>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">File Name *</label><input value={f('attName')} onChange={e => sf('attName', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., tax-return-2025.pdf" /></div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">File Size</label><input value={f('attSize')} onChange={e => sf('attSize', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 1.2 MB" /></div>
+            <div className="bg-sand-100 border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500"><strong>In production:</strong> A file picker would allow drag-and-drop upload to S3/GCS. The attachment would be stored with the filing record and downloadable by any board member.</p></div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Archive Year Modal */}
+      {modal === 'archiveYear' && (
+        <Modal title="📦 Create Annual Archive" onClose={() => setModal(null)} onSave={() => {
+          const year = parseInt(f('archiveYear')) || new Date().getFullYear() - 1;
+          const pStart = `${year}-01-01`;
+          const pEnd = `${year}-12-31`;
+          const metrics = finStore.getIncomeMetrics();
+          const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
+          const snapshot: ArchiveSnapshot = {
+            id: 'arc_' + Date.now(),
+            label: `FY ${year} (Jan 1, ${year} – Dec 31, ${year})`,
+            periodStart: pStart, periodEnd: pEnd,
+            createdAt: new Date().toISOString(),
+            createdBy: currentUser?.name || 'Board Member',
+            compliance: { runbookCompletions: { ...comp.completions }, healthIndex, grade },
+            filings: comp.filings.filter(fi => fi.dueDate >= pStart && fi.dueDate <= pEnd).map(fi => ({ ...fi, attachments: [...fi.attachments] })),
+            meetings: mtg.meetings.filter(m => m.date >= pStart && m.date <= pEnd).map(m => ({ ...m, votes: [...m.votes], attendees: { ...m.attendees }, agenda: [...m.agenda] })),
+            communications: comp.communications.filter(c => c.date >= pStart && c.date <= pEnd).map(c => ({ ...c })),
+            financial: { collectionRate: metrics.collectionRate, totalBudgeted: metrics.totalBudgeted, totalActual: metrics.totalActual, reserveBalance: 245000, totalAR: finStore.units.reduce((s, u) => s + u.balance, 0), monthlyRevenue: finStore.units.reduce((s, u) => s + u.monthlyFee, 0), unitCount: finStore.units.length, occupiedCount: occupiedUnits.length, delinquentCount: occupiedUnits.filter(u => u.balance > 0).length },
+            insurance: insurance.map(p => ({ type: p.type, carrier: p.carrier, policyNumber: p.policyNumber, coverage: p.coverage, premium: p.premium, expires: p.expires, status: new Date(p.expires) > new Date(pEnd) ? 'active' : 'expired' })),
+            legalDocuments: legalDocuments.map(d => ({ name: d.name, version: d.version, status: d.status, attachments: (d.attachments || []).map(a => ({ name: a.name, size: a.size })) })),
+            board: board.map(b => ({ name: b.name, role: b.role, term: b.term })),
+          };
+          archiveStore.addArchive(snapshot);
+          setModal(null); setForm({});
+          alert(`Archive created for FY ${year}.\n\nView it in The Archives module.`);
+          navigate('/archives');
+        }} saveLabel="Create Archive">
+          <div className="space-y-4">
+            <p className="text-sm text-ink-700">Create a permanent read-only snapshot of all compliance, financial, and governance records for a fiscal year.</p>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Fiscal Year</label><select value={f('archiveYear') || String(new Date().getFullYear() - 1)} onChange={e => sf('archiveYear', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{[2025,2024,2023].map(y => <option key={y} value={y}>FY {y} (Jan 1 – Dec 31, {y})</option>)}</select></div>
+            <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-bold text-ink-900">What gets archived:</p>
+              {[
+                { icon: '✅', label: 'Compliance Runbook', desc: 'All checklist completions and health score' },
+                { icon: '📅', label: 'Filings & Deadlines', desc: 'All filings with statuses and attached proof documents' },
+                { icon: '🗓', label: 'Meetings', desc: 'Agendas, minutes, attendance records, and vote results' },
+                { icon: '📨', label: 'Communications', desc: 'Owner communication log with type, method, and status' },
+                { icon: '💰', label: 'Fiscal Lens Snapshot', desc: 'Collection rate, budget vs actual, reserve balance, receivables' },
+                { icon: '🛡', label: 'Insurance Policies', desc: 'All policies with carrier, coverage, and expiration' },
+                { icon: '⚖', label: 'Legal & Governing Documents', desc: 'Document versions and attached files' },
+                { icon: '👥', label: 'Board Composition', desc: 'Board members, roles, and terms during the period' },
+              ].map(item => (
+                <div key={item.label} className="flex items-start gap-2"><span className="text-sm">{item.icon}</span><div><span className="text-xs font-semibold text-ink-800">{item.label}</span><span className="text-xs text-ink-400 ml-1">— {item.desc}</span></div></div>
+              ))}
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-xs text-amber-800"><strong>Note:</strong> Archives are read-only snapshots. All users (including residents) can view archived records in The Archives module for transparency and auditing.</p></div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
+
