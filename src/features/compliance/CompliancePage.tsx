@@ -500,7 +500,7 @@ export default function CompliancePage() {
             meetings: mtg.meetings.filter(m => m.date >= pStart && m.date <= pEnd).map(m => ({ ...m, votes: [...m.votes], attendees: { ...m.attendees }, agenda: [...m.agenda] })),
             communications: comp.communications.filter(c => c.date >= pStart && c.date <= pEnd).map(c => ({ ...c })),
             financial: { collectionRate: metrics.collectionRate, totalBudgeted: metrics.totalBudgeted, totalActual: metrics.totalActual, reserveBalance: 245000, totalAR: finStore.units.reduce((s, u) => s + u.balance, 0), monthlyRevenue: finStore.units.reduce((s, u) => s + u.monthlyFee, 0), unitCount: finStore.units.length, occupiedCount: occupiedUnits.length, delinquentCount: occupiedUnits.filter(u => u.balance > 0).length },
-            insurance: insurance.map(p => ({ type: p.type, carrier: p.carrier, policyNumber: p.policyNum, coverage: p.coverage, premium: p.premium, expires: p.expires, status: new Date(p.expires) > new Date(pEnd) ? 'active' : 'expired' })),
+            insurance: insurance.map(p => ({ type: p.type, carrier: p.carrier, policyNumber: p.policyNumber, coverage: p.coverage, premium: p.premium, expires: p.expires, status: new Date(p.expires) > new Date(pEnd) ? 'active' : 'expired' })),
             legalDocuments: legalDocuments.map(d => ({ name: d.name, version: d.version, status: d.status, attachments: (d.attachments || []).map(a => ({ name: a.name, size: a.size })) })),
             board: board.map(b => ({ name: b.name, role: b.role, term: b.term })),
           };
