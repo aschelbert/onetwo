@@ -3,13 +3,12 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getInitials } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
-import UnitsManager from './tabs/UnitsManager';
+import TheUnitsTab from './tabs/TheUnitsTab';
 import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
-import PaymentsManager from './tabs/PaymentsManager';
 
-const TABS = ['details','contacts','units','payments','legal','insurance','vendors'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'Units', payments:'Payments', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors' };
+const TABS = ['details','contacts','units','legal','insurance','vendors'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors' };
 
 type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor';
 
@@ -18,7 +17,7 @@ export default function BuildingPage() {
   const { currentRole } = useAuthStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const [tab, setTab] = useState<typeof TABS[number]>('details');
-  const visibleTabs = isBoard ? TABS : TABS.filter(t => !['units','payments'].includes(t));
+  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
@@ -118,7 +117,7 @@ export default function BuildingPage() {
           </div>)}
 
           {/* UNITS */}
-          {tab === 'units' && <UnitsManager />}
+          {tab === 'units' && isBoard && <TheUnitsTab />}
 
           {/* DETAILS */}
           {tab === 'details' && (<div className="space-y-6">
@@ -130,8 +129,6 @@ export default function BuildingPage() {
             <div><p className="text-sm font-bold text-ink-900 mb-2">Amenities</p><div className="flex flex-wrap gap-2">{store.details.amenities.map(a => <span key={a} className="px-3 py-1 bg-accent-100 text-accent-700 rounded-full text-xs font-medium">✓ {a}</span>)}</div></div>
           </div>)}
 
-          {/* PAYMENTS (board/mgmt only) */}
-          {tab === 'payments' && isBoard && <PaymentsManager />}
 
           {/* LEGAL */}
           {tab === 'legal' && (
