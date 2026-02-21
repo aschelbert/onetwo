@@ -68,18 +68,15 @@ export default function BuildingPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           {[
-            { label: 'Legal & Bylaws', score: legalScore, detail: `${currentDocs}/${totalDocs} current`, tab: 'legal' as typeof TABS[number] },
-            { label: 'Insurance', score: insScore, detail: `${activePolicies}/${totalPolicies} active`, tab: 'insurance' as typeof TABS[number] },
-            { label: 'Governance', score: govScore, detail: `Board ${store.board.length} · Vendors ${store.vendors.filter(v => v.status === 'active').length}`, tab: 'contacts' as typeof TABS[number] },
-            { label: 'Documentation', score: totalDocs > 0 ? Math.round(((docsWithFiles + policiesWithDocs) / (totalDocs + totalPolicies)) * 100) : 0, detail: `${docsWithFiles + policiesWithDocs}/${totalDocs + totalPolicies} have files`, tab: 'legal' as typeof TABS[number] },
+            { label: 'Legal & Bylaws', score: legalScore, detail: `${currentDocs}/${totalDocs}`, tab: 'legal' as typeof TABS[number] },
+            { label: 'Insurance', score: insScore, detail: `${activePolicies}/${totalPolicies}`, tab: 'insurance' as typeof TABS[number] },
+            { label: 'Governance', score: govScore, detail: `Board ${store.board.length}`, tab: 'contacts' as typeof TABS[number] },
+            { label: 'Documentation', score: totalDocs > 0 ? Math.round(((docsWithFiles + policiesWithDocs) / (totalDocs + totalPolicies)) * 100) : 0, detail: `${docsWithFiles + policiesWithDocs}/${totalDocs + totalPolicies}`, tab: 'legal' as typeof TABS[number] },
           ].map(m => (
-            <div key={m.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setTab(m.tab)}>
-              <p className="text-xs text-accent-200 font-medium">{m.label}</p>
-              <p className={`text-lg font-bold ${m.score >= 80 ? 'text-green-300' : m.score >= 60 ? 'text-yellow-300' : 'text-red-300'}`}>{m.score}%</p>
-              <div className="mt-1.5 h-1.5 bg-white bg-opacity-20 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${m.score >= 80 ? 'bg-green-400' : m.score >= 60 ? 'bg-yellow-400' : 'bg-red-400'}`} style={{ width: `${m.score}%` }} />
-              </div>
-              <p className="text-[10px] text-accent-300 mt-1">{m.detail}</p>
+            <div key={m.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(m.tab)}>
+              <p className="text-[11px] text-accent-100 leading-tight">{m.label}</p>
+              <p className={`text-sm font-bold mt-1 ${m.score >= 80 ? 'text-green-300' : m.score >= 60 ? 'text-yellow-300' : 'text-red-300'}`}>{m.score}%</p>
+              <p className="text-[10px] text-accent-300">{m.detail}</p>
             </div>
           ))}
         </div>

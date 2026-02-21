@@ -67,27 +67,25 @@ export default function FinancialPage() {
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
-            <p className="text-xs text-accent-200">Operating Cash</p>
-            <p className="text-lg font-bold text-white">{fmt(bs.assets.operating)}</p>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Operating Cash</p>
+            <p className="text-sm font-bold text-white mt-1">{fmt(bs.assets.operating)}</p>
           </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('ledger')}>
-            <p className="text-xs text-accent-200">Collection Rate</p>
-            <p className={`text-lg font-bold ${metrics.collectionRate >= 90 ? 'text-green-300' : metrics.collectionRate >= 75 ? 'text-yellow-300' : 'text-red-300'}`}>{metrics.collectionRate}%</p>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('ledger')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Collection Rate</p>
+            <p className={`text-sm font-bold mt-1 ${metrics.collectionRate >= 90 ? 'text-green-300' : metrics.collectionRate >= 75 ? 'text-yellow-300' : 'text-red-300'}`}>{metrics.collectionRate}%</p>
           </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('budget')}>
-            <p className="text-xs text-accent-200">Budget Used</p>
-            <p className={`text-lg font-bold ${budgetPct <= 75 ? 'text-green-300' : budgetPct <= 100 ? 'text-yellow-300' : 'text-red-300'}`}>{budgetPct}%</p>
-            <div className="mt-1 h-1.5 bg-white bg-opacity-20 rounded-full overflow-hidden"><div className={`h-full rounded-full ${budgetPct <= 75 ? 'bg-green-400' : budgetPct <= 100 ? 'bg-yellow-400' : 'bg-red-400'}`} style={{ width: `${Math.min(budgetPct, 100)}%` }} /></div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('budget')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Budget Used</p>
+            <p className={`text-sm font-bold mt-1 ${budgetPct <= 75 ? 'text-green-300' : budgetPct <= 100 ? 'text-yellow-300' : 'text-red-300'}`}>{budgetPct}%</p>
           </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('reserves')}>
-            <p className="text-xs text-accent-200">Reserve Funded</p>
-            <p className={`text-lg font-bold ${reservePct >= 70 ? 'text-green-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300'}`}>{reservePct}%</p>
-            <div className="mt-1 h-1.5 bg-white bg-opacity-20 rounded-full overflow-hidden"><div className={`h-full rounded-full ${reservePct >= 70 ? 'bg-green-400' : reservePct >= 40 ? 'bg-yellow-400' : 'bg-red-400'}`} style={{ width: `${Math.min(reservePct, 100)}%` }} /></div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('reserves')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Reserve Funded</p>
+            <p className={`text-sm font-bold mt-1 ${reservePct >= 70 ? 'text-green-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300'}`}>{reservePct}%</p>
           </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
-            <p className="text-xs text-accent-200">Receivables</p>
-            <p className={`text-lg font-bold ${bs.assets.totalReceivable === 0 ? 'text-green-300' : 'text-red-300'}`}>{fmt(bs.assets.totalReceivable)}</p>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Receivables</p>
+            <p className={`text-sm font-bold mt-1 ${bs.assets.totalReceivable === 0 ? 'text-green-300' : 'text-red-300'}`}>{fmt(bs.assets.totalReceivable)}</p>
           </div>
         </div>
       </div>

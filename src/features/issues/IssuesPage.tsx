@@ -10,222 +10,266 @@ import type { CaseApproach, CasePriority } from '@/types/issues';
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function IssuesPage() {
-  const { cases, issues } = useIssuesStore();
-  const [view, setView] = useState<string>('dashboard');
+  const store = useIssuesStore();
+  const { cases, issues } = store;
+  const [view, setView] = useState<string>('tabs');
   const role = useAuthStore(s => s.currentUser.role);
+  const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
 
-  if (view === 'new') return <WizardView onDone={(id) => setView(`case:${id}`)} onBack={() => setView('dashboard')} />;
-  if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('dashboard')} onNav={setView} />;
-  if (view === 'cases') return <CaseList onNav={setView} />;
-  if (view === 'issues') return <IssuesList onBack={() => setView('dashboard')} />;
+  if (view === 'new') return <WizardView onDone={(id) => setView(`case:${id}`)} onBack={() => setView('tabs')} />;
+  if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;
 
-  // Dashboard
   const open = cases.filter(c => c.status === 'open');
+  const closed = cases.filter(c => c.status === 'closed');
   const urgent = open.filter(c => c.priority === 'urgent');
   const high = open.filter(c => c.priority === 'high');
-  const closed = cases.filter(c => c.status === 'closed');
+
+  return <CaseOpsTabs
+    open={open} closed={closed} urgent={urgent} high={high}
+    issues={issues} isBoard={isBoard} user={user}
+    onNav={setView} store={store}
+  />;
+}
+
+type CaseTab = 'open' | 'issues' | 'archive';
+
+function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store }: {
+  open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
+  isBoard: boolean; user: any; onNav: (v: string) => void; store: any;
+}) {
+  const [tab, setTab] = useState<CaseTab>('open');
+  const [search, setSearch] = useState('');
+  const [prioFilter, setPrioFilter] = useState('all');
+  const [catFilter, setCatFilter] = useState('all');
+  // Issue creation
+  const [showCreate, setShowCreate] = useState(false);
+  const [iTitle, setITitle] = useState('');
+  const [iDesc, setIDesc] = useState('');
+  const [iCat, setICat] = useState('Maintenance');
+  const [iPrio, setIPrio] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+
+  const handleCreateIssue = () => {
+    if (!iTitle.trim()) return;
+    store.addIssue({
+      type: 'BUILDING_PUBLIC', category: iCat, priority: iPrio, status: 'SUBMITTED',
+      title: iTitle, description: iDesc,
+      reportedBy: user.id, reporterName: user.name, reporterEmail: user.email,
+      unitNumber: user.linkedUnits?.[0] || '', submittedDate: new Date().toISOString().split('T')[0]
+    });
+    setITitle(''); setIDesc(''); setShowCreate(false);
+  };
+
+  const handleConvertToCase = (issue: any) => {
+    const catMap: Record<string, string> = { Maintenance: 'maintenance', Safety: 'safety', Noise: 'noise', 'Common Area': 'common-area', Parking: 'parking', Other: 'other' };
+    const prioMap: Record<string, string> = { HIGH: 'high', MEDIUM: 'medium', LOW: 'low', URGENT: 'urgent' };
+    const catId = catMap[issue.category] || 'other';
+    const sits = CATS.find(c => c.id === catId)?.sits || CATS[0].sits;
+    const id = store.createCase({
+      catId, sitId: sits[0]?.id || 'other', approach: 'pre' as CaseApproach,
+      title: issue.title, unit: issue.unitNumber || '', owner: issue.reporterName,
+      priority: (prioMap[issue.priority] || 'medium') as CasePriority, notes: `Converted from issue ${issue.id}. ${issue.description}`
+    });
+    store.updateIssueStatus(issue.id, 'IN_PROGRESS');
+    onNav(`case:${id}`);
+  };
+
+  // Filter open cases
+  let filteredOpen = [...open];
+  if (search) { const s = search.toLowerCase(); filteredOpen = filteredOpen.filter(c => c.title.toLowerCase().includes(s) || c.id.toLowerCase().includes(s) || c.unit?.toLowerCase().includes(s) || c.owner?.toLowerCase().includes(s)); }
+  if (prioFilter !== 'all') filteredOpen = filteredOpen.filter(c => c.priority === prioFilter);
+  if (catFilter !== 'all') filteredOpen = filteredOpen.filter(c => c.catId === catFilter);
+
+  // Filter archive
+  let filteredClosed = [...closed];
+  if (search) { const s = search.toLowerCase(); filteredClosed = filteredClosed.filter(c => c.title.toLowerCase().includes(s) || c.id.toLowerCase().includes(s)); }
+
+  const allCats = [...new Set(open.map(c => c.catId))];
+
+  const TABS: { id: CaseTab; label: string; badge?: number }[] = [
+    { id: 'open', label: 'Open Cases', badge: open.length || undefined },
+    { id: 'issues', label: 'Recent Issues', badge: issues.filter(i => i.status === 'SUBMITTED').length || undefined },
+    { id: 'archive', label: 'Case Archive', badge: closed.length || undefined },
+  ];
 
   return (
-    <div className="space-y-5">
-      {/* Header container */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-8 text-white shadow-sm">
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div className="space-y-0">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">{isBoard ? '📋 Case Ops' : 'Issues & Cases'}</h2>
             <p className="text-accent-200 text-sm mt-1">Track situations, enforce compliance, manage disputes</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setView('cases')} className="px-4 py-2 bg-white bg-opacity-10 border border-white border-opacity-20 text-white rounded-lg text-sm font-medium hover:bg-opacity-20">All Cases</button>
-            <button onClick={() => setView('issues')} className="px-4 py-2 bg-white bg-opacity-10 border border-white border-opacity-20 text-white rounded-lg text-sm font-medium hover:bg-opacity-20">Issues Board</button>
-            {isBoard && <button onClick={() => setView('new')} className="px-4 py-2 bg-white text-ink-900 rounded-lg text-sm font-medium hover:bg-accent-100">＋ New Case</button>}
+          <div className="flex items-center gap-4">
+            {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-white text-ink-900 rounded-lg text-sm font-medium hover:bg-accent-100">＋ New Case</button>}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           {[
-            { val: open.length, label: 'Open Cases', icon: '📂', border: 'border-white border-opacity-20' },
-            { val: urgent.length, label: 'Urgent', icon: '🔴', border: urgent.length > 0 ? 'border-red-400 border-opacity-50' : 'border-white border-opacity-10' },
-            { val: high.length, label: 'High Priority', icon: '🟠', border: high.length > 0 ? 'border-orange-400 border-opacity-50' : 'border-white border-opacity-10' },
-            { val: closed.length, label: 'Closed', icon: '✅', border: 'border-white border-opacity-20' },
+            { val: open.length, label: 'Open Cases', icon: '📂' },
+            { val: urgent.length, label: 'Urgent', icon: '🔴' },
+            { val: high.length, label: 'High Priority', icon: '🟠' },
+            { val: closed.length, label: 'Closed', icon: '✅' },
           ].map(s => (
-            <div key={s.label} className={`bg-white bg-opacity-10 backdrop-blur-sm rounded-xl border ${s.border} p-4`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-lg">{s.icon}</span>
-                <span className="text-2xl font-bold text-white">{s.val}</span>
-              </div>
-              <p className="text-xs text-accent-200">{s.label}</p>
+            <div key={s.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(s.label === 'Closed' ? 'archive' : 'open')}>
+              <span className="text-xl">{s.icon}</span>
+              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight">{s.label}</p>
+              <p className="text-sm font-bold text-white mt-1">{s.val}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Quick start categories */}
-      {isBoard && (
-        <div className="bg-white rounded-xl border border-ink-100 p-5">
-          <h3 className="text-lg font-semibold text-ink-800 mb-3">Quick Start</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {CATS.map(cat => (
-              <button key={cat.id} onClick={() => setView('new')} className="bg-white rounded-xl border border-ink-100 p-3 text-center hover:border-accent-300 transition-all">
-                <span className="text-2xl">{cat.icon}</span>
-                <p className="text-xs font-semibold text-ink-700 mt-1">{cat.label}</p>
-                <p className="text-[10px] text-ink-400">{cat.sits.length} types</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Open cases */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <h3 className="text-lg font-semibold text-ink-800 mb-3">Open Cases</h3>
-        {open.length === 0 ? (
-          <p className="text-sm text-ink-400 py-4 text-center">No open cases.</p>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {open.map(c => <CaseCard key={c.id} c={c} onClick={() => setView(`case:${c.id}`)} />)}
-          </div>
-        )}
-      </div>
-
-      {/* Recent issues */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-ink-800">Recent Issues</h3>
-          <button onClick={() => setView('issues')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
-        </div>
-        {issues.length === 0 ? (
-          <p className="text-sm text-ink-400 text-center py-4">No issues reported.</p>
-        ) : (
-          <div className="space-y-2">
-            {issues.slice(0, 5).map(i => (
-              <div key={i.id} className="flex items-center justify-between p-3 bg-mist-50 rounded-lg border border-mist-100">
-                <div>
-                  <p className="text-sm font-medium text-ink-900">{i.title}</p>
-                  <p className="text-xs text-ink-400">{i.category} · {i.submittedDate} · {i.upvotes.length} upvotes</p>
-                </div>
-                <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${i.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : i.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : 'bg-sage-100 text-sage-700'}`}>{i.status.replace('_', ' ')}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Case List ─────────────────────────────────────────────
-function CaseList({ onNav }: { onNav: (v: string) => void }) {
-  const { cases } = useIssuesStore();
-  const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
-  const filtered = filter === 'all' ? cases : cases.filter(c => c.status === filter);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => onNav('dashboard')} className="text-xs text-ink-400 hover:text-ink-600">← Dashboard</button>
-          <h2 className="text-2xl font-bold text-ink-900">All Cases</h2>
-        </div>
-        <div className="flex gap-2">
-          {(['all', 'open', 'closed'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${filter === f ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-500 hover:border-ink-300'}`}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+      {/* Tab Nav */}
+      <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
+        <div className="flex min-w-max px-4">
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${tab === t.id ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>
+              {t.label}
+              {t.badge && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 font-bold">{t.badge}</span>}
             </button>
           ))}
-          <button onClick={() => onNav('new')} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">＋ New Case</button>
         </div>
       </div>
-      {filtered.length === 0 ? (
-        <p className="text-sm text-ink-400 text-center py-8">No cases match this filter.</p>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map(c => <CaseCard key={c.id} c={c} onClick={() => onNav(`case:${c.id}`)} />)}
-        </div>
-      )}
-    </div>
-  );
-}
 
-// ─── Issues Board ──────────────────────────────────────────
-function IssuesList({ onBack }: { onBack: () => void }) {
-  const { issues, addIssue, upvoteIssue, updateIssueStatus } = useIssuesStore();
-  const user = useAuthStore(s => s.currentUser);
-  const isBoard = user.role !== 'RESIDENT';
-  const [showCreate, setShowCreate] = useState(false);
-  const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [cat, setCat] = useState('Maintenance');
-  const [prio, setPrio] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+      {/* Tab Content */}
+      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
 
-  const handleCreate = () => {
-    if (!title.trim()) return;
-    addIssue({
-      type: 'BUILDING_PUBLIC', category: cat, priority: prio, status: 'SUBMITTED',
-      title, description: desc,
-      reportedBy: user.id, reporterName: user.name, reporterEmail: user.email,
-      unitNumber: user.linkedUnits?.[0] || '', submittedDate: new Date().toISOString().split('T')[0]
-    });
-    setTitle(''); setDesc(''); setShowCreate(false);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Dashboard</button>
-          <h2 className="text-2xl font-bold text-ink-900">Issues Board</h2>
-        </div>
-        <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">
-          {showCreate ? 'Cancel' : '＋ Report Issue'}
-        </button>
-      </div>
-
-      {showCreate && (
-        <div className="bg-white rounded-xl border border-ink-100 p-5 space-y-3">
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Issue title" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description..." rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
-          <div className="flex gap-3 flex-wrap">
-            <select value={cat} onChange={e => setCat(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
-              {['Maintenance', 'Safety', 'Noise', 'Common Area', 'Parking', 'Other'].map(c => <option key={c}>{c}</option>)}
+        {/* ─── OPEN CASES ─── */}
+        {tab === 'open' && (<div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input type="text" placeholder="Search cases..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            <select value={prioFilter} onChange={e => setPrioFilter(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
+              <option value="all">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
             </select>
-            <select value={prio} onChange={e => setPrio(e.target.value as any)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
-              <option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option>
-            </select>
-            <button onClick={handleCreate} className="px-6 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">Submit</button>
+            {allCats.length > 1 && (
+              <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                <option value="all">All Categories</option>
+                {allCats.map(c => { const cat = CATS.find(ct => ct.id === c); return <option key={c} value={c}>{cat?.label || c}</option>; })}
+              </select>
+            )}
           </div>
-        </div>
-      )}
+          <p className="text-xs text-ink-400">{filteredOpen.length} case{filteredOpen.length !== 1 ? 's' : ''}{(search || prioFilter !== 'all' || catFilter !== 'all') ? ' (filtered)' : ''}</p>
+          {filteredOpen.length === 0 ? (
+            <p className="text-sm text-ink-400 py-8 text-center">No open cases match your filters.</p>
+          ) : (
+            <div className="divide-y divide-ink-50">
+              {filteredOpen.map(c => {
+                const cat = CATS.find(ct => ct.id === c.catId);
+                return (
+                  <div key={c.id} className="py-3 flex items-center gap-4 hover:bg-mist-50 -mx-2 px-2 rounded-lg cursor-pointer" onClick={() => onNav(`case:${c.id}`)}>
+                    <span className={`shrink-0 w-2 h-2 rounded-full ${c.priority === 'urgent' ? 'bg-red-500' : c.priority === 'high' ? 'bg-orange-500' : c.priority === 'medium' ? 'bg-yellow-500' : 'bg-slate-300'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-ink-300">{c.id}</span>
+                        <p className="text-sm font-semibold text-ink-900 truncate">{c.title}</p>
+                      </div>
+                      <p className="text-xs text-ink-400 mt-0.5">{cat?.label || c.catId} · {c.unit ? `Unit ${c.unit}` : 'No unit'}{c.owner ? ` · ${c.owner}` : ''} · {c.dateOpened}</p>
+                    </div>
+                    <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${PRIO_COLORS[c.priority] || 'bg-ink-100 text-ink-500'}`}>{c.priority}</span>
+                    <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${APPR_COLORS[c.approach] || 'bg-ink-100 text-ink-500'}`}>{APPR_LABELS[c.approach] || c.approach}</span>
+                    <span className="text-ink-300 text-sm">→</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>)}
 
-      <div className="space-y-2">
-        {issues.map(i => (
-          <div key={i.id} className="bg-white rounded-xl border border-ink-100 p-4">
-            <div className="flex items-start gap-3">
-              <button onClick={() => upvoteIssue(i.id, user.id, user.name, user.linkedUnits?.[0] || '')} className="flex flex-col items-center shrink-0 mt-1">
-                <span className={`text-lg ${i.upvotes.find(u => u.userId === user.id) ? 'text-accent-500' : 'text-ink-300'}`}>▲</span>
-                <span className="text-xs font-bold text-ink-500">{i.upvotes.length}</span>
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.priority === 'HIGH' ? 'bg-red-100 text-red-700' : i.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i.priority}</span>
-                  <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">{i.category}</span>
-                  <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : i.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : 'bg-sage-100 text-sage-700'}`}>{i.status.replace('_', ' ')}</span>
-                </div>
-                <p className="text-sm font-semibold text-ink-900 mt-1">{i.title}</p>
-                <p className="text-xs text-ink-400 mt-0.5">{i.description}</p>
-                <p className="text-[11px] text-ink-300 mt-1">Reported by {i.reporterName} · {i.submittedDate} · {i.viewCount} views</p>
-                {isBoard && (
-                  <div className="flex gap-1 mt-2">
-                    {(['SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map(st => (
-                      <button key={st} onClick={() => updateIssueStatus(i.id, st)} className={`px-2 py-0.5 rounded text-[10px] font-semibold ${i.status === st ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-400 hover:bg-ink-100'}`}>
+        {/* ─── RECENT ISSUES ─── */}
+        {tab === 'issues' && (<div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-ink-400">{issues.length} issue{issues.length !== 1 ? 's' : ''} reported</p>
+            <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">
+              {showCreate ? 'Cancel' : '＋ Report Issue'}
+            </button>
+          </div>
+          {showCreate && (
+            <div className="bg-mist-50 rounded-xl border border-mist-200 p-5 space-y-3">
+              <input value={iTitle} onChange={e => setITitle(e.target.value)} placeholder="Issue title" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
+              <textarea value={iDesc} onChange={e => setIDesc(e.target.value)} placeholder="Description..." rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
+              <div className="flex gap-3 flex-wrap">
+                <select value={iCat} onChange={e => setICat(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                  {['Maintenance', 'Safety', 'Noise', 'Common Area', 'Parking', 'Other'].map(c => <option key={c}>{c}</option>)}
+                </select>
+                <select value={iPrio} onChange={e => setIPrio(e.target.value as any)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                  <option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option>
+                </select>
+                <button onClick={handleCreateIssue} className="px-6 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">Submit</button>
+              </div>
+            </div>
+          )}
+          <div className="divide-y divide-ink-50">
+            {issues.map(i => (
+              <div key={i.id} className="py-3 flex items-start gap-3">
+                <button onClick={() => store.upvoteIssue(i.id, user.id, user.name, user.linkedUnits?.[0] || '')} className="flex flex-col items-center shrink-0 mt-1">
+                  <span className={`text-base ${i.upvotes.find((u: any) => u.userId === user.id) ? 'text-accent-500' : 'text-ink-300'}`}>▲</span>
+                  <span className="text-[10px] font-bold text-ink-500">{i.upvotes.length}</span>
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.priority === 'HIGH' ? 'bg-red-100 text-red-700' : i.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i.priority}</span>
+                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">{i.category}</span>
+                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : i.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : 'bg-sage-100 text-sage-700'}`}>{i.status.replace('_', ' ')}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-ink-900 mt-1">{i.title}</p>
+                  {i.description && <p className="text-xs text-ink-400 mt-0.5">{i.description}</p>}
+                  <p className="text-[11px] text-ink-300 mt-1">Reported by {i.reporterName} · {i.submittedDate} · {i.viewCount} views</p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {isBoard && (['SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map(st => (
+                      <button key={st} onClick={() => store.updateIssueStatus(i.id, st)} className={`px-2 py-0.5 rounded text-[10px] font-semibold ${i.status === st ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-400 hover:bg-ink-100'}`}>
                         {st.replace('_', ' ')}
                       </button>
                     ))}
+                    {isBoard && i.status !== 'CLOSED' && (
+                      <button onClick={(e) => { e.stopPropagation(); handleConvertToCase(i); }} className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white hover:bg-accent-700 ml-1">
+                        → Convert to Case
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            ))}
+            {issues.length === 0 && <p className="text-sm text-ink-400 text-center py-8">No issues reported.</p>}
           </div>
-        ))}
+        </div>)}
+
+        {/* ─── CASE ARCHIVE ─── */}
+        {tab === 'archive' && (<div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input type="text" placeholder="Search closed cases..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+          </div>
+          <p className="text-xs text-ink-400">{filteredClosed.length} closed case{filteredClosed.length !== 1 ? 's' : ''}</p>
+          {filteredClosed.length === 0 ? (
+            <p className="text-sm text-ink-400 py-8 text-center">No closed cases.</p>
+          ) : (
+            <div className="divide-y divide-ink-50">
+              {filteredClosed.map(c => {
+                const cat = CATS.find(ct => ct.id === c.catId);
+                return (
+                  <div key={c.id} className="py-3 flex items-center gap-4 hover:bg-mist-50 -mx-2 px-2 rounded-lg cursor-pointer" onClick={() => onNav(`case:${c.id}`)}>
+                    <span className="shrink-0 w-2 h-2 rounded-full bg-sage-400" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-ink-300">{c.id}</span>
+                        <p className="text-sm font-medium text-ink-700 truncate">{c.title}</p>
+                      </div>
+                      <p className="text-xs text-ink-400 mt-0.5">{cat?.label || c.catId} · {c.unit ? `Unit ${c.unit}` : ''} · Opened {c.dateOpened}{c.dateClosed ? ` · Closed ${c.dateClosed}` : ''}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-sage-100 text-sage-700">Closed</span>
+                    <span className="text-ink-300 text-sm">→</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>)}
       </div>
     </div>
   );
