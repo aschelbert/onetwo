@@ -1,0 +1,118 @@
+import { useState } from 'react';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { fmt } from '@/lib/formatters';
+import Modal from '@/components/ui/Modal';
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-ink-100 text-ink-500',
+  approved: 'bg-yellow-100 text-yellow-700',
+  invoiced: 'bg-accent-100 text-accent-700',
+  paid: 'bg-sage-100 text-sage-700',
+};
+
+export default function FLWorkOrders() {
+  const { workOrders, createWorkOrder, approveWorkOrder, receiveInvoice, payWorkOrder, getAcctName, chartOfAccounts, generalLedger, budgetCategories, setActiveTab } = useFinancialStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [showInvoice, setShowInvoice] = useState<string | null>(null);
+  const [woForm, setWoForm] = useState({ title: '', vendor: '', amount: '', acctNum: '5010', caseId: '' });
+  const [invForm, setInvForm] = useState({ invoiceNum: '', amount: '' });
+  const allAccts = chartOfAccounts.filter(a => a.sub !== 'header' && (a.type === 'expense' || a.type === 'asset'));
+
+  const byStatus = (status: string) => workOrders.filter(w => w.status === status);
+  const statusFlow = [
+    { key: 'draft', label: 'Draft', count: byStatus('draft').length },
+    { key: 'approved', label: 'Approved', count: byStatus('approved').length },
+    { key: 'invoiced', label: 'Invoiced', count: byStatus('invoiced').length },
+    { key: 'paid', label: 'Paid', count: byStatus('paid').length },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="grid grid-cols-4 gap-3 flex-1">
+          {statusFlow.map(s => (
+            <div key={s.key} className={`rounded-xl p-3 border ${s.key === 'paid' ? 'bg-sage-50 border-sage-200' : 'bg-white border-ink-100'}`}>
+              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">{s.label}</p>
+              <p className="text-2xl font-bold text-ink-900 mt-1">{s.count}</p>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => { setWoForm({ title: '', vendor: '', amount: '', acctNum: '5010', caseId: '' }); setShowCreate(true); }} className="ml-4 px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Create Work Order</button>
+      </div>
+
+      <div className="space-y-2">
+        {workOrders.map(wo => (
+          <div key={wo.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-sm transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`pill px-2 py-0.5 rounded-full ${STATUS_COLORS[wo.status]}`}>{wo.status}</span>
+                <span className="text-xs text-ink-300 font-mono">{wo.id}</span>
+                <span className="font-semibold text-ink-900 truncate">{wo.title}</span>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-sm text-ink-500">
+                {wo.vendor}
+                {wo.caseId && <span className="text-accent-600 ml-2">· {wo.caseId}</span>}
+                {wo.invoiceNum && <span className="ml-2">· Inv: {wo.invoiceNum}</span>}
+              </p>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-xs text-ink-300 font-mono">{getAcctName(wo.acctNum).split(' · ')[0]}</span>
+                <span className="font-bold text-ink-900">{fmt(wo.amount)}</span>
+                {wo.status === 'draft' && (
+                  <button onClick={() => approveWorkOrder(wo.id)} className="px-3 py-1 bg-yellow-500 text-white rounded text-xs font-medium hover:bg-yellow-600">Approve</button>
+                )}
+                {wo.status === 'approved' && (
+                  <button onClick={() => { setShowInvoice(wo.id); setInvForm({ invoiceNum: '', amount: String(wo.amount) }); }} className="px-3 py-1 bg-accent-600 text-white rounded text-xs font-medium hover:bg-accent-700">Receive Invoice</button>
+                )}
+                {wo.status === 'invoiced' && (
+                  <button onClick={() => payWorkOrder(wo.id)} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Pay → GL</button>
+                )}
+                {wo.glEntryId && (
+                  <span className="text-xs text-sage-600 font-mono cursor-pointer hover:text-sage-800" onClick={() => setActiveTab('ledger')} title="View in General Ledger">{wo.glEntryId} ↗</span>
+                )}
+              </div>
+            </div>
+            {/* Linkage row */}
+            <div className="mt-1.5 flex flex-wrap gap-2 text-[10px]">
+              <span className="text-ink-400">GL: <span className="font-mono text-ink-500">{wo.acctNum} {getAcctName(wo.acctNum).split(' · ').pop()}</span></span>
+              {(() => { const coa = chartOfAccounts.find(a => a.num === wo.acctNum); const bc = coa?.budgetCat ? budgetCategories.find(b => b.id === coa.budgetCat) : null; return bc ? <span className="text-accent-500">Budget: {bc.name}</span> : null; })()}
+              {wo.glEntryId && <span className="text-sage-500">Posted {generalLedger.find(g => g.id === wo.glEntryId)?.date || ''}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showCreate && (
+        <Modal title="Create Work Order" onClose={() => setShowCreate(false)} onSave={() => {
+          if (!woForm.title || !woForm.vendor) { alert('Title and vendor required'); return; }
+          createWorkOrder({ title: woForm.title, vendor: woForm.vendor, amount: parseFloat(woForm.amount) || 0, acctNum: woForm.acctNum, caseId: woForm.caseId || undefined });
+          setShowCreate(false);
+        }} saveLabel="Create">
+          <div className="space-y-3">
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={woForm.title} onChange={e => setWoForm({ ...woForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Elevator repair" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Vendor *</label><input value={woForm.vendor} onChange={e => setWoForm({ ...woForm, vendor: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Est. Amount</label><input type="number" value={woForm.amount} onChange={e => setWoForm({ ...woForm, amount: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
+            </div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">GL Account</label><select value={woForm.acctNum} onChange={e => setWoForm({ ...woForm, acctNum: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{allAccts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Case ID (optional)</label><input value={woForm.caseId} onChange={e => setWoForm({ ...woForm, caseId: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="c1" /></div>
+          </div>
+        </Modal>
+      )}
+
+      {showInvoice && (
+        <Modal title="Receive Invoice" onClose={() => setShowInvoice(null)} onSave={() => {
+          if (!invForm.invoiceNum) { alert('Invoice number required'); return; }
+          receiveInvoice(showInvoice, invForm.invoiceNum, parseFloat(invForm.amount) || 0);
+          setShowInvoice(null);
+        }} saveLabel="Record Invoice">
+          <div className="space-y-3">
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Invoice Number *</label><input value={invForm.invoiceNum} onChange={e => setInvForm({ ...invForm, invoiceNum: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="INV-2026-001" /></div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Invoice Amount</label><input type="number" value={invForm.amount} onChange={e => setInvForm({ ...invForm, amount: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

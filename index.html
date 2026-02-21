@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE two — HOA handled.</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #0f1a2e;
+            --paper: #faf9f7;
+            --accent: #d62839;
+            --accent-light: #fde8ea;
+            --warm: #f59e0b;
+            --warm-light: #fef3c7;
+            --muted: #64748b;
+            --border: #e2e0dc;
+            --card: #ffffff;
+            --green: #059669;
+            --green-light: #d1fae5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .display { font-family: 'Fraunces', serif; }
+
+        /* NAV */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(250,249,247,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-inner {
+            max-width: 1200px; margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .logo {
+            font-family: 'Fraunces', serif;
+            font-weight: 900; font-size: 1.5rem;
+            color: var(--ink);
+            text-decoration: none;
+        }
+        .logo span { color: var(--accent); }
+        .nav-links { display: flex; gap: 2rem; align-items: center; }
+        .nav-links a {
+            text-decoration: none; color: var(--muted);
+            font-size: 0.9rem; font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover { color: var(--ink); }
+        .btn {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.7rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600; font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.25s;
+            cursor: pointer; border: none;
+        }
+        .btn-primary {
+            background: var(--accent); color: #fff;
+            box-shadow: 0 2px 8px rgba(214,40,57,0.25);
+        }
+        .btn-primary:hover {
+            background: #b91c2c;
+            box-shadow: 0 4px 16px rgba(214,40,57,0.35);
+            transform: translateY(-1px);
+        }
+        .btn-outline {
+            background: transparent; color: var(--accent);
+            border: 2px solid var(--accent);
+        }
+        .btn-outline:hover {
+            background: var(--accent-light);
+        }
+
+        /* HERO */
+        .hero {
+            padding: 10rem 2rem 6rem;
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 4rem;
+            align-items: center;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: #ecfeff;
+            color: #155e75;
+            padding: 0.4rem 1rem;
+            border-radius: 100px;
+            font-size: 0.8rem; font-weight: 600;
+            margin-bottom: 1.5rem;
+            border: 1px solid #a5f3fc;
+        }
+        .hero h1 {
+            font-family: 'Fraunces', serif;
+            font-size: 3.8rem;
+            line-height: 1.1;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+        }
+        .hero h1 em {
+            font-style: italic;
+            color: var(--accent);
+        }
+        .hero p {
+            font-size: 1.15rem;
+            color: var(--muted);
+            line-height: 1.7;
+            margin-bottom: 2rem;
+            max-width: 520px;
+        }
+        .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+        .hero-visual {
+            position: relative;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 25px 60px rgba(15,26,46,0.2), 0 0 0 1px rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+        .hero-visual::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--warm), var(--green));
+        }
+        .mock-header {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .mock-dot.r { background: #ef4444; }
+        .mock-dot.y { background: #f59e0b; }
+        .mock-dot.g { background: #22c55e; }
+        .mock-bar {
+            flex: 1;
+            height: 28px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 6px;
+            display: flex; align-items: center;
+            padding: 0 0.75rem;
+            font-size: 0.7rem; color: rgba(255,255,255,0.35);
+        }
+        .mock-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .mock-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 1.1rem;
+            transition: all 0.3s;
+        }
+        .mock-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+        .mock-card .mc-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+            margin-bottom: 0.6rem;
+        }
+        .mock-card h4 { color: #fff; font-size: 0.8rem; font-weight: 600; }
+        .mock-card p { color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.25rem; }
+        .mock-card .mc-stat {
+            margin-top: 0.6rem;
+            font-family: 'Fraunces', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .mc-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .mc-green { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .mc-amber { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .mc-purple { background: rgba(168,85,247,0.2); color: #c084fc; }
+        .stat-blue { color: #60a5fa; }
+        .stat-green { color: #4ade80; }
+        .stat-amber { color: #fbbf24; }
+        .stat-purple { color: #c084fc; }
+
+        /* SOCIAL PROOF */
+        .social-proof {
+            max-width: 1200px; margin: 0 auto;
+            padding: 2rem 2rem 4rem;
+            display: flex; align-items: center; gap: 3rem;
+            flex-wrap: wrap;
+        }
+        .social-proof span {
+            font-size: 0.85rem; color: var(--muted); font-weight: 500;
+        }
+        .proof-stat {
+            display: flex; align-items: baseline; gap: 0.4rem;
+        }
+        .proof-stat strong {
+            font-family: 'Fraunces', serif;
+            font-size: 1.8rem; font-weight: 700;
+            color: var(--ink);
+        }
+        .proof-stat span { font-size: 0.85rem; color: var(--muted); }
+
+        /* SECTIONS */
+        section { padding: 5rem 2rem; }
+        .section-inner { max-width: 1200px; margin: 0 auto; }
+        .section-label {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            font-size: 0.8rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            font-family: 'Fraunces', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            max-width: 600px;
+        }
+        .section-desc {
+            font-size: 1.05rem;
+            color: var(--muted);
+            max-width: 560px;
+            margin-bottom: 3rem;
+        }
+
+        /* FEATURES */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+        .feature-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .feature-card::after {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px; opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .feature-card:hover {
+            border-color: transparent;
+            box-shadow: 0 8px 30px rgba(15,26,46,0.08);
+            transform: translateY(-3px);
+        }
+        .feature-card:hover::after { opacity: 1; }
+        .feature-card:nth-child(1)::after { background: var(--accent); }
+        .feature-card:nth-child(2)::after { background: var(--green); }
+        .feature-card:nth-child(3)::after { background: var(--warm); }
+        .feature-card:nth-child(4)::after { background: #8b5cf6; }
+        .feature-card:nth-child(5)::after { background: #ec4899; }
+        .feature-card:nth-child(6)::after { background: #06b6d4; }
+
+        .feature-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 1.25rem;
+        }
+        .fi-blue { background: var(--accent-light); }
+        .fi-green { background: var(--green-light); }
+        .fi-amber { background: var(--warm-light); }
+        .fi-purple { background: #ede9fe; }
+        .fi-pink { background: #fce7f3; }
+        .fi-cyan { background: #cffafe; }
+
+        .feature-card h3 { font-weight: 700; font-size: 1.05rem; margin-bottom: 0.5rem; }
+        .feature-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+        .feature-tag {
+            display: inline-block;
+            margin-top: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 100px;
+            font-size: 0.7rem; font-weight: 600;
+            background: var(--accent-light); color: var(--accent);
+        }
+
+        /* DC SECTION */
+        .dc-section {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #fff;
+            border-radius: 24px;
+            margin: 0 2rem;
+            max-width: 1200px;
+            margin-left: auto; margin-right: auto;
+        }
+        .dc-section .section-inner { padding: 4rem; }
+        .dc-section .section-label { color: #a5f3fc; }
+        .dc-section .section-title { color: #fff; }
+        .dc-section .section-desc { color: rgba(255,255,255,0.6); }
+        .dc-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+        }
+        .dc-item {
+            display: flex; gap: 1rem; align-items: flex-start;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+        .dc-item:hover {
+            background: rgba(255,255,255,0.14);
+            border-color: rgba(255,255,255,0.22);
+        }
+        .dc-icon {
+            width: 40px; height: 40px; flex-shrink: 0;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            background: rgba(245,158,11,0.15);
+        }
+        .dc-item h4 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 0.25rem; }
+        .dc-item p { font-size: 0.82rem; color: rgba(255,255,255,0.5); line-height: 1.5; }
+
+        /* BILLING TOGGLE */
+        .billing-toggle {
+            display: inline-flex; align-items: center; gap: 0.75rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.5rem 1.25rem;
+        }
+        .toggle-label {
+            font-size: 0.9rem; font-weight: 500;
+            color: var(--muted);
+            transition: color 0.3s;
+        }
+        .toggle-label.active { color: var(--ink); font-weight: 600; }
+        .toggle-save {
+            font-size: 0.7rem; font-weight: 700;
+            color: var(--green);
+            background: var(--green-light);
+            padding: 0.15rem 0.5rem;
+            border-radius: 100px;
+            margin-left: 0.25rem;
+        }
+        .toggle-switch {
+            width: 48px; height: 26px;
+            background: #e2e0dc;
+            border-radius: 100px;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s;
+            padding: 0;
+        }
+        .toggle-switch.active { background: var(--accent); }
+        .toggle-knob {
+            position: absolute;
+            top: 3px; left: 3px;
+            width: 20px; height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+        .toggle-switch.active .toggle-knob { transform: translateX(22px); }
+
+        /* PRICING */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+        .price-card {
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem 2rem;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .price-card:hover {
+            box-shadow: 0 12px 40px rgba(15,26,46,0.08);
+        }
+        .price-card.featured {
+            border-color: var(--accent);
+            box-shadow: 0 12px 40px rgba(214,40,57,0.12);
+        }
+        .price-badge {
+            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+            background: var(--accent); color: #fff;
+            padding: 0.3rem 1.2rem;
+            border-radius: 100px;
+            font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+        .price-card h3 {
+            font-family: 'Fraunces', serif;
+            font-size: 1.35rem; font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .price-card .price-desc {
+            font-size: 0.85rem; color: var(--muted);
+            margin-bottom: 1.5rem;
+        }
+        .price-amount {
+            display: flex; align-items: baseline; gap: 0.3rem;
+            margin-bottom: 0.25rem;
+        }
+        .price-amount .dollar {
+            font-family: 'Fraunces', serif;
+            font-size: 3rem; font-weight: 900;
+            line-height: 1;
+            color: var(--ink);
+        }
+        .price-amount .period {
+            font-size: 0.9rem; color: var(--muted); font-weight: 500;
+        }
+        .price-unit {
+            font-size: 0.8rem; color: var(--muted);
+            margin-bottom: 2rem;
+        }
+        .price-features {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+        .price-features li {
+            padding: 0.5rem 0;
+            font-size: 0.88rem;
+            color: var(--ink);
+            display: flex; align-items: flex-start; gap: 0.6rem;
+        }
+        .price-features li::before {
+            content: '✓';
+            color: var(--green);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .price-features li.disabled {
+            color: var(--muted);
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+        .price-features li.disabled::before {
+            content: '—';
+            color: var(--muted);
+        }
+        .price-btn { width: 100%; text-align: center; justify-content: center; }
+
+        /* CTA */
+        .cta-section {
+            text-align: center;
+            padding: 6rem 2rem;
+        }
+        .cta-section .section-title {
+            max-width: 700px; margin: 0 auto 1rem;
+        }
+        .cta-section .section-desc {
+            max-width: 500px; margin: 0 auto 2rem;
+        }
+        .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+        /* FOOTER */
+        footer {
+            max-width: 1200px; margin: 0 auto;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 1rem;
+        }
+        footer p { font-size: 0.85rem; color: var(--muted); }
+        .footer-links { display: flex; gap: 1.5rem; }
+        .footer-links a {
+            font-size: 0.85rem; color: var(--muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--ink); }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .hero { grid-template-columns: 1fr; padding-top: 8rem; }
+            .hero h1 { font-size: 2.6rem; }
+            .hero-visual { display: none; }
+            .features-grid { grid-template-columns: 1fr; }
+            .dc-grid { grid-template-columns: 1fr; }
+            .pricing-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
+            .nav-links a:not(.btn) { display: none; }
+            .social-proof { justify-content: center; }
+            .dc-section .section-inner { padding: 2.5rem 1.5rem; }
+        }
+        @media (min-width: 901px) and (max-width: 1100px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ANIMATIONS */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate {
+            animation: slideUp 0.6s ease-out forwards;
+            opacity: 0;
+        }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+    <div class="nav-inner">
+        <a href="#" class="logo">ONE <span>two</span></a>
+        <span style="font-size: 0.85rem; color: var(--muted); font-weight: 500; margin-left: 0.5rem;">HOA handled.</span>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#dc">DC Focus</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/login" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem; margin-right: 0.25rem;">Sign In</a>
+            <a href="/login?create=1" class="btn btn-primary" style="color: #fff; padding: 0.5rem 1rem; font-size: 0.85rem;">Create Account →</a>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="animate">
+        <div class="hero-badge">🏛 Built for DC</div>
+        <h1 class="display">
+            The <em>compliance-first</em> operating system for HOA boards
+        </h1>
+        <p>
+            <strong>ONE two</strong> HOA replaces scattered spreadsheets, emails, and guesswork with a single platform that keeps your community legally compliant, financially transparent, and operationally sharp — starting with Washington, DC.
+        </p>
+        <div class="hero-actions">
+            <a href="#pricing" class="btn btn-primary">See Plans & Pricing →</a>
+            <a href="/login?create=1" class="btn btn-outline">Create Account</a>
+        </div>
+    </div>
+    <div class="hero-visual animate delay-2">
+        <div class="mock-header">
+            <div class="mock-dot r"></div>
+            <div class="mock-dot y"></div>
+            <div class="mock-dot g"></div>
+            <div class="mock-bar">onetwo.app/dashboard</div>
+        </div>
+        <div class="mock-cards">
+            <div class="mock-card">
+                <div class="mc-icon mc-green">⚖️</div>
+                <h4>Compliance Score</h4>
+                <p>DC Code aligned</p>
+                <div class="mc-stat stat-green">96%</div>
+            </div>
+            <div class="mock-card">
+                <div class="mc-icon mc-blue">💰</div>
+                <h4>Collection Rate</h4>
+                <p>This quarter</p>
+                <div class="mc-stat stat-blue">94%</div>
+            </div>
+            <div class="mock-card">
+                <div class="mc-icon mc-amber">📋</div>
+                <h4>Open Cases</h4>
+                <p>3 need review</p>
+                <div class="mc-stat stat-amber">7</div>
+            </div>
+            <div class="mock-card">
+                <div class="mc-icon mc-purple">🏘</div>
+                <h4>Community</h4>
+                <p>Active reports</p>
+                <div class="mc-stat stat-purple">12</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SOCIAL PROOF -->
+<div class="social-proof animate delay-3">
+    <span>Designed for communities like yours:</span>
+    <div class="proof-stat">
+        <strong>2–200</strong>
+        <span>unit condos & HOAs</span>
+    </div>
+    <div class="proof-stat">
+        <strong>50+</strong>
+        <span>DC compliance rules mapped</span>
+    </div>
+    <div class="proof-stat">
+        <strong>3</strong>
+        <span>roles: Board · Resident · Manager</span>
+    </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+    <div class="section-inner">
+        <div class="section-label">⚡ Platform Features</div>
+        <h2 class="section-title display">Everything a board needs. Nothing it doesn't.</h2>
+        <p class="section-desc">
+            Financial tracking, community reporting, compliance workflows, meeting management, and building info — all in one platform with role-based access for boards, residents, and property managers.
+        </p>
+
+        <div class="features-grid">
+            <div class="feature-card animate">
+                <div class="feature-icon fi-blue">⚖️</div>
+                <h3>Compliance Corner</h3>
+                <p>15+ state-specific legal workflows covering noise complaints, parking disputes, security issues, developer transitions, and more. Pre-legal steps, self-rep guidance, and attorney escalation paths built in.</p>
+                <span class="feature-tag">Unique to <strong>ONE two</strong></span>
+            </div>
+            <div class="feature-card animate delay-1">
+                <div class="feature-icon fi-amber">🛡️</div>
+                <h3>Case Ops</h3>
+                <p>Board-facing issue management with status tracking (Opened → In Progress → Legal → Closed), priority triage, approach tracking (pre-legal, self-rep, legal counsel), and review notes for full audit trails.</p>
+                <span class="feature-tag">Unique to <strong>ONE two</strong></span>
+            </div>
+            <div class="feature-card animate delay-2">
+                <div class="feature-icon fi-green">💰</div>
+                <h3>Financial Health</h3>
+                <p>Collection rate tracking, reserve fund monitoring, and unit-level payment status for the board. Residents pay dues, set up AutoPay, and view their balance and payment history in their own portal.</p>
+            </div>
+            <div class="feature-card animate delay-1">
+                <div class="feature-icon fi-purple">📧</div>
+                <h3>Community Activity</h3>
+                <p>Residents report maintenance, parking, noise, pet, common area, and rules issues. Upvoting surfaces priorities. Community event postings and idea/suggestion submissions keep engagement high.</p>
+            </div>
+            <div class="feature-card animate delay-2">
+                <div class="feature-icon fi-pink">📅</div>
+                <h3>Meetings & The Building</h3>
+                <p>Meeting schedules, agendas, and past meeting notes in one place. Building info hub with contacts, bylaws, CC&Rs, and building schematics — always accessible to every role.</p>
+            </div>
+            <div class="feature-card animate delay-3">
+                <div class="feature-icon fi-cyan">👥</div>
+                <h3>Role-Based Views</h3>
+                <p>Three distinct portals. Board members see Compliance Corner, Case Ops, and financials. Residents see payments and community activity. Property managers see requests and compliance tools.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- DC FOCUS -->
+<section id="dc" style="padding-bottom: 5rem;">
+    <div class="dc-section">
+        <div class="section-inner">
+            <div class="section-label">🏛 DC-First Launch Market</div>
+            <h2 class="section-title display">Built for DC's unique condo & HOA landscape</h2>
+            <p class="section-desc">
+                Washington, DC has over 2,000 condo and cooperative associations governed by a complex web of local regulations. <strong>ONE two</strong> maps every relevant DC code into actionable workflows.
+            </p>
+
+            <div class="dc-grid">
+                <div class="dc-item">
+                    <div class="dc-icon">📜</div>
+                    <div>
+                        <h4>DC Condominium Act Compliance</h4>
+                        <p>Automated checks against DC Code § 42-19, meeting notice requirements, and board fiduciary obligations.</p>
+                    </div>
+                </div>
+                <div class="dc-item">
+                    <div class="dc-icon">🏗</div>
+                    <div>
+                        <h4>DCRA & Building Permits</h4>
+                        <p>Workflows for architectural modifications, permit tracking, and code violation reporting to DCRA.</p>
+                    </div>
+                </div>
+                <div class="dc-item">
+                    <div class="dc-icon">🔒</div>
+                    <div>
+                        <h4>DC Surveillance & Privacy</h4>
+                        <p>Two-party consent audio rules, camera installation checklists, and footage retention policies aligned to DC regs.</p>
+                    </div>
+                </div>
+                <div class="dc-item">
+                    <div class="dc-icon">🅿️</div>
+                    <div>
+                        <h4>DC Towing & Parking Regs</h4>
+                        <p>DCRA-regulated towing procedures, written authorization templates, and signage compliance checklists.</p>
+                    </div>
+                </div>
+                <div class="dc-item">
+                    <div class="dc-icon">⚡</div>
+                    <div>
+                        <h4>Historic District Awareness</h4>
+                        <p>HPRB review triggers for communities in DC's historic neighborhoods. Prevent costly renovation missteps.</p>
+                    </div>
+                </div>
+                <div class="dc-item">
+                    <div class="dc-icon">🤝</div>
+                    <div>
+                        <h4>Mediation-First Dispute Path</h4>
+                        <p>DC requires mediation before lawsuits. Our compliance workflows route disputes through mediation before legal escalation.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+    <div class="section-inner">
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <div class="section-label">💎 Simple Pricing</div>
+            <h2 class="section-title display" style="max-width: 600px; margin: 0 auto 1rem;">Plans that scale with your community</h2>
+            <p class="section-desc" style="margin: 0 auto 2rem;">
+                No per-unit nickel-and-diming. Flat pricing so you know exactly what you'll pay.
+            </p>
+            <div class="billing-toggle">
+                <span id="label-monthly" class="toggle-label active">Monthly</span>
+                <button id="toggle-btn" class="toggle-switch" onclick="toggleBilling()" aria-label="Toggle billing period">
+                    <span class="toggle-knob" id="toggle-knob"></span>
+                </button>
+                <span id="label-yearly" class="toggle-label">Yearly <span class="toggle-save">Save up to 17%</span></span>
+            </div>
+        </div>
+
+        <div class="pricing-grid">
+            <!-- ESSENTIALS -->
+            <div class="price-card animate">
+                <h3 class="display">Essentials</h3>
+                <div class="price-desc">For simple process governance</div>
+                <div class="price-amount">
+                    <span class="dollar" id="price-essentials">$49</span>
+                    <span class="period" id="period-essentials">/mo</span>
+                </div>
+                <ul class="price-features">
+                    <li>Resident & Board portals</li>
+                    <li>Financial dashboard</li>
+                    <li>Meeting management</li>
+                    <li>Document library & contacts</li>
+                </ul>
+                <a href="/login?create=1&tier=essentials" class="btn btn-outline price-btn">Start Free Trial</a>
+            </div>
+
+            <!-- COMPLIANCE PRO -->
+            <div class="price-card featured animate delay-1">
+                <div class="price-badge">Most Popular</div>
+                <h3 class="display">Compliance Pro</h3>
+                <div class="price-desc">Full compliance engine for serious boards</div>
+                <div class="price-amount">
+                    <span class="dollar" id="price-compliance">$179</span>
+                    <span class="period" id="period-compliance">/mo</span>
+                </div>
+                <ul class="price-features">
+                    <li>Everything in Essentials</li>
+                    <li>Location-specific compliance guidance</li>
+                    <li>Audit trails & compliance scoring</li>
+                    <li>Case Ops with compliant escalation paths</li>
+                    <li>Pre-legal & self-rep guidance</li>
+                    <li>Assessment tracking and processing</li>
+                    <li>Board voting moderation & tracking</li>
+                    <li>Priority email support</li>
+                    <li>Integrated AI task automation & compliance tracking</li>
+                </ul>
+                <a href="/login?create=1&tier=compliance_pro" class="btn btn-primary price-btn">Start Free Trial →</a>
+            </div>
+
+            <!-- GROWTH -->
+            <div class="price-card animate delay-2">
+                <h3 class="display">Advanced Governance</h3>
+                <div class="price-desc">For larger communities with full engagement</div>
+                <div class="price-amount">
+                    <span class="dollar" id="price-growth">$299</span>
+                    <span class="period" id="period-growth">/mo</span>
+                </div>
+                <ul class="price-features">
+                    <li>Everything in Compliance Pro</li>
+                    <li>Community issue reporting</li>
+                    <li>Unit voting moderation & tracking</li>
+                    <li>Invoice & work order generation</li>
+                    <li>Email & postal distributions</li>
+                    <li>Property Manager role & tools</li>
+                </ul>
+                <span class="btn price-btn" style="background: #e2e0dc; color: #94a3b8; cursor: default; border: none;">Coming Soon</span>
+            </div>
+        </div>
+
+        <!-- ADD-ONS -->
+        <div style="max-width: 600px; margin: 3rem auto 0;">
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <h3 class="display" style="font-size: 1.5rem; font-weight: 700;">Add-Ons</h3>
+                <p style="font-size: 0.9rem; color: var(--muted);">Available with any plan</p>
+            </div>
+            <div style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.95rem;">One-Time Setup & Onboarding</div>
+                        <div style="font-size: 0.82rem; color: var(--muted);">Guided configuration, data migration, and board training</div>
+                    </div>
+                    <div style="font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.15rem; white-space: nowrap; margin-left: 1.5rem;">$299</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section id="cta" class="cta-section">
+    <div class="section-label">🚀 Get Started</div>
+    <h2 class="section-title display" style="margin: 0 auto 1rem;">Stop guessing. Start governing.</h2>
+    <p class="section-desc">
+        Join the waitlist for early access when we launch in Washington, DC. The first 20 communities that enroll in Compliance Pro are eligible for an introductory first-year rate of $1,500 — equivalent to $125 per month.
+    </p>
+    <div class="cta-actions">
+        <a href="/login?create=1" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Create Account →</a>
+        <a href="/login" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Sign In</a>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <p>© 2026 <strong>ONE two</strong>, Inc. All rights reserved.</p>
+    <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Contact</a>
+    </div>
+</footer>
+
+<!-- Scroll animation observer -->
+<script>
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animationPlayState = 'running';
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.animate').forEach(el => {
+        el.style.animationPlayState = 'paused';
+        observer.observe(el);
+    });
+
+    // Unstick hero animations immediately
+    document.querySelectorAll('.hero .animate, .social-proof.animate').forEach(el => {
+        el.style.animationPlayState = 'running';
+    });
+    // Billing toggle
+    let isYearly = false;
+    const prices = {
+        essentials: { monthly: '$49', yearly: '$500' },
+        compliance: { monthly: '$179', yearly: '$1,800' },
+        growth: { monthly: '$299', yearly: '$3,250' }
+    };
+    const periods = { monthly: '/mo', yearly: '/yr' };
+
+    function toggleBilling() {
+        isYearly = !isYearly;
+        const btn = document.getElementById('toggle-btn');
+        const labelM = document.getElementById('label-monthly');
+        const labelY = document.getElementById('label-yearly');
+
+        btn.classList.toggle('active', isYearly);
+        labelM.classList.toggle('active', !isYearly);
+        labelY.classList.toggle('active', isYearly);
+
+        const mode = isYearly ? 'yearly' : 'monthly';
+        ['essentials', 'compliance', 'growth'].forEach(plan => {
+            document.getElementById('price-' + plan).textContent = prices[plan][mode];
+            document.getElementById('period-' + plan).textContent = periods[mode];
+        });
+    }
+</script>
+
+</body>
+</html>
