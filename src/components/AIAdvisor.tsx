@@ -30,10 +30,11 @@ export default function AIAdvisor() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-  if (!isBoard) return null;
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(scrollToBottom, [messages, loading]);
+
+  if (!isBoard) return null;
 
   const toggleChat = () => {
     setOpen(!open);
