@@ -3,75 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore, type Meeting, type MeetingVote } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { useFinancialStore } from '@/store/useFinancialStore';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useArchiveStore } from '@/store/useArchiveStore';
-import type { ArchiveSnapshot } from '@/store/useArchiveStore';
+import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import Modal from '@/components/ui/Modal';
-
-// ─── Compliance categories ────────────────────────────────
-interface ComplianceItem {
-  id: string; task: string; role: string; freq: string; due: string;
-  critical: boolean; tip: string; legalRef: string; autoPass?: boolean;
-}
-interface ComplianceCategory {
-  id: string; icon: string; label: string; weight: number; items: ComplianceItem[];
-}
-
-const categories: ComplianceCategory[] = [
-  { id:'governance', icon:'⚖️', label:'Governance & Legal', weight:25, items:[
-    { id:'g1', task:'Bylaws reviewed and up to date', role:'President', freq:'Annual', due:'2026-01-15', critical:true, tip:'Review bylaws annually for compliance with state law changes.', legalRef:'DC Code § 29-1101 et seq.', autoPass:true },
-    { id:'g2', task:'CC&Rs reviewed and up to date', role:'President', freq:'Annual', due:'2025-06-20', critical:true, tip:'CC&Rs should be reviewed after any legislative changes.', legalRef:'DC Code § 29-1131' },
-    { id:'g3', task:'Board meeting minutes maintained', role:'Secretary', freq:'Ongoing', due:'Ongoing', critical:true, tip:'Minutes must be maintained and available for owner inspection.', legalRef:'DC Code § 29-1108.06', autoPass:true },
-    { id:'g4', task:'Annual meeting held within 13 months of prior', role:'President', freq:'Annual', due:'2026-03-31', critical:true, tip:'Must hold annual meeting within 13 months of the previous one.', legalRef:'DC Code § 29-1109.02', autoPass:true },
-    { id:'g5', task:'Board election conducted per bylaws', role:'Secretary', freq:'Annual', due:'2026-12-31', critical:false, tip:'Follow nomination and election procedures in bylaws.', legalRef:'Bylaws Art. IV' },
-    { id:'g6', task:'Conflict of interest disclosures collected', role:'Secretary', freq:'Annual', due:'2026-02-28', critical:false, tip:'Board members should disclose conflicts annually.', legalRef:'DC Code § 29-406.70' },
-  ]},
-  { id:'financial', icon:'💰', label:'Financial Compliance', weight:25, items:[
-    { id:'f1', task:'Annual budget approved and distributed', role:'Treasurer', freq:'Annual', due:'2026-01-31', critical:true, tip:'Budget must be approved by board and distributed to owners.', legalRef:'DC Code § 29-1135.03', autoPass:true },
-    { id:'f2', task:'Reserve study current (within 3 years)', role:'Treasurer', freq:'Every 3 years', due:'2028-06-15', critical:true, tip:'Professional reserve study recommended every 3 years.', legalRef:'Best practice', autoPass:true },
-    { id:'f3', task:'Annual financial audit/review completed', role:'Treasurer', freq:'Annual', due:'2026-06-30', critical:true, tip:'Independent financial review recommended annually.', legalRef:'DC Code § 29-1135.05' },
-    { id:'f4', task:'Fidelity bond in place', role:'Treasurer', freq:'Annual', due:'2026-09-30', critical:true, tip:'Fidelity bond protects against employee/board theft.', legalRef:'DC Code § 29-1135.06', autoPass:true },
-    { id:'f5', task:'Assessment collection policy documented', role:'Treasurer', freq:'As needed', due:'Ongoing', critical:false, tip:'Written collection policy should be adopted and enforced.', legalRef:'Bylaws Art. VII', autoPass:true },
-    { id:'f6', task:'Tax returns filed (Form 1120-H)', role:'Treasurer', freq:'Annual', due:'2026-04-15', critical:true, tip:'HOA must file federal tax return annually.', legalRef:'IRS Code § 528' },
-  ]},
-  { id:'insurance', icon:'🛡️', label:'Insurance & Risk', weight:20, items:[
-    { id:'i1', task:'D&O insurance current', role:'President', freq:'Annual', due:'2026-09-30', critical:true, tip:'Directors & Officers liability coverage protects board members.', legalRef:'Best practice', autoPass:true },
-    { id:'i2', task:'General liability insurance current', role:'President', freq:'Annual', due:'2026-09-30', critical:true, tip:'Minimum $1M/$2M general liability recommended.', legalRef:'DC Code § 29-1135.06', autoPass:true },
-    { id:'i3', task:'Property insurance adequate for replacement', role:'Treasurer', freq:'Annual', due:'2026-09-30', critical:true, tip:'Coverage should equal 100% replacement cost.', legalRef:'Bylaws Art. VIII' },
-    { id:'i4', task:'Workers compensation if employees', role:'President', freq:'Annual', due:'2026-12-31', critical:false, tip:'Required if HOA has any employees.', legalRef:'DC Workers Comp Act', autoPass:true },
-    { id:'i5', task:'Insurance certificates from vendors collected', role:'Vice President', freq:'Annual', due:'2026-03-31', critical:false, tip:'All vendors should provide proof of insurance.', legalRef:'Best practice' },
-  ]},
-  { id:'maintenance', icon:'🔧', label:'Maintenance & Safety', weight:15, items:[
-    { id:'m1', task:'Fire safety systems inspected', role:'Vice President', freq:'Annual', due:'2026-06-30', critical:true, tip:'Fire alarm, sprinkler, and extinguisher inspection required.', legalRef:'DC Fire Code' },
-    { id:'m2', task:'Elevator inspection current', role:'Vice President', freq:'Annual', due:'2026-08-15', critical:true, tip:'Elevator must pass annual safety inspection.', legalRef:'DC Code § 1-303.43', autoPass:true },
-    { id:'m3', task:'Common area maintenance schedule documented', role:'Vice President', freq:'Ongoing', due:'Ongoing', critical:false, tip:'Maintain written schedule for all maintenance items.', legalRef:'Best practice', autoPass:true },
-    { id:'m4', task:'ADA compliance reviewed', role:'Vice President', freq:'Annual', due:'2026-06-30', critical:false, tip:'Ensure common areas meet accessibility requirements.', legalRef:'ADA Title III' },
-    { id:'m5', task:'Emergency preparedness plan updated', role:'President', freq:'Annual', due:'2026-03-31', critical:false, tip:'Update emergency contacts, procedures, and evacuation plans.', legalRef:'Best practice' },
-  ]},
-  { id:'records', icon:'📋', label:'Records & Communications', weight:15, items:[
-    { id:'r1', task:'Owner records current and accessible', role:'Secretary', freq:'Ongoing', due:'Ongoing', critical:false, tip:'Maintain current owner contact info and mailing addresses.', legalRef:'DC Code § 29-1135.01', autoPass:true },
-    { id:'r2', task:'Meeting notices sent per requirements', role:'Secretary', freq:'Per meeting', due:'Ongoing', critical:true, tip:'Annual: 10-60 days notice. Board: 48 hours notice.', legalRef:'DC Code § 29-1109.02', autoPass:true },
-    { id:'r3', task:'Annual disclosure statement distributed', role:'Secretary', freq:'Annual', due:'2026-03-31', critical:false, tip:'Financial and governance disclosures to all owners.', legalRef:'DC Code § 29-1135.05' },
-    { id:'r4', task:'Resale certificate process in place', role:'Secretary', freq:'As needed', due:'Ongoing', critical:false, tip:'Must provide resale certificates within statutory timeframe.', legalRef:'DC Code § 29-1141', autoPass:true },
-    { id:'r5', task:'Document retention policy adopted', role:'Secretary', freq:'As needed', due:'Ongoing', critical:false, tip:'Retain key documents per legal requirements (7+ years financial).', legalRef:'Best practice' },
-  ]},
-];
 
 const ROLE_COLORS: Record<string, string> = { President:'accent', 'Vice President':'mist', Treasurer:'sage', Secretary:'yellow', 'Member at Large':'purple' };
 const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-700', minutes:'bg-sage-100 text-sage-700', financial:'bg-yellow-100 text-yellow-700', response:'bg-mist-100 text-ink-600', resale:'bg-ink-100 text-ink-600', violation:'bg-red-100 text-red-700', other:'bg-ink-100 text-ink-500' };
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
+type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote' | 'addFilingAtt';
 type TabId = 'runbook' | 'filings' | 'meetings' | 'communications';
 
 export default function CompliancePage() {
   const comp = useComplianceStore();
   const mtg = useMeetingsStore();
-  const { board, address, legalDocuments, insurance, name: buildingName } = useBuildingStore();
-  const finStore = useFinancialStore();
-  const { currentUser } = useAuthStore();
+  const { board, address, legalDocuments, insurance, management } = useBuildingStore();
   const navigate = useNavigate();
+
+  // ─── Dynamic compliance refresh based on jurisdiction + uploaded docs ───
+  const refreshResult = refreshComplianceRequirements({
+    state: address.state,
+    legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })),
+    insurance: insurance.map(p => ({ type: p.type, expires: p.expires })),
+    boardCount: board.length,
+    hasManagement: !!management.company,
+  });
+  const categories = refreshResult.categories;
 
   const [tab, setTab] = useState<TabId>('runbook');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -223,9 +180,17 @@ export default function CompliancePage() {
 
         {/* ─── RUNBOOK TAB ─── */}
         {tab === 'runbook' && (<div className="space-y-6">
+          {/* Regulatory Refresh Banner */}
+          {refreshResult.regulatoryNotes.length > 0 && (
+            <div className="bg-accent-50 border border-accent-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2"><span className="text-base">🔄</span><h4 className="text-xs font-bold text-accent-800">Compliance Auto-Refresh · {refreshResult.jurisdiction} Jurisdiction</h4></div>
+              <div className="space-y-1">{refreshResult.regulatoryNotes.map((n, i) => <p key={i} className="text-xs text-accent-700">{n}</p>)}</div>
+              {refreshResult.documentsDetected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{refreshResult.documentsDetected.map(d => <span key={d} className="text-[10px] bg-accent-100 text-accent-700 px-2 py-0.5 rounded-lg font-medium">📄 {d}</span>)}</div>}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setRoleFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>All Roles</button>
-            {allRoles.map(r => (<button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === r ? 'bg-accent-600 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>{r}</button>))}
+            {allRoles.map(r => (<button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === r ? 'px-3 py-1.5 bg-accent-600 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>{r}</button>))}
           </div>
           {catScores.filter(c => c.items.length > 0).map(cat => {
             const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red';
@@ -478,52 +443,6 @@ export default function CompliancePage() {
         </Modal>
       )}
 
-      {/* Archive Year Modal */}
-        <Modal title="📦 Create Annual Archive" onClose={() => setModal(null)} onSave={() => {
-          const pStart = `${year}-01-01`;
-          const pEnd = `${year}-12-31`;
-          const metrics = finStore.getIncomeMetrics();
-          const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
-          const snapshot: ArchiveSnapshot = {
-            id: 'arc_' + Date.now(),
-            label: `FY ${year} (Jan 1, ${year} – Dec 31, ${year})`,
-            periodStart: pStart, periodEnd: pEnd,
-            createdAt: new Date().toISOString(),
-            createdBy: currentUser?.name || 'Board Member',
-            compliance: { runbookCompletions: { ...comp.completions }, healthIndex, grade },
-            filings: comp.filings.filter(fi => fi.dueDate >= pStart && fi.dueDate <= pEnd).map(fi => ({ ...fi, attachments: [...fi.attachments] })),
-            meetings: mtg.meetings.filter(m => m.date >= pStart && m.date <= pEnd).map(m => ({ ...m, votes: [...m.votes], attendees: { ...m.attendees }, agenda: [...m.agenda] })),
-            communications: comp.communications.filter(c => c.date >= pStart && c.date <= pEnd).map(c => ({ ...c })),
-            financial: { collectionRate: metrics.collectionRate, totalBudgeted: metrics.totalBudgeted, totalActual: metrics.totalActual, reserveBalance: 245000, totalAR: finStore.units.reduce((s, u) => s + u.balance, 0), monthlyRevenue: finStore.units.reduce((s, u) => s + u.monthlyFee, 0), unitCount: finStore.units.length, occupiedCount: occupiedUnits.length, delinquentCount: occupiedUnits.filter(u => u.balance > 0).length },
-            insurance: insurance.map(p => ({ type: p.type, carrier: p.carrier, policyNumber: p.policyNum, coverage: p.coverage, premium: p.premium, expires: p.expires, status: new Date(p.expires) > new Date(pEnd) ? 'active' : 'expired' })),
-            legalDocuments: legalDocuments.map(d => ({ name: d.name, version: d.version, status: d.status, attachments: (d.attachments || []).map(a => ({ name: a.name, size: a.size })) })),
-            board: board.map(b => ({ name: b.name, role: b.role, term: b.term })),
-          };
-          setModal(null); setForm({});
-          alert(`Archive created for FY ${year}.\n\nView it in The Archives module.`);
-          navigate('/archives');
-          <div className="space-y-4">
-            <p className="text-sm text-ink-700">Create a permanent read-only snapshot of all compliance, financial, and governance records for a fiscal year.</p>
-            <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-bold text-ink-900">What gets archived:</p>
-              {[
-                { icon: '✅', label: 'Compliance Runbook', desc: 'All checklist completions and health score' },
-                { icon: '📅', label: 'Filings & Deadlines', desc: 'All filings with statuses and attached proof documents' },
-                { icon: '🗓', label: 'Meetings', desc: 'Agendas, minutes, attendance records, and vote results' },
-                { icon: '📨', label: 'Communications', desc: 'Owner communication log with type, method, and status' },
-                { icon: '💰', label: 'Fiscal Lens Snapshot', desc: 'Collection rate, budget vs actual, reserve balance, receivables' },
-                { icon: '🛡', label: 'Insurance Policies', desc: 'All policies with carrier, coverage, and expiration' },
-                { icon: '⚖', label: 'Legal & Governing Documents', desc: 'Document versions and attached files' },
-                { icon: '👥', label: 'Board Composition', desc: 'Board members, roles, and terms during the period' },
-              ].map(item => (
-                <div key={item.label} className="flex items-start gap-2"><span className="text-sm">{item.icon}</span><div><span className="text-xs font-semibold text-ink-800">{item.label}</span><span className="text-xs text-ink-400 ml-1">— {item.desc}</span></div></div>
-              ))}
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-xs text-amber-800"><strong>Note:</strong> Archives are read-only snapshots. All users (including residents) can view archived records in The Archives module for transparency and auditing.</p></div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
-
