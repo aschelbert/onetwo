@@ -13,7 +13,7 @@ import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
 import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
-import ElectionsPage from '@/features/elections/ElectionsPage';
+import VotingPage from '@/features/elections/ElectionsPage';
 import AIAdvisor from '@/components/AIAdvisor';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -62,7 +62,7 @@ export default function App() {
           <Route path="/building" element={<BuildingPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/archives" element={<ArchivesPage />} />
-          <Route path="/elections" element={<ElectionsPage />} />
+          <Route path="/voting" element={<VotingPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
