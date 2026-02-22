@@ -72,3 +72,4 @@ export const useArchiveStore = create<ArchiveState>((set) => ({
   addArchive: (a) => set(s => ({ archives: [a, ...s.archives] })),
   deleteArchive: (id) => set(s => ({ archives: s.archives.filter(a => a.id !== id) })),
 }));
+

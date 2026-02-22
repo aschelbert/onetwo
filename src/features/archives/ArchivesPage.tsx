@@ -8,7 +8,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import Modal from '@/components/ui/Modal';
 
-const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 type Section = 'overview' | 'compliance' | 'refresh' | 'filings' | 'meetings' | 'communications' | 'financial' | 'insurance' | 'legal' | 'board';
 
@@ -100,9 +100,9 @@ export default function ArchivesPage() {
       meetings: mtg.meetings.filter(m => m.date >= pStart && m.date <= pEnd).map(m => ({ ...m, votes: [...m.votes], attendees: { ...m.attendees }, agenda: [...m.agenda] })),
       communications: comp.communications.filter(c => c.date >= pStart && c.date <= pEnd).map(c => ({ ...c })),
       financial: {
-        collectionRate: metrics.collectionRate,
-        totalBudgeted: metrics.totalBudgeted,
-        totalActual: metrics.totalActual,
+        collectionRate: metrics.collectionRate || 0,
+        totalBudgeted: metrics.annualExpected || 0,
+        totalActual: metrics.annualCollected || 0,
         reserveBalance: 245000,
         totalAR: finStore.units.reduce((s, u) => s + u.balance, 0),
         monthlyRevenue: finStore.units.reduce((s, u) => s + u.monthlyFee, 0),
@@ -466,3 +466,4 @@ function Card({ label, val, sub }: { label: string; val: string; sub: string }) 
     </div>
   );
 }
+
