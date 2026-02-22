@@ -55,7 +55,7 @@ export default function CompliancePage() {
   const totalWeight = catScores.reduce((s, c) => s + c.weight, 0);
   const healthIndex = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
   const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
-  const allRoles = [...new Set(categories.flatMap(c => c.items.map(i => i.role)))];
+  const allRoles: string[] = [...new Set(categories.flatMap(c => c.items.map(i => i.role)))];
 
   // ─── Meeting stats ───
   const { meetings } = mtg;
@@ -446,3 +446,4 @@ export default function CompliancePage() {
     </div>
   );
 }
+
