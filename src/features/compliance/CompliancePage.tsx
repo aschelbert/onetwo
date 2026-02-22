@@ -63,7 +63,6 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote' | 'addFilingAtt' | 'archiveYear';
 type TabId = 'runbook' | 'filings' | 'meetings' | 'communications';
 
 export default function CompliancePage() {
@@ -72,7 +71,6 @@ export default function CompliancePage() {
   const { board, address, legalDocuments, insurance, name: buildingName } = useBuildingStore();
   const finStore = useFinancialStore();
   const { currentUser } = useAuthStore();
-  const archiveStore = useArchiveStore();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState<TabId>('runbook');
@@ -185,7 +183,6 @@ export default function CompliancePage() {
             <p className="text-accent-200 text-sm mt-1">Runbook, meetings, filings & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p>
           </div>
           <div className="flex items-center gap-6">
-            <button onClick={() => { setForm({ archiveYear: String(new Date().getFullYear() - 1) }); setModal('archiveYear'); }} className="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 text-white rounded-lg text-sm font-medium border border-white border-opacity-20 transition-colors">📦 Create Archive</button>
             <div className="text-center">
               <div className="text-4xl font-bold text-white">{grade}</div>
               <div className="text-accent-200 text-xs">Health {healthIndex}%</div>
@@ -482,9 +479,7 @@ export default function CompliancePage() {
       )}
 
       {/* Archive Year Modal */}
-      {modal === 'archiveYear' && (
         <Modal title="📦 Create Annual Archive" onClose={() => setModal(null)} onSave={() => {
-          const year = parseInt(f('archiveYear')) || new Date().getFullYear() - 1;
           const pStart = `${year}-01-01`;
           const pEnd = `${year}-12-31`;
           const metrics = finStore.getIncomeMetrics();
@@ -504,14 +499,11 @@ export default function CompliancePage() {
             legalDocuments: legalDocuments.map(d => ({ name: d.name, version: d.version, status: d.status, attachments: (d.attachments || []).map(a => ({ name: a.name, size: a.size })) })),
             board: board.map(b => ({ name: b.name, role: b.role, term: b.term })),
           };
-          archiveStore.addArchive(snapshot);
           setModal(null); setForm({});
           alert(`Archive created for FY ${year}.\n\nView it in The Archives module.`);
           navigate('/archives');
-        }} saveLabel="Create Archive">
           <div className="space-y-4">
             <p className="text-sm text-ink-700">Create a permanent read-only snapshot of all compliance, financial, and governance records for a fiscal year.</p>
-            <div><label className="block text-xs font-medium text-ink-700 mb-1">Fiscal Year</label><select value={f('archiveYear') || String(new Date().getFullYear() - 1)} onChange={e => sf('archiveYear', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{[2025,2024,2023].map(y => <option key={y} value={y}>FY {y} (Jan 1 – Dec 31, {y})</option>)}</select></div>
             <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
               <p className="text-xs font-bold text-ink-900">What gets archived:</p>
               {[
