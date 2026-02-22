@@ -17,6 +17,7 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
+    { id: 'elections', label: 'Elections', path: '/elections' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
   RESIDENT: [
@@ -30,6 +31,7 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
+    { id: 'elections', label: 'Elections', path: '/elections' },
     { id: 'compliance', label: 'Compliance Runbook', path: '/compliance' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
