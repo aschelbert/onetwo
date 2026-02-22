@@ -14,6 +14,14 @@ export interface ArchiveSnapshot {
     healthIndex: number;
     grade: string;
   };
+  regulatoryRefresh: {
+    refreshedAt: string;
+    jurisdiction: string;
+    documentsDetected: string[];
+    regulatoryNotes: string[];
+    categoryCount: number;
+    totalChecklistItems: number;
+  };
   filings: Array<{
     id: string; name: string; category: string; dueDate: string; status: string;
     filedDate: string | null; confirmationNum: string; notes: string;
@@ -64,4 +72,3 @@ export const useArchiveStore = create<ArchiveState>((set) => ({
   addArchive: (a) => set(s => ({ archives: [a, ...s.archives] })),
   deleteArchive: (id) => set(s => ({ archives: s.archives.filter(a => a.id !== id) })),
 }));
-
