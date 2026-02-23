@@ -99,7 +99,7 @@ export default function AuthPage() {
             const m = { id: data.user.id, name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User', email: data.user.email || email, phone: '', role: roleMap[tu.role] || 'BOARD_MEMBER', unit: tu.unit || '', status: 'active' as const, joined: new Date().toISOString().split('T')[0], boardTitle: tu.board_title || null };
             addMember(m); login(m);
             const h = window.location.hostname;
-            if (tenant?.subdomain && !h.startsWith(tenant.subdomain)) { window.location.href = 'https://' + tenant.subdomain + '.getonetwo.com/dashboard'; return; }
+            // Subdomain redirect disabled until session persistence
             setLoginLoading(false); return;
           }
           alert('Account exists but not linked to a building. Contact your administrator.'); setLoginLoading(false); return;
