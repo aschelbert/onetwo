@@ -54,3 +54,4 @@ export const ROLE_LABELS: Record<Role, string> = {
   PROPERTY_MANAGER: 'Property Manager',
   PLATFORM_ADMIN: 'Platform Admin',
 };
+

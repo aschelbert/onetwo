@@ -1,293 +1,37 @@
 import { useState } from 'react';
-import { usePlatformAdminStore, type Tenant, type PlatformUser, type SubscriptionTier } from '@/store/usePlatformAdminStore';
+import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, type Tenant, type PlatformUser, type SubscriptionTier } from '@/store/usePlatformAdminStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
 const TABS = [
   { id: 'overview', label: '◎ Overview' },
   { id: 'buildings', label: '🏢 Buildings' },
+  { id: 'onboarding', label: '🚀 Onboarding' },
+  { id: 'tiers', label: '💎 Tiers & Features' },
+  { id: 'health', label: '❤️ Health Monitor' },
   { id: 'users', label: '👤 Platform Users' },
   { id: 'audit', label: '📋 Audit Log' },
 ];
 
-const STATUS_BADGE: Record<string, string> = {
-  active: 'bg-sage-100 text-sage-700', onboarding: 'bg-accent-100 text-accent-700',
-  suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500',
-  trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700',
-  cancelled: 'bg-ink-100 text-ink-500',
-};
-const TIER_BADGE: Record<string, string> = {
-  essentials: 'bg-ink-100 text-ink-600', compliance_pro: 'bg-accent-100 text-accent-700',
-  advanced_governance: 'bg-sage-100 text-sage-700',
-};
+const STATUS_BADGE: Record<string, string> = { active: 'bg-sage-100 text-sage-700', onboarding: 'bg-accent-100 text-accent-700', suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500', trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700', cancelled: 'bg-ink-100 text-ink-500' };
+const TIER_BADGE: Record<string, string> = { essentials: 'bg-ink-100 text-ink-600', compliance_pro: 'bg-accent-100 text-accent-700', advanced_governance: 'bg-sage-100 text-sage-700' };
 const TIER_PRICES: Record<SubscriptionTier, number> = { essentials: 49, compliance_pro: 179, advanced_governance: 299 };
-const TIER_LABELS: Record<string, string> = {
-  essentials: 'Essentials', compliance_pro: 'Compliance Pro', advanced_governance: 'Advanced Governance',
-};
-const ROLE_BADGE: Record<string, string> = {
-  super_admin: 'bg-red-100 text-red-700', support: 'bg-accent-100 text-accent-700',
-  billing: 'bg-sage-100 text-sage-700', readonly: 'bg-ink-100 text-ink-500',
-};
+const TIER_LABELS: Record<string, string> = { essentials: 'Essentials', compliance_pro: 'Compliance Pro', advanced_governance: 'Advanced Governance' };
+const ROLE_BADGE: Record<string, string> = { super_admin: 'bg-red-100 text-red-700', support: 'bg-accent-100 text-accent-700', billing: 'bg-sage-100 text-sage-700', readonly: 'bg-ink-100 text-ink-500' };
+const FEATURE_LABELS: Record<string, string> = { fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook', aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing', votesResolutions: 'Votes & Resolutions', communityPortal: 'Community Portal', vendorManagement: 'Vendor Management', reserveStudyTools: 'Reserve Study Tools' };
 
-// ═══════════════════════════════════════════════════
-// SUB-COMPONENTS
-// ═══════════════════════════════════════════════════
-
-function OverviewTab() {
-  const { tenants, auditLog, getPlatformMetrics } = usePlatformAdminStore();
-  const metrics = getPlatformMetrics();
-
-  return (
-    <div className="space-y-6">
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Active Buildings', value: metrics.activeBuildings, sub: `of ${metrics.totalBuildings} total` },
-          { label: 'Monthly Revenue', value: fmt(metrics.mrr), sub: `ARR ${fmt(metrics.arr)}` },
-          { label: 'Platform Users', value: metrics.totalUsers, sub: `across all buildings` },
-          { label: 'Avg Compliance', value: `${metrics.avgCompliance}%`, sub: metrics.avgCompliance >= 80 ? 'Healthy' : 'Needs attention' },
-        ].map(m => (
-          <div key={m.label} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-sm transition-all">
-            <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">{m.label}</p>
-            <p className="text-2xl font-bold text-ink-900 mt-1">{m.value}</p>
-            <p className="text-xs text-ink-400 mt-0.5">{m.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Alerts */}
-      {metrics.pastDueBuildings > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-          <span className="text-xl">⚠️</span>
-          <div className="flex-1"><p className="font-semibold text-red-800">{metrics.pastDueBuildings} building{metrics.pastDueBuildings > 1 ? 's' : ''} past due</p><p className="text-xs text-red-600">Subscription payment overdue — action required</p></div>
-        </div>
-      )}
-      {metrics.trialBuildings > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center gap-3">
-          <span className="text-xl">🕐</span>
-          <div className="flex-1"><p className="font-semibold text-yellow-800">{metrics.trialBuildings} building{metrics.trialBuildings > 1 ? 's' : ''} on trial</p><p className="text-xs text-yellow-600">Follow up for conversion before trial ends</p></div>
-        </div>
-      )}
-
-      {/* Tier Breakdown */}
-      <div>
-        <h3 className="font-display text-lg font-bold text-ink-900 mb-3">Subscription Mix</h3>
-        <div className="grid grid-cols-3 gap-3">
-          {(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(tier => {
-            const count = tenants.filter(t => t.subscription.tier === tier).length;
-            const rev = tenants.filter(t => t.subscription.tier === tier && ['active','trial'].includes(t.subscription.status)).reduce((s,t) => s + t.subscription.monthlyRate, 0);
-            return (
-              <div key={tier} className={`rounded-xl p-4 border ${TIER_BADGE[tier].replace('text-','border-').split(' ')[0].replace('bg-','border-')} ${TIER_BADGE[tier].split(' ')[0]}`}>
-                <p className="text-xs font-semibold uppercase tracking-wide">{TIER_LABELS[tier]}</p>
-                <p className="text-2xl font-bold text-ink-900 mt-1">{count}</p>
-                <p className="text-xs text-ink-500">{fmt(rev)}/mo · {fmt(TIER_PRICES[tier])}/bldg</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Building summary cards */}
-      <div>
-        <h3 className="font-display text-lg font-bold text-ink-900 mb-3">All Buildings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {tenants.map(t => (
-            <div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md hover:border-ink-300 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-ink-900 truncate">{t.name}</h4>
-                <div className="flex gap-1.5 shrink-0">
-                  <span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span>
-                  <span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${TIER_BADGE[t.subscription.tier]}`}>{TIER_LABELS[t.subscription.tier]}</span>
-                </div>
-              </div>
-              <p className="text-xs text-ink-400 mb-2">{t.address.street}, {t.address.city} {t.address.state}</p>
-              <div className="grid grid-cols-4 gap-2 text-xs">
-                <div><p className="text-ink-400">Units</p><p className="font-bold">{t.totalUnits}</p></div>
-                <div><p className="text-ink-400">Users</p><p className="font-bold">{t.stats.activeUsers}</p></div>
-                <div><p className="text-ink-400">Collection</p><p className={`font-bold ${t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}`}>{t.stats.collectionRate}%</p></div>
-                <div><p className="text-ink-400">MRR</p><p className="font-bold">{fmt(t.subscription.monthlyRate)}</p></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent audit */}
-      <div>
-        <h3 className="font-display text-lg font-bold text-ink-900 mb-3">Recent Activity</h3>
-        <div className="space-y-1">
-          {auditLog.slice(0, 6).map(e => (
-            <div key={e.id} className="flex items-center gap-3 py-2 text-sm border-b border-ink-50">
-              <span className="text-xs text-ink-300 w-28 shrink-0">{new Date(e.timestamp).toLocaleDateString()}</span>
-              <span className={`pill px-1.5 py-0.5 rounded text-xs shrink-0 ${ROLE_BADGE[e.actorRole]}`}>{e.actorRole.replace('_',' ')}</span>
-              <span className="text-ink-700 shrink-0">{e.actor}</span>
-              <span className="text-ink-300">→</span>
-              <span className="text-ink-500 truncate">{e.details}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+  return <button onClick={onChange} className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${on ? 'bg-sage-500' : 'bg-ink-200'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${on ? 'left-[22px]' : 'left-0.5'}`} /></button>;
 }
-
-function BuildingDetail({ bldgId, onBack }: { bldgId: string; onBack: () => void }) {
-  const { tenants, auditLog, updateTenantStatus, updateSubscription, toggleFeature, addAuditEntry } = usePlatformAdminStore();
-  const b = tenants.find(t => t.id === bldgId);
-  if (!b) return null;
-
-  const ACTOR = 'Alex Rivera';
-
-  return (
-    <div className="space-y-6">
-      <button onClick={onBack} className="text-sm text-accent-600 hover:text-accent-700 font-medium">← Back to Buildings</button>
-
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-display text-2xl font-bold text-ink-900">{b.name}</h3>
-          <p className="text-sm text-ink-500">{b.address.street}, {b.address.city}, {b.address.state} {b.address.zip}</p>
-          <p className="text-xs text-ink-400 mt-1">Created {b.createdAt} · {b.totalUnits} units · Built {b.yearBuilt}</p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <span className={`pill px-3 py-1 rounded text-sm font-semibold ${STATUS_BADGE[b.status]}`}>{b.status}</span>
-          <span className={`pill px-3 py-1 rounded text-sm font-semibold ${TIER_BADGE[b.subscription.tier]}`}>{TIER_LABELS[b.subscription.tier]}</span>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-        {[
-          { l: 'Units', v: b.totalUnits }, { l: 'Occupied', v: b.stats.occupiedUnits },
-          { l: 'Users', v: b.stats.activeUsers }, { l: 'Collection', v: `${b.stats.collectionRate}%` },
-          { l: 'Compliance', v: `${b.stats.complianceScore}%` }, { l: 'Open Cases', v: b.stats.openCases },
-        ].map(s => (
-          <div key={s.l} className="bg-mist-50 rounded-lg p-3"><p className="text-xs text-ink-400">{s.l}</p><p className="text-lg font-bold text-ink-900">{s.v}</p></div>
-        ))}
-      </div>
-
-      {/* Status Actions */}
-      <div className="bg-white border border-ink-100 rounded-xl p-5">
-        <h4 className="font-display font-bold text-ink-900 mb-3">Account Actions</h4>
-        <div className="flex gap-2 flex-wrap">
-          {b.status !== 'active' && (
-            <button onClick={() => { updateTenantStatus(b.id, 'active'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: b.name, details: 'Account set to active', buildingId: b.id }); }}
-              className="px-4 py-2 bg-sage-600 text-white rounded-lg text-sm font-medium hover:bg-sage-700">✓ Set Active</button>
-          )}
-          {b.status !== 'suspended' && (
-            <button onClick={() => { updateTenantStatus(b.id, 'suspended'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.suspend', target: b.name, details: 'Account suspended by admin', buildingId: b.id }); }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">⛔ Suspend</button>
-          )}
-          {b.status !== 'archived' && (
-            <button onClick={() => { updateTenantStatus(b.id, 'archived'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.archive', target: b.name, details: 'Account archived', buildingId: b.id }); }}
-              className="px-4 py-2 border border-ink-200 text-ink-600 rounded-lg text-sm font-medium hover:bg-ink-50">📦 Archive</button>
-          )}
-          {b.status === 'onboarding' && (
-            <button onClick={() => { updateTenantStatus(b.id, 'active'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: b.name, details: 'Onboarding complete — activated', buildingId: b.id }); }}
-              className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">🚀 Complete Onboarding</button>
-          )}
-        </div>
-      </div>
-
-      {/* Subscription */}
-      <div className="bg-accent-50 border border-accent-200 rounded-xl p-5">
-        <h4 className="font-display font-bold text-ink-900 mb-3">Subscription Management</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm mb-4">
-          <div><p className="text-xs text-ink-400">Tier</p><p className="font-bold capitalize">{TIER_LABELS[b.subscription.tier]}</p></div>
-          <div><p className="text-xs text-ink-400">Status</p><p className="font-bold capitalize">{b.subscription.status.replace('_',' ')}</p></div>
-          <div><p className="text-xs text-ink-400">Rate</p><p className="font-bold">{fmt(b.subscription.monthlyRate)}/mo</p></div>
-          <div><p className="text-xs text-ink-400">Start</p><p className="font-bold">{b.subscription.startDate}</p></div>
-          <div><p className="text-xs text-ink-400">Next Billing</p><p className="font-bold">{b.subscription.nextBillingDate}</p></div>
-        </div>
-        {b.subscription.trialEndsAt && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-sm">
-            <p className="text-yellow-800 font-semibold">🕐 Trial expires {b.subscription.trialEndsAt}</p>
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          {(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).filter(t => t !== b.subscription.tier).map(tier => (
-            <button key={tier} onClick={() => {
-              updateSubscription(b.id, { tier, monthlyRate: TIER_PRICES[tier] });
-              addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'subscription.change', target: b.name, details: `Tier changed: ${TIER_LABELS[b.subscription.tier]} → ${TIER_LABELS[tier]} (${fmt(TIER_PRICES[tier])}/mo)`, buildingId: b.id });
-            }} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:shadow-sm">
-              {TIER_LABELS[tier]} ({fmt(TIER_PRICES[tier])}/mo)
-            </button>
-          ))}
-          {b.subscription.status === 'past_due' && (
-            <button onClick={() => { updateSubscription(b.id, { status: 'active' }); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'subscription.resolve', target: b.name, details: 'Past-due status resolved', buildingId: b.id }); }}
-              className="px-3 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-medium hover:bg-sage-700">✓ Mark Paid</button>
-          )}
-        </div>
-      </div>
-
-      {/* Primary Contact */}
-      <div className="bg-white border border-ink-100 rounded-xl p-5">
-        <h4 className="font-display font-bold text-ink-900 mb-3">Primary Contact</h4>
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-full bg-ink-900 flex items-center justify-center shrink-0">
-            <span className="text-white font-bold">{b.primaryContact.name.split(' ').map(n => n[0]).join('')}</span>
-          </div>
-          <div>
-            <p className="font-semibold text-ink-900">{b.primaryContact.name}</p>
-            <p className="text-sm text-accent-600">{b.primaryContact.role}</p>
-            <p className="text-xs text-ink-500">{b.primaryContact.email} · {b.primaryContact.phone}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Feature Flags */}
-      <div className="bg-white border border-ink-100 rounded-xl p-5">
-        <h4 className="font-display font-bold text-ink-900 mb-3">Feature Flags</h4>
-        <p className="text-xs text-ink-400 mb-3">Toggle features for this building. Changes take effect immediately.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(Object.entries(b.features) as [keyof Tenant['features'], boolean][]).map(([key, enabled]) => {
-            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
-            return (
-              <div key={key} className="flex items-center justify-between py-2.5 px-3 bg-mist-50 rounded-lg">
-                <span className="text-sm font-medium text-ink-700">{label}</span>
-                <button onClick={() => {
-                  toggleFeature(b.id, key);
-                  addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'feature.toggle', target: b.name, details: `${enabled ? 'Disabled' : 'Enabled'} ${label}`, buildingId: b.id });
-                }} className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${enabled ? 'bg-sage-500' : 'bg-ink-200'}`}>
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${enabled ? 'left-[22px]' : 'left-0.5'}`} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Building Audit Trail */}
-      <div>
-        <h4 className="font-display font-bold text-ink-900 mb-3">Audit Trail for {b.name}</h4>
-        <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
-          {auditLog.filter(e => e.buildingId === b.id).length === 0 ? (
-            <p className="p-4 text-sm text-ink-400">No audit entries for this building.</p>
-          ) : (
-            <div className="divide-y divide-ink-50">
-              {auditLog.filter(e => e.buildingId === b.id).map(e => (
-                <div key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-mist-50">
-                  <span className="text-xs text-ink-300 w-28 shrink-0">{new Date(e.timestamp).toLocaleDateString()}</span>
-                  <span className={`pill px-1.5 py-0.5 rounded text-xs shrink-0 ${ROLE_BADGE[e.actorRole]}`}>{e.actor}</span>
-                  <span className="font-mono text-xs text-ink-400 shrink-0">{e.action}</span>
-                  <span className="text-ink-600 truncate">{e.details}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════
-// MAIN PAGE
-// ═══════════════════════════════════════════════════
 
 export default function PlatformAdminPage() {
-  const { tenants, platformUsers, auditLog, addTenant, addPlatformUser, removePlatformUser, addAuditEntry, getPlatformMetrics } = usePlatformAdminStore();
+  const store = usePlatformAdminStore();
+  const { tenants, platformUsers, auditLog, addTenant, changeTier, updateTenantStatus, updateSubscription, toggleFeature, updateOnboardingStep, addPlatformUser, removePlatformUser, addAuditEntry, getPlatformMetrics } = store;
+  const { currentUser } = useAuthStore();
   const metrics = getPlatformMetrics();
+  const ACTOR = currentUser?.name || 'Admin';
+
   const [tab, setTab] = useState('overview');
   const [selectedBldg, setSelectedBldg] = useState<string | null>(null);
   const [showAddBldg, setShowAddBldg] = useState(false);
@@ -302,16 +46,18 @@ export default function PlatformAdminPage() {
     const id = `bld-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
     const trialEnd = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    const subdomain = generateSubdomain(bldgForm.name, tenants.map(t => t.subdomain));
     addTenant({
-      id, name: bldgForm.name,
+      id, name: bldgForm.name, subdomain,
       address: { street: bldgForm.street, city: bldgForm.city, state: bldgForm.state, zip: bldgForm.zip },
       totalUnits: parseInt(bldgForm.units) || 0, yearBuilt: bldgForm.yearBuilt, status: 'onboarding', createdAt: today,
       subscription: { tier: bldgForm.tier, status: 'trial', startDate: today, nextBillingDate: trialEnd, monthlyRate: TIER_PRICES[bldgForm.tier], trialEndsAt: trialEnd },
       stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
       primaryContact: { name: bldgForm.contactName, email: bldgForm.contactEmail, phone: bldgForm.contactPhone, role: 'Primary Contact' },
-      features: { fiscalLens: true, caseOps: true, complianceRunbook: true, aiAdvisor: bldgForm.tier !== 'essentials', documentVault: bldgForm.tier !== 'essentials', paymentProcessing: bldgForm.tier !== 'essentials' },
+      features: { ...TIER_FEATURES[bldgForm.tier] },
+      onboardingChecklist: { accountCreated: true, buildingProfileComplete: !!bldgForm.street, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
     });
-    addAuditEntry({ actor: 'Alex Rivera', actorRole: 'super_admin', action: 'building.create', target: bldgForm.name, details: `New building onboarded — ${bldgForm.tier} trial`, buildingId: id });
+    addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.create', target: bldgForm.name, details: `Onboarded: ${subdomain}.getonetwo.com — ${TIER_LABELS[bldgForm.tier]} trial`, buildingId: id });
     setBldgForm({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' });
     setShowAddBldg(false);
   };
@@ -319,211 +65,121 @@ export default function PlatformAdminPage() {
   const handleAddUser = () => {
     if (!userForm.name || !userForm.email) { alert('Name and email required'); return; }
     addPlatformUser({ id: `padm-${Date.now()}`, name: userForm.name, email: userForm.email, role: userForm.role, status: 'active', lastLogin: '', createdAt: new Date().toISOString().split('T')[0], buildings: ['*'] });
-    addAuditEntry({ actor: 'Alex Rivera', actorRole: 'super_admin', action: 'user.create', target: userForm.name, details: `Platform user created (${userForm.role})`, buildingId: null });
-    setUserForm({ name: '', email: '', role: 'support' });
-    setShowAddUser(false);
+    addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'user.create', target: userForm.name, details: `Platform user created (${userForm.role})`, buildingId: null });
+    setUserForm({ name: '', email: '', role: 'support' }); setShowAddUser(false);
   };
+
+  const selected = tenants.find(t => t.id === selectedBldg);
 
   return (
     <div className="space-y-0">
-      {/* Header */}
       <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-red-900 rounded-t-xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="px-2 py-0.5 bg-red-500 bg-opacity-30 rounded text-xs font-bold tracking-wide uppercase">Platform Admin</span>
-        </div>
+        <div className="flex items-center gap-3 mb-1"><span className="px-2 py-0.5 bg-red-500 bg-opacity-30 rounded text-xs font-bold tracking-wide uppercase">Platform Admin</span><span className="text-xs text-red-200">Logged in as {ACTOR}</span></div>
         <h2 className="font-display text-2xl font-bold">Multi-Tenancy Console</h2>
         <p className="text-red-200 text-sm mt-1">{metrics.totalBuildings} buildings · {metrics.totalUnits} units · {metrics.totalUsers} users · MRR {fmt(metrics.mrr)}</p>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border-x border-b border-ink-100 overflow-x-auto">
-        <div className="flex min-w-max px-4">
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => { setTab(t.id); setSelectedBldg(null); }}
-              className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-red-600 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="bg-white border-x border-b border-ink-100 overflow-x-auto"><div className="flex min-w-max px-4">{TABS.map(t => (<button key={t.id} onClick={() => { setTab(t.id); setSelectedBldg(null); }} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-red-600 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>{t.label}</button>))}</div></div>
 
-      {/* Content */}
       <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
 
-        {tab === 'overview' && <OverviewTab />}
+        {/* ═══ OVERVIEW ═══ */}
+        {tab === 'overview' && (<div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">{[
+            { label: 'Active Buildings', value: metrics.activeBuildings, sub: `of ${metrics.totalBuildings} total` },
+            { label: 'Monthly Revenue', value: fmt(metrics.mrr), sub: `ARR ${fmt(metrics.arr)}` },
+            { label: 'Platform Users', value: metrics.totalUsers, sub: 'across all buildings' },
+            { label: 'Avg Compliance', value: `${metrics.avgCompliance}%`, sub: metrics.avgCompliance >= 80 ? 'Healthy' : 'Needs attention' },
+          ].map(m => (<div key={m.label} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-sm"><p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">{m.label}</p><p className="text-2xl font-bold text-ink-900 mt-1">{m.value}</p><p className="text-xs text-ink-400 mt-0.5">{m.sub}</p></div>))}</div>
+          {metrics.pastDueBuildings > 0 && <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3"><span className="text-xl">⚠️</span><div><p className="font-semibold text-red-800">{metrics.pastDueBuildings} building{metrics.pastDueBuildings > 1 ? 's' : ''} past due</p><p className="text-xs text-red-600">Subscription payment overdue</p></div></div>}
+          {metrics.trialBuildings > 0 && <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center gap-3"><span className="text-xl">🕐</span><div><p className="font-semibold text-yellow-800">{metrics.trialBuildings} on trial</p><p className="text-xs text-yellow-600">Follow up for conversion</p></div></div>}
+          <div><h3 className="font-display text-lg font-bold text-ink-900 mb-3">Subscription Mix</h3><div className="grid grid-cols-3 gap-3">{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(tier => { const count = tenants.filter(t => t.subscription.tier === tier).length; const rev = tenants.filter(t => t.subscription.tier === tier && ['active','trial'].includes(t.subscription.status)).reduce((s,t) => s + t.subscription.monthlyRate, 0); return (<div key={tier} className={`rounded-xl p-4 border ${TIER_BADGE[tier].split(' ')[0]}`}><p className="text-xs font-semibold uppercase tracking-wide">{TIER_LABELS[tier]}</p><p className="text-2xl font-bold text-ink-900 mt-1">{count}</p><p className="text-xs text-ink-500">{fmt(rev)}/mo · {fmt(TIER_PRICES[tier])}/bldg</p></div>); })}</div></div>
+          <div><h3 className="font-display text-lg font-bold text-ink-900 mb-3">All Buildings</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{tenants.map(t => (<div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md cursor-pointer" onClick={() => { setTab('buildings'); setSelectedBldg(t.id); }}><div className="flex items-center justify-between mb-2"><h4 className="font-semibold text-ink-900 truncate">{t.name}</h4><div className="flex gap-1.5 shrink-0"><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${TIER_BADGE[t.subscription.tier]}`}>{TIER_LABELS[t.subscription.tier]}</span></div></div><p className="text-xs text-ink-400 mb-1">🌐 {t.subdomain}.getonetwo.com</p><div className="grid grid-cols-4 gap-2 text-xs"><div><p className="text-ink-400">Units</p><p className="font-bold">{t.totalUnits}</p></div><div><p className="text-ink-400">Users</p><p className="font-bold">{t.stats.activeUsers}</p></div><div><p className="text-ink-400">Collect.</p><p className={`font-bold ${t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}`}>{t.stats.collectionRate || '—'}%</p></div><div><p className="text-ink-400">MRR</p><p className="font-bold">{fmt(t.subscription.monthlyRate)}</p></div></div></div>))}</div></div>
+          <div><h3 className="font-display text-lg font-bold text-ink-900 mb-3">Recent Activity</h3><div className="space-y-1">{auditLog.slice(0, 6).map(e => (<div key={e.id} className="flex items-center gap-3 py-2 text-sm border-b border-ink-50"><span className="text-xs text-ink-300 w-28 shrink-0">{new Date(e.timestamp).toLocaleDateString()}</span><span className={`pill px-1.5 py-0.5 rounded text-xs shrink-0 ${ROLE_BADGE[e.actorRole]}`}>{e.actorRole.replace('_',' ')}</span><span className="text-ink-700 shrink-0">{e.actor}</span><span className="text-ink-300">→</span><span className="text-ink-500 truncate">{e.details}</span></div>))}</div></div>
+        </div>)}
 
-        {/* ═══ BUILDINGS LIST ═══ */}
-        {tab === 'buildings' && !selectedBldg && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold text-ink-900">Buildings ({tenants.length})</h3>
-              <button onClick={() => setShowAddBldg(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Onboard Building</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-ink-400 uppercase tracking-wide border-b border-ink-100">
-                    <th className="py-2 pr-3">Building</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">Tier</th>
-                    <th className="py-2 pr-3 text-right">Units</th><th className="py-2 pr-3 text-right">Users</th>
-                    <th className="py-2 pr-3 text-right">MRR</th><th className="py-2 pr-3 text-right">Collect.</th>
-                    <th className="py-2 pr-3 text-right">Compl.</th><th className="py-2">Contact</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tenants.map(t => (
-                    <tr key={t.id} className="border-b border-ink-50 hover:bg-mist-50 cursor-pointer" onClick={() => setSelectedBldg(t.id)}>
-                      <td className="py-3 pr-3"><p className="font-semibold text-ink-900">{t.name}</p><p className="text-xs text-ink-400">{t.address.city}, {t.address.state}</p></td>
-                      <td className="py-3 pr-3"><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span></td>
-                      <td className="py-3 pr-3"><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${TIER_BADGE[t.subscription.tier]}`}>{TIER_LABELS[t.subscription.tier]}</span></td>
-                      <td className="py-3 pr-3 text-right">{t.totalUnits}</td>
-                      <td className="py-3 pr-3 text-right">{t.stats.activeUsers}</td>
-                      <td className="py-3 pr-3 text-right font-semibold">{fmt(t.subscription.monthlyRate)}</td>
-                      <td className="py-3 pr-3 text-right"><span className={t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}>{t.stats.collectionRate || '—'}%</span></td>
-                      <td className="py-3 pr-3 text-right"><span className={t.stats.complianceScore >= 80 ? 'text-sage-600' : t.stats.complianceScore >= 60 ? 'text-yellow-600' : 'text-ink-400'}>{t.stats.complianceScore || '—'}%</span></td>
-                      <td className="py-3 text-xs text-ink-500">{t.primaryContact.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* ═══ BUILDINGS ═══ */}
+        {tab === 'buildings' && !selected && (<div className="space-y-4">
+          <div className="flex items-center justify-between"><h3 className="font-display text-lg font-bold text-ink-900">Buildings ({tenants.length})</h3><button onClick={() => setShowAddBldg(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Onboard Building</button></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-400 uppercase tracking-wide border-b border-ink-100"><th className="py-2 pr-3">Building</th><th className="py-2 pr-3">Subdomain</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">Tier</th><th className="py-2 pr-3 text-right">Units</th><th className="py-2 pr-3 text-right">MRR</th><th className="py-2">Contact</th></tr></thead><tbody>{tenants.map(t => (<tr key={t.id} className="border-b border-ink-50 hover:bg-mist-50 cursor-pointer" onClick={() => setSelectedBldg(t.id)}><td className="py-3 pr-3"><p className="font-semibold text-ink-900">{t.name}</p><p className="text-xs text-ink-400">{t.address.city}, {t.address.state}</p></td><td className="py-3 pr-3"><span className="text-xs font-mono text-accent-600">{t.subdomain}.getonetwo.com</span></td><td className="py-3 pr-3"><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span></td><td className="py-3 pr-3"><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${TIER_BADGE[t.subscription.tier]}`}>{TIER_LABELS[t.subscription.tier]}</span></td><td className="py-3 pr-3 text-right">{t.totalUnits}</td><td className="py-3 pr-3 text-right font-semibold">{fmt(t.subscription.monthlyRate)}</td><td className="py-3 text-xs text-ink-500">{t.primaryContact.name}</td></tr>))}</tbody></table></div>
+        </div>)}
 
         {/* ═══ BUILDING DETAIL ═══ */}
-        {tab === 'buildings' && selectedBldg && (
-          <BuildingDetail bldgId={selectedBldg} onBack={() => setSelectedBldg(null)} />
-        )}
+        {tab === 'buildings' && selected && (<div className="space-y-6">
+          <button onClick={() => setSelectedBldg(null)} className="text-sm text-accent-600 hover:text-accent-700 font-medium">← Back</button>
+          <div className="flex items-start justify-between flex-wrap gap-3"><div><h3 className="font-display text-2xl font-bold text-ink-900">{selected.name}</h3><p className="text-sm text-ink-500">{selected.address.street}, {selected.address.city}, {selected.address.state} {selected.address.zip}</p><p className="text-xs text-accent-600 font-mono mt-1">🌐 {selected.subdomain}.getonetwo.com</p></div><div className="flex gap-2 shrink-0"><span className={`pill px-3 py-1 rounded text-sm font-semibold ${STATUS_BADGE[selected.status]}`}>{selected.status}</span><span className={`pill px-3 py-1 rounded text-sm font-semibold ${TIER_BADGE[selected.subscription.tier]}`}>{TIER_LABELS[selected.subscription.tier]}</span></div></div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">{[{ l: 'Units', v: selected.totalUnits }, { l: 'Occupied', v: selected.stats.occupiedUnits }, { l: 'Users', v: selected.stats.activeUsers }, { l: 'Collection', v: `${selected.stats.collectionRate}%` }, { l: 'Compliance', v: `${selected.stats.complianceScore}%` }, { l: 'Open Cases', v: selected.stats.openCases }].map(s => (<div key={s.l} className="bg-mist-50 rounded-lg p-3"><p className="text-xs text-ink-400">{s.l}</p><p className="text-lg font-bold text-ink-900">{s.v}</p></div>))}</div>
+          {/* Actions */}
+          <div className="bg-white border border-ink-100 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-3">Account Actions</h4><div className="flex gap-2 flex-wrap">{selected.status !== 'active' && <button onClick={() => { updateTenantStatus(selected.id, 'active'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: selected.name, details: 'Set active', buildingId: selected.id }); }} className="px-4 py-2 bg-sage-600 text-white rounded-lg text-sm font-medium">✓ Activate</button>}{selected.status !== 'suspended' && <button onClick={() => { updateTenantStatus(selected.id, 'suspended'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.suspend', target: selected.name, details: 'Suspended', buildingId: selected.id }); }} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium">⛔ Suspend</button>}{selected.status === 'onboarding' && <button onClick={() => { updateTenantStatus(selected.id, 'active'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: selected.name, details: 'Onboarding complete', buildingId: selected.id }); }} className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium">🚀 Complete Onboarding</button>}</div></div>
+          {/* Subscription */}
+          <div className="bg-accent-50 border border-accent-200 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-3">Subscription</h4><div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm mb-4"><div><p className="text-xs text-ink-400">Tier</p><p className="font-bold">{TIER_LABELS[selected.subscription.tier]}</p></div><div><p className="text-xs text-ink-400">Status</p><p className="font-bold capitalize">{selected.subscription.status.replace('_',' ')}</p></div><div><p className="text-xs text-ink-400">Rate</p><p className="font-bold">{fmt(selected.subscription.monthlyRate)}/mo</p></div><div><p className="text-xs text-ink-400">Start</p><p className="font-bold">{selected.subscription.startDate}</p></div><div><p className="text-xs text-ink-400">Next Billing</p><p className="font-bold">{selected.subscription.nextBillingDate}</p></div></div>{selected.subscription.trialEndsAt && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-sm"><p className="text-yellow-800 font-semibold">🕐 Trial expires {selected.subscription.trialEndsAt}</p></div>}<div className="flex gap-2 flex-wrap">{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).filter(t => t !== selected.subscription.tier).map(tier => (<button key={tier} onClick={() => changeTier(selected.id, tier, ACTOR)} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:shadow-sm">→ {TIER_LABELS[tier]} ({fmt(TIER_PRICES[tier])}/mo)</button>))}{selected.subscription.status === 'past_due' && <button onClick={() => { updateSubscription(selected.id, { status: 'active' }); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'subscription.resolve', target: selected.name, details: 'Past-due resolved', buildingId: selected.id }); }} className="px-3 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-medium">✓ Mark Paid</button>}</div><p className="text-[10px] text-ink-400 mt-3">Changing tier auto-updates feature flags to the new tier's defaults.</p></div>
+          {/* Contact */}
+          <div className="bg-white border border-ink-100 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-3">Primary Contact</h4><div className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-ink-900 flex items-center justify-center shrink-0"><span className="text-white font-bold">{selected.primaryContact.name.split(' ').map(n => n[0]).join('')}</span></div><div><p className="font-semibold text-ink-900">{selected.primaryContact.name}</p><p className="text-sm text-accent-600">{selected.primaryContact.role}</p><p className="text-xs text-ink-500">{selected.primaryContact.email} · {selected.primaryContact.phone}</p></div></div></div>
+          {/* Features */}
+          <div className="bg-white border border-ink-100 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-1">Feature Flags</h4><p className="text-xs text-ink-400 mb-3">Override tier defaults. Changes take effect immediately.</p><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{(Object.entries(selected.features) as [keyof Tenant['features'], boolean][]).map(([key, enabled]) => { const tierDefault = TIER_FEATURES[selected.subscription.tier][key]; const isOverride = enabled !== tierDefault; return (<div key={key} className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${isOverride ? 'bg-yellow-50 border border-yellow-200' : 'bg-mist-50'}`}><div><span className="text-sm font-medium text-ink-700">{FEATURE_LABELS[key] || key}</span>{isOverride && <span className="ml-1.5 text-[9px] bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded font-bold">OVERRIDE</span>}</div><Toggle on={enabled} onChange={() => { toggleFeature(selected.id, key); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'feature.toggle', target: selected.name, details: `${enabled ? 'Disabled' : 'Enabled'} ${FEATURE_LABELS[key] || key}`, buildingId: selected.id }); }} /></div>); })}</div></div>
+          {/* Onboarding */}
+          <div className="bg-white border border-ink-100 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-3">Onboarding Checklist</h4><div className="space-y-2">{(Object.entries(selected.onboardingChecklist) as [keyof Tenant['onboardingChecklist'], boolean][]).map(([step, done]) => { const labels: Record<string, string> = { accountCreated: 'Account created', buildingProfileComplete: 'Building profile complete', unitsConfigured: 'Units configured', firstUserInvited: 'First user invited', bylawsUploaded: 'Bylaws uploaded', financialSetupDone: 'Financial setup done', goLive: 'Go-live' }; return (<label key={step} className="flex items-center gap-3 p-2 rounded-lg hover:bg-mist-50 cursor-pointer"><input type="checkbox" checked={done} onChange={() => updateOnboardingStep(selected.id, step, !done)} className="h-4 w-4" /><span className={`text-sm ${done ? 'text-ink-500 line-through' : 'text-ink-900 font-medium'}`}>{labels[step] || step}</span></label>); })}</div></div>
+          {/* Audit */}
+          <div><h4 className="font-bold text-ink-900 mb-3">Audit Trail</h4><div className="bg-white border border-ink-100 rounded-xl overflow-hidden">{auditLog.filter(e => e.buildingId === selected.id).length === 0 ? <p className="p-4 text-sm text-ink-400">No entries.</p> : <div className="divide-y divide-ink-50">{auditLog.filter(e => e.buildingId === selected.id).map(e => (<div key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-mist-50"><span className="text-xs text-ink-300 w-28 shrink-0">{new Date(e.timestamp).toLocaleDateString()}</span><span className={`pill px-1.5 py-0.5 rounded text-xs shrink-0 ${ROLE_BADGE[e.actorRole]}`}>{e.actor}</span><span className="font-mono text-xs text-ink-400 shrink-0">{e.action}</span><span className="text-ink-600 truncate">{e.details}</span></div>))}</div>}</div></div>
+        </div>)}
 
-        {/* ═══ PLATFORM USERS ═══ */}
-        {tab === 'users' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold text-ink-900">Platform Users ({platformUsers.length})</h3>
-              <button onClick={() => setShowAddUser(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Add Admin User</button>
-            </div>
-            <p className="text-sm text-ink-500">Platform-level administrative accounts. These users can access the admin console and manage buildings.</p>
-            <div className="space-y-3">
-              {platformUsers.map(u => (
-                <div key={u.id} className="bg-white border border-ink-100 rounded-xl p-4 flex items-center justify-between hover:shadow-sm transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full ${u.status === 'active' ? 'bg-ink-900' : 'bg-ink-300'} flex items-center justify-center shrink-0`}>
-                      <span className="text-white font-bold text-sm">{u.name.split(' ').map(n => n[0]).join('')}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-ink-900">{u.name}</p>
-                        <span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${ROLE_BADGE[u.role]}`}>{u.role.replace('_',' ')}</span>
-                        {u.status === 'inactive' && <span className="pill px-2 py-0.5 rounded text-xs bg-ink-100 text-ink-500">inactive</span>}
-                      </div>
-                      <p className="text-xs text-ink-500">{u.email}</p>
-                      <p className="text-xs text-ink-400">
-                        Last login: {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'} ·
-                        Access: {u.buildings.includes('*') ? 'All buildings' : `${u.buildings.length} building(s)`} ·
-                        Created {u.createdAt}
-                      </p>
-                    </div>
-                  </div>
-                  <button onClick={() => { if(confirm(`Remove ${u.name}?`)) { removePlatformUser(u.id); addAuditEntry({ actor: 'Alex Rivera', actorRole: 'super_admin', action: 'user.remove', target: u.name, details: `Removed platform user (${u.role})`, buildingId: null }); }}}
-                    className="px-3 py-1.5 text-red-500 hover:text-red-700 text-xs font-medium hover:bg-red-50 rounded">Remove</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* ═══ ONBOARDING ═══ */}
+        {tab === 'onboarding' && (<div className="space-y-6">
+          <div className="flex items-center justify-between"><h3 className="font-display text-lg font-bold text-ink-900">🚀 Onboarding Pipeline</h3><button onClick={() => setShowAddBldg(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium">+ Onboard Building</button></div>
+          <div className="bg-mist-50 border border-mist-200 rounded-xl p-5"><h4 className="font-bold text-ink-900 mb-2">How Onboarding Works</h4><div className="grid grid-cols-7 gap-2 text-center">{['Account Created', 'Profile Done', 'Units Set Up', 'User Invited', 'Bylaws Up', 'Finances Set', 'Go-Live'].map((s, i) => <div key={s} className="text-[10px] text-ink-500"><div className="w-8 h-8 rounded-full bg-ink-200 text-ink-600 flex items-center justify-center mx-auto mb-1 font-bold text-xs">{i + 1}</div>{s}</div>)}</div><p className="text-xs text-ink-400 mt-3">When a building is onboarded, their subdomain is provisioned at <strong>[name].getonetwo.com</strong> and feature flags are set based on their subscription tier.</p></div>
+          {tenants.filter(t => t.status === 'onboarding').length === 0 ? <p className="text-sm text-ink-400 text-center py-8">No buildings currently onboarding.</p> : tenants.filter(t => t.status === 'onboarding').map(t => { const steps = Object.values(t.onboardingChecklist); const done = steps.filter(Boolean).length; const pct = Math.round((done / steps.length) * 100); return (<div key={t.id} className="bg-white border border-accent-200 rounded-xl p-5"><div className="flex items-center justify-between mb-3"><div><h4 className="font-semibold text-ink-900">{t.name}</h4><p className="text-xs text-accent-600 font-mono">{t.subdomain}.getonetwo.com</p></div><div className="text-right"><p className="text-sm font-bold text-ink-900">{pct}%</p><p className="text-[10px] text-ink-400">{done}/{steps.length} steps</p></div></div><div className="w-full h-2 bg-ink-100 rounded-full mb-3"><div className="h-full bg-accent-500 rounded-full transition-all" style={{ width: `${pct}%` }} /></div><div className="grid grid-cols-7 gap-1">{(Object.entries(t.onboardingChecklist) as [keyof Tenant['onboardingChecklist'], boolean][]).map(([step, d]) => (<button key={step} onClick={() => updateOnboardingStep(t.id, step, !d)} className={`text-center p-1.5 rounded ${d ? 'bg-sage-100 text-sage-700' : 'bg-ink-50 text-ink-400'}`}><span className="text-xs">{d ? '✓' : '○'}</span></button>))}</div>{pct === 100 && <button onClick={() => { updateTenantStatus(t.id, 'active'); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: t.name, details: 'Onboarding complete — activated', buildingId: t.id }); }} className="mt-3 px-4 py-2 bg-sage-600 text-white rounded-lg text-sm font-medium w-full">🚀 Activate — Go Live</button>}</div>); })}
+          {/* Trials */}
+          {tenants.filter(t => t.subscription.status === 'trial').length > 0 && <div><h3 className="font-display text-lg font-bold text-ink-900 mb-3">Active Trials</h3><div className="space-y-2">{tenants.filter(t => t.subscription.status === 'trial').map(t => { const daysLeft = Math.max(0, Math.ceil((new Date(t.subscription.trialEndsAt || '').getTime() - Date.now()) / 86400000)); return (<div key={t.id} className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between"><div><p className="font-semibold text-ink-900">{t.name}</p><p className="text-xs text-yellow-700">{TIER_LABELS[t.subscription.tier]} trial · {daysLeft} days left · {t.subdomain}.getonetwo.com</p></div><span className={`text-sm font-bold ${daysLeft <= 7 ? 'text-red-600' : 'text-yellow-700'}`}>{daysLeft}d</span></div>); })}</div></div>}
+        </div>)}
 
-        {/* ═══ AUDIT LOG ═══ */}
-        {tab === 'audit' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <h3 className="font-display text-lg font-bold text-ink-900">Audit Log ({auditLog.length} entries)</h3>
-              <input value={auditFilter} onChange={e => setAuditFilter(e.target.value)} placeholder="Filter by actor, action, or details..." className="px-3 py-2 border border-ink-200 rounded-lg text-sm w-72" />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-ink-400 uppercase tracking-wide border-b border-ink-100">
-                    <th className="py-2 pr-3 w-40">Timestamp</th><th className="py-2 pr-3">Actor</th><th className="py-2 pr-3">Role</th>
-                    <th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Target</th><th className="py-2">Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLog
-                    .filter(e => !auditFilter || [e.actor, e.action, e.target, e.details].some(f => f.toLowerCase().includes(auditFilter.toLowerCase())))
-                    .map(e => (
-                    <tr key={e.id} className="border-b border-ink-50 hover:bg-mist-50">
-                      <td className="py-2.5 pr-3 text-xs text-ink-400 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td>
-                      <td className="py-2.5 pr-3 font-medium text-ink-900 whitespace-nowrap">{e.actor}</td>
-                      <td className="py-2.5 pr-3"><span className={`pill px-1.5 py-0.5 rounded text-xs ${ROLE_BADGE[e.actorRole]}`}>{e.actorRole.replace('_',' ')}</span></td>
-                      <td className="py-2.5 pr-3 text-ink-600 font-mono text-xs whitespace-nowrap">{e.action}</td>
-                      <td className="py-2.5 pr-3 text-ink-700 whitespace-nowrap">{e.target}</td>
-                      <td className="py-2.5 text-ink-500 truncate max-w-xs">{e.details}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* ═══ TIERS & FEATURES ═══ */}
+        {tab === 'tiers' && (<div className="space-y-6">
+          <h3 className="font-display text-lg font-bold text-ink-900">💎 Subscription Tiers & Feature Matrix</h3>
+          <p className="text-sm text-ink-500">When a building's tier changes, their feature flags auto-update to match. Admins can override individual features per building.</p>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-400 uppercase tracking-wide border-b border-ink-200"><th className="py-3 pr-6 w-48">Feature</th>{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(t => <th key={t} className="py-3 px-4 text-center"><span className={`pill px-2.5 py-1 rounded text-xs font-bold ${TIER_BADGE[t]}`}>{TIER_LABELS[t]}</span><p className="text-lg font-bold text-ink-900 mt-1">{fmt(TIER_PRICES[t])}/mo</p></th>)}</tr></thead><tbody>{Object.keys(TIER_FEATURES.essentials).map(feat => (<tr key={feat} className="border-b border-ink-50"><td className="py-3 pr-6 font-medium text-ink-700">{FEATURE_LABELS[feat] || feat}</td>{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(t => <td key={t} className="py-3 px-4 text-center"><span className={`text-lg ${TIER_FEATURES[t][feat as keyof Tenant['features']] ? 'text-sage-600' : 'text-ink-200'}`}>{TIER_FEATURES[t][feat as keyof Tenant['features']] ? '✓' : '—'}</span></td>)}</tr>))}</tbody></table></div>
+          <div><h4 className="font-bold text-ink-900 mb-3">Buildings by Tier</h4><div className="grid grid-cols-3 gap-4">{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(tier => (<div key={tier} className={`rounded-xl p-4 border ${TIER_BADGE[tier].split(' ')[0]}`}><p className="text-xs font-bold uppercase mb-2">{TIER_LABELS[tier]}</p>{tenants.filter(t => t.subscription.tier === tier).map(t => (<div key={t.id} className="flex items-center justify-between py-1.5"><span className="text-sm text-ink-700">{t.name}</span><span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[t.status]}`}>{t.status}</span></div>))}{tenants.filter(t => t.subscription.tier === tier).length === 0 && <p className="text-xs text-ink-400">No buildings</p>}</div>))}</div></div>
+        </div>)}
+
+        {/* ═══ HEALTH MONITOR ═══ */}
+        {tab === 'health' && (<div className="space-y-6">
+          <h3 className="font-display text-lg font-bold text-ink-900">❤️ Tenant Health Monitor</h3>
+          <div className="grid grid-cols-3 gap-4"><div className="bg-sage-50 border border-sage-200 rounded-xl p-4 text-center"><p className="text-3xl font-bold text-sage-700">{tenants.filter(t => t.stats.complianceScore >= 80).length}</p><p className="text-xs text-sage-600">Healthy (≥80%)</p></div><div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center"><p className="text-3xl font-bold text-yellow-700">{tenants.filter(t => t.stats.complianceScore >= 50 && t.stats.complianceScore < 80).length}</p><p className="text-xs text-yellow-600">At Risk (50-79%)</p></div><div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center"><p className="text-3xl font-bold text-red-700">{tenants.filter(t => t.stats.complianceScore < 50 && t.status === 'active').length}</p><p className="text-xs text-red-600">Critical ({'<'}50%)</p></div></div>
+          <div className="space-y-2">{tenants.filter(t => t.status !== 'archived').sort((a, b) => a.stats.complianceScore - b.stats.complianceScore).map(t => { const c = t.stats.complianceScore; const color = c >= 80 ? 'sage' : c >= 50 ? 'yellow' : 'red'; return (<div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 flex items-center gap-4"><div className="flex-1"><div className="flex items-center gap-2 mb-1"><p className="font-semibold text-ink-900">{t.name}</p><span className={`pill px-2 py-0.5 rounded text-xs ${STATUS_BADGE[t.status]}`}>{t.status}</span></div><div className="grid grid-cols-5 gap-3 text-xs"><div><p className="text-ink-400">Compliance</p><p className={`font-bold text-${color}-600`}>{c || '—'}%</p></div><div><p className="text-ink-400">Collection</p><p className={`font-bold ${t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}`}>{t.stats.collectionRate || '—'}%</p></div><div><p className="text-ink-400">Users</p><p className="font-bold">{t.stats.activeUsers}</p></div><div><p className="text-ink-400">Open Cases</p><p className="font-bold">{t.stats.openCases}</p></div><div><p className="text-ink-400">Revenue</p><p className="font-bold">{fmt(t.subscription.monthlyRate)}/mo</p></div></div></div><div className="w-20 shrink-0"><div className="w-full h-2 bg-ink-100 rounded-full"><div className={`h-full bg-${color}-500 rounded-full`} style={{ width: `${c}%` }} /></div><p className={`text-center text-xs font-bold mt-1 text-${color}-600`}>{c}%</p></div></div>); })}</div>
+        </div>)}
+
+        {/* ═══ USERS ═══ */}
+        {tab === 'users' && (<div className="space-y-4">
+          <div className="flex items-center justify-between"><h3 className="font-display text-lg font-bold text-ink-900">Platform Users ({platformUsers.length})</h3><button onClick={() => setShowAddUser(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium">+ Add Admin</button></div>
+          <div className="space-y-3">{platformUsers.map(u => (<div key={u.id} className="bg-white border border-ink-100 rounded-xl p-4 flex items-center justify-between hover:shadow-sm"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full ${u.status === 'active' ? 'bg-ink-900' : 'bg-ink-300'} flex items-center justify-center shrink-0`}><span className="text-white font-bold text-sm">{u.name.split(' ').map(n => n[0]).join('')}</span></div><div><div className="flex items-center gap-2"><p className="font-semibold text-ink-900">{u.name}</p><span className={`pill px-2 py-0.5 rounded text-xs font-semibold ${ROLE_BADGE[u.role]}`}>{u.role.replace('_',' ')}</span>{u.status === 'inactive' && <span className="pill px-2 py-0.5 rounded text-xs bg-ink-100 text-ink-500">inactive</span>}</div><p className="text-xs text-ink-500">{u.email}</p><p className="text-xs text-ink-400">Last: {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'} · Access: {u.buildings.includes('*') ? 'All' : `${u.buildings.length} buildings`}</p></div></div><button onClick={() => { if(confirm(`Remove ${u.name}?`)) { removePlatformUser(u.id); addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'user.remove', target: u.name, details: `Removed (${u.role})`, buildingId: null }); }}} className="px-3 py-1.5 text-red-500 text-xs font-medium hover:bg-red-50 rounded">Remove</button></div>))}</div>
+        </div>)}
+
+        {/* ═══ AUDIT ═══ */}
+        {tab === 'audit' && (<div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3"><h3 className="font-display text-lg font-bold text-ink-900">Audit Log ({auditLog.length})</h3><input value={auditFilter} onChange={e => setAuditFilter(e.target.value)} placeholder="Filter..." className="px-3 py-2 border border-ink-200 rounded-lg text-sm w-72" /></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-400 uppercase tracking-wide border-b border-ink-100"><th className="py-2 pr-3 w-40">Timestamp</th><th className="py-2 pr-3">Actor</th><th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Target</th><th className="py-2">Details</th></tr></thead><tbody>{auditLog.filter(e => !auditFilter || [e.actor, e.action, e.target, e.details].some(f => f.toLowerCase().includes(auditFilter.toLowerCase()))).map(e => (<tr key={e.id} className="border-b border-ink-50 hover:bg-mist-50"><td className="py-2.5 pr-3 text-xs text-ink-400 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td><td className="py-2.5 pr-3 font-medium text-ink-900 whitespace-nowrap">{e.actor}</td><td className="py-2.5 pr-3"><span className={`pill px-1.5 py-0.5 rounded text-xs ${ROLE_BADGE[e.actorRole]}`}>{e.actorRole.replace('_',' ')}</span></td><td className="py-2.5 pr-3 text-ink-600 font-mono text-xs whitespace-nowrap">{e.action}</td><td className="py-2.5 pr-3 text-ink-700 whitespace-nowrap">{e.target}</td><td className="py-2.5 text-ink-500 truncate max-w-xs">{e.details}</td></tr>))}</tbody></table></div>
+        </div>)}
       </div>
 
       {/* ═══ ADD BUILDING MODAL ═══ */}
-      {showAddBldg && (
-        <Modal title="Onboard New Building" subtitle="Create a new tenant with trial subscription" onClose={() => setShowAddBldg(false)} onSave={handleAddBuilding} saveLabel="Create Building" wide>
-          <div className="space-y-4">
-            <div className="border-b border-ink-100 pb-3 mb-1"><p className="text-xs font-semibold text-ink-400 uppercase">Building Information</p></div>
-            <div><label className="block text-sm font-medium text-ink-700 mb-1">Building / Association Name *</label><input value={bldgForm.name} onChange={e => setBldgForm({...bldgForm, name: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" placeholder="e.g., Sunny Acres Condominium" /></div>
-            <div><label className="block text-sm font-medium text-ink-700 mb-1">Street Address</label><input value={bldgForm.street} onChange={e => setBldgForm({...bldgForm, street: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" placeholder="123 Main St" /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">City</label><input value={bldgForm.city} onChange={e => setBldgForm({...bldgForm, city: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">State</label><input value={bldgForm.state} onChange={e => setBldgForm({...bldgForm, state: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" maxLength={2} /></div>
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">ZIP</label><input value={bldgForm.zip} onChange={e => setBldgForm({...bldgForm, zip: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">Total Units</label><input type="number" value={bldgForm.units} onChange={e => setBldgForm({...bldgForm, units: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">Year Built</label><input value={bldgForm.yearBuilt} onChange={e => setBldgForm({...bldgForm, yearBuilt: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            </div>
-            <div className="border-b border-ink-100 pb-3 mb-1 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Primary Contact</p></div>
-            <div><label className="block text-sm font-medium text-ink-700 mb-1">Contact Name</label><input value={bldgForm.contactName} onChange={e => setBldgForm({...bldgForm, contactName: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">Email *</label><input type="email" value={bldgForm.contactEmail} onChange={e => setBldgForm({...bldgForm, contactEmail: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-              <div><label className="block text-sm font-medium text-ink-700 mb-1">Phone</label><input value={bldgForm.contactPhone} onChange={e => setBldgForm({...bldgForm, contactPhone: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            </div>
-            <div className="border-b border-ink-100 pb-3 mb-1 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Subscription</p></div>
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-2">Tier</label>
-              <div className="grid grid-cols-3 gap-3">
-                {(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(tier => (
-                  <button key={tier} type="button" onClick={() => setBldgForm({...bldgForm, tier})}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${bldgForm.tier === tier ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}>
-                    <p className="font-bold text-ink-900">{TIER_LABELS[tier]}</p>
-                    <p className="text-lg font-bold text-accent-600">{fmt(TIER_PRICES[tier])}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                    <p className="text-xs text-ink-400 mt-1">{tier === 'essentials' ? 'Portals, Financial, Meetings, Docs' : tier === 'compliance_pro' ? '+ Compliance, Case Ops, AI, Payments' : '+ Community, Invoicing, PM Tools'}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {showAddBldg && (<Modal title="Onboard New Building" subtitle="Provisions subdomain and starts trial" onClose={() => setShowAddBldg(false)} onSave={handleAddBuilding} saveLabel="Create & Provision" wide>
+        <div className="space-y-4">
+          <div className="border-b border-ink-100 pb-3 mb-1"><p className="text-xs font-semibold text-ink-400 uppercase">Building Information</p></div>
+          <div><label className="block text-sm font-medium text-ink-700 mb-1">Building / Association Name *</label><input value={bldgForm.name} onChange={e => setBldgForm({...bldgForm, name: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" placeholder="e.g., Sunny Acres Condominium" /></div>
+          {bldgForm.name && <div className="bg-accent-50 border border-accent-200 rounded-lg p-3"><p className="text-xs text-accent-800">🌐 Subdomain: <strong className="font-mono">{generateSubdomain(bldgForm.name, tenants.map(t => t.subdomain))}.getonetwo.com</strong></p></div>}
+          <div><label className="block text-sm font-medium text-ink-700 mb-1">Street Address</label><input value={bldgForm.street} onChange={e => setBldgForm({...bldgForm, street: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
+          <div className="grid grid-cols-3 gap-3"><div><label className="block text-sm font-medium text-ink-700 mb-1">City</label><input value={bldgForm.city} onChange={e => setBldgForm({...bldgForm, city: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">State</label><input value={bldgForm.state} onChange={e => setBldgForm({...bldgForm, state: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" maxLength={2} /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">ZIP</label><input value={bldgForm.zip} onChange={e => setBldgForm({...bldgForm, zip: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div></div>
+          <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium text-ink-700 mb-1">Total Units</label><input type="number" value={bldgForm.units} onChange={e => setBldgForm({...bldgForm, units: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">Year Built</label><input value={bldgForm.yearBuilt} onChange={e => setBldgForm({...bldgForm, yearBuilt: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div></div>
+          <div className="border-b border-ink-100 pb-3 mb-1 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Primary Contact</p></div>
+          <div><label className="block text-sm font-medium text-ink-700 mb-1">Contact Name</label><input value={bldgForm.contactName} onChange={e => setBldgForm({...bldgForm, contactName: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
+          <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium text-ink-700 mb-1">Email *</label><input type="email" value={bldgForm.contactEmail} onChange={e => setBldgForm({...bldgForm, contactEmail: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">Phone</label><input value={bldgForm.contactPhone} onChange={e => setBldgForm({...bldgForm, contactPhone: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div></div>
+          <div className="border-b border-ink-100 pb-3 mb-1 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Subscription Tier</p></div>
+          <div className="grid grid-cols-3 gap-3">{(['essentials','compliance_pro','advanced_governance'] as SubscriptionTier[]).map(tier => (<button key={tier} type="button" onClick={() => setBldgForm({...bldgForm, tier})} className={`p-3 rounded-xl border-2 text-left transition-all ${bldgForm.tier === tier ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}><p className="font-bold text-ink-900">{TIER_LABELS[tier]}</p><p className="text-lg font-bold text-accent-600">{fmt(TIER_PRICES[tier])}<span className="text-xs font-normal text-ink-400">/mo</span></p><p className="text-xs text-ink-400 mt-1">{Object.entries(TIER_FEATURES[tier]).filter(([,v]) => v).length} features enabled</p></button>))}</div>
+          <div className="bg-mist-50 border border-mist-200 rounded-lg p-3"><p className="text-xs text-ink-600">On creation: 30-day trial starts, subdomain provisioned, feature flags set to tier defaults, onboarding checklist initiated. The primary contact will receive an invitation email (in production) to complete setup.</p></div>
+        </div>
+      </Modal>)}
 
-      {/* ═══ ADD USER MODAL ═══ */}
-      {showAddUser && (
-        <Modal title="Add Platform User" subtitle="Grant administrative access to the platform" onClose={() => setShowAddUser(false)} onSave={handleAddUser} saveLabel="Create User">
-          <div className="space-y-4">
-            <div><label className="block text-sm font-medium text-ink-700 mb-1">Full Name *</label><input value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            <div><label className="block text-sm font-medium text-ink-700 mb-1">Email *</label><input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div>
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Role</label>
-              <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as PlatformUser['role']})} className="w-full px-3 py-2 border border-ink-200 rounded-lg bg-white">
-                <option value="super_admin">Super Admin — full access</option>
-                <option value="support">Support — manage buildings, assist users</option>
-                <option value="billing">Billing — subscriptions and payments</option>
-                <option value="readonly">Read Only — view only</option>
-              </select>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {showAddUser && (<Modal title="Add Platform User" onClose={() => setShowAddUser(false)} onSave={handleAddUser} saveLabel="Create User"><div className="space-y-4"><div><label className="block text-sm font-medium text-ink-700 mb-1">Full Name *</label><input value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">Email *</label><input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className="w-full px-3 py-2 border border-ink-200 rounded-lg" /></div><div><label className="block text-sm font-medium text-ink-700 mb-1">Role</label><select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as PlatformUser['role']})} className="w-full px-3 py-2 border border-ink-200 rounded-lg bg-white"><option value="super_admin">Super Admin — full access</option><option value="support">Support — manage buildings</option><option value="billing">Billing — subscriptions</option><option value="readonly">Read Only</option></select></div></div></Modal>)}
     </div>
   );
 }
+

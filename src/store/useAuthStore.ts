@@ -43,6 +43,7 @@ const defaultUser: User = {
 
 const seedMembers: BuildingMember[] = [
   { id: 'user0', name: 'Alex Rivera', email: 'admin@getonetwo.com', phone: '202-555-0000', role: 'PLATFORM_ADMIN', unit: '', status: 'active', joined: '2024-11-01', boardTitle: null },
+  { id: 'user0b', name: 'Alyssa Schelbert', email: 'alyssa@getonetwo.com', phone: '202-555-0001', role: 'PLATFORM_ADMIN', unit: '', status: 'active', joined: '2024-10-01', boardTitle: null },
   { id: 'user1', name: 'John Smith', email: 'john@example.com', phone: '202-555-0301', role: 'BOARD_MEMBER', unit: '301', status: 'active', joined: '2017-04-01', boardTitle: 'Treasurer' },
   { id: 'user2', name: 'Sarah Johnson', email: 'sarah@example.com', phone: '202-555-0204', role: 'RESIDENT', unit: '204', status: 'active', joined: '2019-08-15', boardTitle: null },
   { id: 'user3', name: 'Robert Mitchell', email: 'robert@example.com', phone: '202-555-0401', role: 'BOARD_MEMBER', unit: '401', status: 'active', joined: '2015-03-01', boardTitle: 'President' },
@@ -163,3 +164,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return `SA-${prefix}-${code}`;
   },
 }));
+
