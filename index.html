@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ONE two — HOA handled.</title>
+    <script>
+      // Subdomain routing: tenant subdomains go to the app, not marketing
+      (function() {
+        var h = window.location.hostname;
+        if (h === 'localhost' || h === '127.0.0.1') return;
+        var parts = h.split('.');
+        // If there's a subdomain (not www), redirect to /login which serves app.html
+        if (parts.length >= 3 && parts[0] !== 'www') {
+          window.location.replace('/login');
+        }
+      })();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -880,3 +892,4 @@
 
 </body>
 </html>
+
