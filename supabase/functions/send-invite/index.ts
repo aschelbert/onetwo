@@ -53,6 +53,12 @@ async function sendMailjet(params: {
       }],
     }),
   });
+  const resBody = await res.text();
+  if (!res.ok) {
+    console.error("Mailjet error:", res.status, resBody);
+  } else {
+    console.log("Mailjet sent:", res.status);
+  }
   return res.ok;
 }
 
