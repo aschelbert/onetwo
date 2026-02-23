@@ -1,25 +1,17 @@
 // supabase/functions/stripe-webhook/index.ts
-// Handles Stripe webhooks:
-//   - checkout.session.completed → provision tenant
-//   - invoice.paid → record payment
-//   - invoice.payment_failed → mark past_due
-//   - customer.subscription.deleted → cancel tenant
-//   - customer.subscription.updated → tier changes
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.14.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-04-10" });
 const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
 
-// Supabase service role client (bypasses RLS for provisioning)
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
     return new Response("No signature", { status: 400 });
