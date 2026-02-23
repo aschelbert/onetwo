@@ -48,6 +48,7 @@ export default function AuthPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
 
   // Profile form
@@ -90,7 +91,7 @@ export default function AuthPage() {
     setSubdomainStatus('checking');
     const timer = setTimeout(async () => {
       try {
-        const { data, error } = await supabase!
+        const { data, error } = await supabase
           .from('tenants')
           .select('id')
           .eq('subdomain', bldgSubdomain)
@@ -110,6 +111,12 @@ export default function AuthPage() {
     }
     if (params.get('provisioned') === '1') {
       setAuthStep('login');
+    }
+    // Auto-fill invite code from email link
+    const urlInvite = params.get('invite');
+    if (urlInvite) {
+      setInviteCode(urlInvite.toUpperCase());
+      setAuthStep('join-invite');
     }
 
     // Restore Supabase session from redirect (subdomain handoff)
@@ -270,9 +277,38 @@ export default function AuthPage() {
     login(member);
   };
 
-  const handleInviteCode = () => {
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteData, setInviteData] = useState<any>(null);
+
+  const handleInviteCode = async () => {
     const code = inviteCode.trim().toUpperCase();
     if (!code) { alert('Please enter your invitation code.'); return; }
+
+    // Try Supabase validation first
+    if (isBackendEnabled && supabase) {
+      setInviteLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('validate_invite_code', { p_code: code });
+        if (!error && data?.valid) {
+          setInviteData(data);
+          setAuthJoinRole(data.role === 'board_member' ? 'BOARD_MEMBER' : data.role === 'property_manager' ? 'PROPERTY_MANAGER' : 'RESIDENT');
+          setProfileEmail(data.email || '');
+          setProfileUnit(data.unit || '');
+          setInviteLoading(false);
+          setAuthStep('join-create');
+          return;
+        } else if (data?.error) {
+          alert(data.error);
+          setInviteLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase invite check failed, trying demo:', err);
+      }
+      setInviteLoading(false);
+    }
+
+    // Demo fallback
     const inv = buildingInvites.find(i => i.code === code && i.status === 'pending');
     if (!inv) { alert('Invalid or expired invitation code.'); return; }
     setInviteMatch(inv);
@@ -282,10 +318,76 @@ export default function AuthPage() {
     setAuthStep('join-create');
   };
 
-  const handleCompleteJoin = () => {
+  const handleCompleteJoin = async () => {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = profileEmail || email;
+
+    // If we have Supabase invite data, create auth user and accept invitation
+    if (inviteData?.valid && isBackendEnabled && supabase) {
+      setSending(true);
+      try {
+        // Sign up user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: finalEmail,
+          password: password || 'temp-' + Date.now(),
+          options: { data: { full_name: name } },
+        });
+
+        if (authError) {
+          // Try sign in if already registered
+          if (authError.message.includes('already registered')) {
+            const { data: signIn } = await supabase.auth.signInWithPassword({ email: finalEmail, password });
+            if (!signIn?.user) { alert('Account exists. Please sign in.'); setSending(false); return; }
+          } else {
+            alert(authError.message); setSending(false); return;
+          }
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { alert('Authentication failed'); setSending(false); return; }
+
+        // Accept the invitation via RPC
+        const { data: acceptResult, error: acceptErr } = await supabase.rpc('accept_invitation', {
+          p_code: inviteCode.trim().toUpperCase(),
+          p_user_id: user.id,
+          p_name: name,
+        });
+
+        if (acceptErr || !acceptResult?.success) {
+          alert(acceptResult?.error || acceptErr?.message || 'Failed to accept invitation');
+          setSending(false);
+          return;
+        }
+
+        // Log in and redirect to tenant subdomain
+        const member = {
+          id: user.id, name, email: finalEmail, phone: profilePhone,
+          role: (inviteData.role === 'board_member' ? 'BOARD_MEMBER' : inviteData.role === 'property_manager' ? 'PROPERTY_MANAGER' : 'RESIDENT') as Role,
+          unit: inviteData.unit || profileUnit, status: 'active' as const,
+          joined: new Date().toISOString().split('T')[0], boardTitle: null,
+        };
+        addMember(member);
+        login(member);
+
+        // Redirect to tenant subdomain
+        if (inviteData.subdomain) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const at = sessionData?.session?.access_token || '';
+          const rt = sessionData?.session?.refresh_token || '';
+          window.location.href = `https://${inviteData.subdomain}.getonetwo.com/login?sb_access=${at}&sb_refresh=${rt}`;
+        }
+
+        setSending(false);
+        return;
+      } catch (err: any) {
+        alert(err.message || 'Failed to join');
+        setSending(false);
+        return;
+      }
+    }
+
+    // Demo fallback
     const newMember = {
       id: `user-${Date.now()}`, name, email: finalEmail, phone: profilePhone,
       role: (inviteMatch?.role || authJoinRole) as Role,
