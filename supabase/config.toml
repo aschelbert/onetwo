@@ -1,7 +1,3 @@
-[project]
-id = "your-project-ref"
-name = "onetwo"
-
 [api]
 port = 54321
 

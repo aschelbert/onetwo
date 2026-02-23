@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 
 const Logo = () => (
@@ -32,12 +33,22 @@ const StepIndicator = ({ steps, current }: { steps: string[]; current: number })
   </div>
 );
 
+type SubscriptionTier = 'essentials' | 'compliance_pro' | 'advanced_governance';
+
+const TIERS: { id: SubscriptionTier; name: string; price: number; features: string[] }[] = [
+  { id: 'essentials', name: 'Essentials', price: 49, features: ['Compliance runbook', 'Financial dashboard', 'Case management'] },
+  { id: 'compliance_pro', name: 'Compliance Pro', price: 179, features: ['Everything in Essentials', 'AI Advisor', 'Document vault', 'Payment processing', 'Vendor management'] },
+  { id: 'advanced_governance', name: 'Advanced Governance', price: 299, features: ['Everything in Pro', 'Votes & Resolutions', 'Community portal', 'Reserve study tools'] },
+];
+
 export default function AuthPage() {
-  const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, skipToDemo, login, buildingMembers, buildingInvites, addMember } = useAuthStore();
+  const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, login, buildingMembers, buildingInvites, addMember } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
 
   // Profile form
   const [firstName, setFirstName] = useState('');
@@ -59,6 +70,10 @@ export default function AuthPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('create') === '1' && authStep === 'welcome') {
       setAuthStep('join-role');
+    }
+    // Handle Stripe checkout return
+    if (params.get('provisioned') === '1') {
+      setAuthStep('login');
     }
   }, []);
 
@@ -98,6 +113,80 @@ export default function AuthPage() {
     login(newMember);
   };
 
+  // Stripe Checkout — creates a checkout session and redirects
+  const handleStripeCheckout = async () => {
+    if (!isBackendEnabled || !supabase) {
+      // Demo mode fallback — skip payment
+      setAuthStep('board-building');
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      // First, sign up the user with Supabase Auth
+      const signupEmail = profileEmail || email;
+      if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: signupEmail,
+        password: password || 'temp-password-' + Date.now(), // Will be set properly later
+      });
+
+      if (authError) {
+        // If user already exists, try signing in
+        if (authError.message.includes('already registered')) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: signupEmail,
+            password: password,
+          });
+          if (signInError) { alert('Account exists. Please sign in instead.'); setCheckoutLoading(false); return; }
+        } else {
+          alert(authError.message); setCheckoutLoading(false); return;
+        }
+      }
+
+      // Get the session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+
+      // Call create-checkout Edge Function
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            tier: selectedTier,
+            buildingName: bldgName,
+            address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+            totalUnits: parseInt(bldgUnits) || 0,
+            yearBuilt: '',
+            contactName: `${firstName} ${lastName}`.trim(),
+            contactPhone: profilePhone,
+            boardTitle,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (data.error) { alert(data.error); setCheckoutLoading(false); return; }
+
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Failed to create checkout session'); setCheckoutLoading(false);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Checkout failed');
+      setCheckoutLoading(false);
+    }
+  };
+
+  // Non-Stripe onboarding completion (demo mode)
   const handleCompleteOnboarding = () => {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
     const name = `${firstName.trim()} ${lastName.trim()}`;
@@ -137,9 +226,8 @@ export default function AuthPage() {
                 className="w-full mt-4 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 transition-all">Start Free Trial →</button>
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
-            <div className="border-t border-ink-100 mt-4 pt-4 flex items-center justify-between">
-              <a href="/index-landing.html" className="text-xs text-accent-600 hover:text-accent-700 font-medium">← Back to website</a>
-              <button onClick={skipToDemo} className="text-xs text-ink-300 hover:text-ink-500 cursor-pointer">Skip to demo →</button>
+            <div className="border-t border-ink-100 mt-4 pt-4 flex items-center justify-center">
+              <a href="/" className="text-xs text-accent-600 hover:text-accent-700 font-medium">← Back to website</a>
             </div>
           </div>
         )}
@@ -210,7 +298,6 @@ export default function AuthPage() {
               </div>
               <button onClick={handleInviteCode}
                 className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800">Continue with Code</button>
-              <p className="text-center text-xs text-ink-400">Demo codes: <span className="font-mono text-ink-600">SA-BRD-7X4K</span> or <span className="font-mono text-ink-600">SA-RES-9M2P</span></p>
             </div>
 
             <div className="relative my-6">
@@ -272,34 +359,37 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ BOARD — SUBSCRIBE ══════ */}
+        {/* ══════ BOARD — SUBSCRIBE (Tier Selection) ══════ */}
         {authStep === 'board-subscribe' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Subscribe','Building','Profile']} current={0} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Subscribe to <span className="font-bold">ONE two</span></h2>
-            <p className="text-sm text-ink-400 text-center mb-6">Start managing your building with confidence</p>
-            <div className="bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-6 text-white mb-6">
-              <div className="flex items-baseline gap-1 mb-3"><span className="text-3xl font-bold">$49</span><span className="text-ink-300">/month per building</span></div>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Full compliance runbook & tracking</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Financial management & GL</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Case management with legal guides</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Unlimited users & units</li>
-              </ul>
-            </div>
+            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={0} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Choose Your Plan</h2>
+            <p className="text-sm text-ink-400 text-center mb-6">30-day free trial on all plans. Cancel anytime.</p>
             <div className="space-y-3">
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Card Number</label>
-                <input className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="4242 4242 4242 4242" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Expiry</label>
-                  <input className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="MM / YY" /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">CVC</label>
-                  <input className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123" /></div>
-              </div>
-              <button onClick={() => setAuthStep('board-building')}
-                className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">Subscribe — $49/mo →</button>
+              {TIERS.map(tier => (
+                <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                    selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                  }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-bold text-ink-900">{tier.name}</p>
+                    <p className="text-lg font-bold text-accent-600">${tier.price}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+                  </div>
+                  <ul className="space-y-1">
+                    {tier.features.map(f => (
+                      <li key={f} className="text-xs text-ink-500 flex items-center gap-1.5">
+                        <span className="text-sage-500">✓</span> {f}
+                      </li>
+                    ))}
+                  </ul>
+                </button>
+              ))}
             </div>
+            <button onClick={() => setAuthStep('board-building')}
+              className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-4">
+              Continue with {TIERS.find(t => t.id === selectedTier)?.name} →
+            </button>
             <div className="mt-4 text-center"><a onClick={() => setAuthStep('join-invite')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
         )}
@@ -308,7 +398,7 @@ export default function AuthPage() {
         {authStep === 'board-building' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Subscribe','Building','Profile']} current={1} />
+            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={1} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Building Information</h2>
             <div className="space-y-3">
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
@@ -332,11 +422,11 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ BOARD — PROFILE ══════ */}
+        {/* ══════ BOARD — PROFILE & CHECKOUT ══════ */}
         {authStep === 'board-profile' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Subscribe','Building','Profile']} current={2} />
+            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={2} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Your Profile</h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -347,22 +437,40 @@ export default function AuthPage() {
               </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
                 <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
                 <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
                 <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                  <input type="password" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                  <input type="password" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
-              </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Board Role</label>
                 <select value={boardTitle} onChange={e => setBoardTitle(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
                   <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option>
                 </select></div>
-              <button onClick={handleCompleteOnboarding}
-                className="w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">Create Account & Enter →</button>
+
+              {/* Summary */}
+              <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 mt-2">
+                <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Order Summary</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-700">{TIERS.find(t => t.id === selectedTier)?.name}</span>
+                  <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.price}/mo</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-ink-400 mt-1">
+                  <span>{bldgName || 'Your building'}</span>
+                  <span>30-day free trial</span>
+                </div>
+              </div>
+
+              {isBackendEnabled ? (
+                <button onClick={handleStripeCheckout} disabled={checkoutLoading}
+                  className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2 disabled:opacity-50">
+                  {checkoutLoading ? 'Setting up...' : `Start Free Trial → Checkout`}
+                </button>
+              ) : (
+                <button onClick={handleCompleteOnboarding}
+                  className="w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">Create Account & Enter →</button>
+              )}
+              <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to Stripe for secure payment. No charge during trial.</p>
             </div>
             <div className="mt-4 text-center"><a onClick={() => setAuthStep('board-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
