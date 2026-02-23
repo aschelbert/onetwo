@@ -71,9 +71,54 @@ export default function AuthPage() {
     if (params.get('create') === '1' && authStep === 'welcome') {
       setAuthStep('join-role');
     }
-    // Handle Stripe checkout return
     if (params.get('provisioned') === '1') {
       setAuthStep('login');
+    }
+
+    // Restore Supabase session from redirect (subdomain handoff)
+    const sbAccess = params.get('sb_access');
+    const sbRefresh = params.get('sb_refresh');
+    if (sbAccess && sbRefresh && isBackendEnabled && supabase) {
+      (async () => {
+        setLoginLoading(true);
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: sbAccess,
+            refresh_token: sbRefresh,
+          });
+          if (!error && data.user) {
+            // Clean URL
+            window.history.replaceState({}, '', '/login');
+
+            // Look up tenant user and log in
+            const { data: tu } = await supabase
+              .from('tenant_users')
+              .select('tenant_id, role, board_title, unit')
+              .eq('user_id', data.user.id)
+              .maybeSingle();
+
+            if (tu) {
+              const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+              const m = {
+                id: data.user.id,
+                name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+                email: data.user.email || '',
+                phone: '',
+                role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+                unit: tu.unit || '',
+                status: 'active' as const,
+                joined: new Date().toISOString().split('T')[0],
+                boardTitle: tu.board_title || null,
+              };
+              addMember(m);
+              login(m);
+            }
+          }
+        } catch (err) {
+          console.warn('Session restore failed:', err);
+        }
+        setLoginLoading(false);
+      })();
     }
   }, []);
 
@@ -81,33 +126,108 @@ export default function AuthPage() {
 
   const handleLogin = async () => {
     if (!email || !password) { alert('Please enter email and password.'); return; }
+
+    // Try Supabase Auth first if backend is enabled
     if (isBackendEnabled && supabase) {
       setLoginLoading(true);
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password });
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.toLowerCase(),
+          password,
+        });
+
         if (!error && data.user) {
-          const { data: admin } = await supabase.from('platform_admins').select('name, role').eq('user_id', data.user.id).maybeSingle();
+          // Check if user is a platform admin
+          const { data: admin } = await supabase
+            .from('platform_admins')
+            .select('name, role')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
           if (admin) {
-            const m = buildingMembers.find((m) => m.email.toLowerCase() === email.toLowerCase());
-            if (m) { login(m); } else { const am = { id: data.user.id, name: admin.name, email: data.user.email || email, phone: '', role: 'PLATFORM_ADMIN' as Role, unit: '', status: 'active' as const, joined: new Date().toISOString().split('T')[0], boardTitle: null }; addMember(am); login(am); }
-            setLoginLoading(false); return;
+            const member = buildingMembers.find(
+              (m) => m.email.toLowerCase() === email.toLowerCase()
+            );
+            if (member) {
+              login(member);
+            } else {
+              const adminMember = {
+                id: data.user.id, name: admin.name, email: data.user.email || email,
+                phone: '', role: 'PLATFORM_ADMIN' as Role, unit: '', status: 'active' as const,
+                joined: new Date().toISOString().split('T')[0], boardTitle: null,
+              };
+              addMember(adminMember);
+              login(adminMember);
+            }
+            setLoginLoading(false);
+            return;
           }
-          const { data: tu } = await supabase.from('tenant_users').select('tenant_id, role, board_title, unit').eq('user_id', data.user.id).maybeSingle();
-          if (tu) {
-            const { data: tenant } = await supabase.from('tenants').select('name, subdomain').eq('id', tu.tenant_id).maybeSingle();
-            const roleMap = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
-            const m = { id: data.user.id, name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User', email: data.user.email || email, phone: '', role: roleMap[tu.role] || 'BOARD_MEMBER', unit: tu.unit || '', status: 'active' as const, joined: new Date().toISOString().split('T')[0], boardTitle: tu.board_title || null };
-            addMember(m); login(m);
-            const h = window.location.hostname;
-            // Subdomain redirect disabled until session persistence
-            setLoginLoading(false); return;
+
+          // Check if user belongs to a tenant
+          const { data: tenantUser } = await supabase
+            .from('tenant_users')
+            .select('tenant_id, role, board_title, unit')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
+          if (tenantUser) {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('name, subdomain')
+              .eq('id', tenantUser.tenant_id)
+              .maybeSingle();
+
+            const roleMap: Record<string, Role> = {
+              board_member: 'BOARD_MEMBER',
+              resident: 'RESIDENT',
+              property_manager: 'PROPERTY_MANAGER',
+            };
+
+            const member = {
+              id: data.user.id,
+              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+              email: data.user.email || email,
+              phone: '',
+              role: roleMap[tenantUser.role] || ('BOARD_MEMBER' as Role),
+              unit: tenantUser.unit || '',
+              status: 'active' as const,
+              joined: new Date().toISOString().split('T')[0],
+              boardTitle: tenantUser.board_title || null,
+            };
+
+            addMember(member);
+            login(member);
+
+            // Redirect to tenant subdomain if on root domain
+            const hostname = window.location.hostname;
+            if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
+              // Pass session tokens so the subdomain can restore the auth state
+              const { data: sessionData } = await supabase.auth.getSession();
+              const accessToken = sessionData?.session?.access_token || '';
+              const refreshToken = sessionData?.session?.refresh_token || '';
+              window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
+              return;
+            }
+
+            setLoginLoading(false);
+            return;
           }
-          alert('Account exists but not linked to a building. Contact your administrator.'); setLoginLoading(false); return;
+
+          // User exists but not linked to tenant or admin
+          alert('Your account is not linked to a building yet. Contact your building administrator.');
+          setLoginLoading(false);
+          return;
         }
-      } catch (err) { console.warn('Supabase login failed, trying demo:', err); }
+      } catch (err) {
+        console.warn('Supabase login attempt failed, trying demo:', err);
+      }
       setLoginLoading(false);
     }
-    const member = buildingMembers.find((m) => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active');
+
+    // Fall back to demo store
+    const member = buildingMembers.find(
+      (m) => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active'
+    );
     if (!member) { alert('No account found with that email.'); return; }
     if (member.role === 'PLATFORM_ADMIN' && password !== 'SuperCooperis9') { alert('Invalid password.'); return; }
     login(member);
@@ -275,7 +395,9 @@ export default function AuthPage() {
                   className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="••••••••"
                   onKeyDown={e => e.key === 'Enter' && handleLogin()} />
               </div>
-              <button onClick={handleLogin} disabled={loginLoading} className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50">{loginLoading ? 'Signing in...' : 'Sign In'}</button>
+              <button onClick={handleLogin} disabled={loginLoading}
+                className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50">
+                {loginLoading ? 'Signing in...' : 'Sign In'}</button>
               <p className="text-center text-xs text-ink-400"><a className="text-accent-600 hover:underline cursor-pointer">Forgot password?</a></p>
             </div>
             <div className="border-t border-ink-100 mt-6 pt-4 text-center">
