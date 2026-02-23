@@ -221,6 +221,49 @@ export default function UserManagementPage() {
     loadData();
   };
 
+  // Resend invitation email
+  const handleResend = async (inv: Invitation) => {
+    if (tenant.isDemo || !isBackendEnabled || !supabase) {
+      alert('Resend is not available in demo mode.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { alert('Not authenticated'); setSending(false); return; }
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            email: inv.email,
+            role: inv.role,
+            unit: inv.unit || null,
+            senderName: currentUser.name,
+            resendCode: inv.code,
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        alert(`Invitation resent to ${inv.email}`);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to resend');
+    }
+    setSending(false);
+  };
+
   // For demo mode, show the original Zustand-based data
   const displayMembers = tenant.isDemo ? buildingMembers.filter(m => m.role !== 'PLATFORM_ADMIN') : users;
   const displayInvites = tenant.isDemo ? buildingInvites : invitations.filter(i => i.status === 'pending');
@@ -282,7 +325,10 @@ export default function UserManagementPage() {
                     <p className="text-xs text-ink-400">expires {new Date(inv.expires_at).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <button onClick={() => handleRevoke(inv.id, inv.code)} className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-xs font-medium hover:bg-red-200">Revoke</button>
+                <div className="flex gap-2">
+                  <button onClick={() => handleResend(inv)} disabled={sending} className="px-3 py-1.5 bg-accent-100 text-accent-700 rounded-lg text-xs font-medium hover:bg-accent-200 disabled:opacity-50">{sending ? '...' : 'Resend'}</button>
+                  <button onClick={() => handleRevoke(inv.id, inv.code)} className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-xs font-medium hover:bg-red-200">Revoke</button>
+                </div>
               </div>
             ))}
           </div>

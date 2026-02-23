@@ -91,7 +91,7 @@ export default function AuthPage() {
     setSubdomainStatus('checking');
     const timer = setTimeout(async () => {
       try {
-        const { data, error } = await supabase!
+        const { data, error } = await supabase
           .from('tenants')
           .select('id')
           .eq('subdomain', bldgSubdomain)
@@ -538,7 +538,7 @@ export default function AuthPage() {
               <button onClick={handleLogin} disabled={loginLoading}
                 className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50">
                 {loginLoading ? 'Signing in...' : 'Sign In'}</button>
-              <p className="text-center text-xs text-ink-400"><a className="text-accent-600 hover:underline cursor-pointer">Forgot password?</a></p>
+              <p className="text-center text-xs text-ink-400"><a href="/reset-password" className="text-accent-600 hover:underline cursor-pointer">Forgot password?</a></p>
             </div>
             <div className="border-t border-ink-100 mt-6 pt-4 text-center">
               <p className="text-sm text-ink-500">Don&apos;t have an account?{' '}<a onClick={() => setAuthStep('join-role')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Create one</a></p>

@@ -118,12 +118,56 @@ Deno.serve(async (req) => {
     }
 
     const senderName = body.senderName || user.email?.split("@")[0] || "A board member";
+    const resendCode = body.resendCode || null;
     const results: Array<{ email: string; code: string; sent: boolean; error?: string }> = [];
 
     for (const inv of invitees) {
       const email = inv.email.trim().toLowerCase();
       const role = inv.role || "resident";
       const unit = inv.unit || null;
+
+      // If resending, reuse the existing code
+      if (resendCode && invitees.length === 1) {
+        const code = resendCode;
+        const inviteUrl = `${SITE_URL}/login?invite=${code}`;
+        const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : "Resident";
+        const unitText = unit ? ` (Unit ${unit})` : "";
+
+        const htmlBody = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 32px;">
+              <div style="display: inline-block; background: #3D3D3D; border-radius: 8px; width: 48px; height: 48px; line-height: 48px; color: white; font-weight: bold; font-size: 24px;">+</div>
+              <h1 style="font-size: 20px; color: #1a1a1a; margin: 16px 0 4px;">Reminder: You're invited to ${tenant.name}</h1>
+              <p style="color: #666; font-size: 14px; margin: 0;">${senderName} has invited you to join as ${roleLabel}${unitText}</p>
+            </div>
+            <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+              <p style="color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px;">Your invitation code</p>
+              <p style="font-family: monospace; font-size: 28px; font-weight: bold; color: #1a1a1a; margin: 0; letter-spacing: 3px;">${code}</p>
+            </div>
+            <div style="text-align: center; margin-bottom: 24px;">
+              <a href="${inviteUrl}" style="display: inline-block; background: #3D3D3D; color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px;">Accept Invitation →</a>
+            </div>
+            <div style="text-align: center; color: #999; font-size: 12px;">
+              <p>Or go to <strong>${SITE_URL}/login</strong> and enter your code manually.</p>
+              <p style="margin-top: 16px;">This is a reminder. Your invitation expires in 30 days from the original send date.<br>Powered by <strong>ONE two</strong> HOA GovOps</p>
+            </div>
+          </div>
+        `;
+        const textBody = `Reminder: You're invited to ${tenant.name}!\n\n${senderName} has invited you to join as ${roleLabel}${unitText}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.`;
+
+        if (MJ_API_KEY && MJ_SECRET_KEY) {
+          const sent = await sendMailjet({
+            to: email, toName: email.split("@")[0],
+            replyTo: user.email || "noreply@getonetwo.com", replyToName: senderName,
+            subject: `Reminder: You're invited to join ${tenant.name} on ONE two`,
+            htmlBody, textBody,
+          });
+          results.push({ email, code, sent });
+        } else {
+          results.push({ email, code, sent: false, error: "Email not configured" });
+        }
+        continue;
+      }
 
       // Generate unique code (retry if collision)
       let code = "";

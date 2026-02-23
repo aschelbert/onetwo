@@ -16,6 +16,7 @@ import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import TenantProvider from '@/components/TenantProvider';
+import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -54,6 +55,7 @@ export default function App() {
       <Routes>
         {/* Login */}
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
