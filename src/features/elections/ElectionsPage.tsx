@@ -5,13 +5,14 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import Modal from '@/components/ui/Modal';
+import FileUpload from '@/components/ui/FileUpload';
 
 const TYPE_LABELS: Record<ElectionType, string> = { board_election: 'Board Election', budget_approval: 'Budget Approval', special_assessment: 'Special Assessment', bylaw_amendment: 'Bylaw Amendment', rule_change: 'Rule Change', meeting_motion: 'Meeting Motion', other: 'Other' };
 const STATUS_STYLE: Record<string, string> = { draft: 'bg-ink-100 text-ink-600', open: 'bg-green-100 text-green-700', closed: 'bg-yellow-100 text-yellow-700', certified: 'bg-sage-100 text-sage-700' };
 const METHOD_ICON: Record<VoteMethod, string> = { paper: '📄', oral: '🗣', virtual: '💻' };
 const CHECK_ICON: Record<string, string> = { pass: '✅', fail: '❌', warning: '⚠️', not_checked: '⬜' };
 
-type ModalType = null | 'createElection' | 'addBallotItem' | 'addCandidate' | 'recordBallot' | 'castVote' | 'addAttachment' | 'viewBallotDetail' | 'addComment' | 'addResolution';
+type ModalType = null | 'createElection' | 'addBallotItem' | 'addCandidate' | 'recordBallot' | 'castVote' | 'addAttachment' | 'viewBallotDetail' | 'addComment' | 'addResolution' | 'linkCaseToVote';
 type DetailTab = 'ballot' | 'compliance' | 'timeline' | 'comments' | 'resolution';
 
 export default function VotingPage() {
@@ -45,6 +46,9 @@ export default function VotingPage() {
   // Attachment
   const [attachTargetItemId, setAttachTargetItemId] = useState('');
   const [attachForm, setAttachForm] = useState({ name: '', size: '', type: '' });
+  const [pendingFile, setPendingFile] = useState<{ name: string; size: string; type: string } | null>(null);
+  // Link case
+  const [linkCaseId, setLinkCaseId] = useState('');
   // Ballot detail view
   const [viewingItemId, setViewingItemId] = useState<string | null>(null);
   // Comment
@@ -154,12 +158,12 @@ export default function VotingPage() {
   };
 
   const handleAddAttachment = () => {
-    if (!selected || !attachTargetItemId || !attachForm.name) return;
+    if (!selected || !attachTargetItemId || !pendingFile) { alert('Select a file'); return; }
     store.addBallotAttachment(selected.id, attachTargetItemId, {
-      name: attachForm.name, size: attachForm.size || '—', type: attachForm.type || 'pdf',
+      name: pendingFile.name, size: pendingFile.size, type: pendingFile.type,
       uploadedAt: new Date().toISOString(), uploadedBy: currentUser?.name || 'Board',
     });
-    setModal(null); setAttachForm({ name: '', size: '', type: '' });
+    setModal(null); setPendingFile(null);
   };
 
   const handleAddComment = () => {
@@ -280,6 +284,7 @@ export default function VotingPage() {
               {selected.status === 'open' && <button onClick={() => { if (confirm('Close voting?')) store.closeElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-yellow-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-yellow-300 border-opacity-40 hover:bg-opacity-50">⏹ Close</button>}
               {selected.status === 'closed' && <button onClick={() => { if (confirm('Certify results?')) store.certifyElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-sage-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-sage-300 border-opacity-40 hover:bg-opacity-50">✓ Certify</button>}
               {(selected.status === 'closed' || selected.status === 'certified') && !selected.linkedCaseId && <button onClick={handleCreateCase} className="px-4 py-2 bg-accent-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-accent-300 border-opacity-40 hover:bg-opacity-50">📋 Create Case</button>}
+              {!selected.linkedCaseId && <button onClick={() => { setLinkCaseId(''); setModal('linkCaseToVote'); }} className="px-4 py-2 bg-violet-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-violet-300 border-opacity-40 hover:bg-opacity-50">🔗 Link Case</button>}
               {selected.status === 'draft' && <button onClick={() => { if (confirm('Delete?')) { store.deleteElection(selected.id); setSelectedId(null); } }} className="px-4 py-2 bg-red-500 bg-opacity-20 text-white rounded-lg text-sm font-semibold border border-red-300 border-opacity-30">Delete</button>}
             </div>
           )}
@@ -346,7 +351,7 @@ export default function VotingPage() {
                             <p className="text-[10px] text-ink-400 mt-1">Threshold: {item.requiredThreshold}%{item.legalRef ? ` · ${item.legalRef}` : ''}</p>
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            {isBoard && selected.status === 'draft' && <button onClick={() => { setAttachTargetItemId(item.id); setAttachForm({ name: '', size: '', type: 'pdf' }); setModal('addAttachment'); }} className="text-[10px] text-accent-600 px-2 py-1 rounded bg-accent-50 hover:bg-accent-100">+ Doc</button>}
+                            {isBoard && selected.status === 'draft' && <button onClick={() => { setAttachTargetItemId(item.id); setPendingFile(null); setModal('addAttachment'); }} className="text-[10px] text-accent-600 px-2 py-1 rounded bg-accent-50 hover:bg-accent-100">+ Doc</button>}
                             {isBoard && selected.status === 'draft' && <button onClick={() => store.removeBallotItem(selected.id, item.id)} className="text-xs text-red-400 hover:text-red-600 px-1">×</button>}
                           </div>
                         </div>
@@ -503,7 +508,9 @@ export default function VotingPage() {
 
       {modal === 'addCandidate' && <Modal title="Add Candidate" onClose={() => setModal('addBallotItem')} onSave={() => { if (!candidateForm.name) return; setBallotItemForm({ ...ballotItemForm, candidates: [...ballotItemForm.candidates, { id: 'c_' + Date.now(), ...candidateForm }] }); setCandidateForm({ name: '', unit: '', bio: '' }); setModal('addBallotItem'); }} saveLabel="Add"><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Name *</label><input value={candidateForm.name} onChange={e => setCandidateForm({ ...candidateForm, name: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit</label><select value={candidateForm.unit} onChange={e => setCandidateForm({ ...candidateForm, unit: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select</option>{occupiedUnits.map(u => <option key={u.number} value={u.number}>{u.number} — {u.owner}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Bio</label><textarea value={candidateForm.bio} onChange={e => setCandidateForm({ ...candidateForm, bio: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>}
 
-      {modal === 'addAttachment' && <Modal title="Attach Document" onClose={() => setModal(null)} onSave={handleAddAttachment} saveLabel="Attach"><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Document Name *</label><input value={attachForm.name} onChange={e => setAttachForm({ ...attachForm, name: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="FY2026-Budget-Draft.pdf" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Size</label><input value={attachForm.size} onChange={e => setAttachForm({ ...attachForm, size: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="1.2 MB" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={attachForm.type} onChange={e => setAttachForm({ ...attachForm, type: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="pdf">PDF</option><option value="xlsx">Excel</option><option value="docx">Word</option><option value="jpg">Image</option><option value="other">Other</option></select></div></div><p className="text-[10px] text-ink-400">In production, a file picker would upload to cloud storage. For now, this records the document reference.</p></div></Modal>}
+      {modal === 'addAttachment' && <Modal title="Attach Document" onClose={() => setModal(null)} onSave={handleAddAttachment} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={f => setPendingFile(f)} label="Drop supporting document here or click to browse" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>}
+
+      {modal === 'linkCaseToVote' && <Modal title="Link Case to Vote" onClose={() => setModal(null)} onSave={() => { if (selected && linkCaseId) { store.linkCase(selected.id, linkCaseId); setModal(null); } }} saveLabel="Link"><div className="space-y-3"><p className="text-xs text-ink-500">Associate a Case Ops case with this vote for governance tracking.</p><select value={linkCaseId} onChange={e => setLinkCaseId(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select a case...</option>{issues.cases.filter(c => c.status !== 'closed').map(c => <option key={c.id} value={c.id}>{c.id}: {c.title} ({c.status})</option>)}</select></div></Modal>}
 
       {modal === 'recordBallot' && <Modal title="Record Unit Ballot" onClose={() => setModal(null)} onSave={handleRecordBallot} saveLabel="Record"><div className="space-y-4"><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label><select value={ballotForm.unitNumber} onChange={e => setBallotForm({ ...ballotForm, unitNumber: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select</option>{occupiedUnits.map(u => <option key={u.number} value={u.number} disabled={votedUnits.has(u.number)}>{u.number} — {u.owner}{votedUnits.has(u.number) ? ' ✓' : ''}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={ballotForm.method} onChange={e => setBallotForm({ ...ballotForm, method: e.target.value as VoteMethod })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="paper">📄 Paper</option><option value="oral">🗣 Oral</option><option value="virtual">💻 Virtual</option></select></div></div>
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={ballotForm.isProxy} onChange={e => setBallotForm({ ...ballotForm, isProxy: e.target.checked })} className="h-3.5 w-3.5" /><span className="text-xs text-ink-700 font-medium">This is a proxy vote</span></label>
