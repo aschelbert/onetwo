@@ -91,7 +91,7 @@ export default function AuthPage() {
     setSubdomainStatus('checking');
     const timer = setTimeout(async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase!
           .from('tenants')
           .select('id')
           .eq('subdomain', bldgSubdomain)
@@ -135,7 +135,7 @@ export default function AuthPage() {
             window.history.replaceState({}, '', '/login');
 
             // Look up tenant user and log in
-            const { data: tu } = await supabase
+            const { data: tu } = await supabase!
               .from('tenant_users')
               .select('tenant_id, role, board_title, unit')
               .eq('user_id', data.user.id)
@@ -182,7 +182,7 @@ export default function AuthPage() {
 
         if (!error && data.user) {
           // Check if user is a platform admin
-          const { data: admin } = await supabase
+          const { data: admin } = await supabase!
             .from('platform_admins')
             .select('name, role')
             .eq('user_id', data.user.id)
@@ -208,14 +208,14 @@ export default function AuthPage() {
           }
 
           // Check if user belongs to a tenant
-          const { data: tenantUser } = await supabase
+          const { data: tenantUser } = await supabase!
             .from('tenant_users')
             .select('tenant_id, role, board_title, unit')
             .eq('user_id', data.user.id)
             .maybeSingle();
 
           if (tenantUser) {
-            const { data: tenant } = await supabase
+            const { data: tenant } = await supabase!
               .from('tenants')
               .select('name, subdomain')
               .eq('id', tenantUser.tenant_id)
