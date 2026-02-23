@@ -119,6 +119,45 @@ export default function AuthPage() {
       setAuthStep('join-invite');
     }
 
+    // Check for existing Supabase session (e.g. after password reset)
+    if (isBackendEnabled && supabase && !params.get('sb_access') && !urlInvite) {
+      (async () => {
+        try {
+          const { data: { session } } = await supabase!.auth.getSession();
+          if (session?.user) {
+            setLoginLoading(true);
+            const { data: tu } = await supabase!
+              .from('tenant_users')
+              .select('tenant_id, role, board_title, unit')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+
+            if (tu) {
+              const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+              const m = {
+                id: session.user.id,
+                name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+                email: session.user.email || '',
+                phone: '',
+                role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+                unit: tu.unit || '',
+                status: 'active' as const,
+                joined: new Date().toISOString().split('T')[0],
+                boardTitle: tu.board_title || null,
+              };
+              addMember(m);
+              login(m);
+              setLoginLoading(false);
+              return;
+            }
+            setLoginLoading(false);
+          }
+        } catch (err) {
+          console.warn('Session check failed:', err);
+        }
+      })();
+    }
+
     // Restore Supabase session from redirect (subdomain handoff)
     const sbAccess = params.get('sb_access');
     const sbRefresh = params.get('sb_refresh');

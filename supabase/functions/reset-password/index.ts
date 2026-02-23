@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         type: "recovery",
         email: email,
         options: {
-          redirect_to: `${SITE_URL}/reset-password`,
+          redirect_to: SITE_URL + "/reset-password",
         },
       }),
     });
@@ -55,18 +55,28 @@ Deno.serve(async (req) => {
     }
 
     const linkData = await genRes.json();
-    const resetLink = linkData.action_link || "";
+    
+    // The action_link goes through Supabase's verify endpoint
+    // which redirects to redirect_to with the tokens in the hash
+    // We'll send this link directly — Supabase will handle the redirect
+    const actionLink = linkData.action_link || "";
 
-    if (!resetLink) {
+    if (!actionLink) {
       console.error("No action_link in response:", JSON.stringify(linkData));
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
-    // Rewrite the link to go through our app instead of Supabase's default
-    // The action_link points to Supabase, which redirects to our redirect_to URL
-    // We'll use it as-is since Supabase handles the token verification
+    // Modify the action_link to include our redirect
+    // The action_link format: https://project.supabase.co/auth/v1/verify?token=...&type=recovery&redirect_to=...
+    let resetLink = actionLink;
+    const redirectTo = encodeURIComponent(SITE_URL + "/reset-password");
+    if (resetLink.includes("redirect_to=")) {
+      resetLink = resetLink.replace(/redirect_to=[^&]*/, `redirect_to=${redirectTo}`);
+    } else {
+      resetLink += `&redirect_to=${redirectTo}`;
+    }
 
     // Send via Mailjet
     const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);

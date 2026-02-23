@@ -73,8 +73,12 @@ export default function ResetPasswordPage() {
       if (updateError) {
         setError(updateError.message);
       } else {
-        setMessage('Password updated successfully! Redirecting to login...');
-        setTimeout(() => navigate('/login'), 2000);
+        setMessage('Password updated! Signing you in...');
+        // The user is already authenticated from the recovery flow
+        // Redirect to login which will detect the session and sign in
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong.');
