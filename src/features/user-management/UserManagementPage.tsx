@@ -72,18 +72,11 @@ export default function UserManagementPage() {
       // Get tenant users with their auth info
       const { data: tuData } = await supabase
         .from('tenant_users')
-        .select('id, user_id, role, unit, board_title, status, created_at')
+        .select('id, user_id, role, unit, board_title, status, created_at, name, email')
         .eq('tenant_id', tenant.id);
 
       if (tuData) {
-        // Fetch emails from auth - for each user, we need their email
-        // Since we can't query auth.users directly via REST, we'll use what we have
-        const enrichedUsers: TenantUser[] = tuData.map(u => ({
-          ...u,
-          email: u.user_id === currentUser.id ? currentUser.email : undefined,
-          name: u.user_id === currentUser.id ? currentUser.name : undefined,
-        }));
-        setUsers(enrichedUsers);
+        setUsers(tuData);
       }
 
       // Get pending invitations
