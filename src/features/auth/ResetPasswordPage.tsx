@@ -33,12 +33,21 @@ export default function ResetPasswordPage() {
     setMessage('');
 
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
 
-      if (resetError) {
-        setError(resetError.message);
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
       } else {
         setMessage('Check your email for a password reset link. It may take a minute to arrive.');
       }
