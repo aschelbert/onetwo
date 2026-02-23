@@ -15,6 +15,7 @@ import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AIAdvisor from '@/components/AIAdvisor';
+import TenantProvider from '@/components/TenantProvider';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -55,7 +56,7 @@ export default function App() {
         <Route path="/login" element={<LoginRoute />} />
 
         {/* Protected app routes */}
-        <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+        <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/financial" element={<FinancialPage />} />
           <Route path="/issues" element={<IssuesPage />} />

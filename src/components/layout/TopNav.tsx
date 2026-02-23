@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { getInitials } from '@/lib/formatters';
 import { ROLE_LABELS } from '@/types/auth';
 import { ChevronDown, User, Home, Users, LogOut } from 'lucide-react';
 
 export default function TopNav() {
   const { currentUser, currentRole, signOut } = useAuthStore();
+  const tenant = useTenantContext();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ export default function TopNav() {
             </svg>
             <div>
               <h1 className="font-display text-base font-bold text-ink-900 leading-tight">
-                Sunny Acres Condominium HOA
+                {tenant.name} {tenant.isDemo ? '' : 'HOA'}
               </h1>
               <p className="text-xs text-ink-400">
                 powered by <span className="font-bold">ONE two</span> HOA GovOps
@@ -118,3 +120,4 @@ export default function TopNav() {
     </nav>
   );
 }
+
