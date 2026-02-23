@@ -90,7 +90,7 @@ export default function AuthPage() {
     setSubdomainStatus('checking');
     const timer = setTimeout(async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase!
           .from('tenants')
           .select('id')
           .eq('subdomain', bldgSubdomain)
