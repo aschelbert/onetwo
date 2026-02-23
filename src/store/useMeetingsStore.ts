@@ -16,7 +16,7 @@ export interface Meeting {
 
 interface MeetingsState {
   meetings: Meeting[];
-  addMeeting: (m: Omit<Meeting, 'id' | 'votes' | 'minutes' | 'attendees'> & { attendees?: Meeting['attendees'] }) => void;
+  addMeeting: (m: Omit<Meeting, 'id' | 'votes' | 'minutes' | 'attendees' | 'linkedCaseIds' | 'linkedVoteIds'> & { attendees?: Meeting['attendees'] }) => void;
   updateMeeting: (id: string, m: Partial<Meeting>) => void;
   deleteMeeting: (id: string) => void;
   updateAttendees: (id: string, attendees: Meeting['attendees']) => void;
@@ -38,7 +38,7 @@ export const useMeetingsStore = create<MeetingsState>((set) => ({
     { id:'mtg3', title:'Annual General Meeting 2025', type:'ANNUAL', status:'COMPLETED', date:'2025-12-10', time:'19:00', location:'Community Room', virtualLink:'', agenda:['Election of board members','Annual financial report','Major projects review','Fee structure for 2026','Q&A session'], notes:'Strong attendance (42 units). Fee increase approved.', attendees:{board:['Robert Mitchell','Jennifer Adams','David Chen','Maria Rodriguez','Thomas Baker'],owners:['Unit 101 — Tom Harris','Unit 201 — Karen Liu','Unit 301 — Alan Park','Unit 401 — Priya Patel','Unit 502 — Lisa Chen'],guests:['PremierProperty — Diane Carter']}, minutes:'Annual General Meeting called to order at 7:00 PM. 42 of 50 units represented (84%).\n\n1. Annual Financial Report — Revenue $425K, Expenses $310K, Surplus $15K to reserves.\n2. Board Election — Three seats filled by acclamation.\n3. Fee Structure — 3% increase approved for 2026.\n\nAdjourned at 9:15 PM.', linkedCaseIds:[], linkedVoteIds:[], votes:[{id:'v3',motion:'Approve 3% assessment increase for 2026',type:'owner',status:'passed',date:'2025-12-10',results:[{name:'Unit 101',vote:'approve'},{name:'Unit 201',vote:'approve'},{name:'Unit 301',vote:'approve'},{name:'Unit 401',vote:'approve'},{name:'Unit 502',vote:'abstain'}],tally:{approve:9,deny:2,abstain:1}}] },
   ],
 
-  addMeeting: (m) => set(s => ({ meetings: [...s.meetings, { id: 'mtg' + Date.now(), votes: [], minutes: '', attendees: { board: [], owners: [], guests: [] }, linkedCaseIds: [], linkedVoteIds: [], ...m }] })),
+  addMeeting: (m) => { const id = 'mtg' + Date.now(); set(s => ({ meetings: [...s.meetings, { id, title: m.title, type: m.type, status: m.status, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda, notes: m.notes, votes: [], minutes: '', attendees: m.attendees || { board: [], owners: [], guests: [] }, linkedCaseIds: [], linkedVoteIds: [] }] })); },
   updateMeeting: (id, m) => set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, ...m } : x) })),
   deleteMeeting: (id) => set(s => ({ meetings: s.meetings.filter(x => x.id !== id) })),
   updateAttendees: (id, attendees) => set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, attendees } : x) })),

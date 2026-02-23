@@ -182,10 +182,91 @@ const seedAuditLog: AuditEntry[] = [
 
 // ── Store ──────────────────────────────────────────
 
+export interface SupportTicket {
+  id: string;
+  buildingId: string;
+  buildingName: string;
+  subject: string;
+  description: string;
+  status: 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assignedTo: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  notes: Array<{ author: string; text: string; date: string }>;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  audience: 'all' | 'essentials' | 'compliance_pro' | 'advanced_governance' | string;
+  status: 'draft' | 'sent';
+  createdBy: string;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  trigger: 'onboarding_welcome' | 'trial_ending' | 'past_due' | 'feature_update' | 'monthly_report' | 'custom';
+  lastEdited: string;
+}
+
+export interface Invoice {
+  id: string;
+  buildingId: string;
+  buildingName: string;
+  amount: number;
+  status: 'paid' | 'pending' | 'overdue' | 'void';
+  date: string;
+  dueDate: string;
+  paidDate: string | null;
+}
+
+const seedTickets: SupportTicket[] = [
+  { id: 'tkt-001', buildingId: 'bld-003', buildingName: 'Georgetown Gardens HOA', subject: 'Cannot upload bylaws PDF', description: 'Getting error when trying to upload bylaws document. File is 4.2MB PDF.', status: 'open', priority: 'medium', assignedTo: null, createdBy: 'William Chen', createdAt: '2026-02-21T09:30:00Z', updatedAt: '2026-02-21T09:30:00Z', notes: [] },
+  { id: 'tkt-002', buildingId: 'bld-001', buildingName: 'Sunny Acres Condominium', subject: 'Need to add property manager role', description: 'We hired PremierProperty as our management company. Need to set up their access.', status: 'in_progress', priority: 'high', assignedTo: 'Morgan Lee', createdBy: 'Robert Mitchell', createdAt: '2026-02-19T14:00:00Z', updatedAt: '2026-02-20T10:15:00Z', notes: [{ author: 'Morgan Lee', text: 'Sent PM invite instructions to Robert. Following up.', date: '2026-02-20T10:15:00Z' }] },
+  { id: 'tkt-003', buildingId: 'bld-005', buildingName: 'Dupont Circle Condos', subject: 'Payment method update failing', description: 'Trying to update credit card but getting "card declined" even though card is valid.', status: 'waiting', priority: 'urgent', assignedTo: 'Jordan Kim', createdBy: 'James Wilson', createdAt: '2026-02-18T16:20:00Z', updatedAt: '2026-02-19T11:00:00Z', notes: [{ author: 'Jordan Kim', text: 'Contacted payment processor. Waiting for response on hold.', date: '2026-02-19T11:00:00Z' }] },
+  { id: 'tkt-004', buildingId: 'bld-002', buildingName: 'Park View Towers', subject: 'Compliance report export', description: 'Can we get a CSV export of our compliance status for the board meeting?', status: 'resolved', priority: 'low', assignedTo: 'Morgan Lee', createdBy: 'Amanda Torres', createdAt: '2026-02-15T08:00:00Z', updatedAt: '2026-02-16T14:30:00Z', notes: [{ author: 'Morgan Lee', text: 'Generated and emailed compliance report CSV.', date: '2026-02-16T14:30:00Z' }] },
+];
+
+const seedAnnouncements: Announcement[] = [
+  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Advanced Governance subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'advanced_governance', status: 'sent', createdBy: 'Alyssa Schelbert', createdAt: '2026-02-15', sentAt: '2026-02-15' },
+  { id: 'ann-002', title: 'Scheduled Maintenance — Feb 28', message: 'Brief downtime expected Feb 28 2-4 AM ET for infrastructure upgrades.', audience: 'all', status: 'draft', createdBy: 'Alex Rivera', createdAt: '2026-02-22', sentAt: null },
+];
+
+const seedTemplates: EmailTemplate[] = [
+  { id: 'tmpl-001', name: 'Welcome — New Building', subject: 'Welcome to ONE two, {{building_name}}!', body: 'Hi {{contact_name}},\n\nYour building {{building_name}} is now set up at {{subdomain}}.getonetwo.com.\n\nYour 30-day trial of {{tier_name}} begins today. Here\'s how to get started:\n\n1. Complete your building profile\n2. Configure your units\n3. Invite your first board member or resident\n4. Upload your governing documents\n\nQuestions? Reply to this email or visit our help center.\n\n— The ONE two Team', trigger: 'onboarding_welcome', lastEdited: '2026-01-10' },
+  { id: 'tmpl-002', name: 'Trial Ending — 7 Days', subject: 'Your ONE two trial ends in 7 days', body: 'Hi {{contact_name}},\n\nYour trial for {{building_name}} ({{tier_name}}) ends on {{trial_end_date}}.\n\nTo continue uninterrupted:\n→ Log in at {{subdomain}}.getonetwo.com\n→ Go to Account Settings → Billing\n→ Add a payment method\n\nNeed more time? Reply and we\'ll extend your trial.', trigger: 'trial_ending', lastEdited: '2026-01-15' },
+  { id: 'tmpl-003', name: 'Payment Past Due', subject: 'Action required: Payment overdue for {{building_name}}', body: 'Hi {{contact_name}},\n\nWe were unable to process payment of {{amount}} for {{building_name}}.\n\nPlease update your payment method within 15 days to avoid service interruption.\n\nUpdate billing: {{subdomain}}.getonetwo.com/settings/billing', trigger: 'past_due', lastEdited: '2026-01-20' },
+  { id: 'tmpl-004', name: 'Feature Update', subject: 'New in ONE two: {{feature_name}}', body: 'Hi {{contact_name}},\n\nWe\'ve just launched {{feature_name}} for {{tier_name}} subscribers.\n\n{{feature_description}}\n\nLog in to try it: {{subdomain}}.getonetwo.com', trigger: 'feature_update', lastEdited: '2026-02-10' },
+  { id: 'tmpl-005', name: 'Monthly Summary Report', subject: 'Your {{month}} summary for {{building_name}}', body: 'Hi {{contact_name}},\n\nHere\'s your monthly summary for {{building_name}}:\n\n• Compliance Score: {{compliance_score}}%\n• Collection Rate: {{collection_rate}}%\n• Open Cases: {{open_cases}}\n• Active Users: {{active_users}}\n\nView full details: {{subdomain}}.getonetwo.com/dashboard', trigger: 'monthly_report', lastEdited: '2026-02-01' },
+];
+
+const seedInvoices: Invoice[] = [
+  { id: 'inv-001', buildingId: 'bld-001', buildingName: 'Sunny Acres Condominium', amount: 179, status: 'paid', date: '2026-02-01', dueDate: '2026-02-15', paidDate: '2026-02-03' },
+  { id: 'inv-002', buildingId: 'bld-001', buildingName: 'Sunny Acres Condominium', amount: 179, status: 'paid', date: '2026-01-01', dueDate: '2026-01-15', paidDate: '2026-01-02' },
+  { id: 'inv-003', buildingId: 'bld-002', buildingName: 'Park View Towers', amount: 299, status: 'paid', date: '2026-02-01', dueDate: '2026-02-15', paidDate: '2026-02-01' },
+  { id: 'inv-004', buildingId: 'bld-002', buildingName: 'Park View Towers', amount: 299, status: 'paid', date: '2026-01-01', dueDate: '2026-01-15', paidDate: '2026-01-03' },
+  { id: 'inv-005', buildingId: 'bld-003', buildingName: 'Georgetown Gardens HOA', amount: 49, status: 'paid', date: '2026-02-01', dueDate: '2026-02-15', paidDate: '2026-02-10' },
+  { id: 'inv-006', buildingId: 'bld-005', buildingName: 'Dupont Circle Condos', amount: 49, status: 'overdue', date: '2026-01-20', dueDate: '2026-02-03', paidDate: null },
+  { id: 'inv-007', buildingId: 'bld-005', buildingName: 'Dupont Circle Condos', amount: 49, status: 'overdue', date: '2025-12-20', dueDate: '2026-01-03', paidDate: null },
+];
+
 interface PlatformAdminState {
   tenants: Tenant[];
   platformUsers: PlatformUser[];
   auditLog: AuditEntry[];
+  supportTickets: SupportTicket[];
+  announcements: Announcement[];
+  emailTemplates: EmailTemplate[];
+  invoices: Invoice[];
+  impersonating: string | null; // tenant ID being impersonated
 
   // Computed
   getPlatformMetrics: () => {
@@ -205,12 +286,30 @@ interface PlatformAdminState {
   updatePlatformUser: (id: string, updates: Partial<PlatformUser>) => void;
   removePlatformUser: (id: string) => void;
   addAuditEntry: (entry: Omit<AuditEntry, 'id' | 'timestamp'>) => void;
+  // Support
+  addTicket: (ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'notes'>) => void;
+  updateTicket: (id: string, updates: Partial<SupportTicket>) => void;
+  addTicketNote: (id: string, author: string, text: string) => void;
+  // Announcements
+  addAnnouncement: (a: Omit<Announcement, 'id' | 'createdAt' | 'sentAt'>) => void;
+  sendAnnouncement: (id: string) => void;
+  deleteAnnouncement: (id: string) => void;
+  // Templates
+  updateTemplate: (id: string, updates: Partial<EmailTemplate>) => void;
+  addTemplate: (t: Omit<EmailTemplate, 'id' | 'lastEdited'>) => void;
+  // Impersonation
+  setImpersonating: (tenantId: string | null) => void;
 }
 
 export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   tenants: seedTenants,
   platformUsers: seedPlatformUsers,
   auditLog: seedAuditLog,
+  supportTickets: seedTickets,
+  announcements: seedAnnouncements,
+  emailTemplates: seedTemplates,
+  invoices: seedInvoices,
+  impersonating: null,
 
   getPlatformMetrics: () => {
     const { tenants } = get();
@@ -271,5 +370,19 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   addAuditEntry: (entry) => set(s => ({
     auditLog: [{ ...entry, id: `aud-${Date.now()}`, timestamp: new Date().toISOString() }, ...s.auditLog],
   })),
+
+  // Support tickets
+  addTicket: (ticket) => set(s => ({ supportTickets: [{ ...ticket, id: `tkt-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), notes: [] }, ...s.supportTickets] })),
+  updateTicket: (id, updates) => set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t) })),
+  addTicketNote: (id, author, text) => set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, notes: [...t.notes, { author, text, date: new Date().toISOString() }], updatedAt: new Date().toISOString() } : t) })),
+  // Announcements
+  addAnnouncement: (a) => set(s => ({ announcements: [{ ...a, id: `ann-${Date.now()}`, createdAt: new Date().toISOString().split('T')[0], sentAt: null }, ...s.announcements] })),
+  sendAnnouncement: (id) => set(s => ({ announcements: s.announcements.map(a => a.id === id ? { ...a, status: 'sent' as const, sentAt: new Date().toISOString().split('T')[0] } : a) })),
+  deleteAnnouncement: (id) => set(s => ({ announcements: s.announcements.filter(a => a.id !== id) })),
+  // Templates
+  updateTemplate: (id, updates) => set(s => ({ emailTemplates: s.emailTemplates.map(t => t.id === id ? { ...t, ...updates, lastEdited: new Date().toISOString().split('T')[0] } : t) })),
+  addTemplate: (t) => set(s => ({ emailTemplates: [...s.emailTemplates, { ...t, id: `tmpl-${Date.now()}`, lastEdited: new Date().toISOString().split('T')[0] }] })),
+  // Impersonation
+  setImpersonating: (tenantId) => set({ impersonating: tenantId }),
 }));
 
