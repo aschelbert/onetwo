@@ -60,11 +60,48 @@ export default function AuthPage() {
 
   // Building form
   const [bldgName, setBldgName] = useState('');
+  const [bldgSubdomain, setBldgSubdomain] = useState('');
+  const [subdomainStatus, setSubdomainStatus] = useState<'idle'|'checking'|'available'|'taken'>('idle');
   const [bldgStreet, setBldgStreet] = useState('');
   const [bldgCity, setBldgCity] = useState('');
   const [bldgState, setBldgState] = useState('');
   const [bldgZip, setBldgZip] = useState('');
   const [bldgUnits, setBldgUnits] = useState('');
+
+  // Auto-suggest subdomain from building name
+  const sanitizeSubdomain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+
+  useEffect(() => {
+    // Only auto-suggest if user hasn't manually edited the subdomain
+    if (!bldgSubdomain || bldgSubdomain === sanitizeSubdomain(bldgName.slice(0, -1)) || bldgSubdomain === sanitizeSubdomain(bldgName + 'x')) {
+      const suggested = sanitizeSubdomain(
+        bldgName.replace(/\b(condominium|condos?|hoa|association|residences|towers|gardens|estates|the|of)\b/gi, '')
+      );
+      setBldgSubdomain(suggested);
+    }
+  }, [bldgName]);
+
+  // Check subdomain uniqueness with debounce
+  useEffect(() => {
+    if (!bldgSubdomain || bldgSubdomain.length < 3 || !isBackendEnabled || !supabase) {
+      setSubdomainStatus('idle');
+      return;
+    }
+    setSubdomainStatus('checking');
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('subdomain', bldgSubdomain)
+          .maybeSingle();
+        setSubdomainStatus(data ? 'taken' : 'available');
+      } catch {
+        setSubdomainStatus('idle');
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [bldgSubdomain]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -308,6 +345,7 @@ export default function AuthPage() {
           body: JSON.stringify({
             tier: selectedTier,
             buildingName: bldgName,
+            subdomain: bldgSubdomain,
             address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
             totalUnits: parseInt(bldgUnits) || 0,
             yearBuilt: '',
@@ -552,6 +590,26 @@ export default function AuthPage() {
             <div className="space-y-3">
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
                 <input value={bldgName} onChange={e => setBldgName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" /></div>
+              <div>
+                <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
+                <div className="flex items-center gap-0">
+                  <input value={bldgSubdomain}
+                    onChange={e => setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20))}
+                    className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
+                      subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
+                      subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
+                      'border-ink-200'
+                    }`}
+                    placeholder="sunnyacres" />
+                  <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
+                </div>
+                <div className="mt-1 h-4">
+                  {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
+                  {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">✓ {bldgSubdomain}.getonetwo.com is available</p>}
+                  {subdomainStatus === 'taken' && <p className="text-xs text-red-600">✗ Already taken — try a different name</p>}
+                  {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
+                </div>
+              </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
                 <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" /></div>
               <div className="grid grid-cols-3 gap-3">
@@ -564,7 +622,13 @@ export default function AuthPage() {
               </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
                 <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" /></div>
-              <button onClick={() => setAuthStep('board-profile')}
+              <button onClick={() => {
+                  if (!bldgName) { alert('Please enter your building name.'); return; }
+                  if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
+                  if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
+                  if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
+                  setAuthStep('board-profile');
+                }}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Continue →</button>
             </div>
             <div className="mt-4 text-center"><a onClick={() => setAuthStep('board-subscribe')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
@@ -608,6 +672,7 @@ export default function AuthPage() {
                   <span>{bldgName || 'Your building'}</span>
                   <span>30-day free trial</span>
                 </div>
+                {bldgSubdomain && <p className="text-xs text-ink-400 mt-1">URL: <span className="font-mono text-ink-600">{bldgSubdomain}.getonetwo.com</span></p>}
               </div>
 
               {isBackendEnabled ? (

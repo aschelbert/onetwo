@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const user = await userRes.json();
 
     // Parse request
-    const { tier, buildingName, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle } = await req.json();
+    const { tier, buildingName, subdomain, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle } = await req.json();
     if (!tier || !buildingName) {
       return new Response(JSON.stringify({ error: "tier and buildingName required" }), {
         status: 400, headers: { ...cors, "Content-Type": "application/json" },
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     p.append("cancel_url", `${SITE_URL}/login?canceled=1`);
     // Metadata
     const meta: Record<string, string> = {
-      user_id: user.id, tier, building_name: buildingName,
+      user_id: user.id, tier, building_name: buildingName, subdomain: subdomain || "",
       address_street: address?.street || "", address_city: address?.city || "",
       address_state: address?.state || "", address_zip: address?.zip || "",
       total_units: String(totalUnits || 0), year_built: yearBuilt || "",
