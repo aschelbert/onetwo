@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^8.8.0",
+    "@supabase/supabase-js": "^2.97.0",
     "lucide-react": "^0.468.0",
     "mixpanel-browser": "^2.74.0",
     "react": "^19.0.0",
