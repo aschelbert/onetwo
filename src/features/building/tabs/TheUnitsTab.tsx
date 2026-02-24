@@ -282,7 +282,6 @@ export default function TheUnitsTab() {
           <thead>
             <tr className="border-b-2 border-ink-200 text-left">
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Unit</th>
-              <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Address</th>
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Owner</th>
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Monthly</th>
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Balance</th>
@@ -298,11 +297,9 @@ export default function TheUnitsTab() {
               const activeFees = u.lateFees.filter(lf => !lf.waived).length;
               const unitUnpaidSA = u.specialAssessments.filter(a => !a.paid).length;
               const lastPay = u.payments.length > 0 ? [...u.payments].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
-              const addr = getUnitAddress(building, u.number);
               return (
                 <tr key={u.number} className={`border-b border-ink-50 hover:bg-mist-50 transition-colors ${acct.sortOrder >= 3 && u.status !== 'VACANT' ? 'bg-red-50 bg-opacity-30' : acct.sortOrder >= 1 && u.status !== 'VACANT' ? 'bg-yellow-50 bg-opacity-20' : ''}`}>
                   <td className="py-3 px-3"><button onClick={() => openDetail(u.number)} className="font-bold text-accent-600 hover:text-accent-700">{u.number}</button></td>
-                  <td className="py-3 px-3"><p className="text-xs text-ink-500 max-w-[200px] truncate" title={addr}>{addr}</p></td>
                   <td className="py-3 px-3"><div><p className="font-medium text-ink-900">{u.owner}</p><p className="text-xs text-ink-400">{u.email}</p></div></td>
                   <td className="py-3 px-3 font-medium text-ink-900">{fmt(u.monthlyFee)}</td>
                   <td className="py-3 px-3"><span className={`font-bold ${u.balance > 0 ? 'text-red-600' : 'text-sage-600'}`}>{fmt(u.balance)}</span></td>

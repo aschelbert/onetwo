@@ -29,6 +29,7 @@ export interface BuildingAddress {
 export interface BuildingDetails {
   yearBuilt: string; totalUnits: number; floors: number; type: string; sqft: string; lotSize: string;
   parking: string; architect: string; contractor: string; amenities: string[];
+  entityType: 'incorporated' | 'unincorporated';
 }
 
 interface BuildingState {
@@ -82,6 +83,7 @@ export const useBuildingStore = create<BuildingState>((set) => ({
     lotSize: '1.2 acres', parking: '65 spaces (covered garage)', architect: 'Thompson & Associates',
     contractor: 'Pacific Coast Builders Inc.',
     amenities: ['Community Room','Fitness Center','Rooftop Deck','Secure Lobby','Elevator (2)','Package Room'],
+    entityType: 'incorporated',
   },
   board: [
     { id: 'bm1', name: 'Robert Mitchell', role: 'President', email: 'robert@example.com', phone: '202-555-0401', term: 'Jan 2025 – Dec 2026' },
@@ -164,3 +166,4 @@ export const useBuildingStore = create<BuildingState>((set) => ({
   removeVendor: (id) => set(s => ({ vendors: s.vendors.filter(x => x.id !== id) })),
   toggleVendorStatus: (id) => set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) })),
 }));
+

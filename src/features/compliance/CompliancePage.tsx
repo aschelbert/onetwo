@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore, type Meeting, type MeetingVote } from '@/store/useMeetingsStore';
@@ -14,8 +14,42 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote' | 'addFilingAtt' | 'linkCaseToMeeting' | 'linkVoteToMeeting' | 'createCaseForMeeting';
+type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addVote' | 'addFilingAtt' | 'linkCaseToMeeting' | 'linkVoteToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate';
 type TabId = 'runbook' | 'filings' | 'meetings' | 'communications';
+
+function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
+  itemId: string; itemTask: string; onAttach: () => void; onComm: () => void; onCase: () => void; onMeeting: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button onClick={() => setOpen(!open)} className="p-1.5 hover:bg-ink-100 rounded-lg transition-colors">
+        <svg className="w-4 h-4 text-ink-400" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 z-30 bg-white border border-ink-200 rounded-lg shadow-lg py-1 w-48">
+          {[
+            { label: '📎 Attach Document', action: onAttach },
+            { label: '✉️ Send Communication', action: onComm },
+            { label: '📋 Add Case', action: onCase },
+            { label: '📅 Add Meeting', action: onMeeting },
+          ].map(item => (
+            <button key={item.label} onClick={() => { item.action(); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-mist-50 transition-colors">
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CompliancePage() {
   const comp = useComplianceStore();
@@ -48,6 +82,8 @@ export default function CompliancePage() {
   const [linkVoteId, setLinkVoteId] = useState('');
   // Case creation from meeting
   const [newCaseForm, setNewCaseForm] = useState({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' as string });
+  // Runbook action state
+  const [runbookAction, setRunbookAction] = useState<'case' | 'meeting'>('case');
 
   // Compliance scores
   const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => comp.completions[i.id]).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
@@ -178,7 +214,7 @@ export default function CompliancePage() {
         {tab === 'runbook' && (<div className="space-y-6">
           {refreshResult.regulatoryNotes.length > 0 && (<div className="bg-accent-50 border border-accent-200 rounded-xl p-4"><div className="flex items-center gap-2 mb-2"><span className="text-base">🔄</span><h4 className="text-xs font-bold text-accent-800">Compliance Auto-Refresh · {refreshResult.jurisdiction} Jurisdiction</h4></div><div className="space-y-1">{refreshResult.regulatoryNotes.map((n, i) => <p key={i} className="text-xs text-accent-700">{n}</p>)}</div>{refreshResult.documentsDetected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{refreshResult.documentsDetected.map(d => <span key={d} className="text-[10px] bg-accent-100 text-accent-700 px-2 py-0.5 rounded-lg font-medium">📄 {d}</span>)}</div>}</div>)}
           <div className="flex flex-wrap gap-2"><button onClick={() => setRoleFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>All Roles</button>{allRoles.map(r => (<button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === r ? 'bg-accent-600 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>{r}</button>))}</div>
-          {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div><div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const rc = ROLE_COLORS[item.role] || 'ink'; return (<div key={item.id} className={`p-4 flex items-start gap-4 ${done ? 'bg-sage-50 bg-opacity-30' : ''}`}><button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button><div className="flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><p className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>{item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}<span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span></div><p className="text-xs text-ink-400 mt-1">{item.tip}</p><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div></div></div>); })}</div></div>); })}
+          {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div><div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const rc = ROLE_COLORS[item.role] || 'ink'; return (<div key={item.id} className={`p-4 flex items-start gap-4 ${done ? 'bg-sage-50 bg-opacity-30' : ''}`}><button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button><div className="flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><p className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>{item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}<span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span></div><p className="text-xs text-ink-400 mt-1">{item.tip}</p><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div></div><RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => { setTargetId(item.id); setRunbookAction('meeting'); setModal('runbookLinkOrCreate'); }} /></div>); })}</div></div>); })}
         </div>)}
 
         {/* FILINGS */}
@@ -225,6 +261,26 @@ export default function CompliancePage() {
 
       {/* Create new case for meeting */}
       {modal === 'createCaseForMeeting' && (<Modal title="Create Case for Meeting" onClose={() => setModal(null)} onSave={handleCreateCaseForMeeting} saveLabel="Create & Link"><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Case Title *</label><input value={newCaseForm.title} onChange={e => setNewCaseForm({ ...newCaseForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., FY 2026 Budget Review" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Workflow</label><select value={newCaseForm.sitId} onChange={e => setNewCaseForm({ ...newCaseForm, sitId: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{GOV_SITS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Priority</label><select value={newCaseForm.priority} onChange={e => setNewCaseForm({ ...newCaseForm, priority: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div></div><div className="bg-mist-50 border border-mist-200 rounded-lg p-3"><p className="text-xs text-ink-600">This creates a new governance case in Case Ops with the selected workflow steps. The case will be linked to this meeting for tracking.</p>{newCaseForm.sitId === 'bylaw-amendment' && <p className="text-xs text-accent-700 mt-1 font-medium">📜 Bylaw Amendment workflow: drafting → legal review → owner notice → vote → recording</p>}{newCaseForm.sitId === 'annual-budgeting' && <p className="text-xs text-accent-700 mt-1 font-medium">📊 Budget workflow: preparation → review → approval vote → implementation</p>}{newCaseForm.sitId === 'elections' && <p className="text-xs text-accent-700 mt-1 font-medium">🗳 Election workflow: nominations → notice → balloting → certification</p>}</div></div></Modal>)}
+
+      {/* Runbook: Attach Document */}
+      {modal === 'addRunbookAtt' && (<Modal title="Attach Document to Checklist Item" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return alert('Select a file.'); comp.addFilingAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" label="Drop document here or click to browse" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
+
+      {/* Runbook: Link or Create Case/Meeting */}
+      {modal === 'runbookLinkOrCreate' && (<Modal title={runbookAction === 'case' ? 'Add Case' : 'Add Meeting'} onClose={() => setModal(null)} onSave={() => setModal(null)} saveLabel="Done"><div className="space-y-4">
+        <p className="text-xs text-ink-500">{runbookAction === 'case' ? 'Link an existing case or create a new one for this checklist item.' : 'Link an existing meeting or schedule a new one for this checklist item.'}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => { if (runbookAction === 'case') { setLinkCaseId(''); setModal('linkCaseToMeeting'); } else { setLinkCaseId(''); /* reuse link case modal for meeting */ const m = meetings.filter(mt => mt.status === 'SCHEDULED'); if (m.length > 0) { alert(`Available meetings: ${m.map(mt => mt.title + ' (' + mt.date + ')').join(', ')}\n\nIn a full implementation, you would select from a list.`); } else { alert('No scheduled meetings to link. Create a new one instead.'); } setModal(null); } }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
+            <span className="text-2xl">🔗</span>
+            <p className="text-sm font-semibold text-ink-900 mt-2">Link Existing</p>
+            <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Choose from open cases' : 'Choose from scheduled meetings'}</p>
+          </button>
+          <button onClick={() => { if (runbookAction === 'case') { setNewCaseForm({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' }); setModal('createCaseForMeeting'); } else { openAddMeeting(); } }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
+            <span className="text-2xl">✨</span>
+            <p className="text-sm font-semibold text-ink-900 mt-2">Create New</p>
+            <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Open a new case' : 'Schedule a new meeting'}</p>
+          </button>
+        </div>
+      </div></Modal>)}
     </div>
   );
 }
