@@ -195,8 +195,12 @@ export default function TheUnitsTab() {
       const data = await res.json();
       console.log('Invoice email result:', data);
 
+      if (data.stripeError) {
+        console.warn('Stripe error:', data.stripeError);
+      }
+
       if (data.success && data.emailSent) {
-        return { sent: true, paymentUrl: data.paymentUrl };
+        return { sent: true, paymentUrl: data.paymentUrl, error: data.stripeError ? `Email sent but Stripe failed: ${data.stripeError}` : undefined };
       }
       return { sent: false, error: data.error || 'Email delivery failed — check Mailjet sender domain.' };
     } catch (err) {
@@ -216,7 +220,7 @@ export default function TheUnitsTab() {
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
     if (result.sent) {
-      alert(`✅ Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.\n${result.paymentUrl ? 'Stripe payment link included.' : ''}`);
+      alert(`✅ Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
     } else {
       alert(`Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
     }
@@ -233,7 +237,7 @@ export default function TheUnitsTab() {
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
     if (result.sent) {
-      alert(`✅ Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.\n${result.paymentUrl ? 'Stripe payment link included.' : ''}`);
+      alert(`✅ Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
     } else {
       alert(`Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
     }

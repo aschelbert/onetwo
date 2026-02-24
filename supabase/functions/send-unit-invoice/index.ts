@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
 
     let paymentUrl = "";
     let stripeSessionId = "";
+    let stripeError = "";
 
     // Create Stripe Checkout Session
     if (STRIPE_KEY) {
@@ -56,12 +57,23 @@ Deno.serve(async (req) => {
       stripeParams.append("metadata[unit_number]", unitNumber || "");
       stripeParams.append("metadata[type]", type || "invoice");
 
+      // If a real Stripe Connect account ID is provided, create the session on that account
+      // with an application fee. Otherwise, create on the platform account.
+      const headers: Record<string, string> = {
+        "Authorization": `Bearer ${STRIPE_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+
+      if (body.stripeConnectId && body.stripeConnectId.startsWith("acct_") && body.stripeConnectId.length > 10) {
+        headers["Stripe-Account"] = body.stripeConnectId;
+        // Add application fee (2.9% platform fee)
+        stripeParams.append("payment_intent_data[application_fee_amount]", String(Math.round(amount * 100 * 0.029)));
+        console.log("Creating Checkout on connected account:", body.stripeConnectId);
+      }
+
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${STRIPE_KEY}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers,
         body: stripeParams.toString(),
       });
 
@@ -69,12 +81,16 @@ Deno.serve(async (req) => {
         const session = await stripeRes.json();
         paymentUrl = session.url || "";
         stripeSessionId = session.id || "";
-        console.log("Stripe session created:", stripeSessionId);
+        console.log("Stripe session created:", stripeSessionId, "url:", paymentUrl);
       } else {
-        const err = await stripeRes.text();
-        console.error("Stripe error:", stripeRes.status, err);
+        const errBody = await stripeRes.text();
+        console.error("Stripe error:", stripeRes.status, errBody);
+        stripeError = `Stripe ${stripeRes.status}: ${errBody.slice(0, 200)}`;
         // Continue without Stripe — still send email without payment link
       }
+    } else {
+      stripeError = "STRIPE_SECRET_KEY not set in Supabase secrets";
+      console.error(stripeError);
     }
 
     // Format amount
@@ -153,6 +169,7 @@ Deno.serve(async (req) => {
       emailSent,
       paymentUrl,
       stripeSessionId,
+      stripeError: stripeError || null,
       invoiceId,
     }), {
       status: 200, headers: { ...cors, "Content-Type": "application/json" },
