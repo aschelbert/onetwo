@@ -95,3 +95,21 @@ export interface BalanceSheet {
     total: number;
   };
 }
+
+export interface UnitInvoice {
+  id: string;
+  unitNumber: string;
+  type: 'fee' | 'special_assessment' | 'monthly';
+  description: string;
+  amount: number;
+  status: 'sent' | 'paid' | 'overdue' | 'void';
+  createdDate: string;
+  dueDate: string;
+  paidDate: string | null;
+  paidAmount: number | null;
+  paymentMethod: string | null;
+  stripePaymentLink: string | null;
+  glEntryId: string | null;
+  paymentGlEntryId: string | null;
+}
+

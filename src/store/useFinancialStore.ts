@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit } from '@/types/financial';
+import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 
 // ─── GL Filter state ─────────────────────────────────
@@ -21,6 +21,7 @@ interface FinancialState {
   units: Unit[];
   hoaDueDay: number;
   workOrders: WorkOrder[];
+  unitInvoices: UnitInvoice[];
 
   // UI state
   activeTab: string;
@@ -72,6 +73,8 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
+  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment', amount: number, description: string) => UnitInvoice;
+  payUnitInvoice: (invoiceId: string, method: string) => void;
 
   // CoA mutations
   addCoASection: (num: string, name: string, type: string) => void;
@@ -106,6 +109,7 @@ export const useFinancialStore = create<FinancialState>((set, get) => ({
   units: seedUnits,
   hoaDueDay: 15,
   workOrders: [...seedWorkOrders],
+  unitInvoices: [],
 
   activeTab: 'dashboard',
   glFilter: { account: '', source: '', search: '' },
@@ -537,4 +541,41 @@ export const useFinancialStore = create<FinancialState>((set, get) => ({
   stripeOnboardingComplete: false,
   setStripeConnect: (id) => set({ stripeConnectId: id }),
   setStripeOnboarding: (complete) => set({ stripeOnboardingComplete: complete }),
+
+  // Unit Invoices
+  createUnitInvoice: (unitNum, type, amount, description) => {
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const id = 'INV-U' + Date.now().toString(36).toUpperCase();
+    const glAcct = type === 'fee' ? '1130' : '1120';
+    const glRev = type === 'fee' ? '4030' : '4020';
+    const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
+    const invoice: UnitInvoice = {
+      id, unitNumber: unitNum, type, description, amount,
+      status: 'sent', createdDate: today, dueDate, paidDate: null,
+      paidAmount: null, paymentMethod: null, stripePaymentLink: null,
+      glEntryId: glEntry?.id || null, paymentGlEntryId: null,
+    };
+    set(s => ({ unitInvoices: [...s.unitInvoices, invoice] }));
+    return invoice;
+  },
+
+  payUnitInvoice: (invoiceId, method) => {
+    const today = new Date().toISOString().split('T')[0];
+    const inv = get().unitInvoices.find(i => i.id === invoiceId);
+    if (!inv || inv.status === 'paid') return;
+    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, '1010', inv.type === 'fee' ? '1130' : '1120', inv.amount, 'payment', inv.unitNumber);
+    set(s => ({
+      unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
+        ...i, status: 'paid' as const, paidDate: today, paidAmount: inv.amount,
+        paymentMethod: method, paymentGlEntryId: glEntry?.id || null,
+      } : i),
+      units: s.units.map(u => u.number === inv.unitNumber ? {
+        ...u,
+        balance: Math.max(0, u.balance - inv.amount),
+        payments: [...u.payments, { date: today, amount: inv.amount, method, note: `Invoice ${inv.id}` }],
+      } : u),
+    }));
+  },
 }));
+

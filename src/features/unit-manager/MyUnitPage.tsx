@@ -19,14 +19,43 @@ export default function MyUnitPage() {
   const linkedUnits = currentUser?.linkedUnits || [];
   const myUnits = units.filter(u => linkedUnits.includes(u.number));
   const stripeReady = stripeConnectId && stripeOnboardingComplete;
+  const allUnits = units;
+
+  // Unit linking
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const { updateProfile } = useAuthStore();
+
+  const handleLinkUnit = (unitNum: string) => {
+    const newLinked = [...linkedUnits, unitNum];
+    updateProfile({ linkedUnits: newLinked });
+  };
+  const handleUnlinkUnit = (unitNum: string) => {
+    const newLinked = linkedUnits.filter(n => n !== unitNum);
+    updateProfile({ linkedUnits: newLinked });
+  };
 
   if (myUnits.length === 0) {
     return (
       <div className="max-w-xl mx-auto text-center py-16">
         <div className="text-6xl mb-4">🏠</div>
         <h2 className="font-display text-2xl font-bold text-ink-900 mb-2">No Unit Linked</h2>
-        <p className="text-ink-500 mb-6">Link your unit in Account Settings to view your assessments, payment history, and manage your HOA account.</p>
-        <button onClick={() => navigate('/account')} className="px-6 py-3 bg-accent-600 text-white rounded-lg font-medium hover:bg-accent-700">Go to My Account →</button>
+        <p className="text-ink-500 mb-6">Select your unit(s) from the list below to view assessments, payment history, and manage your HOA account.</p>
+        <div className="bg-white rounded-xl border border-ink-100 shadow-sm max-w-md mx-auto">
+          <div className="border-b px-5 py-3"><h3 className="text-sm font-bold text-ink-800">Available Units</h3></div>
+          <div className="max-h-64 overflow-y-auto divide-y divide-ink-50">
+            {allUnits.length === 0 ? (
+              <p className="p-4 text-sm text-ink-400">No units configured yet. Contact your board administrator.</p>
+            ) : allUnits.map(u => (
+              <div key={u.number} className="flex items-center justify-between px-5 py-3 hover:bg-mist-50">
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">Unit {u.number}</p>
+                  <p className="text-xs text-ink-400">{u.owner} · {u.status}</p>
+                </div>
+                <button onClick={() => handleLinkUnit(u.number)} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Link to My Account</button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -92,6 +121,7 @@ export default function MyUnitPage() {
             <h1 className="font-display text-2xl font-bold">My Unit{myUnits.length > 1 ? 's' : ''}</h1>
             <p className="text-accent-100 text-sm mt-1">{currentUser?.name} · {myUnits.length} unit{myUnits.length !== 1 ? 's' : ''} · Due {hoaDueDay}{getOrdinalSuffix(hoaDueDay)} monthly</p>
           </div>
+          <button onClick={() => setShowLinkModal(true)} className="px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg text-sm font-medium hover:bg-opacity-30">+ Link Unit</button>
         </div>
       </div>
 
@@ -370,6 +400,45 @@ export default function MyUnitPage() {
           </div>
         </div>
       )}
+
+      {/* Link Unit Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowLinkModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="border-b p-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-ink-900">Link a Unit</h2>
+              <button onClick={() => setShowLinkModal(false)} className="text-ink-400 hover:text-ink-600 text-xl">✕</button>
+            </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-ink-50">
+              {allUnits.filter(u => !linkedUnits.includes(u.number)).length === 0 ? (
+                <p className="p-5 text-sm text-ink-400 text-center">All units are already linked to your account.</p>
+              ) : allUnits.filter(u => !linkedUnits.includes(u.number)).map(u => (
+                <div key={u.number} className="flex items-center justify-between px-5 py-3 hover:bg-mist-50">
+                  <div>
+                    <p className="text-sm font-semibold text-ink-900">Unit {u.number}</p>
+                    <p className="text-xs text-ink-400">{u.owner} · {u.status}</p>
+                  </div>
+                  <button onClick={() => { handleLinkUnit(u.number); setShowLinkModal(false); }} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Link</button>
+                </div>
+              ))}
+            </div>
+            {linkedUnits.length > 0 && (
+              <div className="border-t p-4">
+                <p className="text-xs font-semibold text-ink-500 uppercase mb-2">Currently Linked</p>
+                <div className="flex flex-wrap gap-2">
+                  {linkedUnits.map(num => (
+                    <span key={num} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-mist-50 border border-mist-200 rounded-lg text-xs text-ink-700">
+                      Unit {num}
+                      <button onClick={() => handleUnlinkUnit(num)} className="text-red-400 hover:text-red-600 font-bold">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
