@@ -141,46 +141,134 @@ export default function TheUnitsTab() {
     store.recordUnitPayment(selected, parseFloat(f('amount')), f('method') || 'ACH');
     setModal(null); resetForm();
   };
-  const handleFee = () => {
+  // Send invoice email via Edge Function
+  const [sending, setSending] = useState(false);
+
+  const sendInvoiceEmail = async (invoiceId: string, unitNum: string, amount: number, description: string, type: 'fee' | 'special_assessment'): Promise<{ sent: boolean; paymentUrl?: string; error?: string }> => {
+    const unit = store.units.find(u => u.number === unitNum);
+    const ownerEmail = unit?.email || '';
+    const ownerName = unit?.owner || '';
+
+    if (!ownerEmail) {
+      return { sent: false, error: `No email address on file for Unit ${unitNum}.` };
+    }
+
+    // Try Supabase Edge Function
+    const sbUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+    if (!sbUrl || sbUrl.includes('YOUR_PROJECT') || !sbKey) {
+      console.warn('Supabase env vars not configured, skipping email send');
+      return { sent: false, error: 'Backend not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.' };
+    }
+
+    const payload = {
+      invoiceId, unitNumber: unitNum, ownerName, ownerEmail,
+      amount, description, type, buildingName: building.name,
+      buildingAddress: `${building.address.street}, ${building.address.city}, ${building.address.state} ${building.address.zip}`,
+    };
+
+    console.log('Sending invoice email:', payload);
+
+    try {
+      const res = await fetch(`${sbUrl}/functions/v1/send-unit-invoice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': sbKey,
+          'Authorization': `Bearer ${sbKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log('Invoice email response status:', res.status);
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Invoice email error response:', text);
+        if (res.status === 404) {
+          return { sent: false, error: 'Edge Function not deployed. Run: supabase functions deploy send-unit-invoice --no-verify-jwt' };
+        }
+        return { sent: false, error: `Server error ${res.status}: ${text.slice(0, 100)}` };
+      }
+
+      const data = await res.json();
+      console.log('Invoice email result:', data);
+
+      if (data.success && data.emailSent) {
+        return { sent: true, paymentUrl: data.paymentUrl };
+      }
+      return { sent: false, error: data.error || 'Email delivery failed — check Mailjet sender domain.' };
+    } catch (err) {
+      console.error('sendInvoiceEmail network error:', err);
+      return { sent: false, error: `Network error: ${String(err)}` };
+    }
+  };
+
+  const handleFee = async () => {
     if (!selected || !f('amount')) return;
     const amount = parseFloat(f('amount'));
     const reason = f('reason') || 'Late payment';
+    setSending(true);
     store.imposeLateFee(selected, amount, reason);
-    // Create invoice record
     const invoice = store.createUnitInvoice(selected, 'fee', amount, `Late Fee: ${reason}`);
+    const result = await sendInvoiceEmail(invoice.id, selected, amount, `Late Fee: ${reason}`, 'fee');
+    setSending(false);
     const unit = store.units.find(u => u.number === selected);
-    alert(`Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created and recorded in GL.\n${unit?.email ? `Invoice email would be sent to ${unit.email}.` : ''}`);
+    if (result.sent) {
+      alert(`✅ Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.\n${result.paymentUrl ? 'Stripe payment link included.' : ''}`);
+    } else {
+      alert(`Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
-  const handleSpecial = () => {
+  const handleSpecial = async () => {
     if (!selected || !f('amount') || !f('reason')) return alert('Amount and reason required.');
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
+    setSending(true);
     store.addSpecialAssessment(selected, amount, reason);
-    // Create invoice record
     const invoice = store.createUnitInvoice(selected, 'special_assessment', amount, `Special Assessment: ${reason}`);
+    const result = await sendInvoiceEmail(invoice.id, selected, amount, `Special Assessment: ${reason}`, 'special_assessment');
+    setSending(false);
     const unit = store.units.find(u => u.number === selected);
-    alert(`Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created and recorded in GL.\n${unit?.email ? `Invoice email would be sent to ${unit.email}.` : ''}`);
+    if (result.sent) {
+      alert(`✅ Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.\n${result.paymentUrl ? 'Stripe payment link included.' : ''}`);
+    } else {
+      alert(`Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
-  const handleBulkAssessment = () => {
+  const handleBulkAssessment = async () => {
     if (!f('amount') || !f('reason') || selectedUnits.length === 0) return alert('Select units, enter amount and reason.');
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
-    selectedUnits.forEach(unitNum => {
+    setSending(true);
+    let sentCount = 0;
+    for (const unitNum of selectedUnits) {
       store.addSpecialAssessment(unitNum, amount, reason);
-      store.createUnitInvoice(unitNum, 'special_assessment', amount, `Special Assessment: ${reason}`);
-    });
-    alert(`Bulk assessment of ${fmt(amount)} applied to ${selectedUnits.length} units.\n${selectedUnits.length} invoices created and recorded in GL.`);
+      const invoice = store.createUnitInvoice(unitNum, 'special_assessment', amount, `Special Assessment: ${reason}`);
+      const result = await sendInvoiceEmail(invoice.id, unitNum, amount, `Special Assessment: ${reason}`, 'special_assessment');
+      if (result.sent) sentCount++;
+    }
+    setSending(false);
+    alert(`Bulk assessment of ${fmt(amount)} applied to ${selectedUnits.length} units.\n✅ ${sentCount}/${selectedUnits.length} invoice emails sent.`);
     setModal(null); resetForm();
   };
-  const handleSendInvoice = () => {
+  const handleSendInvoice = async () => {
     if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
     const amount = parseFloat(f('amount'));
+    setSending(true);
     store.addSpecialAssessment(f('unitNum'), amount, f('description'));
     const invoice = store.createUnitInvoice(f('unitNum'), 'special_assessment', amount, f('description'));
+    const result = await sendInvoiceEmail(invoice.id, f('unitNum'), amount, f('description'), 'special_assessment');
+    setSending(false);
     const unit = store.units.find(u => u.number === f('unitNum'));
-    alert(`Invoice ${invoice.id} sent to ${unit?.owner || f('unitNum')} for ${fmt(amount)}.`);
+    if (result.sent) {
+      alert(`✅ Invoice ${invoice.id} sent to ${unit?.owner || f('unitNum')} (${unit?.email}).`);
+    } else {
+      alert(`Invoice ${invoice.id} created for ${unit?.owner || f('unitNum')}.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
   const handleUpdateMonthly = () => {
@@ -430,9 +518,9 @@ export default function TheUnitsTab() {
 
       {modal === 'pay' && <Modal title={`Record Payment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handlePay}><div className="space-y-3"><Field label="Amount *" k="amount" type="number" placeholder={selectedUnit ? String(selectedUnit.balance) : ''} /><div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method') || 'ACH'} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACH">ACH / Bank Transfer</option><option value="check">Check</option>{stripeReady && <option value="stripe">Stripe (Online)</option>}<option value="cash">Cash</option><option value="wire">Wire Transfer</option></select></div></div></Modal>}
 
-      {modal === 'fee' && <Modal title={`Impose Fee — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleFee}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A fee invoice will be created, recorded in the GL, and emailed to the unit owner.</p><Field label="Amount *" k="amount" type="number" placeholder="25" /><Field label="Reason *" k="reason" placeholder="e.g., Late payment — Feb 2026" /></div></Modal>}
+      {modal === 'fee' && <Modal title={`Impose Fee — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleFee} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A fee invoice will be created, recorded in the GL, and emailed to the unit owner.</p><Field label="Amount *" k="amount" type="number" placeholder="25" /><Field label="Reason *" k="reason" placeholder="e.g., Late payment — Feb 2026" />{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
-      {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p><Field label="Amount *" k="amount" type="number" placeholder="500" /><Field label="Reason *" k="reason" placeholder="e.g., Roof emergency repair assessment" /></div></Modal>}
+      {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p><Field label="Amount *" k="amount" type="number" placeholder="500" /><Field label="Reason *" k="reason" placeholder="e.g., Roof emergency repair assessment" />{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
       {modal === 'editDueDay' && <Modal title="Assessment Due Day" onClose={() => { setModal(null); resetForm(); }} onSave={() => { store.setHoaDueDay(parseInt(f('dueDay')) || 1); setModal(null); resetForm(); }}><div className="space-y-3"><p className="text-xs text-ink-500">Set the day of the month when monthly assessments are due.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Day (1-28)</label><input type="number" min="1" max="28" value={f('dueDay')} onChange={e => sf('dueDay', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
