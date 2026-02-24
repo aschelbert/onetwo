@@ -48,6 +48,7 @@ export default function AuthPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
 
@@ -148,6 +149,7 @@ export default function AuthPage() {
               addMember(m);
               login(m);
               setLoginLoading(false);
+              setSessionChecking(false);
               return;
             }
             setLoginLoading(false);
@@ -155,7 +157,10 @@ export default function AuthPage() {
         } catch (err) {
           console.warn('Session check failed:', err);
         }
+        setSessionChecking(false);
       })();
+    } else {
+      setSessionChecking(false);
     }
 
     // Restore Supabase session from redirect (subdomain handoff)
@@ -525,6 +530,17 @@ export default function AuthPage() {
     login(newMember);
   };
 
+  if (sessionChecking) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-mist-100 via-white to-sage-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-ink-300 border-t-ink-900 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-ink-400">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
       <div className="w-full max-w-md mx-4">
@@ -836,4 +852,3 @@ export default function AuthPage() {
   );
 }
 
-// rebuild

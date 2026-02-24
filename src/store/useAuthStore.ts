@@ -100,13 +100,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       currentRole: 'BOARD_MEMBER',
     }),
 
-  signOut: () =>
+  signOut: () => {
+    // Sign out of Supabase if available
+    import('@/lib/supabase').then(({ supabase, isBackendEnabled }) => {
+      if (isBackendEnabled && supabase) {
+        supabase.auth.signOut().catch(() => {});
+      }
+    });
     set({
       isAuthenticated: false,
       authStep: 'welcome',
       currentUser: defaultUser,
       currentRole: 'BOARD_MEMBER',
-    }),
+    });
+  },
 
   updateProfile: (updates) =>
     set((state) => ({
