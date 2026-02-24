@@ -18,11 +18,15 @@ export interface OwnerCommunication {
 
 interface ComplianceState {
   completions: Record<string, boolean>;
+  itemAttachments: Record<string, FilingAttachment[]>;
   filings: RegulatoryFiling[];
   communications: OwnerCommunication[];
 
   toggleItem: (id: string) => void;
   setCompletion: (id: string, val: boolean) => void;
+
+  addItemAttachment: (itemId: string, att: FilingAttachment) => void;
+  removeItemAttachment: (itemId: string, attName: string) => void;
 
   addFiling: (f: Omit<RegulatoryFiling, 'id' | 'status' | 'filedDate' | 'confirmationNum' | 'attachments'>) => void;
   markFilingComplete: (id: string, filedDate: string, confirmationNum: string) => void;
@@ -39,6 +43,8 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
     g1: true, g3: true, g4: true, f1: true, f2: true, f4: true, f5: true,
     i1: true, i2: true, i4: true, m2: true, m3: true, r1: true, r2: true, r4: true,
   },
+
+  itemAttachments: {},
 
   filings: [
     { id: 'rf1', name: 'DC Biennial Report', category: 'government', dueDate: '2026-04-01', status: 'pending', filedDate: null, confirmationNum: '', notes: 'File with DCRA. $80 fee.', responsible: 'President', recurrence: 'biennial', legalRef: 'DC Code § 29-102.11', attachments: [] },
@@ -60,6 +66,13 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
 
   toggleItem: (id) => set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } })),
   setCompletion: (id, val) => set(s => ({ completions: { ...s.completions, [id]: val } })),
+
+  addItemAttachment: (itemId, att) => set(s => ({
+    itemAttachments: { ...s.itemAttachments, [itemId]: [...(s.itemAttachments[itemId] || []), att] }
+  })),
+  removeItemAttachment: (itemId, attName) => set(s => ({
+    itemAttachments: { ...s.itemAttachments, [itemId]: (s.itemAttachments[itemId] || []).filter(a => a.name !== attName) }
+  })),
 
   addFiling: (f) => set(s => ({ filings: [...s.filings, { id: 'rf' + Date.now(), status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f }] })),
   markFilingComplete: (id, filedDate, confirmationNum) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, status: 'filed', filedDate, confirmationNum } : f) })),

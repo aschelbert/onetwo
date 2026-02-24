@@ -25,9 +25,18 @@ export default function MyUnitPage() {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const { updateProfile } = useAuthStore();
 
-  const handleLinkUnit = (unitNum: string) => {
+  const handleLinkUnit = (unitNum: string, isPrimary: boolean) => {
     const newLinked = [...linkedUnits, unitNum];
     updateProfile({ linkedUnits: newLinked });
+    // Auto-populate unit owner info from current user if primary
+    if (isPrimary && currentUser) {
+      store.updateUnit(unitNum, {
+        owner: currentUser.name,
+        email: currentUser.email,
+        phone: currentUser.phone || '',
+        status: 'OCCUPIED',
+      });
+    }
   };
   const handleUnlinkUnit = (unitNum: string) => {
     const newLinked = linkedUnits.filter(n => n !== unitNum);
@@ -51,7 +60,10 @@ export default function MyUnitPage() {
                   <p className="text-sm font-semibold text-ink-900">Unit {u.number}</p>
                   <p className="text-xs text-ink-400">{u.owner} · {u.status}</p>
                 </div>
-                <button onClick={() => handleLinkUnit(u.number)} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Link to My Account</button>
+                <div className="flex gap-2">
+                  <button onClick={() => handleLinkUnit(u.number, true)} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Link as Primary</button>
+                  <button onClick={() => handleLinkUnit(u.number, false)} className="px-3 py-1.5 bg-ink-100 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-200">Link as Co-owner</button>
+                </div>
               </div>
             ))}
           </div>
@@ -406,7 +418,10 @@ export default function MyUnitPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowLinkModal(false)}>
           <div className="bg-white rounded-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
             <div className="border-b p-5 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-ink-900">Link a Unit</h2>
+              <div>
+                <h2 className="text-lg font-bold text-ink-900">Link a Unit</h2>
+                <p className="text-xs text-ink-400 mt-1">Primary: your name, email & phone auto-populate as unit contact. Co-owner: link only.</p>
+              </div>
               <button onClick={() => setShowLinkModal(false)} className="text-ink-400 hover:text-ink-600 text-xl">✕</button>
             </div>
             <div className="max-h-80 overflow-y-auto divide-y divide-ink-50">
@@ -418,7 +433,10 @@ export default function MyUnitPage() {
                     <p className="text-sm font-semibold text-ink-900">Unit {u.number}</p>
                     <p className="text-xs text-ink-400">{u.owner} · {u.status}</p>
                   </div>
-                  <button onClick={() => { handleLinkUnit(u.number); setShowLinkModal(false); }} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Link</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => { handleLinkUnit(u.number, true); setShowLinkModal(false); }} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium hover:bg-accent-700">Primary</button>
+                    <button onClick={() => { handleLinkUnit(u.number, false); setShowLinkModal(false); }} className="px-3 py-1.5 bg-ink-100 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-200">Co-owner</button>
+                  </div>
                 </div>
               ))}
             </div>
