@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 
@@ -20,6 +21,7 @@ interface FinancialState {
   glNextId: number;
   units: Unit[];
   hoaDueDay: number;
+  annualReserveContribution: number;
   workOrders: WorkOrder[];
   unitInvoices: UnitInvoice[];
 
@@ -58,6 +60,10 @@ interface FinancialState {
 
   // Mutations
   addBudgetCategory: (name: string, budgeted: number) => void;
+  updateBudgetCategory: (id: string, updates: { name?: string; budgeted?: number }) => void;
+  deleteBudgetCategory: (id: string) => void;
+  setAnnualReserveContribution: (amount: number) => void;
+  getOperatingBudget: () => { annualRevenue: number; reserveContribution: number; operatingBudget: number; totalAllocated: number; unallocated: number; overAllocated: boolean };
   addExpense: (categoryId: string, expense: { description: string; amount: number; date: string; vendor: string; invoice: string }) => void;
   deleteExpense: (categoryId: string, expenseId: string) => void;
   addReserveItem: (item: Omit<ReserveItem, 'id'>) => void;
@@ -99,7 +105,7 @@ interface FinancialState {
   setStripeOnboarding: (complete: boolean) => void;
 }
 
-export const useFinancialStore = create<FinancialState>((set, get) => ({
+export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
   budgetCategories: seedBudgetCategories,
   reserveItems: seedReserveItems,
   chartOfAccounts: [...seedChartOfAccounts],
@@ -108,6 +114,7 @@ export const useFinancialStore = create<FinancialState>((set, get) => ({
   glNextId: 1000,
   units: seedUnits,
   hoaDueDay: 15,
+  annualReserveContribution: 12000,
   workOrders: [...seedWorkOrders],
   unitInvoices: [],
 
@@ -362,6 +369,29 @@ export const useFinancialStore = create<FinancialState>((set, get) => ({
       budgetCategories: [...s.budgetCategories, { id: 'cat' + Date.now(), name, budgeted, expenses: [] }],
     })),
 
+  updateBudgetCategory: (id, updates) =>
+    set((s) => ({
+      budgetCategories: s.budgetCategories.map((c) =>
+        c.id === id ? { ...c, ...updates } : c
+      ),
+    })),
+
+  deleteBudgetCategory: (id) =>
+    set((s) => ({
+      budgetCategories: s.budgetCategories.filter((c) => c.id !== id),
+    })),
+
+  setAnnualReserveContribution: (amount) => set({ annualReserveContribution: amount }),
+
+  getOperatingBudget: () => {
+    const { units, annualReserveContribution, budgetCategories } = get();
+    const annualRevenue = units.reduce((sum, u) => sum + u.monthlyFee, 0) * 12;
+    const operatingBudget = annualRevenue - annualReserveContribution;
+    const totalAllocated = budgetCategories.reduce((sum, c) => sum + c.budgeted, 0);
+    const unallocated = operatingBudget - totalAllocated;
+    return { annualRevenue, reserveContribution: annualReserveContribution, operatingBudget, totalAllocated, unallocated, overAllocated: totalAllocated > operatingBudget };
+  },
+
   addExpense: (categoryId, expense) =>
     set((s) => ({
       budgetCategories: s.budgetCategories.map((c) =>
@@ -577,5 +607,26 @@ export const useFinancialStore = create<FinancialState>((set, get) => ({
       } : u),
     }));
   },
+}), {
+  name: 'onetwo-financial',
+  partialize: (state) => ({
+    budgetCategories: state.budgetCategories,
+    reserveItems: state.reserveItems,
+    chartOfAccounts: state.chartOfAccounts,
+    acctStatus: state.acctStatus,
+    generalLedger: state.generalLedger,
+    glNextId: state.glNextId,
+    units: state.units,
+    hoaDueDay: state.hoaDueDay,
+    annualReserveContribution: state.annualReserveContribution,
+    workOrders: state.workOrders,
+    unitInvoices: state.unitInvoices,
+    stripeConnectId: state.stripeConnectId,
+    stripeOnboardingComplete: state.stripeOnboardingComplete,
+  }),
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+  }),
 }));
 
