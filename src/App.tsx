@@ -7,7 +7,6 @@ import DashboardPage from '@/features/dashboard/DashboardPage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import BuildingPage from '@/features/building/BuildingPage';
-import CompliancePage from '@/features/compliance/CompliancePage';
 import ArchivesPage from '@/features/archives/ArchivesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
@@ -75,7 +74,7 @@ export default function App() {
           <Route path="/financial" element={<FinancialPage />} />
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/building" element={<BuildingPage />} />
-          <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/archives" element={<ArchivesPage />} />
           <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
           <Route path="/boardroom" element={<BoardRoomPage />} />

@@ -13,11 +13,10 @@ export const navigation: Record<Role, NavItem[]> = {
   ],
   BOARD_MEMBER: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-    { id: 'compliance', label: 'Compliance Runbook', path: '/compliance' },
+    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
-    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
   RESIDENT: [
@@ -29,11 +28,10 @@ export const navigation: Record<Role, NavItem[]> = {
   ],
   PROPERTY_MANAGER: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
-    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
-    { id: 'compliance', label: 'Compliance Runbook', path: '/compliance' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
 };

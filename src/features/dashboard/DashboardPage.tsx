@@ -84,7 +84,7 @@ export default function DashboardPage() {
   // ─── BOARD / MANAGEMENT DASHBOARD ───
   if (isBoard) {
     const attentionItems: { label: string; count: number; color: string; path: string; icon: string }[] = [];
-    if (overdueFilings.length > 0) attentionItems.push({ label: 'Overdue Filings', count: overdueFilings.length, color: 'red', path: '/compliance', icon: '📅' });
+    if (overdueFilings.length > 0) attentionItems.push({ label: 'Overdue Filings', count: overdueFilings.length, color: 'red', path: '/boardroom', icon: '📅' });
     if (urgentCases.length > 0) attentionItems.push({ label: 'Urgent Cases', count: urgentCases.length, color: 'red', path: '/issues', icon: '🚨' });
     if (submittedIssues.length > 0) attentionItems.push({ label: 'New Issues', count: submittedIssues.length, color: 'amber', path: '/issues', icon: '📥' });
     if (expiringInsurance.length > 0) attentionItems.push({ label: 'Insurance Expiring', count: expiringInsurance.length, color: 'amber', path: '/building', icon: '🛡' });
@@ -94,8 +94,8 @@ export default function DashboardPage() {
     type Activity = { icon: string; text: string; date: string; path: string };
     const activities: Activity[] = [];
     pastMeetings.slice(0, 2).forEach(m => activities.push({ icon: '🗓', text: `${m.title} completed`, date: m.date, path: '/boardroom' }));
-    comp.filings.filter(f => f.status === 'filed').slice(0, 2).forEach(f => activities.push({ icon: '✅', text: `${f.name} filed`, date: f.filedDate || '', path: '/compliance' }));
-    recentComms.slice(0, 2).forEach(c => activities.push({ icon: '📨', text: c.subject, date: c.date, path: '/compliance' }));
+    comp.filings.filter(f => f.status === 'filed').slice(0, 2).forEach(f => activities.push({ icon: '✅', text: `${f.name} filed`, date: f.filedDate || '', path: '/boardroom' }));
+    recentComms.slice(0, 2).forEach(c => activities.push({ icon: '📨', text: c.subject, date: c.date, path: '/boardroom' }));
     archives.archives.slice(0, 1).forEach(a => activities.push({ icon: '📦', text: `${a.label} archived`, date: a.createdAt.split('T')[0], path: '/archives' }));
     activities.sort((a, b) => b.date.localeCompare(a.date));
 
@@ -152,13 +152,13 @@ export default function DashboardPage() {
 
           type ActionItem = { icon: string; label: string; sub: string; path: string; color: string; priority: number };
           const actionItems: ActionItem[] = [];
-          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/compliance', color: 'red', priority: 1 }));
+          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/boardroom', color: 'red', priority: 1 }));
           myCases.forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, path: '/issues', color: 'red', priority: 2 }));
           if (nextMtg) {
             const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
           }
-          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/compliance', color: i.critical ? 'red' : 'amber', priority: 4 }));
+          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/boardroom', color: i.critical ? 'red' : 'amber', priority: 4 }));
           actionItems.sort((a, b) => a.priority - b.priority);
 
           return (
@@ -199,7 +199,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             <div className="grid grid-cols-2 gap-3">
-              <div onClick={() => navigate('/compliance')} className="bg-white rounded-xl border border-ink-100 p-5 cursor-pointer hover:border-sage-300 hover:shadow-sm transition-all">
+              <div onClick={() => navigate('/boardroom')} className="bg-white rounded-xl border border-ink-100 p-5 cursor-pointer hover:border-sage-300 hover:shadow-sm transition-all">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-ink-700">Compliance Runbook</h3>
                   <span className={`text-2xl font-bold ${complianceScore >= 75 ? 'text-sage-600' : complianceScore >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>{complianceScore}%</span>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <QAction icon="📋" label="Case Ops" sub={`${openCases.length} open`} onClick={() => navigate('/issues')} />
                 <QAction icon="💰" label="Fiscal Lens" sub={`${metrics.collectionRate}% rate`} onClick={() => navigate('/financial')} />
-                <QAction icon="✅" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/compliance')} />
+                <QAction icon="✅" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/boardroom')} />
                 <QAction icon="🏢" label="Building" sub={`${buildingGrade} health`} onClick={() => navigate('/building')} />
               </div>
             </div>
