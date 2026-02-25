@@ -1,7 +1,6 @@
 {
   "rewrites": [
     { "source": "/login", "destination": "/app.html" },
-    { "source": "/reset-password", "destination": "/app.html" },
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/financial", "destination": "/app.html" },
     { "source": "/issues", "destination": "/app.html" },
@@ -9,6 +8,7 @@
     { "source": "/compliance", "destination": "/app.html" },
     { "source": "/archives", "destination": "/app.html" },
     { "source": "/voting", "destination": "/app.html" },
+    { "source": "/boardroom", "destination": "/app.html" },
     { "source": "/my-unit", "destination": "/app.html" },
     { "source": "/account", "destination": "/app.html" },
     { "source": "/admin/:path*", "destination": "/app.html" }
