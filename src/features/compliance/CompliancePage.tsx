@@ -298,6 +298,7 @@ export default function CompliancePage() {
                 {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
                 {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
                 {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
                 <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
               </div>
               <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
@@ -350,21 +351,38 @@ export default function CompliancePage() {
       {modal === 'addRunbookAtt' && (<Modal title="Attach Document to Checklist Item" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return alert('Select a file.'); comp.addItemAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" label="Drop document here or click to browse" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
 
       {/* Runbook: Link or Create Case/Meeting */}
-      {modal === 'runbookLinkOrCreate' && (<Modal title={runbookAction === 'case' ? 'Add Case' : 'Add Meeting'} onClose={() => setModal(null)} onSave={() => setModal(null)} saveLabel="Done"><div className="space-y-4">
-        <p className="text-xs text-ink-500">{runbookAction === 'case' ? 'Link an existing case or create a new one for this checklist item.' : 'Link an existing meeting or schedule a new one for this checklist item.'}</p>
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => { if (runbookAction === 'case') { setLinkCaseId(''); setModal('linkCaseToMeeting'); } else { setLinkCaseId(''); /* reuse link case modal for meeting */ const m = meetings.filter(mt => mt.status === 'SCHEDULED'); if (m.length > 0) { alert(`Available meetings: ${m.map(mt => mt.title + ' (' + mt.date + ')').join(', ')}\n\nIn a full implementation, you would select from a list.`); } else { alert('No scheduled meetings to link. Create a new one instead.'); } setModal(null); } }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
-            <span className="text-2xl">🔗</span>
-            <p className="text-sm font-semibold text-ink-900 mt-2">Link Existing</p>
-            <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Choose from open cases' : 'Choose from scheduled meetings'}</p>
-          </button>
-          <button onClick={() => { if (runbookAction === 'case') { setNewCaseForm({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' }); setModal('createCaseForMeeting'); } else { openAddMeeting(); } }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
-            <span className="text-2xl">✨</span>
-            <p className="text-sm font-semibold text-ink-900 mt-2">Create New</p>
-            <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Open a new case' : 'Schedule a new meeting'}</p>
-          </button>
-        </div>
-      </div></Modal>)}
+      {modal === 'runbookLinkOrCreate' && (() => {
+        const item = categories.flatMap(c => c.items).find(i => i.id === targetId);
+        return (<Modal title={runbookAction === 'case' ? 'Add Case' : 'Schedule Meeting'} onClose={() => setModal(null)} onSave={() => setModal(null)} saveLabel="Done"><div className="space-y-4">
+          <p className="text-xs text-ink-500">{runbookAction === 'case' ? 'Link an existing case or create a new one for this checklist item.' : 'Link an existing meeting or schedule a new one for this checklist item.'}</p>
+          {item && <div className="bg-mist-50 border border-mist-200 rounded-lg p-3"><p className="text-xs font-semibold text-ink-700">📋 {item.task}</p><p className="text-[10px] text-ink-400 mt-0.5">{item.legalRef} · {item.role} · {item.freq}</p></div>}
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => { if (runbookAction === 'case') { setLinkCaseId(''); setModal('linkCaseToMeeting'); } else { setLinkCaseId(''); const m = meetings.filter(mt => mt.status === 'SCHEDULED'); if (m.length > 0) { alert(`Available meetings: ${m.map(mt => mt.title + ' (' + mt.date + ')').join(', ')}\n\nIn a full implementation, you would select from a list.`); } else { alert('No scheduled meetings to link. Create a new one instead.'); } setModal(null); } }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
+              <span className="text-2xl">🔗</span>
+              <p className="text-sm font-semibold text-ink-900 mt-2">Link Existing</p>
+              <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Choose from open cases' : 'Choose from scheduled meetings'}</p>
+            </button>
+            <button onClick={() => {
+              if (runbookAction === 'case') {
+                setNewCaseForm({ catId: 'governance', sitId: 'board-meetings', title: item?.task || '', priority: item?.critical ? 'high' : 'medium' });
+                setModal('createCaseForMeeting');
+              } else {
+                // Auto-create meeting from runbook item metadata
+                const mType = item?.meetingType || 'BOARD';
+                const agenda = item?.suggestedAgenda || [item?.task || 'Agenda item'];
+                mtg.addMeeting({ title: `${item?.task || 'Meeting'}`, type: mType, status: 'SCHEDULED', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda, notes: `Created from Compliance Runbook: ${item?.task || ''}. ${item?.legalRef || ''}` });
+                comp.toggleCompletion(targetId);
+                setModal(null);
+                navigate('/boardroom');
+              }
+            }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors">
+              <span className="text-2xl">✨</span>
+              <p className="text-sm font-semibold text-ink-900 mt-2">Create New</p>
+              <p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Open a new case' : 'Schedule meeting & mark complete'}</p>
+            </button>
+          </div>
+        </div></Modal>);
+      })()}
     </div>
   );
 }

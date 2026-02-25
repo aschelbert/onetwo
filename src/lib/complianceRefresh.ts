@@ -15,6 +15,12 @@
 export interface ComplianceItem {
   id: string; task: string; role: string; freq: string; due: string;
   critical: boolean; tip: string; legalRef: string; autoPass?: boolean;
+  /** Describes what action satisfies this item: 'meeting' items can auto-create a meeting, 'case' items suggest creating a case */
+  satisfyingAction?: 'meeting' | 'case' | 'filing' | 'document' | 'review';
+  /** Pre-filled meeting type if satisfyingAction is 'meeting' */
+  meetingType?: string;
+  /** Pre-filled agenda items if satisfyingAction is 'meeting' */
+  suggestedAgenda?: string[];
 }
 
 export interface ComplianceCategory {
@@ -68,12 +74,12 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
   // ─── Build categories dynamically ───
 
   const governance: ComplianceItem[] = [
-    { id: 'g1', task: 'Bylaws reviewed and up to date', role: 'President', freq: 'Annual', due: '2026-01-15', critical: true, tip: hasBylaws ? 'Bylaws detected — cross-referencing requirements with uploaded document.' : 'Upload bylaws to enable document-specific checks.', legalRef: stateAct, autoPass: hasBylaws },
-    { id: 'g2', task: 'CC&Rs reviewed and up to date', role: 'President', freq: 'Annual', due: '2025-06-20', critical: true, tip: hasCCRs ? 'Declaration/CC&Rs detected — compliance checks updated.' : 'Upload CC&Rs or Declaration to enable checks.', legalRef: isDC ? 'DC Code § 29-1131' : `${stateActShort} § Condo Declaration`, autoPass: false },
-    { id: 'g3', task: 'Board meeting minutes maintained', role: 'Secretary', freq: 'Ongoing', due: 'Ongoing', critical: true, tip: 'Minutes must be maintained and available for owner inspection.', legalRef: isDC ? 'DC Code § 29-1108.06' : `${stateActShort} Minutes Req.`, autoPass: true },
-    { id: 'g4', task: 'Annual meeting held within 13 months of prior', role: 'President', freq: 'Annual', due: '2026-03-31', critical: true, tip: 'Must hold annual meeting within 13 months of the previous one.', legalRef: isDC ? 'DC Code § 29-1109.02' : `${stateActShort} § Annual Meeting`, autoPass: true },
-    { id: 'g5', task: 'Board election conducted per bylaws', role: 'Secretary', freq: 'Annual', due: '2026-12-31', critical: false, tip: hasBylaws ? 'Follow nomination and election procedures per your uploaded Bylaws.' : 'Follow nomination and election procedures in bylaws.', legalRef: hasBylaws ? 'Bylaws Art. IV' : 'Governing Documents' },
-    { id: 'g6', task: 'Conflict of interest disclosures collected', role: 'Secretary', freq: 'Annual', due: '2026-02-28', critical: false, tip: `Board members should disclose conflicts annually. ${boardCount} current members.`, legalRef: isDC ? 'DC Code § 29-406.70' : `${stateActShort} § Conflicts` },
+    { id: 'g1', task: 'Bylaws reviewed and up to date', role: 'President', freq: 'Annual', due: '2026-01-15', critical: true, tip: hasBylaws ? 'Bylaws detected — cross-referencing requirements with uploaded document.' : 'Upload bylaws to enable document-specific checks.', legalRef: stateAct, autoPass: hasBylaws, satisfyingAction: 'document' },
+    { id: 'g2', task: 'CC&Rs reviewed and up to date', role: 'President', freq: 'Annual', due: '2025-06-20', critical: true, tip: hasCCRs ? 'Declaration/CC&Rs detected — compliance checks updated.' : 'Upload CC&Rs or Declaration to enable checks.', legalRef: isDC ? 'DC Code § 29-1131' : `${stateActShort} § Condo Declaration`, autoPass: false, satisfyingAction: 'document' },
+    { id: 'g3', task: 'Board meeting minutes maintained', role: 'Secretary', freq: 'Ongoing', due: 'Ongoing', critical: true, tip: 'Minutes must be maintained and available for owner inspection.', legalRef: isDC ? 'DC Code § 29-1108.06' : `${stateActShort} Minutes Req.`, autoPass: true, satisfyingAction: 'review' },
+    { id: 'g4', task: 'Annual meeting held within 13 months of prior', role: 'President', freq: 'Annual', due: '2026-03-31', critical: true, tip: 'Must hold annual meeting within 13 months of the previous one.', legalRef: isDC ? 'DC Code § 29-1109.02' : `${stateActShort} § Annual Meeting`, autoPass: true, satisfyingAction: 'meeting', meetingType: 'ANNUAL', suggestedAgenda: ['Election of board members', 'Annual financial report', 'Budget approval', 'Q&A session'] },
+    { id: 'g5', task: 'Board election conducted per bylaws', role: 'Secretary', freq: 'Annual', due: '2026-12-31', critical: false, tip: hasBylaws ? 'Follow nomination and election procedures per your uploaded Bylaws.' : 'Follow nomination and election procedures in bylaws.', legalRef: hasBylaws ? 'Bylaws Art. IV' : 'Governing Documents', satisfyingAction: 'meeting', meetingType: 'ANNUAL', suggestedAgenda: ['Board member nominations', 'Candidate statements', 'Board election vote'] },
+    { id: 'g6', task: 'Conflict of interest disclosures collected', role: 'Secretary', freq: 'Annual', due: '2026-02-28', critical: false, tip: `Board members should disclose conflicts annually. ${boardCount} current members.`, legalRef: isDC ? 'DC Code § 29-406.70' : `${stateActShort} § Conflicts`, satisfyingAction: 'review' },
   ];
 
   // Add rules & regulations check if document detected
@@ -83,12 +89,12 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
   }
 
   const financial: ComplianceItem[] = [
-    { id: 'f1', task: 'Annual budget approved and distributed', role: 'Treasurer', freq: 'Annual', due: '2026-01-31', critical: true, tip: 'Budget must be approved by board and distributed to owners.', legalRef: isDC ? 'DC Code § 29-1135.03' : `${stateActShort} § Budget`, autoPass: true },
-    { id: 'f2', task: 'Reserve study current (within 3 years)', role: 'Treasurer', freq: 'Every 3 years', due: '2028-06-15', critical: true, tip: 'Professional reserve study recommended every 3 years.', legalRef: 'Best practice', autoPass: true },
-    { id: 'f3', task: 'Annual financial audit/review completed', role: 'Treasurer', freq: 'Annual', due: '2026-06-30', critical: true, tip: 'Independent financial review recommended annually.', legalRef: isDC ? 'DC Code § 29-1135.05' : `${stateActShort} § Audit` },
-    { id: 'f4', task: 'Fidelity bond in place', role: 'Treasurer', freq: 'Annual', due: '2026-09-30', critical: true, tip: 'Fidelity bond protects against employee/board theft.', legalRef: isDC ? 'DC Code § 29-1135.06' : `${stateActShort} § Bond`, autoPass: true },
-    { id: 'f5', task: 'Assessment collection policy documented', role: 'Treasurer', freq: 'As needed', due: 'Ongoing', critical: false, tip: hasCollectionPolicy ? 'Collection policy document detected — auto-verified.' : 'Written collection policy should be adopted and enforced.', legalRef: hasBylaws ? 'Bylaws Art. VII' : 'Governing Documents', autoPass: hasCollectionPolicy },
-    { id: 'f6', task: 'Tax returns filed (Form 1120-H)', role: 'Treasurer', freq: 'Annual', due: '2026-04-15', critical: true, tip: 'HOA must file federal tax return annually.', legalRef: 'IRS Code § 528' },
+    { id: 'f1', task: 'Annual budget approved and distributed', role: 'Treasurer', freq: 'Annual', due: '2026-01-31', critical: true, tip: 'Budget must be approved by board and distributed to owners.', legalRef: isDC ? 'DC Code § 29-1135.03' : `${stateActShort} § Budget`, autoPass: true, satisfyingAction: 'meeting', meetingType: 'BOARD', suggestedAgenda: ['Review draft annual budget', 'Budget line item discussion', 'Vote to approve annual budget'] },
+    { id: 'f2', task: 'Reserve study current (within 3 years)', role: 'Treasurer', freq: 'Every 3 years', due: '2028-06-15', critical: true, tip: 'Professional reserve study recommended every 3 years.', legalRef: 'Best practice', autoPass: true, satisfyingAction: 'case' },
+    { id: 'f3', task: 'Annual financial audit/review completed', role: 'Treasurer', freq: 'Annual', due: '2026-06-30', critical: true, tip: 'Independent financial review recommended annually.', legalRef: isDC ? 'DC Code § 29-1135.05' : `${stateActShort} § Audit`, satisfyingAction: 'case' },
+    { id: 'f4', task: 'Fidelity bond in place', role: 'Treasurer', freq: 'Annual', due: '2026-09-30', critical: true, tip: 'Fidelity bond protects against employee/board theft.', legalRef: isDC ? 'DC Code § 29-1135.06' : `${stateActShort} § Bond`, autoPass: true, satisfyingAction: 'document' },
+    { id: 'f5', task: 'Assessment collection policy documented', role: 'Treasurer', freq: 'As needed', due: 'Ongoing', critical: false, tip: hasCollectionPolicy ? 'Collection policy document detected — auto-verified.' : 'Written collection policy should be adopted and enforced.', legalRef: hasBylaws ? 'Bylaws Art. VII' : 'Governing Documents', autoPass: hasCollectionPolicy, satisfyingAction: 'document' },
+    { id: 'f6', task: 'Tax returns filed (Form 1120-H)', role: 'Treasurer', freq: 'Annual', due: '2026-04-15', critical: true, tip: 'HOA must file federal tax return annually.', legalRef: 'IRS Code § 528', satisfyingAction: 'filing' },
   ];
 
   const insuranceItems: ComplianceItem[] = [
@@ -142,4 +148,3 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
     regulatoryNotes,
   };
 }
-
