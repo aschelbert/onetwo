@@ -211,11 +211,103 @@ export default function CompliancePage() {
 
       <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
         {/* RUNBOOK */}
-        {tab === 'runbook' && (<div className="space-y-6">
-          {refreshResult.regulatoryNotes.length > 0 && (<div className="bg-accent-50 border border-accent-200 rounded-xl p-4"><div className="flex items-center gap-2 mb-2"><span className="text-base">🔄</span><h4 className="text-xs font-bold text-accent-800">Compliance Auto-Refresh · {refreshResult.jurisdiction} Jurisdiction</h4></div><div className="space-y-1">{refreshResult.regulatoryNotes.map((n, i) => <p key={i} className="text-xs text-accent-700">{n}</p>)}</div>{refreshResult.documentsDetected.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{refreshResult.documentsDetected.map(d => <span key={d} className="text-[10px] bg-accent-100 text-accent-700 px-2 py-0.5 rounded-lg font-medium">📄 {d}</span>)}</div>}</div>)}
+        {tab === 'runbook' && (() => {
+          const allItems = catScores.flatMap(c => c.items);
+          const autoVerifiedCount = allItems.filter(i => i.autoPass).length;
+          const needsActionCount = allItems.filter(i => !i.autoPass && !comp.completions[i.id]).length;
+          const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
+          const missingDocs: string[] = [];
+          if (!hasBylaws) missingDocs.push('Bylaws');
+          if (!hasCCRs) missingDocs.push('CC&Rs / Declaration');
+          if (!legalDocuments.some(d => d.name.toLowerCase().includes('rule'))) missingDocs.push('Rules & Regulations');
+          if (!legalDocuments.some(d => d.name.toLowerCase().includes('collection') || d.name.toLowerCase().includes('assessment'))) missingDocs.push('Collection Policy');
+
+          return (<div className="space-y-6">
+          {/* 1. Hero explainer */}
+          <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent-100 flex items-center justify-center shrink-0 mt-0.5"><span className="text-lg">📜</span></div>
+              <div>
+                <h3 className="text-sm font-bold text-ink-900">Your Board's Minimum Compliance Obligations</h3>
+                <p className="text-xs text-ink-600 mt-1 leading-relaxed">
+                  This runbook is generated from your building's <strong>{isDC ? 'District of Columbia' : jurisdiction}</strong> jurisdiction requirements
+                  (<span className="font-mono text-accent-700">{stateAct}</span>),
+                  your uploaded governing documents, and current insurance policies. Each item represents a legal or fiduciary
+                  obligation your board must fulfill to remain compliant.
+                  {missingDocs.length > 0 && <> Upload additional documents in <button onClick={() => navigate('/building?tab=legal')} className="text-accent-700 font-semibold underline underline-offset-2 hover:text-accent-900">Building → Legal & Bylaws</button> to refine requirements.</>}
+                </p>
+                <div className="flex items-center gap-4 mt-3">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-600"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{needsActionCount} need{needsActionCount !== 1 ? '' : 's'} board action</span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-600"><span className="w-2 h-2 rounded-full bg-sage-400"></span>{autoVerifiedCount} auto-verified by documents</span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-ink-600"><span className="w-2 h-2 rounded-full bg-ink-300"></span>{allItems.filter(i => comp.completions[i.id] && !i.autoPass).length} manually confirmed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Sources strip */}
+          <div className="bg-white border border-ink-100 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-bold text-ink-500 uppercase tracking-wide">Runbook Sources</span>
+              <div className="flex-1 border-t border-ink-100"></div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-ink-500">Jurisdiction</span>
+                <span className="inline-flex items-center gap-1 text-[11px] bg-accent-100 text-accent-800 px-2 py-0.5 rounded-lg font-bold">🏛 {isDC ? 'District of Columbia' : jurisdiction}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-ink-500">Legislation</span>
+                <span className="text-[11px] font-mono text-accent-700 bg-accent-50 px-2 py-0.5 rounded-lg">{stateAct}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold text-ink-500">Documents</span>
+                {refreshResult.documentsDetected.map(d => (
+                  <span key={d} className="inline-flex items-center gap-1 text-[10px] bg-sage-100 text-sage-700 px-2 py-0.5 rounded-lg font-medium">✓ {d}</span>
+                ))}
+                {missingDocs.map(d => (
+                  <button key={d} onClick={() => navigate('/building?tab=legal')} className="inline-flex items-center gap-1 text-[10px] bg-ink-50 text-ink-400 px-2 py-0.5 rounded-lg font-medium border border-dashed border-ink-200 hover:border-accent-400 hover:text-accent-600 hover:bg-accent-50 transition-colors">+ {d}</button>
+                ))}
+              </div>
+              {insurance.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-ink-500">Insurance</span>
+                  <span className="text-[10px] bg-sage-100 text-sage-700 px-2 py-0.5 rounded-lg font-medium">✓ {insurance.length} polic{insurance.length === 1 ? 'y' : 'ies'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Role filter */}
           <div className="flex flex-wrap gap-2"><button onClick={() => setRoleFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>All Roles</button>{allRoles.map(r => (<button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === r ? 'bg-accent-600 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>{r}</button>))}</div>
-          {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div><div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; return (<div key={item.id} className={`p-4 flex items-start gap-4 ${done ? 'bg-sage-50 bg-opacity-30' : ''}`}><button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button><div className="flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><p className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>{item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}<span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span></div><p className="text-xs text-ink-400 mt-1">{item.tip}</p><div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>{itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}</div><RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => { setTargetId(item.id); setRunbookAction('meeting'); setModal('runbookLinkOrCreate'); }} /></div>); })}</div></div>); })}
-        </div>)}
+
+          {/* Category cards */}
+          {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; const catAutoCount = cat.items.filter(i => i.autoPass).length; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%{catAutoCount > 0 && <span className="text-sage-600 ml-1">· {catAutoCount} auto-verified</span>}</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div>
+          {/* Items */}
+          <div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; return (<div key={item.id} className={`p-4 flex items-start gap-4 ${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
+            {/* 3. Auto-verified vs manual checkbox */}
+            {isAuto ? (
+              <div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified by uploaded documents or policies">
+                <svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </div>
+            ) : (
+              <button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>
+                {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
+                {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
+                {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
+              </div>
+              <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
+              <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
+              {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
+            </div>
+            <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => { setTargetId(item.id); setRunbookAction('meeting'); setModal('runbookLinkOrCreate'); }} />
+          </div>); })}</div></div>); })}
+        </div>); })()}
 
         {/* FILINGS */}
         {tab === 'filings' && (<div className="space-y-4">
@@ -284,4 +376,3 @@ export default function CompliancePage() {
     </div>
   );
 }
-
