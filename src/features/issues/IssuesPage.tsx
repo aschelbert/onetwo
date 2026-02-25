@@ -5,6 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal } from './components/CaseModals';
+import Modal from '@/components/ui/Modal';
 import type { CaseApproach, CasePriority } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -414,13 +415,16 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
 function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => void; onNav: (v: string) => void }) {
   const store = useIssuesStore();
   const { board: boardMembers } = useBuildingStore();
-  const { workOrders } = useFinancialStore();
+  const fin = useFinancialStore();
+  const { workOrders } = fin;
   const c = store.cases.find(x => x.id === caseId);
 
   const [showVoteModal, setShowVoteModal] = useState(false);
   const [showCommModal, setShowCommModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
   const [showApproachModal, setShowApproachModal] = useState(false);
+  const [showWOModal, setShowWOModal] = useState(false);
+  const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
 
   if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Case not found.</p></div>;
 
@@ -600,7 +604,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
 
       {/* Linked Work Orders */}
       <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <h3 className="text-lg font-semibold text-ink-800 mb-4">Financials</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-ink-800">Financials</h3>
+          <button onClick={() => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Create Work Order</button>
+        </div>
         {c.linkedWOs.length > 0 ? (
           <div className="space-y-2">
             {c.linkedWOs.map(woId => {
@@ -631,6 +638,31 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showCommModal && <CommModal caseId={caseId} store={store} onClose={() => setShowCommModal(false)} />}
       {showDocModal && <DocModal caseId={caseId} store={store} onClose={() => setShowDocModal(false)} />}
       {showApproachModal && <ApproachModal c={c} store={store} onClose={() => setShowApproachModal(false)} />}
+      {showWOModal && (
+        <Modal title="Create Work Order" onClose={() => setShowWOModal(false)} onSave={() => {
+          if (!woForm.title || !woForm.vendor || !woForm.amount) { alert('Title, vendor, and amount required'); return; }
+          fin.createWorkOrder({ title: woForm.title, vendor: woForm.vendor, amount: parseFloat(woForm.amount), acctNum: woForm.acctNum, caseId });
+          const newWO = fin.workOrders[fin.workOrders.length - 1];
+          if (newWO) store.linkWO(caseId, newWO.id);
+          setShowWOModal(false);
+        }} saveLabel="Create & Link">
+          <div className="space-y-3">
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={woForm.title} onChange={e => setWOForm({ ...woForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Vendor *</label><input value={woForm.vendor} onChange={e => setWOForm({ ...woForm, vendor: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Company name" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Amount *</label><input type="number" value={woForm.amount} onChange={e => setWOForm({ ...woForm, amount: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="0.00" /></div>
+            </div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Expense Account</label>
+              <select value={woForm.acctNum} onChange={e => setWOForm({ ...woForm, acctNum: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                {fin.chartOfAccounts.filter(a => a.type === 'expense').map(a => <option key={a.num} value={a.num}>{a.num} — {a.name}</option>)}
+              </select>
+            </div>
+            <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
+              <p className="text-xs text-ink-600">This creates a work order in Fiscal Lens and links it to case <strong>{caseId}</strong>. The WO will appear in AP/Work Orders for approval and payment.</p>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import AppShell from '@/components/layout/AppShell';
@@ -14,9 +14,27 @@ import AccountSettingsPage from '@/features/account/AccountSettingsPage';
 import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
+import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import TenantProvider from '@/components/TenantProvider';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
+
+// Wait for Zustand persist to hydrate before rendering auth-dependent routes
+function HydrationGate({ children }: { children: React.ReactNode }) {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    // Zustand persist hydrates synchronously from localStorage in most cases,
+    // but we give it a tick to be safe
+    const unsub = (useAuthStore as any).persist.onFinishHydration(() => setHydrated(true));
+    // If already hydrated (common case)
+    if ((useAuthStore as any).persist.hasHydrated()) setHydrated(true);
+    return unsub;
+  }, []);
+  if (!hydrated) {
+    return <div className="min-h-screen flex items-center justify-center bg-mist-50"><div className="animate-pulse text-accent-600 font-display text-lg font-bold">Loading...</div></div>;
+  }
+  return <>{children}</>;
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -51,6 +69,7 @@ function AIAdvisorWrapper() {
 
 export default function App() {
   return (
+    <HydrationGate>
     <BrowserRouter>
       <Routes>
         {/* Login */}
@@ -65,7 +84,8 @@ export default function App() {
           <Route path="/building" element={<BuildingPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/archives" element={<ArchivesPage />} />
-          <Route path="/voting" element={<VotingPage />} />
+          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/boardroom" element={<BoardRoomPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
@@ -77,6 +97,6 @@ export default function App() {
       </Routes>
       <AIAdvisorWrapper />
     </BrowserRouter>
+    </HydrationGate>
   );
 }
-

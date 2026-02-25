@@ -17,14 +17,14 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
-    { id: 'voting', label: 'Votes & Resolutions', path: '/voting' },
+    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'issues-resident', label: 'Report Issues', path: '/issues' },
-    { id: 'voting', label: 'Votes & Resolutions', path: '/voting' },
+    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
   PROPERTY_MANAGER: [
@@ -32,9 +32,8 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'issues-board', label: 'Case Ops', path: '/issues' },
-    { id: 'voting', label: 'Votes & Resolutions', path: '/voting' },
+    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
     { id: 'compliance', label: 'Compliance Runbook', path: '/compliance' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
 };
-

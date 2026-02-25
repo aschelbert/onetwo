@@ -93,7 +93,7 @@ export default function DashboardPage() {
 
     type Activity = { icon: string; text: string; date: string; path: string };
     const activities: Activity[] = [];
-    pastMeetings.slice(0, 2).forEach(m => activities.push({ icon: '🗓', text: `${m.title} completed`, date: m.date, path: '/compliance' }));
+    pastMeetings.slice(0, 2).forEach(m => activities.push({ icon: '🗓', text: `${m.title} completed`, date: m.date, path: '/boardroom' }));
     comp.filings.filter(f => f.status === 'filed').slice(0, 2).forEach(f => activities.push({ icon: '✅', text: `${f.name} filed`, date: f.filedDate || '', path: '/compliance' }));
     recentComms.slice(0, 2).forEach(c => activities.push({ icon: '📨', text: c.subject, date: c.date, path: '/compliance' }));
     archives.archives.slice(0, 1).forEach(a => activities.push({ icon: '📦', text: `${a.label} archived`, date: a.createdAt.split('T')[0], path: '/archives' }));
@@ -131,6 +131,62 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+
+        {/* ─── ACTION ITEMS ─── */}
+        {(() => {
+          const memberRecord = building.board.find(b => b.name === currentUser.name);
+          const userRole = memberRecord?.role || 'President';
+          // Runbook items: not completed, not auto-pass, filtered to user role
+          const allRunbookItems = refreshResult.categories.flatMap(c => c.items);
+          const myRunbookItems = allRunbookItems.filter(i => !comp.completions[i.id] && !i.autoPass && i.role === userRole);
+          // Overdue filings assigned to user role
+          const myOverdueFilings = comp.filings.filter(f => f.status === 'pending' && new Date(f.dueDate) < new Date() && f.responsible === userRole);
+          // Cases assigned to user (open, high/urgent priority)
+          const myCases = openCases.filter(c => c.priority === 'urgent' || c.priority === 'high');
+          // Next meeting needing prep
+          const nextMtg = upcoming[0];
+          // Total action count
+          const totalActions = myRunbookItems.length + myOverdueFilings.length + myCases.length + (nextMtg ? 1 : 0);
+
+          if (totalActions === 0) return null;
+
+          type ActionItem = { icon: string; label: string; sub: string; path: string; color: string; priority: number };
+          const actionItems: ActionItem[] = [];
+          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/compliance', color: 'red', priority: 1 }));
+          myCases.forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, path: '/issues', color: 'red', priority: 2 }));
+          if (nextMtg) {
+            const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
+          }
+          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/compliance', color: i.critical ? 'red' : 'amber', priority: 4 }));
+          actionItems.sort((a, b) => a.priority - b.priority);
+
+          return (
+            <div className="bg-white rounded-xl border border-ink-100 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <h2 className="text-sm font-bold text-ink-700">Your Action Items</h2>
+                  <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{totalActions}</span>
+                </div>
+                <span className="text-[10px] text-ink-400 font-medium">Role: {userRole}</span>
+              </div>
+              <div className="space-y-1.5">
+                {actionItems.slice(0, 6).map((item, idx) => (
+                  <button key={idx} onClick={() => navigate(item.path)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border border-red-100 hover:border-red-200' : 'bg-amber-50 border border-amber-100 hover:border-amber-200'}`}>
+                    <span className="text-base shrink-0">{item.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-ink-900 truncate">{item.label}</p>
+                      <p className="text-[10px] text-ink-500">{item.sub}</p>
+                    </div>
+                    <span className="text-ink-300 text-xs">→</span>
+                  </button>
+                ))}
+              </div>
+              {totalActions > 6 && <p className="text-[10px] text-ink-400 mt-2 text-center">+ {totalActions - 6} more items</p>}
+            </div>
+          );
+        })()}
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
@@ -179,11 +235,11 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-bold text-ink-700">Upcoming Meetings</h2>
-                  <button onClick={() => navigate('/compliance')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
+                  <button onClick={() => navigate('/boardroom')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
                 </div>
                 <div className="space-y-2">
                   {upcoming.slice(0, 3).map(m => (
-                    <div key={m.id} onClick={() => navigate('/compliance')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
+                    <div key={m.id} onClick={() => navigate('/boardroom')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-accent-50 rounded-lg flex flex-col items-center justify-center">
                           <span className="text-[10px] font-bold text-accent-600 leading-none">{new Date(m.date + 'T12:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
@@ -392,4 +448,3 @@ function AgingRow({ label, count, total, color }: { label: string; count: number
     </div>
   );
 }
-
