@@ -19,18 +19,11 @@ import AIAdvisor from '@/components/AIAdvisor';
 import TenantProvider from '@/components/TenantProvider';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 
-// Wait for Zustand persist to hydrate before rendering auth-dependent routes
+// Wait one tick for Zustand persist to hydrate from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    // Zustand persist hydrates synchronously from localStorage in most cases,
-    // but we give it a tick to be safe
-    const unsub = (useAuthStore as any).persist.onFinishHydration(() => setHydrated(true));
-    // If already hydrated (common case)
-    if ((useAuthStore as any).persist.hasHydrated()) setHydrated(true);
-    return unsub;
-  }, []);
-  if (!hydrated) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setReady(true); }, []);
+  if (!ready) {
     return <div className="min-h-screen flex items-center justify-center bg-mist-50"><div className="animate-pulse text-accent-600 font-display text-lg font-bold">Loading...</div></div>;
   }
   return <>{children}</>;
