@@ -220,6 +220,7 @@ export default function VotingPage() {
                       <div>
                         <div className="flex items-center gap-2 flex-wrap"><h3 className="font-bold text-ink-900">{e.title}</h3><span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${STATUS_STYLE[e.status]}`}>{e.status.toUpperCase()}</span>{compTotal > 0 && isBoard && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${compPass === compTotal ? 'bg-sage-100 text-sage-700' : 'bg-amber-100 text-amber-700'}`}>{compPass}/{compTotal} checks</span>}</div>
                         <p className="text-xs text-ink-500">{TYPE_LABELS[e.type]} · {e.ballotItems.length} item{e.ballotItems.length !== 1 ? 's' : ''} · {new Date(e.createdAt).toLocaleDateString()}{e.scheduledCloseDate ? ` · Closes ${new Date(e.scheduledCloseDate + 'T12:00').toLocaleDateString()}` : ''}</p>
+                        <div className="flex items-center gap-1.5 mt-1"><span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${e.quorumRequired >= 50 ? 'bg-accent-100 text-accent-700' : 'bg-sage-100 text-sage-700'}`}>{e.quorumRequired >= 50 ? '🏛 Board Vote' : '🗳 Owner Vote'}</span>{e.linkedMeetingId && <span className="text-[10px] px-1.5 py-0.5 rounded bg-mist-100 text-ink-600 font-medium">📅 Meeting linked</span>}</div>
                         {isResident && e.status === 'open' && myStatus.length > 0 && <p className={`text-xs mt-1 font-medium ${allVoted ? 'text-sage-600' : 'text-green-700'}`}>{allVoted ? '✓ You have voted' : '⚡ Your vote is needed'}</p>}
                       </div>
                     </div>
@@ -261,7 +262,7 @@ export default function VotingPage() {
   const compWarn = selected.complianceChecks.filter(c => c.status === 'warning').length;
 
   const TABS: { id: DetailTab; label: string; badge?: string }[] = [
-    { id: 'ballot', label: 'Ballot Items', badge: String(selected.ballotItems.length) },
+    { id: 'ballot', label: 'Vote Items', badge: String(selected.ballotItems.length) },
     { id: 'compliance', label: 'Compliance', badge: compFail > 0 ? `${compFail} ✗` : compWarn > 0 ? `${compWarn} ⚠` : `${compPass} ✓` },
     { id: 'timeline', label: 'Timeline', badge: String(selected.timeline.length) },
     { id: 'comments', label: 'Discussion', badge: String(selected.comments.length) },
@@ -280,7 +281,7 @@ export default function VotingPage() {
           </div>
           {isBoard && (
             <div className="flex gap-2 flex-wrap">
-              {selected.status === 'draft' && <button onClick={() => { if (!selected.ballotItems.length) { alert('Add ballot items first'); return; } if (confirm('Open voting?')) store.openElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-green-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-green-300 border-opacity-40 hover:bg-opacity-50">▶ Open</button>}
+              {selected.status === 'draft' && <button onClick={() => { if (!selected.ballotItems.length) { alert('Add vote items first'); return; } if (confirm('Open voting?')) store.openElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-green-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-green-300 border-opacity-40 hover:bg-opacity-50">▶ Open</button>}
               {selected.status === 'open' && <button onClick={() => { if (confirm('Close voting?')) store.closeElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-yellow-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-yellow-300 border-opacity-40 hover:bg-opacity-50">⏹ Close</button>}
               {selected.status === 'closed' && <button onClick={() => { if (confirm('Certify results?')) store.certifyElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-sage-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-sage-300 border-opacity-40 hover:bg-opacity-50">✓ Certify</button>}
               {(selected.status === 'closed' || selected.status === 'certified') && !selected.linkedCaseId && <button onClick={handleCreateCase} className="px-4 py-2 bg-accent-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-accent-300 border-opacity-40 hover:bg-opacity-50">📋 Create Case</button>}
@@ -335,10 +336,10 @@ export default function VotingPage() {
           {detailTab === 'ballot' && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-ink-700">Ballot Items</h3>
+                <h3 className="text-sm font-bold text-ink-700">Vote Items</h3>
                 {isBoard && selected.status === 'draft' && <button onClick={() => { setBallotItemForm({ title: '', description: '', rationale: '', type: 'yes_no', threshold: '50.1', maxSelections: '1', legalRef: '', financialImpact: '', candidates: [] }); setModal('addBallotItem'); }} className="text-xs text-accent-600 font-semibold">+ Add Item</button>}
               </div>
-              {selected.ballotItems.length === 0 ? <p className="text-xs text-ink-400 p-4 text-center border border-ink-100 rounded-xl">No ballot items yet.</p> : (
+              {selected.ballotItems.length === 0 ? <p className="text-xs text-ink-400 p-4 text-center border border-ink-100 rounded-xl">No vote items yet.</p> : (
                 <div className="space-y-4">{selected.ballotItems.map((item, idx) => {
                   const ir = results?.itemResults.find(r => r.ballotItemId === item.id);
                   return (
@@ -401,7 +402,7 @@ export default function VotingPage() {
           {detailTab === 'compliance' && (
             <div>
               <div className="flex items-center justify-between mb-4"><h3 className="text-sm font-bold text-ink-700">Compliance Checks</h3><div className="flex gap-2 text-[10px]"><span className="bg-sage-100 text-sage-700 px-2 py-0.5 rounded font-medium">{compPass} Pass</span><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium">{compWarn} Warning</span><span className="bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">{compFail} Fail</span></div></div>
-              {selected.complianceChecks.length === 0 ? <p className="text-xs text-ink-400 text-center p-4 border rounded-xl">Compliance checks will be generated when ballot items are added.</p> : (
+              {selected.complianceChecks.length === 0 ? <p className="text-xs text-ink-400 text-center p-4 border rounded-xl">Compliance checks will be generated when vote items are added.</p> : (
                 <div className="space-y-2">{selected.complianceChecks.map(c => (
                   <div key={c.id} className={`rounded-xl p-4 border ${c.status === 'pass' ? 'bg-sage-50 border-sage-200' : c.status === 'fail' ? 'bg-red-50 border-red-200' : c.status === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-ink-50 border-ink-100'}`}>
                     <div className="flex items-start gap-2">
@@ -489,7 +490,7 @@ export default function VotingPage() {
       )}
 
       {modal === 'addBallotItem' && (
-        <Modal title="Add Ballot Item" onClose={() => setModal(null)} onSave={handleAddBallotItem} saveLabel="Add">
+        <Modal title="Add Vote Item" onClose={() => setModal(null)} onSave={handleAddBallotItem} saveLabel="Add">
           <div className="space-y-4">
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={ballotItemForm.title} onChange={e => setBallotItemForm({ ...ballotItemForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Approve FY 2026 Operating Budget" /></div>
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Summary</label><input value={ballotItemForm.description} onChange={e => setBallotItemForm({ ...ballotItemForm, description: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Brief description for voters" /></div>
@@ -527,4 +528,3 @@ export default function VotingPage() {
 function MiniStat({ label, val, color }: { label: string; val: string; color?: string }) {
   return <div className="px-4 py-3 text-center"><p className="text-[10px] text-ink-400">{label}</p><p className={`text-sm font-bold ${color === 'sage' ? 'text-sage-700' : color === 'red' ? 'text-red-700' : 'text-ink-900'}`}>{val}</p></div>;
 }
-

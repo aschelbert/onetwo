@@ -43,7 +43,7 @@ export default function BoardRoomPage() {
   const [targetId, setTargetId] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED' });
+  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: false, voteScope: 'board' as 'board' | 'owner' });
   const [attForm, setAttForm] = useState({ board: [] as string[], owners: '' as string, guests: '' as string });
   const [minText, setMinText] = useState('');
   const [vForm, setVForm] = useState({ motion: '', type: 'board' as 'board' | 'owner', votes: {} as Record<string, string> });
@@ -57,12 +57,77 @@ export default function BoardRoomPage() {
     { id: 'special-assessments', label: 'Special Assessments' }, { id: 'covenant-violations', label: 'Covenant Violations' },
   ];
 
-  const openAddMeeting = () => { setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED' }); setModal('addMeeting'); };
-  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status }); setModal('editMeeting'); };
+  // Smart defaults for vote requirement based on meeting type and jurisdiction
+  const getVoteDefaults = (meetingType: string): { requiresVote: boolean; voteScope: 'board' | 'owner'; reason: string } => {
+    const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
+    switch (meetingType) {
+      case 'ANNUAL': return { requiresVote: true, voteScope: 'owner', reason: `Required: Board elections & budget approval (${stateAct})` };
+      case 'SPECIAL': return { requiresVote: true, voteScope: 'owner', reason: `Typically required: Special meetings are called for items requiring owner vote (${stateAct})` };
+      case 'BOARD': return { requiresVote: false, voteScope: 'board', reason: 'Board meetings may include motions but votes are not always required' };
+      case 'QUARTERLY': return { requiresVote: false, voteScope: 'board', reason: 'Quarterly reviews typically informational; toggle on if motions are planned' };
+      case 'EMERGENCY': return { requiresVote: true, voteScope: 'board', reason: 'Emergency actions often require board ratification vote' };
+      default: return { requiresVote: false, voteScope: 'board', reason: '' };
+    }
+  };
+
+  const openAddMeeting = () => {
+    const defaults = getVoteDefaults('BOARD');
+    setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: defaults.requiresVote, voteScope: defaults.voteScope });
+    setModal('addMeeting');
+  };
+  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board' }); setModal('editMeeting'); };
   const openAttendees = (m: Meeting) => { setTargetId(m.id); setAttForm({ board: [...m.attendees.board], owners: m.attendees.owners.join('\n'), guests: m.attendees.guests.join('\n') }); setModal('attendees'); };
   const openMinutes = (m: Meeting) => { setTargetId(m.id); setMinText(m.minutes); setModal('minutes'); };
   const openAddVote = (m: Meeting) => { setTargetId(m.id); const voteMap: Record<string, string> = {}; board.forEach(b => { voteMap[b.name] = ''; }); setVForm({ motion: '', type: 'board', votes: voteMap }); setModal('addVote'); };
-  const saveMeeting = () => { if (!mForm.title || !mForm.date) { alert('Title and date required'); return; } const agenda = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean); if (modal === 'addMeeting') mtg.addMeeting({ title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes }); else mtg.updateMeeting(targetId, { title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes }); setModal(null); };
+  const saveMeeting = () => {
+    if (!mForm.title || !mForm.date) { alert('Title and date required'); return; }
+    const agenda = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean);
+    if (modal === 'addMeeting') {
+      mtg.addMeeting({ title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
+      // Auto-create election if vote required
+      if (mForm.requiresVote && agenda.length > 0) {
+        const newMeetingId = mtg.meetings[mtg.meetings.length - 1]?.id;
+        // Map meeting type to election type
+        const typeMap: Record<string, string> = { ANNUAL: 'budget_approval', SPECIAL: 'special_assessment', BOARD: 'meeting_motion', QUARTERLY: 'meeting_motion', EMERGENCY: 'meeting_motion' };
+        const elType = (typeMap[mForm.type] || 'meeting_motion') as any;
+        const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
+        // Create the election with agenda items as vote items
+        elections.addElection({
+          title: `${mForm.title} — Vote`,
+          type: elType,
+          status: 'draft',
+          description: `Vote items for ${mForm.title} on ${mForm.date}. ${mForm.voteScope === 'owner' ? 'Owner vote' : 'Board vote'}.`,
+          createdBy: 'Board',
+          openedAt: null, closedAt: null, certifiedAt: null, certifiedBy: null,
+          scheduledCloseDate: mForm.date,
+          noticeDate: null,
+          quorumRequired: mForm.voteScope === 'owner' ? 25 : 50.1,
+          ballotItems: agenda.map((item, i) => ({
+            id: 'bi_auto_' + Date.now() + '_' + i,
+            title: item,
+            description: `Agenda item from ${mForm.title}`,
+            rationale: '',
+            type: 'yes_no' as const,
+            requiredThreshold: 50.1,
+            legalRef: stateAct,
+            attachments: [],
+          })),
+          legalRef: stateAct,
+          notes: `Auto-created from meeting: ${mForm.title}. Scope: ${mForm.voteScope} vote.`,
+          complianceChecks: [],
+          linkedMeetingId: newMeetingId || null,
+        });
+        // Link the election to the meeting
+        const newElection = elections.elections[0];
+        if (newMeetingId && newElection) {
+          mtg.linkVote(newMeetingId, newElection.id);
+        }
+      }
+    } else {
+      mtg.updateMeeting(targetId, { title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
+    }
+    setModal(null);
+  };
   const saveAttendees = () => { mtg.updateAttendees(targetId, { board: attForm.board, owners: attForm.owners.split('\n').map(s => s.trim()).filter(Boolean), guests: attForm.guests.split('\n').map(s => s.trim()).filter(Boolean) }); setModal(null); };
   const saveVote = () => { if (!vForm.motion) { alert('Motion required'); return; } const results = Object.entries(vForm.votes).filter(([, v]) => v).map(([name, vote]) => ({ name, vote })); const tally = { approve: results.filter(r => r.vote === 'approve').length, deny: results.filter(r => r.vote === 'deny').length, abstain: results.filter(r => r.vote === 'abstain').length }; const status = tally.approve > tally.deny ? 'passed' : 'failed'; mtg.addVote(targetId, { motion: vForm.motion, type: vForm.type, status, date: meetings.find(m => m.id === targetId)?.date || '', results, tally }); setModal(null); };
   const handleCreateCase = () => { if (!newCaseForm.title) { alert('Title required'); return; } const caseId = issues.createCase({ catId: newCaseForm.catId, sitId: newCaseForm.sitId, approach: 'self', title: newCaseForm.title, unit: 'N/A', owner: 'Board', priority: newCaseForm.priority as any, notes: `Linked to meeting: ${meetings.find(m => m.id === targetId)?.title || targetId}` }); mtg.linkCase(targetId, caseId); setModal(null); };
@@ -208,7 +273,7 @@ export default function BoardRoomPage() {
           <div className="space-y-3">
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={mForm.title} onChange={e => setMForm({ ...mForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="February Board Meeting" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={mForm.type} onChange={e => setMForm({ ...mForm, type: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['BOARD','ANNUAL','QUARTERLY','SPECIAL','EMERGENCY'].map(t => <option key={t}>{t}</option>)}</select></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={mForm.type} onChange={e => { const t = e.target.value; const d = getVoteDefaults(t); setMForm({ ...mForm, type: t, requiresVote: d.requiresVote, voteScope: d.voteScope }); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['BOARD','ANNUAL','QUARTERLY','SPECIAL','EMERGENCY'].map(t => <option key={t}>{t}</option>)}</select></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={mForm.status} onChange={e => setMForm({ ...mForm, status: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['SCHEDULED','COMPLETED','CANCELLED','RESCHEDULED'].map(s => <option key={s}>{s}</option>)}</select></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -217,7 +282,50 @@ export default function BoardRoomPage() {
             </div>
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Location</label><input value={mForm.location} onChange={e => setMForm({ ...mForm, location: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Virtual Link</label><input value={mForm.virtualLink} onChange={e => setMForm({ ...mForm, virtualLink: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="https://zoom.us/j/..." /></div>
-            <div><label className="block text-xs font-medium text-ink-700 mb-1">Agenda (one item per line)</label><textarea value={mForm.agenda} onChange={e => setMForm({ ...mForm, agenda: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={4} /></div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Agenda (one item per line)</label><textarea value={mForm.agenda} onChange={e => setMForm({ ...mForm, agenda: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={4} placeholder="Review January financials&#10;Elevator maintenance proposal&#10;Approve 2026 budget" /></div>
+            {/* Vote requirement */}
+            {modal === 'addMeeting' && (() => {
+              const defaults = getVoteDefaults(mForm.type);
+              return (
+                <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-bold text-ink-700">Requires Vote?</label>
+                      <p className="text-[10px] text-ink-400 mt-0.5">{defaults.reason}</p>
+                    </div>
+                    <button onClick={() => setMForm({ ...mForm, requiresVote: !mForm.requiresVote })} className={`relative w-11 h-6 rounded-full transition-colors ${mForm.requiresVote ? 'bg-accent-500' : 'bg-ink-200'}`}>
+                      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${mForm.requiresVote ? 'left-[22px]' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                  {mForm.requiresVote && (
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-ink-600 mb-1">Vote Scope</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => setMForm({ ...mForm, voteScope: 'board' })} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mForm.voteScope === 'board' ? 'bg-accent-600 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:border-accent-300'}`}>Board Vote</button>
+                          <button onClick={() => setMForm({ ...mForm, voteScope: 'owner' })} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mForm.voteScope === 'owner' ? 'bg-accent-600 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:border-accent-300'}`}>Owner Vote</button>
+                        </div>
+                      </div>
+                      <div className="bg-white border border-ink-100 rounded-lg p-3">
+                        <p className="text-[10px] text-ink-600">
+                          {mForm.voteScope === 'board'
+                            ? '🏛 Board members vote on motions during the meeting. Quorum: majority of board.'
+                            : '🗳 Unit owners vote on the items. Each occupied unit gets one vote weighted by ownership %. Quorum: 25% of eligible units.'}
+                        </p>
+                        {mForm.agenda.trim() && (
+                          <div className="mt-2 border-t border-ink-50 pt-2">
+                            <p className="text-[10px] font-semibold text-ink-500 mb-1">Agenda items will become vote items:</p>
+                            {mForm.agenda.split('\n').filter(s => s.trim()).map((item, i) => (
+                              <p key={i} className="text-[10px] text-accent-700">• {item.trim()}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={mForm.notes} onChange={e => setMForm({ ...mForm, notes: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div>
           </div>
         </Modal>
