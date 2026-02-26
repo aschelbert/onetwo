@@ -273,9 +273,7 @@ export default function BoardRoomPage() {
 
             {/* ── DATE-SORTED VIEW ── */}
             {runbookSort === 'date' && (() => {
-              // Build unified list: runbook items + filings, all with a due date
               type UnifiedItem = { kind: 'runbook'; item: typeof allItems[0]; catLabel: string; catIcon: string } | { kind: 'filing'; filing: typeof comp.filings[0] };
-              const catMap = Object.fromEntries(catScores.map(c => [c.id, c]));
               const unified: UnifiedItem[] = [
                 ...allItems.map(item => {
                   const cat = catScores.find(c => c.items.includes(item));
@@ -283,84 +281,104 @@ export default function BoardRoomPage() {
                 }),
                 ...comp.filings.filter(fi => roleFilter === 'all' || fi.responsible === roleFilter).map(fi => ({ kind: 'filing' as const, filing: fi })),
               ];
-              // Sort: items needing action first, then by date. "Ongoing" sorts last.
-              const parseDate = (d: string) => d === 'Ongoing' ? '9999-12-31' : d;
+
+              // Split: dated items vs ongoing/per-meeting items
+              const isOngoing = (u: UnifiedItem) => {
+                if (u.kind === 'filing') return false; // filings always have dates
+                const due = u.item.due;
+                return due === 'Ongoing' || due === 'Per meeting' || due === 'Per transfer' || due === 'Per request' || due === 'Quarterly' || due === 'As needed';
+              };
+              const datedItems = unified.filter(u => !isOngoing(u));
+              const ongoingItems = unified.filter(u => isOngoing(u));
+
               const isDone = (u: UnifiedItem) => u.kind === 'runbook' ? (u.item.autoPass || comp.completions[u.item.id]) : u.filing.status === 'filed';
-              unified.sort((a, b) => {
+              datedItems.sort((a, b) => {
                 const aDone = isDone(a); const bDone = isDone(b);
                 if (aDone !== bDone) return aDone ? 1 : -1;
-                const aDate = parseDate(a.kind === 'runbook' ? a.item.due : a.filing.dueDate);
-                const bDate = parseDate(b.kind === 'runbook' ? b.item.due : b.filing.dueDate);
+                const aDate = a.kind === 'runbook' ? a.item.due : a.filing.dueDate;
+                const bDate = b.kind === 'runbook' ? b.item.due : b.filing.dueDate;
                 return aDate.localeCompare(bDate);
               });
-              return (
-                <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
-                  <div className="divide-y divide-ink-50">
-                    {unified.map(u => {
-                      if (u.kind === 'filing') {
-                        const fi = u.filing;
-                        const isPast = fi.status === 'pending' && new Date(fi.dueDate) < new Date();
-                        const rc = ROLE_COLORS[fi.responsible] || 'ink';
-                        return (<div key={`fi-${fi.id}`} className={`p-4 flex items-start gap-4 ${fi.status === 'filed' ? 'bg-sage-50 bg-opacity-40' : isPast ? 'bg-red-50 bg-opacity-40' : ''}`}>
-                          {fi.status === 'filed' ? (
-                            <div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>
-                          ) : (
-                            <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${isPast ? 'border-red-300 hover:border-red-500' : 'border-ink-200 hover:border-accent-400'}`} title="Mark as filed" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`text-sm font-medium ${fi.status === 'filed' ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{fi.name}</p>
-                              {fi.status === 'filed' ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold">✓ FILED</span>
-                                : isPast ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">OVERDUE</span>
-                                : <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">PENDING</span>}
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 font-medium border border-yellow-200">📁 Filing</span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{fi.responsible}</span>
-                              <span className="text-xs text-ink-400">{fi.category} · {fi.recurrence}</span>
-                            </div>
-                            <p className="text-xs text-ink-500 mt-1">Due: {fi.dueDate}{fi.filedDate ? ` · Filed: ${fi.filedDate}` : ''}{fi.confirmationNum ? ` · Ref: ${fi.confirmationNum}` : ''}</p>
-                            {fi.legalRef && <span className="text-[10px] font-mono text-accent-600">{fi.legalRef}</span>}
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {fi.attachments.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeFilingAttachment(fi.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}
-                              <button onClick={() => { setTargetId(fi.id); setPendingFile(null); setModal('addFilingAtt'); }} className="text-[11px] text-accent-600 font-medium hover:text-accent-700 border border-dashed border-accent-300 rounded-lg px-2.5 py-1 hover:bg-accent-50">+ Attach proof</button>
-                              {fi.status === 'pending' && <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Mark Filed</button>}
-                            </div>
-                          </div>
-                          <button onClick={() => { if (confirm('Remove?')) comp.deleteFiling(fi.id); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
-                        </div>);
-                      }
-                      // Runbook item
-                      const { item, catLabel, catIcon } = u;
-                      const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
-                      return (<div key={item.id} className={`p-4 flex items-start gap-4 ${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
-                        {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                        : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>
-                            {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                            {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                            {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                            {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
-                          </div>
-                          <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                          <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
-                          {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
-                        </div>
-                        <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
-                          const mType = item.meetingType || 'BOARD';
-                          const agenda = item.suggestedAgenda || [item.task];
-                          const d = getVoteDefaults(mType);
-                          setRunbookItemForMeeting(item.id);
-                          setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope });
-                          setModal('addMeeting');
-                        }} />
-                      </div>);
-                    })}
+
+              // Render a unified item row
+              const renderUnifiedItem = (u: UnifiedItem) => {
+                if (u.kind === 'filing') {
+                  const fi = u.filing;
+                  const isPast = fi.status === 'pending' && new Date(fi.dueDate) < new Date();
+                  const rc = ROLE_COLORS[fi.responsible] || 'ink';
+                  return (<div key={`fi-${fi.id}`} className={`p-4 flex items-start gap-4 ${fi.status === 'filed' ? 'bg-sage-50 bg-opacity-40' : isPast ? 'bg-red-50 bg-opacity-40' : ''}`}>
+                    {fi.status === 'filed' ? (
+                      <div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>
+                    ) : (
+                      <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${isPast ? 'border-red-300 hover:border-red-500' : 'border-ink-200 hover:border-accent-400'}`} title="Mark as filed" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`text-sm font-medium ${fi.status === 'filed' ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{fi.name}</p>
+                        {fi.status === 'filed' ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold">✓ FILED</span>
+                          : isPast ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">OVERDUE</span>
+                          : <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">PENDING</span>}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 font-medium border border-yellow-200">📁 Filing</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{fi.responsible}</span>
+                      </div>
+                      <p className="text-xs text-ink-500 mt-1">Due: {fi.dueDate}{fi.filedDate ? ` · Filed: ${fi.filedDate}` : ''}{fi.confirmationNum ? ` · Ref: ${fi.confirmationNum}` : ''}</p>
+                      {fi.legalRef && <span className="text-[10px] font-mono text-accent-600">{fi.legalRef}</span>}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {fi.attachments.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeFilingAttachment(fi.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}
+                        <button onClick={() => { setTargetId(fi.id); setPendingFile(null); setModal('addFilingAtt'); }} className="text-[11px] text-accent-600 font-medium hover:text-accent-700 border border-dashed border-accent-300 rounded-lg px-2.5 py-1 hover:bg-accent-50">+ Attach proof</button>
+                        {fi.status === 'pending' && <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Mark Filed</button>}
+                      </div>
+                    </div>
+                    <button onClick={() => { if (confirm('Remove?')) comp.deleteFiling(fi.id); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
+                  </div>);
+                }
+                const { item, catLabel, catIcon } = u;
+                const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
+                return (<div key={item.id} className={`p-4 flex items-start gap-4 ${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
+                  {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
+                  : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>
+                      {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
+                      {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
+                      {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                      {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
+                      {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
+                    </div>
+                    <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
+                    <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
+                    {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                   </div>
+                  <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
+                    const mType = item.meetingType || 'BOARD';
+                    const agenda = item.suggestedAgenda || [item.task];
+                    const d = getVoteDefaults(mType);
+                    setRunbookItemForMeeting(item.id);
+                    setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope });
+                    setModal('addMeeting');
+                  }} />
+                </div>);
+              };
+
+              return (<div className="space-y-6">
+                {/* Scheduled Deadlines */}
+                <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+                  <div className="p-4 border-b border-ink-100 bg-mist-50 flex items-center gap-2"><span className="text-lg">📅</span><h3 className="font-bold text-ink-900 text-sm">Scheduled Deadlines</h3><span className="text-[10px] text-ink-400 ml-1">{datedItems.filter(u => !isDone(u)).length} remaining</span></div>
+                  <div className="divide-y divide-ink-50">{datedItems.map(renderUnifiedItem)}</div>
+                  {datedItems.length === 0 && <p className="p-6 text-center text-sm text-ink-400">All deadlines met</p>}
                 </div>
-              );
+
+                {/* Ongoing & Per-Meeting Obligations */}
+                {ongoingItems.length > 0 && (
+                  <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+                    <div className="p-4 border-b border-ink-100 bg-amber-50 flex items-center gap-2"><span className="text-lg">🔄</span><h3 className="font-bold text-ink-900 text-sm">Ongoing & Per-Meeting Obligations</h3><span className="text-[10px] text-ink-400 ml-1">Continuous requirements with no fixed deadline</span></div>
+                    <div className="divide-y divide-ink-50">{ongoingItems.map(renderUnifiedItem)}</div>
+                  </div>
+                )}
+              </div>);
             })()}
 
             {/* ── CATEGORY-GROUPED VIEW ── */}
