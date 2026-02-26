@@ -371,7 +371,7 @@ export default function CompliancePage() {
                 const mType = item?.meetingType || 'BOARD';
                 const agenda = item?.suggestedAgenda || [item?.task || 'Agenda item'];
                 mtg.addMeeting({ title: `${item?.task || 'Meeting'}`, type: mType, status: 'SCHEDULED', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda, notes: `Created from Compliance Runbook: ${item?.task || ''}. ${item?.legalRef || ''}` });
-                comp.toggleCompletion(targetId);
+                comp.toggleItem(targetId);
                 setModal(null);
                 navigate('/boardroom');
               }
