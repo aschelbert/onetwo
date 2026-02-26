@@ -173,6 +173,8 @@ export default function BoardRoomPage() {
               <h3 className="font-bold text-ink-900">{m.title}</h3>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_BADGE[m.status] || 'bg-ink-100 text-ink-600'}`}>{m.status}</span>
               {linkedVotes.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">🗳 {linkedVotes.length} vote{linkedVotes.length !== 1 ? 's' : ''}</span>}
+              {m.status === 'COMPLETED' && m.minutes && (() => { const approvals = (m.minutesApprovals || []); const total = m.attendees.board.length > 0 ? m.attendees.board.length : board.length; const isMaj = approvals.length > total / 2; return m.minutes ? <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isMaj ? 'bg-sage-100 text-sage-700' : 'bg-amber-100 text-amber-700'}`}>{isMaj ? '✍️ Minutes approved' : `✍️ ${approvals.length}/${total} approvals`}</span> : null; })()}
+              {m.status === 'COMPLETED' && !m.minutes && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">⚠ No minutes</span>}
             </div>
             <div className="flex items-center gap-3"><span className="text-sm text-ink-500">{m.date} · {m.time}</span><span className={`text-sm transition-transform ${expanded === m.id ? 'rotate-180' : ''}`}>▼</span></div>
           </div>
@@ -195,6 +197,61 @@ export default function BoardRoomPage() {
             {linkedVotes.length > 0 && (<div><p className="font-bold text-ink-900 mb-2">🗳 Linked Votes ({linkedVotes.length})</p><div className="space-y-2">{linkedVotes.map(v => (<div key={v.id} className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between"><div><p className="text-sm font-medium text-green-900">{v.title}</p><p className="text-[10px] text-green-600">{v.status} · {v.ballotItems.length} items · {v.ballots.length} ballots</p></div><div className="flex gap-2"><button onClick={() => setTab('votes')} className="text-[10px] text-accent-600 hover:underline">View in Votes →</button>{isBoard && <button onClick={() => mtg.unlinkVote(m.id, v.id)} className="text-xs text-red-400">×</button>}</div></div>))}</div></div>)}
             {(m.attendees.board.length > 0 || m.attendees.owners.length > 0) && (<div><p className="font-bold text-ink-900 mb-2">Attendance</p><div className="bg-mist-50 rounded-lg p-3 space-y-2 text-sm">{m.attendees.board.length > 0 && <div><span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Board</span><p className="text-ink-700">{m.attendees.board.join(', ')}</p></div>}{m.attendees.owners.length > 0 && <div><span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Owners ({m.attendees.owners.length})</span><p className="text-ink-700">{m.attendees.owners.join(', ')}</p></div>}{m.attendees.guests.length > 0 && <div><span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Guests</span><p className="text-ink-700">{m.attendees.guests.join(', ')}</p></div>}</div></div>)}
             {m.minutes && (<div><p className="font-bold text-ink-900 mb-2">Meeting Minutes</p><div className="bg-mist-50 rounded-lg p-4 text-sm text-ink-700 whitespace-pre-wrap max-h-48 overflow-y-auto border border-mist-100">{m.minutes}</div></div>)}
+            {/* Minutes Approval */}
+            {m.status === 'COMPLETED' && m.minutes && (() => {
+              const approvals = m.minutesApprovals || [];
+              const approvedNames = approvals.map(a => a.name);
+              const boardAttendees = m.attendees.board.length > 0 ? m.attendees.board : board.map(b => b.name);
+              const totalBoard = boardAttendees.length;
+              const approvedCount = approvals.length;
+              const isMajority = approvedCount > totalBoard / 2;
+              const currentUserName = currentUser?.name || '';
+              const currentBoardMember = board.find(b => b.name === currentUserName);
+              const alreadyApproved = approvedNames.includes(currentUserName);
+              return (
+                <div className={`rounded-xl border p-4 ${isMajority ? 'bg-sage-50 border-sage-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-ink-900 text-sm">✍️ Minutes Approval</p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isMajority ? 'bg-sage-100 text-sage-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {isMajority ? '✓ APPROVED' : `${approvedCount}/${totalBoard} — needs majority`}
+                      </span>
+                    </div>
+                    {isBoard && currentBoardMember && !alreadyApproved && (
+                      <button onClick={() => mtg.approveMinutes(m.id, { name: currentUserName, role: currentBoardMember.role, date: new Date().toISOString().split('T')[0] })}
+                        className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700 transition-colors">
+                        ✓ Approve Minutes
+                      </button>
+                    )}
+                    {isBoard && alreadyApproved && (
+                      <button onClick={() => mtg.revokeMinutesApproval(m.id, currentUserName)}
+                        className="px-3 py-1.5 border border-ink-200 text-ink-500 rounded-lg text-xs font-medium hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors">
+                        Revoke My Approval
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {boardAttendees.map(name => {
+                      const approval = approvals.find(a => a.name === name);
+                      const memberRole = board.find(b => b.name === name)?.role || '';
+                      return (
+                        <div key={name} className="flex items-center gap-2 text-sm">
+                          {approval ? (
+                            <span className="w-5 h-5 rounded-full bg-sage-500 text-white flex items-center justify-center shrink-0 text-[10px]">✓</span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-full border-2 border-ink-200 shrink-0" />
+                          )}
+                          <span className={`${approval ? 'text-ink-700' : 'text-ink-400'}`}>{name}</span>
+                          {memberRole && <span className="text-[10px] text-ink-400">({memberRole})</span>}
+                          {approval && <span className="text-[10px] text-sage-600 ml-auto">{approval.date}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-ink-400 mt-3">{isDC ? 'DC Code § 29-1108.06 — Minutes must be approved by board majority and made available for owner inspection.' : 'Bylaws require board approval of meeting minutes at or before the next regular meeting.'}</p>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

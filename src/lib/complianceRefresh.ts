@@ -82,11 +82,11 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
     { id: 'g2', task: 'CC&Rs reviewed and up to date', role: 'President', freq: 'Annual', due: '2025-06-20', critical: true,
       tip: hasCCRs ? 'Declaration/CC&Rs detected — compliance checks updated.' : 'Upload CC&Rs or Declaration to enable checks.',
       legalRef: isDC ? 'DC Code § 29-1131' : `${stateActShort} § Condo Declaration`, autoPass: false, satisfyingAction: 'document' },
-    { id: 'g3', task: 'Board meeting minutes recorded and distributed', role: 'Secretary', freq: 'Per meeting', due: 'Per meeting',
+    { id: 'g3', task: 'Board meeting minutes recorded, approved, and distributed', role: 'Secretary', freq: 'Per meeting', due: 'Per meeting',
       critical: true, perMeeting: true,
       tip: isDC
-        ? 'Minutes must be prepared within 10 business days of each meeting and made available for owner inspection upon request.'
-        : 'Minutes must be prepared promptly after each meeting and retained per governing documents.',
+        ? 'Minutes must be prepared within 10 business days of each meeting, approved by board majority at the next meeting, and made available for owner inspection upon request.'
+        : 'Minutes must be prepared promptly after each meeting, approved by board majority at the next regular meeting, and retained per governing documents.',
       legalRef: isDC ? 'DC Code § 29-1108.06' : `${stateActShort} Minutes Req.`, satisfyingAction: 'review' },
     { id: 'g4', task: 'Annual meeting held within 13 months of prior', role: 'President', freq: 'Annual', due: '2026-03-31', critical: true,
       tip: 'Must hold annual meeting within 13 months of the previous one. Schedule early to allow for notice requirements.',
