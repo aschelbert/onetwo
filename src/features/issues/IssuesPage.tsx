@@ -5,8 +5,6 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal } from './components/CaseModals';
-import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
-import { useComplianceStore } from '@/store/useComplianceStore';
 import Modal from '@/components/ui/Modal';
 import type { CaseApproach, CasePriority } from '@/types/issues';
 
@@ -35,18 +33,16 @@ export default function IssuesPage() {
   />;
 }
 
-type CaseTab = 'operations' | 'open' | 'issues' | 'archive';
+type CaseTab = 'open' | 'issues' | 'archive';
 
 function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store }: {
   open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
   isBoard: boolean; user: any; onNav: (v: string) => void; store: any;
 }) {
-  const [tab, setTab] = useState<CaseTab>('operations');
+  const [tab, setTab] = useState<CaseTab>('open');
   const [search, setSearch] = useState('');
   const [prioFilter, setPrioFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
-  const [expandedOp, setExpandedOp] = useState<string | null>(null);
-  const [opSteps, setOpSteps] = useState<Record<string, boolean[]>>({});
   // Issue creation
   const [showCreate, setShowCreate] = useState(false);
   const [iTitle, setITitle] = useState('');
@@ -91,25 +87,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
   const allCats = [...new Set(open.map(c => c.catId))];
 
-  // Operations runbook items
-  const building = useBuildingStore();
-  const compStore = useComplianceStore();
-  const { categories: compCategories } = refreshComplianceRequirements({
-    state: building.address?.state || 'District of Columbia',
-    legalDocuments: (building.legalDocuments || []).map(d => ({ name: d.name, status: d.status })),
-    insurance: (building.insurance || []).map(p => ({ type: p.type, expires: p.expires })),
-    boardCount: building.board?.length || 5,
-    hasManagement: !!building.management?.company,
-  });
-  const opsItems = compCategories.flatMap(c => c.items).filter(i => i.scope === 'operations');
-  const DUTY_LABELS: Record<string, string> = { care:'Duty of Care', loyalty:'Duty of Loyalty', obedience:'Duty of Obedience' };
-  const DUTY_COLORS: Record<string, string> = { care:'accent', loyalty:'violet', obedience:'amber' };
-  const ROLE_COLORS: Record<string, string> = { 'President':'ink', 'Vice President':'accent', 'Treasurer':'emerald', 'Secretary':'violet', 'Member at Large':'amber' };
-  const isOpComplete = (id: string, howToLen: number) => { const s = opSteps[id]; return s && s.length >= howToLen && s.every(Boolean); };
-  const opsCompleted = opsItems.filter(i => isOpComplete(i.id, i.howTo.length)).length;
-
   const TABS: { id: CaseTab; label: string; badge?: number }[] = [
-    { id: 'operations', label: 'Operations Runbook', badge: (opsItems.length - opsCompleted) || undefined },
     { id: 'open', label: 'Open Cases', badge: open.length || undefined },
     { id: 'issues', label: 'Recent Issues', badge: issues.filter(i => i.status === 'SUBMITTED').length || undefined },
     { id: 'archive', label: 'Case Archive', badge: closed.length || undefined },
@@ -159,84 +137,6 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
       {/* Tab Content */}
       <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
 
-        {/* ─── OPERATIONS RUNBOOK ─── */}
-        {tab === 'operations' && (<div className="space-y-4">
-          <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
-            <h3 className="font-bold text-ink-900 text-sm">⚙️ Operations Runbook</h3>
-            <p className="text-xs text-ink-500 mt-1">Event-driven and ongoing obligations — owner requests, enforcement, records, reconciliation. These don't have fixed annual dates; they're triggered by events or run continuously.</p>
-            <div className="flex flex-wrap gap-4 mt-3 text-[11px]">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-sage-700"><span className="w-2 h-2 rounded-full bg-sage-400"></span>{opsCompleted} completed</span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-accent-700"><span className="w-2 h-2 rounded-full bg-accent-400"></span>{opsItems.filter(i => { const s = opSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length} in progress</span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{opsItems.length - opsCompleted - opsItems.filter(i => { const s = opSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length} not started</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {opsItems.map(item => {
-              const done = isOpComplete(item.id, item.howTo.length);
-              const wSteps = opSteps[item.id] || [];
-              const wDone = wSteps.filter(Boolean).length;
-              const wTotal = item.howTo.length;
-              const wStarted = wDone > 0;
-              const isExp = expandedOp === item.id;
-              const rc = ROLE_COLORS[item.role] || 'ink';
-              const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
-              return (<div key={item.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm bg-white' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : wStarted ? 'border-accent-200 bg-white' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
-                <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={() => setExpandedOp(isExp ? null : item.id)}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 text-white' : wStarted ? 'bg-accent-100 text-accent-600' : 'bg-ink-50 text-ink-300'}`}>
-                    {done ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    : wStarted ? <span className="text-[10px] font-bold">{wDone}/{wTotal}</span>
-                    : <span className="text-[10px] font-bold">—</span>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
-                      {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                      {done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">✅ COMPLETE</span>}
-                      {!done && wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-semibold border border-accent-200">IN PROGRESS</span>}
-                      {!done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
-                      <span className="text-[10px] text-ink-400">{item.freq}</span>
-                      <span className="text-[10px] font-medium text-ink-500">Due: {item.due}</span>
-                    </div>
-                    {!done && wTotal > 0 && (
-                      <div className="mt-2.5 flex items-center gap-2.5">
-                        <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${done ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${(wDone / wTotal) * 100}%` }} /></div>
-                        <span className={`text-[10px] font-semibold shrink-0 ${done ? 'text-sage-600' : wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
-                        <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`}>{wStarted ? '▶ Continue' : '▶ Start workflow'}</span>
-                      </div>
-                    )}
-                    {done && (<div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">✅ All {wTotal} steps completed</span><span className="text-[10px] text-ink-400">· View details ›</span></div>)}
-                  </div>
-                  <svg className={`w-4 h-4 transition-transform ${isExp ? 'rotate-180' : ''} text-ink-300 shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-                {isExp && (() => {
-                  const steps = opSteps[item.id] || item.howTo.map(() => false);
-                  const completedSteps = steps.filter(Boolean).length;
-                  const allDone = completedSteps === item.howTo.length;
-                  const toggleStep = (si: number) => { const ns = [...steps]; ns[si] = !ns[si]; setOpSteps({ ...opSteps, [item.id]: ns }); };
-                  return (<div className="px-4 pb-4 ml-11 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p><p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p></div>
-                    </div>
-                    <div className={`border rounded-xl overflow-hidden ${allDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
-                      <div className="p-3 border-b border-ink-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2"><p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span></div>
-                        <div className="flex gap-2">{!allDone && <button onClick={() => setOpSteps({ ...opSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setOpSteps({ ...opSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
-                      </div>
-                      <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
-                      {allDone && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2"><svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span></div>)}
-                    </div>
-                    <div className="flex items-center gap-4 text-[10px] text-ink-400"><span>📖 {item.legalRef}</span><span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}</span></div>
-                  </div>);
-                })()}
-              </div>);
-            })}
-          </div>
-        </div>)}
 
         {/* ─── OPEN CASES ─── */}
         {tab === 'open' && (<div className="space-y-4">
