@@ -14,6 +14,7 @@ import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
+import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import TenantProvider from '@/components/TenantProvider';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="/archives" element={<ArchivesPage />} />
           <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
           <Route path="/boardroom" element={<BoardRoomPage />} />
+          <Route path="/community" element={<CommunityRoomPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />

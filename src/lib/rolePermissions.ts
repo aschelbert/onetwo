@@ -20,9 +20,9 @@ export const navigation: Record<Role, NavItem[]> = {
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
+    { id: 'community', label: 'Community Room', path: '/community' },
     { id: 'contacts', label: 'The Building', path: '/building' },
-    { id: 'issues-resident', label: 'Report Issues', path: '/issues' },
-    { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
+    { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'archives', label: 'The Archives', path: '/archives' },
   ],
   PROPERTY_MANAGER: [
