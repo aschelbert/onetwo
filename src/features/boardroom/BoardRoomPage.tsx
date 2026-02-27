@@ -19,7 +19,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'operations' | 'meetings' | 'votes' | 'communications' | 'dailyops';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -95,8 +95,6 @@ export default function BoardRoomPage() {
   const healthIndex = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
   const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
   const allRoles: string[] = [...new Set(categories.flatMap(c => c.items.map(i => i.role)))];
-  const opsItems = categories.flatMap(c => c.items).filter(i => i.scope === 'operations');
-  const opsCompleted = opsItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
 
   // Meeting data
   const { meetings } = mtg;
@@ -286,7 +284,6 @@ export default function BoardRoomPage() {
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'duties', label: 'Duties & Roles' },
     { id: 'runbook', label: 'Governance Calendar', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => i.scope === 'governance' && !isItemComplete(i.id, i.howTo.length)).length) || undefined },
-    { id: 'operations', label: 'Operations Runbook', badge: (opsItems.length - opsCompleted) || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
@@ -642,10 +639,10 @@ export default function BoardRoomPage() {
 
                 {/* Link to ongoing items in Duties tab */}
                 {ongoingItems.length > 0 && (
-                  <a href="/issues" className="block w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between hover:bg-amber-100 transition-colors no-underline">
-                    <div className="flex items-center gap-2"><span className="text-lg">🔄</span><span className="text-sm font-medium text-amber-800">{ongoingItems.length} operational items</span><span className="text-xs text-amber-600">— per-request, monthly, and ongoing duties</span></div>
-                    <span className="text-xs text-amber-600 font-medium">View in Daily Operations →</span>
-                  </a>
+                  <button onClick={() => setTab('duties')} className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between hover:bg-amber-100 transition-colors">
+                    <div className="flex items-center gap-2"><span className="text-lg">🔄</span><span className="text-sm font-medium text-amber-800">{ongoingItems.length} ongoing obligations</span><span className="text-xs text-amber-600">— per-meeting, monthly, and continuous duties</span></div>
+                    <span className="text-xs text-amber-600 font-medium">View in Duties tab →</span>
+                  </button>
                 )}
               </div>);
             })()}
@@ -769,87 +766,33 @@ export default function BoardRoomPage() {
           </div>);
         })()}
 
-        {/* ═══ OPERATIONS RUNBOOK TAB ═══ */}
-        {tab === 'operations' && (<div className="space-y-4">
-          <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
-            <h3 className="font-bold text-ink-900 text-sm">⚙️ Operations Runbook</h3>
-            <p className="text-xs text-ink-500 mt-1">Event-driven and ongoing obligations — owner requests, enforcement, records, reconciliation. Triggered by events or run continuously, not on an annual calendar.</p>
-            <div className="flex flex-wrap gap-4 mt-3 text-[11px]">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-sage-700"><span className="w-2 h-2 rounded-full bg-sage-400"></span>{opsCompleted} completed</span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-accent-700"><span className="w-2 h-2 rounded-full bg-accent-400"></span>{opsItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length} in progress</span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{opsItems.length - opsCompleted - opsItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length} not started</span>
+        {/* ═══ MEETINGS TAB ═══ */}
+        {tab === 'meetings' && (() => {
+          const bylawRef = hasBylaws ? 'Bylaws Art. IV-V' : 'Governing Documents';
+          const meetingsThisYear = meetings.filter(m => m.date.startsWith('2026')).length;
+          const meetingsRequired = 6; // bi-monthly per bylaws
+          const cadencePct = Math.min(100, Math.round((meetingsThisYear / meetingsRequired) * 100));
+          const minutesPending = past.filter(m => !m.minutesApprovals || m.minutesApprovals.length === 0).length;
+          return (<div className="space-y-6">
+          {/* Compliance context */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={`rounded-xl border p-4 ${cadencePct >= 80 ? 'border-sage-200 bg-sage-50' : cadencePct >= 50 ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
+              <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Meeting Cadence</p>
+              <p className="text-lg font-bold text-ink-900 mt-1">{meetingsThisYear}/{meetingsRequired} <span className="text-xs font-normal text-ink-400">this year</span></p>
+              <div className="w-full h-1.5 bg-ink-100 rounded-full mt-2 overflow-hidden"><div className={`h-full rounded-full ${cadencePct >= 80 ? 'bg-sage-500' : cadencePct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${cadencePct}%` }} /></div>
+              <p className="text-[10px] text-ink-400 mt-1.5">📖 {bylawRef} — bi-monthly required</p>
+            </div>
+            <div className={`rounded-xl border p-4 ${minutesPending === 0 ? 'border-sage-200 bg-sage-50' : 'border-amber-200 bg-amber-50'}`}>
+              <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Minutes Status</p>
+              <p className="text-lg font-bold text-ink-900 mt-1">{minutesPending === 0 ? '✅ All approved' : `⚠ ${minutesPending} pending`}</p>
+              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 29-1108.06' : 'State statute'} — record, approve, distribute</p>
+            </div>
+            <div className="rounded-xl border border-ink-100 bg-white p-4">
+              <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Notice Requirements</p>
+              <p className="text-xs text-ink-700 mt-1.5">{isDC ? '48-hour notice for board meetings. 10–60 day window for annual meeting.' : 'Follow bylaws notice requirements.'}</p>
+              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 29-1109.04' : bylawRef}</p>
             </div>
           </div>
-          <div className="space-y-2">
-            {opsItems.map(item => {
-              const done = isItemComplete(item.id, item.howTo.length);
-              const wSteps = workflowSteps[item.id] || [];
-              const wDone = wSteps.filter(Boolean).length;
-              const wTotal = item.howTo.length;
-              const wStarted = wDone > 0;
-              const isExp = expandedRunbook === item.id;
-              const rc = ROLE_COLORS[item.role] || 'ink';
-              const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
-              return (<div key={item.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm bg-white' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : wStarted ? 'border-accent-200 bg-white' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
-                <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={() => setExpandedRunbook(isExp ? null : item.id)}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 text-white' : wStarted ? 'bg-accent-100 text-accent-600' : 'bg-ink-50 text-ink-300'}`}>
-                    {done ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    : wStarted ? <span className="text-[10px] font-bold">{wDone}/{wTotal}</span>
-                    : <span className="text-[10px] font-bold">—</span>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
-                      {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                      {done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">✅ COMPLETE</span>}
-                      {!done && wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-semibold border border-accent-200">IN PROGRESS</span>}
-                      {!done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
-                      <span className="text-[10px] text-ink-400">{item.freq}</span>
-                      <span className="text-[10px] font-medium text-ink-500">Due: {item.due}</span>
-                    </div>
-                    {!done && wTotal > 0 && (
-                      <div className="mt-2.5 flex items-center gap-2.5">
-                        <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${done ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${(wDone / wTotal) * 100}%` }} /></div>
-                        <span className={`text-[10px] font-semibold shrink-0 ${wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
-                        <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`}>{wStarted ? '▶ Continue' : '▶ Start workflow'}</span>
-                      </div>
-                    )}
-                    {done && (<div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">✅ All {wTotal} steps completed</span><span className="text-[10px] text-ink-400">· View details ›</span></div>)}
-                  </div>
-                  <svg className={`w-4 h-4 transition-transform ${isExp ? 'rotate-180' : ''} text-ink-300 shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </div>
-                {isExp && (() => {
-                  const steps = workflowSteps[item.id] || item.howTo.map(() => false);
-                  const completedSteps = steps.filter(Boolean).length;
-                  const allDone = completedSteps === item.howTo.length;
-                  const toggleStep = (si: number) => { const ns = [...steps]; ns[si] = !ns[si]; setWorkflowSteps({ ...workflowSteps, [item.id]: ns }); };
-                  return (<div className="px-4 pb-4 ml-11 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p><p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p></div>
-                    </div>
-                    <div className={`border rounded-xl overflow-hidden ${allDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
-                      <div className="p-3 border-b border-ink-100 flex items-center justify-between">
-                        <div className="flex items-center gap-2"><p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span></div>
-                        <div className="flex gap-2">{!allDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
-                      </div>
-                      <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
-                      {allDone && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2"><svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span></div>)}
-                    </div>
-                    <div className="flex items-center gap-4 text-[10px] text-ink-400"><span>📖 {item.legalRef}</span><span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}</span></div>
-                  </div>);
-                })()}
-              </div>);
-            })}
-          </div>
-        </div>)}
-
-        {/* ═══ MEETINGS TAB ═══ */}
-        {tab === 'meetings' && (<div className="space-y-6">
           <div className="flex items-center justify-between">
             <div><h3 className="font-display text-lg font-bold text-ink-900">📅 Meetings</h3><p className="text-xs text-ink-400">{upcoming.length} upcoming · {past.length} completed</p></div>
             {isBoard && <button onClick={openAddMeeting} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Schedule Meeting</button>}
@@ -857,7 +800,7 @@ export default function BoardRoomPage() {
           {upcoming.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Upcoming</p><div className="space-y-3">{upcoming.map(m => renderMeeting(m, true))}</div></div>)}
           {past.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Past</p><div className="space-y-3">{past.map(m => renderMeeting(m, false))}</div></div>)}
           {meetings.length === 0 && <p className="text-center text-ink-400 py-8">No meetings scheduled yet.</p>}
-        </div>)}
+        </div>); })()}
 
         {/* ═══ VOTES TAB ═══ */}
         {tab === 'votes' && <VotingPage />}
