@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface FilingAttachment {
   name: string; size: string; uploadedAt: string;
@@ -16,11 +17,17 @@ export interface OwnerCommunication {
   recipients: string; respondedBy: string | null; status: 'sent' | 'pending' | 'draft'; notes: string;
 }
 
+export interface Announcement {
+  id: string; title: string; body: string; category: 'general' | 'maintenance' | 'financial' | 'safety' | 'rules' | 'meeting';
+  postedBy: string; postedDate: string; pinned: boolean;
+}
+
 interface ComplianceState {
   completions: Record<string, boolean>;
   itemAttachments: Record<string, FilingAttachment[]>;
   filings: RegulatoryFiling[];
   communications: OwnerCommunication[];
+  announcements: Announcement[];
 
   toggleItem: (id: string) => void;
   setCompletion: (id: string, val: boolean) => void;
@@ -36,9 +43,13 @@ interface ComplianceState {
 
   addCommunication: (c: Omit<OwnerCommunication, 'id'>) => void;
   deleteCommunication: (id: string) => void;
+
+  addAnnouncement: (a: Omit<Announcement, 'id'>) => void;
+  deleteAnnouncement: (id: string) => void;
+  togglePinAnnouncement: (id: string) => void;
 }
 
-export const useComplianceStore = create<ComplianceState>((set) => ({
+export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   completions: {
     g1: true, g3: true, g4: true, f1: true, f2: true, f4: true, f5: true,
     i1: true, i2: true, i4: true, m2: true, m3: true, r1: true, r2: true, r4: true,
@@ -64,6 +75,14 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
     { id: 'oc6', type: 'resale', subject: 'Resale Certificate Package — Unit 204', date: '2026-02-05', method: 'email', recipients: 'Unit 204 buyer agent', respondedBy: 'Secretary', status: 'sent', notes: 'Bylaws, CC&Rs, rules, budget, reserve study, insurance cert.' },
   ],
 
+  announcements: [
+    { id: 'ann1', title: 'Elevator Modernization Project — March Timeline', body: 'The board has approved an elevator modernization project beginning March 15. Service elevator will be out of commission for approximately 6 weeks. The passenger elevator will remain in service throughout. Residents on floors 5+ are encouraged to plan accordingly for move-ins/outs during this period. Contractor: Schindler Elevator Corp. Questions? Contact the property manager.', category: 'maintenance', postedBy: 'Vice President', postedDate: '2026-02-20', pinned: true },
+    { id: 'ann2', title: '2026 Annual Meeting — Save the Date', body: 'The 2026 Annual Meeting of Unit Owners is scheduled for Saturday, March 28 at 10:00 AM in the community room. Agenda includes: board elections (2 seats), 2026 budget ratification, reserve fund update, and Q&A. Proxy forms will be mailed by March 1. If you are interested in running for the board, please submit your candidacy by March 14.', category: 'meeting', postedBy: 'President', postedDate: '2026-02-15', pinned: true },
+    { id: 'ann3', title: 'Monthly Assessment Reminder — Auto-Pay Available', body: 'A friendly reminder that monthly assessments are due on the 1st of each month. Late fees apply after the 15th per the collection policy. We now offer auto-pay through the resident portal — set it up under My Unit > Payment Settings to avoid late fees.', category: 'financial', postedBy: 'Treasurer', postedDate: '2026-02-01', pinned: false },
+    { id: 'ann4', title: 'Fire Alarm Testing — February 28', body: 'DC Fire and EMS will conduct annual fire alarm testing on Friday, February 28 between 9 AM and 3 PM. Expect intermittent alarm sounds throughout the day. No evacuation required unless continuous alarm. Please ensure your unit smoke detectors have fresh batteries.', category: 'safety', postedBy: 'Vice President', postedDate: '2026-02-18', pinned: false },
+    { id: 'ann5', title: 'Updated Quiet Hours Policy', body: 'The board has approved updated quiet hours effective March 1: Sunday–Thursday 10 PM to 8 AM, Friday–Saturday 11 PM to 9 AM. Construction and renovation work remains restricted to Monday–Friday 9 AM to 5 PM. Please review the updated House Rules posted in the lobby and on the portal.', category: 'rules', postedBy: 'President', postedDate: '2026-02-10', pinned: false },
+  ],
+
   toggleItem: (id) => set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } })),
   setCompletion: (id, val) => set(s => ({ completions: { ...s.completions, [id]: val } })),
 
@@ -82,5 +101,8 @@ export const useComplianceStore = create<ComplianceState>((set) => ({
 
   addCommunication: (c) => set(s => ({ communications: [{ id: 'oc' + Date.now(), ...c }, ...s.communications] })),
   deleteCommunication: (id) => set(s => ({ communications: s.communications.filter(c => c.id !== id) })),
-}));
 
+  addAnnouncement: (a) => set(s => ({ announcements: [{ id: 'ann' + Date.now(), ...a }, ...s.announcements] })),
+  deleteAnnouncement: (id) => set(s => ({ announcements: s.announcements.filter(a => a.id !== id) })),
+  togglePinAnnouncement: (id) => set(s => ({ announcements: s.announcements.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a) })),
+}), { name: 'onetwo-compliance' }));
