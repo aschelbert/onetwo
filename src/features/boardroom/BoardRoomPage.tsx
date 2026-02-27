@@ -971,8 +971,8 @@ export default function BoardRoomPage() {
       {/* Announcement modal */}
       {modal === 'addAnnouncement' && (<Modal title="Post Announcement" onClose={() => setModal(null)} onSave={() => {
         if (!f('annTitle') || !f('annBody')) { alert('Title and body required'); return; }
-        const boardMember = board.find(b => b.userId === currentUser.id);
-        const roleName = boardMember?.position || currentRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const boardMember = board.find(b => b.name === currentUser.name);
+        const roleName = boardMember?.role || currentRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
         comp.addAnnouncement({
           title: f('annTitle'),
           body: f('annBody'),
