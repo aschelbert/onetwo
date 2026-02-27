@@ -284,10 +284,10 @@ export default function BoardRoomPage() {
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'duties', label: 'Duties & Roles' },
     { id: 'runbook', label: 'Governance Calendar', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => i.scope === 'governance' && !isItemComplete(i.id, i.howTo.length)).length) || undefined },
+    { id: 'dailyops', label: 'Daily Operations', badge: issues.cases.filter(c => c.status === 'open').length || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
-    { id: 'dailyops', label: 'Daily Operations', badge: issues.cases.filter(c => c.status === 'open').length || undefined },
   ];
 
   return (
@@ -812,7 +812,7 @@ export default function BoardRoomPage() {
         </div>)}
 
         {/* ═══ DAILY OPERATIONS TAB ═══ */}
-        {tab === 'dailyops' && <IssuesPage />}
+        {tab === 'dailyops' && <IssuesPage embedded />}
       </div>
 
       {/* ═══ MODALS ═══ */}

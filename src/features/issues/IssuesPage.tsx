@@ -10,7 +10,7 @@ import type { CaseApproach, CasePriority } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-export default function IssuesPage() {
+export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useState<string>('tabs');
@@ -29,15 +29,15 @@ export default function IssuesPage() {
   return <CaseOpsTabs
     open={open} closed={closed} urgent={urgent} high={high}
     issues={issues} isBoard={isBoard} user={user}
-    onNav={setView} store={store}
+    onNav={setView} store={store} embedded={embedded}
   />;
 }
 
 type CaseTab = 'open' | 'issues' | 'archive';
 
-function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store }: {
+function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store, embedded }: {
   open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
-  isBoard: boolean; user: any; onNav: (v: string) => void; store: any;
+  isBoard: boolean; user: any; onNav: (v: string) => void; store: any; embedded?: boolean;
 }) {
   const [tab, setTab] = useState<CaseTab>('open');
   const [search, setSearch] = useState('');
@@ -94,13 +94,14 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   ];
 
   return (
-    <div className="space-y-0">
-      {/* Header */}
+    <div className={embedded ? 'space-y-4' : 'space-y-0'}>
+      {/* Header — only show when standalone */}
+      {!embedded && (<>
       <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">{isBoard ? '⚙️ Daily Operations' : 'Issues & Cases'}</h2>
-            <p className="text-accent-200 text-sm mt-1">Operations runbook, case tracking, issue management</p>
+            <p className="text-accent-200 text-sm mt-1">Case tracking and issue management</p>
           </div>
           <div className="flex items-center gap-4">
             {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-white text-ink-900 rounded-lg text-sm font-medium hover:bg-accent-100">＋ New Case</button>}
@@ -122,7 +123,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
         </div>
       </div>
 
-      {/* Tab Nav */}
+      {/* Tab Nav — standalone style */}
       <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
         <div className="flex min-w-max px-4">
           {TABS.map(t => (
@@ -133,9 +134,25 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
           ))}
         </div>
       </div>
+      </>)}
+
+      {/* Embedded: pill sub-tabs + New Case button on same row */}
+      {embedded && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-1 bg-mist-50 rounded-lg p-1">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${tab === t.id ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>
+                {t.label}
+                {t.badge ? <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${tab === t.id ? 'bg-ink-100 text-ink-600' : 'bg-ink-200 text-ink-500'}`}>{t.badge}</span> : null}
+              </button>
+            ))}
+          </div>
+          {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 shrink-0">+ New Case</button>}
+        </div>
+      )}
 
       {/* Tab Content */}
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
 
 
         {/* ─── OPEN CASES ─── */}
