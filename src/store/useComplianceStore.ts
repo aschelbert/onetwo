@@ -102,7 +102,14 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   addCommunication: (c) => set(s => ({ communications: [{ id: 'oc' + Date.now(), ...c }, ...s.communications] })),
   deleteCommunication: (id) => set(s => ({ communications: s.communications.filter(c => c.id !== id) })),
 
-  addAnnouncement: (a) => set(s => ({ announcements: [{ id: 'ann' + Date.now(), ...a }, ...s.announcements] })),
-  deleteAnnouncement: (id) => set(s => ({ announcements: s.announcements.filter(a => a.id !== id) })),
-  togglePinAnnouncement: (id) => set(s => ({ announcements: s.announcements.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a) })),
-}), { name: 'onetwo-compliance' }));
+  addAnnouncement: (a) => set(s => ({ announcements: [{ id: 'ann' + Date.now(), ...a }, ...(s.announcements || [])] })),
+  deleteAnnouncement: (id) => set(s => ({ announcements: (s.announcements || []).filter(a => a.id !== id) })),
+  togglePinAnnouncement: (id) => set(s => ({ announcements: (s.announcements || []).map(a => a.id === id ? { ...a, pinned: !a.pinned } : a) })),
+}), {
+  name: 'onetwo-compliance',
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...persisted,
+    announcements: persisted?.announcements || current.announcements || [],
+  }),
+}));
