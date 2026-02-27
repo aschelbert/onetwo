@@ -79,7 +79,6 @@ export default function BoardRoomPage() {
   const [runbookAction, setRunbookAction] = useState<'case' | 'meeting'>('case');
   const [runbookSort, setRunbookSort] = useState<'date' | 'category'>('date');
   const [runbookItemForMeeting, setRunbookItemForMeeting] = useState<string | null>(null);
-  const [expandedRunbook, setExpandedRunbook] = useState<string | null>(null);
 
   // Compliance scores
   const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => comp.completions[i.id]).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
