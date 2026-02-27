@@ -134,8 +134,12 @@ export default function BoardRoomPage() {
       mtg.addMeeting({ title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
       const freshMeetings = useMeetingsStore.getState().meetings;
       const newMeetingId = freshMeetings[freshMeetings.length - 1]?.id;
-      if (mForm.requiresVote && mForm.voteItems.length > 0 && newMeetingId) {
-        const selectedAgenda = mForm.voteItems.map(i => agenda[i]).filter(Boolean);
+      if (mForm.requiresVote && newMeetingId) {
+        // Use explicitly selected items, or fall back to auto-detected
+        const voteKeywordsRe = /\b(approv|adopt|ratif|elect|amend|authori|resolv|vote|budget|assess|special assessment|terminat|contract|remov|waiv)\w*/i;
+        const autoDetectedIdx = agenda.map((a, i) => voteKeywordsRe.test(a) ? i : -1).filter(i => i >= 0);
+        const effectiveItems = mForm.voteItems.length > 0 ? mForm.voteItems : autoDetectedIdx;
+        const selectedAgenda = effectiveItems.map(i => agenda[i]).filter(Boolean);
         if (selectedAgenda.length > 0) {
         const typeMap: Record<string, string> = { ANNUAL: 'budget_approval', SPECIAL: 'special_assessment', BOARD: 'meeting_motion', QUARTERLY: 'meeting_motion', EMERGENCY: 'meeting_motion' };
         const elType = (typeMap[mForm.type] || 'meeting_motion') as any;
@@ -377,7 +381,7 @@ export default function BoardRoomPage() {
                         <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                       </div>
                       <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                      <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq}</span>
+                      <div className="flex items-center gap-3 mt-1.5"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-400">{item.freq}</span><span className="text-[10px] font-medium text-ink-500">Due: {item.due}</span>
                         <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExp ? '▲ Less' : '▼ Details'}</button>
                       </div>
                     </div>
@@ -457,18 +461,22 @@ export default function BoardRoomPage() {
               const isOngoing = (u: UnifiedItem) => {
                 if (u.kind === 'filing') return false; // filings always have dates
                 const due = u.item.due;
-                return due === 'Ongoing' || due === 'Per meeting' || due === 'Per transfer' || due === 'Per request' || due === 'Quarterly' || due === 'As needed';
+                return due === 'Ongoing' || due === 'Per meeting' || due === 'Per transfer' || due === 'Per request' || due === 'Quarterly' || due === 'As needed' || due === 'Monthly' || due === 'Annual';
               };
               const datedItems = unified.filter(u => !isOngoing(u));
               const ongoingItems = unified.filter(u => isOngoing(u));
 
               const isDone = (u: UnifiedItem) => u.kind === 'runbook' ? isItemComplete(u.item.id, u.item.howTo.length) : u.filing.status === 'filed';
+              // Sort: incomplete first, then soonest due date first
               datedItems.sort((a, b) => {
                 const aDone = isDone(a); const bDone = isDone(b);
                 if (aDone !== bDone) return aDone ? 1 : -1;
                 const aDate = a.kind === 'runbook' ? a.item.due : a.filing.dueDate;
                 const bDate = b.kind === 'runbook' ? b.item.due : b.filing.dueDate;
-                return aDate.localeCompare(bDate);
+                // Parse as dates for reliable comparison
+                const aT = Date.parse(aDate) || 99999999999999;
+                const bT = Date.parse(bDate) || 99999999999999;
+                return aT - bT;
               });
 
               // Render a unified item row
@@ -531,7 +539,8 @@ export default function BoardRoomPage() {
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
-                        <span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
+                        <span className="text-[10px] text-ink-400">{item.freq}</span>
+                        <span className="text-[10px] font-medium text-ink-500">Due: {item.due}</span>
                       </div>
                       {/* Workflow progress bar — always visible when not complete */}
                       {!done && wTotal > 0 && (
@@ -704,7 +713,7 @@ export default function BoardRoomPage() {
                     {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
                     <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
+                  <div className="flex items-center gap-3 mt-1.5"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-400">{item.freq}</span><span className="text-[10px] font-medium text-ink-500">Due: {item.due}</span></div>
                   {!done && wTotal > 0 && (
                     <div className="mt-2.5 flex items-center gap-2.5">
                       <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${wComplete ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${wTotal > 0 ? (wDone / wTotal) * 100 : 0}%` }} /></div>
@@ -792,43 +801,64 @@ export default function BoardRoomPage() {
         <div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Location</label><input value={mForm.location} onChange={e => setMForm({ ...mForm, location: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Virtual Link</label><input value={mForm.virtualLink} onChange={e => setMForm({ ...mForm, virtualLink: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="https://zoom.us/..." /></div></div>
         <div><label className="block text-xs font-medium text-ink-700 mb-1">Agenda (one item per line) *</label><textarea value={mForm.agenda} onChange={e => setMForm({ ...mForm, agenda: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={4} placeholder={"Review January financials\nElevator maintenance proposal\nApprove 2026 budget"} /></div>
         {/* Vote requirement */}
-        {modal === 'addMeeting' && (() => { const defaults = getVoteDefaults(mForm.type); return (
+        {modal === 'addMeeting' && (() => { const defaults = getVoteDefaults(mForm.type);
+          // Auto-detect agenda items that likely need a vote
+          const agendaItems = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean);
+          const voteKeywords = /\b(approv|adopt|ratif|elect|amend|authori|resolv|vote|budget|assess|special assessment|terminat|contract|remov|waiv)\w*/i;
+          const autoDetected = agendaItems.map((item, i) => ({ index: i, text: item, isVotable: voteKeywords.test(item) }));
+          const detectedIndices = autoDetected.filter(a => a.isVotable).map(a => a.index);
+          const hasVotableItems = detectedIndices.length > 0;
+          // Auto-suggest vote items if not manually configured
+          const effectiveVoteItems = mForm.voteItems.length > 0 ? mForm.voteItems : (mForm.requiresVote ? detectedIndices : []);
+          return (
           <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between"><div><label className="text-xs font-bold text-ink-700">Requires Vote?</label><p className="text-[10px] text-ink-400 mt-0.5">{defaults.reason}</p></div>
-              <button onClick={() => setMForm({ ...mForm, requiresVote: !mForm.requiresVote })} className={`relative w-11 h-6 rounded-full transition-colors ${mForm.requiresVote ? 'bg-accent-500' : 'bg-ink-200'}`}><span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${mForm.requiresVote ? 'left-[22px]' : 'left-0.5'}`} /></button>
+              <button onClick={() => { const nv = !mForm.requiresVote; setMForm({ ...mForm, requiresVote: nv, voteItems: nv && mForm.voteItems.length === 0 ? detectedIndices : mForm.voteItems }); }} className={`relative w-11 h-6 rounded-full transition-colors ${mForm.requiresVote ? 'bg-accent-500' : 'bg-ink-200'}`}><span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${mForm.requiresVote ? 'left-[22px]' : 'left-0.5'}`} /></button>
             </div>
+            {/* Auto-detection hint */}
+            {!mForm.requiresVote && hasVotableItems && agendaItems.length > 0 && (
+              <button onClick={() => setMForm({ ...mForm, requiresVote: true, voteItems: detectedIndices })} className="w-full text-left bg-amber-50 border border-amber-200 rounded-lg p-3 hover:bg-amber-100 transition-colors">
+                <p className="text-[10px] font-semibold text-amber-800">💡 {detectedIndices.length} agenda item{detectedIndices.length > 1 ? 's' : ''} may require a vote:</p>
+                <div className="mt-1.5 space-y-0.5">{autoDetected.filter(a => a.isVotable).map(a => (<p key={a.index} className="text-[10px] text-amber-700">• {a.text}</p>))}</div>
+                <p className="text-[10px] text-accent-600 font-medium mt-2">Click to enable vote for these items →</p>
+              </button>
+            )}
             {mForm.requiresVote && (<div className="space-y-2"><div><label className="block text-[10px] font-semibold text-ink-600 mb-1">Vote Scope</label><div className="flex gap-2">
               <button onClick={() => setMForm({ ...mForm, voteScope: 'board' })} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mForm.voteScope === 'board' ? 'bg-accent-600 text-white' : 'bg-white border border-ink-200 text-ink-600'}`}>Board Vote</button>
               <button onClick={() => setMForm({ ...mForm, voteScope: 'owner' })} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mForm.voteScope === 'owner' ? 'bg-accent-600 text-white' : 'bg-white border border-ink-200 text-ink-600'}`}>Owner Vote</button>
             </div></div>
             <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-[10px] text-ink-600">{mForm.voteScope === 'board' ? '🏛 Board members vote on motions. Quorum: majority of board.' : '🗳 Unit owners vote. Quorum: 25% of eligible units.'}</p>
-              {mForm.agenda.trim() && (() => {
-                const items = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean);
-                const selected = mForm.voteItems;
+              {agendaItems.length > 0 && (() => {
+                const selected = effectiveVoteItems;
                 return (<div className="mt-3 border-t border-ink-50 pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-semibold text-ink-500">Select agenda items that require a vote:</p>
                     <div className="flex gap-2">
-                      <button onClick={() => setMForm({ ...mForm, voteItems: items.map((_, i) => i) })} className="text-[10px] text-accent-600 font-medium hover:underline">Select all</button>
+                      <button onClick={() => setMForm({ ...mForm, voteItems: agendaItems.map((_, i) => i) })} className="text-[10px] text-accent-600 font-medium hover:underline">Select all</button>
                       <button onClick={() => setMForm({ ...mForm, voteItems: [] })} className="text-[10px] text-ink-400 font-medium hover:underline">Clear</button>
                     </div>
                   </div>
-                  <div className="space-y-1.5">{items.map((item, i) => (
-                    <label key={i} className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${selected.includes(i) ? 'bg-accent-50 border border-accent-200' : 'hover:bg-mist-50 border border-transparent'}`}>
-                      <input type="checkbox" checked={selected.includes(i)} onChange={e => {
+                  <div className="space-y-1.5">{agendaItems.map((agItem, i) => {
+                    const isSelected = selected.includes(i);
+                    const isAutoDetected = detectedIndices.includes(i);
+                    return (
+                    <label key={i} className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-accent-50 border border-accent-200' : 'hover:bg-mist-50 border border-transparent'}`}>
+                      <input type="checkbox" checked={isSelected} onChange={e => {
                         if (e.target.checked) setMForm({ ...mForm, voteItems: [...selected, i] });
                         else setMForm({ ...mForm, voteItems: selected.filter(x => x !== i) });
                       }} className="h-4 w-4 mt-0.5 shrink-0 accent-accent-600" />
-                      <div>
-                        <span className={`text-xs ${selected.includes(i) ? 'text-accent-800 font-medium' : 'text-ink-600'}`}>{item}</span>
-                        {selected.includes(i) && <span className="text-[10px] text-accent-500 ml-1.5">→ vote item</span>}
+                      <div className="flex-1">
+                        <span className={`text-xs ${isSelected ? 'text-accent-800 font-medium' : 'text-ink-600'}`}>{agItem}</span>
+                        {isSelected && <span className="text-[10px] text-accent-500 ml-1.5">→ vote item</span>}
+                        {isAutoDetected && !isSelected && <span className="text-[10px] text-amber-500 ml-1.5">💡 suggested</span>}
                       </div>
-                    </label>
-                  ))}</div>
+                    </label>);
+                  })}</div>
                   {selected.length === 0 && <p className="text-[10px] text-amber-600 mt-2">⚠ No items selected — select at least one agenda item to vote on, or toggle off "Requires Vote"</p>}
-                  {selected.length > 0 && <p className="text-[10px] text-sage-600 mt-2">✓ {selected.length} of {items.length} agenda items will become vote items</p>}
+                  {selected.length > 0 && <p className="text-[10px] text-sage-600 mt-2">✓ {selected.length} of {agendaItems.length} agenda items will become vote items</p>}
                 </div>);
               })()}
+              {agendaItems.length === 0 && <p className="text-[10px] text-ink-400 mt-2 italic">Add agenda items above to select which require a vote</p>}
             </div></div>)}
           </div>); })()}
         <div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={mForm.notes} onChange={e => setMForm({ ...mForm, notes: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div>
