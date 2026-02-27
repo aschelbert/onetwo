@@ -81,8 +81,15 @@ export default function BoardRoomPage() {
   const [runbookSort, setRunbookSort] = useState<'date' | 'category'>('date');
   const [runbookItemForMeeting, setRunbookItemForMeeting] = useState<string | null>(null);
 
-  // Compliance scores
-  const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => comp.completions[i.id]).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
+  // Completion = all workflow steps checked
+  const isItemComplete = (itemId: string, howToLength: number): boolean => {
+    const steps = workflowSteps[itemId];
+    if (!steps || steps.length === 0) return false;
+    return steps.length >= howToLength && steps.every(Boolean);
+  };
+
+  // Compliance scores (driven by workflow completion)
+  const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => isItemComplete(i.id, i.howTo.length)).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
   const totalWeight = catScores.reduce((s, c) => s + c.weight, 0);
   const healthIndex = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
   const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
@@ -152,9 +159,12 @@ export default function BoardRoomPage() {
       mtg.updateMeeting(targetId, { title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
     }
     setModal(null);
-    // If this meeting was created from a runbook item, mark it complete
+    // If this meeting was created from a runbook item, complete the "schedule meeting" workflow step
     if (runbookItemForMeeting && modal === 'addMeeting') {
-      comp.toggleItem(runbookItemForMeeting);
+      const item = categories.flatMap(c => c.items).find(i => i.id === runbookItemForMeeting);
+      if (item) {
+        setWorkflowSteps(prev => ({ ...prev, [runbookItemForMeeting!]: item.howTo.map(() => true) }));
+      }
       setRunbookItemForMeeting(null);
     }
   };
@@ -268,7 +278,7 @@ export default function BoardRoomPage() {
   // ─── Tab definitions ───
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'duties', label: 'Duties & Roles' },
-    { id: 'runbook', label: 'Runbook', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => !i.autoPass && !comp.completions[i.id] && !i.perMeeting && i.due !== 'Ongoing' && i.due !== 'Per meeting' && i.due !== 'Per transfer' && i.due !== 'Per request' && i.due !== 'Quarterly' && i.due !== 'As needed' && i.due !== 'Monthly').length) || undefined },
+    { id: 'runbook', label: 'Runbook', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => !isItemComplete(i.id, i.howTo.length) && !i.perMeeting && i.due !== 'Ongoing' && i.due !== 'Per meeting' && i.due !== 'Per transfer' && i.due !== 'Per request' && i.due !== 'Quarterly' && i.due !== 'As needed' && i.due !== 'Monthly').length) || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
@@ -353,9 +363,9 @@ export default function BoardRoomPage() {
               <div className="p-4 border-b border-ink-100 bg-amber-50 flex items-center gap-2"><span className="text-lg">🔄</span><h3 className="font-bold text-ink-900 text-sm">Ongoing & Per-Meeting Obligations</h3><span className="text-[10px] text-ink-400 ml-1">Continuous requirements — no fixed deadline</span></div>
               {roleFilter !== 'all' && <div className="px-4 pt-3 flex items-center gap-2"><span className="text-[10px] px-2 py-0.5 rounded bg-accent-100 text-accent-700 font-semibold">Filtered: {roleFilter}</span><button onClick={() => setRoleFilter('all')} className="text-[10px] text-ink-400 hover:text-red-500">✕ Clear</button></div>}
               <div className="divide-y divide-ink-50">{ongoingItems.filter(i => roleFilter === 'all' || i.role === roleFilter).map(item => {
-                const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
+                const done = isItemComplete(item.id, item.howTo.length); const rc = ROLE_COLORS[item.role] || 'ink'; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
                 const isExp = expandedRunbook === item.id;
-                return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : ''}`}>
+                return (<div key={item.id} className={`${done ? 'bg-sage-50 bg-opacity-40' : ''}`}>
                   <div className="p-4 flex items-start gap-4">
                     <div className="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 mt-0.5 text-[10px]">🔄</div>
                     <div className="flex-1 min-w-0">
@@ -392,8 +402,9 @@ export default function BoardRoomPage() {
         {/* ═══ RUNBOOK TAB (with filings integrated) ═══ */}
         {tab === 'runbook' && (() => {
           const allItems = catScores.flatMap(c => c.items);
-          const autoVerifiedCount = allItems.filter(i => i.autoPass).length;
-          const needsActionCount = allItems.filter(i => !i.autoPass && !comp.completions[i.id]).length;
+          const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
+          const inProgressCount = allItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length;
+          const needsActionCount = allItems.filter(i => { const s = workflowSteps[i.id]; return !s || !s.some(Boolean); }).length - completedCount;
           const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
           const missingDocs: string[] = [];
           const hasCCRs = legalDocuments.some(d => d.name.toLowerCase().includes('cc&r') || d.name.toLowerCase().includes('declaration'));
@@ -411,9 +422,9 @@ export default function BoardRoomPage() {
                 {missingDocs.map(d => <button key={d} onClick={() => navigate('/building')} className="text-[10px] px-2 py-1 rounded-lg bg-white border border-dashed border-ink-300 text-ink-500 hover:border-accent-400 hover:text-accent-700">+ {d}</button>)}
               </div>
               <div className="flex flex-wrap gap-4 mt-3 text-[11px]">
-                <span className="inline-flex items-center gap-1.5 font-semibold text-sage-700"><span className="w-2 h-2 rounded-full bg-sage-400"></span>{autoVerifiedCount} auto-verified</span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{needsActionCount} needs action</span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-ink-600"><span className="w-2 h-2 rounded-full bg-ink-300"></span>{allItems.filter(i => comp.completions[i.id] && !i.autoPass).length} manually confirmed</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-sage-700"><span className="w-2 h-2 rounded-full bg-sage-400"></span>{completedCount} completed</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-accent-700"><span className="w-2 h-2 rounded-full bg-accent-400"></span>{inProgressCount} in progress</span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{needsActionCount > 0 ? needsActionCount : 0} not started</span>
               </div>
             </div>
 
@@ -451,7 +462,7 @@ export default function BoardRoomPage() {
               const datedItems = unified.filter(u => !isOngoing(u));
               const ongoingItems = unified.filter(u => isOngoing(u));
 
-              const isDone = (u: UnifiedItem) => u.kind === 'runbook' ? (u.item.autoPass || comp.completions[u.item.id]) : u.filing.status === 'filed';
+              const isDone = (u: UnifiedItem) => u.kind === 'runbook' ? isItemComplete(u.item.id, u.item.howTo.length) : u.filing.status === 'filed';
               datedItems.sort((a, b) => {
                 const aDone = isDone(a); const bDone = isDone(b);
                 if (aDone !== bDone) return aDone ? 1 : -1;
@@ -493,7 +504,7 @@ export default function BoardRoomPage() {
                   </div>);
                 }
                 const { item, catLabel, catIcon } = u;
-                const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
+                const done = isItemComplete(item.id, item.howTo.length); const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
                 const isExpanded = expandedRunbook === item.id;
                 const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
                 const wSteps = workflowSteps[item.id] || [];
@@ -501,16 +512,20 @@ export default function BoardRoomPage() {
                 const wTotal = item.howTo?.length || 0;
                 const wStarted = wDone > 0;
                 const wComplete = wDone === wTotal && wTotal > 0;
-                return (<div key={item.id} className={`rounded-xl border transition-all ${isExpanded ? 'border-accent-300 shadow-sm' : isAuto ? 'border-sage-200 bg-sage-50 bg-opacity-40' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : 'border-ink-100 hover:border-accent-200 hover:shadow-sm'} ${isExpanded ? 'bg-white' : ''}`}>
+                return (<div key={item.id} className={`rounded-xl border transition-all ${isExpanded ? 'border-accent-300 shadow-sm bg-white' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : wStarted ? 'border-accent-200 bg-white' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
                   <div className={`p-4 flex items-start gap-4 cursor-pointer`} onClick={() => setExpandedRunbook(isExpanded ? null : item.id)}>
-                    {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                    : (<button onClick={e => { e.stopPropagation(); comp.toggleItem(item.id); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 text-white' : wStarted ? 'bg-accent-100 text-accent-600' : 'bg-ink-50 text-ink-300'}`}>
+                      {done ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      : wStarted ? <span className="text-[10px] font-bold">{wDone}/{wTotal}</span>
+                      : <span className="text-[10px] font-bold">—</span>}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
+                        <span className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
                         {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                        {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                        {!isAuto && !done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                        {done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">✅ COMPLETE</span>}
+                        {!done && wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-semibold border border-accent-200">IN PROGRESS</span>}
+                        {!done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
                         <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
                       </div>
@@ -518,22 +533,18 @@ export default function BoardRoomPage() {
                         <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
                         <span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
                       </div>
-                      {/* Workflow progress bar — always visible */}
-                      {!isAuto && !done && wTotal > 0 && (
+                      {/* Workflow progress bar — always visible when not complete */}
+                      {!done && wTotal > 0 && (
                         <div className="mt-2.5 flex items-center gap-2.5">
                           <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${wComplete ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${wTotal > 0 ? (wDone / wTotal) * 100 : 0}%` }} /></div>
                           <span className={`text-[10px] font-semibold shrink-0 ${wComplete ? 'text-sage-600' : wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
                           <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`} onClick={e => { e.stopPropagation(); setExpandedRunbook(isExpanded ? null : item.id); }}>
-                            {wComplete ? '✅ Review' : wStarted ? '▶ Continue' : '▶ Start workflow'}
+                            {wStarted ? '▶ Continue' : '▶ Start workflow'}
                           </span>
                         </div>
                       )}
-                      {(isAuto || done) && wTotal > 0 && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[10px] text-sage-500">{wTotal} workflow steps</span>
-                          <span className="text-[10px] text-ink-300">·</span>
-                          <span className="text-[10px] text-ink-400 hover:text-accent-600">View details ›</span>
-                        </div>
+                      {done && wTotal > 0 && (
+                        <div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">✅ All {wTotal} steps completed</span><span className="text-[10px] text-ink-400">· View details ›</span></div>
                       )}
                       {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={e => { e.stopPropagation(); comp.removeItemAttachment(item.id, att.name); }} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                     </div>
@@ -590,10 +601,10 @@ export default function BoardRoomPage() {
                             </label>
                           ))}
                         </div>
-                        {allDone && !comp.completions[item.id] && !item.autoPass && (
-                          <div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-between">
-                            <span className="text-xs text-sage-700 font-medium">✅ All steps completed</span>
-                            <button onClick={() => comp.toggleItem(item.id)} className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Mark Item Complete</button>
+                        {allDone && (
+                          <div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            <span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span>
                           </div>
                         )}
                       </div>
@@ -669,35 +680,39 @@ export default function BoardRoomPage() {
               )}
 
               {/* Category cards */}
-              {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; const catAutoCount = cat.items.filter(i => i.autoPass).length; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%{catAutoCount > 0 && <span className="text-sage-600 ml-1">· {catAutoCount} auto-verified</span>}</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div>
-              <div className="space-y-2 p-4">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; const isExp = expandedRunbook === item.id; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
+              {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div>
+              <div className="space-y-2 p-4">{cat.items.map(item => { const done = isItemComplete(item.id, item.howTo.length); const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; const isExp = expandedRunbook === item.id; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
                 const wSteps = workflowSteps[item.id] || [];
                 const wDone = wSteps.filter(Boolean).length;
                 const wTotal = item.howTo?.length || 0;
                 const wStarted = wDone > 0;
                 const wComplete = wDone === wTotal && wTotal > 0;
-                return (<div key={item.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm bg-white' : isAuto ? 'border-sage-200 bg-sage-50 bg-opacity-40' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
+                return (<div key={item.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm bg-white' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : wStarted ? 'border-accent-200 bg-white' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
                 <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={() => setExpandedRunbook(isExp ? null : item.id)}>
-                {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                : (<button onClick={e => { e.stopPropagation(); comp.toggleItem(item.id); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 text-white' : wStarted ? 'bg-accent-100 text-accent-600' : 'bg-ink-50 text-ink-300'}`}>
+                  {done ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  : wStarted ? <span className="text-[10px] font-bold">{wDone}/{wTotal}</span>
+                  : <span className="text-[10px] font-bold">—</span>}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
+                    <span className={`text-sm font-medium ${done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
                     {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                    {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                    {!isAuto && !done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                    {done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">✅ COMPLETE</span>}
+                    {!done && wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-semibold border border-accent-200">IN PROGRESS</span>}
+                    {!done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
                     {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
                     <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                   </div>
                   <div className="flex items-center gap-3 mt-1.5"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
-                  {!isAuto && !done && wTotal > 0 && (
+                  {!done && wTotal > 0 && (
                     <div className="mt-2.5 flex items-center gap-2.5">
                       <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${wComplete ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${wTotal > 0 ? (wDone / wTotal) * 100 : 0}%` }} /></div>
                       <span className={`text-[10px] font-semibold shrink-0 ${wComplete ? 'text-sage-600' : wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
-                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`}>{wComplete ? '✅ Review' : wStarted ? '▶ Continue' : '▶ Start workflow'}</span>
+                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`}>{wStarted ? '▶ Continue' : '▶ Start workflow'}</span>
                     </div>
                   )}
-                  {(isAuto || done) && wTotal > 0 && (<div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">{wTotal} workflow steps</span><span className="text-[10px] text-ink-300">·</span><span className="text-[10px] text-ink-400">View details ›</span></div>)}
+                  {done && wTotal > 0 && (<div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">✅ All {wTotal} steps completed</span><span className="text-[10px] text-ink-400">· View details ›</span></div>)}
                   {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={e => { e.stopPropagation(); comp.removeItemAttachment(item.id, att.name); }} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -730,7 +745,7 @@ export default function BoardRoomPage() {
                           <div className="flex gap-2">{!allStepsDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
                         </div>
                         <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
-                        {allStepsDone && !done && !isAuto && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-between"><span className="text-xs text-sage-700 font-medium">✅ All steps completed</span><button onClick={() => comp.toggleItem(item.id)} className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Mark Item Complete</button></div>)}
+                        {allStepsDone && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2"><svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span></div>)}
                       </div>
                       <div className="flex items-center gap-4 text-[10px] text-ink-400"><span>📖 {item.legalRef}</span><span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span></div>
                     </div>);
