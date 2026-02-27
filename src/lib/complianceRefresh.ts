@@ -1,28 +1,19 @@
 /**
- * Compliance Refresh Engine
+ * Compliance Refresh Engine v2 — Board Obligations & Fiduciary Responsibility
  *
- * Dynamically generates compliance requirements based on:
- * - Building jurisdiction (state/district)
- * - Uploaded legal & bylaw documents
- * - Current insurance policies
- * - Board composition
- *
- * Called on:
- * 1. Archive creation (ensures snapshot reflects current regs)
- * 2. Legal/bylaw document addition (ensures checks match current docs)
+ * Each item includes: whyItMatters, consequence, howTo[], fiduciaryDuty
+ * 8 categories, ~45 items with rich guidance
  */
+
+export type FiduciaryDuty = 'care' | 'loyalty' | 'obedience';
 
 export interface ComplianceItem {
   id: string; task: string; role: string; freq: string; due: string;
   critical: boolean; tip: string; legalRef: string; autoPass?: boolean;
-  /** Describes what action satisfies this item */
   satisfyingAction?: 'meeting' | 'case' | 'filing' | 'document' | 'review';
-  /** Pre-filled meeting type if satisfyingAction is 'meeting' */
-  meetingType?: string;
-  /** Pre-filled agenda items if satisfyingAction is 'meeting' */
-  suggestedAgenda?: string[];
-  /** If true, this is a per-meeting obligation checked in the Meetings module */
-  perMeeting?: boolean;
+  meetingType?: string; suggestedAgenda?: string[]; perMeeting?: boolean;
+  whyItMatters: string; consequence: string; howTo: string[];
+  fiduciaryDuty: FiduciaryDuty;
 }
 
 export interface ComplianceCategory {
@@ -30,30 +21,22 @@ export interface ComplianceCategory {
 }
 
 export interface RefreshResult {
-  categories: ComplianceCategory[];
-  refreshedAt: string;
-  jurisdiction: string;
-  documentsDetected: string[];
-  regulatoryNotes: string[];
+  categories: ComplianceCategory[]; refreshedAt: string; jurisdiction: string;
+  documentsDetected: string[]; regulatoryNotes: string[];
 }
 
 interface RefreshInput {
-  state: string;
-  legalDocuments: Array<{ name: string; status: string }>;
-  insurance: Array<{ type: string; expires: string }>;
-  boardCount: number;
-  hasManagement: boolean;
+  state: string; legalDocuments: Array<{ name: string; status: string }>;
+  insurance: Array<{ type: string; expires: string }>; boardCount: number; hasManagement: boolean;
 }
 
 export function refreshComplianceRequirements(input: RefreshInput): RefreshResult {
   const { state, legalDocuments, insurance, boardCount } = input;
-
   const isDC = state === 'District of Columbia';
   const jurisdiction = isDC ? 'DC' : state;
   const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
   const stateActShort = isDC ? 'DC Code' : `${jurisdiction} Code`;
 
-  // Detect uploaded documents
   const hasBylaws = legalDocuments.some(d => d.name.toLowerCase().includes('bylaw'));
   const hasCCRs = legalDocuments.some(d => d.name.toLowerCase().includes('cc&r') || d.name.toLowerCase().includes('declaration'));
   const hasRules = legalDocuments.some(d => d.name.toLowerCase().includes('rule') || d.name.toLowerCase().includes('regulation'));
@@ -72,188 +55,97 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
   if (hasEmergencyPlan) documentsDetected.push('Emergency Preparedness Plan');
 
   const regulatoryNotes: string[] = [];
+  const bylawRef = hasBylaws ? 'Bylaws' : 'Governing Documents';
 
-  // ─── Build categories dynamically ───
-
+  // ═══ 1. GOVERNANCE & LEGAL (20%) ═══
   const governance: ComplianceItem[] = [
-    { id: 'g1', task: 'Bylaws reviewed and up to date', role: 'President', freq: 'Annual', due: '2026-01-15', critical: true,
-      tip: hasBylaws ? 'Bylaws detected — cross-referencing requirements with uploaded document.' : 'Upload bylaws to enable document-specific checks.',
-      legalRef: stateAct, autoPass: hasBylaws, satisfyingAction: 'document' },
-    { id: 'g2', task: 'CC&Rs reviewed and up to date', role: 'President', freq: 'Annual', due: '2025-06-20', critical: true,
-      tip: hasCCRs ? 'Declaration/CC&Rs detected — compliance checks updated.' : 'Upload CC&Rs or Declaration to enable checks.',
-      legalRef: isDC ? 'DC Code § 29-1131' : `${stateActShort} § Condo Declaration`, autoPass: false, satisfyingAction: 'document' },
-    { id: 'g3', task: 'Board meeting minutes recorded, approved, and distributed', role: 'Secretary', freq: 'Per meeting', due: 'Per meeting',
-      critical: true, perMeeting: true,
-      tip: isDC
-        ? 'Minutes must be prepared within 10 business days of each meeting, approved by board majority at the next meeting, and made available for owner inspection upon request.'
-        : 'Minutes must be prepared promptly after each meeting, approved by board majority at the next regular meeting, and retained per governing documents.',
-      legalRef: isDC ? 'DC Code § 29-1108.06' : `${stateActShort} Minutes Req.`, satisfyingAction: 'review' },
-    { id: 'g4', task: 'Annual meeting held within 13 months of prior', role: 'President', freq: 'Annual', due: '2026-03-31', critical: true,
-      tip: 'Must hold annual meeting within 13 months of the previous one. Schedule early to allow for notice requirements.',
-      legalRef: isDC ? 'DC Code § 29-1109.02' : `${stateActShort} § Annual Meeting`,
-      satisfyingAction: 'meeting', meetingType: 'ANNUAL',
-      suggestedAgenda: ['Election of board members', 'Annual financial report', 'Budget approval', 'Q&A session'] },
-    { id: 'g5', task: 'Board election conducted per bylaws', role: 'Secretary', freq: 'Annual', due: '2026-12-31', critical: false,
-      tip: hasBylaws ? 'Follow nomination and election procedures per your uploaded Bylaws.' : 'Follow nomination and election procedures in bylaws.',
-      legalRef: hasBylaws ? 'Bylaws Art. IV' : 'Governing Documents',
-      satisfyingAction: 'meeting', meetingType: 'ANNUAL',
-      suggestedAgenda: ['Board member nominations', 'Candidate statements', 'Board election vote'] },
-    { id: 'g6', task: 'Conflict of interest disclosures collected', role: 'Secretary', freq: 'Annual', due: '2026-02-28', critical: false,
-      tip: `Board members should disclose conflicts annually. ${boardCount} current members.`,
-      legalRef: isDC ? 'DC Code § 29-406.70' : `${stateActShort} § Conflicts`, satisfyingAction: 'review' },
+    { id:'g1', task:'Bylaws reviewed and up to date', role:'President', freq:'Annual', due:'2026-01-15', critical:true, legalRef:stateAct, autoPass:hasBylaws, satisfyingAction:'document', tip:hasBylaws ? 'Bylaws detected — cross-referencing.' : 'Upload bylaws for document-specific checks.', fiduciaryDuty:'obedience', whyItMatters:'Bylaws are the association\'s operating constitution. Every board decision must comply. Outdated bylaws that conflict with current law create legal exposure.', consequence:'Board actions outside bylaws authority may be void. Owners can challenge decisions judicially. Board members face personal liability for ultra vires acts.', howTo:['Obtain current bylaws from files or county records','Compare against current state condo act for conflicts','Flag any provisions that conflict with current law','Engage attorney for formal review if amendments needed','Present amendment proposals at annual meeting'] },
+    { id:'g2', task:'CC&Rs / Declaration reviewed', role:'President', freq:'Annual', due:'2025-06-20', critical:true, legalRef:isDC ? 'DC Code § 29-1131' : `${stateActShort} § Declaration`, autoPass:false, satisfyingAction:'document', tip:hasCCRs ? 'Declaration detected — checks updated.' : 'Upload CC&Rs to enable checks.', fiduciaryDuty:'obedience', whyItMatters:'The Declaration creates the condo regime — unit boundaries, common elements, voting rights, assessment authority. It supersedes bylaws where they conflict.', consequence:'Failure to enforce CC&Rs consistently exposes the board to selective enforcement claims. Unenforced provisions may be deemed waived by courts.', howTo:['Review declaration for assessment authority and limits','Cross-reference with current state law','Verify unit boundaries and common elements match reality','Document any needed amendments for board discussion'] },
+    { id:'g3', task:'Board meeting minutes recorded, approved, and distributed', role:'Secretary', freq:'Per meeting', due:'Per meeting', critical:true, perMeeting:true, satisfyingAction:'review', legalRef:isDC ? 'DC Code § 29-1108.06' : `${stateActShort} Minutes Req.`, tip:isDC ? 'Prepare within 10 business days. Board majority approval required.' : 'Prepare promptly. Board approval at next meeting.', fiduciaryDuty:'care', whyItMatters:'Minutes are the official legal record of board actions. They establish decisions were properly made, quorum present, conflicts disclosed. They are the board\'s primary legal defense in litigation.', consequence:'Without approved minutes, board decisions may be challenged as unauthorized. In litigation, missing minutes create negative inference that proper process was not followed.', howTo:['Record during meeting: date, time, quorum count, attendees','Capture all motions verbatim with vote counts','Note conflicts of interest disclosures and recusals','Prepare draft within 10 business days','Circulate to board for review','Present for formal approval at next meeting (use Minutes Approval feature)','Distribute to owners and retain permanently'] },
+    { id:'g4', task:'Annual meeting held within 13 months of prior', role:'President', freq:'Annual', due:'2026-03-31', critical:true, legalRef:isDC ? 'DC Code § 29-1109.02' : `${stateActShort} § Annual Meeting`, satisfyingAction:'meeting', meetingType:'ANNUAL', suggestedAgenda:['Election of board members','Annual financial report','Budget ratification','Reserve fund status','Q&A session'], tip:'Schedule early to allow for notice requirements (10-60 day window).', fiduciaryDuty:'obedience', whyItMatters:'The annual meeting is the primary mechanism for owner self-governance — elections, budget ratification, and accountability.', consequence:'Failure to hold within statutory timeframe allows owners to petition court to compel meeting. Board legitimacy questioned if elections delayed.', howTo:['Set date at least 60 days out for notice window','Prepare notice with date, time, location, agenda','Include proxy forms and nomination instructions','Prepare annual financial report','Arrange election inspector if contested','Verify quorum at meeting (40% of units per bylaws)'] },
+    { id:'g5', task:'Board election conducted per bylaws', role:'Secretary', freq:'Annual', due:'2026-12-31', critical:false, legalRef:hasBylaws ? 'Bylaws Art. III-IV' : 'Governing Documents', satisfyingAction:'meeting', meetingType:'ANNUAL', suggestedAgenda:['Board member nominations','Candidate statements','Board election vote'], tip:'Secret ballot per DC Code. Independent inspector recommended.', fiduciaryDuty:'obedience', whyItMatters:'Properly conducted elections ensure board legitimacy and protect against challenges. Flawed elections can result in removal of the entire board.', consequence:'Courts may invalidate elections not conducted per governing documents. DC Code permits owners to petition for court-supervised elections.', howTo:['Open nominations per bylaws timeline','Verify candidate eligibility (owner in good standing)','Distribute candidate statements','Use secret ballot per DC Code','Appoint independent inspector','Certify results and retain ballots 1 year'] },
+    { id:'g6', task:'Minimum board meetings held per bylaws', role:'President', freq:'Bi-monthly', due:'Ongoing', critical:true, perMeeting:true, legalRef:isDC ? `${bylawRef} Art. IV-V; DC Code § 29-1108.06` : bylawRef, tip:isDC ? 'Bylaws require bi-monthly (6/year). DC minimum quarterly (4/year). 48-hour notice.' : 'Hold meetings per bylaws schedule.', fiduciaryDuty:'care', whyItMatters:'Regular meetings demonstrate active oversight. Boards that meet infrequently fail to address issues promptly, increasing liability.', consequence:'Failure to meet minimum frequency violates bylaws and may constitute breach of fiduciary duty. Owners may petition court to compel meetings.', howTo:['Set annual meeting schedule at first meeting of year','Post schedule in common areas','Send 48-hour notice for each meeting','Ensure quorum (majority of board) before conducting business','Allow owner comment period'] },
+    { id:'g7', task:'Conflict of interest disclosures collected', role:'Secretary', freq:'Annual', due:'2026-02-28', critical:false, satisfyingAction:'review', legalRef:isDC ? 'DC Code § 29-406.70' : `${stateActShort} § Conflicts`, tip:`${boardCount} board members should disclose conflicts annually.`, fiduciaryDuty:'loyalty', whyItMatters:'The duty of loyalty requires putting association interests above personal. Undisclosed conflicts can void transactions and expose the board to liability.', consequence:'Transactions involving undisclosed conflicts are voidable. Board members may face personal liability for self-dealing.', howTo:['Distribute disclosure form to all board members by January 31','Disclose: business interests, vendor relationships, family in building','Conflicted member recuses from related discussion and vote','File completed forms with meeting minutes','Adopt formal conflict of interest policy if not in place'] },
+    { id:'g8', task:'File annual/biennial report with DCRA', role:'President', freq:'Biennial', due:'2026-04-01', critical:true, satisfyingAction:'filing', legalRef:isDC ? 'DC Code § 29-102.11' : `${stateActShort} § Registration`, tip:isDC ? 'Biennial report to DCRA. $80 filing fee. Update officers.' : 'File required state registration.', fiduciaryDuty:'obedience', whyItMatters:'The association must maintain its legal registration. Failure to file may result in administrative dissolution.', consequence:'Loss of good standing, ability to sue or enforce liens. Dissolution makes board personally liable for association debts.', howTo:['Verify current registered agent and office address','Update officer/director names','Submit biennial report with $80 fee','Retain confirmation for records'] },
   ];
+  if (hasRules) { governance.push({ id:'g9', task:'Rules & Regulations reviewed and current', role:'President', freq:'Annual', due:'2026-06-30', critical:false, satisfyingAction:'review', legalRef:hasBylaws?'Bylaws + Rules':stateAct, tip:'Ensure rules consistent with bylaws and law.', fiduciaryDuty:'obedience', whyItMatters:'Rules that conflict with bylaws or law are unenforceable and create legal exposure.', consequence:'Owners may challenge rules in court. Unenforceable rules undermine board authority.', howTo:['Compare rules against bylaws and CC&Rs','Verify consistency with current law','Remove conflicting provisions','Distribute updated rules with 30-day notice'] }); }
 
-  if (hasRules) {
-    governance.push({
-      id: 'g7', task: 'Rules & Regulations reviewed and current', role: 'President', freq: 'Annual', due: '2026-06-30', critical: false,
-      tip: 'Rules & Regulations document detected — review annually to ensure consistency with bylaws and current law.',
-      legalRef: hasBylaws ? 'Bylaws + Rules' : stateAct, satisfyingAction: 'review' });
-    regulatoryNotes.push('Rules & Regulations document detected — added compliance check for annual review.');
-  }
-
+  // ═══ 2. FINANCIAL (20%) ═══
   const financial: ComplianceItem[] = [
-    { id: 'f1', task: 'Annual budget approved by board and distributed to owners', role: 'Treasurer', freq: 'Annual', due: '2026-01-31', critical: true,
-      tip: isDC
-        ? 'Budget must be approved by board vote and distributed to all unit owners at least 30 days before the fiscal year begins.'
-        : 'Budget must be approved by the board and distributed to owners per governing documents.',
-      legalRef: isDC ? 'DC Code § 29-1135.03' : `${stateActShort} § Budget`,
-      satisfyingAction: 'meeting', meetingType: 'BOARD',
-      suggestedAgenda: ['Review draft annual budget', 'Budget line item discussion', 'Vote to approve annual budget'] },
-    { id: 'f2', task: 'Reserve study current (within 3 years)', role: 'Treasurer', freq: 'Every 3 years', due: '2028-06-15', critical: true,
-      tip: 'Professional reserve study required at least every 3 years. Must cover all major common element components with estimated useful life and replacement cost.',
-      legalRef: isDC ? 'DC Code § 29-1135.04' : 'Best practice', satisfyingAction: 'case' },
-    { id: 'f3', task: 'Annual financial audit/review completed', role: 'Treasurer', freq: 'Annual', due: '2026-06-30', critical: true,
-      tip: isDC
-        ? 'Independent financial review or audit required annually for associations with annual assessments exceeding $150,000.'
-        : 'Independent financial review recommended annually.',
-      legalRef: isDC ? 'DC Code § 29-1135.05' : `${stateActShort} § Audit`, satisfyingAction: 'case' },
-    { id: 'f4', task: 'Fidelity bond in place', role: 'Treasurer', freq: 'Annual', due: '2026-09-30', critical: true,
-      tip: 'Fidelity bond protects against employee/board theft. Coverage should equal at least 3 months of assessments plus reserves.',
-      legalRef: isDC ? 'DC Code § 29-1135.06' : `${stateActShort} § Bond`,
-      autoPass: insurance.some(p => p.type.toLowerCase().includes('fidelity')),
-      satisfyingAction: 'document' },
-    { id: 'f5', task: 'Assessment collection policy documented and current', role: 'Treasurer', freq: 'As needed', due: 'As needed',
-      critical: false,
-      tip: hasCollectionPolicy
-        ? 'Collection policy document detected. Review when collection procedures, late fees, or lien processes change.'
-        : isDC
-          ? 'Written collection policy required. Must specify late fees, interest rates, lien procedures, and collection timelines per DC Code.'
-          : 'Written collection policy should be adopted and enforced per governing documents.',
-      legalRef: isDC ? 'DC Code § 29-1136' : (hasBylaws ? 'Bylaws Art. VII' : 'Governing Documents'),
-      autoPass: hasCollectionPolicy, satisfyingAction: 'document' },
-    { id: 'f6', task: 'Tax returns filed (Form 1120-H)', role: 'Treasurer', freq: 'Annual', due: '2026-04-15', critical: true,
-      tip: 'HOA must file federal tax return annually by April 15 (or request extension by that date). Form 1120-H elects tax-exempt treatment on exempt function income.',
-      legalRef: 'IRS Code § 528', satisfyingAction: 'filing' },
+    { id:'f1', task:'Annual budget approved and distributed to owners', role:'Treasurer', freq:'Annual', due:'2026-01-31', critical:true, satisfyingAction:'meeting', meetingType:'BOARD', legalRef:isDC?'DC Code § 29-1135.03':`${stateActShort} § Budget`, suggestedAgenda:['Review draft annual budget','Budget line items','Vote to approve'], tip:isDC?'Distribute to owners 30 days before fiscal year.':'Approve and distribute per governing docs.', fiduciaryDuty:'care', whyItMatters:'The budget authorizes assessments and sets spending limits. Without approval, the board may lack authority to collect or spend.', consequence:'Without approved budget, board may lack assessment authority. Owners can challenge unauthorized spending.', howTo:['Prepare draft based on prior year actuals and projections','Include: operating, reserves, insurance, utilities, maintenance','Present to board for discussion and vote','Distribute to all owners 30 days before fiscal year','Present for ratification at annual meeting'] },
+    { id:'f2', task:'Reserve study current (within 3 years)', role:'Treasurer', freq:'Every 3 years', due:'2028-06-15', critical:true, satisfyingAction:'case', legalRef:isDC?'DC Code § 29-1135.04':'Best practice', tip:'Professional study required. Fund at minimum 70%.', fiduciaryDuty:'care', whyItMatters:'Projects replacement costs for major common elements. Without it, board can\'t demonstrate adequate reserve funding — a core fiduciary obligation.', consequence:'Underfunded reserves → special assessments. Breach of duty claims. Lenders may deny mortgages.', howTo:['Engage qualified reserve study professional','Inventory all components with useful life and cost','Calculate annual funding requirement','Adjust contribution rate if underfunded','Present to board and owners'] },
+    { id:'f3', task:'Annual financial audit/review completed', role:'Treasurer', freq:'Annual', due:'2026-06-30', critical:true, satisfyingAction:'case', legalRef:isDC?'DC Code § 29-1135.05':`${stateActShort} § Audit`, tip:isDC?'Required for associations with assessments >$150K.':'Independent review recommended annually.', fiduciaryDuty:'care', whyItMatters:'Independent review provides assurance funds are properly managed. Primary check against mismanagement.', consequence:'Without review, irregularities go undetected. Board personally liable if funds mismanaged without oversight.', howTo:['Select independent CPA (rotate every 3-5 years)','Provide all financial records and bank statements','Review findings with full board','Address management letter recommendations','Distribute report with annual disclosure'] },
+    { id:'f4', task:'Fidelity bond in place', role:'Treasurer', freq:'Annual', due:'2026-09-30', critical:true, satisfyingAction:'document', legalRef:isDC?'DC Code § 29-1135.06':`${stateActShort} § Bond`, autoPass:insurance.some(p=>p.type.toLowerCase().includes('fidelity')), tip:'Coverage ≥ 3 months assessments + reserves.', fiduciaryDuty:'care', whyItMatters:'Protects against theft/embezzlement by board, officers, employees, or management company.', consequence:'Without bond, association bears full loss from theft. Board personally liable for failing to obtain coverage.', howTo:['Calculate minimum: 3 months assessments + reserve balance','Get quotes from insurance agent','Ensure coverage names association, board, and management','Verify current annually'] },
+    { id:'f5', task:'Tax returns filed (Form 1120-H & DC D-20)', role:'Treasurer', freq:'Annual', due:'2026-04-15', critical:true, satisfyingAction:'filing', legalRef:isDC?'IRS § 528; DC Code § 47-1807.02':'IRS Code § 528', tip:isDC?'Federal 1120-H and DC franchise tax (D-20, $250 minimum).':'Federal 1120-H due April 15.', fiduciaryDuty:'obedience', whyItMatters:'HOAs are taxable entities. Form 1120-H provides favorable treatment on assessment income.', consequence:'IRS penalties, interest, loss of 1120-H election. DC penalties for late franchise tax.', howTo:['Gather financials, bank interest, non-member income','Prepare Form 1120-H','File DC Form D-20 with $250 minimum tax','File by April 15 or request extension','Retain copies 7+ years'] },
+    { id:'f6', task:'Reconcile bank accounts monthly', role:'Treasurer', freq:'Monthly', due:'Monthly', critical:false, satisfyingAction:'review', legalRef:`${bylawRef}; Fiduciary duty`, tip:'Two-signature requirement for checks >$5,000. Treasurer reviews monthly.', fiduciaryDuty:'care', whyItMatters:'Most basic financial control. Detects unauthorized transactions and cash flow issues before they become crises.', consequence:'Unreconciled accounts may conceal embezzlement. Board personally liable for losses from inadequate oversight.', howTo:['Download statements for all accounts','Compare every transaction against invoices/receipts','Verify dual signatures on checks >$5,000','Investigate discrepancies immediately','Report to board at next meeting'] },
+    { id:'f7', task:'Assessment collection policy documented', role:'Treasurer', freq:'As needed', due:'As needed', critical:false, satisfyingAction:'document', legalRef:isDC?'DC Code § 42-1903.13':`${bylawRef}`, autoPass:hasCollectionPolicy, tip:isDC?'Late fee after 15 days. Lien notice after 60 days.':'Follow collection policy uniformly.', fiduciaryDuty:'care', whyItMatters:'Consistent enforcement ensures operating funds. Selective collection creates legal liability.', consequence:'Failure to collect starves operating funds. Selective enforcement may bar collection from anyone.', howTo:['Adopt written policy: late fees, interest, lien procedures','Apply uniformly — no exceptions','Late notice at 15 days','Demand letter/lien notice at 60 days','Attorney referral at 90 days'] },
   ];
 
+  // ═══ 3. INSURANCE & RISK (15%) ═══
   const insuranceItems: ComplianceItem[] = [
-    { id: 'i1', task: 'D&O insurance current', role: 'President', freq: 'Annual', due: '2026-09-30', critical: true,
-      tip: 'Directors & Officers liability coverage protects board members from personal liability for board decisions.',
-      legalRef: 'Best practice',
-      autoPass: insurance.some(p => p.type.toLowerCase().includes('d&o') || p.type.toLowerCase().includes('director')) },
-    { id: 'i2', task: 'General liability insurance current', role: 'President', freq: 'Annual', due: '2026-09-30', critical: true,
-      tip: isDC
-        ? 'General liability insurance required. Minimum $1M per occurrence / $2M aggregate recommended.'
-        : 'Minimum $1M/$2M general liability recommended.',
-      legalRef: isDC ? 'DC Code § 29-1135.06' : `${stateActShort} § Insurance`,
-      autoPass: insurance.some(p => p.type.toLowerCase().includes('general liability')) },
-    { id: 'i3', task: 'Property insurance adequate for replacement', role: 'Treasurer', freq: 'Annual', due: '2026-09-30', critical: true,
-      tip: 'Coverage should equal 100% replacement cost of common elements. Review after capital improvements or market changes.',
-      legalRef: hasBylaws ? 'Bylaws Art. VIII' : 'Governing Documents' },
-    { id: 'i4', task: 'Workers compensation if employees', role: 'President', freq: 'Annual', due: '2026-12-31', critical: false,
-      tip: isDC
-        ? 'Required if HOA has any employees (including part-time). DC requires coverage for all employers.'
-        : 'Required if HOA has any employees.',
-      legalRef: isDC ? 'DC Workers Comp Act' : `${jurisdiction} Workers Comp` },
-    { id: 'i5', task: 'Insurance certificates from vendors collected', role: 'Vice President', freq: 'Annual', due: '2026-03-31', critical: false,
-      tip: 'All vendors performing work on property should provide current certificates of insurance naming the HOA as additional insured.',
-      legalRef: 'Best practice' },
+    { id:'i1', task:'D&O insurance current', role:'President', freq:'Annual', due:'2026-09-30', critical:true, legalRef:isDC?'DC Code § 42-1903.10':'Best practice', autoPass:insurance.some(p=>p.type.toLowerCase().includes('d&o')||p.type.toLowerCase().includes('director')), tip:'Covers wrongful acts, mismanagement, breach of fiduciary duty.', fiduciaryDuty:'care', whyItMatters:'Without D&O, every board member is personally liable for claims. Most people will refuse to serve without it.', consequence:'Personal assets at risk for any lawsuit. Qualified candidates refuse to serve.', howTo:['Verify policy covers all current board members','Review limits vs. association assets','Ensure EPL endorsement included','Compare premiums at renewal','Present recommendation to board'] },
+    { id:'i2', task:'General liability insurance current', role:'President', freq:'Annual', due:'2026-09-30', critical:true, legalRef:isDC?'DC Code § 29-1135.06':`${stateActShort} § Insurance`, autoPass:insurance.some(p=>p.type.toLowerCase().includes('general liability')), tip:'Minimum $1M/$2M recommended.', fiduciaryDuty:'care', whyItMatters:'Covers bodily injury and property damage in common areas. A single serious injury can bankrupt an uninsured association.', consequence:'Without GL, association and board personally exposed to catastrophic claims.', howTo:['Verify $1M/$2M minimum limits','Review for common area exclusions','Ensure parking, pool, gym covered','Verify management company as additional insured'] },
+    { id:'i3', task:'Property insurance at replacement cost', role:'Treasurer', freq:'Annual', due:'2026-09-30', critical:true, legalRef:hasBylaws?'Bylaws Art. VIII':'Governing Documents', tip:'100% replacement cost. Review after capital improvements.', fiduciaryDuty:'care', whyItMatters:'Ensures building can be fully rebuilt after catastrophic loss. Underinsurance means owners bear the gap through special assessments.', consequence:'Underinsured → breach of duty claims. Co-insurance penalties can reduce payouts 40-60%.', howTo:['Obtain replacement cost appraisal','Compare to policy limits','Update after renovations','Review co-insurance clause'] },
+    { id:'i4', task:'Workers compensation if employees', role:'President', freq:'Annual', due:'2026-12-31', critical:false, legalRef:isDC?'DC Workers Comp Act':`${jurisdiction} Workers Comp`, tip:isDC?'Required for ALL DC employers, including part-time.':'Required if HOA has employees.', fiduciaryDuty:'obedience', whyItMatters:'Legally mandated for all employers. Even part-time workers trigger the requirement.', consequence:'Operating without is criminal. Board personally liable for workplace injuries plus penalties.', howTo:['Determine if any employees exist (including part-time)','If yes, obtain coverage immediately','Verify 1099 contractors carry their own','Maintain contractor COIs'] },
+    { id:'i5', task:'Vendor insurance certificates collected', role:'Vice President', freq:'Annual', due:'2026-03-31', critical:false, legalRef:'Fiduciary duty', tip:'All vendors should provide COIs naming HOA as additional insured.', fiduciaryDuty:'care', whyItMatters:'Uninsured vendor causes injury → association\'s policy pays. Without COI, owners bear the cost.', consequence:'Board personally responsible for failing to verify vendor insurance.', howTo:['List all current vendors','Request current COIs from each','Verify HOA named as additional insured','Track expirations','Suspend work without current COI'] },
   ];
+  if (hasBylaws) { insuranceItems.push({ id:'i6', task:'Umbrella/excess liability reviewed', role:'President', freq:'Annual', due:'2026-09-30', critical:false, legalRef:'Bylaws + Best practice', tip:'$1M-$5M excess recommended.', fiduciaryDuty:'care', whyItMatters:'One catastrophic claim can exceed GL limits. Umbrella fills the gap.', consequence:'Claim exceeding GL without umbrella falls on association and board personally.', howTo:['Review GL aggregate limits','Assess risk profile (high-rise, pool, gym)','Obtain umbrella quotes $1M-$5M','Present cost-benefit to board'] }); }
 
-  if (hasBylaws) {
-    insuranceItems.push({
-      id: 'i6', task: 'Umbrella/excess liability policy reviewed', role: 'President', freq: 'Annual', due: '2026-09-30', critical: false,
-      tip: 'Bylaws detected — check if umbrella coverage is required by governing documents. Recommended: $1M-$5M excess.',
-      legalRef: 'Bylaws + Best practice' });
-    regulatoryNotes.push('Bylaws detected — added umbrella liability policy review check.');
-  }
-
+  // ═══ 4. MAINTENANCE & SAFETY (15%) ═══
   const maintenance: ComplianceItem[] = [
-    { id: 'm1', task: 'Fire safety systems inspected', role: 'Vice President', freq: 'Annual', due: '2026-06-30', critical: true,
-      tip: isDC
-        ? 'Fire alarm, sprinkler, extinguisher, and standpipe inspection required annually. DC Fire Marshal may conduct additional inspections.'
-        : 'Fire alarm, sprinkler, and extinguisher inspection required.',
-      legalRef: isDC ? 'DC Fire Code' : `${jurisdiction} Fire Code` },
-    { id: 'm2', task: 'Elevator inspection current', role: 'Vice President', freq: 'Annual', due: '2026-08-15', critical: true,
-      tip: isDC
-        ? 'Elevators must pass annual safety inspection by DC-licensed inspector. Certificate must be posted in elevator car.'
-        : 'Elevator must pass annual safety inspection.',
-      legalRef: isDC ? 'DC Code § 1-303.43' : `${stateActShort} § Elevator` },
-    { id: 'm3', task: 'Common area maintenance schedule documented', role: 'Vice President', freq: 'Quarterly review', due: 'Quarterly',
-      critical: false,
-      tip: 'Maintain written preventive maintenance schedule for HVAC, plumbing, roof, exterior, and common areas. Review quarterly, update annually with reserve study.',
-      legalRef: 'Best practice + Reserve Study', satisfyingAction: 'review' },
-    { id: 'm4', task: 'ADA compliance reviewed', role: 'Vice President', freq: 'Annual', due: '2026-06-30', critical: false,
-      tip: 'Ensure common areas meet accessibility requirements. Applies to areas open to the public (lobbies, parking, common rooms).',
-      legalRef: 'ADA Title III' },
-    { id: 'm5', task: 'Emergency preparedness plan updated', role: 'President', freq: 'Annual', due: '2026-03-31', critical: false,
-      tip: hasEmergencyPlan ? 'Emergency plan document detected. Review annually and update emergency contacts, procedures, and evacuation routes.' : 'Create and maintain emergency contacts, procedures, and evacuation plans. Distribute to all residents.',
-      legalRef: 'Best practice', autoPass: hasEmergencyPlan },
+    { id:'m1', task:'Fire safety systems inspected', role:'Vice President', freq:'Annual', due:'2026-06-30', critical:true, legalRef:isDC?'DC Fire Code; NFPA 72':`${jurisdiction} Fire Code`, tip:'Alarms, sprinklers, extinguishers, standpipes, emergency lighting.', fiduciaryDuty:'care', whyItMatters:'Highest life-safety obligation. Failed systems during emergency → deaths, catastrophic liability, criminal charges.', consequence:'Failed inspection → possible condemnation. Fire with non-functioning systems → criminal negligence.', howTo:['Schedule annual inspection with licensed company','Include all fire protection components','Address deficiencies within 30 days','Post certificate in lobby','Retain reports 7+ years'] },
+    { id:'m2', task:'Elevator inspection current', role:'Vice President', freq:'Annual', due:'2026-08-15', critical:true, legalRef:isDC?'DC Code § 1-303.43':`${stateActShort} § Elevator`, tip:isDC?'DC-licensed inspector. Certificate posted in car.':'Annual safety inspection required.', fiduciaryDuty:'care', whyItMatters:'Elevator injuries are among highest-liability events. Expired certificate = uninspected elevator.', consequence:'Expired → shutdown order. Injury in uninspected elevator → near-automatic liability.', howTo:['Schedule 60 days before expiration','Use licensed inspector','Address deficiencies before certificate issued','Post certificate in each car','Maintain service contract with 24hr emergency'] },
+    { id:'m3', task:'Common area maintenance schedule documented', role:'Vice President', freq:'Quarterly review', due:'Quarterly', critical:false, satisfyingAction:'review', legalRef:'Best practice + Reserve Study', tip:'Preventive maintenance for HVAC, plumbing, roof, exterior. Review quarterly.', fiduciaryDuty:'care', whyItMatters:'Preventive maintenance extends system life, reduces emergencies, demonstrates active asset protection.', consequence:'Deferred maintenance → exponentially higher costs. Breach of duty for preventable deterioration.', howTo:['Inventory systems with install dates and expected life','Cross-reference with reserve study','Create seasonal calendar','Track completion','Review and adjust quarterly'] },
+    { id:'m4', task:'Vendor contracts and licenses verified', role:'Vice President', freq:'Annual', due:'Annual', critical:false, legalRef:'Fiduciary duty', tip:'Insurance, business license, W-9 from all vendors. Review contracts annually.', fiduciaryDuty:'care', whyItMatters:'Uninsured/unlicensed vendors expose association to liability for injuries, damage, and regulatory violations.', consequence:'Unlicensed work may be voided. Uninsured injury → association bears full cost.', howTo:['Maintain master vendor list','Collect COI, license, W-9 from each','Verify workers comp for vendors with employees','Review contract terms annually','Terminate non-compliant vendors'] },
+    { id:'m5', task:'Emergency preparedness plan updated', role:'President', freq:'Annual', due:'2026-03-31', critical:false, satisfyingAction:hasEmergencyPlan?'review':'document', legalRef:'Best practice', autoPass:hasEmergencyPlan, tip:hasEmergencyPlan?'Plan detected. Review annually.':'Create plan with contacts, evacuation routes.', fiduciaryDuty:'care', whyItMatters:'Saves lives during emergencies. Demonstrates reasonable care in post-incident litigation.', consequence:'No plan during incident → negligence liability. Outdated contacts delay response.', howTo:['Update emergency contacts (fire, police, utilities, board)','Review evacuation routes and assembly points','Verify extinguisher and AED locations','Distribute to all residents','Post in common areas'] },
+    { id:'m6', task:'ADA compliance reviewed', role:'Vice President', freq:'Annual', due:'2026-06-30', critical:false, legalRef:'ADA Title III', tip:'Applies to public areas: lobbies, parking, common rooms.', fiduciaryDuty:'obedience', whyItMatters:'ADA requires accessibility. Failure can result in federal complaints, lawsuits, mandatory retrofits.', consequence:'Costly retrofits, attorney fees, statutory damages. Serial litigants target non-compliant properties.', howTo:['Walk common areas with ADA checklist','Identify barriers to accessibility','Prioritize: parking, entrance, lobby, elevator, restrooms','Budget corrections','Document accommodation requests and responses'] },
   ];
 
+  // ═══ 5. RECORDS & COMMUNICATIONS (10%) ═══
   const records: ComplianceItem[] = [
-    { id: 'r1', task: 'Owner records current and accessible', role: 'Secretary', freq: 'Within 30 days of ownership change', due: 'Per transfer',
-      critical: false,
-      tip: isDC
-        ? 'Update owner contact info and mailing addresses within 30 days of any ownership transfer. Records must be available for inspection upon 5 business days notice.'
-        : 'Maintain current owner contact info and mailing addresses. Update promptly upon ownership changes.',
-      legalRef: isDC ? 'DC Code § 29-1135.01' : `${stateActShort} § Records`, satisfyingAction: 'review' },
-    { id: 'r2', task: 'Meeting notices sent per statutory requirements', role: 'Secretary', freq: 'Per meeting', due: 'Per meeting',
-      critical: true, perMeeting: true,
-      tip: isDC
-        ? 'Annual meeting: 10-60 days written notice required. Board meetings: 48 hours notice. Special meetings: 10 days notice. Emergency: reasonable notice.'
-        : 'Send meeting notices per bylaws and state statute. Maintain proof of delivery.',
-      legalRef: isDC ? 'DC Code § 29-1109.02(a)' : `${stateActShort} § Notice` },
-    { id: 'r3', task: 'Annual disclosure statement distributed', role: 'Secretary', freq: 'Annual', due: '2026-03-31', critical: false,
-      tip: isDC
-        ? 'Annual financial and governance disclosure required to all owners. Must include budget, reserve balances, insurance summary, and pending litigation.'
-        : 'Financial and governance disclosures to all owners.',
-      legalRef: isDC ? 'DC Code § 29-1135.05' : `${stateActShort} § Disclosure` },
-    { id: 'r4', task: 'Resale certificate process in place', role: 'Secretary', freq: 'Within 10 business days of request', due: 'Per request',
-      critical: false,
-      tip: hasResalePolicy
-        ? 'Resale certificate policy detected. Must be fulfilled within 10 business days of request. Fee may not exceed statutory maximum.'
-        : isDC
-          ? 'Must provide resale certificates within 10 business days of request. Maximum fee set by DC Code.'
-          : 'Must provide resale certificates within statutory timeframe.',
-      legalRef: isDC ? 'DC Code § 29-1141' : `${stateActShort} § Resale`,
-      autoPass: hasResalePolicy, satisfyingAction: 'document' },
-    { id: 'r5', task: 'Document retention policy adopted', role: 'Secretary', freq: 'Review annually', due: '2026-06-30',
-      critical: false,
-      tip: hasRetentionPolicy
-        ? 'Retention policy detected. Verify compliance: financial records 7+ years, tax returns permanently, meeting minutes permanently, contracts duration + 6 years.'
-        : 'Adopt written policy. Financial records: 7+ years. Tax returns: permanently. Meeting minutes: permanently. Contracts: duration + 6 years. Insurance claims: 10 years.',
-      legalRef: isDC ? 'DC Code § 29-1135.01 + IRS guidelines' : 'Best practice + IRS guidelines',
-      autoPass: hasRetentionPolicy, satisfyingAction: 'document' },
+    { id:'r1', task:'Owner records current and accessible', role:'Secretary', freq:'Within 30 days of transfer', due:'Per transfer', critical:false, satisfyingAction:'review', legalRef:isDC?'DC Code § 29-1135.01':`${stateActShort} § Records`, tip:isDC?'Update within 30 days. Available for inspection upon 5 days notice.':'Update promptly upon transfers.', fiduciaryDuty:'care', whyItMatters:'Accurate records ensure proper notice, voting eligibility, and assessment billing. Incorrect records invalidate meetings and elections.', consequence:'Wrong address → meeting invalidated. Wrong owner → collection fails. Bad voter rolls → election challenge.', howTo:['Update within 30 days of sale/transfer','Verify mailing, email, phone for each unit','Maintain mortgagee records','Allow inspection upon 5 business days notice','Verify before annual meeting'] },
+    { id:'r2', task:'Meeting notices sent per statute', role:'Secretary', freq:'Per meeting', due:'Per meeting', critical:true, perMeeting:true, legalRef:isDC?'DC Code § 29-1109.02(a)':`${stateActShort} § Notice`, tip:isDC?'Annual: 10-60 days. Board: 48hrs. Special: 10 days. Emergency: reasonable.':'Per bylaws and statute.', fiduciaryDuty:'obedience', whyItMatters:'Proper notice is due process. Actions at improperly noticed meetings may be void.', consequence:'Voidable actions. Must re-notice and re-hold, delaying decisions.', howTo:['Determine notice period for meeting type','Prepare written notice: date, time, location, agenda','Deliver per bylaws method','Document proof of delivery','Retain copies permanently'] },
+    { id:'r3', task:'Annual disclosure statement distributed', role:'Secretary', freq:'Annual', due:'2026-03-31', critical:false, legalRef:isDC?'DC Code § 29-1135.05':`${stateActShort} § Disclosure`, tip:isDC?'Include: budget, reserves, insurance, pending litigation.':'Financial and governance disclosures.', fiduciaryDuty:'care', whyItMatters:'Keeps owners informed about financial health. Transparency reduces conflict.', consequence:'Liability for non-disclosure. Some jurisdictions allow owners to withhold assessments.', howTo:['Compile: budget, actual vs budget, reserve balance','Include: insurance summary, pending litigation','Include: board members and officers','Distribute by mail or email','Retain proof of distribution'] },
+    { id:'r4', task:'Resale certificate process in place', role:'Secretary', freq:'Within 10 business days', due:'Per request', critical:false, satisfyingAction:'document', legalRef:isDC?'DC Code § 29-1141':`${stateActShort} § Resale`, autoPass:hasResalePolicy, tip:isDC?'10 business days. Fee ≤ statutory max.':'Provide within statutory timeframe.', fiduciaryDuty:'obedience', whyItMatters:'Required to complete condo sales. Delays can kill transactions.', consequence:'Liability for buyer/seller damages if delayed. Transaction costs if sale fails.', howTo:['Establish standard process','Prepare template with required disclosures','Verify unit account current','Fulfill within 10 business days','Charge fee ≤ statutory maximum'] },
+    { id:'r5', task:'Document retention policy adopted', role:'Secretary', freq:'Review annually', due:'2026-06-30', critical:false, satisfyingAction:'document', legalRef:'IRS guidelines + Best practice', autoPass:hasRetentionPolicy, tip:'Financial: 7yr. Tax: permanent. Minutes: permanent. Contracts: term+6yr.', fiduciaryDuty:'care', whyItMatters:'Protects in litigation, audits, regulatory inquiries. Ensures institutional knowledge survives turnover.', consequence:'Destroyed docs → negative inference in litigation. Missing tax records → IRS penalties.', howTo:['Adopt written schedule by document type','Financial/bank: 7+ years','Tax returns: permanently','Minutes/resolutions: permanently','Contracts: duration + 6 years','Insurance claims: 10 years','Implement secure physical and digital storage'] },
   ];
 
+  // ═══ 6. OWNER RELATIONS (10%) ═══
+  const ownerRelations: ComplianceItem[] = [
+    { id:'o1', task:'Respond to owner requests within 14 days', role:'Vice President', freq:'Per request', due:'Per request', critical:false, satisfyingAction:'review', legalRef:`${bylawRef}; Fiduciary duty`, tip:'Written acknowledgment within 14 days. Track in Case Ops.', fiduciaryDuty:'care', whyItMatters:'Timely response is a core governance obligation. Unresponsive boards erode trust and face removal petitions.', consequence:'Chronic non-responsiveness → removal petitions, litigation, regulatory complaints.', howTo:['Log all requests in Case Ops immediately','Send written acknowledgment within 5 business days','Respond substantively within 14 days','If more time needed, send interim update','Document all communications'] },
+    { id:'o2', task:'Make records available for owner inspection', role:'Secretary', freq:'As requested', due:'Within 5 business days', critical:true, satisfyingAction:'review', legalRef:isDC?'DC Code § 42-1903.14':`${stateActShort} § Records`, tip:'Owners may inspect: financials, minutes, contracts, insurance.', fiduciaryDuty:'obedience', whyItMatters:'Inspection rights are statutory. They are owners\' primary oversight mechanism. Obstruction is a serious legal violation.', consequence:'DC allows court petition with attorney fees to prevailing owner. Board may be held in contempt.', howTo:['Establish written inspection policy','Provide access within 5 business days of written request','Allow inspection at reasonable time and place','May charge reasonable copying fees','May NOT withhold except attorney-client privileged','Document every request and fulfillment'] },
+    { id:'o3', task:'Enforce CC&Rs and rules uniformly', role:'Vice President', freq:'Ongoing', due:'Ongoing', critical:true, satisfyingAction:'review', legalRef:'Fiduciary duty; CC&Rs', tip:'Selective enforcement = #1 source of HOA lawsuits. Document everything.', fiduciaryDuty:'loyalty', whyItMatters:'Uniform enforcement shows the board acts for all owners. Selective enforcement is the #1 lawsuit source.', consequence:'Courts may bar all enforcement if selective. Board personally liable for discrimination.', howTo:['Written violation process: notice → hearing → fine/remedy','Apply to every violation regardless of owner','Document every violation, notice, response in Case Ops','If past non-enforcement, send blanket notice before resuming','Never make exceptions for board members'] },
+    { id:'o4', task:'Annual notice of owner rights', role:'Secretary', freq:'Annual', due:'2026-01-31', critical:false, satisfyingAction:'review', legalRef:isDC?'DC Code § 42-1903.14(c)':`${stateActShort}`, tip:'Right to inspect records, attend meetings, run for board, vote.', fiduciaryDuty:'obedience', whyItMatters:'Many owners don\'t know their rights. Proactive disclosure builds trust and reduces conflict.', consequence:'Failure increases likelihood of contentious disputes and legal challenges.', howTo:['Prepare annual notice of key rights','Include: inspect records, attend meetings, run for board, vote','Include: how to request records, submit issues','Distribute with annual disclosure','Post on building portal'] },
+  ];
+
+  // ═══ 7. ETHICS & FIDUCIARY (5%) ═══
+  const ethics: ComplianceItem[] = [
+    { id:'e1', task:'Board members understand three fiduciary duties', role:'President', freq:'Annual', due:'2026-01-31', critical:true, satisfyingAction:'review', legalRef:isDC?'DC Code § 29-406.30':'Common law', tip:'Care: informed decisions. Loyalty: no self-dealing. Obedience: follow docs and law.', fiduciaryDuty:'care', whyItMatters:'These duties define the legal standard for every decision. Understanding them is the foundation of competent service and the board\'s legal defense.', consequence:'Violation → personal liability. D&O may not cover intentional or knowing violations.', howTo:['Distribute fiduciary duty summary annually','Care: attend meetings, read materials, ask questions, decide informed','Loyalty: disclose conflicts, no self-dealing, association first','Obedience: follow bylaws, CC&Rs, law in all decisions','Document acknowledgment','Consider annual training with association attorney'] },
+    { id:'e2', task:'Business judgment rule compliance', role:'President', freq:'Ongoing', due:'Ongoing', critical:false, satisfyingAction:'review', legalRef:isDC?'DC Code § 29-406.31':'Common law', tip:'Decisions protected if: good faith, reasonable care, informed basis, association interest.', fiduciaryDuty:'care', whyItMatters:'Protects from personal liability for bad outcomes — but only if proper process was followed.', consequence:'Decisions without information, quorum, or with undisclosed conflicts lose protection. Board personally liable.', howTo:['Before major decisions: gather information and alternatives','Get professional advice outside board expertise','Ensure quorum and proper notice','Disclose and manage conflicts','Document rationale in minutes','Vote — don\'t rubber-stamp'] },
+    { id:'e3', task:'No board member self-dealing', role:'President', freq:'Ongoing', due:'Ongoing', critical:true, legalRef:isDC?'DC Code § 29-406.70':'Duty of loyalty', tip:'Related-party transactions: disclose, recuse, disinterested approval, fair market value.', fiduciaryDuty:'loyalty', whyItMatters:'Most common basis for personal liability. Even fair transactions must be properly disclosed.', consequence:'Voidable even if fair. Disgorgement of profits + damages. D&O may deny coverage for intentional self-dealing.', howTo:['Conflicted member discloses in writing before discussion','Member leaves room during discussion and vote','Remaining board evaluates on merits','Document fair market comparison (competing bids)','Record disclosure, recusal, rationale in minutes','If in doubt, engage attorney first'] },
+  ];
+
+  // ═══ 8. LEGAL & REGULATORY (5%) ═══
+  const legalItems: ComplianceItem[] = [
+    { id:'l1', task:'Fair Housing Act compliance reviewed', role:'President', freq:'Annual', due:'2026-06-30', critical:true, satisfyingAction:'review', legalRef:isDC?'FHA; DC Human Rights Act':'Fair Housing Act', tip:isDC?'DC HRA broader than FHA — includes source of income, personal appearance.':'FHA: race, color, religion, sex, national origin, disability, familial status.', fiduciaryDuty:'obedience', whyItMatters:'Violations carry severe penalties. Board members individually liable.', consequence:'$50K-$200K+ per violation. Criminal penalties for pattern. Personal liability.', howTo:['Review rules/policies for disparate impact','Ensure no rules target demographics or family types','Process accommodation requests promptly','Train board on fair housing basics annually','Never retaliate against complaint filers'] },
+    { id:'l2', task:'Legal counsel retained and accessible', role:'President', freq:'Annual', due:'2026-01-31', critical:false, satisfyingAction:'review', legalRef:'Fiduciary duty', tip:'Attorney experienced in community association law. Review retainer annually.', fiduciaryDuty:'care', whyItMatters:'Boards aren\'t legal experts but must seek advice when appropriate. Available counsel ensures timely advice on critical decisions.', consequence:'Decisions without counsel → failure to exercise care. Delayed response escalates disputes.', howTo:['Verify attorney expertise in condo/HOA law','Review retainer terms and rates annually','Establish scope: contracts >$10K, disputes, collections, FHA','Budget adequate legal fees','Change counsel if response times inadequate'] },
+  ];
+
+  // ═══ ASSEMBLE ═══
   const categories: ComplianceCategory[] = [
-    { id: 'governance', icon: '⚖️', label: 'Governance & Legal', weight: 25, items: governance },
-    { id: 'financial', icon: '💰', label: 'Financial Compliance', weight: 25, items: financial },
-    { id: 'insurance', icon: '🛡️', label: 'Insurance & Risk', weight: 20, items: insuranceItems },
-    { id: 'maintenance', icon: '🔧', label: 'Maintenance & Safety', weight: 15, items: maintenance },
-    { id: 'records', icon: '📋', label: 'Records & Communications', weight: 15, items: records },
+    { id:'governance', icon:'⚖️', label:'Governance & Legal', weight:20, items:governance },
+    { id:'financial', icon:'💰', label:'Financial Compliance', weight:20, items:financial },
+    { id:'insurance', icon:'🛡️', label:'Insurance & Risk', weight:15, items:insuranceItems },
+    { id:'maintenance', icon:'🔧', label:'Maintenance & Safety', weight:15, items:maintenance },
+    { id:'records', icon:'📋', label:'Records & Communications', weight:10, items:records },
+    { id:'owner-relations', icon:'👥', label:'Owner Relations', weight:10, items:ownerRelations },
+    { id:'ethics', icon:'⚖️', label:'Ethics & Fiduciary', weight:5, items:ethics },
+    { id:'legal', icon:'📜', label:'Legal & Regulatory', weight:5, items:legalItems },
   ];
 
-  if (hasBylaws) regulatoryNotes.push('Bylaws detected — bylaw-specific references activated across all categories.');
+  if (hasBylaws) regulatoryNotes.push('Bylaws detected — bylaw-specific references activated.');
   if (hasCCRs) regulatoryNotes.push('CC&Rs/Declaration detected — declaration-specific checks enabled.');
-  if (!hasBylaws) regulatoryNotes.push('⚠ No bylaws uploaded — some checks use generic statutory references. Upload bylaws for more accurate compliance tracking.');
+  if (!hasBylaws) regulatoryNotes.push('⚠ No bylaws uploaded — some checks use generic references. Upload bylaws for accuracy.');
 
-  return {
-    categories,
-    refreshedAt: new Date().toISOString(),
-    jurisdiction,
-    documentsDetected,
-    regulatoryNotes,
-  };
+  return { categories, refreshedAt: new Date().toISOString(), jurisdiction, documentsDetected, regulatoryNotes };
 }

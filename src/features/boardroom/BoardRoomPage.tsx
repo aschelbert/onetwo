@@ -12,6 +12,8 @@ import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 
 const ROLE_COLORS: Record<string, string> = { President:'accent', 'Vice President':'mist', Treasurer:'sage', Secretary:'yellow', 'Member at Large':'purple' };
+const DUTY_LABELS: Record<string, string> = { care:'Duty of Care', loyalty:'Duty of Loyalty', obedience:'Duty of Obedience' };
+const DUTY_COLORS: Record<string, string> = { care:'accent', loyalty:'violet', obedience:'amber' };
 const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-700', minutes:'bg-sage-100 text-sage-700', financial:'bg-yellow-100 text-yellow-700', response:'bg-mist-100 text-ink-600', resale:'bg-ink-100 text-ink-600', violation:'bg-red-100 text-red-700', other:'bg-ink-100 text-ink-500' };
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
@@ -66,16 +68,18 @@ export default function BoardRoomPage() {
   const f = (k: string) => form[k] || '';
   const sf = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: false, voteScope: 'board' as 'board' | 'owner' });
+  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: false, voteScope: 'board' as 'board' | 'owner', voteItems: [] as number[] });
   const [attForm, setAttForm] = useState({ board: [] as string[], owners: '' as string, guests: '' as string });
   const [minText, setMinText] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedRunbook, setExpandedRunbook] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; size: string; type: string } | null>(null);
   const [linkCaseId, setLinkCaseId] = useState('');
   const [newCaseForm, setNewCaseForm] = useState({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' as string });
   const [runbookAction, setRunbookAction] = useState<'case' | 'meeting'>('case');
   const [runbookSort, setRunbookSort] = useState<'date' | 'category'>('date');
   const [runbookItemForMeeting, setRunbookItemForMeeting] = useState<string | null>(null);
+  const [expandedRunbook, setExpandedRunbook] = useState<string | null>(null);
 
   // Compliance scores
   const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => comp.completions[i.id]).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
@@ -110,8 +114,8 @@ export default function BoardRoomPage() {
   };
 
   // Meeting handlers
-  const openAddMeeting = () => { const d = getVoteDefaults('BOARD'); setRunbookItemForMeeting(null); setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope }); setModal('addMeeting'); };
-  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board' }); setModal('editMeeting'); };
+  const openAddMeeting = () => { const d = getVoteDefaults('BOARD'); setRunbookItemForMeeting(null); setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] }); setModal('addMeeting'); };
+  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board', voteItems: [] }); setModal('editMeeting'); };
   const openAttendees = (m: Meeting) => { setTargetId(m.id); setAttForm({ board: [...m.attendees.board], owners: m.attendees.owners.join('\n'), guests: m.attendees.guests.join('\n') }); setModal('attendees'); };
   const openMinutes = (m: Meeting) => { setTargetId(m.id); setMinText(m.minutes); setModal('minutes'); };
 
@@ -123,7 +127,9 @@ export default function BoardRoomPage() {
       mtg.addMeeting({ title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
       const freshMeetings = useMeetingsStore.getState().meetings;
       const newMeetingId = freshMeetings[freshMeetings.length - 1]?.id;
-      if (mForm.requiresVote && agenda.length > 0 && newMeetingId) {
+      if (mForm.requiresVote && mForm.voteItems.length > 0 && newMeetingId) {
+        const selectedAgenda = mForm.voteItems.map(i => agenda[i]).filter(Boolean);
+        if (selectedAgenda.length > 0) {
         const typeMap: Record<string, string> = { ANNUAL: 'budget_approval', SPECIAL: 'special_assessment', BOARD: 'meeting_motion', QUARTERLY: 'meeting_motion', EMERGENCY: 'meeting_motion' };
         const elType = (typeMap[mForm.type] || 'meeting_motion') as any;
         const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
@@ -133,13 +139,14 @@ export default function BoardRoomPage() {
           createdBy: 'Board', openedAt: null, closedAt: null, certifiedAt: null, certifiedBy: null,
           scheduledCloseDate: mForm.date, noticeDate: null,
           quorumRequired: mForm.voteScope === 'owner' ? 25 : 50.1,
-          ballotItems: agenda.map((item, i) => ({ id: 'bi_auto_' + Date.now() + '_' + i, title: item, description: `Agenda item from ${mForm.title}`, rationale: '', type: 'yes_no' as const, requiredThreshold: 50.1, legalRef: stateAct, attachments: [] })),
+          ballotItems: selectedAgenda.map((item, i) => ({ id: 'bi_auto_' + Date.now() + '_' + i, title: item, description: `Agenda item from ${mForm.title}`, rationale: '', type: 'yes_no' as const, requiredThreshold: 50.1, legalRef: stateAct, attachments: [] })),
           legalRef: stateAct, notes: `Auto-created from meeting: ${mForm.title}. Scope: ${mForm.voteScope} vote.`,
           complianceChecks: [], linkedMeetingId: newMeetingId,
         });
         const freshElections = useElectionStore.getState().elections;
         const newElectionId = freshElections[0]?.id;
         if (newElectionId) useMeetingsStore.getState().linkVote(newMeetingId, newElectionId);
+        }
       }
     } else {
       mtg.updateMeeting(targetId, { title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
@@ -314,6 +321,32 @@ export default function BoardRoomPage() {
               </div>
             </div>
 
+            {/* Role Responsibility Matrix */}
+            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+              <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                <div className="flex items-center gap-2"><span className="text-lg">👤</span><h3 className="font-bold text-ink-900 text-sm">Role Responsibility Matrix</h3></div>
+                <p className="text-[10px] text-ink-400">Click a role to filter items</p>
+              </div>
+              <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-ink-50"><tr><th className="text-left p-3 font-semibold text-ink-600 text-xs">Role</th><th className="text-left p-3 font-semibold text-ink-600 text-xs">Member</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Items</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Critical</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Done</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Score</th></tr></thead>
+              <tbody className="divide-y divide-ink-50">{allRoles.map(role => {
+                const roleItems = categories.flatMap(c => c.items).filter(i => i.role === role);
+                const roleCritical = roleItems.filter(i => i.critical);
+                const roleDone = roleItems.filter(i => i.autoPass || comp.completions[i.id]);
+                const pct = roleItems.length > 0 ? Math.round((roleDone.length / roleItems.length) * 100) : 100;
+                const rc = ROLE_COLORS[role] || 'ink';
+                const member = board.find(b => b.role === role);
+                const pc = pct >= 80 ? 'sage' : pct >= 50 ? 'yellow' : 'red';
+                return (<tr key={role} className={`cursor-pointer hover:bg-ink-50 transition-colors ${roleFilter === role ? 'bg-accent-50' : ''}`} onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}>
+                  <td className="p-3"><span className={`text-xs font-semibold px-2 py-1 rounded bg-${rc}-100 text-${rc}-700`}>{role}</span></td>
+                  <td className="p-3 text-xs text-ink-700">{member?.name || '—'}</td>
+                  <td className="p-3 text-center text-xs font-medium">{roleItems.length}</td>
+                  <td className="p-3 text-center">{roleCritical.length > 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">{roleCritical.length}</span> : <span className="text-ink-300 text-xs">—</span>}</td>
+                  <td className="p-3 text-center text-xs">{roleDone.length}/{roleItems.length}</td>
+                  <td className="p-3 text-center"><div className="flex items-center justify-center gap-1.5"><div className="w-12 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${pct}%` }} /></div><span className={`text-xs font-bold text-${pc}-600`}>{pct}%</span></div></td>
+                </tr>);
+              })}</tbody></table></div>
+            </div>
+
             {/* Sort toggle + Role filter + Add Filing */}
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex flex-wrap gap-2 items-center">
@@ -391,32 +424,71 @@ export default function BoardRoomPage() {
                 }
                 const { item, catLabel, catIcon } = u;
                 const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
-                return (<div key={item.id} className={`p-4 flex items-start gap-4 ${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
-                  {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                  : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>
-                      {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
-                      {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                      {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                      {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
-                      {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
+                const isExpanded = expandedRunbook === item.id;
+                const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
+                return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
+                  <div className="p-4 flex items-start gap-4">
+                    {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
+                    : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button onClick={() => setExpandedRunbook(isExpanded ? null : item.id)} className={`text-sm font-medium text-left hover:underline ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</button>
+                        {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
+                        {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
+                        {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
+                        {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
+                        {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${dc}-50 text-${dc}-700 font-medium border border-${dc}-200`}>{DUTY_LABELS[item.fiduciaryDuty]}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
+                      </div>
+                      <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
+                        <span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
+                        <button onClick={() => setExpandedRunbook(isExpanded ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExpanded ? '▲ Less' : '▼ Details'}</button>
+                      </div>
+                      {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                     </div>
-                    <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                    <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
-                    {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
+                    <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
+                      const mType = item.meetingType || 'BOARD';
+                      const agenda = item.suggestedAgenda || [item.task];
+                      const d = getVoteDefaults(mType);
+                      setRunbookItemForMeeting(item.id);
+                      setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
+                      setModal('addMeeting');
+                    }} />
                   </div>
-                  <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
-                    const mType = item.meetingType || 'BOARD';
-                    const agenda = item.suggestedAgenda || [item.task];
-                    const d = getVoteDefaults(mType);
-                    setRunbookItemForMeeting(item.id);
-                    setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope });
-                    setModal('addMeeting');
-                  }} />
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 ml-10 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p>
+                          <p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p>
+                          <p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p>
+                        </div>
+                      </div>
+                      <div className="bg-sage-50 border border-sage-200 rounded-lg p-3">
+                        <p className="text-[10px] font-bold text-sage-800 uppercase tracking-wider mb-2">✅ How To Complete</p>
+                        <ol className="space-y-1.5">
+                          {item.howTo.map((step, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-sage-900">
+                              <span className="bg-sage-200 text-sage-700 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">{i + 1}</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                      <div className="flex items-center gap-4 text-[10px] text-ink-400">
+                        <span>📖 {item.legalRef}</span>
+                        <span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>);
               };
 
@@ -483,20 +555,25 @@ export default function BoardRoomPage() {
 
               {/* Category cards */}
               {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; const catAutoCount = cat.items.filter(i => i.autoPass).length; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%{catAutoCount > 0 && <span className="text-sage-600 ml-1">· {catAutoCount} auto-verified</span>}</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div>
-              <div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; return (<div key={item.id} className={`p-4 flex items-start gap-4 ${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
+              <div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; const isExp = expandedRunbook === item.id; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink'; return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
+                <div className="p-4 flex items-start gap-4">
                 {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
                 : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</p>
+                    <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className={`text-sm font-medium text-left hover:underline ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</button>
                     {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
                     {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
                     {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
                     {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
+                    {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${dc}-50 text-${dc}-700 font-medium border border-${dc}-200`}>{DUTY_LABELS[item.fiduciaryDuty]}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                   </div>
                   <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                  <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
+                  <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
+                    <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExp ? '▲ Less' : '▼ Details'}</button>
+                  </div>
                   {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                 </div>
                 <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
@@ -504,9 +581,32 @@ export default function BoardRoomPage() {
                   const agenda = item.suggestedAgenda || [item.task];
                   const d = getVoteDefaults(mType);
                   setRunbookItemForMeeting(item.id);
-                  setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope });
+                  setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
                   setModal('addMeeting');
                 }} />
+                </div>
+                {isExp && (
+                  <div className="px-4 pb-4 ml-10 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p>
+                        <p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p>
+                      </div>
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p>
+                        <p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p>
+                      </div>
+                    </div>
+                    <div className="bg-sage-50 border border-sage-200 rounded-lg p-3">
+                      <p className="text-[10px] font-bold text-sage-800 uppercase tracking-wider mb-2">✅ How To Complete</p>
+                      <ol className="space-y-1.5">{item.howTo.map((step, si) => (<li key={si} className="flex items-start gap-2 text-xs text-sage-900"><span className="bg-sage-200 text-sage-700 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">{si + 1}</span><span>{step}</span></li>))}</ol>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] text-ink-400">
+                      <span>📖 {item.legalRef}</span>
+                      <span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span>
+                    </div>
+                  </div>
+                )}
               </div>); })}</div></div>); })}
             </>)}
           </div>);
@@ -542,7 +642,7 @@ export default function BoardRoomPage() {
       {(modal === 'addMeeting' || modal === 'editMeeting') && (<Modal title={modal === 'addMeeting' ? 'Schedule Meeting' : 'Edit Meeting'} onClose={() => setModal(null)} onSave={saveMeeting} saveLabel={modal === 'addMeeting' ? 'Schedule' : 'Save'}><div className="space-y-3">
         <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={mForm.title} onChange={e => setMForm({ ...mForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="February Board Meeting" /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={mForm.type} onChange={e => { const t = e.target.value; const d = getVoteDefaults(t); setMForm({ ...mForm, type: t, requiresVote: d.requiresVote, voteScope: d.voteScope }); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['BOARD','ANNUAL','QUARTERLY','SPECIAL','EMERGENCY'].map(t => <option key={t}>{t}</option>)}</select></div>
+          <div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={mForm.type} onChange={e => { const t = e.target.value; const d = getVoteDefaults(t); setMForm({ ...mForm, type: t, requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] }); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['BOARD','ANNUAL','QUARTERLY','SPECIAL','EMERGENCY'].map(t => <option key={t}>{t}</option>)}</select></div>
           <div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={mForm.status} onChange={e => setMForm({ ...mForm, status: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['SCHEDULED','COMPLETED','CANCELLED','RESCHEDULED'].map(s => <option key={s}>{s}</option>)}</select></div>
         </div>
         <div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Date *</label><input type="date" value={mForm.date} onChange={e => setMForm({ ...mForm, date: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Time</label><input type="time" value={mForm.time} onChange={e => setMForm({ ...mForm, time: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div>
@@ -559,7 +659,33 @@ export default function BoardRoomPage() {
               <button onClick={() => setMForm({ ...mForm, voteScope: 'owner' })} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mForm.voteScope === 'owner' ? 'bg-accent-600 text-white' : 'bg-white border border-ink-200 text-ink-600'}`}>Owner Vote</button>
             </div></div>
             <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-[10px] text-ink-600">{mForm.voteScope === 'board' ? '🏛 Board members vote on motions. Quorum: majority of board.' : '🗳 Unit owners vote. Quorum: 25% of eligible units.'}</p>
-              {mForm.agenda.trim() && (<div className="mt-2 border-t border-ink-50 pt-2"><p className="text-[10px] font-semibold text-ink-500 mb-1">Agenda items will become vote items:</p>{mForm.agenda.split('\n').filter(s => s.trim()).map((item, i) => (<p key={i} className="text-[10px] text-accent-700">• {item.trim()}</p>))}</div>)}
+              {mForm.agenda.trim() && (() => {
+                const items = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean);
+                const selected = mForm.voteItems;
+                return (<div className="mt-3 border-t border-ink-50 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-semibold text-ink-500">Select agenda items that require a vote:</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setMForm({ ...mForm, voteItems: items.map((_, i) => i) })} className="text-[10px] text-accent-600 font-medium hover:underline">Select all</button>
+                      <button onClick={() => setMForm({ ...mForm, voteItems: [] })} className="text-[10px] text-ink-400 font-medium hover:underline">Clear</button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">{items.map((item, i) => (
+                    <label key={i} className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${selected.includes(i) ? 'bg-accent-50 border border-accent-200' : 'hover:bg-mist-50 border border-transparent'}`}>
+                      <input type="checkbox" checked={selected.includes(i)} onChange={e => {
+                        if (e.target.checked) setMForm({ ...mForm, voteItems: [...selected, i] });
+                        else setMForm({ ...mForm, voteItems: selected.filter(x => x !== i) });
+                      }} className="h-4 w-4 mt-0.5 shrink-0 accent-accent-600" />
+                      <div>
+                        <span className={`text-xs ${selected.includes(i) ? 'text-accent-800 font-medium' : 'text-ink-600'}`}>{item}</span>
+                        {selected.includes(i) && <span className="text-[10px] text-accent-500 ml-1.5">→ vote item</span>}
+                      </div>
+                    </label>
+                  ))}</div>
+                  {selected.length === 0 && <p className="text-[10px] text-amber-600 mt-2">⚠ No items selected — select at least one agenda item to vote on, or toggle off "Requires Vote"</p>}
+                  {selected.length > 0 && <p className="text-[10px] text-sage-600 mt-2">✓ {selected.length} of {items.length} agenda items will become vote items</p>}
+                </div>);
+              })()}
             </div></div>)}
           </div>); })()}
         <div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={mForm.notes} onChange={e => setMForm({ ...mForm, notes: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div>
@@ -592,7 +718,7 @@ export default function BoardRoomPage() {
                 const agenda = item?.suggestedAgenda || [item?.task || 'Agenda item'];
                 const d = getVoteDefaults(mType);
                 setRunbookItemForMeeting(targetId);
-                setMForm({ title: item?.task || 'Meeting', type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item?.task || ''}. ${item?.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope });
+                setMForm({ title: item?.task || 'Meeting', type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item?.task || ''}. ${item?.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
                 setModal('addMeeting');
               }
             }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors"><span className="text-2xl">✨</span><p className="text-sm font-semibold text-ink-900 mt-2">Create New</p><p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Open a new case' : 'Schedule & mark complete'}</p></button>
