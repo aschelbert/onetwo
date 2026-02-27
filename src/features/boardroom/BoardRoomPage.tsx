@@ -18,7 +18,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'runbook' | 'meetings' | 'votes' | 'communications';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -60,7 +60,7 @@ export default function BoardRoomPage() {
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const [tab, setTab] = useState<TabId>('runbook');
+  const [tab, setTab] = useState<TabId>('duties');
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
   const [targetId, setTargetId] = useState('');
@@ -73,6 +73,7 @@ export default function BoardRoomPage() {
   const [minText, setMinText] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRunbook, setExpandedRunbook] = useState<string | null>(null);
+  const [workflowSteps, setWorkflowSteps] = useState<Record<string, boolean[]>>({});
   const [pendingFile, setPendingFile] = useState<{ name: string; size: string; type: string } | null>(null);
   const [linkCaseId, setLinkCaseId] = useState('');
   const [newCaseForm, setNewCaseForm] = useState({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' as string });
@@ -266,7 +267,8 @@ export default function BoardRoomPage() {
 
   // ─── Tab definitions ───
   const TABS: { id: TabId; label: string; badge?: number }[] = [
-    { id: 'runbook', label: 'Runbook', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => !i.autoPass && !comp.completions[i.id]).length) || undefined },
+    { id: 'duties', label: 'Duties & Roles' },
+    { id: 'runbook', label: 'Runbook', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => !i.autoPass && !comp.completions[i.id] && !i.perMeeting && i.due !== 'Ongoing' && i.due !== 'Per meeting' && i.due !== 'Per transfer' && i.due !== 'Per request' && i.due !== 'Quarterly' && i.due !== 'As needed' && i.due !== 'Monthly').length) || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
@@ -292,6 +294,101 @@ export default function BoardRoomPage() {
 
       <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
 
+        {/* ═══ DUTIES & ROLES TAB ═══ */}
+        {tab === 'duties' && (() => {
+          const allItemsUnfiltered = categories.flatMap(c => c.items);
+          const ongoingItems = allItemsUnfiltered.filter(i => i.perMeeting || i.due === 'Ongoing' || i.due === 'Per meeting' || i.due === 'Per transfer' || i.due === 'Per request' || i.due === 'Quarterly' || i.due === 'As needed' || i.due === 'Monthly');
+          return (<div className="space-y-6">
+
+            {/* Three Fiduciary Duties */}
+            <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
+              <h3 className="font-bold text-ink-900 text-sm mb-1">⚖️ The Three Fiduciary Duties</h3>
+              <p className="text-xs text-ink-500 mb-4">Every board decision is measured against these three legal obligations. Understanding them is the foundation of competent service and your primary legal defense.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-white rounded-lg border border-accent-200 p-4">
+                  <div className="flex items-center gap-2 mb-2"><span className="text-lg">🔍</span><h4 className="font-bold text-accent-800 text-sm">Duty of Care</h4></div>
+                  <p className="text-xs text-ink-600 leading-relaxed">Act as a reasonably prudent person would in a similar position. This means attending meetings, reading materials before voting, asking questions, and making informed decisions.</p>
+                  <p className="text-[10px] text-accent-600 mt-2 font-semibold">{allItemsUnfiltered.filter(i => i.fiduciaryDuty === 'care').length} runbook items</p>
+                </div>
+                <div className="bg-white rounded-lg border border-violet-200 p-4">
+                  <div className="flex items-center gap-2 mb-2"><span className="text-lg">🤝</span><h4 className="font-bold text-violet-800 text-sm">Duty of Loyalty</h4></div>
+                  <p className="text-xs text-ink-600 leading-relaxed">Put the association's interests above personal interests. Disclose all conflicts, recuse yourself from related votes, and never engage in self-dealing transactions.</p>
+                  <p className="text-[10px] text-violet-600 mt-2 font-semibold">{allItemsUnfiltered.filter(i => i.fiduciaryDuty === 'loyalty').length} runbook items</p>
+                </div>
+                <div className="bg-white rounded-lg border border-amber-200 p-4">
+                  <div className="flex items-center gap-2 mb-2"><span className="text-lg">📜</span><h4 className="font-bold text-amber-800 text-sm">Duty of Obedience</h4></div>
+                  <p className="text-xs text-ink-600 leading-relaxed">Follow the governing documents and the law in every decision. Board authority is limited to what bylaws, CC&Rs, and statute grant. Actions beyond that authority are void.</p>
+                  <p className="text-[10px] text-amber-600 mt-2 font-semibold">{allItemsUnfiltered.filter(i => i.fiduciaryDuty === 'obedience').length} runbook items</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Role Responsibility Matrix */}
+            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+              <div className="p-4 border-b border-ink-100 flex items-center justify-between">
+                <div className="flex items-center gap-2"><span className="text-lg">👤</span><h3 className="font-bold text-ink-900 text-sm">Role Responsibility Matrix</h3></div>
+                <p className="text-[10px] text-ink-400">Click a role to see their obligations below</p>
+              </div>
+              <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-ink-50"><tr><th className="text-left p-3 font-semibold text-ink-600 text-xs">Role</th><th className="text-left p-3 font-semibold text-ink-600 text-xs">Member</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Total Items</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Critical</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Ongoing</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Deadline</th></tr></thead>
+              <tbody className="divide-y divide-ink-50">{allRoles.map(role => {
+                const roleItems = allItemsUnfiltered.filter(i => i.role === role);
+                const roleCritical = roleItems.filter(i => i.critical);
+                const roleOngoing = roleItems.filter(i => ongoingItems.includes(i));
+                const roleDeadline = roleItems.filter(i => !ongoingItems.includes(i));
+                const rc = ROLE_COLORS[role] || 'ink';
+                const member = board.find(b => b.role === role);
+                return (<tr key={role} className={`cursor-pointer hover:bg-ink-50 transition-colors ${roleFilter === role ? 'bg-accent-50' : ''}`} onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}>
+                  <td className="p-3"><span className={`text-xs font-semibold px-2 py-1 rounded bg-${rc}-100 text-${rc}-700`}>{role}</span></td>
+                  <td className="p-3 text-xs text-ink-700">{member?.name || '—'}</td>
+                  <td className="p-3 text-center text-xs font-medium">{roleItems.length}</td>
+                  <td className="p-3 text-center">{roleCritical.length > 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">{roleCritical.length}</span> : <span className="text-ink-300 text-xs">—</span>}</td>
+                  <td className="p-3 text-center text-xs text-ink-500">{roleOngoing.length}</td>
+                  <td className="p-3 text-center text-xs text-ink-500">{roleDeadline.length}</td>
+                </tr>);
+              })}</tbody></table></div>
+            </div>
+
+            {/* Ongoing & Per-Meeting Obligations */}
+            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+              <div className="p-4 border-b border-ink-100 bg-amber-50 flex items-center gap-2"><span className="text-lg">🔄</span><h3 className="font-bold text-ink-900 text-sm">Ongoing & Per-Meeting Obligations</h3><span className="text-[10px] text-ink-400 ml-1">Continuous requirements — no fixed deadline</span></div>
+              {roleFilter !== 'all' && <div className="px-4 pt-3 flex items-center gap-2"><span className="text-[10px] px-2 py-0.5 rounded bg-accent-100 text-accent-700 font-semibold">Filtered: {roleFilter}</span><button onClick={() => setRoleFilter('all')} className="text-[10px] text-ink-400 hover:text-red-500">✕ Clear</button></div>}
+              <div className="divide-y divide-ink-50">{ongoingItems.filter(i => roleFilter === 'all' || i.role === roleFilter).map(item => {
+                const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
+                const isExp = expandedRunbook === item.id;
+                return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : ''}`}>
+                  <div className="p-4 flex items-start gap-4">
+                    <div className="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 mt-0.5 text-[10px]">🔄</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className="text-sm font-medium text-left hover:underline text-ink-900">{item.task}</button>
+                        {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
+                        {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${dc}-50 text-${dc}-700 font-medium border border-${dc}-200`}>{DUTY_LABELS[item.fiduciaryDuty]}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
+                      </div>
+                      <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
+                      <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq}</span>
+                        <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExp ? '▲ Less' : '▼ Details'}</button>
+                      </div>
+                    </div>
+                  </div>
+                  {isExp && (<div className="px-4 pb-4 ml-10 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p><p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p></div>
+                    </div>
+                    <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-[10px] font-bold text-sage-800 uppercase tracking-wider mb-2">✅ How To Complete</p>
+                      <ol className="space-y-1.5">{item.howTo.map((step, si) => (<li key={si} className="flex items-start gap-2 text-xs text-sage-900"><span className="bg-sage-200 text-sage-700 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">{si + 1}</span><span>{step}</span></li>))}</ol>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] text-ink-400"><span>📖 {item.legalRef}</span><span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span></div>
+                  </div>)}
+                </div>);
+              })}</div>
+              {ongoingItems.filter(i => roleFilter === 'all' || i.role === roleFilter).length === 0 && <p className="p-6 text-center text-sm text-ink-400">No ongoing items for this role</p>}
+            </div>
+          </div>);
+        })()}
+
         {/* ═══ RUNBOOK TAB (with filings integrated) ═══ */}
         {tab === 'runbook' && (() => {
           const allItems = catScores.flatMap(c => c.items);
@@ -306,7 +403,7 @@ export default function BoardRoomPage() {
             {/* Explainer */}
             <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
               <h3 className="font-bold text-ink-900 text-sm">📋 Compliance Runbook</h3>
-              <p className="text-xs text-ink-500 mt-1">Auto-generated from your jurisdiction, governing documents, and local legislation. Filings and deadlines are integrated below.</p>
+              <p className="text-xs text-ink-500 mt-1">Actionable deadlines with step-by-step workflows. Click any item to expand its workflow checklist. Ongoing duties are in the Duties tab.</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="text-[10px] px-2 py-1 rounded-lg bg-accent-100 text-accent-700 font-semibold">📍 {isDC ? 'District of Columbia' : jurisdiction}</span>
                 <span className="text-[10px] px-2 py-1 rounded-lg bg-ink-100 text-ink-600 font-semibold">{stateAct}</span>
@@ -318,32 +415,6 @@ export default function BoardRoomPage() {
                 <span className="inline-flex items-center gap-1.5 font-semibold text-amber-700"><span className="w-2 h-2 rounded-full bg-amber-400"></span>{needsActionCount} needs action</span>
                 <span className="inline-flex items-center gap-1.5 font-semibold text-ink-600"><span className="w-2 h-2 rounded-full bg-ink-300"></span>{allItems.filter(i => comp.completions[i.id] && !i.autoPass).length} manually confirmed</span>
               </div>
-            </div>
-
-            {/* Role Responsibility Matrix */}
-            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
-              <div className="p-4 border-b border-ink-100 flex items-center justify-between">
-                <div className="flex items-center gap-2"><span className="text-lg">👤</span><h3 className="font-bold text-ink-900 text-sm">Role Responsibility Matrix</h3></div>
-                <p className="text-[10px] text-ink-400">Click a role to filter items</p>
-              </div>
-              <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-ink-50"><tr><th className="text-left p-3 font-semibold text-ink-600 text-xs">Role</th><th className="text-left p-3 font-semibold text-ink-600 text-xs">Member</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Items</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Critical</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Done</th><th className="text-center p-3 font-semibold text-ink-600 text-xs">Score</th></tr></thead>
-              <tbody className="divide-y divide-ink-50">{allRoles.map(role => {
-                const roleItems = categories.flatMap(c => c.items).filter(i => i.role === role);
-                const roleCritical = roleItems.filter(i => i.critical);
-                const roleDone = roleItems.filter(i => i.autoPass || comp.completions[i.id]);
-                const pct = roleItems.length > 0 ? Math.round((roleDone.length / roleItems.length) * 100) : 100;
-                const rc = ROLE_COLORS[role] || 'ink';
-                const member = board.find(b => b.role === role);
-                const pc = pct >= 80 ? 'sage' : pct >= 50 ? 'yellow' : 'red';
-                return (<tr key={role} className={`cursor-pointer hover:bg-ink-50 transition-colors ${roleFilter === role ? 'bg-accent-50' : ''}`} onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}>
-                  <td className="p-3"><span className={`text-xs font-semibold px-2 py-1 rounded bg-${rc}-100 text-${rc}-700`}>{role}</span></td>
-                  <td className="p-3 text-xs text-ink-700">{member?.name || '—'}</td>
-                  <td className="p-3 text-center text-xs font-medium">{roleItems.length}</td>
-                  <td className="p-3 text-center">{roleCritical.length > 0 ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">{roleCritical.length}</span> : <span className="text-ink-300 text-xs">—</span>}</td>
-                  <td className="p-3 text-center text-xs">{roleDone.length}/{roleItems.length}</td>
-                  <td className="p-3 text-center"><div className="flex items-center justify-center gap-1.5"><div className="w-12 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${pct}%` }} /></div><span className={`text-xs font-bold text-${pc}-600`}>{pct}%</span></div></td>
-                </tr>);
-              })}</tbody></table></div>
             </div>
 
             {/* Sort toggle + Role filter + Add Filing */}
@@ -458,36 +529,59 @@ export default function BoardRoomPage() {
                       setModal('addMeeting');
                     }} />
                   </div>
-                  {/* Expanded detail panel */}
-                  {isExpanded && (
+                  {/* Workflow panel */}
+                  {isExpanded && (() => {
+                    const steps = workflowSteps[item.id] || item.howTo.map(() => false);
+                    const completedSteps = steps.filter(Boolean).length;
+                    const allDone = completedSteps === item.howTo.length;
+                    const toggleStep = (si: number) => {
+                      const ns = [...steps]; ns[si] = !ns[si];
+                      setWorkflowSteps({ ...workflowSteps, [item.id]: ns });
+                    };
+                    return (
                     <div className="px-4 pb-4 ml-10 space-y-3">
+                      {/* Context row */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                          <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p>
-                          <p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p>
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p>
-                          <p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p>
-                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p><p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p></div>
                       </div>
-                      <div className="bg-sage-50 border border-sage-200 rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-sage-800 uppercase tracking-wider mb-2">✅ How To Complete</p>
-                        <ol className="space-y-1.5">
-                          {item.howTo.map((step, i) => (
-                            <li key={i} className="flex items-start gap-2 text-xs text-sage-900">
-                              <span className="bg-sage-200 text-sage-700 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">{i + 1}</span>
-                              <span>{step}</span>
-                            </li>
+                      {/* Workflow steps */}
+                      <div className={`border rounded-xl overflow-hidden ${allDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
+                        <div className="p-3 border-b border-ink-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            {!allDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
+                            {completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
+                          </div>
+                        </div>
+                        <div className="divide-y divide-ink-50">
+                          {item.howTo.map((step, si) => (
+                            <label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}>
+                              <input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" />
+                              <div className="flex-1">
+                                <span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span>
+                              </div>
+                              <span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span>
+                            </label>
                           ))}
-                        </ol>
+                        </div>
+                        {allDone && !comp.completions[item.id] && !item.autoPass && (
+                          <div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-between">
+                            <span className="text-xs text-sage-700 font-medium">✅ All steps completed</span>
+                            <button onClick={() => comp.toggleItem(item.id)} className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Mark Item Complete</button>
+                          </div>
+                        )}
                       </div>
+                      {/* Legal & duty footer */}
                       <div className="flex items-center gap-4 text-[10px] text-ink-400">
                         <span>📖 {item.legalRef}</span>
                         <span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span>
                       </div>
-                    </div>
-                  )}
+                    </div>);
+                  })()}
                 </div>);
               };
 
@@ -499,12 +593,12 @@ export default function BoardRoomPage() {
                   {datedItems.length === 0 && <p className="p-6 text-center text-sm text-ink-400">All deadlines met</p>}
                 </div>
 
-                {/* Ongoing & Per-Meeting Obligations */}
+                {/* Link to ongoing items in Duties tab */}
                 {ongoingItems.length > 0 && (
-                  <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
-                    <div className="p-4 border-b border-ink-100 bg-amber-50 flex items-center gap-2"><span className="text-lg">🔄</span><h3 className="font-bold text-ink-900 text-sm">Ongoing & Per-Meeting Obligations</h3><span className="text-[10px] text-ink-400 ml-1">Continuous requirements with no fixed deadline</span></div>
-                    <div className="divide-y divide-ink-50">{ongoingItems.map(renderUnifiedItem)}</div>
-                  </div>
+                  <button onClick={() => setTab('duties')} className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between hover:bg-amber-100 transition-colors">
+                    <div className="flex items-center gap-2"><span className="text-lg">🔄</span><span className="text-sm font-medium text-amber-800">{ongoingItems.length} ongoing obligations</span><span className="text-xs text-amber-600">— per-meeting, monthly, quarterly duties</span></div>
+                    <span className="text-xs text-amber-600 font-medium">View in Duties tab →</span>
+                  </button>
                 )}
               </div>);
             })()}
@@ -584,28 +678,27 @@ export default function BoardRoomPage() {
                   setModal('addMeeting');
                 }} />
                 </div>
-                {isExp && (
-                  <div className="px-4 pb-4 ml-10 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p>
-                        <p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p>
+                {isExp && (() => {
+                    const steps = workflowSteps[item.id] || item.howTo.map(() => false);
+                    const completedSteps = steps.filter(Boolean).length;
+                    const allStepsDone = completedSteps === item.howTo.length;
+                    const toggleStep = (si: number) => { const ns = [...steps]; ns[si] = !ns[si]; setWorkflowSteps({ ...workflowSteps, [item.id]: ns }); };
+                    return (<div className="px-4 pb-4 ml-10 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p><p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p></div>
                       </div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">🚨 If Not Completed</p>
-                        <p className="text-xs text-red-900 leading-relaxed">{item.consequence}</p>
+                      <div className={`border rounded-xl overflow-hidden ${allStepsDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
+                        <div className="p-3 border-b border-ink-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2"><p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allStepsDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span></div>
+                          <div className="flex gap-2">{!allStepsDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
+                        </div>
+                        <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
+                        {allStepsDone && !done && !isAuto && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-between"><span className="text-xs text-sage-700 font-medium">✅ All steps completed</span><button onClick={() => comp.toggleItem(item.id)} className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Mark Item Complete</button></div>)}
                       </div>
-                    </div>
-                    <div className="bg-sage-50 border border-sage-200 rounded-lg p-3">
-                      <p className="text-[10px] font-bold text-sage-800 uppercase tracking-wider mb-2">✅ How To Complete</p>
-                      <ol className="space-y-1.5">{item.howTo.map((step, si) => (<li key={si} className="flex items-start gap-2 text-xs text-sage-900"><span className="bg-sage-200 text-sage-700 rounded-full w-4 h-4 flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">{si + 1}</span><span>{step}</span></li>))}</ol>
-                    </div>
-                    <div className="flex items-center gap-4 text-[10px] text-ink-400">
-                      <span>📖 {item.legalRef}</span>
-                      <span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span>
-                    </div>
-                  </div>
-                )}
+                      <div className="flex items-center gap-4 text-[10px] text-ink-400"><span>📖 {item.legalRef}</span><span className={`px-2 py-0.5 rounded bg-${dc}-50 text-${dc}-700 border border-${dc}-200 font-medium`}>{DUTY_LABELS[item.fiduciaryDuty]}: {item.fiduciaryDuty === 'care' ? 'Make informed, prudent decisions' : item.fiduciaryDuty === 'loyalty' ? 'Put association interests first' : 'Follow governing docs and law'}</span></div>
+                    </div>);
+                  })()}
               </div>); })}</div></div>); })}
             </>)}
           </div>);
