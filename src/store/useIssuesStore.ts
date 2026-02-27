@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach } from '@/types/issues';
 
 // ─── Situation Templates ───────────────────────────────────
@@ -658,6 +659,7 @@ interface IssuesState {
   addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes'>) => void;
   upvoteIssue: (issueId: string, userId: string, userName: string, unitNumber: string) => void;
   updateIssueStatus: (issueId: string, status: Issue['status']) => void;
+  addIssueComment: (issueId: string, author: string, text: string) => void;
 
   // Case actions
   createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string }) => string;
@@ -687,7 +689,7 @@ interface IssuesState {
   unlinkWO: (caseId: string, woId: string) => void;
 }
 
-export const useIssuesStore = create<IssuesState>((set, get) => ({
+export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   issues: seedIssues,
   cases: seedCases,
   nextCaseNum: 4,
@@ -712,6 +714,12 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
 
   updateIssueStatus: (issueId, status) => set(s => ({
     issues: s.issues.map(i => i.id === issueId ? { ...i, status } : i)
+  })),
+
+  addIssueComment: (issueId, author, text) => set(s => ({
+    issues: s.issues.map(i => i.id === issueId ? {
+      ...i, comments: [...i.comments, { id: 'cmt-' + Date.now(), author, text, date: new Date().toISOString().split('T')[0] }]
+    } : i)
   })),
 
   createCase: (data) => {
@@ -860,4 +868,4 @@ export const useIssuesStore = create<IssuesState>((set, get) => ({
   unlinkWO: (caseId, woId) => set(s => ({
     cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: c.linkedWOs.filter(id => id !== woId) } : c)
   }))
-}));
+}), { name: 'onetwo-issues' }));

@@ -74,6 +74,7 @@ export default function CommunityRoomPage() {
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
+  const [expandedReq, setExpandedReq] = useState<string | null>(null);
 
   const renderMeeting = (m: Meeting) => {
     const isExp = expandedMeeting === m.id;
@@ -223,33 +224,71 @@ export default function CommunityRoomPage() {
               </div>
             )}
 
-            {myRequests.length > 0 && (
+            {myRequests.length > 0 && (() => {
+              const getSLA = (submitted: string) => {
+                const sub = new Date(submitted + 'T12:00');
+                const due = new Date(sub); due.setDate(due.getDate() + 14);
+                const now = new Date();
+                const daysLeft = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                return { due: due.toISOString().split('T')[0], daysLeft, overdue: daysLeft < 0 };
+              };
+              return (
               <div>
                 <p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">My Requests ({myRequests.length})</p>
                 <div className="space-y-2">
-                  {myRequests.map(r => (
-                    <div key={r.id} className="rounded-xl border border-ink-100 p-4 hover:border-accent-200 transition-colors">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${r.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : r.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : r.status === 'RESOLVED' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{r.status.replace('_', ' ')}</span>
-                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${r.priority === 'HIGH' ? 'bg-red-100 text-red-700' : r.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-ink-100 text-ink-500'}`}>{r.priority}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-mist-100 text-ink-600 font-medium">{r.category}</span>
+                  {myRequests.map(r => {
+                    const sla = getSLA(r.submittedDate);
+                    const isOpen = r.status === 'SUBMITTED' || r.status === 'IN_PROGRESS';
+                    const isExp = expandedReq === r.id;
+                    return (
+                    <div key={r.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm' : 'border-ink-100 hover:border-accent-200'}`}>
+                      <div className="p-4 cursor-pointer" onClick={() => setExpandedReq(isExp ? null : r.id)}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${r.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : r.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : r.status === 'RESOLVED' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{r.status.replace('_', ' ')}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-mist-100 text-ink-600 font-medium">{r.category}</span>
+                              {isOpen && (sla.overdue
+                                ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">⚠ OVERDUE — response was due {sla.due}</span>
+                                : sla.daysLeft <= 3
+                                  ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">⏰ {sla.daysLeft} day{sla.daysLeft !== 1 ? 's' : ''} left</span>
+                                  : <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">Response due by {sla.due}</span>
+                              )}
+                            </div>
+                            <p className="text-sm font-semibold text-ink-900 mt-1">{r.title}</p>
+                            <p className="text-[10px] text-ink-300 mt-1">Submitted {r.submittedDate} · {r.id}</p>
                           </div>
-                          <p className="text-sm font-semibold text-ink-900 mt-1">{r.title}</p>
-                          {r.description && <p className="text-xs text-ink-400 mt-0.5 line-clamp-2">{r.description}</p>}
-                          <p className="text-[10px] text-ink-300 mt-1.5">Submitted {r.submittedDate} · {r.id}</p>
+                          <svg className={`w-4 h-4 transition-transform ${isExp ? 'rotate-180' : ''} text-ink-300 shrink-0 mt-1`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
                         </div>
-                        <button onClick={() => issueStore.upvoteIssue(r.id, user.id, user.name, user.linkedUnits?.[0] || '')} className="flex flex-col items-center shrink-0">
-                          <span className={`text-base ${r.upvotes.find((u: any) => u.userId === user.id) ? 'text-accent-500' : 'text-ink-300'}`}>▲</span>
-                          <span className="text-[10px] font-bold text-ink-500">{r.upvotes.length}</span>
-                        </button>
                       </div>
+                      {isExp && (
+                        <div className="px-4 pb-4 border-t border-ink-50 pt-3 space-y-3">
+                          {r.description && <p className="text-xs text-ink-600">{r.description}</p>}
+                          {/* Comment thread */}
+                          {(r.comments || []).length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-ink-500 uppercase tracking-wider">Responses</p>
+                              {r.comments.map((c: any) => (
+                                <div key={c.id} className="bg-mist-50 rounded-lg p-3 border border-mist-200">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-bold text-ink-700">{c.author}</span>
+                                    <span className="text-[10px] text-ink-400">{c.date}</span>
+                                  </div>
+                                  <p className="text-xs text-ink-600">{c.text}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(r.comments || []).length === 0 && isOpen && (
+                            <p className="text-xs text-ink-400 italic">No response yet. The board is required to respond within 14 days.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  ); })}
                 </div>
               </div>
-            )}
+            ); })()}
 
             {allRequests.filter(r => r.reportedBy !== user.id).length > 0 && (
               <div>

@@ -4,6 +4,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
+import { useComplianceStore } from '@/store/useComplianceStore';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 
@@ -21,6 +22,7 @@ export default function VotingPage() {
   const { currentUser, currentRole } = useAuthStore();
   const building = useBuildingStore();
   const issues = useIssuesStore();
+  const compStore = useComplianceStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const isResident = currentRole === 'RESIDENT';
 
@@ -283,7 +285,7 @@ export default function VotingPage() {
             <div className="flex gap-2 flex-wrap">
               {selected.status === 'draft' && <button onClick={() => { if (!selected.ballotItems.length) { alert('Add vote items first'); return; } if (confirm('Open voting?')) store.openElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-green-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-green-300 border-opacity-40 hover:bg-opacity-50">▶ Open</button>}
               {selected.status === 'open' && <button onClick={() => { if (confirm('Close voting?')) store.closeElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-yellow-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-yellow-300 border-opacity-40 hover:bg-opacity-50">⏹ Close</button>}
-              {selected.status === 'closed' && <button onClick={() => { if (confirm('Certify results?')) store.certifyElection(selected.id, currentUser?.name || 'Board'); }} className="px-4 py-2 bg-sage-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-sage-300 border-opacity-40 hover:bg-opacity-50">✓ Certify</button>}
+              {selected.status === 'closed' && <button onClick={() => { if (confirm('Certify results? This will post an announcement to the Community Room.')) { store.certifyElection(selected.id, currentUser?.name || 'Board'); const resultSummary = selected.ballotItems.map(bi => `${bi.title}: ${bi.type === 'yes_no' ? 'Passed/Failed' : 'Results tallied'}`).join('. '); compStore.addAnnouncement({ title: `Vote Results Certified: ${selected.title}`, body: `The results of "${selected.title}" have been officially certified by ${currentUser?.name || 'the Board'}. ${resultSummary}. Full results are available in the Community Room under Votes & Resolutions.`, category: 'meeting', postedBy: currentUser?.name || 'Board', postedDate: new Date().toISOString().split('T')[0], pinned: true }); compStore.addCommunication({ type: 'notice', subject: `Vote Certified: ${selected.title}`, date: new Date().toISOString().split('T')[0], method: 'portal', recipients: 'All owners (50 units)', respondedBy: currentUser?.name || null, status: 'sent', notes: `Results certified and posted to Community Room. ${selected.ballotItems.length} ballot items.` }); } }} className="px-4 py-2 bg-sage-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-sage-300 border-opacity-40 hover:bg-opacity-50">✓ Certify</button>}
               {(selected.status === 'closed' || selected.status === 'certified') && !selected.linkedCaseId && <button onClick={handleCreateCase} className="px-4 py-2 bg-accent-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-accent-300 border-opacity-40 hover:bg-opacity-50">📋 Create Case</button>}
               {!selected.linkedCaseId && <button onClick={() => { setLinkCaseId(''); setModal('linkCaseToVote'); }} className="px-4 py-2 bg-violet-500 bg-opacity-30 text-white rounded-lg text-sm font-semibold border border-violet-300 border-opacity-40 hover:bg-opacity-50">🔗 Link Case</button>}
               {selected.status === 'draft' && <button onClick={() => { if (confirm('Delete?')) { store.deleteElection(selected.id); setSelectedId(null); } }} className="px-4 py-2 bg-red-500 bg-opacity-20 text-white rounded-lg text-sm font-semibold border border-red-300 border-opacity-30">Delete</button>}

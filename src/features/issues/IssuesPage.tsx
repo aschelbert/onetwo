@@ -45,6 +45,8 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   const [catFilter, setCatFilter] = useState('all');
   // Issue creation
   const [showCreate, setShowCreate] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
   const [iTitle, setITitle] = useState('');
   const [iDesc, setIDesc] = useState('');
   const [iCat, setICat] = useState('Maintenance');
@@ -225,7 +227,12 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
             </div>
           )}
           <div className="divide-y divide-ink-50">
-            {issues.map(i => (
+            {issues.map(i => {
+              const subDate = new Date(i.submittedDate + 'T12:00');
+              const dueDate = new Date(subDate); dueDate.setDate(dueDate.getDate() + 14);
+              const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              const isOpen = i.status === 'SUBMITTED' || i.status === 'IN_PROGRESS';
+              return (
               <div key={i.id} className="py-3 flex items-start gap-3">
                 <button onClick={() => store.upvoteIssue(i.id, user.id, user.name, user.linkedUnits?.[0] || '')} className="flex flex-col items-center shrink-0 mt-1">
                   <span className={`text-base ${i.upvotes.find((u: any) => u.userId === user.id) ? 'text-accent-500' : 'text-ink-300'}`}>▲</span>
@@ -236,25 +243,48 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                     <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.priority === 'HIGH' ? 'bg-red-100 text-red-700' : i.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i.priority}</span>
                     <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">{i.category}</span>
                     <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${i.status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' : i.status === 'IN_PROGRESS' ? 'bg-accent-100 text-accent-700' : 'bg-sage-100 text-sage-700'}`}>{i.status.replace('_', ' ')}</span>
+                    {isBoard && isOpen && (daysLeft < 0
+                      ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">⚠ OVERDUE by {Math.abs(daysLeft)}d</span>
+                      : daysLeft <= 3
+                        ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">⏰ {daysLeft}d left to respond</span>
+                        : <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">Due {dueDate.toISOString().split('T')[0]}</span>
+                    )}
                   </div>
                   <p className="text-sm font-semibold text-ink-900 mt-1">{i.title}</p>
                   {i.description && <p className="text-xs text-ink-400 mt-0.5">{i.description}</p>}
                   <p className="text-[11px] text-ink-300 mt-1">Reported by {i.reporterName} · {i.submittedDate} · {i.viewCount} views</p>
+                  {/* Comments */}
+                  {(i.comments || []).length > 0 && (
+                    <div className="mt-2 space-y-1">{i.comments.map((c: any) => (
+                      <div key={c.id} className="bg-mist-50 rounded-lg p-2 border border-mist-100">
+                        <span className="text-[10px] font-bold text-ink-600">{c.author}</span>
+                        <span className="text-[10px] text-ink-400 ml-2">{c.date}</span>
+                        <p className="text-xs text-ink-600 mt-0.5">{c.text}</p>
+                      </div>
+                    ))}</div>
+                  )}
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     {isBoard && (['SUBMITTED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map(st => (
                       <button key={st} onClick={() => store.updateIssueStatus(i.id, st)} className={`px-2 py-0.5 rounded text-[10px] font-semibold ${i.status === st ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-400 hover:bg-ink-100'}`}>
                         {st.replace('_', ' ')}
                       </button>
                     ))}
+                    {isBoard && <button onClick={() => setReplyTo(replyTo === i.id ? null : i.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200">💬 Reply</button>}
                     {isBoard && i.status !== 'CLOSED' && (
                       <button onClick={(e) => { e.stopPropagation(); handleConvertToCase(i); }} className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white hover:bg-accent-700 ml-1">
                         → Convert to Case
                       </button>
                     )}
                   </div>
+                  {isBoard && replyTo === i.id && (
+                    <div className="mt-2 flex gap-2">
+                      <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Reply to resident..." className="flex-1 px-3 py-1.5 border border-ink-200 rounded-lg text-xs" onKeyDown={e => { if (e.key === 'Enter' && replyText.trim()) { store.addIssueComment(i.id, 'Board', replyText.trim()); setReplyText(''); setReplyTo(null); } }} />
+                      <button onClick={() => { if (replyText.trim()) { store.addIssueComment(i.id, 'Board', replyText.trim()); setReplyText(''); setReplyTo(null); } }} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium">Send</button>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+            ); })}
             {issues.length === 0 && <p className="text-sm text-ink-400 text-center py-8">No issues reported.</p>}
           </div>
         </div>)}

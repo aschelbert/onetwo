@@ -193,7 +193,7 @@ export default function DashboardPage() {
           <MetricCard label="Operating Cash" value={fmt(bs.assets.operating)} sub={`${fmt(bs.assets.totalReceivable)} AR`} color="accent" onClick={() => navigate('/financial')} />
           <MetricCard label="Delinquent" value={`${metrics.delinquentUnits}`} sub={`${fmt(aging.totalOutstanding)} owed`} color={metrics.delinquentUnits === 0 ? 'sage' : 'red'} onClick={() => navigate('/building')} />
           <MetricCard label="Reserve Fund" value={`${reservePct}%`} sub={`${fmt(totalReserveFunded)} funded`} color={reservePct >= 70 ? 'sage' : reservePct >= 50 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
-          <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/issues')} />
+          <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/boardroom')} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -322,7 +322,7 @@ export default function DashboardPage() {
         <MetricCard label="Monthly Fee" value={myUnit ? fmt(myUnit.monthlyFee) : '—'} sub={myUnit ? `Due day ${fin.hoaDueDay || 1}` : ''} color="accent" onClick={() => navigate('/my-unit')} />
         <MetricCard label="Account Status" value={myTotalBalance === 0 ? 'Current' : 'Past Due'} sub={myTotalBalance > 0 ? fmt(myTotalBalance) + ' owed' : 'No balance'} color={myTotalBalance === 0 ? 'sage' : 'red'} onClick={() => navigate('/my-unit')} />
         <MetricCard label="Next Meeting" value={nextMeeting ? new Date(nextMeeting.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'} sub={nextMeeting ? `${nextMeeting.type} · ${nextMeeting.time}` : 'None scheduled'} color="accent" onClick={() => navigate('/building')} />
-        <MetricCard label="Open Issues" value={String(submittedIssues.length)} sub="Community reports" color={submittedIssues.length > 0 ? 'amber' : 'sage'} onClick={() => navigate('/issues')} />
+        <MetricCard label="Open Issues" value={String(submittedIssues.length)} sub="Community reports" color={submittedIssues.length > 0 ? 'amber' : 'sage'} onClick={() => navigate('/community')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -334,9 +334,9 @@ export default function DashboardPage() {
                 <div className="w-10 h-10 bg-white bg-opacity-15 rounded-lg flex items-center justify-center text-lg">💳</div>
                 <div><p className="text-sm font-bold">Make a Payment</p><p className="text-xs text-accent-200">{myTotalBalance > 0 ? `Pay ${fmt(myTotalBalance)}` : 'No balance due'}</p></div>
               </button>
-              <button onClick={() => navigate('/issues')} className="flex items-center gap-3 p-4 bg-accent-600 text-white rounded-xl hover:bg-accent-700 transition-all text-left">
+              <button onClick={() => navigate('/community')} className="flex items-center gap-3 p-4 bg-accent-600 text-white rounded-xl hover:bg-accent-700 transition-all text-left">
                 <div className="w-10 h-10 bg-white bg-opacity-15 rounded-lg flex items-center justify-center text-lg">🔧</div>
-                <div><p className="text-sm font-bold">Report an Issue</p><p className="text-xs text-accent-100">Submit a request</p></div>
+                <div><p className="text-sm font-bold">Submit a Request</p><p className="text-xs text-accent-100">Maintenance, info, complaints</p></div>
               </button>
               <button onClick={() => navigate('/building')} className="flex items-center gap-3 p-4 bg-white border border-ink-100 rounded-xl hover:border-accent-200 hover:shadow-sm transition-all text-left">
                 <div className="w-10 h-10 bg-mist-50 rounded-lg flex items-center justify-center text-lg">🏢</div>

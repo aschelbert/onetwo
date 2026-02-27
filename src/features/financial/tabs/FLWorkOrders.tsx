@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
@@ -12,6 +14,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function FLWorkOrders() {
   const { workOrders, unitInvoices, createWorkOrder, approveWorkOrder, receiveInvoice, payWorkOrder, payUnitInvoice, getAcctName, chartOfAccounts, generalLedger, budgetCategories, setActiveTab } = useFinancialStore();
+  const { vendors } = useBuildingStore();
+  const issuesStore = useIssuesStore();
+  const openCases = issuesStore.cases.filter(c => c.status === 'open');
   const [showCreate, setShowCreate] = useState(false);
   const [showInvoice, setShowInvoice] = useState<string | null>(null);
   const [tab, setTab] = useState<'workOrders' | 'unitInvoices'>('workOrders');
@@ -151,11 +156,23 @@ export default function FLWorkOrders() {
           <div className="space-y-3">
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={woForm.title} onChange={e => setWoForm({ ...woForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Elevator repair" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Vendor *</label><input value={woForm.vendor} onChange={e => setWoForm({ ...woForm, vendor: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Vendor *</label>
+                <select value={woForm.vendor} onChange={e => setWoForm({ ...woForm, vendor: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                  <option value="">Select vendor...</option>
+                  {vendors.filter(v => v.status === 'active').map(v => <option key={v.id} value={v.name}>{v.name} — {v.service}</option>)}
+                  <option value="__other__">Other (type below)</option>
+                </select>
+                {woForm.vendor === '__other__' && <input value="" onChange={e => setWoForm({ ...woForm, vendor: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm mt-1" placeholder="Enter vendor name" />}
+              </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Est. Amount</label><input type="number" value={woForm.amount} onChange={e => setWoForm({ ...woForm, amount: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
             </div>
             <div><label className="block text-xs font-medium text-ink-700 mb-1">GL Account</label><select value={woForm.acctNum} onChange={e => setWoForm({ ...woForm, acctNum: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{allAccts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></div>
-            <div><label className="block text-xs font-medium text-ink-700 mb-1">Case ID (optional)</label><input value={woForm.caseId} onChange={e => setWoForm({ ...woForm, caseId: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="c1" /></div>
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Link to Case (optional)</label>
+              <select value={woForm.caseId} onChange={e => setWoForm({ ...woForm, caseId: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                <option value="">No linked case</option>
+                {openCases.map(c => <option key={c.id} value={c.id}>{c.id}: {c.title}</option>)}
+              </select>
+            </div>
           </div>
         </Modal>
       )}
@@ -175,4 +192,3 @@ export default function FLWorkOrders() {
     </div>
   );
 }
-
