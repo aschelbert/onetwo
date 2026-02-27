@@ -466,7 +466,7 @@ export default function BoardRoomPage() {
                   const fi = u.filing;
                   const isPast = fi.status === 'pending' && new Date(fi.dueDate) < new Date();
                   const rc = ROLE_COLORS[fi.responsible] || 'ink';
-                  return (<div key={`fi-${fi.id}`} className={`p-4 flex items-start gap-4 ${fi.status === 'filed' ? 'bg-sage-50 bg-opacity-40' : isPast ? 'bg-red-50 bg-opacity-40' : ''}`}>
+                  return (<div key={`fi-${fi.id}`} className={`rounded-xl border p-4 flex items-start gap-4 ${fi.status === 'filed' ? 'border-sage-200 bg-sage-50 bg-opacity-40' : isPast ? 'border-red-200 bg-red-50 bg-opacity-40' : 'border-ink-100 bg-white'}`}>
                     {fi.status === 'filed' ? (
                       <div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>
                     ) : (
@@ -496,38 +496,60 @@ export default function BoardRoomPage() {
                 const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || [];
                 const isExpanded = expandedRunbook === item.id;
                 const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
-                return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
-                  <div className="p-4 flex items-start gap-4">
+                const wSteps = workflowSteps[item.id] || [];
+                const wDone = wSteps.filter(Boolean).length;
+                const wTotal = item.howTo?.length || 0;
+                const wStarted = wDone > 0;
+                const wComplete = wDone === wTotal && wTotal > 0;
+                return (<div key={item.id} className={`rounded-xl border transition-all ${isExpanded ? 'border-accent-300 shadow-sm' : isAuto ? 'border-sage-200 bg-sage-50 bg-opacity-40' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : 'border-ink-100 hover:border-accent-200 hover:shadow-sm'} ${isExpanded ? 'bg-white' : ''}`}>
+                  <div className={`p-4 flex items-start gap-4 cursor-pointer`} onClick={() => setExpandedRunbook(isExpanded ? null : item.id)}>
                     {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                    : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                    : (<button onClick={e => { e.stopPropagation(); comp.toggleItem(item.id); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <button onClick={() => setExpandedRunbook(isExpanded ? null : item.id)} className={`text-sm font-medium text-left hover:underline ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</button>
+                        <span className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
                         {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
                         {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                        {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                        {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
-                        {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${dc}-50 text-${dc}-700 font-medium border border-${dc}-200`}>{DUTY_LABELS[item.fiduciaryDuty]}</span>
+                        {!isAuto && !done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
                         <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-50 text-ink-500">{catIcon} {catLabel}</span>
                       </div>
-                      <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                      <div className="flex items-center gap-3 mt-1">
+                      <div className="flex items-center gap-3 mt-1.5">
                         <span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span>
                         <span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
-                        <button onClick={() => setExpandedRunbook(isExpanded ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExpanded ? '▲ Less' : '▼ Details'}</button>
                       </div>
-                      {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
+                      {/* Workflow progress bar — always visible */}
+                      {!isAuto && !done && wTotal > 0 && (
+                        <div className="mt-2.5 flex items-center gap-2.5">
+                          <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${wComplete ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${wTotal > 0 ? (wDone / wTotal) * 100 : 0}%` }} /></div>
+                          <span className={`text-[10px] font-semibold shrink-0 ${wComplete ? 'text-sage-600' : wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
+                          <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`} onClick={e => { e.stopPropagation(); setExpandedRunbook(isExpanded ? null : item.id); }}>
+                            {wComplete ? '✅ Review' : wStarted ? '▶ Continue' : '▶ Start workflow'}
+                          </span>
+                        </div>
+                      )}
+                      {(isAuto || done) && wTotal > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[10px] text-sage-500">{wTotal} workflow steps</span>
+                          <span className="text-[10px] text-ink-300">·</span>
+                          <span className="text-[10px] text-ink-400 hover:text-accent-600">View details ›</span>
+                        </div>
+                      )}
+                      {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={e => { e.stopPropagation(); comp.removeItemAttachment(item.id, att.name); }} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                     </div>
-                    <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
-                      const mType = item.meetingType || 'BOARD';
-                      const agenda = item.suggestedAgenda || [item.task];
-                      const d = getVoteDefaults(mType);
-                      setRunbookItemForMeeting(item.id);
-                      setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
-                      setModal('addMeeting');
-                    }} />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div onClick={e => e.stopPropagation()}>
+                        <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
+                          const mType = item.meetingType || 'BOARD';
+                          const agenda = item.suggestedAgenda || [item.task];
+                          const d = getVoteDefaults(mType);
+                          setRunbookItemForMeeting(item.id);
+                          setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
+                          setModal('addMeeting');
+                        }} />
+                      </div>
+                      <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''} text-ink-300`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
                   </div>
                   {/* Workflow panel */}
                   {isExpanded && (() => {
@@ -587,10 +609,10 @@ export default function BoardRoomPage() {
 
               return (<div className="space-y-6">
                 {/* Scheduled Deadlines */}
-                <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
-                  <div className="p-4 border-b border-ink-100 bg-mist-50 flex items-center gap-2"><span className="text-lg">📅</span><h3 className="font-bold text-ink-900 text-sm">Scheduled Deadlines</h3><span className="text-[10px] text-ink-400 ml-1">{datedItems.filter(u => !isDone(u)).length} remaining</span></div>
-                  <div className="divide-y divide-ink-50">{datedItems.map(renderUnifiedItem)}</div>
-                  {datedItems.length === 0 && <p className="p-6 text-center text-sm text-ink-400">All deadlines met</p>}
+                <div>
+                  <div className="flex items-center gap-2 mb-3"><span className="text-lg">📅</span><h3 className="font-bold text-ink-900 text-sm">Scheduled Deadlines</h3><span className="text-[10px] text-ink-400 ml-1">{datedItems.filter(u => !isDone(u)).length} remaining</span></div>
+                  <div className="space-y-2">{datedItems.map(renderUnifiedItem)}</div>
+                  {datedItems.length === 0 && <p className="p-6 text-center text-sm text-ink-400 bg-white rounded-xl border border-ink-100">All deadlines met</p>}
                 </div>
 
                 {/* Link to ongoing items in Duties tab */}
@@ -648,28 +670,39 @@ export default function BoardRoomPage() {
 
               {/* Category cards */}
               {catScores.filter(c => c.items.length > 0).map(cat => { const pc = cat.pct >= 80 ? 'sage' : cat.pct >= 50 ? 'yellow' : 'red'; const catAutoCount = cat.items.filter(i => i.autoPass).length; return (<div key={cat.id} id={`comp-${cat.id}`} className="bg-white rounded-xl border border-ink-100 overflow-hidden"><div className="p-5 border-b border-ink-100 flex items-center justify-between"><div className="flex items-center gap-3"><span className="text-2xl">{cat.icon}</span><div><h3 className="font-bold text-ink-900">{cat.label}</h3><p className="text-xs text-ink-400">{cat.passed}/{cat.total} complete · Weight: {cat.weight}%{catAutoCount > 0 && <span className="text-sage-600 ml-1">· {catAutoCount} auto-verified</span>}</p></div></div><div className="flex items-center gap-3"><div className="w-24 h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full bg-${pc}-500 rounded-full`} style={{ width: `${cat.pct}%` }} /></div><span className={`text-lg font-bold text-${pc}-600`}>{cat.pct}%</span></div></div>
-              <div className="divide-y divide-ink-50">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; const isExp = expandedRunbook === item.id; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink'; return (<div key={item.id} className={`${isAuto ? 'bg-sage-50 bg-opacity-40' : done ? 'bg-sage-50 bg-opacity-30' : ''}`}>
-                <div className="p-4 flex items-start gap-4">
+              <div className="space-y-2 p-4">{cat.items.map(item => { const done = comp.completions[item.id]; const isAuto = item.autoPass; const rc = ROLE_COLORS[item.role] || 'ink'; const itemAtts = comp.itemAttachments[item.id] || []; const isExp = expandedRunbook === item.id; const dc = DUTY_COLORS[item.fiduciaryDuty] || 'ink';
+                const wSteps = workflowSteps[item.id] || [];
+                const wDone = wSteps.filter(Boolean).length;
+                const wTotal = item.howTo?.length || 0;
+                const wStarted = wDone > 0;
+                const wComplete = wDone === wTotal && wTotal > 0;
+                return (<div key={item.id} className={`rounded-xl border transition-all ${isExp ? 'border-accent-300 shadow-sm bg-white' : isAuto ? 'border-sage-200 bg-sage-50 bg-opacity-40' : done ? 'border-sage-200 bg-sage-50 bg-opacity-30' : 'border-ink-100 bg-white hover:border-accent-200 hover:shadow-sm'}`}>
+                <div className="p-4 flex items-start gap-4 cursor-pointer" onClick={() => setExpandedRunbook(isExp ? null : item.id)}>
                 {isAuto ? (<div className="w-6 h-6 rounded-lg bg-sage-100 border-2 border-sage-300 flex items-center justify-center shrink-0 mt-0.5" title="Auto-verified"><svg className="w-3.5 h-3.5 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>)
-                : (<button onClick={() => comp.toggleItem(item.id)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
+                : (<button onClick={e => { e.stopPropagation(); comp.toggleItem(item.id); }} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 ${done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 hover:border-accent-400'}`}>{done ? '✓' : ''}</button>)}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className={`text-sm font-medium text-left hover:underline ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</button>
+                    <span className={`text-sm font-medium ${isAuto ? 'text-sage-700' : done ? 'text-ink-500 line-through' : 'text-ink-900'}`}>{item.task}</span>
                     {item.critical && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">CRITICAL</span>}
                     {isAuto && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sage-100 text-sage-700 font-semibold border border-sage-200">AUTO-VERIFIED</span>}
-                    {!isAuto && !done && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
-                    {!isAuto && !done && item.satisfyingAction && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${item.satisfyingAction === 'meeting' ? 'bg-accent-50 text-accent-700 border border-accent-200' : item.satisfyingAction === 'case' ? 'bg-violet-50 text-violet-700 border border-violet-200' : item.satisfyingAction === 'filing' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-mist-50 text-ink-600 border border-mist-200'}`}>{item.satisfyingAction === 'meeting' ? '📅 Schedule Meeting' : item.satisfyingAction === 'case' ? '📋 Create Case' : item.satisfyingAction === 'filing' ? '📁 File Required' : item.satisfyingAction === 'document' ? '📄 Upload Document' : '👁 Review'}</span>}
+                    {!isAuto && !done && !wStarted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">NEEDS ACTION</span>}
                     {item.perMeeting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-50 text-accent-700 font-medium border border-accent-200">🔄 Per Meeting</span>}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${dc}-50 text-${dc}-700 font-medium border border-${dc}-200`}>{DUTY_LABELS[item.fiduciaryDuty]}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded bg-${rc}-100 text-${rc}-700 font-semibold`}>{item.role}</span>
                   </div>
-                  <p className="text-xs text-ink-400 mt-1">{item.tip}</p>
-                  <div className="flex items-center gap-3 mt-1"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span>
-                    <button onClick={() => setExpandedRunbook(isExp ? null : item.id)} className="text-[10px] text-accent-600 font-medium hover:underline ml-auto">{isExp ? '▲ Less' : '▼ Details'}</button>
-                  </div>
-                  {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={() => comp.removeItemAttachment(item.id, att.name)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
+                  <div className="flex items-center gap-3 mt-1.5"><span className="text-[10px] font-mono text-accent-600">{item.legalRef}</span><span className="text-[10px] text-ink-300">{item.freq} · Due: {item.due}</span></div>
+                  {!isAuto && !done && wTotal > 0 && (
+                    <div className="mt-2.5 flex items-center gap-2.5">
+                      <div className="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${wComplete ? 'bg-sage-500' : wStarted ? 'bg-accent-500' : 'bg-ink-200'}`} style={{ width: `${wTotal > 0 ? (wDone / wTotal) * 100 : 0}%` }} /></div>
+                      <span className={`text-[10px] font-semibold shrink-0 ${wComplete ? 'text-sage-600' : wStarted ? 'text-accent-600' : 'text-ink-400'}`}>{wDone}/{wTotal} steps</span>
+                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-semibold shrink-0 ${wStarted ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-600'}`}>{wComplete ? '✅ Review' : wStarted ? '▶ Continue' : '▶ Start workflow'}</span>
+                    </div>
+                  )}
+                  {(isAuto || done) && wTotal > 0 && (<div className="mt-2 flex items-center gap-2"><span className="text-[10px] text-sage-500">{wTotal} workflow steps</span><span className="text-[10px] text-ink-300">·</span><span className="text-[10px] text-ink-400">View details ›</span></div>)}
+                  {itemAtts.length > 0 && (<div className="mt-2 flex flex-wrap gap-1.5">{itemAtts.map(att => (<span key={att.name} className="inline-flex items-center gap-1.5 bg-mist-50 border border-mist-200 rounded-lg px-2.5 py-1"><span className="text-[11px] text-accent-600 font-medium">📎 {att.name}</span><span className="text-[10px] text-ink-400">{att.size}</span><button onClick={e => { e.stopPropagation(); comp.removeItemAttachment(item.id, att.name); }} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button></span>))}</div>)}
                 </div>
-                <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
+                <div className="flex items-center gap-2 shrink-0">
+                  <div onClick={e => e.stopPropagation()}>
+                    <RunbookActionMenu itemId={item.id} itemTask={item.task} onAttach={() => { setTargetId(item.id); setPendingFile(null); setModal('addRunbookAtt'); }} onComm={() => { setTargetId(item.id); setForm({ type: 'notice', subject: `Re: ${item.task}`, date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners', status: 'sent', notes: '' }); setModal('addComm'); }} onCase={() => { setTargetId(item.id); setRunbookAction('case'); setModal('runbookLinkOrCreate'); }} onMeeting={() => {
                   const mType = item.meetingType || 'BOARD';
                   const agenda = item.suggestedAgenda || [item.task];
                   const d = getVoteDefaults(mType);
@@ -677,6 +710,9 @@ export default function BoardRoomPage() {
                   setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
                   setModal('addMeeting');
                 }} />
+                  </div>
+                  <svg className={`w-4 h-4 transition-transform ${isExp ? 'rotate-180' : ''} text-ink-300`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </div>
                 </div>
                 {isExp && (() => {
                     const steps = workflowSteps[item.id] || item.howTo.map(() => false);
