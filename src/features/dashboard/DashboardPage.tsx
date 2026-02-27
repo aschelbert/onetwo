@@ -224,7 +224,7 @@ export default function DashboardPage() {
             <div>
               <h2 className="text-sm font-bold text-ink-700 mb-3">Quick Actions</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <QAction icon="📋" label="Case Ops" sub={`${openCases.length} open`} onClick={() => navigate('/issues')} />
+                <QAction icon="⚙️" label="Daily Operations" sub={`${openCases.length} open`} onClick={() => navigate('/issues')} />
                 <QAction icon="💰" label="Fiscal Lens" sub={`${metrics.collectionRate}% rate`} onClick={() => navigate('/financial')} />
                 <QAction icon="✅" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/boardroom')} />
                 <QAction icon="🏢" label="Building" sub={`${buildingGrade} health`} onClick={() => navigate('/building')} />

@@ -282,7 +282,7 @@ export default function BoardRoomPage() {
   // ─── Tab definitions ───
   const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'duties', label: 'Duties & Roles' },
-    { id: 'runbook', label: 'Runbook', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => !isItemComplete(i.id, i.howTo.length) && !i.perMeeting && i.due !== 'Ongoing' && i.due !== 'Per meeting' && i.due !== 'Per transfer' && i.due !== 'Per request' && i.due !== 'Quarterly' && i.due !== 'As needed' && i.due !== 'Monthly').length) || undefined },
+    { id: 'runbook', label: 'Governance Calendar', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => i.scope === 'governance' && !isItemComplete(i.id, i.howTo.length)).length) || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
@@ -293,7 +293,7 @@ export default function BoardRoomPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2><p className="text-accent-200 text-sm mt-1">Runbook, meetings, votes & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p></div>
+          <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2><p className="text-accent-200 text-sm mt-1">Governance calendar, meetings, votes & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p></div>
           <div className="flex items-center gap-6">
             <div className="text-center"><div className="text-4xl font-bold text-white">{grade}</div><div className="text-accent-200 text-xs">Health {healthIndex}%</div></div>
           </div>
@@ -405,10 +405,10 @@ export default function BoardRoomPage() {
 
         {/* ═══ RUNBOOK TAB (with filings integrated) ═══ */}
         {tab === 'runbook' && (() => {
-          const allItems = catScores.flatMap(c => c.items);
+          const allItems = catScores.flatMap(c => c.items).filter(i => i.scope === 'governance');
           const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
           const inProgressCount = allItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length;
-          const needsActionCount = allItems.filter(i => { const s = workflowSteps[i.id]; return !s || !s.some(Boolean); }).length - completedCount;
+          const needsActionCount = allItems.length - completedCount - inProgressCount;
           const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
           const missingDocs: string[] = [];
           const hasCCRs = legalDocuments.some(d => d.name.toLowerCase().includes('cc&r') || d.name.toLowerCase().includes('declaration'));
@@ -417,8 +417,8 @@ export default function BoardRoomPage() {
           return (<div className="space-y-6">
             {/* Explainer */}
             <div className="bg-gradient-to-r from-mist-50 to-accent-50 border border-accent-200 rounded-xl p-5">
-              <h3 className="font-bold text-ink-900 text-sm">📋 Compliance Runbook</h3>
-              <p className="text-xs text-ink-500 mt-1">Actionable deadlines with step-by-step workflows. Click any item to expand its workflow checklist. Ongoing duties are in the Duties tab.</p>
+              <h3 className="font-bold text-ink-900 text-sm">📅 Governance Calendar</h3>
+              <p className="text-xs text-ink-500 mt-1">Annual and scheduled obligations with step-by-step workflows. Click any item to expand its workflow. Day-to-day operational items are in Daily Operations.</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="text-[10px] px-2 py-1 rounded-lg bg-accent-100 text-accent-700 font-semibold">📍 {isDC ? 'District of Columbia' : jurisdiction}</span>
                 <span className="text-[10px] px-2 py-1 rounded-lg bg-ink-100 text-ink-600 font-semibold">{stateAct}</span>
@@ -637,10 +637,10 @@ export default function BoardRoomPage() {
 
                 {/* Link to ongoing items in Duties tab */}
                 {ongoingItems.length > 0 && (
-                  <button onClick={() => setTab('duties')} className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between hover:bg-amber-100 transition-colors">
-                    <div className="flex items-center gap-2"><span className="text-lg">🔄</span><span className="text-sm font-medium text-amber-800">{ongoingItems.length} ongoing obligations</span><span className="text-xs text-amber-600">— per-meeting, monthly, quarterly duties</span></div>
-                    <span className="text-xs text-amber-600 font-medium">View in Duties tab →</span>
-                  </button>
+                  <a href="/issues" className="block w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between hover:bg-amber-100 transition-colors no-underline">
+                    <div className="flex items-center gap-2"><span className="text-lg">🔄</span><span className="text-sm font-medium text-amber-800">{ongoingItems.length} operational items</span><span className="text-xs text-amber-600">— per-request, monthly, and ongoing duties</span></div>
+                    <span className="text-xs text-amber-600 font-medium">View in Daily Operations →</span>
+                  </a>
                 )}
               </div>);
             })()}
