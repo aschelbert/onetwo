@@ -8,6 +8,7 @@ import { useElectionStore } from '@/store/useElectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import VotingPage from '@/features/elections/ElectionsPage';
+import IssuesPage from '@/features/issues/IssuesPage';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 
@@ -18,7 +19,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'operations' | 'meetings' | 'votes' | 'communications';
+type TabId = 'duties' | 'runbook' | 'operations' | 'meetings' | 'votes' | 'communications' | 'dailyops';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -289,6 +290,7 @@ export default function BoardRoomPage() {
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
+    { id: 'dailyops', label: 'Daily Operations', badge: issues.cases.filter(c => c.status === 'open').length || undefined },
   ];
 
   return (
@@ -865,6 +867,9 @@ export default function BoardRoomPage() {
           <div className="flex items-center justify-between"><div><h3 className="font-display text-lg font-bold text-ink-900">✉ Owner Communications Log</h3><p className="text-xs text-ink-400">Notices, minutes distribution, disclosure statements</p></div><button onClick={() => { setForm({ type: 'notice', subject: '', date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners (50 units)', status: 'sent', notes: '' }); setModal('addComm'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Log Communication</button></div>
           <div className="bg-white rounded-xl border border-ink-100 overflow-hidden divide-y divide-ink-50">{comp.communications.sort((a, b) => b.date.localeCompare(a.date)).map(c => (<div key={c.id} className="p-4 hover:bg-mist-50 transition-colors"><div className="flex items-start justify-between gap-3"><div className="flex-1"><div className="flex items-center gap-2 flex-wrap mb-1"><span className={`pill px-1.5 py-0.5 rounded text-xs ${COMM_TYPES[c.type] || COMM_TYPES.other}`}>{c.type}</span><p className="text-sm font-medium text-ink-900">{c.subject}</p><span className={`pill px-1.5 py-0.5 rounded text-xs ${c.status === 'sent' ? 'bg-sage-100 text-sage-700' : c.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-ink-100 text-ink-500'}`}>{c.status}</span></div><p className="text-xs text-ink-500">{c.date} · {c.method} · To: {c.recipients}</p>{c.notes && <p className="text-xs text-ink-400 mt-1">{c.notes}</p>}</div><button onClick={() => { if (confirm('Remove?')) comp.deleteCommunication(c.id); }} className="text-xs text-red-400 shrink-0">Remove</button></div></div>))}</div>
         </div>)}
+
+        {/* ═══ DAILY OPERATIONS TAB ═══ */}
+        {tab === 'dailyops' && <IssuesPage />}
       </div>
 
       {/* ═══ MODALS ═══ */}
