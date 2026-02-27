@@ -6,6 +6,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useElectionStore } from '@/store/useElectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
@@ -54,7 +55,7 @@ export default function BoardRoomPage() {
   const { board, address, legalDocuments, insurance, management } = useBuildingStore();
   const issues = useIssuesStore();
   const elections = useElectionStore();
-  const { currentRole, currentUser } = useAuthStore();
+  const { currentRole, currentUser, buildingMembers } = useAuthStore();
   const navigate = useNavigate();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
@@ -81,6 +82,7 @@ export default function BoardRoomPage() {
   const [runbookAction, setRunbookAction] = useState<'case' | 'meeting'>('case');
   const [runbookSort, setRunbookSort] = useState<'date' | 'category'>('date');
   const [runbookItemForMeeting, setRunbookItemForMeeting] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Completion = all workflow steps checked
   const isItemComplete = (itemId: string, howToLength: number): boolean => {
@@ -819,7 +821,7 @@ export default function BoardRoomPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div><h3 className="font-display text-lg font-bold text-ink-900">📢 Community Announcements</h3><p className="text-xs text-ink-400">Post updates visible to all residents in the Community Room</p></div>
-              <button onClick={() => { setForm({ annTitle: '', annBody: '', annCategory: 'general', annPinned: 'false' }); setModal('addAnnouncement'); }} className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">+ Post Announcement</button>
+              <button onClick={() => { setForm({ annTitle: '', annBody: '', annCategory: 'general', annPinned: 'false', annSendEmail: 'false' }); setModal('addAnnouncement'); }} className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">+ Post Announcement</button>
             </div>
             {(comp.announcements || []).length === 0 && <p className="text-sm text-ink-400 text-center py-4">No announcements yet.</p>}
             <div className="space-y-2">
@@ -977,7 +979,7 @@ export default function BoardRoomPage() {
       })()}
 
       {/* Announcement modal */}
-      {modal === 'addAnnouncement' && (<Modal title="Post Announcement" onClose={() => setModal(null)} onSave={() => {
+      {modal === 'addAnnouncement' && (<Modal title="Post Announcement" onClose={() => { if (!sendingEmail) setModal(null); }} onSave={async () => {
         if (!f('annTitle') || !f('annBody')) { alert('Title and body required'); return; }
         const boardMember = board.find(b => b.name === currentUser.name);
         const roleName = boardMember?.role || currentRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -989,8 +991,57 @@ export default function BoardRoomPage() {
           postedDate: new Date().toISOString().split('T')[0],
           pinned: f('annPinned') === 'true',
         });
+        // Send via email if checked
+        if (f('annSendEmail') === 'true') {
+          setSendingEmail(true);
+          try {
+            const sbUrl = import.meta.env.VITE_SUPABASE_URL as string;
+            const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+            const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+            const recipients = buildingMembers.filter(m => m.email && m.status === 'active').map(m => ({ email: m.email, name: m.name }));
+            if (!sbUrl || !sbKey) {
+              alert('Announcement posted! Email not sent — Supabase not configured.');
+            } else {
+              const res = await fetch(`${sbUrl}/functions/v1/send-announcement`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': session ? `Bearer ${session.access_token}` : `Bearer ${sbKey}`,
+                  'apikey': sbKey,
+                },
+                body: JSON.stringify({
+                  title: f('annTitle'),
+                  announcementBody: f('annBody'),
+                  category: f('annCategory') || 'general',
+                  postedBy: roleName,
+                  recipients,
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.sent > 0) {
+                  alert(`Announcement posted and emailed to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}.`);
+                } else {
+                  alert('Announcement posted! Email sending is not configured yet — deploy the send-announcement Edge Function.');
+                }
+              } else {
+                const errText = await res.text();
+                if (res.status === 404) {
+                  alert('Announcement posted! To enable email, deploy the Edge Function:\nsupabase functions deploy send-announcement --no-verify-jwt');
+                } else {
+                  alert(`Announcement posted but email failed: ${errText.slice(0, 100)}`);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Announcement email error:', e);
+            alert('Announcement posted! Email sending encountered an error.');
+          } finally {
+            setSendingEmail(false);
+          }
+        }
         setModal(null);
-      }} saveLabel="Post to Community">
+      }} saveLabel={sendingEmail ? 'Sending...' : f('annSendEmail') === 'true' ? 'Post & Send Email' : 'Post to Community'}>
         <div className="space-y-3">
           <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={f('annTitle')} onChange={e => sf('annTitle', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Elevator Modernization Project Update" /></div>
           <div><label className="block text-xs font-medium text-ink-700 mb-1">Category</label><select value={f('annCategory')} onChange={e => sf('annCategory', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
@@ -998,6 +1049,12 @@ export default function BoardRoomPage() {
           </select></div>
           <div><label className="block text-xs font-medium text-ink-700 mb-1">Message *</label><textarea value={f('annBody')} onChange={e => sf('annBody', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={5} placeholder="Write the announcement body. This will be visible to all residents in the Community Room." /></div>
           <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={f('annPinned') === 'true'} onChange={e => sf('annPinned', e.target.checked ? 'true' : 'false')} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">📌 Pin this announcement</span><span className="text-[10px] text-ink-400">(pinned posts appear first)</span></label>
+          <div className="border-t border-ink-100 pt-3 mt-1">
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={f('annSendEmail') === 'true'} onChange={e => sf('annSendEmail', e.target.checked ? 'true' : 'false')} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">✉️ Also send via email</span><span className="text-[10px] text-ink-400">(to all building members)</span></label>
+            {f('annSendEmail') === 'true' && (
+              <p className="text-[11px] text-ink-400 mt-1.5 ml-6">This announcement will be emailed to {buildingMembers.filter(m => m.email && m.status === 'active').length} active members via Mailjet.</p>
+            )}
+          </div>
         </div>
       </Modal>)}
     </div>
