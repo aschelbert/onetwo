@@ -37,7 +37,7 @@ export default function CommunityRoomPage() {
   const upcoming = meetings.filter(m => m.status === 'SCHEDULED' || m.status === 'RESCHEDULED').sort((a, b) => a.date.localeCompare(b.date));
   const past = meetings.filter(m => m.status === 'COMPLETED').sort((a, b) => b.date.localeCompare(a.date));
   const openElections = elections.elections.filter(e => e.status === 'open').length;
-  const announcements = [...comp.announcements].sort((a, b) => {
+  const announcements = [...(comp.announcements || [])].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
     return b.postedDate.localeCompare(a.postedDate);
   });
