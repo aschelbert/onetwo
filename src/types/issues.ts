@@ -47,6 +47,7 @@ export interface CaseStep {
   done: boolean;
   doneDate: string | null;
   userNotes: string;
+  stepAttachments?: CaseAttachment[];
 }
 
 export interface AdditionalApproach {

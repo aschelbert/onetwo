@@ -14,8 +14,8 @@ interface ModalProps {
 }
 
 // ─── Board Vote Modal ──────────────────────────────────────
-export function BoardVoteModal({ c, boardMembers, store, onClose }: ModalProps & { c: CaseTrackerCase; boardMembers: BoardMember[]; store: any }) {
-  const [motion, setMotion] = useState(c.boardVotes?.motion || '');
+export function BoardVoteModal({ c, boardMembers, store, defaultMotion, onClose }: ModalProps & { c: CaseTrackerCase; boardMembers: BoardMember[]; store: any; defaultMotion?: string }) {
+  const [motion, setMotion] = useState(c.boardVotes?.motion || defaultMotion || '');
   const [date, setDate] = useState(c.boardVotes?.date || new Date().toISOString().split('T')[0]);
   const [votes, setVotes] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
@@ -361,18 +361,23 @@ export function CommModal({ caseId, store, onClose, catId, sitId, issueId }: Mod
 }
 
 // ─── Document Upload Modal ─────────────────────────────────
-export function DocModal({ caseId, store, onClose }: ModalProps & { caseId: string; store: any }) {
+export function DocModal({ caseId, store, stepIdx, onClose }: ModalProps & { caseId: string; store: any; stepIdx?: number | null }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('document');
   const [size, setSize] = useState('');
 
   const handleSave = () => {
     if (!name.trim()) return alert('Document name is required.');
-    store.addDocument(caseId, {
+    const doc = {
       name, type,
       date: new Date().toISOString().split('T')[0],
       size: size || 'N/A'
-    });
+    };
+    if (stepIdx != null) {
+      store.addStepDocument(caseId, stepIdx, doc);
+    } else {
+      store.addDocument(caseId, doc);
+    }
     onClose();
   };
 

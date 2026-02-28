@@ -689,6 +689,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
   const [inlineStepIdx, setInlineStepIdx] = useState<number | null>(null);
+  const [docTargetStep, setDocTargetStep] = useState<number | null>(null);
+  const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
 
   const ACTION_NAV: Record<string, { route: string; tab?: string }> = {
     'financial':            { route: '/financial' },
@@ -712,10 +714,15 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         setWOForm({ title: c.title, vendor: '', amount: '', acctNum: '6050' });
         setShowWOModal(true);
       } else if (action.target === 'board-vote') {
+        setVoteTargetStep(null);
+        setShowVoteModal(true);
+      } else if (action.target === 'owner-vote') {
+        setVoteTargetStep(stepIdx);
         setShowVoteModal(true);
       } else if (action.target === 'send-comm') {
         setShowCommModal(true);
       } else if (action.target === 'upload-doc') {
+        setDocTargetStep(stepIdx);
         setShowDocModal(true);
       } else if (action.target === 'link-meeting') {
         setShowMeetingModal(true);
@@ -983,9 +990,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       )}
 
       {/* Modals */}
-      {showVoteModal && <BoardVoteModal c={c} boardMembers={boardMembers} store={store} onClose={() => setShowVoteModal(false)} />}
+      {showVoteModal && <BoardVoteModal c={c} boardMembers={boardMembers} store={store} defaultMotion={voteTargetStep != null && c.steps?.[voteTargetStep] ? c.steps[voteTargetStep].s : undefined} onClose={() => { setShowVoteModal(false); setVoteTargetStep(null); }} />}
       {showCommModal && <CommModal caseId={caseId} store={store} catId={c.catId} sitId={c.sitId} onClose={() => setShowCommModal(false)} />}
-      {showDocModal && <DocModal caseId={caseId} store={store} onClose={() => setShowDocModal(false)} />}
+      {showDocModal && <DocModal caseId={caseId} store={store} stepIdx={docTargetStep} onClose={() => { setShowDocModal(false); setDocTargetStep(null); }} />}
       {showApproachModal && <ApproachModal c={c} store={store} onClose={() => setShowApproachModal(false)} />}
       {showLinkLetterModal && <LinkLetterModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkLetterModal(false)} />}
       {showInvoiceModal && <InvoiceCreateModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowInvoiceModal(false)} />}

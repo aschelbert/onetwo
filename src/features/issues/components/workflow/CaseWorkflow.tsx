@@ -72,6 +72,7 @@ export function CaseWorkflow({
             <WorkflowStepCard
               key={step.id}
               ref={(el) => { stepRefs.current[i] = el; }}
+              caseId={c.id}
               step={step}
               index={i}
               isActive={i === activeStepIdx}

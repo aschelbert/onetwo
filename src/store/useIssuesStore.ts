@@ -40,7 +40,7 @@ export const CATS: Category[] = [
           {s:'Build a 3-year financial outlook: what known costs are coming and how will you fund them?',t:'60-90 days out',detail:'Beyond next year\'s budget, think 3 years ahead. Are there: major contracts expiring (management, insurance, elevator)? Capital projects in the reserve study within 3 years? Insurance premium increases expected? A 3-year outlook prevents surprise assessments and gives the board time to plan. Share this outlook with owners — it builds confidence.'},
           {s:'Obtain bids, contract renewals, and cost estimates for all operating expenses',t:'60-90 days out',d:'Vendor contracts',detail:'Review each vendor contract for renewal terms and rate changes. Obtain competitive bids for expiring contracts. Factor in inflation (typically 3-5% for utilities, insurance often higher). Don\'t just roll forward last year\'s numbers — cost assumptions should be justified.'},
           {s:'Draft proposed budget: operating expenses + reserve contribution + contingency = total; calculate per-unit assessment',t:'60 days out',detail:'Budget structure: (1) Operating expenses by category (use Fiscal Lens Budget tab). (2) Reserve contribution (per reserve study recommendation). (3) Contingency (3-5% of operating budget — covers unexpected costs without raiding reserves). (4) Total divided by total percentage interests = per-unit assessment. Show the per-unit impact clearly.',action:{type:'navigate',target:'financial:budget',label:'Open Budget'}},
-          {s:'Determine if assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. If you need a large increase, consider phasing it over 2 years (e.g., 10% this year, 8% next year) to stay within the cap.'},
+          {s:'Check whether assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. If you need a large increase, consider phasing it over 2 years (e.g., 10% this year, 8% next year) to stay within the cap.'},
           {s:'Present proposed budget at open board meeting in plain language; explain the "why" behind every increase',t:'30 days before adoption',d:'DC Code § 29-1135.02',detail:'DC requires 30-day notice before budget adoption. Owners don\'t need to understand every line item — they need to know: (1) What is my assessment? (2) Why is it changing? (3) What am I getting for it? (4) What happens to reserves? Present in these terms, not accounting jargon. Allow written questions from owners who cannot attend.'},
           {s:'Distribute formal budget package and assessment notice to all owners',t:'30 days before effective',d:'DC Code § 29-1135.02 & Bylaws',detail:'Package should include: proposed budget with prior year comparison, reserve funding status, assessment amount and effective date, explanation of changes, and a summary of upcoming capital needs from the reserve study. Send via method required by bylaws.'},
           {s:'Board votes to adopt budget',t:'Before fiscal year start',d:'Bylaws: Voting & DC Code § 29-1135.02',detail:'Record vote in minutes with full budget attached. If the assessment increase exceeds the bylaws cap (see Step 6), present at annual meeting for owner ratification. If owners reject the budget, operate under prior year budget until a revised budget is adopted.',w:'Owner ratification required when assessment increase exceeds bylaws cap — see Bylaws & DC Code § 29-1135.02'}
@@ -51,9 +51,9 @@ export const CATS: Category[] = [
           {s:'File any required annual financial reports or disclosures',detail:'DC requires annual financial disclosure to owners per § 29-1135.05.'}
         ],
         legal:[
-          {s:'Consult attorney if assessment increase exceeds bylaws threshold requiring owner vote',w:'Increase > 10-15% or per bylaws cap'},
-          {s:'Legal review of budget adoption process if challenged by owners',w:'Owner files formal challenge or threatens suit'},
-          {s:'Attorney advises on fiduciary duty if board knowingly underfunds reserves',w:'Reserve funding below 50% of recommended level'}
+          {s:'Consult attorney on assessment increase exceeding bylaws threshold requiring owner vote',w:'Increase > 10-15% or per bylaws cap'},
+          {s:'Legal review of budget adoption process when challenged by owners',w:'Owner files formal challenge or threatens suit'},
+          {s:'Attorney advises on fiduciary duty when board knowingly underfunds reserves',w:'Reserve funding below 50% of recommended level'}
         ],
         notes:{
           'DC':'DC Code § 29-1135.02: 30-day notice before budget adoption. § 29-1135.05: Annual financial disclosure required. PLANNING AHEAD: The budget is the board\'s most powerful planning tool. A well-funded budget with adequate reserve contributions prevents special assessments. Boards that keep reserves above 70% funded and include a 3-5% contingency rarely face financial crises. If reserves are underfunded, increase contributions gradually over 2-3 years rather than one large jump.',
@@ -83,10 +83,10 @@ export const CATS: Category[] = [
         ],
         legal:[
           {s:'Attorney reviews special assessment process and vote requirements before adoption',w:'Assessment exceeds bylaws threshold or > $5K/unit'},
-          {s:'Attorney advises on per-unit allocation methodology if challenged',w:'Owner disputes allocation basis'},
-          {s:'Attorney reviews HOA financing terms if considering a loan instead of assessment',w:'Board evaluating HOA loan option'},
+          {s:'Attorney advises on per-unit allocation methodology when challenged',w:'Owner disputes allocation basis'},
+          {s:'Attorney reviews HOA financing terms for loan-based assessment alternative',w:'Board evaluating HOA loan option'},
           {s:'Attorney files liens and pursues collection for non-payment',w:'Owner is 60+ days delinquent'},
-          {s:'Attorney initiates foreclosure on assessment lien if necessary',w:'Severe delinquency, 6-12 months'}
+          {s:'Attorney initiates foreclosure on assessment lien when warranted',w:'Severe delinquency, 6-12 months'}
         ],
         notes:{
           'DC':'DC Code § 29-1135.03: Special assessments typically require 2/3 owner vote. DC Code § 42-1903.13: Assessment liens attach automatically. § 29-1135.08: 6-month super-lien priority over first mortgage. REDUCING OWNER IMPACT: (1) Phase the project to spread cost over 2+ years. (2) Use partial reserves + smaller assessment. (3) HOA loan spreads cost across 3-10 years of modest assessment increases instead of one large hit. (4) Offer installment plans with hardship provisions. (5) Early-pay discount improves cash flow. The goal is to get the work done while being fair to owners of all income levels.',
@@ -100,7 +100,7 @@ export const CATS: Category[] = [
           {s:'Apply late fee per governing docs; send second notice',t:'30 days past due',d:'CC&Rs: Collection policy'},
           {s:'Send formal demand letter via certified mail',t:'60 days past due',d:'Collection policy'},
           {s:'Offer payment plan agreement in writing',t:'60-90 days',d:'Board resolution'},
-          {s:'Suspend amenity access/voting rights if permitted',t:'Per governing docs',d:'CC&Rs: Suspension provisions'},
+          {s:'Suspend amenity access/voting rights per governing docs',t:'Per governing docs',d:'CC&Rs: Suspension provisions',w:'Only when permitted by CC&Rs'},
           {s:'Send pre-lien notice (required in many states)',t:'90 days',d:'State condo act: Pre-lien notice'}
         ],
         self:[
@@ -123,7 +123,7 @@ export const CATS: Category[] = [
           {s:'Review draft audit/review report',t:'2-4 weeks after records provided'},
           {s:'Board reviews findings and management letter',t:'Board meeting'},
           {s:'Present results to owners at annual meeting',t:'Annual meeting',d:'Bylaws: Financial reporting'},
-          {s:'File report if required by state',t:'Per state requirements'}
+          {s:'File report per state requirements',t:'Per state requirements',w:'Required when state mandates annual financial report filing'}
         ],
         self:[{s:'Develop remediation plan and timeline for any findings requiring action',w:'Required when audit/review identifies deficiencies'}],
         legal:[{s:'Attorney reviews audit findings with legal implications',w:'Material findings or irregularities discovered'}],
@@ -149,7 +149,7 @@ export const CATS: Category[] = [
         legal:[
           {s:'Attorney reviews reserve borrowing or commingling questions',w:'Board wants to use reserves for non-designated purpose'},
           {s:'Attorney advises on fiduciary duty regarding underfunded reserves',w:'Reserve study shows significant shortfall (< 30% funded)'},
-          {s:'Attorney advises if reserve expenditure exceeds board authority and requires owner vote',w:'Large unplanned reserve expenditure not in study'}
+          {s:'Attorney advises on reserve expenditure exceeding board authority and owner vote requirements',w:'Large unplanned reserve expenditure not in study'}
         ],
         notes:{
           'DC':'DC Code § 42-1903.13: Reserves must be maintained per governing documents. PLANNING AHEAD: The single best thing a board can do is maintain reserves above 70% funded. This virtually eliminates special assessments for planned capital work. Boards that chronically underfund reserves are transferring costs to future owners via special assessments — this is a fiduciary risk. Disclose reserve status in resale packages per § 42-1904.04(a). Update study every 3-5 years.',
@@ -164,7 +164,7 @@ export const CATS: Category[] = [
         tags:['Roof leaks','Structural cracks','Plumbing risers','Elevator failures'],
         pre:[
           {s:'Document issue with photos, video, dates, affected areas',t:'Immediately',detail:'Include: location, severity, units affected, date discovered, who reported it. This documentation supports insurance claims and contractor scope.'},
-          {s:'Determine if common element or unit owner responsibility per CC&Rs',t:'1-3 days',d:'CC&Rs: Maintenance matrix',detail:'CC&Rs define the boundary between HOA and unit owner responsibility. Typically: structure, roof, exterior walls, common pipes = HOA. Interior finishes, fixtures, appliances = owner. If it is an owner responsibility, notify them in writing with the CC&R section cited.'},
+          {s:'Determine whether common element or unit owner responsibility per CC&Rs',t:'1-3 days',d:'CC&Rs: Maintenance matrix',detail:'CC&Rs define the boundary between HOA and unit owner responsibility. Typically: structure, roof, exterior walls, common pipes = HOA. Interior finishes, fixtures, appliances = owner. If it is an owner responsibility, notify them in writing with the CC&R section cited.'},
           {s:'Obtain 2-3 qualified contractor bids; verify licenses and insurance',t:'1-2 weeks',detail:'For emergency repairs (active leak, safety hazard), board may authorize immediate work under emergency spending provisions and ratify at next meeting. For non-emergency: always get competitive bids.'},
           {s:'FUNDING DECISION: Determine where the money comes from before approving the repair',t:'Before approval',d:'Fiscal Lens: Spending Decisions',detail:'Use the Spending Decisions tab to analyze: (1) Is this a BUDGETED operating expense? If yes, check if the budget category has room — use operating funds. (2) Is this a RESERVE item (e.g., roof, elevator, plumbing risers)? If yes, use reserves — that\'s what they\'re for. (3) Is this covered by INSURANCE (e.g., storm damage, water intrusion from covered peril)? File a claim. (4) Is this UNEXPECTED and large? Create a spending request to see the per-unit impact and options. Never spend money without knowing where it comes from.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'}},
           {s:'Check bylaws for board spending authority — does this need an owner vote?',t:'Before approval',d:'Bylaws: Spending authority',detail:'Most bylaws authorize the board to spend up to a threshold (e.g., $5K-$25K) without owner vote. If the repair exceeds this threshold and is not an emergency, you need owner approval. If it IS an emergency (health/safety), proceed and ratify at the next meeting.'},
@@ -175,12 +175,12 @@ export const CATS: Category[] = [
         self:[
           {s:'Send formal demand for reimbursement to responsible unit owner with documentation',detail:'Include CC&R section, invoices, photos. Certified mail, return receipt.',w:'Required when unit owner is determined to be responsible for damage'},
           {s:'Send demand letter to contractor citing contract terms and deficiency documentation',w:'Required when contractor dispute arises over repair quality or scope'},
-          {s:'File insurance claim if applicable; coordinate with unit owner HO-6 insurance'}
+          {s:'File insurance claim and coordinate with unit owner HO-6 insurance',w:'Applicable when damage is covered under HOA master policy or unit owner policy'}
         ],
         legal:[
           {s:'Attorney reviews responsibility dispute between HOA and unit owner',w:'Dispute over who pays for repair'},
           {s:'Attorney pursues claim against contractor for defective work',w:'Contractor refuses to remedy'},
-          {s:'Attorney advises if repair cost exceeds board spending authority',w:'Cost exceeds bylaws threshold and owner vote may be needed'}
+          {s:'Attorney advises on repair cost exceeding board spending authority',w:'Cost exceeds bylaws threshold and owner vote may be needed'}
         ],
         notes:{
           'DC':'DC Code § 42-1903.04: Maintenance responsibility follows the Declaration\'s allocation. Board has fiduciary duty to maintain common elements promptly. FUNDING: Routine maintenance = operating budget. Capital replacements (roof, elevator, plumbing) = reserves. Damage from covered perils = insurance. Check bylaws for spending authority limits — repairs above threshold require owner vote unless emergency.',
@@ -199,17 +199,17 @@ export const CATS: Category[] = [
           {s:'Board ratifies emergency expenditure at next meeting; document justification and funding source',t:'Next board meeting',d:'Bylaws: Emergency provisions',detail:'Present: description of emergency, actions taken, contractors engaged, total cost, insurance claim status, funding source. Board votes to ratify. Record in minutes. Even though the board president had authority to act, ratification creates a formal record.'},
           {s:'FUNDING THE GAP: After adjuster estimate, determine the shortfall and how to cover it',t:'After adjuster estimate',d:'Fiscal Lens: Spending Decisions',detail:'Calculate: Total repair cost minus insurance proceeds minus HOA deductible = gap. Use the Spending Decisions tab to analyze options: (1) INSURANCE covers most or all — best case, wait for proceeds. (2) OPERATING BUDGET can absorb the deductible + small gap. (3) RESERVES can cover the gap if the item is a designated reserve component. (4) SPECIAL ASSESSMENT needed if gap is large — check bylaws for emergency assessment procedures (often expedited notice/vote). (5) HOA LINE OF CREDIT to bridge until insurance pays.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'}},
           {s:'Appeal and pursue the insurance claim aggressively when denied or underpaid',t:'Within appeal window',detail:'Insurance carriers frequently underpay first estimates. Steps: (1) Get a detailed independent estimate from your own contractor. (2) File a written appeal with supporting documentation. (3) Request the specific policy provision cited for any denial. (4) Consider a public adjuster (works on contingency, typically 10% of recovery). (5) Escalate to state insurance commissioner if necessary.',w:'Required when carrier denies or underpays — carriers frequently underpay first estimates'},
-          {s:'Determine who caused the damage and pursue cost recovery if applicable',t:'After emergency stabilized',detail:'If caused by unit owner negligence (e.g., left water running, failed to maintain appliance): the CC&Rs typically allow the HOA to charge the repair cost back to the owner. If caused by a contractor or third party: pursue their insurance. Cost recovery reduces the financial impact on the HOA and all other owners.'}
+          {s:'Determine who caused the damage and pursue cost recovery',t:'After emergency stabilized',detail:'If caused by unit owner negligence (e.g., left water running, failed to maintain appliance): the CC&Rs typically allow the HOA to charge the repair cost back to the owner. If caused by a contractor or third party: pursue their insurance. Cost recovery reduces the financial impact on the HOA and all other owners.',w:'Applicable when damage was caused by identifiable negligence'}
         ],
         self:[
           {s:'Coordinate insurance between master policy and unit HO-6 policies; determine deductible allocation per CC&Rs',detail:'CC&Rs typically define deductible allocation. Common approaches: (1) HOA bears the master policy deductible. (2) Deductible charged to the unit that caused the loss. (3) Deductible split among affected units. Know your CC&Rs approach BEFORE the emergency.'},
           {s:'Send formal notice of responsibility and demand for reimbursement to negligent unit owner',detail:'Include: CC&R section, documentation of cause, repair invoices. Certified mail.',w:'Required per CC&Rs when owner negligence caused the damage'},
-          {s:'After emergency is resolved: review insurance coverage and deductible levels; adjust if needed at next renewal',detail:'If the deductible was a financial strain, consider lowering it at renewal. If coverage was insufficient, increase limits. Review annually.'}
+          {s:'After emergency is resolved: review insurance coverage and deductible levels; adjust at next renewal',detail:'If the deductible was a financial strain, consider lowering it at renewal. If coverage was insufficient, increase limits. Review annually.'}
         ],
         legal:[
           {s:'Attorney advises on insurance coverage disputes and deductible allocation',w:'Carrier denies or underpays claim'},
           {s:'Attorney pursues subrogation or third-party claims for cost recovery',w:'Damage caused by negligent third party or unit owner'},
-          {s:'Attorney advises on emergency special assessment authority if insurance shortfall',w:'Insurance does not cover full cost and reserves insufficient'},
+          {s:'Attorney advises on emergency special assessment authority for insurance shortfall',w:'Insurance does not cover full cost and reserves insufficient'},
           {s:'Attorney engages public adjuster or files bad faith claim against carrier',w:'Carrier significantly underpays or denies valid claim'}
         ],
         notes:{
@@ -225,7 +225,7 @@ export const CATS: Category[] = [
           {s:'Verify contractor licenses, insurance (GL + workers comp), and check references',t:'1-2 weeks',d:'Fiduciary duty of care',detail:'Require: current state/local business license, general liability insurance ($1M+ naming HOA as additional insured), workers compensation if they have employees, completed W-9. Call 2-3 references on similar projects.'},
           {s:'Review contract terms: scope, fixed price, timeline, payment schedule, warranty, indemnification, termination',t:'1 week',detail:'Key terms: payment tied to milestones (not time), 10% retention on large projects, warranty (1-2 years minimum), insurance requirements, hold-harmless/indemnification, termination for cause and convenience, dispute resolution.'},
           {s:'Check for conflicts of interest: does any board member have a relationship with the contractor?',t:'Before approval',d:'Fiduciary duty of loyalty',detail:'Any board member with a relationship to the contractor must disclose and recuse from discussion and vote per conflict of interest policy. Document disclosure in minutes. This is a common source of board liability — take it seriously.'},
-          {s:'Submit Spending Decision request if amount exceeds routine threshold; board approves at meeting',t:'Board meeting',d:'Fiscal Lens: Spending Decisions & Bylaws',detail:'For contracts above $5K: create a spending request in Fiscal Lens so the board can see the funding analysis (operating vs reserves, per-unit impact). Board approves with vote documented in minutes. If value exceeds bylaws threshold, schedule owner vote first.'},
+          {s:'Submit Spending Decision request and obtain board approval at meeting',t:'Board meeting',d:'Fiscal Lens: Spending Decisions & Bylaws',detail:'For contracts above $5K: create a spending request in Fiscal Lens so the board can see the funding analysis (operating vs reserves, per-unit impact). Board approves with vote documented in minutes. If value exceeds bylaws threshold, schedule owner vote first.',w:'Required when amount exceeds routine spending threshold'},
           {s:'Execute contract; create Work Order in Fiscal Lens; set up payment milestones',t:'After approval',d:'Fiscal Lens: Work Orders',detail:'The WO tracks the financial lifecycle: draft → approved → invoiced → paid, creating GL entries automatically. Set payment milestones tied to completed work — never pay ahead of work.',action:{type:'modal',target:'create-wo',label:'Create Work Order'}},
           {s:'Monitor performance; document milestones and any deficiencies in writing immediately',t:'Ongoing',detail:'Regular progress check-ins. Photograph completed milestones. Send written notice of any deficiencies immediately — do not wait until project end. Early communication prevents disputes.'},
           {s:'Final inspection, punch list resolution, retention release, and warranty documentation',t:'At completion',detail:'Walk project with contractor and board representative. Create written punch list. Do not release retention until all items resolved and warranty documentation received. Update the reserve study if this was a capital replacement.'}
@@ -233,12 +233,12 @@ export const CATS: Category[] = [
         self:[
           {s:'Send written notice citing contract provisions with cure period for performance issues',detail:'Give reasonable cure period (15-30 days). Certified mail.',w:'Required when contractor performance does not meet contract standards'},
           {s:'Send formal demand with documentation of deficiencies and cost of remediation',w:'Required when contractor fails to cure within the notice period'},
-          {s:'File complaint with DC DLCP contractor licensing division if applicable'}
+          {s:'File complaint with DC DLCP contractor licensing division',w:'Applicable when contractor is unlicensed or engages in fraud'}
         ],
         legal:[
           {s:'Attorney reviews contract before execution for large projects',w:'Contracts exceeding $25K or per bylaws threshold'},
           {s:'Attorney sends demand and pursues breach of contract claim',w:'Contractor defaults or work defective'},
-          {s:'Attorney advises if contract requires owner approval per bylaws spending limits',w:'Contract value exceeds board authority'}
+          {s:'Attorney advises on owner approval requirements per bylaws spending limits',w:'Contract value exceeds board authority'}
         ],
         notes:{
           'DC':'DC DLCP (formerly DCRA) handles contractor licensing. Verify at dlcp.dc.gov. Require GL insurance naming HOA as additional insured. Check bylaws for contract value thresholds. FUNDING: Operating expenses = operating budget. Capital replacements = reserves. Use the Spending Decisions tab for contracts over $5K to see the financial impact before the board votes.',
@@ -285,7 +285,7 @@ export const CATS: Category[] = [
           {s:'Identify specific CC&R or rule section violated',t:'1-3 days',d:'CC&Rs/Rules'},
           {s:'Send first courtesy notice with cure period',t:'Within 1 week',d:'Bylaws: Enforcement section'},
           {s:'Send formal violation notice via certified mail when not cured',t:'After cure period',d:'CC&Rs: Enforcement',w:'Required when owner does not cure violation within the courtesy notice period'},
-          {s:'Schedule hearing per governing docs (if required before fines)',t:'10-30 days notice',d:'Bylaws: Hearing procedures'},
+          {s:'Schedule hearing per governing docs before imposing fines',t:'10-30 days notice',d:'Bylaws: Hearing procedures',w:'Required when bylaws mandate a hearing before fines'},
           {s:'Impose fine or remedy per board resolution',t:'After hearing',d:'Fine schedule'}
         ],
         self:[
@@ -315,7 +315,7 @@ export const CATS: Category[] = [
           {s:'Add unpaid fine to assessment ledger and pursue as delinquency',w:'Required when fine remains unpaid past the deadline'}
         ],
         legal:[
-          {s:'Attorney reviews hearing procedures for due process compliance',w:'Before first hearing or if challenged'},
+          {s:'Attorney reviews hearing procedures for due process compliance',w:'Before first hearing or when challenged'},
           {s:'Attorney defends against lawsuit challenging fine',w:'Owner files suit'}
         ],
         notes:{'_':'Due process is critical. Provide adequate notice, opportunity to be heard, and impartial decision-makers.'}
@@ -325,7 +325,7 @@ export const CATS: Category[] = [
         pre:[
           {s:'Receive written application with plans/specs',t:'Upon submission'},
           {s:'Review against architectural guidelines and CC&Rs',t:'1-2 weeks',d:'Architectural guidelines'},
-          {s:'Inspect unit/area if needed',t:'Within 2 weeks'},
+          {s:'Inspect unit/area to verify scope and feasibility',t:'Within 2 weeks',w:'Recommended when modification involves structural or common elements'},
           {s:'Committee or board votes on application',t:'Next meeting or within 30 days'},
           {s:'Issue written decision with conditions (if approved)',t:'Within 5 days of decision'},
           {s:'Monitor construction for compliance with approved plans',t:'During work'}
@@ -368,7 +368,7 @@ export const CATS: Category[] = [
         pre:[
           {s:'Document damage immediately with photos and written timeline',t:'Immediately'},
           {s:'Notify insurance carrier within policy timeframe',t:'Within 24-48 hours',d:'Insurance policy'},
-          {s:'Determine if common element or unit responsibility',t:'1-3 days',d:'CC&Rs'},
+          {s:'Determine whether common element or unit responsibility',t:'1-3 days',d:'CC&Rs'},
           {s:'Coordinate between master policy and unit HO-6 policies',t:'1-2 weeks'},
           {s:'Obtain repair estimates and provide to adjuster',t:'As requested'},
           {s:'Review settlement offer against actual damages',t:'When received'}
@@ -383,7 +383,7 @@ export const CATS: Category[] = [
           {s:'Document the underlying issue thoroughly',t:'Ongoing'},
           {s:'Attempt resolution through internal processes first',t:'Before litigation'},
           {s:'Review governing docs for dispute resolution requirements (mediation, arbitration)',t:'Before filing',d:'CC&Rs: Dispute resolution'},
-          {s:'Notify D&O insurance carrier if board is sued',t:'Immediately upon notice',d:'D&O policy'}
+          {s:'Notify D&O insurance carrier upon receipt of lawsuit or claim',t:'Immediately upon notice',d:'D&O policy'}
         ],
         self:[{s:'Prepare and file in small claims court for amounts within jurisdictional limits',detail:'Check jurisdictional limits.',w:'Applies when claim amount is within small claims threshold'},{s:'Schedule mediation through approved provider per CC&Rs dispute resolution requirements',w:'Required when governing docs mandate mediation before litigation'}],
         legal:[{s:'Attorney handles all litigation (do not self-represent HOA in court beyond small claims)',w:'Any lawsuit filed or received'},{s:'Attorney evaluates cost-benefit of litigation vs settlement',w:'Before committing to trial'}],
@@ -398,7 +398,7 @@ export const CATS: Category[] = [
           {s:'Draft board resolution documenting interpretation',t:'1 week'}
         ],
         self:[{s:'Provide written explanation with citations when owner disputes interpretation',w:'Required when owner formally disputes a board interpretation'}],
-        legal:[{s:'Attorney provides formal opinion on ambiguous provisions',w:'Significant financial or legal consequence'},{s:'Attorney drafts amendment if current language is problematic',w:'Recurring interpretation disputes'}],
+        legal:[{s:'Attorney provides formal opinion on ambiguous provisions',w:'Significant financial or legal consequence'},{s:'Attorney drafts amendment to address problematic language',w:'Recurring interpretation disputes'}],
         notes:{'_':'Document all board interpretations as resolutions. Consistent application is key to enforceability.'}
       },
       { id:'bylaw-amendment', title:'Bylaw / CC&R Amendment', desc:'Full amendment lifecycle: drafting, notice, vote, recording',
@@ -437,7 +437,7 @@ export const CATS: Category[] = [
         pre:[
           {s:'Send election notice with nomination procedures',t:'Per bylaws (30-60 days)',d:'Bylaws: Election section'},
           {s:'Accept nominations and prepare ballot',t:'Per timeline'},
-          {s:'Appoint independent election inspector if required',t:'Before election'},
+          {s:'Appoint independent election inspector per bylaws',t:'Before election',w:'Required when bylaws mandate an independent inspector'},
           {s:'Conduct election per governing docs',t:'At annual meeting'},
           {s:'Certify and announce results',t:'At meeting or within 3 days'}
         ],
@@ -471,7 +471,7 @@ export const CATS: Category[] = [
         legal:[
           {s:'Attorney reviews annual meeting notice and proxy forms for statutory compliance',w:'Annual review or first meeting after bylaw changes'},
           {s:'Attorney advises on quorum challenges or contested elections',w:'Quorum dispute or candidate challenge'},
-          {s:'Attorney reviews budget ratification if assessment increase exceeds threshold requiring owner approval',w:'Assessment increase > 10-15% or per bylaws'}
+          {s:'Attorney reviews budget ratification for assessment increase exceeding owner approval threshold',w:'Assessment increase > 10-15% or per bylaws'}
         ],
         notes:{
           'DC':'DC Code § 29-1109.02: Annual meeting required within 13 months of prior. Notice: 10-60 days per § 29-1109.02(a). Quorum per bylaws (typically 33-40%). Secret ballot for elections per § 29-1135.09. Proxy voting per § 29-1135.10. Budget notice 30 days per § 29-1135.02. Retain ballots 1 year per § 29-1135.13. If 20%+ of owners petition and board fails to call meeting, owners may call it themselves per § 29-1108.01.',
@@ -489,7 +489,7 @@ export const CATS: Category[] = [
           {s:'Record completion in meeting minutes',t:'At meeting'}
         ],
         self:[{s:'Reassign task or adjust timeline at next meeting when assignee is unable to complete',w:'Required when the assigned person cannot meet the deadline'}],
-        legal:[{s:'Attorney reviews if action item has legal implications',w:'Action involves contracts, disputes, or regulatory matters'}],
+        legal:[{s:'Attorney reviews action item for legal implications',w:'Action involves contracts, disputes, or regulatory matters'}],
         notes:{'_':'Track all board action items with clear ownership and deadlines. Report status at each meeting.'}
       },
       { id:'policy-update', title:'Policy Updates', desc:'Updating association policies or documents',
@@ -499,7 +499,7 @@ export const CATS: Category[] = [
           {s:'Draft updated policy language',t:'2-4 weeks'},
           {s:'Legal review of proposed changes',t:'1-2 weeks',d:'Attorney review'},
           {s:'Board discussion of draft at meeting',t:'Board meeting'},
-          {s:'Provide owner notice period if required',t:'Per governing docs',d:'Bylaws: Notice requirements'},
+          {s:'Provide owner notice period per governing docs',t:'Per governing docs',d:'Bylaws: Notice requirements',w:'Required when bylaws mandate owner notice before policy adoption'},
           {s:'Board votes to adopt updated policy',t:'Board meeting',d:'Bylaws: Voting requirements'},
           {s:'Distribute updated documents to all owners',t:'Within 2 weeks of adoption'}
         ],
@@ -533,7 +533,7 @@ export const CATS: Category[] = [
           {s:'Escalate per enforcement policy for continuing violations',t:'Per bylaws',w:'Required when mediation does not resolve the dispute'}
         ],
         self:[{s:'Impose fines per hearing process when mediation fails',w:'Required when mediation does not produce resolution'}],
-        legal:[{s:'Attorney sends cease-and-desist if nuisance continues',w:'Ongoing nuisance after multiple notices'}],
+        legal:[{s:'Attorney sends cease-and-desist for continuing nuisance',w:'Ongoing nuisance after multiple notices'}],
         notes:{'_':'Document all complaints and responses. Mediation is often more effective than enforcement for neighbor disputes.'}
       },
       { id:'damage-responsibility', title:'Damage Responsibility', desc:'Leak source disputes, insurance coordination',
@@ -569,7 +569,7 @@ export const CATS: Category[] = [
         tags:['Theft','Access control','Camera installations'],
         pre:[
           {s:'Document security incident with details and timeline',t:'Immediately'},
-          {s:'Report to police if criminal activity involved',t:'Immediately'},
+          {s:'Report to police for criminal activity',t:'Immediately',w:'Required when incident involves criminal activity'},
           {s:'Review and update access control measures',t:'After incident'},
           {s:'Notify affected owners',t:'Promptly'},
           {s:'Board reviews security improvements',t:'Next meeting'}
@@ -594,15 +594,15 @@ export const CATS: Category[] = [
           {s:'Develop detailed project scope, specifications, and timeline for bidding',t:'3-6 months out',detail:'Scope should be detailed enough for apples-to-apples bidding. Include performance standards, warranty requirements, and completion timeline. If phasing, clearly define Phase 1 scope.'},
           {s:'Obtain minimum 3 competitive bids from qualified, licensed, and insured contractors',t:'2-3 months out',detail:'Verify: state/local contractor license, general liability insurance ($1M+), workers comp, bonding capacity. Check references on similar projects. Require bids on identical scope.'},
           {s:'Board evaluates bids on qualifications, references, price, and timeline — not lowest price alone',t:'Board meeting',d:'Fiduciary duty of care',detail:'Document evaluation criteria and rationale. Lowest bid is not always best — consider experience, warranty, financial stability, and how they handle change orders. Record decision in minutes.'},
-          {s:'Hold owner vote if required; present funding plan with per-unit impact and payment options',t:'At meeting per notice',d:'Bylaws & DC Code § 29-1135.03',detail:'If special assessment needed: typically requires 2/3 owner approval in DC. Present: total cost, per-unit share, payment schedule options, what happens if project is deferred. If using reserves for designated purpose per reserve study: board may approve. Document vote results.'},
+          {s:'Hold owner vote; present funding plan with per-unit impact and payment options',t:'At meeting per notice',d:'Bylaws & DC Code § 29-1135.03',detail:'If special assessment needed: typically requires 2/3 owner approval in DC. Present: total cost, per-unit share, payment schedule options, what happens if project is deferred. If using reserves for designated purpose per reserve study: board may approve. Document vote results.',w:'Required when project cost exceeds board spending authority per bylaws'},
           {s:'Execute contract with performance bond and payment/retention schedule',t:'After all approvals',d:'Best practice for projects > $50K',detail:'Contract should include: detailed scope, fixed price or GMP, payment schedule tied to milestones (not time), 10% retention until final completion, performance bond (100% of contract value for large projects), warranty terms, insurance requirements, indemnification.'},
-          {s:'Create Work Order in Fiscal Lens and submit Spending Decision request if not already done',t:'Before work begins',d:'Fiscal Lens: Work Orders & Spending Decisions',detail:'Create the WO to track the financial lifecycle: draft → approved → invoiced → paid. This creates the GL entries automatically and gives you a paper trail of the entire project cost.',action:{type:'modal',target:'create-wo',label:'Create Work Order'}},
+          {s:'Create Work Order in Fiscal Lens and submit Spending Decision request',t:'Before work begins',d:'Fiscal Lens: Work Orders & Spending Decisions',detail:'Create the WO to track the financial lifecycle: draft → approved → invoiced → paid. This creates the GL entries automatically and gives you a paper trail of the entire project cost.',action:{type:'modal',target:'create-wo',label:'Create Work Order'}},
           {s:'Monitor construction; track budget vs actual; flag change orders before approving',t:'Weekly during project',detail:'Require written change orders approved by board before extra work. If change orders push total cost above the original approved amount, you may need additional owner approval per bylaws. Track cumulative change order percentage (flag at 10% of contract).'},
           {s:'Final inspection, punch list, retention release, and reserve study update',t:'At substantial completion',detail:'Walk the project with contractor and independent inspector. Do not release retention until all punch list items resolved. After completion: update the reserve study to reflect the new component and its useful life — this resets the replacement timeline and affects future reserve contributions.'}
         ],
         self:[
           {s:'Review contract remedies, engage bonding company, and file insurance claim for contractor default',w:'Required when contractor fails to perform or abandons the project'},
-          {s:'Document reasons for budget overrun, evaluate change orders, and determine if additional owner approval is needed',w:'Required when cumulative costs exceed the approved project budget'},
+          {s:'Document reasons for budget overrun, evaluate change orders, and seek additional owner approval as needed',w:'Required when cumulative costs exceed the approved project budget'},
           {s:'Post-project: update reserve study to reflect completed improvement and adjusted useful life — this is critical for accurate future planning'}
         ],
         legal:[
@@ -670,13 +670,13 @@ export const CATS: Category[] = [
           {s:'Identify filing requirement and deadline',t:'As needed',d:'DC Code § 29-102.11',detail:'DC condos must file a Biennial Report with DCRA (now DLCP). Also check for sales tax, personal property tax, and business license renewals.'},
           {s:'Gather required documentation: financial statements, officer/agent updates, registered agent confirmation',t:'2-4 weeks before deadline',detail:'If incorporated, ensure registered agent is current with DC Department of Licensing and Consumer Protection (DLCP).'},
           {s:'Complete forms and prepare submission via online portal',t:'1-2 weeks before deadline',d:'DLCP / MyTax.DC.gov',detail:'DC Biennial Report filed online at DLCP. Tax filings via MyTax.DC.gov. Keep login credentials secure with Treasurer.'},
-          {s:'Board review and sign-off if required',t:'Board meeting',d:'Bylaws: Officer duties'},
+          {s:'Board review and sign-off on filing',t:'Board meeting',d:'Bylaws: Officer duties',w:'Required when bylaws mandate board approval for official filings'},
           {s:'Submit filing to appropriate agency and pay any required fees',t:'Before deadline',detail:'DC Biennial Report fee varies. Late filing can result in administrative dissolution of the entity.'},
           {s:'Confirm receipt and save confirmation number/receipt',t:'Within days of submission'},
           {s:'File copy of submission and confirmation in association records',t:'Immediately',d:'Document retention policy'}
         ],
         self:[{s:'Review deficiencies and resubmit promptly for rejected filings',w:'Required when the agency rejects or returns the submission'},{s:'Set calendar reminders 60 and 30 days before each filing deadline'}],
-        legal:[{s:'Attorney assists with complex filings or disputed requirements',w:'Filing involves legal interpretation or dispute'},{s:'Attorney handles reinstatement if entity dissolved for non-filing',w:'Missed deadline resulted in administrative dissolution'}],
+        legal:[{s:'Attorney assists with complex filings or disputed requirements',w:'Filing involves legal interpretation or dispute'},{s:'Attorney handles reinstatement of entity dissolved for non-filing',w:'Missed deadline resulted in administrative dissolution'}],
         notes:{
           'DC':'DC condos organized as nonprofits must file a Biennial Report with DLCP (formerly DCRA) per DC Code § 29-102.11. Late filing can lead to administrative dissolution per § 29-106.02. Reinstatement requires filing + penalty. Also: Form FR-16 (franchise tax exemption may apply), UCC filings for liens via DC Recorder of Deeds.',
           '_':'Maintain a calendar of all regulatory filing deadlines. Many jurisdictions impose penalties for late filings.'
@@ -687,7 +687,7 @@ export const CATS: Category[] = [
         pre:[
           {s:'Receive written request and log date received',t:'Upon receipt',d:'DC Code § 42-1903.14',detail:'DC owners have statutory right to inspect association records. Log the exact date — this starts the response clock.'},
           {s:'Acknowledge receipt to the requesting owner within 3 business days',t:'3 business days',detail:'Written acknowledgment (email is sufficient). Confirm scope of request and expected timeframe.'},
-          {s:'Identify requested records and determine if any exemptions apply',t:'3-5 days',d:'DC Code § 42-1903.14(b)',detail:'Exemptions are narrow: attorney-client privilege, individual owner payment records (of other owners), personnel records. When in doubt, disclose.'},
+          {s:'Identify requested records and review for applicable exemptions',t:'3-5 days',d:'DC Code § 42-1903.14(b)',detail:'Exemptions are narrow: attorney-client privilege, individual owner payment records (of other owners), personnel records. When in doubt, disclose.'},
           {s:'Arrange inspection at reasonable time and place, or prepare copies',t:'Within 5 business days of request',d:'DC Code § 42-1903.14',detail:'DC requires records be available within 5 business days. May charge reasonable copying costs (per page). Electronic delivery preferred for efficiency.'},
           {s:'Provide records and document what was delivered',t:'Within 5 business days',detail:'Retain a log entry: date, owner, records requested, records provided, any items withheld with reason.'},
           {s:'Provide written explanation citing specific statutory exemption for any withheld records',t:'With response',d:'DC Code § 42-1903.14(b)',detail:'Must cite the specific exemption relied upon. Vague denials are not legally defensible.',w:'Required when any requested records are withheld — exemptions are narrow per DC Code'}
@@ -932,6 +932,7 @@ interface IssuesState {
 
   // Docs & Comms
   addDocument: (caseId: string, doc: CaseAttachment) => void;
+  addStepDocument: (caseId: string, stepIdx: number, doc: CaseAttachment) => void;
   removeDocument: (caseId: string, idx: number) => void;
   addComm: (caseId: string, comm: Omit<CaseComm, 'id'>) => void;
   removeComm: (caseId: string, idx: number) => void;
@@ -1208,6 +1209,16 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   addDocument: (caseId, doc) => set(s => ({
     cases: s.cases.map(c => c.id === caseId ? { ...c, attachments: [...c.attachments, doc] } : c)
+  })),
+
+  addStepDocument: (caseId, stepIdx, doc) => set(s => ({
+    cases: s.cases.map(c => {
+      if (c.id !== caseId || !c.steps) return c;
+      const steps = [...c.steps];
+      const existing = steps[stepIdx].stepAttachments || [];
+      steps[stepIdx] = { ...steps[stepIdx], stepAttachments: [...existing, doc] };
+      return { ...c, steps };
+    })
   })),
 
   removeDocument: (caseId, idx) => set(s => ({

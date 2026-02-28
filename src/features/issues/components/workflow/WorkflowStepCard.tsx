@@ -3,10 +3,12 @@ import type { CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
 import { deriveActionsForStep, type RichAction } from './stepActionMap';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useSpendingStore } from '@/store/useSpendingStore';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
 
 interface WorkflowStepCardProps {
+  caseId: string;
   step: CaseStep;
   index: number;
   isActive: boolean;
@@ -19,18 +21,53 @@ interface WorkflowStepCardProps {
   totalSteps: number;
 }
 
-function FundingAnalysisInline() {
+interface FundingAnalysisInlineProps {
+  caseId: string;
+  stepTitle: string;
+  onDecisionRecorded?: (approvalId: string) => void;
+}
+
+function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: FundingAnalysisInlineProps) {
   const financialStore = useFinancialStore();
+  const spendingStore = useSpendingStore();
   const [amount, setAmount] = useState('');
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [recorded, setRecorded] = useState(false);
   const parsed = parseFloat(amount);
   const ctx = getFinancialContext(financialStore);
   const analysis = parsed > 0 ? analyzeFunding(parsed, ctx) : null;
+
+  const handleRecordDecision = () => {
+    if (!analysis || !selectedSource) return;
+    const opt = analysis.options.find(o => o.source === selectedSource);
+    if (!opt) return;
+    const id = 'sa' + Date.now();
+    spendingStore.addApproval({
+      title: stepTitle,
+      description: `Funding decision from workflow step: ${stepTitle}`,
+      amount: parsed,
+      category: 'capital',
+      requestedBy: 'Board (Workflow)',
+      status: parsed <= 5000 ? 'approved' : 'pending',
+      priority: 'normal',
+      vendorName: '',
+      workOrderId: '',
+      votes: [],
+      threshold: 5000,
+      notes: `Source: ${opt.label}. ${opt.impact}`,
+      decidedAt: parsed <= 5000 ? new Date().toISOString().split('T')[0] : '',
+      fundingSource: selectedSource as any,
+      caseId,
+    });
+    setRecorded(true);
+    onDecisionRecorded?.(id);
+  };
 
   return (
     <div className="mt-3 bg-mist-50 border border-mist-200 rounded-lg p-4 space-y-3">
       <div>
         <label className="block text-xs font-medium text-ink-700 mb-1">Project / Repair Amount</label>
-        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Enter estimated cost..." className="w-full max-w-xs px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+        <input type="number" value={amount} onChange={e => { setAmount(e.target.value); setRecorded(false); setSelectedSource(null); }} placeholder="Enter estimated cost..." className="w-full max-w-xs px-3 py-2 border border-ink-200 rounded-lg text-sm" />
       </div>
       {analysis && (
         <>
@@ -40,17 +77,27 @@ function FundingAnalysisInline() {
           </div>
           <div className="space-y-2">
             {analysis.options.map(opt => (
-              <div key={opt.source} className={`flex items-start gap-3 p-3 rounded-lg border ${opt.recommended ? 'bg-sage-50 border-sage-200' : opt.available ? 'bg-white border-ink-100' : 'bg-ink-50 border-ink-100 opacity-70'}`}>
+              <button
+                key={opt.source}
+                type="button"
+                onClick={() => opt.available && setSelectedSource(opt.source)}
+                className={`w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all ${
+                  selectedSource === opt.source
+                    ? 'bg-accent-50 border-accent-400 ring-2 ring-accent-200'
+                    : opt.recommended ? 'bg-sage-50 border-sage-200 hover:border-sage-300' : opt.available ? 'bg-white border-ink-100 hover:border-ink-200' : 'bg-ink-50 border-ink-100 opacity-70 cursor-not-allowed'
+                }`}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-ink-900">{opt.label}</span>
                     {opt.recommended && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-sage-200 text-sage-800">Recommended</span>}
                     {!opt.available && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700">Insufficient</span>}
+                    {selectedSource === opt.source && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent-200 text-accent-800">Selected</span>}
                   </div>
                   <p className="text-xs text-ink-500 mt-1">{opt.impact}</p>
                   {opt.perUnit > 0 && <p className="text-xs text-ink-400 mt-0.5">Per unit: {fmt(opt.perUnit)}</p>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-mist-200">
@@ -71,6 +118,21 @@ function FundingAnalysisInline() {
               <p className={`text-sm font-bold ${ctx.reservePctFunded >= 70 ? 'text-sage-700' : ctx.reservePctFunded >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>{ctx.reservePctFunded}%</p>
             </div>
           </div>
+          {/* Record Decision */}
+          {selectedSource && !recorded && (
+            <button
+              onClick={handleRecordDecision}
+              className="w-full py-2.5 rounded-lg bg-accent-600 text-white text-sm font-semibold hover:bg-accent-700 transition-colors"
+            >
+              Record Funding Decision
+            </button>
+          )}
+          {recorded && (
+            <div className="bg-sage-50 border border-sage-200 rounded-lg p-3 flex items-center gap-2">
+              <span className="text-sage-600">✓</span>
+              <p className="text-sm text-sage-800 font-medium">Funding decision recorded — visible in Financial → Spending Decisions</p>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -92,15 +154,22 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
         <div className={`font-semibold text-sm ${action.primary ? 'text-white' : 'text-ink-900'}`}>{action.label}</div>
         <div className={`text-xs mt-0.5 ${action.primary ? 'text-accent-100' : 'text-ink-400'}`}>{action.description}</div>
       </div>
-      <svg className={`w-4 h-4 ml-auto mt-1 shrink-0 opacity-40 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 ${action.primary ? 'text-white' : 'text-ink-400'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
+      <div className="flex items-center gap-2 ml-auto shrink-0">
+        {!action.isAction && (
+          <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${action.primary ? 'bg-white bg-opacity-20 text-white' : 'bg-accent-50 text-accent-600 border border-accent-200'}`}>
+            → {action.target.split(':').pop()}
+          </span>
+        )}
+        <svg className={`w-4 h-4 mt-0.5 opacity-40 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 ${action.primary ? 'text-white' : 'text-ink-400'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
     </button>
   );
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -172,7 +241,7 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
-            {step.w && <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">⚠ Warning</span>}
+            {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">💡 Guidance</span>}
             {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
           </div>
         </div>
@@ -186,19 +255,21 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
         <div className="px-5 pb-5 space-y-4">
           <div className="border-t border-ink-100 pt-4" />
 
-          {/* Warning banner */}
-          {step.w && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-              <span className="text-amber-500 mt-0.5">⚠️</span>
-              <p className="text-sm text-amber-800">{step.w}</p>
+          {/* Description — prominent at top (matching reference) */}
+          {step.detail && (
+            <div>
+              <p className="text-sm text-ink-700 leading-relaxed">{step.detail}</p>
             </div>
           )}
 
-          {/* Guidance panel — detail field as prominent callout */}
-          {step.detail && (
-            <div className="bg-accent-50 border border-accent-200 rounded-xl p-4">
-              <p className="text-xs font-semibold text-accent-700 uppercase tracking-wider mb-1.5">Guidance</p>
-              <p className="text-sm text-accent-900 leading-relaxed">{step.detail}</p>
+          {/* Guidance banner — accent-colored, below description */}
+          {step.w && (
+            <div className="bg-accent-50 border border-accent-200 rounded-lg p-3 flex items-start gap-2">
+              <span className="text-accent-500 mt-0.5">💡</span>
+              <div>
+                <p className="text-xs font-semibold text-accent-700 uppercase tracking-wider mb-0.5">Guidance</p>
+                <p className="text-sm text-accent-800">{step.w}</p>
+              </div>
             </div>
           )}
 
@@ -209,10 +280,10 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
             </div>
           )}
 
-          {/* Two-column layout: Actions + Completion */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* Two-column layout: Actions (2/3) + Completion (1/3) — matching reference */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Left — Actions */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-2">
               {richActions.length > 0 && (
                 <>
                   <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2.5">Actions</p>
@@ -225,11 +296,28 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
               )}
 
               {/* Inline funding analysis */}
-              {inlineOpen && step.action?.type === 'inline' && <FundingAnalysisInline />}
+              {inlineOpen && step.action?.type === 'inline' && <FundingAnalysisInline caseId={caseId} stepTitle={step.s} />}
+
+              {/* Step attachments */}
+              {(step.stepAttachments?.length ?? 0) > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2">Step Documents</p>
+                  <div className="space-y-1.5">
+                    {step.stepAttachments!.map((att, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-mist-50 border border-mist-100 rounded-lg">
+                        <span className="text-ink-400">📄</span>
+                        <span className="text-sm text-ink-700 truncate">{att.name}</span>
+                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-ink-100 text-ink-500">{att.type}</span>
+                        <span className="text-xs text-ink-300 ml-auto shrink-0">{att.size}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right — Completion */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-1">
               <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2.5">Completion</p>
               <div className="bg-mist-50 rounded-xl p-4 border border-mist-100 space-y-3">
                 {/* Done toggle */}
@@ -286,21 +374,33 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                     </button>
                   )}
                 </div>
+
+                {/* Step attachments mini-list */}
+                {(step.stepAttachments?.length ?? 0) > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-ink-500 mb-1">Attached</p>
+                    <div className="space-y-1">
+                      {step.stepAttachments!.map((att, i) => (
+                        <div key={i} className="text-[11px] text-ink-500 bg-white rounded px-2 py-1 border border-ink-100 truncate">
+                          📄 {att.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Continue button — inside completion column */}
+                {!step.done && onContinue && index < totalSteps - 1 && (
+                  <button
+                    onClick={onContinue}
+                    className="w-full py-2.5 rounded-xl bg-accent-500 text-white text-sm font-semibold hover:bg-accent-600 transition-colors shadow-sm"
+                  >
+                    Continue →
+                  </button>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Continue button */}
-          {!step.done && onContinue && index < totalSteps - 1 && (
-            <div className="pt-2">
-              <button
-                onClick={onContinue}
-                className="w-full py-2.5 rounded-xl bg-accent-500 text-white text-sm font-semibold hover:bg-accent-600 transition-colors shadow-sm"
-              >
-                Continue to Next Step →
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
