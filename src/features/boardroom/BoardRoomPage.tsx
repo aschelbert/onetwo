@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
-import LetterEngineTab from './tabs/LetterEngineTab';
+import CommunicationsTab from './tabs/CommunicationsTab';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 
@@ -22,7 +22,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops' | 'letters';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument' | 'addAnnouncement';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -338,7 +338,6 @@ export default function BoardRoomPage() {
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
-    { id: 'letters', label: 'Letter Engine' },
   ];
 
   return (
@@ -360,7 +359,7 @@ export default function BoardRoomPage() {
             { label: 'Open Cases', value: String(openCases), sub: overdueCases > 0 ? `${overdueCases} overdue` : 'On track', color: overdueCases > 0 ? 'text-red-300' : 'text-emerald-300', onClick: () => setTab('dailyops') },
             { label: 'Elections', value: String(openElections), sub: openElections > 0 ? 'Active' : 'None active', color: openElections > 0 ? 'text-yellow-300' : 'text-white', onClick: () => setTab('votes') },
             { label: 'Pending Notices', value: String(pendingComms), sub: pendingComms > 0 ? 'Needs attention' : 'All sent', color: pendingComms > 0 ? 'text-yellow-300' : 'text-emerald-300', onClick: () => setTab('communications') },
-            { label: 'Letters Sent', value: String(lettersSent), sub: `${letterStore.templates.length} templates`, color: 'text-white', onClick: () => setTab('letters') },
+            { label: 'Letters Sent', value: String(lettersSent), sub: `${letterStore.templates.length} templates`, color: 'text-white', onClick: () => setTab('communications') },
           ];
           return (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -897,55 +896,11 @@ export default function BoardRoomPage() {
         {tab === 'votes' && <VotingPage />}
 
         {/* ═══ COMMUNICATIONS TAB ═══ */}
-        {tab === 'communications' && (<div className="space-y-6">
-          {/* Announcements section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div><h3 className="font-display text-lg font-bold text-ink-900">📢 Community Announcements</h3><p className="text-xs text-ink-400">Post updates visible to all residents in the Community Room</p></div>
-              <button onClick={() => { setForm({ annTitle: '', annBody: '', annCategory: 'general', annPinned: 'false', annSendEmail: 'false' }); setModal('addAnnouncement'); }} className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">+ Post Announcement</button>
-            </div>
-            {(comp.announcements || []).length === 0 && <p className="text-sm text-ink-400 text-center py-4">No announcements yet.</p>}
-            <div className="space-y-2">
-              {[...(comp.announcements || [])].sort((a, b) => { if (a.pinned !== b.pinned) return a.pinned ? -1 : 1; return b.postedDate.localeCompare(a.postedDate); }).map(a => {
-                const catStyles: Record<string, string> = { general:'bg-ink-100 text-ink-600', maintenance:'bg-amber-100 text-amber-700', financial:'bg-sage-100 text-sage-700', safety:'bg-red-100 text-red-700', rules:'bg-violet-100 text-violet-700', meeting:'bg-accent-100 text-accent-700' };
-                return (
-                  <div key={a.id} className={`rounded-xl border p-4 ${a.pinned ? 'border-accent-300 bg-accent-50 bg-opacity-30' : 'border-ink-100'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {a.pinned && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-100 text-accent-700 font-bold">📌 PINNED</span>}
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${catStyles[a.category] || catStyles.general}`}>{a.category}</span>
-                          <span className="text-sm font-semibold text-ink-900">{a.title}</span>
-                        </div>
-                        <p className="text-xs text-ink-500 mt-1 line-clamp-2">{a.body}</p>
-                        <p className="text-[10px] text-ink-400 mt-1.5">Posted by {a.postedBy} · {a.postedDate}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => comp.togglePinAnnouncement(a.id)} className={`text-[10px] px-2 py-1 rounded font-medium ${a.pinned ? 'bg-accent-100 text-accent-700' : 'bg-ink-50 text-ink-500 hover:bg-ink-100'}`}>{a.pinned ? 'Unpin' : 'Pin'}</button>
-                        <button onClick={() => { if (confirm('Delete this announcement?')) comp.deleteAnnouncement(a.id); }} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-ink-200" />
-
-          {/* Communications log */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between"><div><h3 className="font-display text-lg font-bold text-ink-900">✉ Owner Communications Log</h3><p className="text-xs text-ink-400">Notices, minutes distribution, disclosure statements</p></div><button onClick={() => { setForm({ type: 'notice', subject: '', date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners (50 units)', status: 'sent', notes: '' }); setModal('addComm'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Log Communication</button></div>
-            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden divide-y divide-ink-50">{comp.communications.sort((a, b) => b.date.localeCompare(a.date)).map(c => (<div key={c.id} className="p-4 hover:bg-mist-50 transition-colors"><div className="flex items-start justify-between gap-3"><div className="flex-1"><div className="flex items-center gap-2 flex-wrap mb-1"><span className={`pill px-1.5 py-0.5 rounded text-xs ${COMM_TYPES[c.type] || COMM_TYPES.other}`}>{c.type}</span><p className="text-sm font-medium text-ink-900">{c.subject}</p><span className={`pill px-1.5 py-0.5 rounded text-xs ${c.status === 'sent' ? 'bg-sage-100 text-sage-700' : c.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-ink-100 text-ink-500'}`}>{c.status}</span></div><p className="text-xs text-ink-500">{c.date} · {c.method} · To: {c.recipients}</p>{c.notes && <p className="text-xs text-ink-400 mt-1">{c.notes}</p>}</div><button onClick={() => { if (confirm('Remove?')) comp.deleteCommunication(c.id); }} className="text-xs text-red-400 shrink-0">Remove</button></div></div>))}</div>
-          </div>
-        </div>)}
+        {tab === 'communications' && <CommunicationsTab />}
 
         {/* ═══ DAILY OPERATIONS TAB ═══ */}
         {tab === 'dailyops' && <IssuesPage embedded />}
 
-        {/* ═══ LETTER ENGINE TAB ═══ */}
-        {tab === 'letters' && <LetterEngineTab />}
       </div>
 
       {/* ═══ MODALS ═══ */}
