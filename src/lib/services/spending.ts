@@ -15,6 +15,8 @@ export interface SpendingApproval {
   threshold: number;
   notes: string;
   decidedAt: string;
+  fundingSource: 'operating' | 'reserves' | 'special_assessment' | 'insurance' | 'loan' | '';
+  caseId: string;
 }
 
 function rowToApproval(r: Record<string, unknown>): SpendingApproval {
@@ -33,6 +35,8 @@ function rowToApproval(r: Record<string, unknown>): SpendingApproval {
     threshold: r.threshold as number,
     notes: r.notes as string,
     decidedAt: r.decided_at as string,
+    fundingSource: (r.funding_source || '') as SpendingApproval['fundingSource'],
+    caseId: (r.case_id || '') as string,
   };
 }
 
@@ -51,6 +55,8 @@ function approvalToRow(a: Partial<SpendingApproval>): Record<string, unknown> {
   if (a.threshold !== undefined) row.threshold = a.threshold;
   if (a.notes !== undefined) row.notes = a.notes;
   if (a.decidedAt !== undefined) row.decided_at = a.decidedAt;
+  if (a.fundingSource !== undefined) row.funding_source = a.fundingSource;
+  if (a.caseId !== undefined) row.case_id = a.caseId;
   return row;
 }
 

@@ -17,7 +17,7 @@ const TABS = [
   { id: 'workorders', label: 'WO & Invoices' },
   { id: 'budget', label: 'Budget' },
   { id: 'reserves', label: 'Reserves' },
-  { id: 'approvals', label: 'Approvals' },
+  { id: 'approvals', label: 'Spending Decisions' },
   { id: 'reports', label: 'Reports' },
 ];
 
