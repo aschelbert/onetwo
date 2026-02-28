@@ -43,7 +43,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
   isBoard: boolean; user: any; onNav: (v: string) => void; store: any; embedded?: boolean;
 }) {
-  const [tab, setTab] = useTabParam<CaseTab>('tab', 'open', ['open', 'issues', 'archive']);
+  const [tab, setTab] = useTabParam<CaseTab>('caseTab', 'open', ['open', 'issues', 'archive']);
   const [search, setSearch] = useState('');
   const [prioFilter, setPrioFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
@@ -569,9 +569,18 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
               ))}
             </div>
           </div>
-          {/* Assignment fields (optional) */}
+          {/* Assignment fields */}
           <div className="border-t border-ink-100 pt-4 mt-2">
-            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-3">Assignment (optional)</p>
+            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-3">Assignment</p>
+            {daciSuggested && catId && DACI_MATRIX[catId] && (
+              <div className="bg-accent-50 border border-accent-200 rounded-lg p-3 mb-3 flex items-center gap-2">
+                <span className="text-base">🎯</span>
+                <div>
+                  <p className="text-xs font-semibold text-accent-800">DACI Auto-Assignment</p>
+                  <p className="text-[11px] text-accent-600">Suggested <strong>{assignedTo}</strong> ({DACI_MATRIX[catId].driver}) as Driver for {selCat?.label || catId} cases</p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Assigned To</label>
@@ -580,9 +589,6 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
                   {boardMembers.map(b => <option key={b.id} value={b.name}>{b.name} ({b.role})</option>)}
                 </select>
                 {assignedRole && <p className="text-[10px] text-ink-400 mt-1">Role: {assignedRole}</p>}
-                {daciSuggested && catId && DACI_MATRIX[catId] && (
-                  <p className="text-[10px] text-accent-600 mt-1">Suggested: {DACI_MATRIX[catId].driver} (Driver per DACI)</p>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Due Date</label>
