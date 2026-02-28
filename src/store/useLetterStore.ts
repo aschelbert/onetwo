@@ -136,8 +136,17 @@ export const useLetterStore = create<LetterState>()(persist((set) => ({
   },
 }), {
   name: 'onetwo-letters',
-  merge: (persisted: any, current: any) => ({
-    ...current,
-    ...(persisted || {}),
-  }),
+  merge: (persisted: any, current: any) => {
+    if (!persisted) return current;
+    // Seed template IDs from code — always include these
+    const seedIds = new Set(current.templates.map((t: any) => t.id));
+    // Keep any user-created templates from localStorage (those with non-seed IDs)
+    const userTemplates = (persisted.templates || []).filter((t: any) => !seedIds.has(t.id));
+    return {
+      ...current,
+      ...persisted,
+      // All seed templates (latest from code) + any user-created ones
+      templates: [...current.templates, ...userTemplates],
+    };
+  },
 }));
