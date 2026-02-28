@@ -90,8 +90,8 @@ export const useLetterStore = create<LetterState>()(persist((set) => ({
       letterSvc.fetchLetters(tenantId),
     ]);
     const updates: Partial<LetterState> = {};
-    if (templates) updates.templates = templates;
-    if (letters) updates.letters = letters;
+    if (templates && templates.length > 0) updates.templates = templates;
+    if (letters && letters.length > 0) updates.letters = letters;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
