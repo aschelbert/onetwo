@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -8,6 +8,8 @@ import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal } from './components/CaseModals';
 import Modal from '@/components/ui/Modal';
+import { useTabParam } from '@/hooks/useTabParam';
+import { DACI_MATRIX } from '@/data/daciMatrix';
 import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -15,7 +17,7 @@ const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigi
 export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const store = useIssuesStore();
   const { cases, issues } = store;
-  const [view, setView] = useState<string>('tabs');
+  const [view, setView] = useTabParam<string>('view', 'tabs');
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
@@ -41,7 +43,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
   isBoard: boolean; user: any; onNav: (v: string) => void; store: any; embedded?: boolean;
 }) {
-  const [tab, setTab] = useState<CaseTab>('open');
+  const [tab, setTab] = useTabParam<CaseTab>('tab', 'open', ['open', 'issues', 'archive']);
   const [search, setSearch] = useState('');
   const [prioFilter, setPrioFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
@@ -409,6 +411,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: () => void }) {
   const { createCase } = useIssuesStore();
   const { board: boardMembers } = useBuildingStore();
+  const units = useFinancialStore(s => s.units);
   const [step, setStep] = useState(1);
   const [catId, setCatId] = useState<string | null>(null);
   const [sitId, setSitId] = useState<string | null>(null);
@@ -422,14 +425,39 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
   const [assignedRole, setAssignedRole] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [source, setSource] = useState('');
+  const [daciSuggested, setDaciSuggested] = useState(false);
 
   const selCat = CATS.find(c => c.id === catId);
   const selSit = selCat?.sits.find(s => s.id === sitId);
+
+  // DACI auto-assignment: when category changes, suggest the driver role
+  useEffect(() => {
+    if (!catId) return;
+    const daci = DACI_MATRIX[catId];
+    if (!daci) return;
+    const driverMember = boardMembers.find(b => b.role === daci.driver);
+    if (driverMember) {
+      setAssignedTo(driverMember.name);
+      setAssignedRole(driverMember.role);
+      setDaciSuggested(true);
+    }
+  }, [catId, boardMembers]);
 
   const handleAssignedToChange = (name: string) => {
     setAssignedTo(name);
     const member = boardMembers.find(b => b.name === name);
     setAssignedRole(member?.role || '');
+    setDaciSuggested(false);
+  };
+
+  const handleUnitChange = (unitNum: string) => {
+    setUnit(unitNum);
+    if (unitNum && unitNum !== 'Common') {
+      const matched = units.find(u => u.number === unitNum);
+      if (matched) setOwner(matched.owner);
+    } else {
+      setOwner('');
+    }
   };
 
   const handleCreate = () => {
@@ -520,7 +548,11 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-1">Unit #</label>
-              <input value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g., 502 or Common" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+              <select value={unit} onChange={e => handleUnitChange(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                <option value="">Select unit...</option>
+                <option value="Common">Common</option>
+                {units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-1">Owner / Contact</label>
@@ -548,6 +580,9 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
                   {boardMembers.map(b => <option key={b.id} value={b.name}>{b.name} ({b.role})</option>)}
                 </select>
                 {assignedRole && <p className="text-[10px] text-ink-400 mt-1">Role: {assignedRole}</p>}
+                {daciSuggested && catId && DACI_MATRIX[catId] && (
+                  <p className="text-[10px] text-accent-600 mt-1">Suggested: {DACI_MATRIX[catId].driver} (Driver per DACI)</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Due Date</label>

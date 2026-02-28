@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTabParam } from '@/hooks/useTabParam';
 import { useMeetingsStore, type Meeting } from '@/store/useMeetingsStore';
 import { useElectionStore } from '@/store/useElectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -25,7 +26,7 @@ const REQ_CATS = [
 ];
 
 export default function CommunityRoomPage() {
-  const [tab, setTab] = useState<TabId>('announcements');
+  const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', ['announcements', 'requests', 'meetings', 'votes']);
   const mtg = useMeetingsStore();
   const elections = useElectionStore();
   const user = useAuthStore(s => s.currentUser);

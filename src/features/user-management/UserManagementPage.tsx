@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import { getInitials } from '@/lib/formatters';
@@ -45,6 +46,7 @@ const roleBadge = (r: string) =>
 
 export default function UserManagementPage() {
   const { currentUser, buildingMembers, buildingInvites, inviteMember, removeMember, revokeInvite } = useAuthStore();
+  const units = useFinancialStore(s => s.units);
   const tenant = useTenantContext();
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -401,7 +403,10 @@ export default function UserManagementPage() {
               </select>
             </div>
             <div><label className="block text-sm font-medium text-ink-700 mb-1">Unit Number (optional)</label>
-              <input value={inviteForm.unit} onChange={e => setInviteForm({ ...inviteForm, unit: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg" placeholder="e.g., 204" /></div>
+              <select value={inviteForm.unit} onChange={e => setInviteForm({ ...inviteForm, unit: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg">
+                <option value="">Select unit...</option>
+                {units.map(u => <option key={u.number} value={u.number}>Unit {u.number}</option>)}
+              </select></div>
             <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
               <p className="text-xs text-ink-500">An email will be sent from <strong>noreply@getonetwo.com</strong> with reply-to set to <strong>{currentUser.email}</strong>. The recipient will receive a unique invitation code and link to join {tenant.name}.</p>
             </div>

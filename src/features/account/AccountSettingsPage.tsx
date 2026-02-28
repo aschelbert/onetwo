@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { getInitials } from '@/lib/formatters';
 
 export default function AccountSettingsPage() {
   const { currentUser, updateProfile } = useAuthStore();
+  const allUnits = useFinancialStore(s => s.units);
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -69,7 +71,12 @@ export default function AccountSettingsPage() {
           <div className="bg-mist-50 rounded-lg p-4 text-center text-ink-400">No units linked yet</div>
         )}
         <div className="flex gap-2">
-          <input value={linkUnit} onChange={e => setLinkUnit(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg" placeholder="Enter unit number (e.g., 204)" />
+          {(() => { const available = allUnits.filter(u => !(currentUser?.linkedUnits || []).includes(u.number)); return (
+            <select value={linkUnit} onChange={e => setLinkUnit(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg">
+              <option value="">Select unit to link...</option>
+              {available.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}
+            </select>
+          ); })()}
           <button onClick={() => { if (linkUnit) { updateProfile({ linkedUnits: [...(currentUser?.linkedUnits || []), linkUnit] }); setLinkUnit(''); } }} className="px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 font-medium">Link Unit</button>
         </div>
       </div>

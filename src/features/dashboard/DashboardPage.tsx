@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTabParam } from '@/hooks/useTabParam';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
@@ -12,7 +13,7 @@ import { fmt } from '@/lib/formatters';
 import ReportsTab from './tabs/ReportsTab';
 
 export default function DashboardPage() {
-  const [dashView, setDashView] = useState<'dashboard' | 'reports'>('dashboard');
+  const [dashView, setDashView] = useTabParam<'dashboard' | 'reports'>('view', 'dashboard', ['dashboard', 'reports']);
   const { currentUser, currentRole } = useAuthStore();
   const fin = useFinancialStore();
   const { meetings } = useMeetingsStore();

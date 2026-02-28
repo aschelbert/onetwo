@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTabParam } from '@/hooks/useTabParam';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -20,7 +21,7 @@ export default function BuildingPage() {
   const { currentRole } = useAuthStore();
   const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-  const [tab, setTab] = useState<typeof TABS[number]>('details');
+  const [tab, setTab] = useTabParam<typeof TABS[number]>('tab', 'details', [...TABS]);
   const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'scorecard');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');

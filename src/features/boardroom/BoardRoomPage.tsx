@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTabParam } from '@/hooks/useTabParam';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore, type Meeting } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -65,7 +66,7 @@ export default function BoardRoomPage() {
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const [tab, setTab] = useState<TabId>('duties');
+  const [tab, setTab] = useTabParam<TabId>('tab', 'duties', ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops']);
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
   const [targetId, setTargetId] = useState('');
