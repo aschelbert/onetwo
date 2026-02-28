@@ -74,7 +74,8 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
     const id = store.createCase({
       catId, sitId: sits[0]?.id || 'other', approach: 'pre' as CaseApproach,
       title: issue.title, unit: issue.unitNumber || '', owner: issue.reporterName,
-      priority: (prioMap[issue.priority] || 'medium') as CasePriority, notes: `Converted from issue ${issue.id}. ${issue.description}`
+      priority: (prioMap[issue.priority] || 'medium') as CasePriority, notes: `Converted from issue ${issue.id}. ${issue.description}`,
+      source: 'issue', sourceId: issue.id
     });
     store.updateIssueStatus(issue.id, 'IN_PROGRESS');
     onNav(`case:${id}`);
@@ -176,7 +177,18 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                   <span className="text-sm text-ink-800 truncate">{i.title}</span>
                   {i.unitNumber && <span className="text-[10px] text-ink-400 shrink-0">Unit {i.unitNumber}</span>}
                 </div>
-                <button onClick={() => { handleConvertToCase(i); }} className="px-2 py-1 text-[10px] font-semibold bg-accent-600 text-white rounded hover:bg-accent-700 shrink-0 ml-2">→ Convert to Case</button>
+                {(() => {
+                  const linkedCase = store.cases.find(c => c.sourceId === i.id);
+                  return linkedCase
+                    ? <button onClick={(e) => { e.stopPropagation(); onNav(`case:${linkedCase.id}`); }}
+                        className="px-2 py-1 text-[10px] font-semibold bg-sage-600 text-white rounded hover:bg-sage-700 shrink-0 ml-2">
+                        View Case →
+                      </button>
+                    : <button onClick={() => { handleConvertToCase(i); }}
+                        className="px-2 py-1 text-[10px] font-semibold bg-accent-600 text-white rounded hover:bg-accent-700 shrink-0 ml-2">
+                        → Convert to Case
+                      </button>;
+                })()}
               </div>
             ))}
             {issues.filter(i => i.status === 'SUBMITTED').length > 3 && (
@@ -319,11 +331,18 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                       </button>
                     ))}
                     {isBoard && <button onClick={() => setReplyTo(replyTo === i.id ? null : i.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200">💬 Reply</button>}
-                    {isBoard && i.status !== 'CLOSED' && (
-                      <button onClick={(e) => { e.stopPropagation(); handleConvertToCase(i); }} className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white hover:bg-accent-700 ml-1">
-                        → Convert to Case
-                      </button>
-                    )}
+                    {isBoard && i.status !== 'CLOSED' && (() => {
+                      const linkedCase = store.cases.find(c => c.sourceId === i.id);
+                      return linkedCase
+                        ? <button onClick={(e) => { e.stopPropagation(); onNav(`case:${linkedCase.id}`); }}
+                            className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-sage-600 text-white hover:bg-sage-700 ml-1">
+                            View Case →
+                          </button>
+                        : <button onClick={(e) => { e.stopPropagation(); handleConvertToCase(i); }}
+                            className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white hover:bg-accent-700 ml-1">
+                            → Convert to Case
+                          </button>;
+                    })()}
                   </div>
                   {isBoard && replyTo === i.id && (
                     <div className="mt-2 flex gap-2">

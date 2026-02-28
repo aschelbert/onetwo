@@ -778,7 +778,7 @@ interface IssuesState {
   addIssueComment: (issueId: string, author: string, text: string) => void;
 
   // Case actions
-  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string }, tenantId?: string) => string;
+  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
@@ -924,6 +924,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
       ...(data.source && { source: data.source }),
+      ...(data.sourceId && { sourceId: data.sourceId }),
     };
     set({ cases: [newCase, ...s.cases], nextCaseNum: s.nextCaseNum + 1 });
     if (isBackendEnabled && tenantId) {
