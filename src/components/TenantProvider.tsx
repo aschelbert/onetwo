@@ -140,22 +140,29 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         updateAddress(tenantInfo.address);
         updateDetails({ totalUnits: tenantInfo.totalUnits });
 
-        // Hydrate operational stores from DB
-        await Promise.all([
-          useComplianceStore.getState().loadFromDb(tenantInfo.id),
-          useMeetingsStore.getState().loadFromDb(tenantInfo.id),
-          useIssuesStore.getState().loadFromDb(tenantInfo.id),
-          useElectionStore.getState().loadFromDb(tenantInfo.id),
-          useBuildingStore.getState().loadFromDb(tenantInfo.id),
-          useFinancialStore.getState().loadFromDb(tenantInfo.id),
-          useArchiveStore.getState().loadFromDb(tenantInfo.id),
-          useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
-          useSpendingStore.getState().loadFromDb(tenantInfo.id),
-          useLetterStore.getState().loadFromDb(tenantInfo.id),
-          usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
-          useReportStore.getState().loadFromDb(tenantInfo.id),
-          useScorecardStore.getState().loadFromDb(tenantInfo.id),
-        ]);
+        // Probe for operational tables before attempting to hydrate stores.
+        // If the tables haven't been migrated yet, skip all loadFromDb calls
+        // to avoid dozens of 404 network errors in the console.
+        const { error: probe } = await supabase.from('meetings').select('id').limit(0);
+        const tablesExist = !probe || probe.code !== 'PGRST205';
+
+        if (tablesExist) {
+          await Promise.all([
+            useComplianceStore.getState().loadFromDb(tenantInfo.id),
+            useMeetingsStore.getState().loadFromDb(tenantInfo.id),
+            useIssuesStore.getState().loadFromDb(tenantInfo.id),
+            useElectionStore.getState().loadFromDb(tenantInfo.id),
+            useBuildingStore.getState().loadFromDb(tenantInfo.id),
+            useFinancialStore.getState().loadFromDb(tenantInfo.id),
+            useArchiveStore.getState().loadFromDb(tenantInfo.id),
+            useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
+            useSpendingStore.getState().loadFromDb(tenantInfo.id),
+            useLetterStore.getState().loadFromDb(tenantInfo.id),
+            usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
+            useReportStore.getState().loadFromDb(tenantInfo.id),
+            useScorecardStore.getState().loadFromDb(tenantInfo.id),
+          ]);
+        }
 
       } catch (err) {
         console.warn('Failed to load tenant, using demo:', err);

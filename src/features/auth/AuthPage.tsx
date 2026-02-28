@@ -122,6 +122,8 @@ export default function AuthPage() {
 
     // Check for existing Supabase session (e.g. after password reset)
     if (isBackendEnabled && supabase && !params.get('sb_access') && !urlInvite) {
+      // Timeout after 3s so the login form is never stuck on "Checking session..."
+      const timeout = setTimeout(() => { setSessionChecking(false); setLoginLoading(false); }, 3000);
       (async () => {
         try {
           const { data: { session } } = await supabase!.auth.getSession();
@@ -149,6 +151,7 @@ export default function AuthPage() {
               addMember(m);
               login(m);
               setLoginLoading(false);
+              clearTimeout(timeout);
               setSessionChecking(false);
               return;
             }
@@ -157,6 +160,7 @@ export default function AuthPage() {
         } catch (err) {
           console.warn('Session check failed:', err);
         }
+        clearTimeout(timeout);
         setSessionChecking(false);
       })();
     } else {
