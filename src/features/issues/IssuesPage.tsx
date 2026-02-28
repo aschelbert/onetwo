@@ -9,6 +9,7 @@ import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal } from './components/CaseModals';
+import { CaseWorkflow } from './components/workflow/CaseWorkflow';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
 import { DACI_MATRIX } from '@/data/daciMatrix';
@@ -673,7 +674,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
     'financial:ledger':     { route: '/financial', tab: 'ledger' },
   };
 
-  const handleStepAction = (action: StepAction, stepIdx: number) => {
+  const handleAction = (action: StepAction, stepIdx: number) => {
     if (action.type === 'navigate') {
       const nav = ACTION_NAV[action.target];
       if (nav) {
@@ -684,6 +685,16 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       if (action.target === 'create-wo' && c) {
         setWOForm({ title: c.title, vendor: '', amount: '', acctNum: '6050' });
         setShowWOModal(true);
+      } else if (action.target === 'board-vote') {
+        setShowVoteModal(true);
+      } else if (action.target === 'send-comm') {
+        setShowCommModal(true);
+      } else if (action.target === 'upload-doc') {
+        setShowDocModal(true);
+      } else if (action.target === 'link-meeting') {
+        setShowMeetingModal(true);
+      } else if (action.target === 'create-invoice') {
+        setShowInvoiceModal(true);
       }
     } else if (action.type === 'inline') {
       setInlineStepIdx(inlineStepIdx === stepIdx ? null : stepIdx);
@@ -694,10 +705,14 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
 
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
-  const pct = c.steps ? Math.round((c.steps.filter(s => s.done).length / c.steps.length) * 100) : 0;
   const buildingState = useBuildingStore(s => s.address.state);
   const jurisdictionKey = buildingState === 'District of Columbia' ? 'DC' : buildingState;
   const stNote = sit?.notes?.[jurisdictionKey] || sit?.notes?.['_'] || '';
+
+  const openAssignmentEditor = () => {
+    setAssignForm({ assignedTo: c.assignedTo || '', assignedRole: c.assignedRole || '', dueDate: c.dueDate || '' });
+    setEditingAssignment(true);
+  };
 
   return (
     <div className="space-y-5">
@@ -706,69 +721,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Dashboard</button>
         <span className="text-ink-300">·</span>
         <button onClick={() => onNav('cases')} className="text-xs text-ink-400 hover:text-ink-600">All Cases</button>
-      </div>
-
-      {/* Header card */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-start gap-4">
-          <span className="text-3xl">{cat?.icon || '📋'}</span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${PRIO_COLORS[c.priority]}`}>{c.priority}</span>
-              <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${APPR_COLORS[c.approach]}`}>{APPR_LABELS[c.approach]}</span>
-              <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'open' ? 'bg-accent-50 text-accent-600' : 'bg-sage-100 text-sage-700'}`}>{c.status}</span>
-            </div>
-            <h2 className="text-xl font-bold text-ink-900">{c.title}</h2>
-            <p className="text-sm text-ink-400 mt-1">{sit?.title || ''} · Unit {c.unit} · {c.owner} · Created {c.created}</p>
-            {/* Assignment info */}
-            {(c.assignedTo || c.dueDate || c.source || c.completedAt) && (
-              <div className="flex flex-wrap items-center gap-3 mt-2">
-                {c.assignedTo && (
-                  <span className="text-xs bg-accent-50 text-accent-700 px-2 py-1 rounded-lg font-medium">
-                    Assigned to: {c.assignedTo}{c.assignedRole ? ` (${c.assignedRole})` : ''}
-                  </span>
-                )}
-                {c.dueDate && (() => {
-                  const today = new Date().toISOString().split('T')[0];
-                  const daysUntil = Math.ceil((new Date(c.dueDate + 'T12:00').getTime() - new Date(today + 'T12:00').getTime()) / (1000 * 60 * 60 * 24));
-                  const isOverdue = c.status === 'open' && daysUntil < 0;
-                  const isNear = c.status === 'open' && daysUntil >= 0 && daysUntil <= 7;
-                  return (
-                    <span className={`text-xs px-2 py-1 rounded-lg font-medium ${isOverdue ? 'bg-red-100 text-red-700' : isNear ? 'bg-amber-100 text-amber-700' : 'bg-ink-100 text-ink-600'}`}>
-                      Due: {c.dueDate}{isOverdue ? ' (OVERDUE)' : ''}
-                    </span>
-                  );
-                })()}
-                {c.source && (c.source === 'issue' && c.sourceId
-                  ? <button onClick={onBack} className="text-xs text-accent-500 hover:text-accent-600 font-medium">Source: Request #{c.sourceId} · View →</button>
-                  : <span className="text-xs text-ink-400">Source: {c.source}</span>
-                )}
-                {c.completedAt && <span className="text-xs bg-sage-100 text-sage-700 px-2 py-1 rounded-lg font-medium">Completed: {c.completedAt}</span>}
-                <button onClick={() => { setAssignForm({ assignedTo: c.assignedTo || '', assignedRole: c.assignedRole || '', dueDate: c.dueDate || '' }); setEditingAssignment(true); }} className="text-[11px] text-accent-500 hover:text-accent-600 font-medium">Edit Assignment</button>
-              </div>
-            )}
-            {!c.assignedTo && !c.dueDate && (
-              <button onClick={() => { setAssignForm({ assignedTo: '', assignedRole: '', dueDate: '' }); setEditingAssignment(true); }} className="text-[11px] text-accent-500 hover:text-accent-600 font-medium mt-2 inline-block">+ Add Assignment</button>
-            )}
-            {c.notes && <p className="text-sm text-ink-500 mt-2 bg-sand-100 rounded-lg p-3">{c.notes}</p>}
-          </div>
-          <div className="shrink-0 text-center">
-            <svg viewBox="0 0 36 36" className="w-16 h-16">
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={c.status === 'closed' ? '#22c55e' : '#f59e0b'} strokeWidth="3" strokeDasharray={`${pct}, 100`} />
-            </svg>
-            <span className="text-sm font-bold text-ink-700">{pct}%</span>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4 pt-4 border-t border-ink-50 flex-wrap">
-          {c.status === 'open' ? (
-            <button onClick={() => { if (confirm('Close this case?')) store.closeCase(caseId); }} className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">✓ Close Case</button>
-          ) : (
-            <button onClick={() => store.reopenCase(caseId)} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">↻ Reopen</button>
-          )}
-          <button onClick={() => setShowApproachModal(true)} className="px-4 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-semibold hover:bg-ink-50">+ Add Approach</button>
-          <button onClick={() => { if (confirm('Delete this case?')) { store.deleteCase(caseId); onBack(); } }} className="px-4 py-1.5 text-red-500 rounded-lg text-xs font-semibold hover:bg-red-50 ml-auto">Delete</button>
-        </div>
+        <span className="text-ink-300">·</span>
+        <span className="text-xs text-ink-500 font-medium">{c.id}</span>
       </div>
 
       {/* Jurisdiction note */}
@@ -784,244 +738,224 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         </div>
       )}
 
-      {/* Main approach steps */}
+      {/* Case Workflow: sidebar + accordion + supporting sections */}
       {c.steps && (
-        <StepsSection
-          caseId={caseId}
-          approach={c.approach}
+        <CaseWorkflow
+          c={c}
           steps={c.steps}
-          onToggle={(idx) => store.toggleStep(caseId, idx)}
-          onNote={(idx, note) => store.addStepNote(caseId, idx, note)}
-          onAction={handleStepAction}
-          inlineStepIdx={inlineStepIdx}
-        />
-      )}
-
-      {/* Additional approaches */}
-      {c.additionalApproaches?.map((aa: any, ai: number) => (
-        <div key={ai} className="bg-white rounded-xl border border-ink-100 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${APPR_COLORS[aa.approach]}`}>{APPR_LABELS[aa.approach]}</span>
-            <h3 className="text-lg font-semibold text-ink-800">Steps</h3>
-            <span className="text-ink-400 text-sm">({aa.steps.filter((s: any) => s.done).length}/{aa.steps.length} complete · added {aa.addedDate})</span>
-          </div>
-          <div className="space-y-3">
-            {aa.steps.map((st: any, si: number) => (
-              <div key={si} className="flex items-start gap-3">
-                <button onClick={() => store.toggleAdditionalStep(caseId, ai, si)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all text-sm font-bold ${st.done ? 'bg-sage-500 border-sage-500 text-white' : 'border-ink-200 text-ink-300 hover:border-accent-400'}`}>
-                  {st.done ? '✓' : si + 1}
+          onToggleStep={(idx) => store.toggleStep(caseId, idx)}
+          onAddNote={(idx, note) => store.addStepNote(caseId, idx, note)}
+          onAction={handleAction}
+          onClose={() => { if (confirm('Close this case?')) store.closeCase(caseId); }}
+          onReopen={() => store.reopenCase(caseId)}
+          onEditAssignment={openAssignmentEditor}
+        >
+          {/* Board Vote */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-ink-800">Board Vote</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setShowVoteModal(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${c.boardVotes ? 'border border-ink-200 text-ink-700 hover:bg-mist-50' : 'bg-ink-900 text-white hover:bg-ink-800'}`}>
+                  {c.boardVotes ? 'Edit Vote' : 'Record Vote'}
                 </button>
-                <div className="flex-1">
-                  <p className={`text-sm ${st.done ? 'text-ink-400 line-through' : 'text-ink-800 font-medium'}`}>{st.s}</p>
-                  {st.w && <span className="text-[11px] text-rose-500">⚠ {st.w}</span>}
-                  {st.done && st.doneDate && <span className="text-[10px] text-sage-500 block">Completed {st.doneDate}</span>}
-                  {st.userNotes && <p className="text-xs text-ink-400 mt-1 bg-sand-100 rounded p-2">📝 {st.userNotes}</p>}
-                  <button onClick={() => { const note = prompt('Add note:', st.userNotes || ''); if (note !== null) store.addAdditionalStepNote(caseId, ai, si, note); }} className="text-[11px] text-accent-500 hover:text-accent-600 mt-1 inline-block">+ Add note</button>
+                {c.boardVotes && <button onClick={() => { if (confirm('Remove vote?')) store.clearBoardVote(caseId); }} className="px-3 py-1.5 text-red-400 hover:bg-red-50 rounded-lg text-xs font-medium">Remove</button>}
+              </div>
+            </div>
+            {c.boardVotes ? <BoardVoteDisplay vote={c.boardVotes} /> : <p className="text-sm text-ink-400 py-3 text-center">No board vote recorded for this case.</p>}
+          </div>
+
+          {/* Documents */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-ink-800">Documents</h3>
+              <button onClick={() => setShowDocModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">📎 Upload</button>
+            </div>
+            {c.attachments.length > 0 ? (
+              <div className="space-y-1.5">
+                {c.attachments.map((a, i) => {
+                  const tc: Record<string, string> = { evidence: 'bg-amber-100 text-amber-700', notice: 'bg-accent-100 text-accent-700', legal: 'bg-rose-100 text-rose-700', claim: 'bg-purple-100 text-purple-700' };
+                  return (
+                    <div key={i} className="flex items-center justify-between p-2.5 bg-mist-50 border border-mist-100 rounded-lg group">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-ink-400">📄</span>
+                        <span className="text-sm text-ink-700 truncate">{a.name}</span>
+                        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${tc[a.type] || 'bg-ink-100 text-ink-500'}`}>{a.type}</span>
+                        <span className="text-xs text-ink-300">{a.size}</span>
+                      </div>
+                      <button onClick={() => store.removeDocument(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0 ml-2">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="text-sm text-ink-400 py-3 text-center">No documents attached.</p>}
+          </div>
+
+          {/* Communications */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-ink-800">Communications</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setShowLinkLetterModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Letter</button>
+                <button onClick={() => setShowCommModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">✉ Send</button>
+              </div>
+            </div>
+            {c.comms.length > 0 ? (
+              <div className="space-y-2">
+                {[...c.comms].sort((a, b) => b.date.localeCompare(a.date)).map((cm, i) => {
+                  const icons: Record<string, string> = { notice: '📢', response: '✉️', reminder: '⏰', violation: '⚠️', legal: '⚖️' };
+                  return (
+                    <div key={cm.id} className="p-3 bg-mist-50 border border-mist-100 rounded-lg group">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-base mt-0.5">{icons[cm.type] || '📨'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium text-ink-900">{cm.subject}</p>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${cm.status === 'sent' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{cm.status}</span>
+                                <span className="text-[11px] text-ink-400">{cm.date} · via {cm.method}</span>
+                                <span className="text-[11px] text-ink-500">→ {cm.recipient}</span>
+                              </div>
+                            </div>
+                            <button onClick={() => store.removeComm(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0">✕</button>
+                          </div>
+                          {cm.notes && <p className="text-xs text-ink-400 mt-1">{cm.notes}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="text-sm text-ink-400 py-3 text-center">No communications sent.</p>}
+
+            {/* Linked Letters */}
+            {(c.linkedLetterIds?.length ?? 0) > 0 && (
+              <div className="mt-4 pt-4 border-t border-ink-50">
+                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Linked Letters</p>
+                <div className="space-y-2">
+                  {(c.linkedLetterIds || []).map(letterId => {
+                    const letter = letterStore.letters.find(l => l.id === letterId);
+                    if (!letter) return <div key={letterId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Letter {letterId} not found</div>;
+                    const sc: Record<string, string> = { draft: 'bg-yellow-100 text-yellow-700', sent: 'bg-sage-100 text-sage-700', archived: 'bg-ink-100 text-ink-500' };
+                    return (
+                      <div key={letterId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg group">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[letter.status] || 'bg-ink-100 text-ink-500'}`}>{letter.status}</span>
+                          <span className="text-sm font-medium text-ink-900 truncate">{letter.subject}</span>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-ink-400">{letter.recipient} · {letter.sentDate}</span>
+                          <button onClick={() => store.unlinkLetter(caseId, letterId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      ))}
 
-      {/* Board Vote */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-ink-800">Board Vote</h3>
-          <div className="flex gap-2">
-            <button onClick={() => setShowVoteModal(true)} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${c.boardVotes ? 'border border-ink-200 text-ink-700 hover:bg-mist-50' : 'bg-ink-900 text-white hover:bg-ink-800'}`}>
-              {c.boardVotes ? 'Edit Vote' : 'Record Vote'}
-            </button>
-            {c.boardVotes && <button onClick={() => { if (confirm('Remove vote?')) store.clearBoardVote(caseId); }} className="px-3 py-1.5 text-red-400 hover:bg-red-50 rounded-lg text-xs font-medium">Remove</button>}
-          </div>
-        </div>
-        {c.boardVotes ? <BoardVoteDisplay vote={c.boardVotes} /> : <p className="text-sm text-ink-400 py-3 text-center">No board vote recorded for this case.</p>}
-      </div>
+          {/* Financials: Work Orders + Invoices */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-ink-800">Financials</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setShowLinkInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Invoice</button>
+                <button onClick={() => setShowInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">+ Create Invoice</button>
+                <button onClick={() => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Create Work Order</button>
+              </div>
+            </div>
 
-      {/* Documents */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-ink-800">Documents</h3>
-          <button onClick={() => setShowDocModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">📎 Upload</button>
-        </div>
-        {c.attachments.length > 0 ? (
-          <div className="space-y-1.5">
-            {c.attachments.map((a, i) => {
-              const tc: Record<string, string> = { evidence: 'bg-amber-100 text-amber-700', notice: 'bg-accent-100 text-accent-700', legal: 'bg-rose-100 text-rose-700', claim: 'bg-purple-100 text-purple-700' };
-              return (
-                <div key={i} className="flex items-center justify-between p-2.5 bg-mist-50 border border-mist-100 rounded-lg group">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-ink-400">📄</span>
-                    <span className="text-sm text-ink-700 truncate">{a.name}</span>
-                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${tc[a.type] || 'bg-ink-100 text-ink-500'}`}>{a.type}</span>
-                    <span className="text-xs text-ink-300">{a.size}</span>
-                  </div>
-                  <button onClick={() => store.removeDocument(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0 ml-2">✕</button>
-                </div>
-              );
-            })}
-          </div>
-        ) : <p className="text-sm text-ink-400 py-3 text-center">No documents attached.</p>}
-      </div>
-
-      {/* Communications */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-ink-800">Communications</h3>
-          <div className="flex gap-2">
-            <button onClick={() => setShowLinkLetterModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Letter</button>
-            <button onClick={() => setShowCommModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">✉ Send</button>
-          </div>
-        </div>
-        {c.comms.length > 0 ? (
-          <div className="space-y-2">
-            {[...c.comms].sort((a, b) => b.date.localeCompare(a.date)).map((cm, i) => {
-              const icons: Record<string, string> = { notice: '📢', response: '✉️', reminder: '⏰', violation: '⚠️', legal: '⚖️' };
-              return (
-                <div key={cm.id} className="p-3 bg-mist-50 border border-mist-100 rounded-lg group">
-                  <div className="flex items-start gap-2.5">
-                    <span className="text-base mt-0.5">{icons[cm.type] || '📨'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium text-ink-900">{cm.subject}</p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${cm.status === 'sent' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{cm.status}</span>
-                            <span className="text-[11px] text-ink-400">{cm.date} · via {cm.method}</span>
-                            <span className="text-[11px] text-ink-500">→ {cm.recipient}</span>
-                          </div>
-                        </div>
-                        <button onClick={() => store.removeComm(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0">✕</button>
+            {/* Work Orders */}
+            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Work Orders</p>
+            {c.linkedWOs.length > 0 ? (
+              <div className="space-y-2">
+                {c.linkedWOs.map(woId => {
+                  const wo = workOrders.find(w => w.id === woId);
+                  if (!wo) return <div key={woId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">WO {woId} not found</div>;
+                  const sc: Record<string, string> = { draft: 'bg-ink-100 text-ink-500', approved: 'bg-yellow-100 text-yellow-700', invoiced: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700' };
+                  return (
+                    <div key={woId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${sc[wo.status]}`}>{wo.status}</span>
+                        <span className="text-xs font-mono text-ink-300">{wo.id}</span>
+                        <span className="text-sm font-medium text-ink-900 truncate">{wo.title}</span>
                       </div>
-                      {cm.notes && <p className="text-xs text-ink-400 mt-1">{cm.notes}</p>}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm text-ink-500">{wo.vendor}</span>
+                        <span className="font-bold text-ink-900">{fmt(wo.amount)}</span>
+                        <button onClick={() => store.unlinkWO(caseId, woId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : <p className="text-sm text-ink-400 py-3 text-center">No communications sent.</p>}
+                  );
+                })}
+              </div>
+            ) : <p className="text-sm text-ink-400 py-2 text-center">No work orders linked.</p>}
 
-        {/* Linked Letters */}
-        {(c.linkedLetterIds?.length ?? 0) > 0 && (
-          <div className="mt-4 pt-4 border-t border-ink-50">
-            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Linked Letters</p>
-            <div className="space-y-2">
-              {(c.linkedLetterIds || []).map(letterId => {
-                const letter = letterStore.letters.find(l => l.id === letterId);
-                if (!letter) return <div key={letterId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Letter {letterId} not found</div>;
-                const sc: Record<string, string> = { draft: 'bg-yellow-100 text-yellow-700', sent: 'bg-sage-100 text-sage-700', archived: 'bg-ink-100 text-ink-500' };
-                return (
-                  <div key={letterId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg group">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[letter.status] || 'bg-ink-100 text-ink-500'}`}>{letter.status}</span>
-                      <span className="text-sm font-medium text-ink-900 truncate">{letter.subject}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs text-ink-400">{letter.recipient} · {letter.sentDate}</span>
-                      <button onClick={() => store.unlinkLetter(caseId, letterId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Linked Invoices */}
+            <div className="mt-4 pt-4 border-t border-ink-50">
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Invoices</p>
+              {(c.linkedInvoiceIds?.length ?? 0) > 0 ? (
+                <div className="space-y-2">
+                  {(c.linkedInvoiceIds || []).map(invId => {
+                    const inv = fin.unitInvoices.find(i => i.id === invId);
+                    if (!inv) return <div key={invId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Invoice {invId} not found</div>;
+                    const sc: Record<string, string> = { sent: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700', overdue: 'bg-red-100 text-red-700', void: 'bg-ink-100 text-ink-500' };
+                    return (
+                      <div key={invId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[inv.status] || 'bg-ink-100 text-ink-500'}`}>{inv.status}</span>
+                          <span className="text-xs font-mono text-ink-300">{inv.id}</span>
+                          <span className="text-sm font-medium text-ink-900 truncate">{inv.description}</span>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-ink-500">Unit {inv.unitNumber}</span>
+                          <span className="font-bold text-ink-900">{fmt(inv.amount)}</span>
+                          <button onClick={() => store.unlinkInvoice(caseId, invId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <p className="text-sm text-ink-400 py-2 text-center">No invoices linked.</p>}
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Financials: Work Orders + Invoices */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-ink-800">Financials</h3>
-          <div className="flex gap-2">
-            <button onClick={() => setShowLinkInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Invoice</button>
-            <button onClick={() => setShowInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">+ Create Invoice</button>
-            <button onClick={() => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Create Work Order</button>
-          </div>
-        </div>
-
-        {/* Work Orders */}
-        <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Work Orders</p>
-        {c.linkedWOs.length > 0 ? (
-          <div className="space-y-2">
-            {c.linkedWOs.map(woId => {
-              const wo = workOrders.find(w => w.id === woId);
-              if (!wo) return <div key={woId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">WO {woId} not found</div>;
-              const sc: Record<string, string> = { draft: 'bg-ink-100 text-ink-500', approved: 'bg-yellow-100 text-yellow-700', invoiced: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700' };
-              return (
-                <div key={woId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${sc[wo.status]}`}>{wo.status}</span>
-                    <span className="text-xs font-mono text-ink-300">{wo.id}</span>
-                    <span className="text-sm font-medium text-ink-900 truncate">{wo.title}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm text-ink-500">{wo.vendor}</span>
-                    <span className="font-bold text-ink-900">{fmt(wo.amount)}</span>
-                    <button onClick={() => store.unlinkWO(caseId, woId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : <p className="text-sm text-ink-400 py-2 text-center">No work orders linked.</p>}
-
-        {/* Linked Invoices */}
-        <div className="mt-4 pt-4 border-t border-ink-50">
-          <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Invoices</p>
-          {(c.linkedInvoiceIds?.length ?? 0) > 0 ? (
-            <div className="space-y-2">
-              {(c.linkedInvoiceIds || []).map(invId => {
-                const inv = fin.unitInvoices.find(i => i.id === invId);
-                if (!inv) return <div key={invId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Invoice {invId} not found</div>;
-                const sc: Record<string, string> = { sent: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700', overdue: 'bg-red-100 text-red-700', void: 'bg-ink-100 text-ink-500' };
-                return (
-                  <div key={invId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[inv.status] || 'bg-ink-100 text-ink-500'}`}>{inv.status}</span>
-                      <span className="text-xs font-mono text-ink-300">{inv.id}</span>
-                      <span className="text-sm font-medium text-ink-900 truncate">{inv.description}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs text-ink-500">Unit {inv.unitNumber}</span>
-                      <span className="font-bold text-ink-900">{fmt(inv.amount)}</span>
-                      <button onClick={() => store.unlinkInvoice(caseId, invId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Meetings */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-ink-800">Meetings</h3>
+              <button onClick={() => setShowMeetingModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Link Meeting</button>
             </div>
-          ) : <p className="text-sm text-ink-400 py-2 text-center">No invoices linked.</p>}
-        </div>
-      </div>
-
-      {/* Meetings */}
-      <div className="bg-white rounded-xl border border-ink-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-ink-800">Meetings</h3>
-          <button onClick={() => setShowMeetingModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Link Meeting</button>
-        </div>
-        {(c.linkedMeetingIds?.length ?? 0) > 0 ? (
-          <div className="space-y-2">
-            {(c.linkedMeetingIds || []).map(meetingId => {
-              const meeting = meetingsStore.meetings.find(m => m.id === meetingId);
-              if (!meeting) return <div key={meetingId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Meeting {meetingId} not found</div>;
-              const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
-              return (
-                <div key={meetingId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[meeting.status] || 'bg-ink-100 text-ink-500'}`}>{meeting.status}</span>
-                    <span className="text-sm font-medium text-ink-900 truncate">{meeting.title}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-ink-400">{meeting.date} · {meeting.type}</span>
-                    <button onClick={() => store.unlinkMeeting(caseId, meetingId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                  </div>
-                </div>
-              );
-            })}
+            {(c.linkedMeetingIds?.length ?? 0) > 0 ? (
+              <div className="space-y-2">
+                {(c.linkedMeetingIds || []).map(meetingId => {
+                  const meeting = meetingsStore.meetings.find(m => m.id === meetingId);
+                  if (!meeting) return <div key={meetingId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Meeting {meetingId} not found</div>;
+                  const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
+                  return (
+                    <div key={meetingId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[meeting.status] || 'bg-ink-100 text-ink-500'}`}>{meeting.status}</span>
+                        <span className="text-sm font-medium text-ink-900 truncate">{meeting.title}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-ink-400">{meeting.date} · {meeting.type}</span>
+                        <button onClick={() => store.unlinkMeeting(caseId, meetingId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : <p className="text-sm text-ink-400 py-3 text-center">No meetings linked.</p>}
           </div>
-        ) : <p className="text-sm text-ink-400 py-3 text-center">No meetings linked.</p>}
+        </CaseWorkflow>
+      )}
+
+      {/* Add Approach button (outside workflow) */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setShowApproachModal(true)} className="px-4 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-semibold hover:bg-ink-50">+ Add Approach</button>
+        <button onClick={() => { if (confirm('Delete this case?')) { store.deleteCase(caseId); onBack(); } }} className="px-4 py-1.5 text-red-500 rounded-lg text-xs font-semibold hover:bg-red-50 ml-auto">Delete Case</button>
       </div>
 
       {/* Modals */}
