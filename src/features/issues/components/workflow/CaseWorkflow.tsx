@@ -14,12 +14,14 @@ interface CaseWorkflowProps {
   onClose: () => void;
   onReopen: () => void;
   onEditAssignment: () => void;
+  onAddApproach: () => void;
+  onDelete: () => void;
   children?: ReactNode;
 }
 
 export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
-  onClose, onReopen, onEditAssignment, children,
+  onClose, onReopen, onEditAssignment, onAddApproach, onDelete, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const activeStepIdx = steps.findIndex(s => !s.done);
@@ -55,6 +57,8 @@ export function CaseWorkflow({
         onClose={onClose}
         onReopen={onReopen}
         onEditAssignment={onEditAssignment}
+        onAddApproach={onAddApproach}
+        onDelete={onDelete}
         additionalApproaches={c.additionalApproaches}
       >
         {children}

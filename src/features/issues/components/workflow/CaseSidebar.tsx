@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import { CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
 
@@ -11,11 +11,38 @@ interface CaseSidebarProps {
   onClose: () => void;
   onReopen: () => void;
   onEditAssignment: () => void;
+  onAddApproach: () => void;
+  onDelete: () => void;
   additionalApproaches?: CaseTrackerCase['additionalApproaches'];
   children?: ReactNode;
 }
 
-export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick, onClose, onReopen, onEditAssignment, additionalApproaches, children }: CaseSidebarProps) {
+function SidebarMenu({ items }: { items: { label: string; onClick: () => void; danger?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="p-1 rounded-lg hover:bg-ink-100 transition-colors text-ink-400 hover:text-ink-600">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-ink-100 py-1 min-w-[160px]">
+            {items.map((item, i) => (
+              <button key={i} onClick={() => { item.onClick(); setOpen(false); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-mist-50 transition-colors ${item.danger ? 'text-red-500 hover:bg-red-50' : 'text-ink-700'}`}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, additionalApproaches, children }: CaseSidebarProps) {
   const cat = CATS.find(x => x.id === c.catId);
   const pct = steps.length > 0 ? Math.round((steps.filter(s => s.done).length / steps.length) * 100) : 0;
   const doneCount = steps.filter(s => s.done).length;
@@ -31,6 +58,14 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
               <p className="text-sm font-bold text-ink-900 truncate">{c.title}</p>
               <p className="text-[10px] text-ink-400 font-mono">{c.id}</p>
             </div>
+            <SidebarMenu items={[
+              c.status === 'open'
+                ? { label: 'Close Case', onClick: onClose }
+                : { label: 'Reopen Case', onClick: onReopen },
+              { label: 'Edit Assignment', onClick: onEditAssignment },
+              { label: 'Add Approach', onClick: onAddApproach },
+              { label: 'Delete Case', onClick: onDelete, danger: true },
+            ]} />
           </div>
 
           {/* Badges */}
@@ -70,15 +105,6 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
             </div>
           </div>
 
-          {/* Case controls */}
-          <div className="flex gap-2 pt-3 border-t border-ink-50">
-            {c.status === 'open' ? (
-              <button onClick={onClose} className="flex-1 px-3 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Close</button>
-            ) : (
-              <button onClick={onReopen} className="flex-1 px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Reopen</button>
-            )}
-            <button onClick={onEditAssignment} className="flex-1 px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-semibold hover:bg-ink-50">Edit</button>
-          </div>
         </div>
 
         {/* Step Rail */}

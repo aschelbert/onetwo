@@ -775,6 +775,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           onClose={() => { if (confirm('Close this case?')) store.closeCase(caseId); }}
           onReopen={() => store.reopenCase(caseId)}
           onEditAssignment={openAssignmentEditor}
+          onAddApproach={() => setShowApproachModal(true)}
+          onDelete={() => { if (confirm('Delete this case?')) { store.deleteCase(caseId); onBack(); } }}
         >
           {/* Board Vote */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
@@ -979,12 +981,6 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           </div>
         </CaseWorkflow>
       )}
-
-      {/* Add Approach button (outside workflow) */}
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setShowApproachModal(true)} className="px-4 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-semibold hover:bg-ink-50">+ Add Approach</button>
-        <button onClick={() => { if (confirm('Delete this case?')) { store.deleteCase(caseId); onBack(); } }} className="px-4 py-1.5 text-red-500 rounded-lg text-xs font-semibold hover:bg-red-50 ml-auto">Delete Case</button>
-      </div>
 
       {/* Modals */}
       {showVoteModal && <BoardVoteModal c={c} boardMembers={boardMembers} store={store} onClose={() => setShowVoteModal(false)} />}
