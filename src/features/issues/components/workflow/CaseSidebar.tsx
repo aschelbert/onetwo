@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import { CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
 
@@ -11,16 +12,17 @@ interface CaseSidebarProps {
   onReopen: () => void;
   onEditAssignment: () => void;
   additionalApproaches?: CaseTrackerCase['additionalApproaches'];
+  children?: ReactNode;
 }
 
-export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick, onClose, onReopen, onEditAssignment, additionalApproaches }: CaseSidebarProps) {
+export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick, onClose, onReopen, onEditAssignment, additionalApproaches, children }: CaseSidebarProps) {
   const cat = CATS.find(x => x.id === c.catId);
   const pct = steps.length > 0 ? Math.round((steps.filter(s => s.done).length / steps.length) * 100) : 0;
   const doneCount = steps.filter(s => s.done).length;
 
   return (
     <aside className="w-72 shrink-0 hidden lg:block">
-      <div className="sticky top-4 space-y-4">
+      <div className="space-y-4">
         {/* Case Summary Card */}
         <div className="bg-white rounded-xl border border-ink-100 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
@@ -132,6 +134,9 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
             </div>
           )}
         </div>
+
+        {/* Supporting sections */}
+        {children}
       </div>
     </aside>
   );

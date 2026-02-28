@@ -24,7 +24,6 @@ export function CaseWorkflow({
   // Find first incomplete step
   const activeStepIdx = steps.findIndex(s => !s.done);
   const [expandedStep, setExpandedStep] = useState<number>(activeStepIdx >= 0 ? activeStepIdx : 0);
-  const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
   const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const scrollToStep = useCallback((idx: number) => {
@@ -46,7 +45,7 @@ export function CaseWorkflow({
 
   return (
     <div className="flex gap-6 items-start">
-      {/* Sidebar */}
+      {/* Sidebar — case summary, step rail, and supporting sections */}
       <CaseSidebar
         c={c}
         steps={steps}
@@ -57,9 +56,11 @@ export function CaseWorkflow({
         onReopen={onReopen}
         onEditAssignment={onEditAssignment}
         additionalApproaches={c.additionalApproaches}
-      />
+      >
+        {children}
+      </CaseSidebar>
 
-      {/* Main content */}
+      {/* Main content — workflow steps */}
       <div className="flex-1 min-w-0 space-y-4">
         {/* Step cards accordion */}
         <div className="space-y-3">
@@ -106,26 +107,6 @@ export function CaseWorkflow({
             </div>
           </div>
         ))}
-
-        {/* Supporting sections — same column as workflow steps */}
-        {children && (
-          <div>
-            <button
-              onClick={() => setSectionsCollapsed(!sectionsCollapsed)}
-              className="flex items-center gap-2 mb-3 text-sm font-semibold text-ink-500 hover:text-ink-700 transition-colors"
-            >
-              <svg className={`w-4 h-4 transition-transform ${sectionsCollapsed ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-              Supporting Sections
-            </button>
-            {!sectionsCollapsed && (
-              <div className="space-y-4">
-                {children}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
