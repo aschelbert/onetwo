@@ -96,6 +96,7 @@ interface FinancialState {
 
   // Manual GL
   postManualEntry: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number) => void;
+  postTransfer: (date: string, memo: string, fromAcct: string, toAcct: string, amount: number) => void;
 
   // Unit payment mutations
   recordUnitPayment: (unitNum: string, amount: number, method: string) => void;
@@ -628,6 +629,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   postManualEntry: (date, memo, debitAcct, creditAcct, amount) => {
     get().glPost(date, memo, debitAcct, creditAcct, amount, 'manual', null);
+  },
+
+  postTransfer: (date, memo, fromAcct, toAcct, amount) => {
+    get().glPost(date, memo, toAcct, fromAcct, amount, 'transfer', null);
   },
 
   recordUnitPayment: (unitNum, amount, method) => {
