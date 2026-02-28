@@ -563,56 +563,84 @@ export const CATS: Category[] = [
       { id:'compliance-filing', title:'Compliance Filings', desc:'Regulatory filings and compliance deadlines',
         tags:['Regulatory filings','Annual reports','Government submissions'],
         pre:[
-          {s:'Identify filing requirement and deadline',t:'As needed',d:'State/local requirements'},
-          {s:'Gather required documentation',t:'2-4 weeks before deadline'},
-          {s:'Complete forms and prepare submission',t:'1-2 weeks before deadline'},
-          {s:'Board review and sign-off if required',t:'Board meeting',d:'Bylaws'},
-          {s:'Submit filing to appropriate agency',t:'Before deadline'},
-          {s:'Confirm receipt and save confirmation',t:'Within days of submission'},
-          {s:'File copy of submission in association records',t:'Immediately'}
+          {s:'Identify filing requirement and deadline',t:'As needed',d:'DC Code § 29-102.11',detail:'DC condos must file a Biennial Report with DCRA (now DLCP). Also check for sales tax, personal property tax, and business license renewals.'},
+          {s:'Gather required documentation: financial statements, officer/agent updates, registered agent confirmation',t:'2-4 weeks before deadline',detail:'If incorporated, ensure registered agent is current with DC Department of Licensing and Consumer Protection (DLCP).'},
+          {s:'Complete forms and prepare submission via online portal',t:'1-2 weeks before deadline',d:'DLCP / MyTax.DC.gov',detail:'DC Biennial Report filed online at DLCP. Tax filings via MyTax.DC.gov. Keep login credentials secure with Treasurer.'},
+          {s:'Board review and sign-off if required',t:'Board meeting',d:'Bylaws: Officer duties'},
+          {s:'Submit filing to appropriate agency and pay any required fees',t:'Before deadline',detail:'DC Biennial Report fee varies. Late filing can result in administrative dissolution of the entity.'},
+          {s:'Confirm receipt and save confirmation number/receipt',t:'Within days of submission'},
+          {s:'File copy of submission and confirmation in association records',t:'Immediately',d:'Document retention policy'}
         ],
-        self:[{s:'If filing rejected: review deficiencies and resubmit promptly'}],
-        legal:[{s:'Attorney assists with complex filings or disputed requirements',w:'Filing involves legal interpretation or dispute'}],
-        notes:{'_':'Maintain a calendar of all regulatory filing deadlines. Many jurisdictions impose penalties for late filings.'}
+        self:[{s:'If filing rejected: review deficiencies and resubmit promptly'},{s:'Set calendar reminders 60 and 30 days before each filing deadline'}],
+        legal:[{s:'Attorney assists with complex filings or disputed requirements',w:'Filing involves legal interpretation or dispute'},{s:'Attorney handles reinstatement if entity dissolved for non-filing',w:'Missed deadline resulted in administrative dissolution'}],
+        notes:{
+          'DC':'DC condos organized as nonprofits must file a Biennial Report with DLCP (formerly DCRA) per DC Code § 29-102.11. Late filing can lead to administrative dissolution per § 29-106.02. Reinstatement requires filing + penalty. Also: Form FR-16 (franchise tax exemption may apply), UCC filings for liens via DC Recorder of Deeds.',
+          '_':'Maintain a calendar of all regulatory filing deadlines. Many jurisdictions impose penalties for late filings.'
+        }
       },
       { id:'record-requests', title:'Record Requests', desc:'Owner inspection requests, financial transparency',
         tags:['Owner inspection requests','Financial transparency disputes'],
         pre:[
-          {s:'Receive written request and log date received',t:'Upon receipt',d:'Bylaws: Records access'},
-          {s:'Review state law for response timeline and scope',t:'1-3 days',d:'State condo act'},
-          {s:'Identify requested records; determine exemptions',t:'3-5 days'},
-          {s:'Provide records within statutory deadline; charge reasonable copying costs',t:'5-10 business days',d:'State condo act'},
-          {s:'If partially denying: written explanation citing specific exemption',t:'With response'}
+          {s:'Receive written request and log date received',t:'Upon receipt',d:'DC Code § 42-1903.14',detail:'DC owners have statutory right to inspect association records. Log the exact date — this starts the response clock.'},
+          {s:'Acknowledge receipt to the requesting owner within 3 business days',t:'3 business days',detail:'Written acknowledgment (email is sufficient). Confirm scope of request and expected timeframe.'},
+          {s:'Identify requested records and determine if any exemptions apply',t:'3-5 days',d:'DC Code § 42-1903.14(b)',detail:'Exemptions are narrow: attorney-client privilege, individual owner payment records (of other owners), personnel records. When in doubt, disclose.'},
+          {s:'Arrange inspection at reasonable time and place, or prepare copies',t:'Within 5 business days of request',d:'DC Code § 42-1903.14',detail:'DC requires records be available within 5 business days. May charge reasonable copying costs (per page). Electronic delivery preferred for efficiency.'},
+          {s:'Provide records and document what was delivered',t:'Within 5 business days',detail:'Retain a log entry: date, owner, records requested, records provided, any items withheld with reason.'},
+          {s:'If partially denying: written explanation citing specific statutory exemption',t:'With response',d:'DC Code § 42-1903.14(b)',detail:'Must cite the specific exemption relied upon. Vague denials are not legally defensible.'}
         ],
-        self:[{s:'If owner disputes denial: review statute and provide additional explanation'},{s:'Document what was provided and when'}],
-        legal:[{s:'Attorney advises on privileged documents and access rights',w:'Sensitive records or dispute'},{s:'Attorney defends records access lawsuit',w:'Owner files suit'}],
-        notes:{'_':'Most states grant broad access with specific response timelines. Exemptions limited to attorney-client privilege.'}
+        self:[{s:'If owner disputes denial: review statute and provide additional explanation',detail:'Consider consulting attorney before refusing. DC courts award attorney fees to prevailing owner.'},{s:'Document what was provided and when — maintain inspection log'}],
+        legal:[{s:'Attorney advises on privileged documents and access rights',w:'Sensitive records or dispute'},{s:'Attorney defends records access lawsuit — DC allows court petition with attorney fees',w:'Owner files suit per DC Code § 42-1903.14(c)'}],
+        notes:{
+          'DC':'DC Code § 42-1903.14: Owners may inspect and copy association records within 5 business days of written request. Association may charge reasonable copying fees. Exemptions limited to attorney-client privilege. If association fails to comply, owner may petition court — prevailing owner recovers attorney fees. Broad scope: financials, minutes, contracts, insurance, correspondence.',
+          '_':'Most states grant broad access with specific response timelines. Exemptions limited to attorney-client privilege. Document everything provided.'
+        }
       },
       { id:'resale-certs', title:'Resale Certificates', desc:'Preparing disclosure documents for unit sales',
-        tags:['Preparing disclosure documents'],
+        tags:['Preparing disclosure documents','Resale package','Estoppel certificate'],
         pre:[
-          {s:'Receive request from selling owner or agent',t:'Upon request'},
-          {s:'Compile required info: assessments, violations, specials, reserves, insurance',t:'3-10 days',d:'State condo act'},
-          {s:'Include all required documents per state law',t:'With certificate'},
-          {s:'Disclose any litigation, special assessments, capital projects',t:'With certificate'},
-          {s:'Issue certificate and charge permitted fee',t:'Within statutory deadline',d:'State condo act'}
+          {s:'Receive written request from selling owner or their agent; log date received',t:'Upon request',d:'DC Code § 42-1904.11',detail:'Starts the 10 business day clock. Request should specify unit number and settlement date.'},
+          {s:'Verify unit account status: current assessments, outstanding balances, late fees, special assessments',t:'1-2 business days',d:'DC Code § 42-1903.13',detail:'Pull unit ledger from Fiscal Lens. Confirm no pending disputes or credits.'},
+          {s:'Compile required financial documents: current budget, most recent audited/reviewed financial statement, reserve study summary',t:'2-3 business days',d:'DC Code § 42-1904.04(a)',detail:'Budget must be the currently adopted version. Financial statement per § 42-1903.18. Include reserve funding plan.'},
+          {s:'Compile governing documents: Bylaws, CC&Rs/Declaration, Rules & Regulations, Articles of Incorporation',t:'1-2 business days',d:'Bylaws & DC Code § 42-1904.04',detail:'Include all amendments. Verify versions are current per Legal & Bylaws tab.'},
+          {s:'Compile compliance documents: insurance certificate (master policy), pending litigation disclosure, planned capital improvements',t:'2-3 business days',d:'DC Code § 42-1904.04(a)',detail:'Insurance cert must name coverage amounts. Litigation disclosure includes all pending or threatened actions.'},
+          {s:'Disclose any special assessments (current or planned), right of first refusal, and transfer/move-in fees',t:'With certificate',d:'DC Code § 42-1904.04(a)(9)',detail:'Include board resolutions for any approved special assessments not yet billed.'},
+          {s:'Prepare the resale certificate cover letter with unit-specific financial summary',t:'1-2 business days',detail:'Use the Resale / Estoppel Certificate letter template. Include: monthly assessment amount, outstanding balance, prepaid credits, next due date.'},
+          {s:'Board officer or property manager reviews and signs the certificate',t:'1 business day',d:'Bylaws: Officer duties',detail:'Authorized signatory per bylaws. Certificate must be signed and dated.'},
+          {s:'Issue completed resale package to requestor; charge permitted processing fee',t:'Within 10 business days of request',d:'DC Code § 42-1904.11',detail:'DC statutory deadline: 10 business days. Fee must not exceed statutory maximum. Send via method requested (email/mail). Retain proof of delivery.'},
+          {s:'File a copy of the issued certificate and all enclosed documents in association records',t:'Immediately after issuance',d:'Document retention policy',detail:'Retain for minimum 7 years. Note: certificate is valid for 30 days from date of issuance.'}
         ],
-        self:[{s:'If info disputed: provide supporting documentation'},{s:'Maintain copy of each certificate in HOA records'}],
-        legal:[{s:'Attorney reviews template for state compliance',w:'Annual or after law changes'}],
-        notes:{'_':'Most states require resale package. Check for contents, timeline, fee limits, buyer rescission rights.'}
+        self:[
+          {s:'If info disputed by buyer/seller: provide supporting documentation (ledger history, board resolutions)',detail:'Respond within 5 business days to avoid delaying settlement.'},
+          {s:'If request is late or urgent (settlement imminent): prioritize and consider expedited fee if permitted by governing docs'},
+          {s:'Maintain a checklist template of all required documents to ensure completeness each time'},
+          {s:'Track all issued certificates in a log: unit, request date, issue date, fee charged, recipient'}
+        ],
+        legal:[
+          {s:'Attorney reviews resale certificate template annually for statutory compliance',w:'Annual or after DC Code changes'},
+          {s:'Attorney advises on scope of litigation disclosure',w:'Active or threatened litigation involving the association'},
+          {s:'Attorney reviews any buyer rescission claims',w:'Buyer alleges incomplete or inaccurate disclosure per § 42-1904.09'}
+        ],
+        notes:{
+          'DC':'DC Code § 42-1904.11: Must deliver within 10 business days. Package must include all items per § 42-1904.04(a): budget, financial statements, reserve study, bylaws, CC&Rs, rules, insurance, pending litigation, special assessments, transfer fees. Buyer has 3-day rescission right after receipt per § 42-1904.09. Fee limits set by statute — check current maximums.',
+          '_':'Most states require a resale package/certificate for condo sales. Key items: financial statements, governing documents, insurance, litigation disclosure, unit account status. Check your jurisdiction for required contents, response deadline, fee limits, and buyer rescission rights.'
+        }
       },
       { id:'move-disputes', title:'Move-In/Move-Out Disputes', desc:'Deposit disputes, damage claims',
         tags:['Deposit disputes','Damage claims'],
         pre:[
-          {s:'Conduct pre-move inspection of common areas',t:'Before move date',d:'Rules: Move policy'},
-          {s:'Collect move-in deposit per rules',t:'Before move date',d:'Rules & Regulations'},
-          {s:'Conduct post-move inspection; document damage with photos',t:'Within 24 hours'},
-          {s:'If no damage: refund deposit within specified timeline',t:'Per rules (30 days)'},
-          {s:'If damage: itemized deduction notice with photos and costs',t:'Per rules'}
+          {s:'Conduct pre-move inspection of common areas; photograph existing conditions',t:'Before move date',d:'Rules: Move policy',detail:'Use a dated checklist. Document hallways, elevators, lobby, and any areas the mover will traverse.'},
+          {s:'Collect move-in/move-out deposit per governing documents',t:'Before move date',d:'Bylaws & Rules',detail:'Deposit amount must be authorized by governing docs. Issue a receipt.'},
+          {s:'Coordinate move logistics: elevator reservation, loading dock, hours',t:'Before move date',d:'Rules & Regulations'},
+          {s:'Conduct post-move inspection; document any damage with dated photos',t:'Within 24 hours',detail:'Compare to pre-move photos. Note any damage to walls, floors, doors, elevator pads.'},
+          {s:'If no damage: refund deposit within timeline specified in rules',t:'Within 30 days',detail:'Written confirmation of inspection clearance. Refund via original payment method.'},
+          {s:'If damage found: send itemized deduction notice with photos, repair estimates, and remaining balance',t:'Within 30 days',d:'Rules & Regulations',detail:'Itemize each deduction with cost. Provide repair invoices or contractor estimates. Refund any remaining balance.'}
         ],
-        self:[{s:'If owner disputes: provide pre/post photos and invoices'},{s:'If damage exceeds deposit: send demand for balance'}],
-        legal:[{s:'Attorney advises on deposit retention procedures',w:'Setup or dispute'}],
-        notes:{'_':'Move deposits must be authorized by governing docs. Inspect before and after. Refund or itemize promptly.'}
+        self:[{s:'If owner disputes deductions: provide pre/post photos, invoices, and repair documentation'},{s:'If damage exceeds deposit: send written demand for balance citing governing docs'}],
+        legal:[{s:'Attorney advises on deposit retention procedures and demand collection',w:'Dispute over deductions or amount exceeds deposit significantly'}],
+        notes:{
+          'DC':'DC does not have a specific condo move deposit statute — authority derives from bylaws and rules. Ensure move deposit and fee amounts are authorized in governing documents. DC small claims limit is $10,000 for damage recovery.',
+          '_':'Move deposits must be authorized by governing docs. Inspect before and after. Refund or itemize promptly.'
+        }
       }
     ]
   }

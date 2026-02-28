@@ -664,7 +664,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
   const pct = c.steps ? Math.round((c.steps.filter(s => s.done).length / c.steps.length) * 100) : 0;
-  const stNote = sit?.notes?.['_'] || '';
+  const buildingState = useBuildingStore(s => s.address.state);
+  const jurisdictionKey = buildingState === 'District of Columbia' ? 'DC' : buildingState;
+  const stNote = sit?.notes?.[jurisdictionKey] || sit?.notes?.['_'] || '';
 
   return (
     <div className="space-y-5">
