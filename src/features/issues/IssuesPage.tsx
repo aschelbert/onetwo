@@ -779,7 +779,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           {/* Board Vote */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-ink-800">Board Vote</h3>
+              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Board Vote</p>
               <ThreeDotMenu items={[
                 { label: c.boardVotes ? 'Edit Vote' : 'Record Vote', onClick: () => setShowVoteModal(true) },
                 ...(c.boardVotes ? [{ label: 'Remove Vote', onClick: () => { if (confirm('Remove vote?')) store.clearBoardVote(caseId); }, danger: true }] : []),
@@ -791,7 +791,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           {/* Documents */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-ink-800">Documents</h3>
+              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Documents</p>
               <ThreeDotMenu items={[
                 { label: 'Upload Document', onClick: () => setShowDocModal(true) },
               ]} />
@@ -819,7 +819,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           {/* Communications */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-ink-800">Communications</h3>
+              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Communications</p>
               <ThreeDotMenu items={[
                 { label: 'Send Communication', onClick: () => setShowCommModal(true) },
                 { label: 'Link Letter', onClick: () => setShowLinkLetterModal(true) },
@@ -884,7 +884,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           {/* Financials: Work Orders + Invoices */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-ink-800">Financials</h3>
+              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Financials</p>
               <ThreeDotMenu items={[
                 { label: 'Create Work Order', onClick: () => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); } },
                 { label: 'Create Invoice', onClick: () => setShowInvoiceModal(true) },
@@ -950,7 +950,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           {/* Meetings */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-ink-800">Meetings</h3>
+              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Meetings</p>
               <ThreeDotMenu items={[
                 { label: 'Link Meeting', onClick: () => setShowMeetingModal(true) },
               ]} />
