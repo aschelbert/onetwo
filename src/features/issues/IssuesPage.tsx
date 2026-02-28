@@ -3,8 +3,10 @@ import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/s
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMeetingsStore } from '@/store/useMeetingsStore';
+import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
-import { BoardVoteModal, CommModal, DocModal, ApproachModal } from './components/CaseModals';
+import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal } from './components/CaseModals';
 import Modal from '@/components/ui/Modal';
 import type { CaseApproach, CasePriority } from '@/types/issues';
 
@@ -545,6 +547,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const { board: boardMembers } = useBuildingStore();
   const fin = useFinancialStore();
   const { workOrders } = fin;
+  const letterStore = useLetterStore();
+  const meetingsStore = useMeetingsStore();
   const c = store.cases.find(x => x.id === caseId);
 
   const [showVoteModal, setShowVoteModal] = useState(false);
@@ -552,6 +556,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showDocModal, setShowDocModal] = useState(false);
   const [showApproachModal, setShowApproachModal] = useState(false);
   const [showWOModal, setShowWOModal] = useState(false);
+  const [showLinkLetterModal, setShowLinkLetterModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showLinkInvoiceModal, setShowLinkInvoiceModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
@@ -727,7 +735,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       <div className="bg-white rounded-xl border border-ink-100 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-ink-800">Communications</h3>
-          <button onClick={() => setShowCommModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">✉ Send</button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowLinkLetterModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Letter</button>
+            <button onClick={() => setShowCommModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">✉ Send</button>
+          </div>
         </div>
         {c.comms.length > 0 ? (
           <div className="space-y-2">
@@ -757,14 +768,47 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             })}
           </div>
         ) : <p className="text-sm text-ink-400 py-3 text-center">No communications sent.</p>}
+
+        {/* Linked Letters */}
+        {(c.linkedLetterIds?.length ?? 0) > 0 && (
+          <div className="mt-4 pt-4 border-t border-ink-50">
+            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Linked Letters</p>
+            <div className="space-y-2">
+              {(c.linkedLetterIds || []).map(letterId => {
+                const letter = letterStore.letters.find(l => l.id === letterId);
+                if (!letter) return <div key={letterId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Letter {letterId} not found</div>;
+                const sc: Record<string, string> = { draft: 'bg-yellow-100 text-yellow-700', sent: 'bg-sage-100 text-sage-700', archived: 'bg-ink-100 text-ink-500' };
+                return (
+                  <div key={letterId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg group">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[letter.status] || 'bg-ink-100 text-ink-500'}`}>{letter.status}</span>
+                      <span className="text-sm font-medium text-ink-900 truncate">{letter.subject}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs text-ink-400">{letter.recipient} · {letter.sentDate}</span>
+                      <button onClick={() => store.unlinkLetter(caseId, letterId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Linked Work Orders */}
+      {/* Financials: Work Orders + Invoices */}
       <div className="bg-white rounded-xl border border-ink-100 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-ink-800">Financials</h3>
-          <button onClick={() => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Create Work Order</button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowLinkInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Link Invoice</button>
+            <button onClick={() => setShowInvoiceModal(true)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">+ Create Invoice</button>
+            <button onClick={() => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Create Work Order</button>
+          </div>
         </div>
+
+        {/* Work Orders */}
+        <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Work Orders</p>
         {c.linkedWOs.length > 0 ? (
           <div className="space-y-2">
             {c.linkedWOs.map(woId => {
@@ -787,14 +831,75 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               );
             })}
           </div>
-        ) : <p className="text-sm text-ink-400 py-4 text-center">No work orders linked.</p>}
+        ) : <p className="text-sm text-ink-400 py-2 text-center">No work orders linked.</p>}
+
+        {/* Linked Invoices */}
+        <div className="mt-4 pt-4 border-t border-ink-50">
+          <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Invoices</p>
+          {(c.linkedInvoiceIds?.length ?? 0) > 0 ? (
+            <div className="space-y-2">
+              {(c.linkedInvoiceIds || []).map(invId => {
+                const inv = fin.unitInvoices.find(i => i.id === invId);
+                if (!inv) return <div key={invId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Invoice {invId} not found</div>;
+                const sc: Record<string, string> = { sent: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700', overdue: 'bg-red-100 text-red-700', void: 'bg-ink-100 text-ink-500' };
+                return (
+                  <div key={invId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[inv.status] || 'bg-ink-100 text-ink-500'}`}>{inv.status}</span>
+                      <span className="text-xs font-mono text-ink-300">{inv.id}</span>
+                      <span className="text-sm font-medium text-ink-900 truncate">{inv.description}</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs text-ink-500">Unit {inv.unitNumber}</span>
+                      <span className="font-bold text-ink-900">{fmt(inv.amount)}</span>
+                      <button onClick={() => store.unlinkInvoice(caseId, invId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <p className="text-sm text-ink-400 py-2 text-center">No invoices linked.</p>}
+        </div>
+      </div>
+
+      {/* Meetings */}
+      <div className="bg-white rounded-xl border border-ink-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-ink-800">Meetings</h3>
+          <button onClick={() => setShowMeetingModal(true)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Link Meeting</button>
+        </div>
+        {(c.linkedMeetingIds?.length ?? 0) > 0 ? (
+          <div className="space-y-2">
+            {(c.linkedMeetingIds || []).map(meetingId => {
+              const meeting = meetingsStore.meetings.find(m => m.id === meetingId);
+              if (!meeting) return <div key={meetingId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Meeting {meetingId} not found</div>;
+              const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
+              return (
+                <div key={meetingId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[meeting.status] || 'bg-ink-100 text-ink-500'}`}>{meeting.status}</span>
+                    <span className="text-sm font-medium text-ink-900 truncate">{meeting.title}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-ink-400">{meeting.date} · {meeting.type}</span>
+                    <button onClick={() => store.unlinkMeeting(caseId, meetingId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="text-sm text-ink-400 py-3 text-center">No meetings linked.</p>}
       </div>
 
       {/* Modals */}
       {showVoteModal && <BoardVoteModal c={c} boardMembers={boardMembers} store={store} onClose={() => setShowVoteModal(false)} />}
-      {showCommModal && <CommModal caseId={caseId} store={store} onClose={() => setShowCommModal(false)} />}
+      {showCommModal && <CommModal caseId={caseId} store={store} catId={c.catId} sitId={c.sitId} onClose={() => setShowCommModal(false)} />}
       {showDocModal && <DocModal caseId={caseId} store={store} onClose={() => setShowDocModal(false)} />}
       {showApproachModal && <ApproachModal c={c} store={store} onClose={() => setShowApproachModal(false)} />}
+      {showLinkLetterModal && <LinkLetterModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkLetterModal(false)} />}
+      {showInvoiceModal && <InvoiceCreateModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowInvoiceModal(false)} />}
+      {showLinkInvoiceModal && <LinkInvoiceModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkInvoiceModal(false)} />}
+      {showMeetingModal && <LinkMeetingModal caseId={caseId} store={store} onClose={() => setShowMeetingModal(false)} />}
       {editingAssignment && (
         <Modal title="Edit Assignment" onClose={() => setEditingAssignment(false)} onSave={() => {
           store.updateCaseAssignment(caseId, {

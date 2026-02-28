@@ -654,7 +654,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Unit 502 — Unauthorized Balcony Enclosure', unit: '502', owner: 'Lisa Chen',
     approach: 'pre', status: 'open', priority: 'high', created: '2026-01-28',
     notes: 'Owner enclosed balcony without architectural review. Structural concerns.',
-    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [],
     comms: [{
       id: 'cm1', type: 'notice', subject: 'First Notice — Unauthorized Balcony Enclosure',
       date: '2026-01-30', method: 'certified mail', recipient: 'Unit 502 — Lisa Chen',
@@ -666,7 +666,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Unit 310 — 90-Day Delinquent Assessment', unit: '310', owner: 'Mark Torres',
     approach: 'self', status: 'open', priority: 'medium', created: '2026-02-01',
     notes: 'Owner $2,700 behind. Payment plan offered but not signed.',
-    steps: null, linkedWOs: [], attachments: [{ name: 'Delinquency-Notice-Unit310.pdf', type: 'notice', date: '2026-02-01', size: '45 KB' }],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [{ name: 'Delinquency-Notice-Unit310.pdf', type: 'notice', date: '2026-02-01', size: '45 KB' }],
     boardVotes: null, additionalApproaches: [],
     comms: [
       { id: 'cm2', type: 'notice', subject: '90-Day Delinquency Notice', date: '2026-02-03', method: 'certified mail', recipient: 'Unit 310 — Mark Torres', sentBy: 'Treasurer', notes: 'Amount owed: $2,700. Lien warning per DC Code § 42-1903.13.', status: 'sent' },
@@ -678,7 +678,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Burst Pipe — 3rd Floor Riser', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'closed', priority: 'urgent', created: '2026-01-15',
     notes: 'Emergency repair completed. Insurance claim filed. Two units affected.',
-    steps: null, linkedWOs: ['WO-101'], attachments: [
+    steps: null, linkedWOs: ['WO-101'], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [
       { name: 'Burst-Pipe-Photos.zip', type: 'evidence', date: '2026-01-15', size: '12.3 MB' },
       { name: 'Insurance-Claim-Form.pdf', type: 'claim', date: '2026-01-18', size: '320 KB' }
     ],
@@ -704,7 +704,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Review elevator modernization bids', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'open', priority: 'high', created: '2026-01-20',
     notes: 'Compare 3 vendor proposals for elevator upgrade project. Budget approved up to $85,000.',
-    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'Jennifer Adams', assignedRole: 'Vice President', dueDate: '2026-03-10',
     source: 'Board Meeting Jan 2026',
   }),
@@ -713,7 +713,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'File DC Biennial Report', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'open', priority: 'medium', created: '2026-01-20',
     notes: 'File with DCRA. $80 filing fee.',
-    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'Robert Mitchell', assignedRole: 'President', dueDate: '2026-04-01',
     source: 'Runbook item', sourceId: 'rf1',
   }),
@@ -722,7 +722,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Schedule annual fire safety inspection', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'open', priority: 'medium', created: '2026-01-20',
     notes: 'Coordinate with DC Fire and EMS for annual inspection.',
-    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'Jennifer Adams', assignedRole: 'Vice President', dueDate: '2026-06-30',
     source: 'Runbook item', sourceId: 'rf4',
   }),
@@ -731,7 +731,7 @@ const seedCases: CaseTrackerCase[] = [
     title: 'Update collection policy document', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'open', priority: 'low', created: '2026-01-20',
     notes: 'Review and update collection policy. Current version is outdated. Legal counsel review needed before finalizing.',
-    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'David Chen', assignedRole: 'Treasurer', dueDate: '2026-05-01',
   }),
 ];
@@ -804,6 +804,18 @@ interface IssuesState {
   // WO linking
   linkWO: (caseId: string, woId: string) => void;
   unlinkWO: (caseId: string, woId: string) => void;
+
+  // Letter linking
+  linkLetter: (caseId: string, letterId: string) => void;
+  unlinkLetter: (caseId: string, letterId: string) => void;
+
+  // Invoice linking
+  linkInvoice: (caseId: string, invoiceId: string) => void;
+  unlinkInvoice: (caseId: string, invoiceId: string) => void;
+
+  // Meeting linking
+  linkMeeting: (caseId: string, meetingId: string) => void;
+  unlinkMeeting: (caseId: string, meetingId: string) => void;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -907,7 +919,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,
       unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
       status: 'open', created: new Date().toISOString().split('T')[0],
-      steps, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+      steps, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
       ...(data.assignedTo && { assignedTo: data.assignedTo }),
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
@@ -1090,5 +1102,76 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       const c = get().cases.find(x => x.id === caseId);
       if (c) casesSvc.updateCase(caseId, { linkedWOs: c.linkedWOs });
     }
+  },
+
+  linkLetter: (caseId, letterId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedLetterIds: [...(c.linkedLetterIds || []), letterId] } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedLetterIds: c.linkedLetterIds });
+    }
+  },
+
+  unlinkLetter: (caseId, letterId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedLetterIds: (c.linkedLetterIds || []).filter(id => id !== letterId) } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedLetterIds: c.linkedLetterIds });
+    }
+  },
+
+  linkInvoice: (caseId, invoiceId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedInvoiceIds: [...(c.linkedInvoiceIds || []), invoiceId] } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedInvoiceIds: c.linkedInvoiceIds });
+    }
+  },
+
+  unlinkInvoice: (caseId, invoiceId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedInvoiceIds: (c.linkedInvoiceIds || []).filter(id => id !== invoiceId) } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedInvoiceIds: c.linkedInvoiceIds });
+    }
+  },
+
+  linkMeeting: (caseId, meetingId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedMeetingIds: [...(c.linkedMeetingIds || []), meetingId] } : c) }));
+    // Bidirectional sync: also link case on the meeting side
+    import('@/store/useMeetingsStore').then(({ useMeetingsStore }) => {
+      useMeetingsStore.getState().linkCase(meetingId, caseId);
+    });
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedMeetingIds: c.linkedMeetingIds });
+    }
+  },
+
+  unlinkMeeting: (caseId, meetingId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedMeetingIds: (c.linkedMeetingIds || []).filter(id => id !== meetingId) } : c) }));
+    // Bidirectional sync: also unlink case on the meeting side
+    import('@/store/useMeetingsStore').then(({ useMeetingsStore }) => {
+      useMeetingsStore.getState().unlinkCase(meetingId, caseId);
+    });
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedMeetingIds: c.linkedMeetingIds });
+    }
   }
-}), { name: 'onetwo-issues' }));
+}), {
+  name: 'onetwo-issues',
+  merge: (persisted: any, current: any) => {
+    const merged = { ...current, ...(persisted || {}) };
+    // Ensure existing localStorage cases get default empty arrays for new fields
+    if (merged.cases) {
+      merged.cases = merged.cases.map((c: any) => ({
+        ...c,
+        linkedLetterIds: c.linkedLetterIds || [],
+        linkedInvoiceIds: c.linkedInvoiceIds || [],
+        linkedMeetingIds: c.linkedMeetingIds || [],
+      }));
+    }
+    return merged;
+  },
+}));

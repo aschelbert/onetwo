@@ -23,6 +23,7 @@ export interface GeneratedLetter {
   sentDate: string;
   sentVia: string;
   createdBy: string;
+  caseId?: string | null;
 }
 
 // ── Row converters: Templates ──
@@ -63,6 +64,7 @@ function rowToLetter(r: Record<string, unknown>): GeneratedLetter {
     sentDate: r.sent_date as string,
     sentVia: r.sent_via as string,
     createdBy: r.created_by as string,
+    caseId: (r.case_id as string) || null,
   };
 }
 
@@ -78,6 +80,7 @@ function letterToRow(l: Partial<GeneratedLetter>): Record<string, unknown> {
   if (l.sentDate !== undefined) row.sent_date = l.sentDate;
   if (l.sentVia !== undefined) row.sent_via = l.sentVia;
   if (l.createdBy !== undefined) row.created_by = l.createdBy;
+  if (l.caseId !== undefined) row.case_id = l.caseId;
   return row;
 }
 

@@ -111,5 +111,6 @@ export interface UnitInvoice {
   stripePaymentLink: string | null;
   glEntryId: string | null;
   paymentGlEntryId: string | null;
+  caseId?: string | null;
 }
 

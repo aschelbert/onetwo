@@ -92,6 +92,9 @@ export interface CaseTrackerCase {
   notes: string;
   steps: CaseStep[] | null;
   linkedWOs: string[];
+  linkedLetterIds: string[];
+  linkedInvoiceIds: string[];
+  linkedMeetingIds: string[];
   attachments: CaseAttachment[];
   boardVotes: BoardVote | null;
   additionalApproaches: AdditionalApproach[];

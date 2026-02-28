@@ -85,7 +85,7 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
-  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment', amount: number, description: string) => UnitInvoice;
+  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment', amount: number, description: string, caseId?: string) => UnitInvoice;
   payUnitInvoice: (invoiceId: string, method: string) => void;
 
   // CoA mutations
@@ -722,7 +722,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   // Unit Invoices
-  createUnitInvoice: (unitNum, type, amount, description) => {
+  createUnitInvoice: (unitNum, type, amount, description, caseId?) => {
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const id = 'INV-U' + Date.now().toString(36).toUpperCase();
@@ -734,6 +734,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       status: 'sent', createdDate: today, dueDate, paidDate: null,
       paidAmount: null, paymentMethod: null, stripePaymentLink: null,
       glEntryId: glEntry?.id || null, paymentGlEntryId: null,
+      ...(caseId ? { caseId } : {}),
     };
     set(s => ({ unitInvoices: [...s.unitInvoices, invoice] }));
     if (isBackendEnabled && get().tenantId) {
