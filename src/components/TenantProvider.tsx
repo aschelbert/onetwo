@@ -10,6 +10,9 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useElectionStore } from '@/store/useElectionStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { useArchiveStore } from '@/store/useArchiveStore';
+import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
 
 export interface TenantInfo {
   id: string;
@@ -49,6 +52,11 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
     // Demo users (from seed data) — keep demo tenant
     if (!isBackendEnabled || !supabase || currentUser.role === 'PLATFORM_ADMIN') {
+      // Hydrate platform admin store if backend is available and user is platform admin
+      if (isBackendEnabled && currentUser.role === 'PLATFORM_ADMIN') {
+        usePlatformAdminStore.getState().loadFromDb().then(() => setLoaded(true));
+        return;
+      }
       setLoaded(true);
       return;
     }
@@ -132,6 +140,9 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           useMeetingsStore.getState().loadFromDb(tenantInfo.id),
           useIssuesStore.getState().loadFromDb(tenantInfo.id),
           useElectionStore.getState().loadFromDb(tenantInfo.id),
+          useBuildingStore.getState().loadFromDb(tenantInfo.id),
+          useFinancialStore.getState().loadFromDb(tenantInfo.id),
+          useArchiveStore.getState().loadFromDb(tenantInfo.id),
         ]);
 
       } catch (err) {

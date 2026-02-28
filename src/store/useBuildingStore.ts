@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as buildingSvc from '@/lib/services/building';
 
 // ─── Types ─────────────────────────────────────
 
@@ -43,39 +46,69 @@ interface BuildingState {
   insurance: InsurancePolicy[];
   vendors: Vendor[];
 
+  // DB sync
+  loadFromDb: (tenantId: string) => Promise<void>;
+
   // Mutations
   updateName: (name: string) => void;
   updateAddress: (addr: Partial<BuildingAddress>) => void;
   updateDetails: (det: Partial<BuildingDetails>) => void;
-  updateManagement: (mgmt: Partial<ManagementInfo>) => void;
+  updateManagement: (mgmt: Partial<ManagementInfo>, tenantId?: string) => void;
 
-  addBoardMember: (m: Omit<BoardMember, 'id'>) => void;
+  addBoardMember: (m: Omit<BoardMember, 'id'>, tenantId?: string) => void;
   updateBoardMember: (id: string, m: Partial<BoardMember>) => void;
   removeBoardMember: (id: string) => void;
 
-  addLegalCounsel: (c: Omit<LegalCounsel, 'id'>) => void;
+  addLegalCounsel: (c: Omit<LegalCounsel, 'id'>, tenantId?: string) => void;
   updateLegalCounsel: (id: string, c: Partial<LegalCounsel>) => void;
   removeLegalCounsel: (id: string) => void;
 
-  addLegalDocument: (d: Omit<LegalDocument, 'id' | 'attachments'>) => void;
+  addLegalDocument: (d: Omit<LegalDocument, 'id' | 'attachments'>, tenantId?: string) => void;
   updateLegalDocument: (id: string, d: Partial<LegalDocument>) => void;
   removeLegalDocument: (id: string) => void;
   addLegalDocAttachment: (docId: string, attachment: { name: string; size: string; type: string }) => void;
   removeLegalDocAttachment: (docId: string, attachmentIndex: number) => void;
 
-  addInsurance: (p: Omit<InsurancePolicy, 'id' | 'attachments'>) => void;
+  addInsurance: (p: Omit<InsurancePolicy, 'id' | 'attachments'>, tenantId?: string) => void;
   updateInsurance: (id: string, p: Partial<InsurancePolicy>) => void;
   removeInsurance: (id: string) => void;
   addInsuranceAttachment: (policyId: string, attachment: { name: string; size: string; type: string }) => void;
   removeInsuranceAttachment: (policyId: string, attachmentIndex: number) => void;
 
-  addVendor: (v: Omit<Vendor, 'id'>) => void;
+  addVendor: (v: Omit<Vendor, 'id'>, tenantId?: string) => void;
   updateVendor: (id: string, v: Partial<Vendor>) => void;
   removeVendor: (id: string) => void;
   toggleVendorStatus: (id: string) => void;
 }
 
-export const useBuildingStore = create<BuildingState>((set) => ({
+// Sync helpers
+function syncBoardMember(id: string) {
+  if (!isBackendEnabled) return;
+  const m = useBuildingStore.getState().board.find(x => x.id === id);
+  if (m) buildingSvc.updateBoardMember(id, m);
+}
+function syncLegalCounsel(id: string) {
+  if (!isBackendEnabled) return;
+  const c = useBuildingStore.getState().legalCounsel.find(x => x.id === id);
+  if (c) buildingSvc.updateLegalCounsel(id, c);
+}
+function syncLegalDocument(id: string) {
+  if (!isBackendEnabled) return;
+  const d = useBuildingStore.getState().legalDocuments.find(x => x.id === id);
+  if (d) buildingSvc.updateLegalDocument(id, d);
+}
+function syncInsurance(id: string) {
+  if (!isBackendEnabled) return;
+  const p = useBuildingStore.getState().insurance.find(x => x.id === id);
+  if (p) buildingSvc.updateInsurancePolicy(id, p);
+}
+function syncVendor(id: string) {
+  if (!isBackendEnabled) return;
+  const v = useBuildingStore.getState().vendors.find(x => x.id === id);
+  if (v) buildingSvc.updateVendor(id, v);
+}
+
+export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   name: 'Sunny Acres Condominium',
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
   details: {
@@ -126,44 +159,164 @@ export const useBuildingStore = create<BuildingState>((set) => ({
     { id: 'v5', name: 'Quick Fix Plumbing', service: 'Plumbing', contact: 'Pete Quick', phone: '202-555-4005', email: 'pete@quickfix.com', contract: 'On-call', status: 'active' },
   ],
 
+  // ─── DB Hydration ─────────────────────────────
+  loadFromDb: async (tenantId: string) => {
+    const data = await buildingSvc.fetchAllBuildingData(tenantId);
+    const updates: Partial<BuildingState> = {};
+    if (data.board) updates.board = data.board;
+    if (data.management) updates.management = data.management;
+    if (data.counsel) updates.legalCounsel = data.counsel;
+    if (data.docs) updates.legalDocuments = data.docs;
+    if (data.insurance) updates.insurance = data.insurance;
+    if (data.vendors) updates.vendors = data.vendors;
+    if (Object.keys(updates).length > 0) set(updates);
+  },
+
   // ─── Mutations ─────────────────────────────────
 
   updateName: (name) => set({ name }),
   updateAddress: (addr) => set(s => ({ address: { ...s.address, ...addr } })),
   updateDetails: (det) => set(s => ({ details: { ...s.details, ...det } })),
-  updateManagement: (mgmt) => set(s => ({ management: { ...s.management, ...mgmt } })),
 
-  addBoardMember: (m) => set(s => ({ board: [...s.board, { id: 'bm' + Date.now(), ...m }] })),
-  updateBoardMember: (id, m) => set(s => ({ board: s.board.map(b => b.id === id ? { ...b, ...m } : b) })),
-  removeBoardMember: (id) => set(s => ({ board: s.board.filter(b => b.id !== id) })),
+  updateManagement: (mgmt, tenantId?) => {
+    set(s => ({ management: { ...s.management, ...mgmt } }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.upsertManagementInfo(tenantId, { ...useBuildingStore.getState().management });
+    }
+  },
 
-  addLegalCounsel: (c) => set(s => ({ legalCounsel: [...s.legalCounsel, { id: 'lc' + Date.now(), ...c }] })),
-  updateLegalCounsel: (id, c) => set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, ...c } : x) })),
-  removeLegalCounsel: (id) => set(s => ({ legalCounsel: s.legalCounsel.filter(x => x.id !== id) })),
+  addBoardMember: (m, tenantId?) => {
+    const id = 'bm' + Date.now();
+    set(s => ({ board: [...s.board, { id, ...m }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createBoardMember(tenantId, m).then(dbRow => {
+        if (dbRow) set(s => ({ board: s.board.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateBoardMember: (id, m) => {
+    set(s => ({ board: s.board.map(b => b.id === id ? { ...b, ...m } : b) }));
+    syncBoardMember(id);
+  },
+  removeBoardMember: (id) => {
+    set(s => ({ board: s.board.filter(b => b.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteBoardMember(id);
+  },
 
-  addLegalDocument: (d) => set(s => ({ legalDocuments: [...s.legalDocuments, { id: 'ld' + Date.now(), ...d, attachments: [] }] })),
-  updateLegalDocument: (id, d) => set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, ...d } : x) })),
-  removeLegalDocument: (id) => set(s => ({ legalDocuments: s.legalDocuments.filter(x => x.id !== id) })),
-  addLegalDocAttachment: (docId, attachment) => set(s => ({
-    legalDocuments: s.legalDocuments.map(x => x.id === docId ? { ...x, attachments: [...x.attachments, { ...attachment, uploadedAt: new Date().toISOString().split('T')[0] }] } : x),
-  })),
-  removeLegalDocAttachment: (docId, idx) => set(s => ({
-    legalDocuments: s.legalDocuments.map(x => x.id === docId ? { ...x, attachments: x.attachments.filter((_, i) => i !== idx) } : x),
-  })),
+  addLegalCounsel: (c, tenantId?) => {
+    const id = 'lc' + Date.now();
+    set(s => ({ legalCounsel: [...s.legalCounsel, { id, ...c }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createLegalCounsel(tenantId, c).then(dbRow => {
+        if (dbRow) set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateLegalCounsel: (id, c) => {
+    set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, ...c } : x) }));
+    syncLegalCounsel(id);
+  },
+  removeLegalCounsel: (id) => {
+    set(s => ({ legalCounsel: s.legalCounsel.filter(x => x.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteLegalCounsel(id);
+  },
 
-  addInsurance: (p) => set(s => ({ insurance: [...s.insurance, { id: 'ins' + Date.now(), ...p, attachments: [] }] })),
-  updateInsurance: (id, p) => set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, ...p } : x) })),
-  removeInsurance: (id) => set(s => ({ insurance: s.insurance.filter(x => x.id !== id) })),
-  addInsuranceAttachment: (policyId, attachment) => set(s => ({
-    insurance: s.insurance.map(x => x.id === policyId ? { ...x, attachments: [...x.attachments, { ...attachment, uploadedAt: new Date().toISOString().split('T')[0] }] } : x),
-  })),
-  removeInsuranceAttachment: (policyId, idx) => set(s => ({
-    insurance: s.insurance.map(x => x.id === policyId ? { ...x, attachments: x.attachments.filter((_, i) => i !== idx) } : x),
-  })),
+  addLegalDocument: (d, tenantId?) => {
+    const id = 'ld' + Date.now();
+    set(s => ({ legalDocuments: [...s.legalDocuments, { id, ...d, attachments: [] }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createLegalDocument(tenantId, d).then(dbRow => {
+        if (dbRow) set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateLegalDocument: (id, d) => {
+    set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, ...d } : x) }));
+    syncLegalDocument(id);
+  },
+  removeLegalDocument: (id) => {
+    set(s => ({ legalDocuments: s.legalDocuments.filter(x => x.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteLegalDocument(id);
+  },
+  addLegalDocAttachment: (docId, attachment) => {
+    set(s => ({
+      legalDocuments: s.legalDocuments.map(x => x.id === docId ? { ...x, attachments: [...x.attachments, { ...attachment, uploadedAt: new Date().toISOString().split('T')[0] }] } : x),
+    }));
+    syncLegalDocument(docId);
+  },
+  removeLegalDocAttachment: (docId, idx) => {
+    set(s => ({
+      legalDocuments: s.legalDocuments.map(x => x.id === docId ? { ...x, attachments: x.attachments.filter((_, i) => i !== idx) } : x),
+    }));
+    syncLegalDocument(docId);
+  },
 
-  addVendor: (v) => set(s => ({ vendors: [...s.vendors, { id: 'v' + Date.now(), ...v }] })),
-  updateVendor: (id, v) => set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, ...v } : x) })),
-  removeVendor: (id) => set(s => ({ vendors: s.vendors.filter(x => x.id !== id) })),
-  toggleVendorStatus: (id) => set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) })),
+  addInsurance: (p, tenantId?) => {
+    const id = 'ins' + Date.now();
+    set(s => ({ insurance: [...s.insurance, { id, ...p, attachments: [] }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createInsurancePolicy(tenantId, p).then(dbRow => {
+        if (dbRow) set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateInsurance: (id, p) => {
+    set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, ...p } : x) }));
+    syncInsurance(id);
+  },
+  removeInsurance: (id) => {
+    set(s => ({ insurance: s.insurance.filter(x => x.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteInsurancePolicy(id);
+  },
+  addInsuranceAttachment: (policyId, attachment) => {
+    set(s => ({
+      insurance: s.insurance.map(x => x.id === policyId ? { ...x, attachments: [...x.attachments, { ...attachment, uploadedAt: new Date().toISOString().split('T')[0] }] } : x),
+    }));
+    syncInsurance(policyId);
+  },
+  removeInsuranceAttachment: (policyId, idx) => {
+    set(s => ({
+      insurance: s.insurance.map(x => x.id === policyId ? { ...x, attachments: x.attachments.filter((_, i) => i !== idx) } : x),
+    }));
+    syncInsurance(policyId);
+  },
+
+  addVendor: (v, tenantId?) => {
+    const id = 'v' + Date.now();
+    set(s => ({ vendors: [...s.vendors, { id, ...v }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createVendor(tenantId, v).then(dbRow => {
+        if (dbRow) set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateVendor: (id, v) => {
+    set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, ...v } : x) }));
+    syncVendor(id);
+  },
+  removeVendor: (id) => {
+    set(s => ({ vendors: s.vendors.filter(x => x.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteVendor(id);
+  },
+  toggleVendorStatus: (id) => {
+    set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) }));
+    syncVendor(id);
+  },
+}), {
+  name: 'onetwo-building',
+  partialize: (state) => ({
+    name: state.name,
+    address: state.address,
+    details: state.details,
+    board: state.board,
+    management: state.management,
+    legalCounsel: state.legalCounsel,
+    legalDocuments: state.legalDocuments,
+    insurance: state.insurance,
+    vendors: state.vendors,
+  }),
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+  }),
 }));
-

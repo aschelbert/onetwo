@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as platformSvc from '@/lib/services/platform';
 
 // ── Types ──────────────────────────────────────────
 
@@ -268,6 +270,9 @@ interface PlatformAdminState {
   invoices: Invoice[];
   impersonating: string | null; // tenant ID being impersonated
 
+  // DB sync
+  loadFromDb: () => Promise<void>;
+
   // Computed
   getPlatformMetrics: () => {
     totalBuildings: number; activeBuildings: number; totalUnits: number;
@@ -310,6 +315,20 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   emailTemplates: seedTemplates,
   invoices: seedInvoices,
   impersonating: null,
+
+  // ─── DB Hydration ──────────────────────────────────
+  loadFromDb: async () => {
+    const [tickets, templates, announcements] = await Promise.all([
+      platformSvc.fetchTickets(),
+      platformSvc.fetchTemplates(),
+      platformSvc.fetchPlatformAnnouncements(),
+    ]);
+    const updates: Partial<PlatformAdminState> = {};
+    if (tickets) updates.supportTickets = tickets;
+    if (templates) updates.emailTemplates = templates;
+    if (announcements) updates.announcements = announcements;
+    if (Object.keys(updates).length > 0) set(updates);
+  },
 
   getPlatformMetrics: () => {
     const { tenants } = get();
@@ -372,17 +391,62 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   })),
 
   // Support tickets
-  addTicket: (ticket) => set(s => ({ supportTickets: [{ ...ticket, id: `tkt-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), notes: [] }, ...s.supportTickets] })),
-  updateTicket: (id, updates) => set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t) })),
-  addTicketNote: (id, author, text) => set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, notes: [...t.notes, { author, text, date: new Date().toISOString() }], updatedAt: new Date().toISOString() } : t) })),
+  addTicket: (ticket) => {
+    const id = `tkt-${Date.now()}`;
+    const now = new Date().toISOString();
+    set(s => ({ supportTickets: [{ ...ticket, id, createdAt: now, updatedAt: now, notes: [] }, ...s.supportTickets] }));
+    if (isBackendEnabled) {
+      platformSvc.createTicket(ticket).then(dbRow => {
+        if (dbRow) set(s => ({ supportTickets: s.supportTickets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateTicket: (id, updates) => {
+    set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t) }));
+    if (isBackendEnabled) platformSvc.updateTicket(id, updates);
+  },
+  addTicketNote: (id, author, text) => {
+    set(s => ({ supportTickets: s.supportTickets.map(t => t.id === id ? { ...t, notes: [...t.notes, { author, text, date: new Date().toISOString() }], updatedAt: new Date().toISOString() } : t) }));
+    if (isBackendEnabled) {
+      const ticket = usePlatformAdminStore.getState().supportTickets.find(t => t.id === id);
+      if (ticket) platformSvc.updateTicket(id, { notes: ticket.notes });
+    }
+  },
   // Announcements
-  addAnnouncement: (a) => set(s => ({ announcements: [{ ...a, id: `ann-${Date.now()}`, createdAt: new Date().toISOString().split('T')[0], sentAt: null }, ...s.announcements] })),
-  sendAnnouncement: (id) => set(s => ({ announcements: s.announcements.map(a => a.id === id ? { ...a, status: 'sent' as const, sentAt: new Date().toISOString().split('T')[0] } : a) })),
-  deleteAnnouncement: (id) => set(s => ({ announcements: s.announcements.filter(a => a.id !== id) })),
+  addAnnouncement: (a) => {
+    const id = `ann-${Date.now()}`;
+    set(s => ({ announcements: [{ ...a, id, createdAt: new Date().toISOString().split('T')[0], sentAt: null }, ...s.announcements] }));
+    if (isBackendEnabled) {
+      platformSvc.createPlatformAnnouncement(a).then(dbRow => {
+        if (dbRow) set(s => ({ announcements: s.announcements.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  sendAnnouncement: (id) => {
+    const sentAt = new Date().toISOString().split('T')[0];
+    set(s => ({ announcements: s.announcements.map(a => a.id === id ? { ...a, status: 'sent' as const, sentAt } : a) }));
+    if (isBackendEnabled) platformSvc.updatePlatformAnnouncement(id, { status: 'sent', sentAt });
+  },
+  deleteAnnouncement: (id) => {
+    set(s => ({ announcements: s.announcements.filter(a => a.id !== id) }));
+    if (isBackendEnabled) platformSvc.deletePlatformAnnouncement(id);
+  },
   // Templates
-  updateTemplate: (id, updates) => set(s => ({ emailTemplates: s.emailTemplates.map(t => t.id === id ? { ...t, ...updates, lastEdited: new Date().toISOString().split('T')[0] } : t) })),
-  addTemplate: (t) => set(s => ({ emailTemplates: [...s.emailTemplates, { ...t, id: `tmpl-${Date.now()}`, lastEdited: new Date().toISOString().split('T')[0] }] })),
+  updateTemplate: (id, updates) => {
+    const lastEdited = new Date().toISOString().split('T')[0];
+    set(s => ({ emailTemplates: s.emailTemplates.map(t => t.id === id ? { ...t, ...updates, lastEdited } : t) }));
+    if (isBackendEnabled) platformSvc.updateTemplate(id, { ...updates, lastEdited });
+  },
+  addTemplate: (t) => {
+    const id = `tmpl-${Date.now()}`;
+    const lastEdited = new Date().toISOString().split('T')[0];
+    set(s => ({ emailTemplates: [...s.emailTemplates, { ...t, id, lastEdited }] }));
+    if (isBackendEnabled) {
+      platformSvc.createTemplate(t).then(dbRow => {
+        if (dbRow) set(s => ({ emailTemplates: s.emailTemplates.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
   // Impersonation
   setImpersonating: (tenantId) => set({ impersonating: tenantId }),
 }));
-

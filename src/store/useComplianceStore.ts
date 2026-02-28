@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as announcementsSvc from '@/lib/services/announcements';
 import * as communicationsSvc from '@/lib/services/communications';
+import * as complianceSvc from '@/lib/services/compliance';
 
 export interface FilingAttachment {
   name: string; size: string; uploadedAt: string;
@@ -35,13 +36,13 @@ interface ComplianceState {
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
 
-  toggleItem: (id: string) => void;
-  setCompletion: (id: string, val: boolean) => void;
+  toggleItem: (id: string, tenantId?: string) => void;
+  setCompletion: (id: string, val: boolean, tenantId?: string) => void;
 
-  addItemAttachment: (itemId: string, att: FilingAttachment) => void;
-  removeItemAttachment: (itemId: string, attName: string) => void;
+  addItemAttachment: (itemId: string, att: FilingAttachment, tenantId?: string) => void;
+  removeItemAttachment: (itemId: string, attName: string, tenantId?: string) => void;
 
-  addFiling: (f: Omit<RegulatoryFiling, 'id' | 'status' | 'filedDate' | 'confirmationNum' | 'attachments'>) => void;
+  addFiling: (f: Omit<RegulatoryFiling, 'id' | 'status' | 'filedDate' | 'confirmationNum' | 'attachments'>, tenantId?: string) => void;
   markFilingComplete: (id: string, filedDate: string, confirmationNum: string) => void;
   deleteFiling: (id: string) => void;
   addFilingAttachment: (id: string, att: FilingAttachment) => void;
@@ -53,6 +54,13 @@ interface ComplianceState {
   addAnnouncement: (a: Omit<Announcement, 'id'>, tenantId?: string) => void;
   deleteAnnouncement: (id: string) => void;
   togglePinAnnouncement: (id: string) => void;
+}
+
+// Sync helpers
+function syncFiling(id: string) {
+  if (!isBackendEnabled) return;
+  const f = useComplianceStore.getState().filings.find(x => x.id === id);
+  if (f) complianceSvc.updateFiling(id, f);
 }
 
 export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
@@ -91,31 +99,79 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
 
   // ── DB sync ──
   loadFromDb: async (tenantId: string) => {
-    const [announcements, communications] = await Promise.all([
+    const [announcements, communications, filings, completions, itemAttachments] = await Promise.all([
       announcementsSvc.fetchAnnouncements(tenantId),
       communicationsSvc.fetchCommunications(tenantId),
+      complianceSvc.fetchFilings(tenantId),
+      complianceSvc.fetchCompletions(tenantId),
+      complianceSvc.fetchItemAttachments(tenantId),
     ]);
     const updates: Partial<ComplianceState> = {};
     if (announcements) updates.announcements = announcements;
     if (communications) updates.communications = communications;
+    if (filings) updates.filings = filings;
+    if (completions) updates.completions = completions;
+    if (itemAttachments) updates.itemAttachments = itemAttachments;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
-  toggleItem: (id) => set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } })),
-  setCompletion: (id, val) => set(s => ({ completions: { ...s.completions, [id]: val } })),
+  toggleItem: (id, tenantId?) => {
+    set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } }));
+    if (isBackendEnabled && tenantId) {
+      const val = useComplianceStore.getState().completions[id];
+      complianceSvc.upsertCompletion(tenantId, id, val);
+    }
+  },
+  setCompletion: (id, val, tenantId?) => {
+    set(s => ({ completions: { ...s.completions, [id]: val } }));
+    if (isBackendEnabled && tenantId) {
+      complianceSvc.upsertCompletion(tenantId, id, val);
+    }
+  },
 
-  addItemAttachment: (itemId, att) => set(s => ({
-    itemAttachments: { ...s.itemAttachments, [itemId]: [...(s.itemAttachments[itemId] || []), att] }
-  })),
-  removeItemAttachment: (itemId, attName) => set(s => ({
-    itemAttachments: { ...s.itemAttachments, [itemId]: (s.itemAttachments[itemId] || []).filter(a => a.name !== attName) }
-  })),
+  addItemAttachment: (itemId, att, tenantId?) => {
+    set(s => ({
+      itemAttachments: { ...s.itemAttachments, [itemId]: [...(s.itemAttachments[itemId] || []), att] }
+    }));
+    if (isBackendEnabled && tenantId) {
+      complianceSvc.createItemAttachment(tenantId, itemId, att);
+    }
+  },
+  removeItemAttachment: (itemId, attName, tenantId?) => {
+    set(s => ({
+      itemAttachments: { ...s.itemAttachments, [itemId]: (s.itemAttachments[itemId] || []).filter(a => a.name !== attName) }
+    }));
+    if (isBackendEnabled && tenantId) {
+      complianceSvc.deleteItemAttachment(tenantId, itemId, attName);
+    }
+  },
 
-  addFiling: (f) => set(s => ({ filings: [...s.filings, { id: 'rf' + Date.now(), status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f }] })),
-  markFilingComplete: (id, filedDate, confirmationNum) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, status: 'filed', filedDate, confirmationNum } : f) })),
-  deleteFiling: (id) => set(s => ({ filings: s.filings.filter(f => f.id !== id) })),
-  addFilingAttachment: (id, att) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: [...f.attachments, att] } : f) })),
-  removeFilingAttachment: (id, attName) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: f.attachments.filter(a => a.name !== attName) } : f) })),
+  addFiling: (f, tenantId?) => {
+    const id = 'rf' + Date.now();
+    const filing: RegulatoryFiling = { id, status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f };
+    set(s => ({ filings: [...s.filings, filing] }));
+    if (isBackendEnabled && tenantId) {
+      complianceSvc.createFiling(tenantId, filing).then(dbRow => {
+        if (dbRow) set(s => ({ filings: s.filings.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  markFilingComplete: (id, filedDate, confirmationNum) => {
+    set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, status: 'filed', filedDate, confirmationNum } : f) }));
+    if (isBackendEnabled) complianceSvc.updateFiling(id, { status: 'filed', filedDate, confirmationNum });
+  },
+  deleteFiling: (id) => {
+    set(s => ({ filings: s.filings.filter(f => f.id !== id) }));
+    if (isBackendEnabled) complianceSvc.deleteFiling(id);
+  },
+  addFilingAttachment: (id, att) => {
+    set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: [...f.attachments, att] } : f) }));
+    syncFiling(id);
+  },
+  removeFilingAttachment: (id, attName) => {
+    set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: f.attachments.filter(a => a.name !== attName) } : f) }));
+    syncFiling(id);
+  },
 
   addCommunication: (c, tenantId?) => {
     const id = 'oc' + Date.now();

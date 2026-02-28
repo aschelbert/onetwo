@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as archivesSvc from '@/lib/services/archives';
 
 export interface ArchiveSnapshot {
   id: string;
@@ -63,13 +66,36 @@ export interface ArchiveSnapshot {
 
 interface ArchiveState {
   archives: ArchiveSnapshot[];
-  addArchive: (a: ArchiveSnapshot) => void;
+  loadFromDb: (tenantId: string) => Promise<void>;
+  addArchive: (a: ArchiveSnapshot, tenantId?: string) => void;
   deleteArchive: (id: string) => void;
 }
 
-export const useArchiveStore = create<ArchiveState>((set) => ({
+export const useArchiveStore = create<ArchiveState>()(persist((set) => ({
   archives: [],
-  addArchive: (a) => set(s => ({ archives: [a, ...s.archives] })),
-  deleteArchive: (id) => set(s => ({ archives: s.archives.filter(a => a.id !== id) })),
-}));
 
+  loadFromDb: async (tenantId: string) => {
+    const archives = await archivesSvc.fetchArchives(tenantId);
+    if (archives) set({ archives });
+  },
+
+  addArchive: (a, tenantId?) => {
+    set(s => ({ archives: [a, ...s.archives] }));
+    if (isBackendEnabled && tenantId) {
+      archivesSvc.createArchive(tenantId, a).then(dbRow => {
+        if (dbRow) set(s => ({ archives: s.archives.map(x => x.id === a.id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+
+  deleteArchive: (id) => {
+    set(s => ({ archives: s.archives.filter(a => a.id !== id) }));
+    if (isBackendEnabled) archivesSvc.deleteArchive(id);
+  },
+}), {
+  name: 'onetwo-archives',
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+  }),
+}));

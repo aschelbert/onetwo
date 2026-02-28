@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as financialSvc from '@/lib/services/financial';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 
@@ -13,6 +15,7 @@ interface GLFilter {
 // ─── Store interface ─────────────────────────────────
 interface FinancialState {
   // Data
+  tenantId: string | null;
   budgetCategories: BudgetCategory[];
   reserveItems: ReserveItem[];
   chartOfAccounts: ChartOfAccountsEntry[];
@@ -29,6 +32,9 @@ interface FinancialState {
   activeTab: string;
   glFilter: GLFilter;
   glPage: number;
+
+  // DB sync
+  loadFromDb: (tenantId: string) => Promise<void>;
 
   // Tab switching
   setActiveTab: (tab: string) => void;
@@ -105,7 +111,44 @@ interface FinancialState {
   setStripeOnboarding: (complete: boolean) => void;
 }
 
+// ── Sync helpers ──
+
+function syncUnit(unitNum: string) {
+  if (!isBackendEnabled) return;
+  const s = useFinancialStore.getState();
+  if (!s.tenantId) return;
+  const u = s.units.find(x => x.number === unitNum);
+  if (u) financialSvc.upsertUnit(s.tenantId, u);
+}
+
+function syncBudgetCategory(id: string) {
+  if (!isBackendEnabled) return;
+  const cat = useFinancialStore.getState().budgetCategories.find(x => x.id === id);
+  if (cat) financialSvc.updateBudgetCategory(id, cat);
+}
+
+function syncWorkOrder(localId: string) {
+  if (!isBackendEnabled) return;
+  const s = useFinancialStore.getState();
+  if (!s.tenantId) return;
+  const wo = s.workOrders.find(x => x.id === localId);
+  if (wo) financialSvc.updateWorkOrderByLocalId(s.tenantId, localId, wo);
+}
+
+function syncSettings() {
+  if (!isBackendEnabled) return;
+  const s = useFinancialStore.getState();
+  if (!s.tenantId) return;
+  financialSvc.upsertFinancialSettings(s.tenantId, {
+    hoaDueDay: s.hoaDueDay,
+    annualReserveContribution: s.annualReserveContribution,
+    stripeConnectId: s.stripeConnectId,
+    stripeOnboardingComplete: s.stripeOnboardingComplete,
+  });
+}
+
 export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
+  tenantId: null,
   budgetCategories: seedBudgetCategories,
   reserveItems: seedReserveItems,
   chartOfAccounts: [...seedChartOfAccounts],
@@ -121,6 +164,38 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   activeTab: 'dashboard',
   glFilter: { account: '', source: '', search: '' },
   glPage: 0,
+
+  // ─── DB Hydration ──────────────────────────────────
+  loadFromDb: async (tenantId: string) => {
+    set({ tenantId });
+    const data = await financialSvc.fetchAllFinancialData(tenantId);
+    const updates: Partial<FinancialState> = {};
+    if (data.units) updates.units = data.units;
+    if (data.budgetCategories) updates.budgetCategories = data.budgetCategories;
+    if (data.reserveItems) updates.reserveItems = data.reserveItems;
+    if (data.chartOfAccounts) {
+      updates.chartOfAccounts = data.chartOfAccounts;
+      updates.acctStatus = Object.fromEntries(data.chartOfAccounts.map(a => [a.num, true]));
+    }
+    if (data.generalLedger) {
+      updates.generalLedger = data.generalLedger;
+      // Set glNextId high enough to avoid collisions
+      const maxId = data.generalLedger.reduce((max, e) => {
+        const num = parseInt(e.id.replace('GL', ''), 10);
+        return isNaN(num) ? max : Math.max(max, num);
+      }, 999);
+      updates.glNextId = maxId + 1;
+    }
+    if (data.workOrders) updates.workOrders = data.workOrders;
+    if (data.unitInvoices) updates.unitInvoices = data.unitInvoices;
+    if (data.settings) {
+      updates.hoaDueDay = data.settings.hoaDueDay;
+      updates.annualReserveContribution = data.settings.annualReserveContribution;
+      updates.stripeConnectId = data.settings.stripeConnectId;
+      updates.stripeOnboardingComplete = data.settings.stripeOnboardingComplete;
+    }
+    if (Object.keys(updates).length > 0) set(updates);
+  },
 
   setActiveTab: (tab) => set({ activeTab: tab, glPage: 0 }),
   setGlFilter: (filter) => set((s) => ({ glFilter: { ...s.glFilter, ...filter }, glPage: 0 })),
@@ -142,6 +217,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       status: 'posted',
     };
     set({ generalLedger: [...state.generalLedger, entry], glNextId: state.glNextId + 1 });
+    if (isBackendEnabled && state.tenantId) {
+      financialSvc.createGLEntry(state.tenantId, entry);
+    }
     return entry;
   },
 
@@ -364,24 +442,37 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   getCategorySpent: (category) => category.expenses.reduce((sum, exp) => sum + exp.amount, 0),
 
   // ─── Mutations ─────────────────────────────────────
-  addBudgetCategory: (name, budgeted) =>
-    set((s) => ({
-      budgetCategories: [...s.budgetCategories, { id: 'cat' + Date.now(), name, budgeted, expenses: [] }],
-    })),
+  addBudgetCategory: (name, budgeted) => {
+    const id = 'cat' + Date.now();
+    const cat: BudgetCategory = { id, name, budgeted, expenses: [] };
+    set((s) => ({ budgetCategories: [...s.budgetCategories, cat] }));
+    if (isBackendEnabled && get().tenantId) {
+      financialSvc.createBudgetCategory(get().tenantId!, cat).then(dbRow => {
+        if (dbRow) set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
 
-  updateBudgetCategory: (id, updates) =>
+  updateBudgetCategory: (id, updates) => {
     set((s) => ({
       budgetCategories: s.budgetCategories.map((c) =>
         c.id === id ? { ...c, ...updates } : c
       ),
-    })),
+    }));
+    if (isBackendEnabled) financialSvc.updateBudgetCategory(id, updates);
+  },
 
-  deleteBudgetCategory: (id) =>
+  deleteBudgetCategory: (id) => {
     set((s) => ({
       budgetCategories: s.budgetCategories.filter((c) => c.id !== id),
-    })),
+    }));
+    if (isBackendEnabled) financialSvc.deleteBudgetCategory(id);
+  },
 
-  setAnnualReserveContribution: (amount) => set({ annualReserveContribution: amount }),
+  setAnnualReserveContribution: (amount) => {
+    set({ annualReserveContribution: amount });
+    syncSettings();
+  },
 
   getOperatingBudget: () => {
     const { units, annualReserveContribution, budgetCategories } = get();
@@ -392,62 +483,93 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     return { annualRevenue, reserveContribution: annualReserveContribution, operatingBudget, totalAllocated, unallocated, overAllocated: totalAllocated > operatingBudget };
   },
 
-  addExpense: (categoryId, expense) =>
+  addExpense: (categoryId, expense) => {
     set((s) => ({
       budgetCategories: s.budgetCategories.map((c) =>
         c.id === categoryId
           ? { ...c, expenses: [...c.expenses, { id: 'exp' + Date.now(), ...expense }].sort((a, b) => b.date.localeCompare(a.date)) }
           : c
       ),
-    })),
+    }));
+    syncBudgetCategory(categoryId);
+  },
 
-  deleteExpense: (categoryId, expenseId) =>
+  deleteExpense: (categoryId, expenseId) => {
     set((s) => ({
       budgetCategories: s.budgetCategories.map((c) =>
         c.id === categoryId ? { ...c, expenses: c.expenses.filter((e) => e.id !== expenseId) } : c
       ),
-    })),
+    }));
+    syncBudgetCategory(categoryId);
+  },
 
-  addReserveItem: (item) =>
-    set((s) => ({ reserveItems: [...s.reserveItems, { id: 'res' + Date.now(), ...item }] })),
+  addReserveItem: (item) => {
+    const id = 'res' + Date.now();
+    const newItem: ReserveItem = { id, ...item };
+    set((s) => ({ reserveItems: [...s.reserveItems, newItem] }));
+    if (isBackendEnabled && get().tenantId) {
+      financialSvc.createReserveItem(get().tenantId!, newItem).then(dbRow => {
+        if (dbRow) set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
 
-  updateReserveItem: (id, updates) =>
+  updateReserveItem: (id, updates) => {
     set((s) => ({
       reserveItems: s.reserveItems.map((i) => (i.id === id ? { ...i, ...updates } : i)),
-    })),
+    }));
+    if (isBackendEnabled) financialSvc.updateReserveItem(id, updates);
+  },
 
-  deleteReserveItem: (id) =>
-    set((s) => ({ reserveItems: s.reserveItems.filter((i) => i.id !== id) })),
+  deleteReserveItem: (id) => {
+    set((s) => ({ reserveItems: s.reserveItems.filter((i) => i.id !== id) }));
+    if (isBackendEnabled) financialSvc.deleteReserveItem(id);
+  },
 
-  addUnit: (unit) =>
-    set((s) => ({ units: [...s.units, { ...unit, payments: [], lateFees: [], specialAssessments: [] }] })),
+  addUnit: (unit) => {
+    set((s) => ({ units: [...s.units, { ...unit, payments: [], lateFees: [], specialAssessments: [] }] }));
+    if (isBackendEnabled && get().tenantId) {
+      financialSvc.upsertUnit(get().tenantId!, { ...unit, payments: [], lateFees: [], specialAssessments: [] });
+    }
+  },
 
-  setHoaDueDay: (day) => set({ hoaDueDay: day }),
+  setHoaDueDay: (day) => {
+    set({ hoaDueDay: day });
+    syncSettings();
+  },
 
-  createWorkOrder: (wo) =>
-    set((s) => ({
-      workOrders: [...s.workOrders, {
-        id: 'WO-' + String(s.workOrders.length + 1).padStart(3, '0'),
-        title: wo.title, vendor: wo.vendor, description: wo.title, amount: wo.amount, acctNum: wo.acctNum,
-        status: 'draft' as const, createdDate: new Date().toISOString().split('T')[0],
-        caseId: wo.caseId || null, invoiceNum: null, invoiceDate: null, approvedDate: null, paidDate: null, glEntryId: null,
-        attachments: [],
-      }],
-    })),
+  createWorkOrder: (wo) => {
+    const state = get();
+    const newWo: WorkOrder = {
+      id: 'WO-' + String(state.workOrders.length + 1).padStart(3, '0'),
+      title: wo.title, vendor: wo.vendor, description: wo.title, amount: wo.amount, acctNum: wo.acctNum,
+      status: 'draft' as const, createdDate: new Date().toISOString().split('T')[0],
+      caseId: wo.caseId || null, invoiceNum: null, invoiceDate: null, approvedDate: null, paidDate: null, glEntryId: null,
+      attachments: [],
+    };
+    set((s) => ({ workOrders: [...s.workOrders, newWo] }));
+    if (isBackendEnabled && state.tenantId) {
+      financialSvc.createWorkOrder(state.tenantId, newWo);
+    }
+  },
 
-  approveWorkOrder: (id) =>
+  approveWorkOrder: (id) => {
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
         w.id === id && w.status === 'draft' ? { ...w, status: 'approved' as const, approvedDate: new Date().toISOString().split('T')[0] } : w
       ),
-    })),
+    }));
+    syncWorkOrder(id);
+  },
 
-  receiveInvoice: (id, invoiceNum, amount) =>
+  receiveInvoice: (id, invoiceNum, amount) => {
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
         w.id === id && w.status === 'approved' ? { ...w, status: 'invoiced' as const, invoiceNum, amount } : w
       ),
-    })),
+    }));
+    syncWorkOrder(id);
+  },
 
   payWorkOrder: (id) => {
     const wo = get().workOrders.find((w) => w.id === id);
@@ -459,13 +581,16 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         w.id === id ? { ...w, status: 'paid' as const, paidDate, glEntryId: entry.id } : w
       ),
     }));
+    syncWorkOrder(id);
   },
 
   addCoASection: (num, name, type) =>
     set((s) => {
       if (s.chartOfAccounts.find((a) => a.num === num)) return s;
-      const updated = [...s.chartOfAccounts, { num, name, type: type as any, sub: 'header', parent: null }];
+      const entry: ChartOfAccountsEntry = { num, name, type: type as any, sub: 'header', parent: null };
+      const updated = [...s.chartOfAccounts, entry];
       updated.sort((a, b) => a.num.localeCompare(b.num));
+      if (isBackendEnabled && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
       return { chartOfAccounts: updated };
     }),
 
@@ -475,20 +600,29 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       let p = s.chartOfAccounts.find((a) => a.num === parent);
       while (p && p.sub !== 'header') p = s.chartOfAccounts.find((a) => a.num === p!.parent!);
       const type = p ? p.type : ('expense' as const);
-      const updated = [...s.chartOfAccounts, { num, name, type, sub, parent }];
+      const entry: ChartOfAccountsEntry = { num, name, type, sub, parent };
+      const updated = [...s.chartOfAccounts, entry];
       updated.sort((a, b) => a.num.localeCompare(b.num));
+      if (isBackendEnabled && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
       return { chartOfAccounts: updated };
     }),
 
-  updateCoAAccount: (num, name, active) =>
+  updateCoAAccount: (num, name, active) => {
     set((s) => ({
       chartOfAccounts: s.chartOfAccounts.map((a) => (a.num === num ? { ...a, name } : a)),
       acctStatus: { ...s.acctStatus, [num]: active },
-    })),
+    }));
+    if (isBackendEnabled) {
+      const s = get();
+      const entry = s.chartOfAccounts.find(a => a.num === num);
+      if (entry && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
+    }
+  },
 
   deleteCoAAccount: (num) =>
     set((s) => {
       if (s.generalLedger.some((e) => e.debitAcct === num || e.creditAcct === num)) return s;
+      if (isBackendEnabled && s.tenantId) financialSvc.deleteCoAEntry(s.tenantId, num);
       return { chartOfAccounts: s.chartOfAccounts.filter((a) => a.num !== num) };
     }),
 
@@ -506,6 +640,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         payments: [...u.payments, { date: today, amount, method, note: `Payment via ${method}` }],
       } : u),
     }));
+    syncUnit(unitNum);
   },
 
   waiveLateFee: (unitNum, feeIndex) => {
@@ -515,6 +650,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         lateFees: u.lateFees.map((f, i) => i === feeIndex ? { ...f, waived: true } : f),
       } : u),
     }));
+    syncUnit(unitNum);
   },
 
   imposeLateFee: (unitNum, amount, reason) => {
@@ -526,16 +662,21 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         lateFees: [...u.lateFees, { date: today, amount, reason, waived: false }],
       } : u),
     }));
+    syncUnit(unitNum);
   },
 
   updateUnit: (unitNum, updates) => {
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? { ...u, ...updates } : u),
     }));
+    syncUnit(unitNum);
   },
 
   removeUnit: (unitNum) => {
     set(s => ({ units: s.units.filter(u => u.number !== unitNum) }));
+    if (isBackendEnabled && get().tenantId) {
+      financialSvc.deleteUnit(get().tenantId!, unitNum);
+    }
   },
 
   addSpecialAssessment: (unitNum, amount, reason) => {
@@ -549,6 +690,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         specialAssessments: [...u.specialAssessments, { id, date: today, amount, reason, paid: false, paidDate: null }],
       } : u),
     }));
+    syncUnit(unitNum);
   },
 
   markSpecialAssessmentPaid: (unitNum, assessmentId) => {
@@ -564,13 +706,20 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         specialAssessments: u.specialAssessments.map(a => a.id === assessmentId ? { ...a, paid: true, paidDate: today } : a),
       } : u),
     }));
+    syncUnit(unitNum);
   },
 
   // Stripe Connect
   stripeConnectId: null,
   stripeOnboardingComplete: false,
-  setStripeConnect: (id) => set({ stripeConnectId: id }),
-  setStripeOnboarding: (complete) => set({ stripeOnboardingComplete: complete }),
+  setStripeConnect: (id) => {
+    set({ stripeConnectId: id });
+    syncSettings();
+  },
+  setStripeOnboarding: (complete) => {
+    set({ stripeOnboardingComplete: complete });
+    syncSettings();
+  },
 
   // Unit Invoices
   createUnitInvoice: (unitNum, type, amount, description) => {
@@ -587,6 +736,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       glEntryId: glEntry?.id || null, paymentGlEntryId: null,
     };
     set(s => ({ unitInvoices: [...s.unitInvoices, invoice] }));
+    if (isBackendEnabled && get().tenantId) {
+      financialSvc.createUnitInvoice(get().tenantId!, invoice).then(dbRow => {
+        if (dbRow) set(s => ({ unitInvoices: s.unitInvoices.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
     return invoice;
   },
 
@@ -606,6 +760,13 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         payments: [...u.payments, { date: today, amount: inv.amount, method, note: `Invoice ${inv.id}` }],
       } : u),
     }));
+    if (isBackendEnabled) {
+      financialSvc.updateUnitInvoice(invoiceId, {
+        status: 'paid', paidDate: today, paidAmount: inv.amount,
+        paymentMethod: method, paymentGlEntryId: glEntry?.id || null,
+      });
+      syncUnit(inv.unitNumber);
+    }
   },
 }), {
   name: 'onetwo-financial',
@@ -629,4 +790,3 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     ...(persisted || {}),
   }),
 }));
-
