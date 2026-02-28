@@ -13,6 +13,13 @@ import { useElectionStore } from '@/store/useElectionStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
+import { useBoardOpsStore } from '@/store/useBoardOpsStore';
+import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useSpendingStore } from '@/store/useSpendingStore';
+import { useLetterStore } from '@/store/useLetterStore';
+import { usePropertyLogStore } from '@/store/usePropertyLogStore';
+import { useReportStore } from '@/store/useReportStore';
+import { useScorecardStore } from '@/store/useScorecardStore';
 
 export interface TenantInfo {
   id: string;
@@ -143,6 +150,13 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           useBuildingStore.getState().loadFromDb(tenantInfo.id),
           useFinancialStore.getState().loadFromDb(tenantInfo.id),
           useArchiveStore.getState().loadFromDb(tenantInfo.id),
+          useBoardOpsStore.getState().loadFromDb(tenantInfo.id),
+          useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
+          useSpendingStore.getState().loadFromDb(tenantInfo.id),
+          useLetterStore.getState().loadFromDb(tenantInfo.id),
+          usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
+          useReportStore.getState().loadFromDb(tenantInfo.id),
+          useScorecardStore.getState().loadFromDb(tenantInfo.id),
         ]);
 
       } catch (err) {

@@ -8,6 +8,7 @@ import FLWorkOrders from './tabs/FLWorkOrders';
 import FLBudget from './tabs/FLBudget';
 import FLReserves from './tabs/FLReserves';
 import FLReports from './tabs/FLReports';
+import FLApprovals from './tabs/FLApprovals';
 
 const TABS = [
   { id: 'dashboard', label: 'Overview' },
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'workorders', label: 'WO & Invoices' },
   { id: 'budget', label: 'Budget' },
   { id: 'reserves', label: 'Reserves' },
+  { id: 'approvals', label: 'Approvals' },
   { id: 'reports', label: 'Reports' },
 ];
 
@@ -26,6 +28,7 @@ const TAB_COMPONENTS: Record<string, () => any> = {
   workorders: FLWorkOrders,
   budget: FLBudget,
   reserves: FLReserves,
+  approvals: FLApprovals,
   reports: FLReports,
 };
 

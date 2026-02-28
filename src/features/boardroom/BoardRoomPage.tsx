@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
+import LetterEngineTab from './tabs/LetterEngineTab';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 
@@ -20,7 +21,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops' | 'letters';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument' | 'addAnnouncement';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -335,6 +336,7 @@ export default function BoardRoomPage() {
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
+    { id: 'letters', label: 'Letter Engine' },
   ];
 
   return (
@@ -919,6 +921,9 @@ export default function BoardRoomPage() {
 
         {/* ═══ DAILY OPERATIONS TAB ═══ */}
         {tab === 'dailyops' && <IssuesPage embedded />}
+
+        {/* ═══ LETTER ENGINE TAB ═══ */}
+        {tab === 'letters' && <LetterEngineTab />}
       </div>
 
       {/* ═══ MODALS ═══ */}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -8,8 +9,10 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { fmt } from '@/lib/formatters';
+import ReportsTab from './tabs/ReportsTab';
 
 export default function DashboardPage() {
+  const [dashView, setDashView] = useState<'dashboard' | 'reports'>('dashboard');
   const { currentUser, currentRole } = useAuthStore();
   const fin = useFinancialStore();
   const { meetings } = useMeetingsStore();
@@ -120,7 +123,15 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {attentionItems.length > 0 && (
+        {/* View Toggle */}
+        <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit">
+          <button onClick={() => setDashView('dashboard')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dashView === 'dashboard' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Dashboard</button>
+          <button onClick={() => setDashView('reports')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dashView === 'reports' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Reports</button>
+        </div>
+
+        {dashView === 'reports' && <ReportsTab />}
+
+        {dashView === 'dashboard' && attentionItems.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {attentionItems.map(item => (
               <button key={item.label} onClick={() => navigate(item.path)} className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}>
@@ -133,7 +144,7 @@ export default function DashboardPage() {
         )}
 
         {/* ─── ACTION ITEMS ─── */}
-        {(() => {
+        {dashView === 'dashboard' && (() => {
           const memberRecord = building.board.find(b => b.name === currentUser.name);
           const userRole = memberRecord?.role || 'President';
           // Runbook items: not completed, not auto-pass, filtered to user role
@@ -188,15 +199,15 @@ export default function DashboardPage() {
           );
         })()}
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {dashView === 'dashboard' && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
           <MetricCard label="Operating Cash" value={fmt(bs.assets.operating)} sub={`${fmt(bs.assets.totalReceivable)} AR`} color="accent" onClick={() => navigate('/financial')} />
           <MetricCard label="Delinquent" value={`${metrics.delinquentUnits}`} sub={`${fmt(aging.totalOutstanding)} owed`} color={metrics.delinquentUnits === 0 ? 'sage' : 'red'} onClick={() => navigate('/building')} />
           <MetricCard label="Reserve Fund" value={`${reservePct}%`} sub={`${fmt(totalReserveFunded)} funded`} color={reservePct >= 70 ? 'sage' : reservePct >= 50 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
           <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/boardroom')} />
-        </div>
+        </div>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {dashView === 'dashboard' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             <div className="grid grid-cols-2 gap-3">
               <div onClick={() => navigate('/boardroom')} className="bg-white rounded-xl border border-ink-100 p-5 cursor-pointer hover:border-sage-300 hover:shadow-sm transition-all">
@@ -285,7 +296,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
     );
   }

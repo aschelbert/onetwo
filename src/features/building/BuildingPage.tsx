@@ -7,9 +7,11 @@ import Modal from '@/components/ui/Modal';
 import TheUnitsTab from './tabs/TheUnitsTab';
 import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
+import VendorsTab from './tabs/VendorsTab';
+import PMScorecardTab from './tabs/PMScorecardTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors' };
+const TABS = ['details','contacts','units','legal','insurance','vendors','scorecard'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', scorecard:'PM Scorecard' };
 
 type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor';
 
@@ -19,7 +21,7 @@ export default function BuildingPage() {
   const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const [tab, setTab] = useState<typeof TABS[number]>('details');
-  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units');
+  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'scorecard');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
@@ -155,10 +157,10 @@ export default function BuildingPage() {
           )}
 
           {/* VENDORS */}
-          {tab === 'vendors' && (<div className="space-y-3">
-            <div className="flex items-center justify-between mb-4"><h3 className="font-display text-xl font-bold text-ink-900">Preferred Vendors</h3><button onClick={() => { resetForm(); setModal('addVendor'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Add Vendor</button></div>
-            {store.vendors.map(v => (<div key={v.id} className={`bg-white border rounded-xl p-4 hover:shadow-sm transition-all ${v.status === 'inactive' ? 'opacity-50 border-ink-100' : 'border-ink-100'}`}><div className="flex items-center justify-between"><div><div className="flex items-center gap-2"><h4 className="font-bold text-ink-900">{v.name}</h4><span className={`pill px-2 py-0.5 rounded text-xs ${v.status === 'active' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{v.status}</span></div><p className="text-sm text-accent-600">{v.service}</p><p className="text-xs text-ink-500">{v.contact} · {v.phone} · {v.email}</p><p className="text-xs text-ink-400 mt-1">{v.contract}</p></div><div className="flex gap-2"><button onClick={() => store.toggleVendorStatus(v.id)} className={`text-xs font-medium ${v.status === 'active' ? 'text-yellow-600' : 'text-sage-600'}`}>{v.status === 'active' ? 'Deactivate' : 'Activate'}</button><button onClick={() => openEdit('editVendor', v.id, { name: v.name, service: v.service, contact: v.contact, phone: v.phone, email: v.email, contract: v.contract })} className="text-xs text-accent-600 font-medium">Edit</button><button onClick={() => { if (confirm('Remove?')) store.removeVendor(v.id); }} className="text-xs text-red-400 hover:text-red-600">Remove</button></div></div></div>))}
-          </div>)}
+          {tab === 'vendors' && <VendorsTab />}
+
+          {/* PM SCORECARD */}
+          {tab === 'scorecard' && isBoard && <PMScorecardTab />}
         </div>
 
       {/* MODALS */}
