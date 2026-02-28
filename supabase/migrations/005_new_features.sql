@@ -283,10 +283,10 @@ create policy "Users can view own tenant board_tasks" on board_tasks for select
 create policy "Board can manage board_tasks" on board_tasks for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all board_tasks" on board_tasks for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 2. Vendor Bids ──
 
@@ -296,10 +296,10 @@ create policy "Users can view own tenant vendor_bids" on vendor_bids for select
 create policy "Board can manage vendor_bids" on vendor_bids for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all vendor_bids" on vendor_bids for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 2. Vendor Reviews ──
 
@@ -309,10 +309,10 @@ create policy "Users can view own tenant vendor_reviews" on vendor_reviews for s
 create policy "Board can manage vendor_reviews" on vendor_reviews for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all vendor_reviews" on vendor_reviews for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 2. Vendor Contracts ──
 
@@ -322,10 +322,10 @@ create policy "Users can view own tenant vendor_contracts" on vendor_contracts f
 create policy "Board can manage vendor_contracts" on vendor_contracts for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all vendor_contracts" on vendor_contracts for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 3. Spending Approvals ──
 
@@ -335,10 +335,10 @@ create policy "Users can view own tenant spending_approvals" on spending_approva
 create policy "Board can manage spending_approvals" on spending_approvals for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all spending_approvals" on spending_approvals for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 4. Letter Templates ──
 
@@ -348,10 +348,10 @@ create policy "Users can view own tenant letter_templates" on letter_templates f
 create policy "Board can manage letter_templates" on letter_templates for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all letter_templates" on letter_templates for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 4. Generated Letters ──
 
@@ -361,10 +361,10 @@ create policy "Users can view own tenant generated_letters" on generated_letters
 create policy "Board can manage generated_letters" on generated_letters for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all generated_letters" on generated_letters for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 5. Property Logs ──
 
@@ -374,10 +374,10 @@ create policy "Users can view own tenant property_logs" on property_logs for sel
 create policy "Board can manage property_logs" on property_logs for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all property_logs" on property_logs for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 6. Report Configs ──
 
@@ -387,10 +387,10 @@ create policy "Users can view own tenant report_configs" on report_configs for s
 create policy "Board can manage report_configs" on report_configs for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all report_configs" on report_configs for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 6. Generated Reports ──
 
@@ -400,10 +400,10 @@ create policy "Users can view own tenant generated_reports" on generated_reports
 create policy "Board can manage generated_reports" on generated_reports for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all generated_reports" on generated_reports for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 7. PM Scorecard Entries ──
 
@@ -413,10 +413,10 @@ create policy "Users can view own tenant pm_scorecard_entries" on pm_scorecard_e
 create policy "Board can manage pm_scorecard_entries" on pm_scorecard_entries for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all pm_scorecard_entries" on pm_scorecard_entries for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ── 7. PM Scorecard Reviews ──
 
@@ -426,10 +426,10 @@ create policy "Users can view own tenant pm_scorecard_reviews" on pm_scorecard_r
 create policy "Board can manage pm_scorecard_reviews" on pm_scorecard_reviews for all
   using (tenant_id in (
     select tu.tenant_id from tenant_users tu
-    where tu.user_id = auth.uid() and tu.role in ('board_member', 'property_manager')
+    where tu.user_id = auth.uid() and tu.role = 'board_member'
   ));
 create policy "Platform admins manage all pm_scorecard_reviews" on pm_scorecard_reviews for all
-  using (auth.uid() in (select id from profiles where role = 'PLATFORM_ADMIN'));
+  using (exists (select 1 from platform_admins where user_id = auth.uid()));
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- TRIGGERS: updated_at auto-refresh
