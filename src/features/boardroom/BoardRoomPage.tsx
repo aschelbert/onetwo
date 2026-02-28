@@ -125,7 +125,7 @@ export default function BoardRoomPage() {
 
   // Meeting handlers
   const openAddMeeting = () => { const d = getVoteDefaults('BOARD'); setRunbookItemForMeeting(null); setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [], sendNotice: false }); setModal('addMeeting'); };
-  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board', voteItems: [] }); setModal('editMeeting'); };
+  const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board', voteItems: [], sendNotice: false }); setModal('editMeeting'); };
   const openAttendees = (m: Meeting) => { setTargetId(m.id); setAttForm({ board: [...m.attendees.board], owners: m.attendees.owners.join('\n'), guests: m.attendees.guests.join('\n') }); setModal('attendees'); };
   const openMinutes = (m: Meeting) => { setTargetId(m.id); setMinText(m.minutes); setModal('minutes'); };
 
@@ -613,7 +613,7 @@ export default function BoardRoomPage() {
                           const agenda = item.suggestedAgenda || [item.task];
                           const d = getVoteDefaults(mType);
                           setRunbookItemForMeeting(item.id);
-                          setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
+                          setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [], sendNotice: false });
                           setModal('addMeeting');
                         }} />
                       </div>
@@ -800,7 +800,7 @@ export default function BoardRoomPage() {
                   const agenda = item.suggestedAgenda || [item.task];
                   const d = getVoteDefaults(mType);
                   setRunbookItemForMeeting(item.id);
-                  setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
+                  setMForm({ title: item.task, type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item.task}. ${item.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [], sendNotice: false });
                   setModal('addMeeting');
                 }} />
                   </div>
