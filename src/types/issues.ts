@@ -29,6 +29,7 @@ export interface Issue {
     text: string;
     date: string;
   }>;
+  comms: CaseComm[];
 }
 
 export type CasePriority = 'urgent' | 'high' | 'medium' | 'low';

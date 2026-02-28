@@ -8,7 +8,7 @@ import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal } from './components/CaseModals';
 import Modal from '@/components/ui/Modal';
-import type { CaseApproach, CasePriority } from '@/types/issues';
+import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -48,8 +48,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   const [assignFilter, setAssignFilter] = useState<'all' | 'mine' | 'overdue'>('all');
   // Issue creation
   const [showCreate, setShowCreate] = useState(false);
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
+  const [commIssueId, setCommIssueId] = useState<string | null>(null);
   const [iTitle, setITitle] = useState('');
   const [iDesc, setIDesc] = useState('');
   const [iCat, setICat] = useState('Maintenance');
@@ -97,7 +96,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
   const TABS: { id: CaseTab; label: string; badge?: number }[] = [
     { id: 'open', label: 'Open Cases', badge: open.length || undefined },
-    { id: 'issues', label: 'Recent Issues', badge: issues.filter(i => i.status === 'SUBMITTED').length || undefined },
+    { id: 'issues', label: 'Request Inbox', badge: issues.filter(i => i.status === 'SUBMITTED').length || undefined },
     { id: 'archive', label: 'Case Archive', badge: closed.length || undefined },
   ];
 
@@ -264,12 +263,12 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
           )}
         </div>)}
 
-        {/* ─── RECENT ISSUES ─── */}
+        {/* ─── REQUEST INBOX ─── */}
         {tab === 'issues' && (<div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-ink-400">{issues.length} issue{issues.length !== 1 ? 's' : ''} reported</p>
             <button onClick={() => setShowCreate(!showCreate)} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">
-              {showCreate ? 'Cancel' : '＋ Report Issue'}
+              {showCreate ? 'Cancel' : '+ Add Request'}
             </button>
           </div>
           {showCreate && (
@@ -330,9 +329,9 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                         {st.replace('_', ' ')}
                       </button>
                     ))}
-                    {isBoard && <button onClick={() => setReplyTo(replyTo === i.id ? null : i.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200">💬 Reply</button>}
+                    {isBoard && <button onClick={() => setCommIssueId(i.id)} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200">New Communication</button>}
                     {isBoard && i.status !== 'CLOSED' && (() => {
-                      const linkedCase = store.cases.find(c => c.sourceId === i.id);
+                      const linkedCase = store.cases.find((c: any) => c.sourceId === i.id);
                       return linkedCase
                         ? <button onClick={(e) => { e.stopPropagation(); onNav(`case:${linkedCase.id}`); }}
                             className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-sage-600 text-white hover:bg-sage-700 ml-1">
@@ -344,10 +343,23 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                           </button>;
                     })()}
                   </div>
-                  {isBoard && replyTo === i.id && (
-                    <div className="mt-2 flex gap-2">
-                      <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Reply to resident..." className="flex-1 px-3 py-1.5 border border-ink-200 rounded-lg text-xs" onKeyDown={e => { if (e.key === 'Enter' && replyText.trim()) { store.addIssueComment(i.id, 'Board', replyText.trim()); setReplyText(''); setReplyTo(null); } }} />
-                      <button onClick={() => { if (replyText.trim()) { store.addIssueComment(i.id, 'Board', replyText.trim()); setReplyText(''); setReplyTo(null); } }} className="px-3 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-medium">Send</button>
+                  {/* Communications */}
+                  {(i.comms || []).length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wider">Communications</p>
+                      {[...(i.comms as CaseComm[])].sort((a, b) => b.date.localeCompare(a.date)).map((cm: CaseComm) => {
+                        const icons: Record<string, string> = { notice: '📢', response: '✉️', reminder: '⏰', violation: '⚠️', legal: '⚖️' };
+                        return (
+                          <div key={cm.id} className="bg-mist-50 rounded-lg p-2 border border-mist-100">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs">{icons[cm.type] || '📨'}</span>
+                              <span className="text-[10px] font-bold text-ink-600">{cm.subject}</span>
+                              <span className="text-[10px] text-ink-400">{cm.date} · via {cm.method}</span>
+                            </div>
+                            {cm.notes && <p className="text-xs text-ink-400 mt-0.5 ml-5">{cm.notes}</p>}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -355,6 +367,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
             ); })}
             {issues.length === 0 && <p className="text-sm text-ink-400 text-center py-8">No issues reported.</p>}
           </div>
+          {commIssueId && <CommModal issueId={commIssueId} store={store} onClose={() => setCommIssueId(null)} />}
         </div>)}
 
         {/* ─── CASE ARCHIVE ─── */}
@@ -630,7 +643,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
                     </span>
                   );
                 })()}
-                {c.source && <span className="text-xs text-ink-400">Source: {c.source}</span>}
+                {c.source && (c.source === 'issue' && c.sourceId
+                  ? <button onClick={onBack} className="text-xs text-accent-500 hover:text-accent-600 font-medium">Source: Request #{c.sourceId} · View →</button>
+                  : <span className="text-xs text-ink-400">Source: {c.source}</span>
+                )}
                 {c.completedAt && <span className="text-xs bg-sage-100 text-sage-700 px-2 py-1 rounded-lg font-medium">Completed: {c.completedAt}</span>}
                 <button onClick={() => { setAssignForm({ assignedTo: c.assignedTo || '', assignedRole: c.assignedRole || '', dueDate: c.dueDate || '' }); setEditingAssignment(true); }} className="text-[11px] text-accent-500 hover:text-accent-600 font-medium">Edit Assignment</button>
               </div>

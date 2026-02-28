@@ -747,7 +747,8 @@ const seedIssues: Issue[] = [
     upvotes: [{ userId: 'u-resident', userName: 'Lisa Chen', unitNumber: '502' }],
     viewCount: 14,
     comments: [{ id: 'cmt-1', author: 'Board', text: 'Plumber inspecting next week.', date: '2026-02-12' }],
-    reviewNotes: []
+    reviewNotes: [],
+    comms: []
   },
   {
     id: 'iss-2', type: 'BUILDING_PUBLIC', category: 'Safety',
@@ -756,7 +757,8 @@ const seedIssues: Issue[] = [
     reportedBy: 'u-res-2', reporterName: 'Mark Torres', reporterEmail: 'mtorres@email.com',
     unitNumber: '310', submittedDate: '2026-02-14',
     upvotes: [{ userId: 'u-res-2', userName: 'Mark Torres', unitNumber: '310' }, { userId: 'u-resident', userName: 'Lisa Chen', unitNumber: '502' }],
-    viewCount: 8, comments: [], reviewNotes: []
+    viewCount: 8, comments: [], reviewNotes: [],
+    comms: []
   }
 ];
 
@@ -772,10 +774,11 @@ interface IssuesState {
   loadFromDb: (tenantId: string) => Promise<void>;
 
   // Issue actions
-  addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes'>, tenantId?: string) => void;
+  addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes' | 'comms'>, tenantId?: string) => void;
   upvoteIssue: (issueId: string, userId: string, userName: string, unitNumber: string) => void;
   updateIssueStatus: (issueId: string, status: Issue['status']) => void;
   addIssueComment: (issueId: string, author: string, text: string) => void;
+  addIssueComm: (issueId: string, comm: Omit<CaseComm, 'id'>) => void;
 
   // Case actions
   createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string }, tenantId?: string) => string;
@@ -839,7 +842,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   addIssue: (issue, tenantId?) => {
     const localId = `iss-${get().nextIssueNum}`;
     set(s => ({
-      issues: [{ ...issue, id: localId, upvotes: [], viewCount: 0, comments: [], reviewNotes: [] }, ...s.issues],
+      issues: [{ ...issue, id: localId, upvotes: [], viewCount: 0, comments: [], reviewNotes: [], comms: [] }, ...s.issues],
       nextIssueNum: s.nextIssueNum + 1
     }));
     if (isBackendEnabled && tenantId) {
@@ -904,6 +907,18 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     }));
     if (isBackendEnabled) issuesSvc.addIssueComment('', issueId, localId, author, text, date);
   },
+
+  addIssueComm: (issueId, comm) => set(s => {
+    const id = `cm${s.nextCommNum}`;
+    const newComm = { ...comm, id };
+    const newIssues = s.issues.map(i => i.id === issueId ? { ...i, comms: [...i.comms, newComm] } : i);
+    // Bidirectional: also add to linked case if one exists
+    const linkedCase = s.cases.find(c => c.source === 'issue' && c.sourceId === issueId);
+    const newCases = linkedCase
+      ? s.cases.map(c => c.id === linkedCase.id ? { ...c, comms: [...c.comms, newComm] } : c)
+      : s.cases;
+    return { issues: newIssues, cases: newCases, nextCommNum: s.nextCommNum + 1 };
+  }),
 
   createCase: (data, tenantId?) => {
     const s = get();
@@ -1171,6 +1186,12 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         linkedLetterIds: c.linkedLetterIds || [],
         linkedInvoiceIds: c.linkedInvoiceIds || [],
         linkedMeetingIds: c.linkedMeetingIds || [],
+      }));
+    }
+    if (merged.issues) {
+      merged.issues = merged.issues.map((i: any) => ({
+        ...i,
+        comms: i.comms || [],
       }));
     }
     return merged;

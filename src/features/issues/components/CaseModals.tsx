@@ -95,7 +95,7 @@ function substituteVariables(text: string, values: Record<string, string>): stri
 }
 
 // ─── Communication Modal (Quick Log + Use Template) ──────
-export function CommModal({ caseId, store, onClose, catId, sitId }: ModalProps & { caseId: string; store: any; catId?: string; sitId?: string }) {
+export function CommModal({ caseId, store, onClose, catId, sitId, issueId }: ModalProps & { caseId?: string; store: any; catId?: string; sitId?: string; issueId?: string }) {
   const [mode, setMode] = useState<'quick' | 'template'>('quick');
 
   // Quick Log state
@@ -119,10 +119,15 @@ export function CommModal({ caseId, store, onClose, catId, sitId }: ModalProps &
 
   const handleQuickSave = () => {
     if (!subject.trim() || !recipient.trim()) return alert('Subject and recipient are required.');
-    store.addComm(caseId, {
+    const commData = {
       type, subject, date: new Date().toISOString().split('T')[0],
       method, recipient, sentBy, notes, status: 'sent'
-    });
+    };
+    if (issueId) {
+      store.addIssueComm(issueId, commData);
+    } else if (caseId) {
+      store.addComm(caseId, commData);
+    }
     onClose();
   };
 
@@ -134,7 +139,12 @@ export function CommModal({ caseId, store, onClose, catId, sitId }: ModalProps &
     const unitNum = templateUnit || templateValues['unit_number'] || '';
     const today = new Date().toISOString().split('T')[0];
 
-    // 1. Create GeneratedLetter
+    // Find linked case for issue-based comms
+    const linkedCaseId = issueId
+      ? store.cases.find((c: any) => c.source === 'issue' && c.sourceId === issueId)?.id
+      : caseId;
+
+    // 1. Create GeneratedLetter (link to case if one exists)
     letterStore.addLetter({
       templateId: selectedTemplate.id,
       templateName: selectedTemplate.name,
@@ -146,21 +156,28 @@ export function CommModal({ caseId, store, onClose, catId, sitId }: ModalProps &
       sentDate: today,
       sentVia: templateSentVia,
       createdBy: currentUser.name,
-      caseId,
+      caseId: linkedCaseId,
     });
 
-    // 2. Link the letter to case (use latest letter ID)
-    setTimeout(() => {
-      const latest = letterStore.letters[0];
-      if (latest) store.linkLetter(caseId, latest.id);
-    }, 50);
+    // 2. Link the letter to case if one exists
+    if (linkedCaseId) {
+      setTimeout(() => {
+        const latest = letterStore.letters[0];
+        if (latest) store.linkLetter(linkedCaseId, latest.id);
+      }, 50);
+    }
 
-    // 3. Also log as CaseComm for the timeline
-    store.addComm(caseId, {
+    // 3. Log as comm
+    const commData = {
       type: 'notice', subject: finalSubject, date: today,
       method: templateSentVia, recipient: recipientName ? `Unit ${unitNum} — ${recipientName}` : `Unit ${unitNum}`,
       sentBy: currentUser.name, notes: `Sent via template: ${selectedTemplate.name}`, status: 'sent'
-    });
+    };
+    if (issueId) {
+      store.addIssueComm(issueId, commData);
+    } else if (caseId) {
+      store.addComm(caseId, commData);
+    }
     onClose();
   };
 

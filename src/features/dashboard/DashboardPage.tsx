@@ -89,7 +89,7 @@ export default function DashboardPage() {
     const attentionItems: { label: string; count: number; color: string; path: string; icon: string }[] = [];
     if (overdueFilings.length > 0) attentionItems.push({ label: 'Overdue Filings', count: overdueFilings.length, color: 'red', path: '/boardroom', icon: '📅' });
     if (urgentCases.length > 0) attentionItems.push({ label: 'Urgent Cases', count: urgentCases.length, color: 'red', path: '/issues', icon: '🚨' });
-    if (submittedIssues.length > 0) attentionItems.push({ label: 'New Issues', count: submittedIssues.length, color: 'amber', path: '/issues', icon: '📥' });
+    if (submittedIssues.length > 0) attentionItems.push({ label: 'New Requests', count: submittedIssues.length, color: 'amber', path: '/issues', icon: '📥' });
     if (expiringInsurance.length > 0) attentionItems.push({ label: 'Insurance Expiring', count: expiringInsurance.length, color: 'amber', path: '/building', icon: '🛡' });
     if (aging.days90plus.length > 0) attentionItems.push({ label: '90+ Days Past Due', count: aging.days90plus.length, color: 'red', path: '/building', icon: '⚠' });
     if (reservePct < 50) attentionItems.push({ label: 'Low Reserves', count: reservePct, color: 'amber', path: '/financial', icon: '💰' });
@@ -333,7 +333,7 @@ export default function DashboardPage() {
         <MetricCard label="Monthly Fee" value={myUnit ? fmt(myUnit.monthlyFee) : '—'} sub={myUnit ? `Due day ${fin.hoaDueDay || 1}` : ''} color="accent" onClick={() => navigate('/my-unit')} />
         <MetricCard label="Account Status" value={myTotalBalance === 0 ? 'Current' : 'Past Due'} sub={myTotalBalance > 0 ? fmt(myTotalBalance) + ' owed' : 'No balance'} color={myTotalBalance === 0 ? 'sage' : 'red'} onClick={() => navigate('/my-unit')} />
         <MetricCard label="Next Meeting" value={nextMeeting ? new Date(nextMeeting.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'} sub={nextMeeting ? `${nextMeeting.type} · ${nextMeeting.time}` : 'None scheduled'} color="accent" onClick={() => navigate('/building')} />
-        <MetricCard label="Open Issues" value={String(submittedIssues.length)} sub="Community reports" color={submittedIssues.length > 0 ? 'amber' : 'sage'} onClick={() => navigate('/community')} />
+        <MetricCard label="Open Requests" value={String(submittedIssues.length)} sub="Community reports" color={submittedIssues.length > 0 ? 'amber' : 'sage'} onClick={() => navigate('/community')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

@@ -36,6 +36,7 @@ function rowToIssue(row: IssueRow, upvotes: Issue['upvotes'], comments: Issue['c
     viewCount: row.view_count,
     comments,
     reviewNotes,
+    comms: [],
   };
 }
 
@@ -77,7 +78,7 @@ export async function fetchIssues(tenantId: string): Promise<Issue[] | null> {
   );
 }
 
-export async function createIssue(tenantId: string, issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes'>, localId: string): Promise<string | null> {
+export async function createIssue(tenantId: string, issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes' | 'comms'>, localId: string): Promise<string | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('issues')
