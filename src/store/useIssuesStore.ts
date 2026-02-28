@@ -26,50 +26,61 @@ export const CATS: Category[] = [
   { id:'financial', num:'1', icon:'💰', label:'Fiscal Lens', color:'emerald',
     sits: [
       { id:'annual-budgeting', title:'Annual Budgeting', desc:'Setting assessments, forecasting costs, funding reserves',
-        tags:['Setting annual assessments','Forecasting operating costs','Funding reserves'],
+        tags:['Setting annual assessments','Forecasting operating costs','Funding reserves','Budget ratification'],
         pre:[
-          {s:'Review current year financials and reserve balances',t:'90 days before fiscal year-end',d:'Bylaws: Budget provisions'},
-          {s:'Obtain bids and cost estimates for upcoming expenses',t:'60-90 days out',d:'CC&Rs: Assessment authority'},
-          {s:'Draft proposed budget with line-item detail',t:'60 days out'},
-          {s:'Present budget at open board meeting for owner input',t:'30 days before adoption',d:'Bylaws: Notice requirements'},
-          {s:'Distribute budget & assessment notice to all owners',t:'Per governing docs',d:'State condo act: Notice timeline'},
-          {s:'Board votes to adopt budget and set new assessment rate',t:'Before fiscal year start',d:'Bylaws: Voting requirements'}
+          {s:'Review current year financials: actual vs budget variance, reserve balances, outstanding receivables',t:'90 days before fiscal year-end',d:'Fiscal Lens: Dashboard & Reports',detail:'Identify line items over/under budget. Review collection rate. Assess reserve funding percentage against reserve study recommendations.'},
+          {s:'Review reserve study for upcoming capital needs and required annual contribution',t:'60-90 days out',d:'Reserve study',detail:'Adjust reserve contribution if funding is below recommended level. Factor in any capital projects planned for next year. Document rationale for reserve funding level chosen.'},
+          {s:'Obtain bids, contract renewals, and cost estimates for all operating expenses',t:'60-90 days out',d:'Vendor contracts',detail:'Review each vendor contract for renewal terms and rate changes. Obtain competitive bids for expiring contracts. Factor in inflation estimates for utilities, insurance, and maintenance.'},
+          {s:'Draft proposed budget with line-item detail and calculate required assessment rate',t:'60 days out',detail:'Include: all operating expenses by category, reserve contribution, contingency (3-5% recommended), debt service if applicable. Calculate per-unit assessment to cover total budget.'},
+          {s:'Determine if assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. Some bylaws require owner ratification of every budget at the annual meeting.'},
+          {s:'Present proposed budget at open board meeting; allow owner questions and input',t:'30 days before adoption',d:'DC Code § 29-1135.02',detail:'DC requires 30-day notice before budget adoption. Present budget in clear, non-technical language. Explain reasons for any assessment increase. Allow written questions from owners who cannot attend.'},
+          {s:'Distribute formal budget package and assessment notice to all owners',t:'30 days before effective',d:'DC Code § 29-1135.02 & Bylaws',detail:'Package should include: proposed budget, prior year comparison, reserve study summary, assessment amount and effective date, explanation of changes. Send via method required by bylaws.'},
+          {s:'Board votes to adopt budget; if owner vote required, conduct at annual meeting',t:'Before fiscal year start',d:'Bylaws: Voting & DC Code § 29-1135.02',detail:'Record vote in minutes with full budget attached. If owner ratification required, present at annual meeting for vote. Document approval or any modifications requested by owners.'}
         ],
         self:[
-          {s:'Research state-mandated budget disclosure requirements',detail:'Review your state condo act for required financial disclosures and timelines'},
-          {s:'File any required annual financial reports with the state',detail:'Some jurisdictions require annual filings'},
-          {s:'If owner disputes assessment: document ratification, send formal response citing governing docs'},
-          {s:'If needed, pursue small claims for unpaid assessments under threshold',detail:'Check local small claims limits'}
+          {s:'If owner disputes assessment increase: provide written response with budget justification, reserve study data, and bylaw authority',detail:'Cite specific bylaw provisions authorizing assessments. Include cost comparison data.'},
+          {s:'If budget not adopted before fiscal year: operate under prior year budget until new budget is approved per bylaws'},
+          {s:'File any required annual financial reports or disclosures',detail:'DC may require annual financial disclosure to owners per § 29-1135.05.'}
         ],
         legal:[
-          {s:'Consult attorney if assessment increase exceeds threshold requiring owner vote',w:'Most states cap increases at 10-25% without owner approval'},
+          {s:'Consult attorney if assessment increase exceeds bylaws threshold requiring owner vote',w:'Increase > 10-15% or per bylaws cap'},
           {s:'Legal review of budget adoption process if challenged by owners',w:'Owner files formal challenge or threatens suit'},
-          {s:'Attorney drafts special meeting notice if supermajority vote needed',w:'Large increase or special assessment'}
+          {s:'Attorney advises on fiduciary duty if board knowingly underfunds reserves',w:'Reserve funding below 50% of recommended level'}
         ],
-        notes:{'DC':'DC Code § 29-1135.02 requires 30-day notice before budget adoption.','CA':'Civil Code § 5300 requires annual budget report including reserve funding.','_':'Review your state condo act for required budget notice periods and owner approval thresholds.'}
+        notes:{
+          'DC':'DC Code § 29-1135.02: 30-day notice before budget adoption. Check bylaws for assessment increase caps requiring owner vote (commonly 10-15%). § 29-1135.05: Annual financial disclosure to owners required. Board has fiduciary duty to fund reserves per reserve study — chronic underfunding may constitute breach of duty of care.',
+          'CA':'Civil Code § 5300 requires annual budget report including reserve funding.',
+          '_':'Review your bylaws for assessment increase caps that trigger owner vote (typically 10-25%). Budget should be transparent, justified, and adequately fund reserves per the reserve study. Underfunding reserves creates future special assessment risk and potential fiduciary liability.'
+        }
       },
       { id:'special-assessments', title:'Special Assessments', desc:'Roof replacement, structural repairs, emergency storm damage',
-        tags:['Roof replacement','Structural repairs','Emergency storm damage'],
+        tags:['Roof replacement','Structural repairs','Emergency storm damage','Special assessment'],
         pre:[
-          {s:'Identify capital need and obtain 2-3 professional cost estimates',t:'Immediately upon identifying need',d:'Reserve study'},
-          {s:'Review governing docs for special assessment authority and voting requirements',t:'1-2 weeks',d:'Bylaws: Special assessment section'},
-          {s:'Determine if owner vote required based on amount threshold',t:'1 week',d:'CC&Rs & State condo act'},
-          {s:'Send written notice of proposed special assessment with justification',t:'Per governing docs (10-30 days)',d:'Bylaws: Notice provisions'},
-          {s:'Hold meeting/vote if required; board resolution if not',t:'Per notice period'},
-          {s:'Issue formal assessment notice with payment schedule',t:'After approval'},
-          {s:'Offer payment plan options if amount is substantial',t:'With notice',d:'Best practice'}
+          {s:'Identify capital need and obtain 2-3 professional cost estimates',t:'Immediately upon identifying need',d:'Reserve study',detail:'Document why the expense is necessary, why reserves are insufficient, and what alternatives were considered (phased approach, financing, deferred scope).'},
+          {s:'Review reserve study: is this item in the plan? Are reserves sufficient?',t:'1-3 days',d:'Fiscal Lens: Reserves tab',detail:'If the item is in the reserve study but underfunded, explain the shortfall. If not in the study, explain why it was unforeseen. This transparency is critical for owner buy-in.'},
+          {s:'Review bylaws and DC Code for special assessment authority, voting thresholds, and notice requirements',t:'1-2 weeks',d:'Bylaws & DC Code § 29-1135.03',detail:'DC typically requires 2/3 (66.7%) owner approval for special assessments. Check bylaws — some set a dollar threshold above which owner vote is mandatory (e.g., > $5,000/unit). Below threshold may be board-only, but transparency is still recommended.'},
+          {s:'Prepare special assessment proposal: total cost, per-unit allocation, justification, and payment options',t:'1-2 weeks',detail:'Per-unit allocation must follow the percentage interest defined in the Declaration (not equal split unless docs specify). Include: total cost, per-unit share, payment schedule options (lump sum, installments), hardship provisions.'},
+          {s:'Send written notice of proposed special assessment to all owners with full justification',t:'30-60 days before vote',d:'DC Code § 29-1135.03 & Bylaws: Notice',detail:'Notice must include: purpose, total amount, per-unit amount, proposed payment schedule, date/time of owner meeting/vote, proxy form. Send via method required by bylaws.'},
+          {s:'Hold owner meeting and conduct vote per bylaws; record results',t:'Per notice period',d:'Bylaws: Voting requirements',detail:'Typically requires 2/3 owner approval in DC. Allow owner questions and discussion. Use secret ballot if bylaws require. Document vote count, quorum verification, and result in minutes.'},
+          {s:'If approved: issue formal assessment notice with payment schedule and due dates',t:'Within 14 days of approval',detail:'Include: total amount, per-unit share, due date(s), payment methods accepted, late fee policy. Offer installment plan for large assessments (e.g., 3-12 months).'},
+          {s:'Record board resolution and owner vote results in official records',t:'Immediately',d:'Document retention',detail:'Resolution should reference: bylaw authority, vote count, effective date, payment terms. This documentation protects the board if the assessment is challenged.'},
+          {s:'If assessment requires financing: evaluate HOA loan options and present to owners',t:'If applicable',d:'Bylaws: Borrowing authority',detail:'HOA loans may also require owner vote per bylaws. Compare: lump-sum assessment, installment assessment, HOA line of credit. Factor in interest cost.'}
         ],
         self:[
-          {s:'If owner refuses to pay: send formal demand letter citing CC&Rs and state statute',detail:'Certified mail, return receipt requested'},
-          {s:'Record lien against non-paying unit per your state lien statute',detail:'Check county recorder requirements'},
-          {s:'File small claims if amount is within jurisdictional limits'}
+          {s:'If owner refuses to pay: send formal demand letter citing CC&Rs, board resolution, and state statute',detail:'Certified mail, return receipt requested. Include copy of vote results and resolution.'},
+          {s:'Record lien against non-paying unit per DC lien statute',detail:'DC Code § 42-1903.13: Assessment liens have 6-month super-priority per § 29-1135.08. File with DC Recorder of Deeds.'},
+          {s:'Offer hardship payment plan for owners demonstrating financial difficulty',detail:'Document in writing. Board should adopt a uniform hardship policy to avoid selective enforcement claims.'}
         ],
         legal:[
-          {s:'Attorney reviews special assessment process for legal compliance before adoption',w:'Assessment exceeds $5K/unit or is contested'},
+          {s:'Attorney reviews special assessment process and vote requirements before adoption',w:'Assessment exceeds bylaws threshold or > $5K/unit'},
+          {s:'Attorney advises on per-unit allocation methodology if challenged',w:'Owner disputes allocation basis'},
           {s:'Attorney files liens and pursues collection for non-payment',w:'Owner is 60+ days delinquent'},
           {s:'Attorney initiates foreclosure on assessment lien if necessary',w:'Severe delinquency, 6-12 months'}
         ],
-        notes:{'DC':'DC Code § 29-1135.03 — Special assessments may require 2/3 owner vote.','_':'Check your state statute for special assessment voting thresholds and notice requirements.'}
+        notes:{
+          'DC':'DC Code § 29-1135.03: Special assessments typically require 2/3 owner vote. DC Code § 42-1903.13: Assessment liens attach automatically. § 29-1135.08: 6-month super-lien priority over first mortgage. Per-unit allocation must follow percentage interests in Declaration. Board must document necessity, alternatives considered, and vote results to satisfy fiduciary duty.',
+          '_':'Check bylaws for special assessment voting thresholds (typically 2/3 or 67% of owners). Document necessity and alternatives considered. Per-unit allocation must follow governing docs (usually percentage interest, not equal split). Offer payment plans for large assessments.'
+        }
       },
       { id:'delinquent-accounts', title:'Delinquent Accounts', desc:'Late notices, payment plans, lien filings, foreclosure',
         tags:['Late notices','Payment plans','Lien filings','Foreclosure proceedings'],
@@ -108,23 +119,30 @@ export const CATS: Category[] = [
         notes:{'_':'Many states require annual financial reviews or audits above certain thresholds. Check your governing docs and state law.'}
       },
       { id:'reserve-management', title:'Reserve Management', desc:'Reserve studies, tapping reserves, capital planning',
-        tags:['Commissioning reserve studies','Tapping reserves','Capital planning'],
+        tags:['Commissioning reserve studies','Tapping reserves','Capital planning','Reserve fund'],
         pre:[
-          {s:'Commission or update professional reserve study',t:'Every 3-5 years',d:'State condo act'},
-          {s:'Review reserve study findings with full board',t:'2-4 weeks after study'},
-          {s:'Adopt funding plan: full, threshold, or baseline',t:'Board vote',d:'Bylaws: Reserve provisions'},
-          {s:'If tapping reserves: document board resolution with specific purpose',t:'Before expenditure',d:'Bylaws'},
-          {s:'Disclose reserve status in annual budget report',t:'Annually',d:'State disclosure requirements'}
+          {s:'Commission or update professional reserve study (required every 3-5 years)',t:'Every 3-5 years',d:'DC Code § 42-1903.13 & Best practice',detail:'Study should cover all common elements with limited useful life. Include: component inventory, condition assessment, estimated replacement cost, remaining useful life, funding recommendations. Use a credentialed reserve specialist (RS) or professional engineer.'},
+          {s:'Review reserve study findings with full board; assess current funding level',t:'2-4 weeks after study',d:'Fiscal Lens: Reserves tab',detail:'Key metric: percent funded (current balance / fully funded balance). Below 30% = critically underfunded. 30-70% = fair. Above 70% = strong. Compare to prior study.'},
+          {s:'Adopt funding plan with board vote: full funding, threshold, or baseline',t:'Board meeting',d:'Bylaws: Reserve provisions',detail:'Full funding targets 100% funded. Threshold targets a minimum balance to avoid special assessments. Baseline targets minimum to keep reserves positive. Board must document rationale — underfunding may constitute breach of fiduciary duty of care.'},
+          {s:'Set annual reserve contribution in budget based on adopted funding plan',t:'During budget process',d:'Fiscal Lens: Budget tab',detail:'Reserve contribution should be a separate line item in the budget. Do not comingle operating and reserve funds in the same bank account. Track reserve contributions and expenditures separately.'},
+          {s:'If tapping reserves: verify expenditure matches a designated reserve component',t:'Before expenditure',d:'Bylaws & DC Code § 42-1903.13',detail:'Reserves should only be spent on the components they were collected for. Using reserves for non-designated purposes (e.g., operating shortfalls) may require owner vote per bylaws and constitutes a fiduciary risk.'},
+          {s:'If using reserves for non-designated purpose: obtain owner vote per bylaws before proceeding',t:'Before expenditure',d:'Bylaws: Reserve use restrictions',detail:'Most bylaws restrict reserve use to designated capital items. Borrowing from reserves for operations requires owner approval and a documented repayment plan. Check bylaws for specific voting threshold.'},
+          {s:'Disclose reserve status in annual budget report and at annual meeting',t:'Annually',d:'DC Code § 42-1903.13 & Bylaws',detail:'Disclosure should include: current balance, percent funded, annual contribution, upcoming major expenditures, and any changes from prior year. Include in resale certificate package.'}
         ],
         self:[
-          {s:'If owner challenges reserve funding: prepare written response with reserve study data'},
-          {s:'Prepare reserve disclosure for resale certificates per state requirements'}
+          {s:'If owner challenges reserve funding level: provide reserve study data, funding plan rationale, and board resolution',detail:'Explain the funding strategy chosen and the trade-offs.'},
+          {s:'Prepare reserve disclosure for resale certificates per DC Code § 42-1904.04(a)'},
+          {s:'If reserves are critically underfunded (< 30%): develop a catch-up plan — may require special assessment or significant contribution increase',detail:'Present plan to owners with timeline to reach target funding level.'}
         ],
         legal:[
           {s:'Attorney reviews reserve borrowing or commingling questions',w:'Board wants to use reserves for non-designated purpose'},
-          {s:'Attorney advises on fiduciary duty regarding underfunded reserves',w:'Reserve study shows significant shortfall'}
+          {s:'Attorney advises on fiduciary duty regarding underfunded reserves',w:'Reserve study shows significant shortfall (< 30% funded)'},
+          {s:'Attorney advises if reserve expenditure exceeds board authority and requires owner vote',w:'Large unplanned reserve expenditure not in study'}
         ],
-        notes:{'_':'Check your state for reserve study requirements, mandatory reserve components, and owner vote provisions.'}
+        notes:{
+          'DC':'DC Code § 42-1903.13: Reserves must be maintained per governing documents. Reserve study best practice: update every 3-5 years. Board has fiduciary duty to adequately fund reserves — chronic underfunding transfers costs to future owners via special assessments. Using reserves for non-designated purposes without owner approval is a fiduciary risk. Disclose reserve status in resale packages per § 42-1904.04(a).',
+          '_':'Check your state for reserve study requirements, mandatory reserve components, and owner vote provisions for tapping reserves. Board has fiduciary duty to fund reserves adequately. Underfunding creates special assessment risk and potential personal liability.'
+        }
       }
     ]
   },
@@ -133,66 +151,84 @@ export const CATS: Category[] = [
       { id:'common-area-repairs', title:'Common Area Repairs', desc:'Roof leaks, structural cracks, plumbing, elevator, HVAC',
         tags:['Roof leaks','Structural cracks','Plumbing risers','Elevator failures'],
         pre:[
-          {s:'Document issue with photos, video, dates, affected areas',t:'Immediately'},
-          {s:'Determine if common element or unit owner responsibility per CC&Rs',t:'1-3 days',d:'CC&Rs: Maintenance matrix'},
-          {s:'Obtain 2-3 qualified contractor bids',t:'1-2 weeks'},
-          {s:'Board approves expenditure (emergency exception for health/safety)',t:'Next board meeting',d:'Bylaws: Spending authority'},
-          {s:'Engage contractor and oversee work; document completion',t:'Per scope'},
-          {s:'If caused by unit owner negligence, send cost responsibility notice',t:'After repair',d:'CC&Rs: Damage responsibility'}
+          {s:'Document issue with photos, video, dates, affected areas',t:'Immediately',detail:'Include: location, severity, units affected, date discovered, who reported it. This documentation supports insurance claims and contractor scope.'},
+          {s:'Determine if common element or unit owner responsibility per CC&Rs',t:'1-3 days',d:'CC&Rs: Maintenance matrix',detail:'CC&Rs define the boundary between HOA and unit owner responsibility. Typically: structure, roof, exterior walls, common pipes = HOA. Interior finishes, fixtures, appliances = owner. Check your specific maintenance responsibility chart.'},
+          {s:'Obtain 2-3 qualified contractor bids; verify licenses and insurance',t:'1-2 weeks',detail:'For emergency repairs (active leak, safety hazard), board may authorize immediate work under emergency spending provisions. For non-emergency: always get competitive bids.'},
+          {s:'Check bylaws for board spending authority limit before approving',t:'Before approval',d:'Bylaws: Spending authority',detail:'Most bylaws authorize the board to spend up to a threshold (e.g., $5K-$25K) without owner vote. Repairs exceeding this threshold may require owner approval unless it qualifies as an emergency. Check your specific bylaws.'},
+          {s:'Determine funding source: operating budget, reserves, or insurance claim',t:'Before approval',d:'Fiscal Lens',detail:'If the repair is a reserve item, use reserves. If it is a routine maintenance item, use operating budget. If caused by a covered peril, file insurance claim. Do not use reserves for operating expenses without owner approval.'},
+          {s:'Board approves expenditure at meeting; document vote and funding source in minutes',t:'Next board meeting (emergency exception for health/safety)',d:'Bylaws: Spending authority',detail:'Emergency repairs for health/safety may proceed before board vote — ratify at next meeting per bylaws emergency spending provision. All other repairs require board approval before work begins.'},
+          {s:'Engage contractor via work order; oversee work; document completion with photos',t:'Per scope',d:'Fiscal Lens: Work Orders',detail:'Create work order in Fiscal Lens. Track: contractor, amount, GL account, approval status. Inspect completed work before final payment.'},
+          {s:'If caused by unit owner negligence: send cost responsibility notice with documentation',t:'After repair',d:'CC&Rs: Damage responsibility',detail:'Include: CC&R section cited, repair invoices, photos, and timeline for reimbursement. If owner disputes, escalate to formal demand.'}
         ],
         self:[
-          {s:'If unit owner responsible: send formal demand for reimbursement with documentation',detail:'Include CC&R section, invoices, photos'},
-          {s:'If contractor dispute: send demand letter citing contract terms'},
-          {s:'File insurance claim if applicable; coordinate with unit owner insurance'}
+          {s:'If unit owner responsible: send formal demand for reimbursement with documentation',detail:'Include CC&R section, invoices, photos. Certified mail, return receipt.'},
+          {s:'If contractor dispute: send demand letter citing contract terms and deficiency documentation'},
+          {s:'File insurance claim if applicable; coordinate with unit owner HO-6 insurance'}
         ],
         legal:[
           {s:'Attorney reviews responsibility dispute between HOA and unit owner',w:'Dispute over who pays for repair'},
-          {s:'Attorney pursues claim against contractor for defective work',w:'Contractor refuses to remedy'}
+          {s:'Attorney pursues claim against contractor for defective work',w:'Contractor refuses to remedy'},
+          {s:'Attorney advises if repair cost exceeds board spending authority',w:'Cost exceeds bylaws threshold and owner vote may be needed'}
         ],
-        notes:{'_':'Review your CC&Rs and state condo act for maintenance responsibility between HOA and individual owners.'}
+        notes:{
+          'DC':'DC Code § 42-1903.04: Maintenance responsibility follows the Declaration\'s allocation between common elements and units. Board has fiduciary duty to maintain common elements promptly. Check bylaws for spending authority limits — repairs above the threshold require owner vote unless emergency. Emergency spending must be ratified at next board meeting.',
+          '_':'Check bylaws for board spending authority limits. Repairs above threshold may require owner vote. Review CC&Rs for maintenance responsibility between HOA and unit owners. Always document with photos and get competitive bids for non-emergency work.'
+        }
       },
       { id:'emergency-situations', title:'Emergency Situations', desc:'Burst pipes, flooding, fire, storm damage, sewer backups',
-        tags:['Burst pipes','Flooding','Fire damage','Storm damage'],
+        tags:['Burst pipes','Flooding','Fire damage','Storm damage','Emergency repair'],
         pre:[
-          {s:'Ensure safety: evacuate if necessary, call 911 for fire/gas/structural',t:'Immediately'},
-          {s:'Engage emergency mitigation contractor (water extraction, board-up)',t:'Within hours',d:'Bylaws: Emergency spending'},
-          {s:'Document everything: photos, video, written timeline',t:'Ongoing'},
-          {s:'Notify insurance carrier and file claim',t:'Within 24-48 hours',d:'Insurance policy'},
-          {s:'Notify affected unit owners in writing',t:'Within 24 hours'},
-          {s:'Board ratifies emergency expenditure at next meeting',t:'Next meeting',d:'Bylaws: Emergency provisions'}
+          {s:'Ensure safety: evacuate if necessary, call 911 for fire/gas/structural',t:'Immediately',detail:'Life safety is the absolute first priority. Do not attempt to assess damage until area is safe.'},
+          {s:'Engage emergency mitigation contractor (water extraction, board-up, temporary repairs)',t:'Within hours',d:'Bylaws: Emergency spending',detail:'Most bylaws authorize the board president or property manager to approve emergency spending without a full board vote when there is imminent risk to health, safety, or property. Document the emergency justification.'},
+          {s:'Document everything: photos, video, written timeline of events and actions taken',t:'Ongoing',detail:'This documentation is critical for insurance claims, contractor disputes, and demonstrating the board acted reasonably. Include: who discovered it, when, actions taken, contractors engaged, costs incurred.'},
+          {s:'Notify insurance carrier and file claim within policy timeframe',t:'Within 24-48 hours',d:'Insurance policy: Notice provisions',detail:'Contact carrier claims department. Provide: policy number, date/time of loss, description, initial photos, estimated damage. Request adjuster visit. Do not dispose of damaged materials until adjuster approves.'},
+          {s:'Notify affected unit owners in writing; advise on HO-6 claim filing',t:'Within 24 hours',detail:'Owners need to file their own HO-6 claims for unit interior damage. Provide: description of incident, areas affected, carrier claim number, contact for questions.'},
+          {s:'Track all emergency expenditures; create work orders in Fiscal Lens',t:'As incurred',d:'Fiscal Lens: Work Orders',detail:'Even in emergencies, track every expense. Create work orders for each contractor/vendor. This is critical for insurance reimbursement and board ratification.'},
+          {s:'Board ratifies emergency expenditure at next meeting; document justification',t:'Next board meeting',d:'Bylaws: Emergency provisions',detail:'Present: description of emergency, actions taken, contractors engaged, total cost, insurance claim status, funding source (operating, reserves, or insurance proceeds). Board votes to ratify. Record in minutes.'},
+          {s:'Determine funding gap: insurance proceeds vs total cost; assess if special assessment is needed',t:'After adjuster estimate',d:'Bylaws & DC Code § 29-1135.03',detail:'If insurance does not cover full cost: determine shortfall. Options: operating budget surplus, reserves (if designated item), special assessment (may require owner vote per bylaws), or HOA line of credit. Emergency special assessments may have expedited procedures in bylaws.'}
         ],
         self:[
-          {s:'Coordinate insurance between master policy and unit HO-6 policies',detail:'Determine deductible allocation per CC&Rs'},
-          {s:'If caused by unit owner: send formal notice of responsibility'},
-          {s:'Document all expenses for insurance/legal recovery'}
+          {s:'Coordinate insurance between master policy and unit HO-6 policies; determine deductible allocation per CC&Rs',detail:'CC&Rs typically define deductible allocation. Some: per-unit deductible. Others: HOA bears master policy deductible. Document clearly.'},
+          {s:'If caused by unit owner negligence: send formal notice of responsibility and demand for reimbursement',detail:'Include: CC&R section, documentation of cause, repair invoices. Certified mail.'},
+          {s:'Document all expenses meticulously for insurance reimbursement and potential legal recovery'}
         ],
         legal:[
-          {s:'Attorney advises on insurance coverage disputes and deductible allocation',w:'Carrier denies or underpays'},
-          {s:'Attorney pursues third-party claims',w:'Damage caused by third party'},
-          {s:'Attorney advises on emergency assessment authority',w:'Insurance does not cover full cost'}
+          {s:'Attorney advises on insurance coverage disputes and deductible allocation',w:'Carrier denies or underpays claim'},
+          {s:'Attorney pursues subrogation or third-party claims',w:'Damage caused by negligent third party or unit owner'},
+          {s:'Attorney advises on emergency special assessment authority if insurance shortfall',w:'Insurance does not cover full cost and reserves insufficient'}
         ],
-        notes:{'_':'Most state condo acts grant boards emergency spending authority. Document emergency and ratify at next meeting.'}
+        notes:{
+          'DC':'DC Code § 29-1108.01: Board has implied authority for emergency actions to protect health, safety, and property. Ratify at next board meeting. If emergency cost exceeds insurance + reserves, emergency special assessment may be needed — check bylaws for expedited voting procedures. Document the emergency thoroughly to defend spending decisions.',
+          '_':'Most state condo acts grant boards emergency spending authority without prior owner vote. Document the emergency, ratify at next meeting, and track all expenses for insurance recovery. If insurance falls short, special assessment may require owner vote.'
+        }
       },
       { id:'vendor-management', title:'Vendor Management', desc:'Hiring contractors, reviewing bids, contracts, disputes',
-        tags:['Hiring contractors','Reviewing bids','Performance disputes'],
+        tags:['Hiring contractors','Reviewing bids','Performance disputes','Contract management'],
         pre:[
-          {s:'Define scope of work and obtain minimum 3 competitive bids',t:'2-4 weeks'},
-          {s:'Verify contractor licenses, insurance, and references',t:'1-2 weeks'},
-          {s:'Review contract: scope, timeline, payment, warranty, indemnification',t:'1 week'},
-          {s:'Board approves contract per spending authority',t:'Board meeting',d:'Bylaws: Contract authority'},
-          {s:'Monitor performance; document milestones and deficiencies in writing',t:'Ongoing'},
-          {s:'Conduct final inspection and punch list before final payment',t:'At completion'}
+          {s:'Define scope of work and budget; check if amount exceeds board spending authority',t:'Before soliciting bids',d:'Bylaws: Spending authority',detail:'Check bylaws for contract value thresholds. Contracts above the threshold (e.g., $10K-$25K) may require owner vote. For recurring contracts (e.g., landscaping, management), consider annual value, not monthly.'},
+          {s:'Obtain minimum 3 competitive bids from qualified contractors',t:'2-4 weeks',detail:'Provide identical scope to all bidders for fair comparison. Request: itemized pricing, timeline, references, proof of insurance, license number.'},
+          {s:'Verify contractor licenses, insurance (GL + workers comp), and check references',t:'1-2 weeks',d:'Fiduciary duty of care',detail:'Require: current state/local business license, general liability insurance ($1M+ naming HOA as additional insured), workers compensation if they have employees, completed W-9. Call 2-3 references on similar projects.'},
+          {s:'Review contract terms: scope, fixed price, timeline, payment schedule, warranty, indemnification, termination',t:'1 week',detail:'Key terms: payment tied to milestones (not time), 10% retention on large projects, warranty (1-2 years minimum), insurance requirements, hold-harmless/indemnification, termination for cause and convenience, dispute resolution.'},
+          {s:'Check for conflicts of interest: does any board member have a relationship with the contractor?',t:'Before approval',d:'Fiduciary duty of loyalty',detail:'Any board member with a relationship to the contractor must disclose and recuse from discussion and vote per conflict of interest policy. Document disclosure in minutes.'},
+          {s:'Board approves contract at meeting; record vote and rationale in minutes',t:'Board meeting',d:'Bylaws: Contract authority',detail:'If contract value exceeds bylaws threshold for board-only approval, schedule owner vote before executing. For contracts within authority: board approves by majority vote with rationale documented.'},
+          {s:'Execute contract; issue work order in Fiscal Lens; set up payment schedule',t:'After approval',d:'Fiscal Lens: Work Orders',detail:'Create work order linked to GL account and budget category. Set payment milestones. Do not make payments ahead of completed work.'},
+          {s:'Monitor performance; document milestones and any deficiencies in writing',t:'Ongoing',detail:'Regular progress check-ins. Photograph completed milestones. Send written notice of any deficiencies immediately — do not wait until project end.'},
+          {s:'Conduct final inspection and resolve punch list before releasing final payment/retention',t:'At completion',detail:'Walk project with contractor and board representative. Create written punch list. Do not release retention until all items resolved and warranty documentation received.'}
         ],
         self:[
-          {s:'If performance issue: send written notice citing contract provisions',detail:'Give reasonable cure period (15-30 days)'},
-          {s:'If unresolved: send formal demand with documentation of deficiencies'},
-          {s:'File complaint with state contractor licensing board'}
+          {s:'If performance issue: send written notice citing contract provisions with cure period',detail:'Give reasonable cure period (15-30 days). Certified mail.'},
+          {s:'If unresolved: send formal demand with documentation of deficiencies and cost of remediation'},
+          {s:'File complaint with DC DLCP contractor licensing division if applicable'}
         ],
         legal:[
-          {s:'Attorney reviews contract before execution for large projects (>$25K)',w:'Best practice for major contracts'},
-          {s:'Attorney sends demand and pursues breach of contract claim',w:'Contractor defaults or work defective'}
+          {s:'Attorney reviews contract before execution for large projects',w:'Contracts exceeding $25K or per bylaws threshold'},
+          {s:'Attorney sends demand and pursues breach of contract claim',w:'Contractor defaults or work defective'},
+          {s:'Attorney advises if contract requires owner approval per bylaws spending limits',w:'Contract value exceeds board authority'}
         ],
-        notes:{'_':'Verify contractor licensing in your state. Require insurance certificates and include indemnification in all contracts.'}
+        notes:{
+          'DC':'DC DLCP (formerly DCRA) handles contractor licensing. Verify license at dlcp.dc.gov. Require contractors to carry GL insurance naming HOA as additional insured. Check bylaws for contract value thresholds — board may not have authority to sign contracts above a certain amount without owner vote. Document all bid comparisons and selection rationale to satisfy fiduciary duty.',
+          '_':'Verify contractor licensing in your state. Require insurance certificates naming HOA as additional insured. Check bylaws for contract approval thresholds. Document bid comparison and selection rationale to demonstrate fiduciary care.'
+        }
       },
       { id:'inspection-scheduling', title:'Inspection Scheduling', desc:'Scheduling required inspections',
         tags:['Fire safety inspections','Elevator inspections','Building code inspections'],
@@ -394,6 +430,39 @@ export const CATS: Category[] = [
         legal:[{s:'Attorney advises on election disputes or challenges',w:'Contested election or procedural challenge'}],
         notes:{'_':'Follow your bylaws election procedures exactly. Independent inspectors add credibility.'}
       },
+      { id:'annual-meeting-planning', title:'Annual Meeting Planning', desc:'End-to-end planning for the annual owners meeting',
+        tags:['Annual meeting','Owner meeting','Elections','Budget ratification','Proxy forms'],
+        pre:[
+          {s:'Set annual meeting date and reserve venue/virtual platform',t:'90 days before meeting',d:'DC Code § 29-1109.02',detail:'DC requires annual meeting within 13 months of prior. Confirm date does not conflict with holidays. Book venue with capacity for quorum attendance.'},
+          {s:'Review bylaws for quorum requirements, notice periods, and election procedures',t:'90 days out',d:'Bylaws: Annual meeting section',detail:'DC typical quorum: 33-40% of units. Notice window: 10-60 days per DC Code § 29-1109.02(a). Identify number of board seats up for election.'},
+          {s:'Open nominations for board seats; distribute Call for Candidates notice',t:'60-75 days out',d:'Bylaws: Election section',detail:'Use the Election — Call for Candidates letter template. Include: number of open seats, term length, eligibility requirements (owner in good standing), candidacy deadline, candidate statement guidelines.'},
+          {s:'Finalize proposed budget for owner ratification; prepare annual financial report',t:'60 days out',d:'DC Code § 29-1135.02',detail:'Budget should be board-adopted before presenting to owners. Include: income projections, operating expenses, reserve contribution, assessment rate changes. Prepare year-end financial summary or audited statements.'},
+          {s:'Prepare reserve fund status report for owner presentation',t:'45 days out',d:'DC Code § 42-1903.13',detail:'Include: current reserve balance, funding plan, percent funded, upcoming major expenditures. Reference most recent reserve study.'},
+          {s:'Close nominations; verify candidate eligibility; prepare ballot',t:'45 days out',d:'Bylaws: Candidate eligibility',detail:'Verify each candidate is a unit owner in good standing (current on assessments). Prepare secret ballot per DC Code § 29-1135.09. Include candidate statements.'},
+          {s:'Send formal Annual Meeting Notice to all owners with agenda, proxy forms, and candidate statements',t:'30-60 days out (per bylaws)',d:'DC Code § 29-1109.02(a)',detail:'Use the Annual Meeting Notice letter template. Must include: date, time, location, full agenda, proxy/ballot form, candidate statements. Send via method required by bylaws (mail, email, or both). Retain proof of delivery.'},
+          {s:'Appoint independent election inspector or committee',t:'14-21 days out',d:'Best practice',detail:'Inspector should not be a candidate or current board member. Responsible for credential verification, ballot counting, and result certification.'},
+          {s:'Prepare meeting materials: agenda packets, sign-in sheets, proxy collection, reserve report, budget summary',t:'7-14 days out',detail:'Print sufficient copies. Prepare presentation slides if applicable. Test virtual platform if hybrid meeting. Confirm AV equipment at venue.'},
+          {s:'Collect and verify proxy forms received before meeting',t:'Before meeting',d:'DC Code § 29-1135.10',detail:'Verify each proxy is signed by a record owner. Confirm proxy holder is authorized. Count proxies toward quorum. Maintain all proxy forms for 1 year minimum.'},
+          {s:'Conduct annual meeting: verify quorum, approve prior minutes, present financials, conduct election, ratify budget, owner Q&A',t:'Meeting day',d:'Bylaws & Roberts Rules',detail:'Suggested order: (1) Call to order, (2) Quorum verification, (3) Approve prior annual meeting minutes, (4) President\'s report, (5) Financial report & budget ratification, (6) Reserve fund update, (7) Board election, (8) Committee reports, (9) Old business, (10) New business & owner forum, (11) Adjournment.'},
+          {s:'Certify election results; announce new board members',t:'At meeting or within 3 days',d:'Bylaws: Election certification',detail:'Inspector certifies results. Announce winners. Retain all ballots for 1 year per DC Code § 29-1135.13.'},
+          {s:'Distribute meeting minutes to all owners; file updated officer information',t:'Within 14 days',d:'DC Code § 29-1108.06',detail:'Minutes should include: attendance/quorum count, election results, budget ratification vote, all motions and votes, owner comments. File any required officer/agent updates with DLCP.'}
+        ],
+        self:[
+          {s:'If quorum not met: adjourn and reconvene per bylaws',detail:'Many bylaws allow reduced quorum at adjourned meeting. Check your specific provisions.'},
+          {s:'If election contested: preserve all ballots and proxy forms; review bylaws dispute procedures'},
+          {s:'If budget ratification fails: board may need to re-present revised budget at a special meeting'},
+          {s:'Post-meeting: new board holds organizational meeting to elect officers (President, VP, Secretary, Treasurer)',detail:'Typically held immediately after annual meeting or within 10 days.'}
+        ],
+        legal:[
+          {s:'Attorney reviews annual meeting notice and proxy forms for statutory compliance',w:'Annual review or first meeting after bylaw changes'},
+          {s:'Attorney advises on quorum challenges or contested elections',w:'Quorum dispute or candidate challenge'},
+          {s:'Attorney reviews budget ratification if assessment increase exceeds threshold requiring owner approval',w:'Assessment increase > 10-15% or per bylaws'}
+        ],
+        notes:{
+          'DC':'DC Code § 29-1109.02: Annual meeting required within 13 months of prior. Notice: 10-60 days per § 29-1109.02(a). Quorum per bylaws (typically 33-40%). Secret ballot for elections per § 29-1135.09. Proxy voting per § 29-1135.10. Budget notice 30 days per § 29-1135.02. Retain ballots 1 year per § 29-1135.13. If 20%+ of owners petition and board fails to call meeting, owners may call it themselves per § 29-1108.01.',
+          '_':'Annual meeting is the primary owner governance event. Includes board elections, budget ratification, financial reporting, and owner Q&A. Check bylaws for quorum, notice periods, and election procedures. Most states require annual meeting within 13 months of prior.'
+        }
+      },
       { id:'board-action-item', title:'Board Action Items', desc:'Action items from board meetings',
         tags:['Board meeting follow-ups','Action item tracking','Task assignments'],
         pre:[
@@ -499,18 +568,35 @@ export const CATS: Category[] = [
   { id:'strategic', num:'8', icon:'📐', label:'Strategic Decisions', color:'indigo',
     sits: [
       { id:'capital-projects', title:'Major Capital Projects', desc:'Window, siding replacement, elevator modernization',
-        tags:['Window replacement','Siding','Elevator modernization'],
+        tags:['Window replacement','Siding','Elevator modernization','Capital improvement'],
         pre:[
-          {s:'Commission engineering study or assessment',t:'6-12 months before project'},
-          {s:'Develop project scope and timeline',t:'3-6 months out'},
-          {s:'Obtain 3+ competitive bids from qualified contractors',t:'2-3 months out'},
-          {s:'Board approves project and funding (reserves, special assessment, loan)',t:'Board meeting'},
-          {s:'Execute contract with performance bond for large projects',t:'After approval'},
-          {s:'Monitor construction with regular progress meetings',t:'During project'}
+          {s:'Commission engineering study or professional assessment to define scope and urgency',t:'6-12 months before project',detail:'Engage a licensed engineer or specialist. Report should include: scope, urgency rating, estimated cost range, recommended timeline, and alternatives considered.'},
+          {s:'Review reserve study and current reserve balance to determine available funding',t:'After assessment',d:'Reserve study & Fiscal Lens',detail:'Check if this project is already in the reserve plan. Determine: can reserves cover it? Is a special assessment needed? Is financing required? Review reserve funding percentage.'},
+          {s:'Determine funding source and check bylaws for owner approval requirements',t:'2-4 weeks',d:'Bylaws: Spending authority & DC Code § 29-1135.03',detail:'Check bylaws for board spending limits (e.g., contracts > $X require owner vote). DC may require 2/3 owner approval for expenditures above threshold or special assessments. If tapping reserves for non-designated purpose, owner vote is likely required.'},
+          {s:'If owner vote required: send notice of proposed project with cost, funding plan, and meeting date',t:'30-60 days before vote',d:'Bylaws: Notice requirements',detail:'Notice must include: project description, total cost, funding source (reserves/assessment/loan), impact on assessments, payment schedule if special assessment. Allow adequate time for owner questions.'},
+          {s:'Develop detailed project scope, specifications, and timeline',t:'3-6 months out',detail:'Scope should be detailed enough for apples-to-apples bidding. Include performance standards, warranty requirements, and completion timeline.'},
+          {s:'Obtain minimum 3 competitive bids from qualified, licensed, and insured contractors',t:'2-3 months out',detail:'Verify: state/local contractor license, general liability insurance ($1M+), workers comp, bonding capacity. Check references on similar projects. Require bids on identical scope.'},
+          {s:'Board evaluates bids on qualifications, references, price, and timeline — not lowest price alone',t:'Board meeting',d:'Fiduciary duty of care',detail:'Document evaluation criteria and rationale. Lowest bid is not always best — consider experience, warranty, financial stability. Record decision in minutes.'},
+          {s:'Hold owner vote if required by bylaws or statute; obtain approval before proceeding',t:'At meeting per notice',d:'Bylaws & DC Code § 29-1135.03',detail:'If special assessment needed: typically requires 2/3 owner approval in DC. If using reserves for designated purpose per reserve study: board may approve. Document vote results in minutes.'},
+          {s:'Execute contract with performance bond and payment/retention schedule',t:'After all approvals',d:'Best practice for projects > $50K',detail:'Contract should include: detailed scope, fixed price or GMP, payment schedule tied to milestones (not time), 10% retention until final completion, performance bond (100% of contract value for large projects), warranty terms, insurance requirements, indemnification.'},
+          {s:'Notify owners of project start, timeline, and expected impact',t:'Before construction begins',detail:'Communication should include: start date, estimated duration, noise/access impacts, parking changes, contact for questions.'},
+          {s:'Monitor construction with regular progress meetings; document milestones and change orders',t:'Weekly during project',detail:'Require written change orders approved by board before extra work. Track budget vs actual spending. Photograph progress at each milestone.'},
+          {s:'Conduct final inspection and punch list; hold retention until all items resolved',t:'At substantial completion',detail:'Walk the project with contractor and independent inspector. Create written punch list. Do not release final retention until all punch list items are resolved and warranty documentation received.'}
         ],
-        self:[{s:'If contractor default: review contract remedies and bonding'}],
-        legal:[{s:'Attorney reviews contract and bonding for major projects',w:'Projects exceeding $50K'}],
-        notes:{'_':'For large capital projects, consider hiring an owners representative to manage the contractor.'}
+        self:[
+          {s:'If contractor default: review contract remedies, bonding, and insurance claims'},
+          {s:'If project goes over budget: document reasons, evaluate change orders, and determine if additional owner approval is needed for the overage'},
+          {s:'Post-project: update reserve study to reflect completed improvement and adjusted useful life'}
+        ],
+        legal:[
+          {s:'Attorney reviews contract and bonding for major projects',w:'Projects exceeding $50K or per bylaws threshold'},
+          {s:'Attorney advises on owner vote requirements before project commitment',w:'Project cost exceeds board spending authority per bylaws'},
+          {s:'Attorney reviews change orders with significant cost impact',w:'Change orders exceed 10% of contract value'}
+        ],
+        notes:{
+          'DC':'DC Code § 29-1135.03: Expenditures above bylaw thresholds may require 2/3 owner vote. Special assessments to fund capital projects almost certainly require owner vote. Check bylaws for board spending authority limits. Contracts over $25K: consider performance bond and attorney review. Reserve borrowing for non-designated purposes requires owner approval.',
+          '_':'Check bylaws for board spending authority limits — most require owner vote above a threshold (e.g., $25K-$100K or % of annual budget). Always obtain multiple bids, require bonding on large projects, and document the decision process to satisfy fiduciary duty.'
+        }
       },
       { id:'developer-transition', title:'Developer Transition', desc:'Turnover audits, construction defect claims',
         tags:['Turnover audits','Construction defect claims'],
