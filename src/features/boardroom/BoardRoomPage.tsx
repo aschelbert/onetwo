@@ -6,6 +6,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useElectionStore } from '@/store/useElectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useLetterStore } from '@/store/useLetterStore';
 import { supabase } from '@/lib/supabase';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import VotingPage from '@/features/elections/ElectionsPage';
@@ -57,6 +58,7 @@ export default function BoardRoomPage() {
   const issues = useIssuesStore();
   const elections = useElectionStore();
   const { currentRole, currentUser, buildingMembers } = useAuthStore();
+  const letterStore = useLetterStore();
   const navigate = useNavigate();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
@@ -343,15 +345,35 @@ export default function BoardRoomPage() {
     <div className="space-y-0">
       {/* Header */}
       <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2><p className="text-accent-200 text-sm mt-1">Governance calendar, meetings, votes & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p></div>
-          <div className="flex items-center gap-6">
-            <div className="text-center"><div className="text-4xl font-bold text-white">{grade}</div><div className="text-accent-200 text-xs">Health {healthIndex}%</div></div>
-          </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-          {catScores.map(c => (<div key={c.id} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => { setTab('runbook'); setTimeout(() => document.getElementById('comp-' + c.id)?.scrollIntoView({ behavior: 'smooth' }), 100); }}><span className="text-xl">{c.icon}</span><p className="text-[11px] text-accent-100 mt-0.5 leading-tight">{c.label}</p><p className="text-sm font-bold text-white mt-1">{c.pct}%</p></div>))}
-        </div>
+        {(() => {
+          const openCases = issues.cases.filter(c => c.status === 'open').length;
+          const overdueCases = issues.cases.filter(c => c.status === 'open' && c.dueDate && new Date(c.dueDate) < new Date()).length;
+          const nextMeeting = upcoming[0];
+          const pendingComms = comp.communications.filter(c => c.status === 'pending').length;
+          const lettersSent = letterStore.letters.filter(l => l.status === 'sent').length;
+          const metrics = [
+            { label: 'Compliance', value: grade, sub: `${healthIndex}%`, color: healthIndex >= 80 ? 'text-emerald-300' : healthIndex >= 60 ? 'text-yellow-300' : 'text-red-300', onClick: () => setTab('runbook') },
+            { label: 'Next Meeting', value: nextMeeting ? new Date(nextMeeting.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—', sub: nextMeeting ? nextMeeting.title : 'None scheduled', color: 'text-white', onClick: () => setTab('meetings') },
+            { label: 'Open Cases', value: String(openCases), sub: overdueCases > 0 ? `${overdueCases} overdue` : 'On track', color: overdueCases > 0 ? 'text-red-300' : 'text-emerald-300', onClick: () => setTab('dailyops') },
+            { label: 'Elections', value: String(openElections), sub: openElections > 0 ? 'Active' : 'None active', color: openElections > 0 ? 'text-yellow-300' : 'text-white', onClick: () => setTab('votes') },
+            { label: 'Pending Notices', value: String(pendingComms), sub: pendingComms > 0 ? 'Needs attention' : 'All sent', color: pendingComms > 0 ? 'text-yellow-300' : 'text-emerald-300', onClick: () => setTab('communications') },
+            { label: 'Letters Sent', value: String(lettersSent), sub: `${letterStore.templates.length} templates`, color: 'text-white', onClick: () => setTab('letters') },
+          ];
+          return (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {metrics.map(m => (
+                <div key={m.label} onClick={m.onClick} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
+                  <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
+                  <p className="text-[11px] text-accent-100 mt-0.5 leading-tight truncate">{m.sub}</p>
+                  <p className="text-[10px] text-accent-200 mt-0.5">{m.label}</p>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Tabs */}
