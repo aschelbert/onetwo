@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as announcementsSvc from '@/lib/services/announcements';
+import * as communicationsSvc from '@/lib/services/communications';
 
 export interface FilingAttachment {
   name: string; size: string; uploadedAt: string;
@@ -29,6 +32,9 @@ interface ComplianceState {
   communications: OwnerCommunication[];
   announcements: Announcement[];
 
+  // DB sync
+  loadFromDb: (tenantId: string) => Promise<void>;
+
   toggleItem: (id: string) => void;
   setCompletion: (id: string, val: boolean) => void;
 
@@ -41,10 +47,10 @@ interface ComplianceState {
   addFilingAttachment: (id: string, att: FilingAttachment) => void;
   removeFilingAttachment: (id: string, attName: string) => void;
 
-  addCommunication: (c: Omit<OwnerCommunication, 'id'>) => void;
+  addCommunication: (c: Omit<OwnerCommunication, 'id'>, tenantId?: string) => void;
   deleteCommunication: (id: string) => void;
 
-  addAnnouncement: (a: Omit<Announcement, 'id'>) => void;
+  addAnnouncement: (a: Omit<Announcement, 'id'>, tenantId?: string) => void;
   deleteAnnouncement: (id: string) => void;
   togglePinAnnouncement: (id: string) => void;
 }
@@ -83,6 +89,18 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     { id: 'ann5', title: 'Updated Quiet Hours Policy', body: 'The board has approved updated quiet hours effective March 1: Sunday–Thursday 10 PM to 8 AM, Friday–Saturday 11 PM to 9 AM. Construction and renovation work remains restricted to Monday–Friday 9 AM to 5 PM. Please review the updated House Rules posted in the lobby and on the portal.', category: 'rules', postedBy: 'President', postedDate: '2026-02-10', pinned: false },
   ],
 
+  // ── DB sync ──
+  loadFromDb: async (tenantId: string) => {
+    const [announcements, communications] = await Promise.all([
+      announcementsSvc.fetchAnnouncements(tenantId),
+      communicationsSvc.fetchCommunications(tenantId),
+    ]);
+    const updates: Partial<ComplianceState> = {};
+    if (announcements) updates.announcements = announcements;
+    if (communications) updates.communications = communications;
+    if (Object.keys(updates).length > 0) set(updates);
+  },
+
   toggleItem: (id) => set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } })),
   setCompletion: (id, val) => set(s => ({ completions: { ...s.completions, [id]: val } })),
 
@@ -99,12 +117,40 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   addFilingAttachment: (id, att) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: [...f.attachments, att] } : f) })),
   removeFilingAttachment: (id, attName) => set(s => ({ filings: s.filings.map(f => f.id === id ? { ...f, attachments: f.attachments.filter(a => a.name !== attName) } : f) })),
 
-  addCommunication: (c) => set(s => ({ communications: [{ id: 'oc' + Date.now(), ...c }, ...s.communications] })),
-  deleteCommunication: (id) => set(s => ({ communications: s.communications.filter(c => c.id !== id) })),
+  addCommunication: (c, tenantId?) => {
+    const id = 'oc' + Date.now();
+    set(s => ({ communications: [{ id, ...c }, ...s.communications] }));
+    if (isBackendEnabled && tenantId) {
+      communicationsSvc.createCommunication(tenantId, c).then(dbRow => {
+        if (dbRow) set(s => ({ communications: s.communications.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  deleteCommunication: (id) => {
+    set(s => ({ communications: s.communications.filter(c => c.id !== id) }));
+    if (isBackendEnabled) communicationsSvc.deleteCommunication(id);
+  },
 
-  addAnnouncement: (a) => set(s => ({ announcements: [{ id: 'ann' + Date.now(), ...a }, ...(s.announcements || [])] })),
-  deleteAnnouncement: (id) => set(s => ({ announcements: (s.announcements || []).filter(a => a.id !== id) })),
-  togglePinAnnouncement: (id) => set(s => ({ announcements: (s.announcements || []).map(a => a.id === id ? { ...a, pinned: !a.pinned } : a) })),
+  addAnnouncement: (a, tenantId?) => {
+    const id = 'ann' + Date.now();
+    set(s => ({ announcements: [{ id, ...a }, ...(s.announcements || [])] }));
+    if (isBackendEnabled && tenantId) {
+      announcementsSvc.createAnnouncement(tenantId, a).then(dbRow => {
+        if (dbRow) set(s => ({ announcements: (s.announcements || []).map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  deleteAnnouncement: (id) => {
+    set(s => ({ announcements: (s.announcements || []).filter(a => a.id !== id) }));
+    if (isBackendEnabled) announcementsSvc.deleteAnnouncement(id);
+  },
+  togglePinAnnouncement: (id) => {
+    set(s => ({ announcements: (s.announcements || []).map(a => a.id === id ? { ...a, pinned: !a.pinned } : a) }));
+    if (isBackendEnabled) {
+      const a = useComplianceStore.getState().announcements.find(x => x.id === id);
+      if (a) announcementsSvc.updateAnnouncement(id, { pinned: a.pinned });
+    }
+  },
 }), {
   name: 'onetwo-compliance',
   merge: (persisted: any, current: any) => ({

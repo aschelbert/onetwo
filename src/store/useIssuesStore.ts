@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as issuesSvc from '@/lib/services/issues';
+import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach } from '@/types/issues';
 
 // ─── Situation Templates ───────────────────────────────────
@@ -655,14 +658,17 @@ interface IssuesState {
   nextIssueNum: number;
   nextCommNum: number;
 
+  // DB sync
+  loadFromDb: (tenantId: string) => Promise<void>;
+
   // Issue actions
-  addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes'>) => void;
+  addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes'>, tenantId?: string) => void;
   upvoteIssue: (issueId: string, userId: string, userName: string, unitNumber: string) => void;
   updateIssueStatus: (issueId: string, status: Issue['status']) => void;
   addIssueComment: (issueId: string, author: string, text: string) => void;
 
   // Case actions
-  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string }) => string;
+  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
@@ -696,33 +702,87 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   nextIssueNum: 3,
   nextCommNum: 6,
 
-  addIssue: (issue) => set(s => ({
-    issues: [{ ...issue, id: `iss-${s.nextIssueNum}`, upvotes: [], viewCount: 0, comments: [], reviewNotes: [] }, ...s.issues],
-    nextIssueNum: s.nextIssueNum + 1
-  })),
+  loadFromDb: async (tenantId: string) => {
+    const [issues, cases] = await Promise.all([
+      issuesSvc.fetchIssues(tenantId),
+      casesSvc.fetchCases(tenantId),
+    ]);
+    const updates: Record<string, unknown> = {};
+    if (issues) updates.issues = issues;
+    if (cases) updates.cases = cases;
+    if (Object.keys(updates).length > 0) set(updates);
+  },
 
-  upvoteIssue: (issueId, userId, userName, unitNumber) => set(s => ({
-    issues: s.issues.map(i => {
-      if (i.id !== issueId) return i;
-      const already = i.upvotes.find(u => u.userId === userId);
-      return {
-        ...i,
-        upvotes: already ? i.upvotes.filter(u => u.userId !== userId) : [...i.upvotes, { userId, userName, unitNumber }]
-      };
-    })
-  })),
+  addIssue: (issue, tenantId?) => {
+    const localId = `iss-${get().nextIssueNum}`;
+    set(s => ({
+      issues: [{ ...issue, id: localId, upvotes: [], viewCount: 0, comments: [], reviewNotes: [] }, ...s.issues],
+      nextIssueNum: s.nextIssueNum + 1
+    }));
+    if (isBackendEnabled && tenantId) {
+      issuesSvc.createIssue(tenantId, issue, localId).then(dbId => {
+        if (dbId) set(s => ({ issues: s.issues.map(i => i.id === localId ? { ...i, id: dbId } : i) }));
+      });
+    }
+  },
 
-  updateIssueStatus: (issueId, status) => set(s => ({
-    issues: s.issues.map(i => i.id === issueId ? { ...i, status } : i)
-  })),
+  upvoteIssue: (issueId, userId, userName, unitNumber) => {
+    const issue = get().issues.find(i => i.id === issueId);
+    const already = issue?.upvotes.find(u => u.userId === userId);
+    set(s => ({
+      issues: s.issues.map(i => {
+        if (i.id !== issueId) return i;
+        const alreadyUp = i.upvotes.find(u => u.userId === userId);
+        return {
+          ...i,
+          upvotes: alreadyUp ? i.upvotes.filter(u => u.userId !== userId) : [...i.upvotes, { userId, userName, unitNumber }]
+        };
+      })
+    }));
+    if (isBackendEnabled) {
+      if (already) issuesSvc.removeIssueUpvote(issueId, userId);
+      else issuesSvc.addIssueUpvote('', issueId, userId, userName, unitNumber);
+    }
+  },
 
-  addIssueComment: (issueId, author, text) => set(s => ({
-    issues: s.issues.map(i => i.id === issueId ? {
-      ...i, comments: [...i.comments, { id: 'cmt-' + Date.now(), author, text, date: new Date().toISOString().split('T')[0] }]
-    } : i)
-  })),
+  updateIssueStatus: (issueId, status) => {
+    const issue = get().issues.find(i => i.id === issueId);
+    set(s => ({
+      issues: s.issues.map(i => i.id === issueId ? { ...i, status } : i)
+    }));
+    if (isBackendEnabled) {
+      issuesSvc.updateIssueStatus(issueId, status);
+      // Send email notification to reporter for meaningful status changes
+      if (issue?.reporterEmail && ['IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(status)) {
+        const latestComment = issue.comments[issue.comments.length - 1]?.text || '';
+        import('@/lib/supabase').then(async ({ supabase }) => {
+          if (!supabase) return;
+          const sbUrl = import.meta.env.VITE_SUPABASE_URL as string;
+          const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+          if (!sbUrl || !sbKey) return;
+          const session = (await supabase.auth.getSession()).data.session;
+          fetch(`${sbUrl}/functions/v1/send-status-update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : `Bearer ${sbKey}`, 'apikey': sbKey },
+            body: JSON.stringify({ recipientEmail: issue.reporterEmail, recipientName: issue.reporterName, issueTitle: issue.title, newStatus: status, boardComment: latestComment }),
+          }).catch(err => console.error('Status email error:', err));
+        });
+      }
+    }
+  },
 
-  createCase: (data) => {
+  addIssueComment: (issueId, author, text) => {
+    const localId = 'cmt-' + Date.now();
+    const date = new Date().toISOString().split('T')[0];
+    set(s => ({
+      issues: s.issues.map(i => i.id === issueId ? {
+        ...i, comments: [...i.comments, { id: localId, author, text, date }]
+      } : i)
+    }));
+    if (isBackendEnabled) issuesSvc.addIssueComment('', issueId, localId, author, text, date);
+  },
+
+  createCase: (data, tenantId?) => {
     const s = get();
     const id = `c${s.nextCaseNum}`;
     const cat = CATS.find(x => x.id === data.catId);
@@ -737,49 +797,77 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       steps, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: []
     };
     set({ cases: [newCase, ...s.cases], nextCaseNum: s.nextCaseNum + 1 });
+    if (isBackendEnabled && tenantId) {
+      casesSvc.createCase(tenantId, newCase).then(dbId => {
+        if (dbId) set(s => ({ cases: s.cases.map(c => c.id === id ? { ...c, id: dbId } : c) }));
+      });
+    }
     return id;
   },
 
-  toggleStep: (caseId, stepIdx) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId || !c.steps) return c;
-      const steps = [...c.steps];
-      steps[stepIdx] = {
-        ...steps[stepIdx],
-        done: !steps[stepIdx].done,
-        doneDate: !steps[stepIdx].done ? new Date().toISOString().split('T')[0] : null
-      };
-      return { ...c, steps };
-    })
-  })),
+  toggleStep: (caseId, stepIdx) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = {
+          ...steps[stepIdx],
+          done: !steps[stepIdx].done,
+          doneDate: !steps[stepIdx].done ? new Date().toISOString().split('T')[0] : null
+        };
+        return { ...c, steps };
+      })
+    }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      const step = c?.steps?.[stepIdx];
+      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+    }
+  },
 
-  addStepNote: (caseId, stepIdx, note) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId || !c.steps) return c;
-      const steps = [...c.steps];
-      steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
-      return { ...c, steps };
-    })
-  })),
+  addStepNote: (caseId, stepIdx, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
+        return { ...c, steps };
+      })
+    }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      const step = c?.steps?.[stepIdx];
+      if (step) casesSvc.updateCaseStepNote(caseId, step.id, note);
+    }
+  },
 
-  closeCase: (caseId) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId) return c;
-      const today = new Date().toISOString().split('T')[0];
-      return {
-        ...c, status: 'closed' as const,
-        steps: c.steps?.map(st => ({ ...st, done: true, doneDate: st.doneDate || today })) || null
-      };
-    })
-  })),
+  closeCase: (caseId) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId) return c;
+        const today = new Date().toISOString().split('T')[0];
+        return {
+          ...c, status: 'closed' as const,
+          steps: c.steps?.map(st => ({ ...st, done: true, doneDate: st.doneDate || today })) || null
+        };
+      })
+    }));
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'closed' });
+  },
 
-  reopenCase: (caseId) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const } : c)
-  })),
+  reopenCase: (caseId) => {
+    set(s => ({
+      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const } : c)
+    }));
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'open' });
+  },
 
-  deleteCase: (caseId) => set(s => ({
-    cases: s.cases.filter(c => c.id !== caseId)
-  })),
+  deleteCase: (caseId) => {
+    set(s => ({
+      cases: s.cases.filter(c => c.id !== caseId)
+    }));
+    if (isBackendEnabled) casesSvc.deleteCase(caseId);
+  },
 
   addApproach: (caseId, approach) => set(s => ({
     cases: s.cases.map(c => {
@@ -823,13 +911,16 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     })
   })),
 
-  saveBoardVote: (caseId, motion, date, votes) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes: { motion, date, votes } } : c)
-  })),
+  saveBoardVote: (caseId, motion, date, votes) => {
+    const boardVotes = { motion, date, votes };
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes } : c) }));
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { boardVotes });
+  },
 
-  clearBoardVote: (caseId) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes: null } : c)
-  })),
+  clearBoardVote: (caseId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes: null } : c) }));
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { boardVotes: null });
+  },
 
   addDocument: (caseId, doc) => set(s => ({
     cases: s.cases.map(c => c.id === caseId ? { ...c, attachments: [...c.attachments, doc] } : c)
@@ -861,11 +952,19 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     })
   })),
 
-  linkWO: (caseId, woId) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: [...c.linkedWOs, woId] } : c)
-  })),
+  linkWO: (caseId, woId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: [...c.linkedWOs, woId] } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedWOs: c.linkedWOs });
+    }
+  },
 
-  unlinkWO: (caseId, woId) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: c.linkedWOs.filter(id => id !== woId) } : c)
-  }))
+  unlinkWO: (caseId, woId) => {
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: c.linkedWOs.filter(id => id !== woId) } : c) }));
+    if (isBackendEnabled) {
+      const c = get().cases.find(x => x.id === caseId);
+      if (c) casesSvc.updateCase(caseId, { linkedWOs: c.linkedWOs });
+    }
+  }
 }), { name: 'onetwo-issues' }));

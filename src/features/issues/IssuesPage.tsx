@@ -153,6 +153,34 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
         </div>
       )}
 
+      {/* Pending Requests Alert (embedded/board view only) */}
+      {embedded && isBoard && tab === 'open' && issues.filter(i => i.status === 'SUBMITTED').length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-amber-800">📋 {issues.filter(i => i.status === 'SUBMITTED').length} Pending Resident Request{issues.filter(i => i.status === 'SUBMITTED').length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-amber-600 mt-0.5">Unresolved issues submitted by residents awaiting board action</p>
+            </div>
+            <button onClick={() => setTab('issues')} className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 shrink-0">Review Requests →</button>
+          </div>
+          <div className="mt-3 space-y-1.5">
+            {issues.filter(i => i.status === 'SUBMITTED').slice(0, 3).map(i => (
+              <div key={i.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${i.priority === 'HIGH' || i.priority === 'URGENT' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{i.priority}</span>
+                  <span className="text-sm text-ink-800 truncate">{i.title}</span>
+                  {i.unitNumber && <span className="text-[10px] text-ink-400 shrink-0">Unit {i.unitNumber}</span>}
+                </div>
+                <button onClick={() => { handleConvertToCase(i); }} className="px-2 py-1 text-[10px] font-semibold bg-accent-600 text-white rounded hover:bg-accent-700 shrink-0 ml-2">→ Convert to Case</button>
+              </div>
+            ))}
+            {issues.filter(i => i.status === 'SUBMITTED').length > 3 && (
+              <p className="text-[10px] text-amber-600 text-center mt-1">+ {issues.filter(i => i.status === 'SUBMITTED').length - 3} more — click "Review Requests" to see all</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tab Content */}
       <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
 

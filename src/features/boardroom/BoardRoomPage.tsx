@@ -70,7 +70,7 @@ export default function BoardRoomPage() {
   const f = (k: string) => form[k] || '';
   const sf = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: false, voteScope: 'board' as 'board' | 'owner', voteItems: [] as number[] });
+  const [mForm, setMForm] = useState({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: false, voteScope: 'board' as 'board' | 'owner', voteItems: [] as number[], sendNotice: false });
   const [attForm, setAttForm] = useState({ board: [] as string[], owners: '' as string, guests: '' as string });
   const [minText, setMinText] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -124,10 +124,32 @@ export default function BoardRoomPage() {
   };
 
   // Meeting handlers
-  const openAddMeeting = () => { const d = getVoteDefaults('BOARD'); setRunbookItemForMeeting(null); setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] }); setModal('addMeeting'); };
+  const openAddMeeting = () => { const d = getVoteDefaults('BOARD'); setRunbookItemForMeeting(null); setMForm({ title: '', type: 'BOARD', date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: '', notes: '', status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [], sendNotice: false }); setModal('addMeeting'); };
   const openEditMeeting = (m: Meeting) => { setTargetId(m.id); setMForm({ title: m.title, type: m.type, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda.join('\n'), notes: m.notes, status: m.status, requiresVote: false, voteScope: 'board', voteItems: [] }); setModal('editMeeting'); };
   const openAttendees = (m: Meeting) => { setTargetId(m.id); setAttForm({ board: [...m.attendees.board], owners: m.attendees.owners.join('\n'), guests: m.attendees.guests.join('\n') }); setModal('attendees'); };
   const openMinutes = (m: Meeting) => { setTargetId(m.id); setMinText(m.minutes); setModal('minutes'); };
+
+  const sendMeetingNotice = async (meeting: { title: string; date: string; time: string; location: string; virtualLink: string; agenda: string[] }) => {
+    setSendingEmail(true);
+    try {
+      const sbUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      if (!sbUrl || !sbKey) { alert('Meeting saved! Email not sent — Supabase not configured.'); return; }
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+      const recipients = buildingMembers.filter(m => m.email && m.status === 'active').map(m => ({ email: m.email, name: m.name }));
+      const res = await fetch(`${sbUrl}/functions/v1/send-meeting-notice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': session ? `Bearer ${session.access_token}` : `Bearer ${sbKey}`, 'apikey': sbKey },
+        body: JSON.stringify({ title: meeting.title, date: meeting.date, time: meeting.time, location: meeting.location, virtualLink: meeting.virtualLink, agenda: meeting.agenda, recipients }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sent > 0) alert(`Meeting notice emailed to ${data.sent} member${data.sent !== 1 ? 's' : ''}.`);
+        else alert('Meeting saved. No recipients to email.');
+      } else { alert('Meeting saved but email failed to send.'); }
+    } catch { alert('Meeting saved but email failed to send.'); }
+    finally { setSendingEmail(false); }
+  };
 
   const saveMeeting = () => {
     if (!mForm.title || !mForm.date) { alert('Title and date required'); return; }
@@ -164,6 +186,10 @@ export default function BoardRoomPage() {
       }
     } else {
       mtg.updateMeeting(targetId, { title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
+    }
+    // Send meeting notice email if checkbox was checked
+    if (mForm.sendNotice && (mForm.status === 'SCHEDULED' || mForm.status === 'RESCHEDULED')) {
+      sendMeetingNotice({ title: mForm.title, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda });
     }
     setModal(null);
     // If this meeting was created from a runbook item, complete the "schedule meeting" workflow step
@@ -210,6 +236,7 @@ export default function BoardRoomPage() {
               <button onClick={() => openAttendees(m)} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">Attendees</button>
               <button onClick={() => openMinutes(m)} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">{m.minutes ? 'Edit Minutes' : 'Add Minutes'}</button>
               <button onClick={() => { setTargetId(m.id); setPendingFile(null); setModal('addDocument'); }} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">📎 Documents</button>
+              {(m.status === 'SCHEDULED' || m.status === 'RESCHEDULED') && <button onClick={() => { if (confirm(`Send meeting notice for "${m.title}" to all building members?`)) sendMeetingNotice({ title: m.title, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda }); }} disabled={sendingEmail} className="px-3 py-1.5 border border-accent-200 text-accent-700 rounded-lg text-xs font-medium hover:bg-accent-50 disabled:opacity-50">{sendingEmail ? 'Sending...' : '📧 Send Notice'}</button>}
               <button onClick={() => { setTargetId(m.id); setNewCaseForm({ catId: 'governance', sitId: 'board-meetings', title: `${m.title} — `, priority: 'medium' }); setModal('createCaseForMeeting'); }} className="px-3 py-1.5 border border-violet-200 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-50">+ Case</button>
               <button onClick={() => { setTargetId(m.id); setLinkCaseId(''); setModal('linkCaseToMeeting'); }} className="px-3 py-1.5 border border-violet-200 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-50">🔗 Link Case</button>
               <button onClick={() => { if (confirm('Delete?')) mtg.deleteMeeting(m.id); }} className="px-3 py-1.5 text-red-500 text-xs font-medium hover:text-red-700">Delete</button>
@@ -249,6 +276,16 @@ export default function BoardRoomPage() {
                         const newMajority = newCount > totalBoard / 2;
                         if (newMajority && !isMajority) {
                           comp.addCommunication({ type: 'minutes', subject: `${m.title} — Minutes Approved & Distributed`, date: new Date().toISOString().split('T')[0], method: 'email+portal', recipients: 'All owners (50 units)', respondedBy: 'Secretary', status: 'sent', notes: `Minutes approved by board majority (${newCount}/${totalBoard}). Auto-distributed per DC Code § 29-1108.06.` });
+                          // Prompt: Post meeting recap as community announcement
+                          const agendaSummary = m.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n');
+                          const minutesSummary = m.minutes ? `\n\nMinutes Summary:\n${m.minutes.slice(0, 500)}${m.minutes.length > 500 ? '...' : ''}` : '';
+                          const recapBody = `The ${m.title} was held on ${new Date(m.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}. Minutes have been approved by the board.\n\nAgenda items discussed:\n${agendaSummary}${minutesSummary}`;
+                          setTimeout(() => {
+                            if (confirm(`Minutes approved! Would you like to post a meeting recap to the Community Room?`)) {
+                              setForm({ annTitle: `${m.title} — Recap & Approved Minutes`, annBody: recapBody, annCategory: 'meeting', annPinned: 'false', annSendEmail: 'false' });
+                              setModal('addAnnouncement');
+                            }
+                          }, 300);
                         }
                       }}
                         className="px-4 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700 transition-colors">
@@ -588,9 +625,29 @@ export default function BoardRoomPage() {
                     const steps = workflowSteps[item.id] || item.howTo.map(() => false);
                     const completedSteps = steps.filter(Boolean).length;
                     const allDone = completedSteps === item.howTo.length;
+                    // Check if completing this item should trigger a communication
+                    const commKeywords = ['notice', 'distribute', 'mail', 'notify', 'send', 'disclose', 'financial statement', 'minutes'];
+                    const requiresComm = commKeywords.some(kw => item.task.toLowerCase().includes(kw));
+                    const promptComm = (itemTask: string) => {
+                      if (!requiresComm) return;
+                      setTimeout(() => {
+                        if (confirm(`"${itemTask}" is complete. This item may require owner notification. Would you like to draft a communication?`)) {
+                          sf('commType', 'notice');
+                          sf('commSubject', itemTask);
+                          sf('commDate', new Date().toISOString().split('T')[0]);
+                          sf('commMethod', 'email');
+                          sf('commRecipients', 'All owners (50 units)');
+                          sf('commRespondedBy', currentUser?.name || '');
+                          sf('commNotes', `Auto-generated from compliance runbook: ${itemTask}`);
+                          setModal('addComm');
+                        }
+                      }, 200);
+                    };
                     const toggleStep = (si: number) => {
                       const ns = [...steps]; ns[si] = !ns[si];
                       setWorkflowSteps({ ...workflowSteps, [item.id]: ns });
+                      // If this step made all steps done, prompt for communication
+                      if (ns.every(Boolean) && !allDone) promptComm(item.task);
                     };
                     return (
                     <div className="px-4 pb-4 ml-10 space-y-3">
@@ -607,7 +664,7 @@ export default function BoardRoomPage() {
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span>
                           </div>
                           <div className="flex gap-2">
-                            {!allDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
+                            {!allDone && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) }); if (!allDone) promptComm(item.task); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
                             {completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
                           </div>
                         </div>
@@ -941,6 +998,14 @@ export default function BoardRoomPage() {
             </div></div>)}
           </div>); })()}
         <div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={mForm.notes} onChange={e => setMForm({ ...mForm, notes: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div>
+        {modal === 'addMeeting' && (mForm.status === 'SCHEDULED' || mForm.status === 'RESCHEDULED') && (
+          <label className="flex items-start gap-3 bg-accent-50 border border-accent-200 rounded-xl p-4 cursor-pointer hover:bg-accent-100 transition-colors">
+            <input type="checkbox" checked={mForm.sendNotice} onChange={e => setMForm({ ...mForm, sendNotice: e.target.checked })} className="h-4 w-4 mt-0.5 accent-accent-600" />
+            <div><span className="text-xs font-semibold text-accent-800">📧 Send meeting notice to all members</span>
+              <p className="text-[11px] text-accent-600 mt-0.5">Emails {buildingMembers.filter(m => m.email && m.status === 'active').length} active members with meeting details, agenda, and virtual link via Mailjet.</p>
+            </div>
+          </label>
+        )}
       </div></Modal>)}
       {modal === 'attendees' && (<Modal title="Manage Attendees" onClose={() => setModal(null)} onSave={saveAttendees}><div className="space-y-4"><div><label className="block text-xs font-medium text-ink-700 mb-2">Board Members</label><div className="space-y-1">{board.map(b => (<label key={b.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={attForm.board.includes(b.name)} onChange={e => { if (e.target.checked) setAttForm({ ...attForm, board: [...attForm.board, b.name] }); else setAttForm({ ...attForm, board: attForm.board.filter(n => n !== b.name) }); }} className="h-4 w-4" />{b.name} <span className="text-ink-400">({b.role})</span></label>))}</div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Owners (one per line)</label><textarea value={attForm.owners} onChange={e => setAttForm({ ...attForm, owners: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={3} /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Guests</label><textarea value={attForm.guests} onChange={e => setAttForm({ ...attForm, guests: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
       {modal === 'minutes' && (<Modal title="Meeting Minutes" onClose={() => setModal(null)} onSave={() => { mtg.updateMinutes(targetId, minText); setModal(null); }} wide><textarea value={minText} onChange={e => setMinText(e.target.value)} className="w-full px-4 py-3 border border-ink-200 rounded-lg text-sm font-mono" rows={12} /></Modal>)}
@@ -970,7 +1035,7 @@ export default function BoardRoomPage() {
                 const agenda = item?.suggestedAgenda || [item?.task || 'Agenda item'];
                 const d = getVoteDefaults(mType);
                 setRunbookItemForMeeting(targetId);
-                setMForm({ title: item?.task || 'Meeting', type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item?.task || ''}. ${item?.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [] });
+                setMForm({ title: item?.task || 'Meeting', type: mType, date: '', time: '19:00', location: 'Community Room', virtualLink: '', agenda: agenda.join('\n'), notes: `From Runbook: ${item?.task || ''}. ${item?.legalRef || ''}`, status: 'SCHEDULED', requiresVote: d.requiresVote, voteScope: d.voteScope, voteItems: [], sendNotice: false });
                 setModal('addMeeting');
               }
             }} className="p-4 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-50 transition-colors"><span className="text-2xl">✨</span><p className="text-sm font-semibold text-ink-900 mt-2">Create New</p><p className="text-xs text-ink-400 mt-1">{runbookAction === 'case' ? 'Open a new case' : 'Schedule & mark complete'}</p></button>

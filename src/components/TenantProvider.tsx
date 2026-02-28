@@ -6,6 +6,10 @@ import { useEffect, useState, createContext, useContext } from 'react';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useComplianceStore } from '@/store/useComplianceStore';
+import { useMeetingsStore } from '@/store/useMeetingsStore';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { useElectionStore } from '@/store/useElectionStore';
 
 export interface TenantInfo {
   id: string;
@@ -121,6 +125,14 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         updateName(tenantInfo.name);
         updateAddress(tenantInfo.address);
         updateDetails({ totalUnits: tenantInfo.totalUnits });
+
+        // Hydrate operational stores from DB
+        await Promise.all([
+          useComplianceStore.getState().loadFromDb(tenantInfo.id),
+          useMeetingsStore.getState().loadFromDb(tenantInfo.id),
+          useIssuesStore.getState().loadFromDb(tenantInfo.id),
+          useElectionStore.getState().loadFromDb(tenantInfo.id),
+        ]);
 
       } catch (err) {
         console.warn('Failed to load tenant, using demo:', err);

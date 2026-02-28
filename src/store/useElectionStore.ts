@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { isBackendEnabled } from '@/lib/supabase';
+import * as electionsSvc from '@/lib/services/elections';
 
 // ─── Types ───
 
@@ -131,7 +133,8 @@ export interface Election {
 
 interface ElectionState {
   elections: Election[];
-  addElection: (e: Omit<Election, 'id' | 'createdAt' | 'ballots' | 'timeline' | 'comments' | 'resolution' | 'linkedCaseId'>) => void;
+  loadFromDb: (tenantId: string) => Promise<void>;
+  addElection: (e: Omit<Election, 'id' | 'createdAt' | 'ballots' | 'timeline' | 'comments' | 'resolution' | 'linkedCaseId'>, tenantId?: string) => void;
   updateElection: (id: string, updates: Partial<Election>) => void;
   deleteElection: (id: string) => void;
   openElection: (id: string, actor: string) => void;
@@ -165,58 +168,84 @@ interface ElectionState {
 
 const tlId = () => 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
+// Helper: sync election updates to DB
+function syncElection(id: string, updates: Partial<Election>) {
+  if (!isBackendEnabled) return;
+  electionsSvc.updateElection(id, updates);
+}
+
 export const useElectionStore = create<ElectionState>((set, get) => ({
   elections: [],
 
-  addElection: (e) => set(s => {
+  loadFromDb: async (tenantId: string) => {
+    const elections = await electionsSvc.fetchElections(tenantId);
+    if (elections) set({ elections });
+  },
+
+  addElection: (e, tenantId?) => {
     const id = 'elec_' + Date.now();
     const now = new Date().toISOString();
-    return {
-      elections: [{
-        ...e, id, createdAt: now, ballots: [],
-        timeline: [{ id: tlId(), type: 'created', description: `Vote created: ${e.title}`, date: now, actor: e.createdBy }],
-        comments: [], resolution: null, linkedCaseId: null,
-      }, ...s.elections],
+    const election: Election = {
+      ...e, id, createdAt: now, ballots: [],
+      timeline: [{ id: tlId(), type: 'created', description: `Vote created: ${e.title}`, date: now, actor: e.createdBy }],
+      comments: [], resolution: null, linkedCaseId: null,
     };
-  }),
+    set(s => ({ elections: [election, ...s.elections] }));
+    if (isBackendEnabled && tenantId) {
+      electionsSvc.createElection(tenantId, election).then(dbId => {
+        if (dbId) set(s => ({ elections: s.elections.map(x => x.id === id ? { ...x, id: dbId } : x) }));
+      });
+    }
+  },
 
-  updateElection: (id, updates) => set(s => ({
-    elections: s.elections.map(e => e.id === id ? { ...e, ...updates } : e),
-  })),
+  updateElection: (id, updates) => {
+    set(s => ({ elections: s.elections.map(e => e.id === id ? { ...e, ...updates } : e) }));
+    syncElection(id, updates);
+  },
 
-  deleteElection: (id) => set(s => ({
-    elections: s.elections.filter(e => e.id !== id),
-  })),
+  deleteElection: (id) => {
+    set(s => ({ elections: s.elections.filter(e => e.id !== id) }));
+    if (isBackendEnabled) electionsSvc.deleteElection(id);
+  },
 
-  openElection: (id, actor) => set(s => {
+  openElection: (id, actor) => {
     const now = new Date().toISOString();
-    return {
+    const tlEvent = { id: tlId(), type: 'opened' as const, description: 'Voting opened', date: now, actor };
+    set(s => ({
       elections: s.elections.map(e => e.id === id ? {
         ...e, status: 'open' as ElectionStatus, openedAt: now,
-        timeline: [...e.timeline, { id: tlId(), type: 'opened' as const, description: 'Voting opened', date: now, actor }],
+        timeline: [...e.timeline, tlEvent],
       } : e),
-    };
-  }),
+    }));
+    syncElection(id, { status: 'open', openedAt: now });
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', id, tlEvent);
+  },
 
-  closeElection: (id, actor) => set(s => {
+  closeElection: (id, actor) => {
     const now = new Date().toISOString();
-    return {
+    const tlEvent = { id: tlId(), type: 'closed' as const, description: 'Voting closed', date: now, actor };
+    set(s => ({
       elections: s.elections.map(e => e.id === id ? {
         ...e, status: 'closed' as ElectionStatus, closedAt: now,
-        timeline: [...e.timeline, { id: tlId(), type: 'closed' as const, description: 'Voting closed', date: now, actor }],
+        timeline: [...e.timeline, tlEvent],
       } : e),
-    };
-  }),
+    }));
+    syncElection(id, { status: 'closed', closedAt: now });
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', id, tlEvent);
+  },
 
-  certifyElection: (id, certifiedBy) => set(s => {
+  certifyElection: (id, certifiedBy) => {
     const now = new Date().toISOString();
-    return {
+    const tlEvent = { id: tlId(), type: 'certified' as const, description: `Results certified by ${certifiedBy}`, date: now, actor: certifiedBy };
+    set(s => ({
       elections: s.elections.map(e => e.id === id ? {
         ...e, status: 'certified' as ElectionStatus, certifiedAt: now, certifiedBy,
-        timeline: [...e.timeline, { id: tlId(), type: 'certified' as const, description: `Results certified by ${certifiedBy}`, date: now, actor: certifiedBy }],
+        timeline: [...e.timeline, tlEvent],
       } : e),
-    };
-  }),
+    }));
+    syncElection(id, { status: 'certified', certifiedAt: now, certifiedBy });
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', id, tlEvent);
+  },
 
   addBallotItem: (electionId, item) => set(s => ({
     elections: s.elections.map(e => e.id === electionId
@@ -250,72 +279,101 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
       : e),
   })),
 
-  recordBallot: (electionId, ballot, actor) => set(s => {
+  recordBallot: (electionId, ballot, actor) => {
     const now = new Date().toISOString();
-    return {
+    const newBallot = { ...ballot, id: 'bal_' + Date.now(), recordedAt: now };
+    const desc = ballot.isProxy
+      ? `Proxy vote recorded: Unit ${ballot.unitNumber} (by ${ballot.proxyVoterName || actor})`
+      : `Ballot recorded: Unit ${ballot.unitNumber} via ${ballot.method}`;
+    const tlEvent = { id: tlId(), type: 'ballot_recorded' as const, description: desc, date: now, actor };
+    set(s => ({
       elections: s.elections.map(e => {
         if (e.id !== electionId) return e;
         const existing = e.ballots.filter(b => b.unitNumber !== ballot.unitNumber);
-        const desc = ballot.isProxy
-          ? `Proxy vote recorded: Unit ${ballot.unitNumber} (by ${ballot.proxyVoterName || actor})`
-          : `Ballot recorded: Unit ${ballot.unitNumber} via ${ballot.method}`;
-        return {
-          ...e,
-          ballots: [...existing, { ...ballot, id: 'bal_' + Date.now(), recordedAt: now }],
-          timeline: [...e.timeline, { id: tlId(), type: 'ballot_recorded' as const, description: desc, date: now, actor }],
-        };
+        return { ...e, ballots: [...existing, newBallot], timeline: [...e.timeline, tlEvent] };
       }),
-    };
-  }),
+    }));
+    if (isBackendEnabled) {
+      electionsSvc.recordBallot('', electionId, newBallot);
+      electionsSvc.addTimelineEvent('', electionId, tlEvent);
+    }
+  },
 
-  removeBallot: (electionId, ballotId) => set(s => ({
-    elections: s.elections.map(e => e.id === electionId
-      ? { ...e, ballots: e.ballots.filter(b => b.id !== ballotId) }
-      : e),
-  })),
+  removeBallot: (electionId, ballotId) => {
+    set(s => ({
+      elections: s.elections.map(e => e.id === electionId
+        ? { ...e, ballots: e.ballots.filter(b => b.id !== ballotId) }
+        : e),
+    }));
+    if (isBackendEnabled) electionsSvc.removeBallot(electionId, ballotId);
+  },
 
-  addComment: (electionId, comment) => set(s => {
+  addComment: (electionId, comment) => {
     const now = new Date().toISOString();
-    return {
+    const newComment = { ...comment, id: 'vc_' + Date.now(), createdAt: now };
+    const tlEvent = { id: tlId(), type: 'comment' as const, description: `Comment by Unit ${comment.unitNumber}`, date: now, actor: comment.owner };
+    set(s => ({
       elections: s.elections.map(e => e.id === electionId ? {
         ...e,
-        comments: [...e.comments, { ...comment, id: 'vc_' + Date.now(), createdAt: now }],
-        timeline: [...e.timeline, { id: tlId(), type: 'comment' as const, description: `Comment by Unit ${comment.unitNumber}`, date: now, actor: comment.owner }],
+        comments: [...e.comments, newComment],
+        timeline: [...e.timeline, tlEvent],
       } : e),
-    };
-  }),
+    }));
+    if (isBackendEnabled) {
+      electionsSvc.addElectionComment('', electionId, newComment);
+      electionsSvc.addTimelineEvent('', electionId, tlEvent);
+    }
+  },
 
-  addTimelineEvent: (electionId, event) => set(s => ({
-    elections: s.elections.map(e => e.id === electionId
-      ? { ...e, timeline: [...e.timeline, { ...event, id: tlId() }] }
-      : e),
-  })),
+  addTimelineEvent: (electionId, event) => {
+    const fullEvent = { ...event, id: tlId() };
+    set(s => ({
+      elections: s.elections.map(e => e.id === electionId
+        ? { ...e, timeline: [...e.timeline, fullEvent] }
+        : e),
+    }));
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', electionId, fullEvent);
+  },
 
-  setComplianceChecks: (electionId, checks) => set(s => ({
-    elections: s.elections.map(e => e.id === electionId ? { ...e, complianceChecks: checks } : e),
-  })),
+  setComplianceChecks: (electionId, checks) => {
+    set(s => ({
+      elections: s.elections.map(e => e.id === electionId ? { ...e, complianceChecks: checks } : e),
+    }));
+    syncElection(electionId, { complianceChecks: checks });
+  },
 
-  updateComplianceCheck: (electionId, checkId, updates) => set(s => ({
-    elections: s.elections.map(e => e.id === electionId
-      ? { ...e, complianceChecks: e.complianceChecks.map(c => c.id === checkId ? { ...c, ...updates } : c) }
-      : e),
-  })),
+  updateComplianceCheck: (electionId, checkId, updates) => {
+    set(s => ({
+      elections: s.elections.map(e => e.id === electionId
+        ? { ...e, complianceChecks: e.complianceChecks.map(c => c.id === checkId ? { ...c, ...updates } : c) }
+        : e),
+    }));
+    const e = get().elections.find(x => x.id === electionId);
+    if (e) syncElection(electionId, { complianceChecks: e.complianceChecks });
+  },
 
-  setResolution: (electionId, resolution) => set(s => ({
-    elections: s.elections.map(e => e.id === electionId
-      ? { ...e, resolution: { ...resolution, id: 'res_' + Date.now() } }
-      : e),
-  })),
+  setResolution: (electionId, resolution) => {
+    const full = { ...resolution, id: 'res_' + Date.now() };
+    set(s => ({
+      elections: s.elections.map(e => e.id === electionId
+        ? { ...e, resolution: full }
+        : e),
+    }));
+    syncElection(electionId, { resolution: full });
+  },
 
-  linkCase: (electionId, caseId) => set(s => {
+  linkCase: (electionId, caseId) => {
     const now = new Date().toISOString();
-    return {
+    const tlEvent = { id: tlId(), type: 'case_created' as const, description: `Compliance case linked: ${caseId}`, date: now, actor: 'System' };
+    set(s => ({
       elections: s.elections.map(e => e.id === electionId ? {
         ...e, linkedCaseId: caseId,
-        timeline: [...e.timeline, { id: tlId(), type: 'case_created' as const, description: `Compliance case linked: ${caseId}`, date: now, actor: 'System' }],
+        timeline: [...e.timeline, tlEvent],
       } : e),
-    };
-  }),
+    }));
+    syncElection(electionId, { linkedCaseId: caseId });
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', electionId, tlEvent);
+  },
 
   getResults: (electionId, units) => {
     const election = get().elections.find(e => e.id === electionId);
