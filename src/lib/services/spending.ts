@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 export interface SpendingApproval {
   id: string;
@@ -61,7 +61,7 @@ export async function fetchApprovals(tenantId: string): Promise<SpendingApproval
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
-  if (error) { console.error('fetchApprovals error:', error); return null; }
+  if (error) { logDbError('fetchApprovals error:', error); return null; }
   return (data || []).map(rowToApproval);
 }
 
@@ -74,7 +74,7 @@ export async function createApproval(tenantId: string, approval: Omit<SpendingAp
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createApproval error:', error); return null; }
+  if (error) { logDbError('createApproval error:', error); return null; }
   return rowToApproval(data);
 }
 
@@ -82,13 +82,13 @@ export async function updateApproval(id: string, updates: Partial<SpendingApprov
   if (!supabase) return false;
   const row = approvalToRow(updates);
   const { error } = await supabase.from('spending_approvals').update(row).eq('id', id);
-  if (error) { console.error('updateApproval error:', error); return false; }
+  if (error) { logDbError('updateApproval error:', error); return false; }
   return true;
 }
 
 export async function deleteApproval(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('spending_approvals').delete().eq('id', id);
-  if (error) { console.error('deleteApproval error:', error); return false; }
+  if (error) { logDbError('deleteApproval error:', error); return false; }
   return true;
 }

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { Meeting } from '@/store/useMeetingsStore';
 
 function rowToMeeting(row: Record<string, unknown>): Meeting {
@@ -51,7 +51,7 @@ export async function fetchMeetings(tenantId: string): Promise<Meeting[] | null>
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false });
-  if (error) { console.error('fetchMeetings error:', error); return null; }
+  if (error) { logDbError('fetchMeetings error:', error); return null; }
   return (data || []).map(rowToMeeting);
 }
 
@@ -64,7 +64,7 @@ export async function createMeeting(tenantId: string, m: Omit<Meeting, 'id'>): P
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createMeeting error:', error); return null; }
+  if (error) { logDbError('createMeeting error:', error); return null; }
   return rowToMeeting(data);
 }
 
@@ -72,13 +72,13 @@ export async function updateMeeting(id: string, updates: Partial<Meeting>): Prom
   if (!supabase) return false;
   const row = meetingToRow(updates);
   const { error } = await supabase.from('meetings').update(row).eq('id', id);
-  if (error) { console.error('updateMeeting error:', error); return false; }
+  if (error) { logDbError('updateMeeting error:', error); return false; }
   return true;
 }
 
 export async function deleteMeeting(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('meetings').delete().eq('id', id);
-  if (error) { console.error('deleteMeeting error:', error); return false; }
+  if (error) { logDbError('deleteMeeting error:', error); return false; }
   return true;
 }

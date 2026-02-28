@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { Issue } from '@/types/issues';
 
 interface IssueRow {
@@ -49,7 +49,7 @@ export async function fetchIssues(tenantId: string): Promise<Issue[] | null> {
     supabase.from('issue_review_notes').select('*').eq('tenant_id', tenantId).order('date', { ascending: true }),
   ]);
 
-  if (issuesRes.error) { console.error('fetchIssues error:', issuesRes.error); return null; }
+  if (issuesRes.error) { logDbError('fetchIssues error:', issuesRes.error); return null; }
 
   const upvotesByIssue = new Map<string, Issue['upvotes']>();
   (upvotesRes.data || []).forEach(u => {
@@ -98,14 +98,14 @@ export async function createIssue(tenantId: string, issue: Omit<Issue, 'id' | 'u
     })
     .select('id')
     .single();
-  if (error) { console.error('createIssue error:', error); return null; }
+  if (error) { logDbError('createIssue error:', error); return null; }
   return data.id;
 }
 
 export async function updateIssueStatus(id: string, status: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('issues').update({ status }).eq('id', id);
-  if (error) { console.error('updateIssueStatus error:', error); return false; }
+  if (error) { logDbError('updateIssueStatus error:', error); return false; }
   return true;
 }
 
@@ -114,7 +114,7 @@ export async function addIssueComment(tenantId: string, issueId: string, localId
   const { error } = await supabase.from('issue_comments').insert({
     tenant_id: tenantId, issue_id: issueId, local_id: localId, author, text, date,
   });
-  if (error) { console.error('addIssueComment error:', error); return false; }
+  if (error) { logDbError('addIssueComment error:', error); return false; }
   return true;
 }
 
@@ -123,13 +123,13 @@ export async function addIssueUpvote(tenantId: string, issueId: string, userId: 
   const { error } = await supabase.from('issue_upvotes').insert({
     tenant_id: tenantId, issue_id: issueId, user_id: userId, user_name: userName, unit_number: unitNumber,
   });
-  if (error) { console.error('addIssueUpvote error:', error); return false; }
+  if (error) { logDbError('addIssueUpvote error:', error); return false; }
   return true;
 }
 
 export async function removeIssueUpvote(issueId: string, userId: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('issue_upvotes').delete().eq('issue_id', issueId).eq('user_id', userId);
-  if (error) { console.error('removeIssueUpvote error:', error); return false; }
+  if (error) { logDbError('removeIssueUpvote error:', error); return false; }
   return true;
 }

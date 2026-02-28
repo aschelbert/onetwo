@@ -20,3 +20,9 @@ export const supabase = supabaseUrl && supabaseAnonKey
 
 export const isBackendEnabled = !!supabase;
 
+/** Log a Supabase error, suppressing "table not found" (PGRST205) noise. */
+export function logDbError(label: string, error: unknown): void {
+  if (error && typeof error === 'object' && (error as any).code === 'PGRST205') return;
+  console.error(label, error);
+}
+

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { CaseTrackerCase, CaseStep, CaseComm } from '@/types/issues';
 
 export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | null> {
@@ -10,7 +10,7 @@ export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | 
     supabase.from('case_communications').select('*').eq('tenant_id', tenantId).order('date', { ascending: true }),
   ]);
 
-  if (casesRes.error) { console.error('fetchCases error:', casesRes.error); return null; }
+  if (casesRes.error) { logDbError('fetchCases error:', casesRes.error); return null; }
 
   const stepsByCase = new Map<string, CaseStep[]>();
   (stepsRes.data || []).forEach(row => {
@@ -103,7 +103,7 @@ export async function createCase(tenantId: string, c: CaseTrackerCase): Promise<
     .select('id')
     .single();
 
-  if (error) { console.error('createCase error:', error); return null; }
+  if (error) { logDbError('createCase error:', error); return null; }
 
   // Insert steps
   if (c.steps && c.steps.length > 0) {
@@ -161,14 +161,14 @@ export async function updateCase(id: string, updates: Partial<CaseTrackerCase>):
   if (updates.completedAt !== undefined) row.completed_at = updates.completedAt || null;
   if (Object.keys(row).length === 0) return true;
   const { error } = await supabase.from('cases').update(row).eq('id', id);
-  if (error) { console.error('updateCase error:', error); return false; }
+  if (error) { logDbError('updateCase error:', error); return false; }
   return true;
 }
 
 export async function deleteCase(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('cases').delete().eq('id', id);
-  if (error) { console.error('deleteCase error:', error); return false; }
+  if (error) { logDbError('deleteCase error:', error); return false; }
   return true;
 }
 
@@ -179,7 +179,7 @@ export async function updateCaseStep(caseId: string, localId: string, done: bool
     .update({ done, done_date: doneDate })
     .eq('case_id', caseId)
     .eq('local_id', localId);
-  if (error) { console.error('updateCaseStep error:', error); return false; }
+  if (error) { logDbError('updateCaseStep error:', error); return false; }
   return true;
 }
 
@@ -190,7 +190,7 @@ export async function updateCaseStepNote(caseId: string, localId: string, userNo
     .update({ user_notes: userNotes })
     .eq('case_id', caseId)
     .eq('local_id', localId);
-  if (error) { console.error('updateCaseStepNote error:', error); return false; }
+  if (error) { logDbError('updateCaseStepNote error:', error); return false; }
   return true;
 }
 
@@ -209,6 +209,6 @@ export async function addCaseComm(tenantId: string, caseId: string, comm: Omit<C
     notes: comm.notes,
     status: comm.status,
   });
-  if (error) { console.error('addCaseComm error:', error); return false; }
+  if (error) { logDbError('addCaseComm error:', error); return false; }
   return true;
 }

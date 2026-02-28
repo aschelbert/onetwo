@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 export interface PropertyLogEntry {
   id: string;
@@ -49,7 +49,7 @@ export async function fetchLogs(tenantId: string): Promise<PropertyLogEntry[] | 
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false });
-  if (error) { console.error('fetchLogs error:', error); return null; }
+  if (error) { logDbError('fetchLogs error:', error); return null; }
   return (data || []).map(rowToLog);
 }
 
@@ -62,7 +62,7 @@ export async function createLog(tenantId: string, log: Omit<PropertyLogEntry, 'i
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createLog error:', error); return null; }
+  if (error) { logDbError('createLog error:', error); return null; }
   return rowToLog(data);
 }
 
@@ -70,13 +70,13 @@ export async function updateLog(id: string, updates: Partial<PropertyLogEntry>):
   if (!supabase) return false;
   const row = logToRow(updates);
   const { error } = await supabase.from('property_logs').update(row).eq('id', id);
-  if (error) { console.error('updateLog error:', error); return false; }
+  if (error) { logDbError('updateLog error:', error); return false; }
   return true;
 }
 
 export async function deleteLog(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('property_logs').delete().eq('id', id);
-  if (error) { console.error('deleteLog error:', error); return false; }
+  if (error) { logDbError('deleteLog error:', error); return false; }
   return true;
 }

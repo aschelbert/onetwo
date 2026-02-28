@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
 
@@ -32,7 +32,7 @@ export async function fetchUnits(tenantId: string): Promise<Unit[] | null> {
     .select('*')
     .eq('tenant_id', tenantId)
     .order('number');
-  if (error) { console.error('fetchUnits error:', error); return null; }
+  if (error) { logDbError('fetchUnits error:', error); return null; }
   return (data || []).map(rowToUnit);
 }
 
@@ -46,14 +46,14 @@ export async function upsertUnit(tenantId: string, u: Unit): Promise<boolean> {
     parking: u.parking, payments: u.payments, late_fees: u.lateFees,
     special_assessments: u.specialAssessments, stripe_customer_id: u.stripeCustomerId || null,
   }, { onConflict: 'tenant_id,number' });
-  if (error) { console.error('upsertUnit error:', error); return false; }
+  if (error) { logDbError('upsertUnit error:', error); return false; }
   return true;
 }
 
 export async function deleteUnit(tenantId: string, unitNum: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('units').delete().eq('tenant_id', tenantId).eq('number', unitNum);
-  if (error) { console.error('deleteUnit error:', error); return false; }
+  if (error) { logDbError('deleteUnit error:', error); return false; }
   return true;
 }
 
@@ -74,7 +74,7 @@ export async function fetchBudgetCategories(tenantId: string): Promise<BudgetCat
     .from('budget_categories')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchBudgetCategories error:', error); return null; }
+  if (error) { logDbError('fetchBudgetCategories error:', error); return null; }
   return (data || []).map(rowToBudgetCategory);
 }
 
@@ -85,7 +85,7 @@ export async function createBudgetCategory(tenantId: string, c: BudgetCategory):
     .insert({ tenant_id: tenantId, name: c.name, budgeted: c.budgeted, expenses: c.expenses })
     .select()
     .single();
-  if (error) { console.error('createBudgetCategory error:', error); return null; }
+  if (error) { logDbError('createBudgetCategory error:', error); return null; }
   return rowToBudgetCategory(data);
 }
 
@@ -96,14 +96,14 @@ export async function updateBudgetCategory(id: string, updates: Partial<BudgetCa
   if (updates.budgeted !== undefined) row.budgeted = updates.budgeted;
   if (updates.expenses !== undefined) row.expenses = updates.expenses;
   const { error } = await supabase.from('budget_categories').update(row).eq('id', id);
-  if (error) { console.error('updateBudgetCategory error:', error); return false; }
+  if (error) { logDbError('updateBudgetCategory error:', error); return false; }
   return true;
 }
 
 export async function deleteBudgetCategory(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('budget_categories').delete().eq('id', id);
-  if (error) { console.error('deleteBudgetCategory error:', error); return false; }
+  if (error) { logDbError('deleteBudgetCategory error:', error); return false; }
   return true;
 }
 
@@ -128,7 +128,7 @@ export async function fetchReserveItems(tenantId: string): Promise<ReserveItem[]
     .from('reserve_items')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchReserveItems error:', error); return null; }
+  if (error) { logDbError('fetchReserveItems error:', error); return null; }
   return (data || []).map(rowToReserveItem);
 }
 
@@ -144,7 +144,7 @@ export async function createReserveItem(tenantId: string, item: ReserveItem): Pr
     })
     .select()
     .single();
-  if (error) { console.error('createReserveItem error:', error); return null; }
+  if (error) { logDbError('createReserveItem error:', error); return null; }
   return rowToReserveItem(data);
 }
 
@@ -159,14 +159,14 @@ export async function updateReserveItem(id: string, updates: Partial<ReserveItem
   if (updates.yearsRemaining !== undefined) row.years_remaining = updates.yearsRemaining;
   if (updates.isContingency !== undefined) row.is_contingency = updates.isContingency;
   const { error } = await supabase.from('reserve_items').update(row).eq('id', id);
-  if (error) { console.error('updateReserveItem error:', error); return false; }
+  if (error) { logDbError('updateReserveItem error:', error); return false; }
   return true;
 }
 
 export async function deleteReserveItem(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('reserve_items').delete().eq('id', id);
-  if (error) { console.error('deleteReserveItem error:', error); return false; }
+  if (error) { logDbError('deleteReserveItem error:', error); return false; }
   return true;
 }
 
@@ -191,7 +191,7 @@ export async function fetchChartOfAccounts(tenantId: string): Promise<ChartOfAcc
     .select('*')
     .eq('tenant_id', tenantId)
     .order('num');
-  if (error) { console.error('fetchChartOfAccounts error:', error); return null; }
+  if (error) { logDbError('fetchChartOfAccounts error:', error); return null; }
   return (data || []).map(rowToCoA);
 }
 
@@ -202,14 +202,14 @@ export async function upsertCoAEntry(tenantId: string, entry: ChartOfAccountsEnt
     sub: entry.sub, parent: entry.parent, budget_cat: entry.budgetCat || null,
     reserve_item: entry.reserveItem || null,
   }, { onConflict: 'tenant_id,num' });
-  if (error) { console.error('upsertCoAEntry error:', error); return false; }
+  if (error) { logDbError('upsertCoAEntry error:', error); return false; }
   return true;
 }
 
 export async function deleteCoAEntry(tenantId: string, num: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('chart_of_accounts').delete().eq('tenant_id', tenantId).eq('num', num);
-  if (error) { console.error('deleteCoAEntry error:', error); return false; }
+  if (error) { logDbError('deleteCoAEntry error:', error); return false; }
   return true;
 }
 
@@ -237,7 +237,7 @@ export async function fetchGeneralLedger(tenantId: string): Promise<GLEntry[] | 
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date');
-  if (error) { console.error('fetchGeneralLedger error:', error); return null; }
+  if (error) { logDbError('fetchGeneralLedger error:', error); return null; }
   return (data || []).map(rowToGLEntry);
 }
 
@@ -248,7 +248,7 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
     debit_acct: entry.debitAcct, credit_acct: entry.creditAcct, amount: entry.amount,
     source: entry.source, source_id: entry.sourceId, posted: entry.posted, status: entry.status,
   });
-  if (error) { console.error('createGLEntry error:', error); return false; }
+  if (error) { logDbError('createGLEntry error:', error); return false; }
   return true;
 }
 
@@ -281,7 +281,7 @@ export async function fetchWorkOrders(tenantId: string): Promise<WorkOrder[] | n
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_date', { ascending: false });
-  if (error) { console.error('fetchWorkOrders error:', error); return null; }
+  if (error) { logDbError('fetchWorkOrders error:', error); return null; }
   return (data || []).map(rowToWorkOrder);
 }
 
@@ -295,7 +295,7 @@ export async function createWorkOrder(tenantId: string, wo: WorkOrder): Promise<
     invoice_date: wo.invoiceDate, paid_date: wo.paidDate,
     gl_entry_id: wo.glEntryId, attachments: wo.attachments,
   });
-  if (error) { console.error('createWorkOrder error:', error); return false; }
+  if (error) { logDbError('createWorkOrder error:', error); return false; }
   return true;
 }
 
@@ -316,7 +316,7 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
   const { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
-  if (error) { console.error('updateWorkOrder error:', error); return false; }
+  if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;
 }
 
@@ -348,7 +348,7 @@ export async function fetchUnitInvoices(tenantId: string): Promise<UnitInvoice[]
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_date', { ascending: false });
-  if (error) { console.error('fetchUnitInvoices error:', error); return null; }
+  if (error) { logDbError('fetchUnitInvoices error:', error); return null; }
   return (data || []).map(rowToUnitInvoice);
 }
 
@@ -366,7 +366,7 @@ export async function createUnitInvoice(tenantId: string, inv: UnitInvoice): Pro
     })
     .select()
     .single();
-  if (error) { console.error('createUnitInvoice error:', error); return null; }
+  if (error) { logDbError('createUnitInvoice error:', error); return null; }
   return rowToUnitInvoice(data);
 }
 
@@ -379,7 +379,7 @@ export async function updateUnitInvoice(id: string, updates: Partial<UnitInvoice
   if (updates.paymentMethod !== undefined) row.payment_method = updates.paymentMethod;
   if (updates.paymentGlEntryId !== undefined) row.payment_gl_entry_id = updates.paymentGlEntryId;
   const { error } = await supabase.from('unit_invoices').update(row).eq('id', id);
-  if (error) { console.error('updateUnitInvoice error:', error); return false; }
+  if (error) { logDbError('updateUnitInvoice error:', error); return false; }
   return true;
 }
 
@@ -399,7 +399,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     .select('*')
     .eq('tenant_id', tenantId)
     .maybeSingle();
-  if (error) { console.error('fetchFinancialSettings error:', error); return null; }
+  if (error) { logDbError('fetchFinancialSettings error:', error); return null; }
   if (!data) return null;
   return {
     hoaDueDay: Number(data.hoa_due_day),
@@ -417,7 +417,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.stripeConnectId !== undefined) row.stripe_connect_id = s.stripeConnectId;
   if (s.stripeOnboardingComplete !== undefined) row.stripe_onboarding_complete = s.stripeOnboardingComplete;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
-  if (error) { console.error('upsertFinancialSettings error:', error); return false; }
+  if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
 }
 

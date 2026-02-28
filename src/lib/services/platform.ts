@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type {
   SupportTicket, EmailTemplate,
   Announcement as PlatformAnnouncement,
@@ -29,7 +29,7 @@ export async function fetchTickets(): Promise<SupportTicket[] | null> {
     .from('support_tickets')
     .select('*')
     .order('created_at', { ascending: false });
-  if (error) { console.error('fetchTickets error:', error); return null; }
+  if (error) { logDbError('fetchTickets error:', error); return null; }
   return (data || []).map(rowToTicket);
 }
 
@@ -45,7 +45,7 @@ export async function createTicket(ticket: Omit<SupportTicket, 'id' | 'createdAt
     })
     .select()
     .single();
-  if (error) { console.error('createTicket error:', error); return null; }
+  if (error) { logDbError('createTicket error:', error); return null; }
   return rowToTicket(data);
 }
 
@@ -57,7 +57,7 @@ export async function updateTicket(id: string, updates: Partial<SupportTicket>):
   if (updates.assignedTo !== undefined) row.assigned_to = updates.assignedTo;
   if (updates.notes !== undefined) row.notes = updates.notes;
   const { error } = await supabase.from('support_tickets').update(row).eq('id', id);
-  if (error) { console.error('updateTicket error:', error); return false; }
+  if (error) { logDbError('updateTicket error:', error); return false; }
   return true;
 }
 
@@ -80,7 +80,7 @@ export async function fetchTemplates(): Promise<EmailTemplate[] | null> {
     .from('email_templates')
     .select('*')
     .order('name');
-  if (error) { console.error('fetchTemplates error:', error); return null; }
+  if (error) { logDbError('fetchTemplates error:', error); return null; }
   return (data || []).map(rowToTemplate);
 }
 
@@ -91,7 +91,7 @@ export async function createTemplate(t: Omit<EmailTemplate, 'id' | 'lastEdited'>
     .insert({ name: t.name, subject: t.subject, body: t.body, trigger: t.trigger })
     .select()
     .single();
-  if (error) { console.error('createTemplate error:', error); return null; }
+  if (error) { logDbError('createTemplate error:', error); return null; }
   return rowToTemplate(data);
 }
 
@@ -104,7 +104,7 @@ export async function updateTemplate(id: string, updates: Partial<EmailTemplate>
   if (updates.trigger !== undefined) row.trigger = updates.trigger;
   if (updates.lastEdited !== undefined) row.last_edited = updates.lastEdited;
   const { error } = await supabase.from('email_templates').update(row).eq('id', id);
-  if (error) { console.error('updateTemplate error:', error); return false; }
+  if (error) { logDbError('updateTemplate error:', error); return false; }
   return true;
 }
 
@@ -129,7 +129,7 @@ export async function fetchPlatformAnnouncements(): Promise<PlatformAnnouncement
     .from('platform_announcements')
     .select('*')
     .order('created_at', { ascending: false });
-  if (error) { console.error('fetchPlatformAnnouncements error:', error); return null; }
+  if (error) { logDbError('fetchPlatformAnnouncements error:', error); return null; }
   return (data || []).map(rowToAnnouncement);
 }
 
@@ -140,7 +140,7 @@ export async function createPlatformAnnouncement(a: Omit<PlatformAnnouncement, '
     .insert({ title: a.title, message: a.message, audience: a.audience, status: a.status, created_by: a.createdBy })
     .select()
     .single();
-  if (error) { console.error('createPlatformAnnouncement error:', error); return null; }
+  if (error) { logDbError('createPlatformAnnouncement error:', error); return null; }
   return rowToAnnouncement(data);
 }
 
@@ -153,13 +153,13 @@ export async function updatePlatformAnnouncement(id: string, updates: Partial<Pl
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.sentAt !== undefined) row.sent_at = updates.sentAt;
   const { error } = await supabase.from('platform_announcements').update(row).eq('id', id);
-  if (error) { console.error('updatePlatformAnnouncement error:', error); return false; }
+  if (error) { logDbError('updatePlatformAnnouncement error:', error); return false; }
   return true;
 }
 
 export async function deletePlatformAnnouncement(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('platform_announcements').delete().eq('id', id);
-  if (error) { console.error('deletePlatformAnnouncement error:', error); return false; }
+  if (error) { logDbError('deletePlatformAnnouncement error:', error); return false; }
   return true;
 }

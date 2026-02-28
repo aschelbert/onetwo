@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
   LegalDocument, InsurancePolicy, Vendor,
@@ -12,7 +12,7 @@ export async function fetchBoardMembers(tenantId: string): Promise<BoardMember[]
     .from('board_members')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchBoardMembers error:', error); return null; }
+  if (error) { logDbError('fetchBoardMembers error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, name: r.name, role: r.role, email: r.email, phone: r.phone, term: r.term,
   }));
@@ -25,7 +25,7 @@ export async function createBoardMember(tenantId: string, m: Omit<BoardMember, '
     .insert({ tenant_id: tenantId, name: m.name, role: m.role, email: m.email, phone: m.phone, term: m.term })
     .select()
     .single();
-  if (error) { console.error('createBoardMember error:', error); return null; }
+  if (error) { logDbError('createBoardMember error:', error); return null; }
   return { id: data.id, name: data.name, role: data.role, email: data.email, phone: data.phone, term: data.term };
 }
 
@@ -38,14 +38,14 @@ export async function updateBoardMember(id: string, m: Partial<BoardMember>): Pr
   if (m.phone !== undefined) row.phone = m.phone;
   if (m.term !== undefined) row.term = m.term;
   const { error } = await supabase.from('board_members').update(row).eq('id', id);
-  if (error) { console.error('updateBoardMember error:', error); return false; }
+  if (error) { logDbError('updateBoardMember error:', error); return false; }
   return true;
 }
 
 export async function deleteBoardMember(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('board_members').delete().eq('id', id);
-  if (error) { console.error('deleteBoardMember error:', error); return false; }
+  if (error) { logDbError('deleteBoardMember error:', error); return false; }
   return true;
 }
 
@@ -58,7 +58,7 @@ export async function fetchManagementInfo(tenantId: string): Promise<ManagementI
     .select('*')
     .eq('tenant_id', tenantId)
     .maybeSingle();
-  if (error) { console.error('fetchManagementInfo error:', error); return null; }
+  if (error) { logDbError('fetchManagementInfo error:', error); return null; }
   if (!data) return null;
   return {
     company: data.company, contact: data.contact, title: data.title,
@@ -80,7 +80,7 @@ export async function upsertManagementInfo(tenantId: string, m: Partial<Manageme
   if (m.hours !== undefined) row.hours = m.hours;
   if (m.afterHours !== undefined) row.after_hours = m.afterHours;
   const { error } = await supabase.from('management_info').upsert(row, { onConflict: 'tenant_id' });
-  if (error) { console.error('upsertManagementInfo error:', error); return false; }
+  if (error) { logDbError('upsertManagementInfo error:', error); return false; }
   return true;
 }
 
@@ -92,7 +92,7 @@ export async function fetchLegalCounsel(tenantId: string): Promise<LegalCounsel[
     .from('legal_counsel')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchLegalCounsel error:', error); return null; }
+  if (error) { logDbError('fetchLegalCounsel error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, firm: r.firm, attorney: r.attorney, email: r.email, phone: r.phone, specialty: r.specialty,
   }));
@@ -105,7 +105,7 @@ export async function createLegalCounsel(tenantId: string, c: Omit<LegalCounsel,
     .insert({ tenant_id: tenantId, firm: c.firm, attorney: c.attorney, email: c.email, phone: c.phone, specialty: c.specialty })
     .select()
     .single();
-  if (error) { console.error('createLegalCounsel error:', error); return null; }
+  if (error) { logDbError('createLegalCounsel error:', error); return null; }
   return { id: data.id, firm: data.firm, attorney: data.attorney, email: data.email, phone: data.phone, specialty: data.specialty };
 }
 
@@ -118,14 +118,14 @@ export async function updateLegalCounsel(id: string, c: Partial<LegalCounsel>): 
   if (c.phone !== undefined) row.phone = c.phone;
   if (c.specialty !== undefined) row.specialty = c.specialty;
   const { error } = await supabase.from('legal_counsel').update(row).eq('id', id);
-  if (error) { console.error('updateLegalCounsel error:', error); return false; }
+  if (error) { logDbError('updateLegalCounsel error:', error); return false; }
   return true;
 }
 
 export async function deleteLegalCounsel(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('legal_counsel').delete().eq('id', id);
-  if (error) { console.error('deleteLegalCounsel error:', error); return false; }
+  if (error) { logDbError('deleteLegalCounsel error:', error); return false; }
   return true;
 }
 
@@ -137,7 +137,7 @@ export async function fetchLegalDocuments(tenantId: string): Promise<LegalDocume
     .from('legal_documents')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchLegalDocuments error:', error); return null; }
+  if (error) { logDbError('fetchLegalDocuments error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, name: r.name, version: r.version, size: r.size,
     status: r.status as 'current' | 'review-due',
@@ -152,7 +152,7 @@ export async function createLegalDocument(tenantId: string, d: Omit<LegalDocumen
     .insert({ tenant_id: tenantId, name: d.name, version: d.version, size: d.size, status: d.status })
     .select()
     .single();
-  if (error) { console.error('createLegalDocument error:', error); return null; }
+  if (error) { logDbError('createLegalDocument error:', error); return null; }
   return { id: data.id, name: data.name, version: data.version, size: data.size, status: data.status, attachments: [] };
 }
 
@@ -165,14 +165,14 @@ export async function updateLegalDocument(id: string, d: Partial<LegalDocument>)
   if (d.status !== undefined) row.status = d.status;
   if (d.attachments !== undefined) row.attachments = d.attachments;
   const { error } = await supabase.from('legal_documents').update(row).eq('id', id);
-  if (error) { console.error('updateLegalDocument error:', error); return false; }
+  if (error) { logDbError('updateLegalDocument error:', error); return false; }
   return true;
 }
 
 export async function deleteLegalDocument(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('legal_documents').delete().eq('id', id);
-  if (error) { console.error('deleteLegalDocument error:', error); return false; }
+  if (error) { logDbError('deleteLegalDocument error:', error); return false; }
   return true;
 }
 
@@ -184,7 +184,7 @@ export async function fetchInsurancePolicies(tenantId: string): Promise<Insuranc
     .from('insurance_policies')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchInsurancePolicies error:', error); return null; }
+  if (error) { logDbError('fetchInsurancePolicies error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, type: r.type, carrier: r.carrier, coverage: r.coverage,
     premium: r.premium, expires: r.expires, policyNum: r.policy_num,
@@ -202,7 +202,7 @@ export async function createInsurancePolicy(tenantId: string, p: Omit<InsuranceP
     })
     .select()
     .single();
-  if (error) { console.error('createInsurancePolicy error:', error); return null; }
+  if (error) { logDbError('createInsurancePolicy error:', error); return null; }
   return {
     id: data.id, type: data.type, carrier: data.carrier, coverage: data.coverage,
     premium: data.premium, expires: data.expires, policyNum: data.policy_num, attachments: [],
@@ -220,14 +220,14 @@ export async function updateInsurancePolicy(id: string, p: Partial<InsurancePoli
   if (p.policyNum !== undefined) row.policy_num = p.policyNum;
   if (p.attachments !== undefined) row.attachments = p.attachments;
   const { error } = await supabase.from('insurance_policies').update(row).eq('id', id);
-  if (error) { console.error('updateInsurancePolicy error:', error); return false; }
+  if (error) { logDbError('updateInsurancePolicy error:', error); return false; }
   return true;
 }
 
 export async function deleteInsurancePolicy(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('insurance_policies').delete().eq('id', id);
-  if (error) { console.error('deleteInsurancePolicy error:', error); return false; }
+  if (error) { logDbError('deleteInsurancePolicy error:', error); return false; }
   return true;
 }
 
@@ -239,7 +239,7 @@ export async function fetchVendors(tenantId: string): Promise<Vendor[] | null> {
     .from('vendors')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchVendors error:', error); return null; }
+  if (error) { logDbError('fetchVendors error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, name: r.name, service: r.service, contact: r.contact,
     phone: r.phone, email: r.email, contract: r.contract,
@@ -257,7 +257,7 @@ export async function createVendor(tenantId: string, v: Omit<Vendor, 'id'>): Pro
     })
     .select()
     .single();
-  if (error) { console.error('createVendor error:', error); return null; }
+  if (error) { logDbError('createVendor error:', error); return null; }
   return {
     id: data.id, name: data.name, service: data.service, contact: data.contact,
     phone: data.phone, email: data.email, contract: data.contract, status: data.status,
@@ -275,14 +275,14 @@ export async function updateVendor(id: string, v: Partial<Vendor>): Promise<bool
   if (v.contract !== undefined) row.contract = v.contract;
   if (v.status !== undefined) row.status = v.status;
   const { error } = await supabase.from('vendors').update(row).eq('id', id);
-  if (error) { console.error('updateVendor error:', error); return false; }
+  if (error) { logDbError('updateVendor error:', error); return false; }
   return true;
 }
 
 export async function deleteVendor(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('vendors').delete().eq('id', id);
-  if (error) { console.error('deleteVendor error:', error); return false; }
+  if (error) { logDbError('deleteVendor error:', error); return false; }
   return true;
 }
 

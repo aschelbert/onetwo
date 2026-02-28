@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
@@ -81,7 +81,7 @@ export async function fetchConfigs(tenantId: string): Promise<ReportConfig[] | n
     .select('*')
     .eq('tenant_id', tenantId)
     .order('name', { ascending: true });
-  if (error) { console.error('fetchConfigs error:', error); return null; }
+  if (error) { logDbError('fetchConfigs error:', error); return null; }
   return (data || []).map(rowToConfig);
 }
 
@@ -94,7 +94,7 @@ export async function createConfig(tenantId: string, config: Omit<ReportConfig, 
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createConfig error:', error); return null; }
+  if (error) { logDbError('createConfig error:', error); return null; }
   return rowToConfig(data);
 }
 
@@ -102,14 +102,14 @@ export async function updateConfig(id: string, updates: Partial<ReportConfig>): 
   if (!supabase) return false;
   const row = configToRow(updates);
   const { error } = await supabase.from('report_configs').update(row).eq('id', id);
-  if (error) { console.error('updateConfig error:', error); return false; }
+  if (error) { logDbError('updateConfig error:', error); return false; }
   return true;
 }
 
 export async function deleteConfig(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('report_configs').delete().eq('id', id);
-  if (error) { console.error('deleteConfig error:', error); return false; }
+  if (error) { logDbError('deleteConfig error:', error); return false; }
   return true;
 }
 
@@ -122,7 +122,7 @@ export async function fetchReports(tenantId: string): Promise<GeneratedReport[] 
     .select('*')
     .eq('tenant_id', tenantId)
     .order('generated_at', { ascending: false });
-  if (error) { console.error('fetchReports error:', error); return null; }
+  if (error) { logDbError('fetchReports error:', error); return null; }
   return (data || []).map(rowToReport);
 }
 
@@ -135,13 +135,13 @@ export async function createReport(tenantId: string, report: Omit<GeneratedRepor
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createReport error:', error); return null; }
+  if (error) { logDbError('createReport error:', error); return null; }
   return rowToReport(data);
 }
 
 export async function deleteReport(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('generated_reports').delete().eq('id', id);
-  if (error) { console.error('deleteReport error:', error); return false; }
+  if (error) { logDbError('deleteReport error:', error); return false; }
   return true;
 }

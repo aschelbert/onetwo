@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { OwnerCommunication } from '@/store/useComplianceStore';
 
 export async function fetchCommunications(tenantId: string): Promise<OwnerCommunication[] | null> {
@@ -8,7 +8,7 @@ export async function fetchCommunications(tenantId: string): Promise<OwnerCommun
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false });
-  if (error) { console.error('fetchCommunications error:', error); return null; }
+  if (error) { logDbError('fetchCommunications error:', error); return null; }
   return (data || []).map(row => ({
     id: row.id,
     type: row.type,
@@ -39,7 +39,7 @@ export async function createCommunication(tenantId: string, c: Omit<OwnerCommuni
     })
     .select()
     .single();
-  if (error) { console.error('createCommunication error:', error); return null; }
+  if (error) { logDbError('createCommunication error:', error); return null; }
   return {
     id: data.id,
     type: data.type,
@@ -56,6 +56,6 @@ export async function createCommunication(tenantId: string, c: Omit<OwnerCommuni
 export async function deleteCommunication(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('communications').delete().eq('id', id);
-  if (error) { console.error('deleteCommunication error:', error); return false; }
+  if (error) { logDbError('deleteCommunication error:', error); return false; }
   return true;
 }

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { Election, BallotItem, UnitBallot, TimelineEvent, VoterComment } from '@/store/useElectionStore';
 
 function rowToElection(
@@ -47,7 +47,7 @@ export async function fetchElections(tenantId: string): Promise<Election[] | nul
     supabase.from('election_comments').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: true }),
   ]);
 
-  if (electionsRes.error) { console.error('fetchElections error:', electionsRes.error); return null; }
+  if (electionsRes.error) { logDbError('fetchElections error:', electionsRes.error); return null; }
 
   const itemsByElection = new Map<string, BallotItem[]>();
   (itemsRes.data || []).forEach(row => {
@@ -142,7 +142,7 @@ export async function createElection(tenantId: string, e: Election): Promise<str
     .select('id')
     .single();
 
-  if (error) { console.error('createElection error:', error); return null; }
+  if (error) { logDbError('createElection error:', error); return null; }
 
   // Insert ballot items
   if (e.ballotItems.length > 0) {
@@ -204,14 +204,14 @@ export async function updateElection(id: string, updates: Partial<Election>): Pr
   if (updates.linkedMeetingId !== undefined) row.linked_meeting_id = updates.linkedMeetingId;
   if (Object.keys(row).length === 0) return true;
   const { error } = await supabase.from('elections').update(row).eq('id', id);
-  if (error) { console.error('updateElection error:', error); return false; }
+  if (error) { logDbError('updateElection error:', error); return false; }
   return true;
 }
 
 export async function deleteElection(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('elections').delete().eq('id', id);
-  if (error) { console.error('deleteElection error:', error); return false; }
+  if (error) { logDbError('deleteElection error:', error); return false; }
   return true;
 }
 
@@ -233,14 +233,14 @@ export async function addBallotItem(tenantId: string, electionId: string, item: 
     financial_impact: item.financialImpact || null,
     sort_order: sortOrder,
   });
-  if (error) { console.error('addBallotItem error:', error); return false; }
+  if (error) { logDbError('addBallotItem error:', error); return false; }
   return true;
 }
 
 export async function removeBallotItem(electionId: string, localId: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('election_ballot_items').delete().eq('election_id', electionId).eq('local_id', localId);
-  if (error) { console.error('removeBallotItem error:', error); return false; }
+  if (error) { logDbError('removeBallotItem error:', error); return false; }
   return true;
 }
 
@@ -263,14 +263,14 @@ export async function recordBallot(tenantId: string, electionId: string, ballot:
     votes: ballot.votes,
     comment: ballot.comment || null,
   }, { onConflict: 'election_id,unit_number' });
-  if (error) { console.error('recordBallot error:', error); return false; }
+  if (error) { logDbError('recordBallot error:', error); return false; }
   return true;
 }
 
 export async function removeBallot(electionId: string, localId: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('election_ballots').delete().eq('election_id', electionId).eq('local_id', localId);
-  if (error) { console.error('removeBallot error:', error); return false; }
+  if (error) { logDbError('removeBallot error:', error); return false; }
   return true;
 }
 
@@ -285,7 +285,7 @@ export async function addTimelineEvent(tenantId: string, electionId: string, eve
     date: event.date,
     actor: event.actor,
   });
-  if (error) { console.error('addTimelineEvent error:', error); return false; }
+  if (error) { logDbError('addTimelineEvent error:', error); return false; }
   return true;
 }
 
@@ -299,6 +299,6 @@ export async function addElectionComment(tenantId: string, electionId: string, c
     owner: comment.owner,
     text: comment.text,
   });
-  if (error) { console.error('addElectionComment error:', error); return false; }
+  if (error) { logDbError('addElectionComment error:', error); return false; }
   return true;
 }

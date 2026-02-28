@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
@@ -78,7 +78,7 @@ export async function fetchEntries(tenantId: string): Promise<ScorecardEntry[] |
     .select('*')
     .eq('tenant_id', tenantId)
     .order('period', { ascending: false });
-  if (error) { console.error('fetchEntries error:', error); return null; }
+  if (error) { logDbError('fetchEntries error:', error); return null; }
   return (data || []).map(rowToEntry);
 }
 
@@ -91,14 +91,14 @@ export async function createEntry(tenantId: string, entry: Omit<ScorecardEntry, 
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createEntry error:', error); return null; }
+  if (error) { logDbError('createEntry error:', error); return null; }
   return rowToEntry(data);
 }
 
 export async function deleteEntry(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('pm_scorecard_entries').delete().eq('id', id);
-  if (error) { console.error('deleteEntry error:', error); return false; }
+  if (error) { logDbError('deleteEntry error:', error); return false; }
   return true;
 }
 
@@ -111,7 +111,7 @@ export async function fetchReviews(tenantId: string): Promise<ScorecardReview[] 
     .select('*')
     .eq('tenant_id', tenantId)
     .order('period', { ascending: false });
-  if (error) { console.error('fetchReviews error:', error); return null; }
+  if (error) { logDbError('fetchReviews error:', error); return null; }
   return (data || []).map(rowToReview);
 }
 
@@ -124,13 +124,13 @@ export async function createReview(tenantId: string, review: Omit<ScorecardRevie
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createReview error:', error); return null; }
+  if (error) { logDbError('createReview error:', error); return null; }
   return rowToReview(data);
 }
 
 export async function deleteReview(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('pm_scorecard_reviews').delete().eq('id', id);
-  if (error) { console.error('deleteReview error:', error); return false; }
+  if (error) { logDbError('deleteReview error:', error); return false; }
   return true;
 }

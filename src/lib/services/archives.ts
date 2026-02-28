@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { ArchiveSnapshot } from '@/store/useArchiveStore';
 
 function rowToArchive(r: Record<string, unknown>): ArchiveSnapshot {
@@ -29,7 +29,7 @@ export async function fetchArchives(tenantId: string): Promise<ArchiveSnapshot[]
     .select('*')
     .eq('tenant_id', tenantId)
     .order('period_end', { ascending: false });
-  if (error) { console.error('fetchArchives error:', error); return null; }
+  if (error) { logDbError('fetchArchives error:', error); return null; }
   return (data || []).map(rowToArchive);
 }
 
@@ -49,13 +49,13 @@ export async function createArchive(tenantId: string, a: ArchiveSnapshot): Promi
     })
     .select()
     .single();
-  if (error) { console.error('createArchive error:', error); return null; }
+  if (error) { logDbError('createArchive error:', error); return null; }
   return rowToArchive(data);
 }
 
 export async function deleteArchive(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('archives').delete().eq('id', id);
-  if (error) { console.error('deleteArchive error:', error); return false; }
+  if (error) { logDbError('deleteArchive error:', error); return false; }
   return true;
 }

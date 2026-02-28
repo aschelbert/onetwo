@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
@@ -134,7 +134,7 @@ export async function fetchBids(tenantId: string): Promise<VendorBid[] | null> {
     .select('*')
     .eq('tenant_id', tenantId)
     .order('submitted_date', { ascending: false });
-  if (error) { console.error('fetchBids error:', error); return null; }
+  if (error) { logDbError('fetchBids error:', error); return null; }
   return (data || []).map(rowToBid);
 }
 
@@ -147,7 +147,7 @@ export async function createBid(tenantId: string, bid: Omit<VendorBid, 'id'>): P
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createBid error:', error); return null; }
+  if (error) { logDbError('createBid error:', error); return null; }
   return rowToBid(data);
 }
 
@@ -155,14 +155,14 @@ export async function updateBid(id: string, updates: Partial<VendorBid>): Promis
   if (!supabase) return false;
   const row = bidToRow(updates);
   const { error } = await supabase.from('vendor_bids').update(row).eq('id', id);
-  if (error) { console.error('updateBid error:', error); return false; }
+  if (error) { logDbError('updateBid error:', error); return false; }
   return true;
 }
 
 export async function deleteBid(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('vendor_bids').delete().eq('id', id);
-  if (error) { console.error('deleteBid error:', error); return false; }
+  if (error) { logDbError('deleteBid error:', error); return false; }
   return true;
 }
 
@@ -175,7 +175,7 @@ export async function fetchReviews(tenantId: string): Promise<VendorReview[] | n
     .select('*')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false });
-  if (error) { console.error('fetchReviews error:', error); return null; }
+  if (error) { logDbError('fetchReviews error:', error); return null; }
   return (data || []).map(rowToReview);
 }
 
@@ -188,14 +188,14 @@ export async function createReview(tenantId: string, review: Omit<VendorReview, 
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createReview error:', error); return null; }
+  if (error) { logDbError('createReview error:', error); return null; }
   return rowToReview(data);
 }
 
 export async function deleteReview(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('vendor_reviews').delete().eq('id', id);
-  if (error) { console.error('deleteReview error:', error); return false; }
+  if (error) { logDbError('deleteReview error:', error); return false; }
   return true;
 }
 
@@ -208,7 +208,7 @@ export async function fetchContracts(tenantId: string): Promise<VendorContract[]
     .select('*')
     .eq('tenant_id', tenantId)
     .order('start_date', { ascending: false });
-  if (error) { console.error('fetchContracts error:', error); return null; }
+  if (error) { logDbError('fetchContracts error:', error); return null; }
   return (data || []).map(rowToContract);
 }
 
@@ -221,7 +221,7 @@ export async function createContract(tenantId: string, contract: Omit<VendorCont
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createContract error:', error); return null; }
+  if (error) { logDbError('createContract error:', error); return null; }
   return rowToContract(data);
 }
 
@@ -229,14 +229,14 @@ export async function updateContract(id: string, updates: Partial<VendorContract
   if (!supabase) return false;
   const row = contractToRow(updates);
   const { error } = await supabase.from('vendor_contracts').update(row).eq('id', id);
-  if (error) { console.error('updateContract error:', error); return false; }
+  if (error) { logDbError('updateContract error:', error); return false; }
   return true;
 }
 
 export async function deleteContract(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('vendor_contracts').delete().eq('id', id);
-  if (error) { console.error('deleteContract error:', error); return false; }
+  if (error) { logDbError('deleteContract error:', error); return false; }
   return true;
 }
 

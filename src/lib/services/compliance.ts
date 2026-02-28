@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { RegulatoryFiling, FilingAttachment } from '@/store/useComplianceStore';
 
 // ── Regulatory Filings ──
@@ -27,7 +27,7 @@ export async function fetchFilings(tenantId: string): Promise<RegulatoryFiling[]
     .select('*')
     .eq('tenant_id', tenantId)
     .order('due_date');
-  if (error) { console.error('fetchFilings error:', error); return null; }
+  if (error) { logDbError('fetchFilings error:', error); return null; }
   return (data || []).map(rowToFiling);
 }
 
@@ -43,7 +43,7 @@ export async function createFiling(tenantId: string, f: RegulatoryFiling): Promi
     })
     .select()
     .single();
-  if (error) { console.error('createFiling error:', error); return null; }
+  if (error) { logDbError('createFiling error:', error); return null; }
   return rowToFiling(data);
 }
 
@@ -62,14 +62,14 @@ export async function updateFiling(id: string, updates: Partial<RegulatoryFiling
   if (updates.legalRef !== undefined) row.legal_ref = updates.legalRef;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
   const { error } = await supabase.from('regulatory_filings').update(row).eq('id', id);
-  if (error) { console.error('updateFiling error:', error); return false; }
+  if (error) { logDbError('updateFiling error:', error); return false; }
   return true;
 }
 
 export async function deleteFiling(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('regulatory_filings').delete().eq('id', id);
-  if (error) { console.error('deleteFiling error:', error); return false; }
+  if (error) { logDbError('deleteFiling error:', error); return false; }
   return true;
 }
 
@@ -81,7 +81,7 @@ export async function fetchCompletions(tenantId: string): Promise<Record<string,
     .from('compliance_completions')
     .select('item_id, completed')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchCompletions error:', error); return null; }
+  if (error) { logDbError('fetchCompletions error:', error); return null; }
   const result: Record<string, boolean> = {};
   (data || []).forEach(r => { result[r.item_id] = r.completed; });
   return result;
@@ -92,7 +92,7 @@ export async function upsertCompletion(tenantId: string, itemId: string, complet
   const { error } = await supabase.from('compliance_completions').upsert({
     tenant_id: tenantId, item_id: itemId, completed,
   }, { onConflict: 'tenant_id,item_id' });
-  if (error) { console.error('upsertCompletion error:', error); return false; }
+  if (error) { logDbError('upsertCompletion error:', error); return false; }
   return true;
 }
 
@@ -104,7 +104,7 @@ export async function fetchItemAttachments(tenantId: string): Promise<Record<str
     .from('compliance_item_attachments')
     .select('*')
     .eq('tenant_id', tenantId);
-  if (error) { console.error('fetchItemAttachments error:', error); return null; }
+  if (error) { logDbError('fetchItemAttachments error:', error); return null; }
   const result: Record<string, FilingAttachment[]> = {};
   (data || []).forEach(r => {
     const itemId = r.item_id as string;
@@ -119,7 +119,7 @@ export async function createItemAttachment(tenantId: string, itemId: string, att
   const { error } = await supabase.from('compliance_item_attachments').insert({
     tenant_id: tenantId, item_id: itemId, name: att.name, size: att.size, uploaded_at: att.uploadedAt,
   });
-  if (error) { console.error('createItemAttachment error:', error); return false; }
+  if (error) { logDbError('createItemAttachment error:', error); return false; }
   return true;
 }
 
@@ -131,6 +131,6 @@ export async function deleteItemAttachment(tenantId: string, itemId: string, att
     .eq('tenant_id', tenantId)
     .eq('item_id', itemId)
     .eq('name', attName);
-  if (error) { console.error('deleteItemAttachment error:', error); return false; }
+  if (error) { logDbError('deleteItemAttachment error:', error); return false; }
   return true;
 }

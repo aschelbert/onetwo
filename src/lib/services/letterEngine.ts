@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
@@ -90,7 +90,7 @@ export async function fetchTemplates(tenantId: string): Promise<LetterTemplate[]
     .select('*')
     .eq('tenant_id', tenantId)
     .order('name', { ascending: true });
-  if (error) { console.error('fetchTemplates error:', error); return null; }
+  if (error) { logDbError('fetchTemplates error:', error); return null; }
   return (data || []).map(rowToTemplate);
 }
 
@@ -103,7 +103,7 @@ export async function createTemplate(tenantId: string, template: Omit<LetterTemp
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createTemplate error:', error); return null; }
+  if (error) { logDbError('createTemplate error:', error); return null; }
   return rowToTemplate(data);
 }
 
@@ -111,14 +111,14 @@ export async function updateTemplate(id: string, updates: Partial<LetterTemplate
   if (!supabase) return false;
   const row = templateToRow(updates);
   const { error } = await supabase.from('letter_templates').update(row).eq('id', id);
-  if (error) { console.error('updateTemplate error:', error); return false; }
+  if (error) { logDbError('updateTemplate error:', error); return false; }
   return true;
 }
 
 export async function deleteTemplate(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('letter_templates').delete().eq('id', id);
-  if (error) { console.error('deleteTemplate error:', error); return false; }
+  if (error) { logDbError('deleteTemplate error:', error); return false; }
   return true;
 }
 
@@ -131,7 +131,7 @@ export async function fetchLetters(tenantId: string): Promise<GeneratedLetter[] 
     .select('*')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
-  if (error) { console.error('fetchLetters error:', error); return null; }
+  if (error) { logDbError('fetchLetters error:', error); return null; }
   return (data || []).map(rowToLetter);
 }
 
@@ -144,7 +144,7 @@ export async function createLetter(tenantId: string, letter: Omit<GeneratedLette
     .insert(row)
     .select()
     .single();
-  if (error) { console.error('createLetter error:', error); return null; }
+  if (error) { logDbError('createLetter error:', error); return null; }
   return rowToLetter(data);
 }
 
@@ -152,13 +152,13 @@ export async function updateLetter(id: string, updates: Partial<GeneratedLetter>
   if (!supabase) return false;
   const row = letterToRow(updates);
   const { error } = await supabase.from('generated_letters').update(row).eq('id', id);
-  if (error) { console.error('updateLetter error:', error); return false; }
+  if (error) { logDbError('updateLetter error:', error); return false; }
   return true;
 }
 
 export async function deleteLetter(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('generated_letters').delete().eq('id', id);
-  if (error) { console.error('deleteLetter error:', error); return false; }
+  if (error) { logDbError('deleteLetter error:', error); return false; }
   return true;
 }

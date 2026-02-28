@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, logDbError } from '@/lib/supabase';
 import type { Announcement } from '@/store/useComplianceStore';
 
 export async function fetchAnnouncements(tenantId: string): Promise<Announcement[] | null> {
@@ -8,7 +8,7 @@ export async function fetchAnnouncements(tenantId: string): Promise<Announcement
     .select('*')
     .eq('tenant_id', tenantId)
     .order('posted_date', { ascending: false });
-  if (error) { console.error('fetchAnnouncements error:', error); return null; }
+  if (error) { logDbError('fetchAnnouncements error:', error); return null; }
   return (data || []).map(row => ({
     id: row.id,
     title: row.title,
@@ -35,7 +35,7 @@ export async function createAnnouncement(tenantId: string, a: Omit<Announcement,
     })
     .select()
     .single();
-  if (error) { console.error('createAnnouncement error:', error); return null; }
+  if (error) { logDbError('createAnnouncement error:', error); return null; }
   return {
     id: data.id,
     title: data.title,
@@ -50,7 +50,7 @@ export async function createAnnouncement(tenantId: string, a: Omit<Announcement,
 export async function deleteAnnouncement(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('announcements').delete().eq('id', id);
-  if (error) { console.error('deleteAnnouncement error:', error); return false; }
+  if (error) { logDbError('deleteAnnouncement error:', error); return false; }
   return true;
 }
 
@@ -64,6 +64,6 @@ export async function updateAnnouncement(id: string, updates: Partial<Announceme
   if (updates.postedDate !== undefined) row.posted_date = updates.postedDate;
   if (updates.pinned !== undefined) row.pinned = updates.pinned;
   const { error } = await supabase.from('announcements').update(row).eq('id', id);
-  if (error) { console.error('updateAnnouncement error:', error); return false; }
+  if (error) { logDbError('updateAnnouncement error:', error); return false; }
   return true;
 }
