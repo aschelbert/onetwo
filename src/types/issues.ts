@@ -43,6 +43,7 @@ export interface CaseStep {
   d?: string | null;
   detail?: string | null;
   w?: string;
+  action?: { type: 'navigate' | 'modal' | 'inline'; target: string; label: string };
   done: boolean;
   doneDate: string | null;
   userNotes: string;

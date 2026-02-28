@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
+import type { StepAction } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -644,6 +646,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const { workOrders } = fin;
   const letterStore = useLetterStore();
   const meetingsStore = useMeetingsStore();
+  const navigate = useNavigate();
   const c = store.cases.find(x => x.id === caseId);
 
   const [showVoteModal, setShowVoteModal] = useState(false);
@@ -658,6 +661,34 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
+  const [inlineStepIdx, setInlineStepIdx] = useState<number | null>(null);
+
+  const ACTION_NAV: Record<string, { route: string; tab?: string }> = {
+    'financial':            { route: '/financial' },
+    'financial:dashboard':  { route: '/financial', tab: 'dashboard' },
+    'financial:reserves':   { route: '/financial', tab: 'reserves' },
+    'financial:budget':     { route: '/financial', tab: 'budget' },
+    'financial:approvals':  { route: '/financial', tab: 'approvals' },
+    'financial:workorders': { route: '/financial', tab: 'workorders' },
+    'financial:ledger':     { route: '/financial', tab: 'ledger' },
+  };
+
+  const handleStepAction = (action: StepAction, stepIdx: number) => {
+    if (action.type === 'navigate') {
+      const nav = ACTION_NAV[action.target];
+      if (nav) {
+        if (nav.tab) fin.setActiveTab(nav.tab);
+        navigate(nav.route);
+      }
+    } else if (action.type === 'modal') {
+      if (action.target === 'create-wo' && c) {
+        setWOForm({ title: c.title, vendor: '', amount: '', acctNum: '6050' });
+        setShowWOModal(true);
+      }
+    } else if (action.type === 'inline') {
+      setInlineStepIdx(inlineStepIdx === stepIdx ? null : stepIdx);
+    }
+  };
 
   if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Case not found.</p></div>;
 
@@ -761,6 +792,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           steps={c.steps}
           onToggle={(idx) => store.toggleStep(caseId, idx)}
           onNote={(idx, note) => store.addStepNote(caseId, idx, note)}
+          onAction={handleStepAction}
+          inlineStepIdx={inlineStepIdx}
         />
       )}
 

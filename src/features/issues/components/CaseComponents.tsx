@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
+import type { StepAction } from '@/store/useIssuesStore';
 import type { CaseTrackerCase, BoardVote } from '@/types/issues';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
+import { fmt } from '@/lib/formatters';
 
 export function CaseCard({ c, onClick }: { c: CaseTrackerCase; onClick: () => void }) {
   const cat = CATS.find(x => x.id === c.catId);
@@ -83,12 +88,78 @@ export function BoardVoteDisplay({ vote }: { vote: BoardVote }) {
   );
 }
 
-export function StepsSection({ caseId, approach, steps, onToggle, onNote }: {
+function FundingAnalysisInline() {
+  const financialStore = useFinancialStore();
+  const [amount, setAmount] = useState('');
+  const parsed = parseFloat(amount);
+  const ctx = getFinancialContext(financialStore);
+  const analysis = parsed > 0 ? analyzeFunding(parsed, ctx) : null;
+
+  return (
+    <div className="mt-2 bg-mist-50 border border-mist-200 rounded-lg p-4 space-y-3">
+      <div>
+        <label className="block text-xs font-medium text-ink-700 mb-1">Project / Repair Amount</label>
+        <input
+          type="number"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          placeholder="Enter estimated cost..."
+          className="w-full max-w-xs px-3 py-2 border border-ink-200 rounded-lg text-sm"
+        />
+      </div>
+      {analysis && (
+        <>
+          <div className="bg-accent-50 border border-accent-200 rounded-lg p-3">
+            <p className="text-xs font-semibold text-accent-800 uppercase tracking-wider mb-1">Recommendation</p>
+            <p className="text-sm text-accent-900">{analysis.recommendation}</p>
+          </div>
+          <div className="space-y-2">
+            {analysis.options.map(opt => (
+              <div key={opt.source} className={`flex items-start gap-3 p-3 rounded-lg border ${opt.recommended ? 'bg-sage-50 border-sage-200' : opt.available ? 'bg-white border-ink-100' : 'bg-ink-50 border-ink-100 opacity-70'}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-ink-900">{opt.label}</span>
+                    {opt.recommended && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-sage-200 text-sage-800">Recommended</span>}
+                    {!opt.available && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700">Insufficient</span>}
+                  </div>
+                  <p className="text-xs text-ink-500 mt-1">{opt.impact}</p>
+                  {opt.perUnit > 0 && <p className="text-xs text-ink-400 mt-0.5">Per unit: {fmt(opt.perUnit)}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-mist-200">
+            <div className="text-center">
+              <p className="text-[10px] text-ink-400 font-medium uppercase">Operating</p>
+              <p className="text-sm font-bold text-ink-900">{fmt(ctx.operatingBalance)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-ink-400 font-medium uppercase">Budget Left</p>
+              <p className={`text-sm font-bold ${ctx.budgetRemaining > 0 ? 'text-sage-700' : 'text-red-600'}`}>{fmt(ctx.budgetRemaining)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-ink-400 font-medium uppercase">Reserves</p>
+              <p className="text-sm font-bold text-ink-900">{fmt(ctx.reserveBalance)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[10px] text-ink-400 font-medium uppercase">Reserve Health</p>
+              <p className={`text-sm font-bold ${ctx.reservePctFunded >= 70 ? 'text-sage-700' : ctx.reservePctFunded >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>{ctx.reservePctFunded}%</p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function StepsSection({ caseId, approach, steps, onToggle, onNote, onAction, inlineStepIdx }: {
   caseId: string;
   approach: string;
   steps: any[];
   onToggle: (idx: number) => void;
   onNote: (idx: number, note: string) => void;
+  onAction?: (action: StepAction, idx: number) => void;
+  inlineStepIdx?: number | null;
 }) {
   return (
     <div className="bg-white rounded-xl border border-ink-100 p-5">
@@ -113,6 +184,17 @@ export function StepsSection({ caseId, approach, steps, onToggle, onNote }: {
                 {st.detail && <span className="text-[11px] text-ink-400">💡 {st.detail}</span>}
                 {st.w && <span className="text-[11px] text-rose-500">⚠ {st.w}</span>}
               </div>
+              {st.action && !st.done && (
+                <button
+                  onClick={() => onAction?.(st.action, i)}
+                  className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 bg-accent-50 border border-accent-200 text-accent-700 rounded-lg text-xs font-medium hover:bg-accent-100 transition-colors"
+                >
+                  {st.action.type === 'navigate' ? '↗' : st.action.type === 'modal' ? '+' : '▼'} {st.action.label}
+                </button>
+              )}
+              {st.action?.type === 'inline' && inlineStepIdx === i && (
+                <FundingAnalysisInline />
+              )}
               {st.done && st.doneDate && <span className="text-[10px] text-sage-500">Completed {st.doneDate}</span>}
               {st.userNotes && <p className="text-xs text-ink-400 mt-1 bg-sand-100 rounded p-2">📝 {st.userNotes}</p>}
               <button
