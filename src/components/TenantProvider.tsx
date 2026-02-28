@@ -13,7 +13,6 @@ import { useElectionStore } from '@/store/useElectionStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
-import { useBoardOpsStore } from '@/store/useBoardOpsStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useLetterStore } from '@/store/useLetterStore';
@@ -150,7 +149,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           useBuildingStore.getState().loadFromDb(tenantInfo.id),
           useFinancialStore.getState().loadFromDb(tenantInfo.id),
           useArchiveStore.getState().loadFromDb(tenantInfo.id),
-          useBoardOpsStore.getState().loadFromDb(tenantInfo.id),
           useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
           useSpendingStore.getState().loadFromDb(tenantInfo.id),
           useLetterStore.getState().loadFromDb(tenantInfo.id),

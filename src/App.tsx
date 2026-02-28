@@ -14,7 +14,6 @@ import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
-import BoardOpsPage from '@/features/board-ops/BoardOpsPage';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import AIAdvisor from '@/components/AIAdvisor';
@@ -81,7 +80,7 @@ export default function App() {
           <Route path="/archives" element={<ArchivesPage />} />
           <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
           <Route path="/boardroom" element={<BoardRoomPage />} />
-          <Route path="/board-ops" element={<BoardOpsPage />} />
+          <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
           <Route path="/property-log" element={<PropertyLogPage />} />
           <Route path="/community" element={<CommunityRoomPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />

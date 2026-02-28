@@ -14,7 +14,6 @@ export const navigation: Record<Role, NavItem[]> = {
   BOARD_MEMBER: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
     { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
-    { id: 'board-ops', label: 'Board Ops', path: '/board-ops' },
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'property-log', label: 'Property Log', path: '/property-log' },
@@ -30,7 +29,6 @@ export const navigation: Record<Role, NavItem[]> = {
   PROPERTY_MANAGER: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
     { id: 'boardroom', label: 'Board Room', path: '/boardroom' },
-    { id: 'board-ops', label: 'Board Ops', path: '/board-ops' },
     { id: 'contacts', label: 'The Building', path: '/building' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial' },
     { id: 'property-log', label: 'Property Log', path: '/property-log' },

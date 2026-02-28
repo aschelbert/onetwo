@@ -93,6 +93,20 @@ export const CATS: Category[] = [
         ],
         notes:{'DC':'DC Code § 29-1135.08 — 6 months super-lien priority.','_':'Review your state for pre-lien notice requirements and lien recording procedures.'}
       },
+      { id:'financial-review', title:'Financial Review', desc:'Financial audits and reviews',
+        tags:['Annual audit','CPA review','Financial statements'],
+        pre:[
+          {s:'Select auditor or CPA firm',t:'60-90 days before fiscal year-end'},
+          {s:'Provide financial records and documentation',t:'After year-end close'},
+          {s:'Review draft audit/review report',t:'2-4 weeks after records provided'},
+          {s:'Board reviews findings and management letter',t:'Board meeting'},
+          {s:'Present results to owners at annual meeting',t:'Annual meeting',d:'Bylaws: Financial reporting'},
+          {s:'File report if required by state',t:'Per state requirements'}
+        ],
+        self:[{s:'If findings require action: develop remediation plan and timeline'}],
+        legal:[{s:'Attorney reviews audit findings with legal implications',w:'Material findings or irregularities discovered'}],
+        notes:{'_':'Many states require annual financial reviews or audits above certain thresholds. Check your governing docs and state law.'}
+      },
       { id:'reserve-management', title:'Reserve Management', desc:'Reserve studies, tapping reserves, capital planning',
         tags:['Commissioning reserve studies','Tapping reserves','Capital planning'],
         pre:[
@@ -179,6 +193,22 @@ export const CATS: Category[] = [
           {s:'Attorney sends demand and pursues breach of contract claim',w:'Contractor defaults or work defective'}
         ],
         notes:{'_':'Verify contractor licensing in your state. Require insurance certificates and include indemnification in all contracts.'}
+      },
+      { id:'inspection-scheduling', title:'Inspection Scheduling', desc:'Scheduling required inspections',
+        tags:['Fire safety inspections','Elevator inspections','Building code inspections'],
+        pre:[
+          {s:'Identify inspection requirement and regulatory deadline',t:'As needed',d:'Local code requirements'},
+          {s:'Research qualified inspectors and obtain quotes',t:'2-4 weeks'},
+          {s:'Obtain quotes and select inspector',t:'1-2 weeks'},
+          {s:'Schedule inspection date',t:'1-2 weeks out'},
+          {s:'Notify residents of inspection date and any access needs',t:'Per notice requirements'},
+          {s:'Attend inspection and receive preliminary findings',t:'Inspection day'},
+          {s:'Address any findings or deficiencies',t:'Per inspector timeline'},
+          {s:'File inspection report in building records',t:'Within 1 week'}
+        ],
+        self:[{s:'If deficiency cited: document remediation plan and timeline'}],
+        legal:[{s:'Attorney responds to citations resulting from failed inspection',w:'Formal citation or enforcement action'}],
+        notes:{'_':'Many jurisdictions require annual fire, elevator, and boiler inspections. Maintain a calendar of all required inspections.'}
       },
       { id:'preventative-maintenance', title:'Preventative Maintenance', desc:'Annual inspections, fire safety, roof, pest control',
         tags:['Annual inspections','Fire/life safety','Roof inspections'],
@@ -364,6 +394,35 @@ export const CATS: Category[] = [
         legal:[{s:'Attorney advises on election disputes or challenges',w:'Contested election or procedural challenge'}],
         notes:{'_':'Follow your bylaws election procedures exactly. Independent inspectors add credibility.'}
       },
+      { id:'board-action-item', title:'Board Action Items', desc:'Action items from board meetings',
+        tags:['Board meeting follow-ups','Action item tracking','Task assignments'],
+        pre:[
+          {s:'Document action item with specific deliverable',t:'During meeting'},
+          {s:'Assign responsibility to board member or manager',t:'During meeting'},
+          {s:'Set timeline and due date',t:'During meeting'},
+          {s:'Execute task per assigned scope',t:'Per timeline'},
+          {s:'Report completion status at next meeting',t:'Next board meeting'},
+          {s:'Record completion in meeting minutes',t:'At meeting'}
+        ],
+        self:[{s:'If assignee unable to complete: reassign or adjust timeline at next meeting'}],
+        legal:[{s:'Attorney reviews if action item has legal implications',w:'Action involves contracts, disputes, or regulatory matters'}],
+        notes:{'_':'Track all board action items with clear ownership and deadlines. Report status at each meeting.'}
+      },
+      { id:'policy-update', title:'Policy Updates', desc:'Updating association policies or documents',
+        tags:['Policy revisions','Document updates','Rule changes'],
+        pre:[
+          {s:'Identify need for policy update and gather input',t:'1-2 weeks'},
+          {s:'Draft updated policy language',t:'2-4 weeks'},
+          {s:'Legal review of proposed changes',t:'1-2 weeks',d:'Attorney review'},
+          {s:'Board discussion of draft at meeting',t:'Board meeting'},
+          {s:'Provide owner notice period if required',t:'Per governing docs',d:'Bylaws: Notice requirements'},
+          {s:'Board votes to adopt updated policy',t:'Board meeting',d:'Bylaws: Voting requirements'},
+          {s:'Distribute updated documents to all owners',t:'Within 2 weeks of adoption'}
+        ],
+        self:[{s:'If owner challenges policy: provide written explanation citing authority'}],
+        legal:[{s:'Attorney reviews policy for legal compliance',w:'Policy affects owner rights or has enforcement implications'}],
+        notes:{'_':'Policy changes may require owner notice periods. Check your bylaws for rule-making authority and procedures.'}
+      },
       { id:'conflict-interest', title:'Conflict of Interest', desc:'Board member recusal, related-party vendors',
         tags:['Board member recusal','Related-party vendors'],
         pre:[
@@ -501,6 +560,21 @@ export const CATS: Category[] = [
   },
   { id:'admin', num:'10', icon:'📁', label:'Administrative', color:'slate',
     sits: [
+      { id:'compliance-filing', title:'Compliance Filings', desc:'Regulatory filings and compliance deadlines',
+        tags:['Regulatory filings','Annual reports','Government submissions'],
+        pre:[
+          {s:'Identify filing requirement and deadline',t:'As needed',d:'State/local requirements'},
+          {s:'Gather required documentation',t:'2-4 weeks before deadline'},
+          {s:'Complete forms and prepare submission',t:'1-2 weeks before deadline'},
+          {s:'Board review and sign-off if required',t:'Board meeting',d:'Bylaws'},
+          {s:'Submit filing to appropriate agency',t:'Before deadline'},
+          {s:'Confirm receipt and save confirmation',t:'Within days of submission'},
+          {s:'File copy of submission in association records',t:'Immediately'}
+        ],
+        self:[{s:'If filing rejected: review deficiencies and resubmit promptly'}],
+        legal:[{s:'Attorney assists with complex filings or disputed requirements',w:'Filing involves legal interpretation or dispute'}],
+        notes:{'_':'Maintain a calendar of all regulatory filing deadlines. Many jurisdictions impose penalties for late filings.'}
+      },
       { id:'record-requests', title:'Record Requests', desc:'Owner inspection requests, financial transparency',
         tags:['Owner inspection requests','Financial transparency disputes'],
         pre:[
@@ -623,7 +697,43 @@ const seedCases: CaseTrackerCase[] = [
       { id: 'cm4', type: 'notice', subject: 'Emergency Water Shutoff Notice', date: '2026-01-15', method: 'posted', recipient: 'All residents', sentBy: 'President', notes: 'Immediate notice posted in lobby and each floor.', status: 'sent' },
       { id: 'cm5', type: 'response', subject: 'Insurance Claim Confirmation', date: '2026-01-20', method: 'email', recipient: 'Claims adjuster — Travelers Insurance', sentBy: 'Treasurer', notes: 'Claim #TRV-2026-00892 filed.', status: 'sent' }
     ]
-  })
+  }),
+  // Migrated board tasks → cases with assignment fields
+  hydrateSteps({
+    id: 'c4', catId: 'maintenance', sitId: 'vendor-management',
+    title: 'Review elevator modernization bids', unit: 'Common', owner: 'N/A',
+    approach: 'pre', status: 'open', priority: 'high', created: '2026-01-20',
+    notes: 'Compare 3 vendor proposals for elevator upgrade project. Budget approved up to $85,000.',
+    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    assignedTo: 'Jennifer Adams', assignedRole: 'Vice President', dueDate: '2026-03-10',
+    source: 'Board Meeting Jan 2026',
+  }),
+  hydrateSteps({
+    id: 'c5', catId: 'admin', sitId: 'compliance-filing',
+    title: 'File DC Biennial Report', unit: 'Common', owner: 'N/A',
+    approach: 'pre', status: 'open', priority: 'medium', created: '2026-01-20',
+    notes: 'File with DCRA. $80 filing fee.',
+    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    assignedTo: 'Robert Mitchell', assignedRole: 'President', dueDate: '2026-04-01',
+    source: 'Runbook item', sourceId: 'rf1',
+  }),
+  hydrateSteps({
+    id: 'c6', catId: 'maintenance', sitId: 'inspection-scheduling',
+    title: 'Schedule annual fire safety inspection', unit: 'Common', owner: 'N/A',
+    approach: 'pre', status: 'open', priority: 'medium', created: '2026-01-20',
+    notes: 'Coordinate with DC Fire and EMS for annual inspection.',
+    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    assignedTo: 'Jennifer Adams', assignedRole: 'Vice President', dueDate: '2026-06-30',
+    source: 'Runbook item', sourceId: 'rf4',
+  }),
+  hydrateSteps({
+    id: 'c7', catId: 'governance', sitId: 'policy-update',
+    title: 'Update collection policy document', unit: 'Common', owner: 'N/A',
+    approach: 'pre', status: 'open', priority: 'low', created: '2026-01-20',
+    notes: 'Review and update collection policy. Current version is outdated. Legal counsel review needed before finalizing.',
+    steps: null, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    assignedTo: 'David Chen', assignedRole: 'Treasurer', dueDate: '2026-05-01',
+  }),
 ];
 
 // ─── Issues seed ───────────────────────────────────────────
@@ -668,12 +778,13 @@ interface IssuesState {
   addIssueComment: (issueId: string, author: string, text: string) => void;
 
   // Case actions
-  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string }, tenantId?: string) => string;
+  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
   reopenCase: (caseId: string) => void;
   deleteCase: (caseId: string) => void;
+  updateCaseAssignment: (caseId: string, updates: { assignedTo?: string; assignedRole?: string; dueDate?: string }) => void;
 
   // Approach
   addApproach: (caseId: string, approach: CaseApproach) => void;
@@ -698,7 +809,7 @@ interface IssuesState {
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   issues: seedIssues,
   cases: seedCases,
-  nextCaseNum: 4,
+  nextCaseNum: 8,
   nextIssueNum: 3,
   nextCommNum: 6,
 
@@ -793,8 +904,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       ...st, id: 's' + i, done: false, doneDate: null, userNotes: ''
     }));
     const newCase: CaseTrackerCase = {
-      id, ...data, status: 'open', created: new Date().toISOString().split('T')[0],
-      steps, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: []
+      id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,
+      unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
+      status: 'open', created: new Date().toISOString().split('T')[0],
+      steps, linkedWOs: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+      ...(data.assignedTo && { assignedTo: data.assignedTo }),
+      ...(data.assignedRole && { assignedRole: data.assignedRole }),
+      ...(data.dueDate && { dueDate: data.dueDate }),
+      ...(data.source && { source: data.source }),
     };
     set({ cases: [newCase, ...s.cases], nextCaseNum: s.nextCaseNum + 1 });
     if (isBackendEnabled && tenantId) {
@@ -842,24 +959,24 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   closeCase: (caseId) => {
+    const today = new Date().toISOString().split('T')[0];
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
-        const today = new Date().toISOString().split('T')[0];
         return {
-          ...c, status: 'closed' as const,
+          ...c, status: 'closed' as const, completedAt: today,
           steps: c.steps?.map(st => ({ ...st, done: true, doneDate: st.doneDate || today })) || null
         };
       })
     }));
-    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'closed' });
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'closed', completedAt: today });
   },
 
   reopenCase: (caseId) => {
     set(s => ({
-      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const } : c)
+      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const, completedAt: undefined } : c)
     }));
-    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'open' });
+    if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'open', completedAt: undefined });
   },
 
   deleteCase: (caseId) => {
@@ -867,6 +984,13 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       cases: s.cases.filter(c => c.id !== caseId)
     }));
     if (isBackendEnabled) casesSvc.deleteCase(caseId);
+  },
+
+  updateCaseAssignment: (caseId, updates) => {
+    set(s => ({
+      cases: s.cases.map(c => c.id === caseId ? { ...c, ...updates } : c)
+    }));
+    if (isBackendEnabled) casesSvc.updateCase(caseId, updates);
   },
 
   addApproach: (caseId, approach) => set(s => ({

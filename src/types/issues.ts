@@ -96,4 +96,10 @@ export interface CaseTrackerCase {
   boardVotes: BoardVote | null;
   additionalApproaches: AdditionalApproach[];
   comms: CaseComm[];
+  assignedTo?: string;
+  assignedRole?: string;
+  dueDate?: string;
+  source?: string;
+  sourceId?: string;
+  completedAt?: string;
 }

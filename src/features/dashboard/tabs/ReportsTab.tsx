@@ -6,7 +6,6 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
-import { useBoardOpsStore } from '@/store/useBoardOpsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import Modal from '@/components/ui/Modal';
@@ -67,7 +66,6 @@ export default function ReportsTab() {
   const comp = useComplianceStore();
   const issues = useIssuesStore();
   const { meetings } = useMeetingsStore();
-  const boardOps = useBoardOpsStore();
   const building = useBuildingStore();
   const propertyLog = usePropertyLogStore();
 

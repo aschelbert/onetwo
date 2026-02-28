@@ -64,6 +64,12 @@ export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | 
     boardVotes: row.board_votes as CaseTrackerCase['boardVotes'],
     additionalApproaches: [], // derived from situation templates, stays client-side
     comms: commsByCase.get(row.id) || [],
+    ...(row.assigned_to && { assignedTo: row.assigned_to as string }),
+    ...(row.assigned_role && { assignedRole: row.assigned_role as string }),
+    ...(row.due_date && { dueDate: row.due_date as string }),
+    ...(row.source && { source: row.source as string }),
+    ...(row.source_id && { sourceId: row.source_id as string }),
+    ...(row.completed_at && { completedAt: row.completed_at as string }),
   }));
 }
 
@@ -87,6 +93,12 @@ export async function createCase(tenantId: string, c: CaseTrackerCase): Promise<
       notes: c.notes,
       board_votes: c.boardVotes,
       linked_wos: c.linkedWOs,
+      ...(c.assignedTo && { assigned_to: c.assignedTo }),
+      ...(c.assignedRole && { assigned_role: c.assignedRole }),
+      ...(c.dueDate && { due_date: c.dueDate }),
+      ...(c.source && { source: c.source }),
+      ...(c.sourceId && { source_id: c.sourceId }),
+      ...(c.completedAt && { completed_at: c.completedAt }),
     })
     .select('id')
     .single();
@@ -141,6 +153,12 @@ export async function updateCase(id: string, updates: Partial<CaseTrackerCase>):
   if (updates.boardVotes !== undefined) row.board_votes = updates.boardVotes;
   if (updates.linkedWOs !== undefined) row.linked_wos = updates.linkedWOs;
   if (updates.priority !== undefined) row.priority = updates.priority;
+  if (updates.assignedTo !== undefined) row.assigned_to = updates.assignedTo || null;
+  if (updates.assignedRole !== undefined) row.assigned_role = updates.assignedRole || null;
+  if (updates.dueDate !== undefined) row.due_date = updates.dueDate || null;
+  if (updates.source !== undefined) row.source = updates.source || null;
+  if (updates.sourceId !== undefined) row.source_id = updates.sourceId || null;
+  if (updates.completedAt !== undefined) row.completed_at = updates.completedAt || null;
   if (Object.keys(row).length === 0) return true;
   const { error } = await supabase.from('cases').update(row).eq('id', id);
   if (error) { console.error('updateCase error:', error); return false; }

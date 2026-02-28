@@ -43,6 +43,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   const [search, setSearch] = useState('');
   const [prioFilter, setPrioFilter] = useState('all');
   const [catFilter, setCatFilter] = useState('all');
+  const [assignFilter, setAssignFilter] = useState<'all' | 'mine' | 'overdue'>('all');
   // Issue creation
   const [showCreate, setShowCreate] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -79,9 +80,11 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
   // Filter open cases
   let filteredOpen = [...open];
-  if (search) { const s = search.toLowerCase(); filteredOpen = filteredOpen.filter(c => c.title.toLowerCase().includes(s) || c.id.toLowerCase().includes(s) || c.unit?.toLowerCase().includes(s) || c.owner?.toLowerCase().includes(s)); }
+  if (search) { const s = search.toLowerCase(); filteredOpen = filteredOpen.filter(c => c.title.toLowerCase().includes(s) || c.id.toLowerCase().includes(s) || c.unit?.toLowerCase().includes(s) || c.owner?.toLowerCase().includes(s) || c.assignedTo?.toLowerCase().includes(s)); }
   if (prioFilter !== 'all') filteredOpen = filteredOpen.filter(c => c.priority === prioFilter);
   if (catFilter !== 'all') filteredOpen = filteredOpen.filter(c => c.catId === catFilter);
+  if (assignFilter === 'mine') filteredOpen = filteredOpen.filter(c => c.assignedTo === user.name);
+  if (assignFilter === 'overdue') { const today = new Date().toISOString().split('T')[0]; filteredOpen = filteredOpen.filter(c => c.dueDate && c.dueDate < today); }
 
   // Filter archive
   let filteredClosed = [...closed];
@@ -187,6 +190,21 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
         {/* ─── OPEN CASES ─── */}
         {tab === 'open' && (<div className="space-y-4">
+          {/* Filter pills */}
+          {isBoard && (
+            <div className="flex gap-2 flex-wrap">
+              {([
+                { id: 'all' as const, label: 'All Open' },
+                { id: 'mine' as const, label: 'My Tasks' },
+                { id: 'overdue' as const, label: 'Overdue' },
+              ]).map(f => (
+                <button key={f.id} onClick={() => setAssignFilter(f.id)} className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${assignFilter === f.id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-500 hover:bg-ink-200'}`}>
+                  {f.label}
+                  {f.id === 'overdue' && (() => { const today = new Date().toISOString().split('T')[0]; const count = open.filter(c => c.dueDate && c.dueDate < today).length; return count > 0 ? <span className="ml-1 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{count}</span> : null; })()}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             <input type="text" placeholder="Search cases..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
@@ -219,7 +237,8 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                         <span className="text-xs font-mono text-ink-300">{c.id}</span>
                         <p className="text-sm font-semibold text-ink-900 truncate">{c.title}</p>
                       </div>
-                      <p className="text-xs text-ink-400 mt-0.5">{cat?.label || c.catId} · {c.unit ? `Unit ${c.unit}` : 'No unit'}{c.owner ? ` · ${c.owner}` : ''} · {c.dateOpened}</p>
+                      <p className="text-xs text-ink-400 mt-0.5">{cat?.label || c.catId} · {c.unit ? `Unit ${c.unit}` : 'No unit'}{c.owner ? ` · ${c.owner}` : ''} · {c.created}{c.assignedTo ? ` · ${c.assignedTo}` : ''}</p>
+                      {c.dueDate && (() => { const today = new Date().toISOString().split('T')[0]; const isOverdue = c.dueDate < today; const daysUntil = Math.ceil((new Date(c.dueDate + 'T12:00').getTime() - new Date(today + 'T12:00').getTime()) / (1000*60*60*24)); const isNear = daysUntil >= 0 && daysUntil <= 7; return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-100 text-red-700' : isNear ? 'bg-amber-100 text-amber-700' : 'bg-ink-50 text-ink-400'}`}>Due {c.dueDate}{isOverdue ? ' (OVERDUE)' : ''}</span>; })()}
                     </div>
                     <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${PRIO_COLORS[c.priority] || 'bg-ink-100 text-ink-500'}`}>{c.priority}</span>
                     <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${APPR_COLORS[c.approach] || 'bg-ink-100 text-ink-500'}`}>{APPR_LABELS[c.approach] || c.approach}</span>
@@ -355,6 +374,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 // ─── Creation Wizard ───────────────────────────────────────
 function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: () => void }) {
   const { createCase } = useIssuesStore();
+  const { board: boardMembers } = useBuildingStore();
   const [step, setStep] = useState(1);
   const [catId, setCatId] = useState<string | null>(null);
   const [sitId, setSitId] = useState<string | null>(null);
@@ -364,13 +384,23 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
   const [owner, setOwner] = useState('');
   const [priority, setPriority] = useState<CasePriority>('medium');
   const [notes, setNotes] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
+  const [assignedRole, setAssignedRole] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [source, setSource] = useState('');
 
   const selCat = CATS.find(c => c.id === catId);
   const selSit = selCat?.sits.find(s => s.id === sitId);
 
+  const handleAssignedToChange = (name: string) => {
+    setAssignedTo(name);
+    const member = boardMembers.find(b => b.name === name);
+    setAssignedRole(member?.role || '');
+  };
+
   const handleCreate = () => {
     if (!catId || !sitId || !title.trim()) return;
-    const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes });
+    const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || undefined });
     onDone(id);
   };
 
@@ -473,6 +503,28 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
               ))}
             </div>
           </div>
+          {/* Assignment fields (optional) */}
+          <div className="border-t border-ink-100 pt-4 mt-2">
+            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-3">Assignment (optional)</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Assigned To</label>
+                <select value={assignedTo} onChange={e => handleAssignedToChange(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                  <option value="">Unassigned</option>
+                  {boardMembers.map(b => <option key={b.id} value={b.name}>{b.name} ({b.role})</option>)}
+                </select>
+                {assignedRole && <p className="text-[10px] text-ink-400 mt-1">Role: {assignedRole}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Due Date</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-ink-700 mb-1">Source</label>
+              <input value={source} onChange={e => setSource(e.target.value)} placeholder="e.g., Board Meeting Jan 2026" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-ink-700 mb-1">Notes</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Background details..." />
@@ -501,6 +553,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showApproachModal, setShowApproachModal] = useState(false);
   const [showWOModal, setShowWOModal] = useState(false);
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
+  const [editingAssignment, setEditingAssignment] = useState(false);
+  const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
 
   if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Case not found.</p></div>;
 
@@ -530,6 +584,33 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             </div>
             <h2 className="text-xl font-bold text-ink-900">{c.title}</h2>
             <p className="text-sm text-ink-400 mt-1">{sit?.title || ''} · Unit {c.unit} · {c.owner} · Created {c.created}</p>
+            {/* Assignment info */}
+            {(c.assignedTo || c.dueDate || c.source || c.completedAt) && (
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                {c.assignedTo && (
+                  <span className="text-xs bg-accent-50 text-accent-700 px-2 py-1 rounded-lg font-medium">
+                    Assigned to: {c.assignedTo}{c.assignedRole ? ` (${c.assignedRole})` : ''}
+                  </span>
+                )}
+                {c.dueDate && (() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const daysUntil = Math.ceil((new Date(c.dueDate + 'T12:00').getTime() - new Date(today + 'T12:00').getTime()) / (1000 * 60 * 60 * 24));
+                  const isOverdue = c.status === 'open' && daysUntil < 0;
+                  const isNear = c.status === 'open' && daysUntil >= 0 && daysUntil <= 7;
+                  return (
+                    <span className={`text-xs px-2 py-1 rounded-lg font-medium ${isOverdue ? 'bg-red-100 text-red-700' : isNear ? 'bg-amber-100 text-amber-700' : 'bg-ink-100 text-ink-600'}`}>
+                      Due: {c.dueDate}{isOverdue ? ' (OVERDUE)' : ''}
+                    </span>
+                  );
+                })()}
+                {c.source && <span className="text-xs text-ink-400">Source: {c.source}</span>}
+                {c.completedAt && <span className="text-xs bg-sage-100 text-sage-700 px-2 py-1 rounded-lg font-medium">Completed: {c.completedAt}</span>}
+                <button onClick={() => { setAssignForm({ assignedTo: c.assignedTo || '', assignedRole: c.assignedRole || '', dueDate: c.dueDate || '' }); setEditingAssignment(true); }} className="text-[11px] text-accent-500 hover:text-accent-600 font-medium">Edit Assignment</button>
+              </div>
+            )}
+            {!c.assignedTo && !c.dueDate && (
+              <button onClick={() => { setAssignForm({ assignedTo: '', assignedRole: '', dueDate: '' }); setEditingAssignment(true); }} className="text-[11px] text-accent-500 hover:text-accent-600 font-medium mt-2 inline-block">+ Add Assignment</button>
+            )}
             {c.notes && <p className="text-sm text-ink-500 mt-2 bg-sand-100 rounded-lg p-3">{c.notes}</p>}
           </div>
           <div className="shrink-0 text-center">
@@ -714,6 +795,31 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showCommModal && <CommModal caseId={caseId} store={store} onClose={() => setShowCommModal(false)} />}
       {showDocModal && <DocModal caseId={caseId} store={store} onClose={() => setShowDocModal(false)} />}
       {showApproachModal && <ApproachModal c={c} store={store} onClose={() => setShowApproachModal(false)} />}
+      {editingAssignment && (
+        <Modal title="Edit Assignment" onClose={() => setEditingAssignment(false)} onSave={() => {
+          store.updateCaseAssignment(caseId, {
+            assignedTo: assignForm.assignedTo || undefined,
+            assignedRole: assignForm.assignedRole || undefined,
+            dueDate: assignForm.dueDate || undefined,
+          });
+          setEditingAssignment(false);
+        }} saveLabel="Save">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-ink-700 mb-1">Assigned To</label>
+              <select value={assignForm.assignedTo} onChange={e => { const name = e.target.value; const member = boardMembers.find(b => b.name === name); setAssignForm({ ...assignForm, assignedTo: name, assignedRole: member?.role || '' }); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                <option value="">Unassigned</option>
+                {boardMembers.map(b => <option key={b.id} value={b.name}>{b.name} ({b.role})</option>)}
+              </select>
+              {assignForm.assignedRole && <p className="text-[10px] text-ink-400 mt-1">Role: {assignForm.assignedRole}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-700 mb-1">Due Date</label>
+              <input type="date" value={assignForm.dueDate} onChange={e => setAssignForm({ ...assignForm, dueDate: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            </div>
+          </div>
+        </Modal>
+      )}
       {showWOModal && (
         <Modal title="Create Work Order" onClose={() => setShowWOModal(false)} onSave={() => {
           if (!woForm.title || !woForm.vendor || !woForm.amount) { alert('Title, vendor, and amount required'); return; }

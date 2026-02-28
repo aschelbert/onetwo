@@ -19,6 +19,29 @@ export function CaseCard({ c, onClick }: { c: CaseTrackerCase; onClick: () => vo
         </div>
         <span className="text-xs font-semibold text-ink-500">{pct}%</span>
       </div>
+      {(c.assignedTo || c.dueDate) && (
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {c.assignedTo && (
+            <span className="flex items-center gap-1 text-[10px] text-ink-500">
+              <span className="w-4 h-4 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                {c.assignedTo.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              </span>
+              {c.assignedTo}
+            </span>
+          )}
+          {c.dueDate && (() => {
+            const today = new Date().toISOString().split('T')[0];
+            const isOverdue = c.status === 'open' && c.dueDate < today;
+            const daysUntil = Math.ceil((new Date(c.dueDate + 'T12:00').getTime() - new Date(today + 'T12:00').getTime()) / (1000*60*60*24));
+            const isNear = c.status === 'open' && daysUntil >= 0 && daysUntil <= 7;
+            return (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-100 text-red-700' : isNear ? 'bg-amber-100 text-amber-700' : 'bg-ink-50 text-ink-400'}`}>
+                {isOverdue ? 'OVERDUE' : `Due ${c.dueDate}`}
+              </span>
+            );
+          })()}
+        </div>
+      )}
     </button>
   );
 }
