@@ -1,6 +1,7 @@
 import { useState, forwardRef } from 'react';
 import type { CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
+import type { FundingOption } from '@/store/useSpendingStore';
 import { deriveActionsForStep, type RichAction } from './stepActionMap';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
@@ -27,24 +28,94 @@ interface FundingAnalysisInlineProps {
   onDecisionRecorded?: (approvalId: string) => void;
 }
 
+function StrategyCard({ opt, selected, onSelect }: { opt: FundingOption; selected: boolean; onSelect: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div
+      className={`rounded-lg border text-left transition-all ${
+        selected
+          ? 'bg-accent-50 border-accent-400 ring-2 ring-accent-200'
+          : opt.recommended ? 'bg-sage-50 border-sage-200 hover:border-sage-300' : 'bg-white border-ink-100 hover:border-ink-200'
+      }`}
+    >
+      <button type="button" onClick={onSelect} className="w-full p-4 text-left">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-ink-900">{opt.label}</span>
+          {opt.recommended && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-sage-200 text-sage-800">Recommended</span>}
+          {selected && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent-200 text-accent-800">Selected</span>}
+          {opt.timeline && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-mist-100 text-ink-600">{opt.timeline}</span>}
+          {opt.approvalType === 'board' && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-sage-100 text-sage-700">Board Only</span>}
+          {opt.approvalType === 'owner' && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Owner Vote</span>}
+        </div>
+        <p className="text-xs text-ink-500 mt-1.5">{opt.impact}</p>
+        <div className="flex items-center gap-4 mt-1.5">
+          {opt.perUnit > 0 && <span className="text-xs text-ink-600 font-medium">One-time: {fmt(opt.perUnit)}/unit</span>}
+          {opt.monthlyPerUnit != null && opt.monthlyPerUnit > 0 && <span className="text-xs text-ink-600 font-medium">Monthly: {fmt(opt.monthlyPerUnit)}/unit</span>}
+        </div>
+      </button>
+      {(opt.pros || opt.cons || opt.nextSteps) && (
+        <div className="px-4 pb-3">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="text-[11px] font-medium text-accent-600 hover:text-accent-800 transition-colors"
+          >
+            {expanded ? 'Hide details' : 'Show pros, cons & next steps'}
+          </button>
+          {expanded && (
+            <div className="mt-2 space-y-2">
+              {opt.pros && opt.pros.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-sage-700 uppercase tracking-wider mb-0.5">Pros</p>
+                  <ul className="space-y-0.5">
+                    {opt.pros.map((p, i) => <li key={i} className="text-xs text-ink-600 pl-3 relative before:content-['+'] before:absolute before:left-0 before:text-sage-500 before:font-bold">{p}</li>)}
+                  </ul>
+                </div>
+              )}
+              {opt.cons && opt.cons.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-0.5">Cons</p>
+                  <ul className="space-y-0.5">
+                    {opt.cons.map((c, i) => <li key={i} className="text-xs text-ink-600 pl-3 relative before:content-['–'] before:absolute before:left-0 before:text-red-400 before:font-bold">{c}</li>)}
+                  </ul>
+                </div>
+              )}
+              {opt.nextSteps && opt.nextSteps.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-accent-700 uppercase tracking-wider mb-0.5">Next Steps</p>
+                  <ol className="space-y-0.5">
+                    {opt.nextSteps.map((n, i) => <li key={i} className="text-xs text-ink-600 pl-3">{i + 1}. {n}</li>)}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: FundingAnalysisInlineProps) {
   const financialStore = useFinancialStore();
   const spendingStore = useSpendingStore();
   const [amount, setAmount] = useState('');
-  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
   const [recorded, setRecorded] = useState(false);
   const parsed = parseFloat(amount);
   const ctx = getFinancialContext(financialStore);
   const analysis = parsed > 0 ? analyzeFunding(parsed, ctx) : null;
 
   const handleRecordDecision = () => {
-    if (!analysis || !selectedSource) return;
-    const opt = analysis.options.find(o => o.source === selectedSource);
+    if (!analysis || !selectedStrategy) return;
+    const opt = analysis.options.find(o => o.strategyId === selectedStrategy);
     if (!opt) return;
     const id = 'sa' + Date.now();
+    const notesParts = [`Strategy: ${opt.label}`, `Impact: ${opt.impact}`];
+    if (opt.nextSteps?.length) notesParts.push(`Next: ${opt.nextSteps.join('; ')}`);
     spendingStore.addApproval({
       title: stepTitle,
-      description: `Funding decision from workflow step: ${stepTitle}`,
+      description: `Funding strategy from workflow step: ${stepTitle}`,
       amount: parsed,
       category: 'capital',
       requestedBy: 'Board (Workflow)',
@@ -54,9 +125,9 @@ function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: Fundin
       workOrderId: '',
       votes: [],
       threshold: 5000,
-      notes: `Source: ${opt.label}. ${opt.impact}`,
+      notes: notesParts.join('. '),
       decidedAt: parsed <= 5000 ? new Date().toISOString().split('T')[0] : '',
-      fundingSource: selectedSource as any,
+      fundingSource: opt.source,
       caseId,
     });
     setRecorded(true);
@@ -67,7 +138,7 @@ function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: Fundin
     <div className="mt-3 bg-mist-50 border border-mist-200 rounded-lg p-4 space-y-3">
       <div>
         <label className="block text-xs font-medium text-ink-700 mb-1">Project / Repair Amount</label>
-        <input type="number" value={amount} onChange={e => { setAmount(e.target.value); setRecorded(false); setSelectedSource(null); }} placeholder="Enter estimated cost..." className="w-full max-w-xs px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+        <input type="number" value={amount} onChange={e => { setAmount(e.target.value); setRecorded(false); setSelectedStrategy(null); }} placeholder="Enter estimated cost..." className="w-full max-w-xs px-3 py-2 border border-ink-200 rounded-lg text-sm" />
       </div>
       {analysis && (
         <>
@@ -77,27 +148,12 @@ function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: Fundin
           </div>
           <div className="space-y-2">
             {analysis.options.map(opt => (
-              <button
-                key={opt.source}
-                type="button"
-                onClick={() => opt.available && setSelectedSource(opt.source)}
-                className={`w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all ${
-                  selectedSource === opt.source
-                    ? 'bg-accent-50 border-accent-400 ring-2 ring-accent-200'
-                    : opt.recommended ? 'bg-sage-50 border-sage-200 hover:border-sage-300' : opt.available ? 'bg-white border-ink-100 hover:border-ink-200' : 'bg-ink-50 border-ink-100 opacity-70 cursor-not-allowed'
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-ink-900">{opt.label}</span>
-                    {opt.recommended && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-sage-200 text-sage-800">Recommended</span>}
-                    {!opt.available && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700">Insufficient</span>}
-                    {selectedSource === opt.source && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-accent-200 text-accent-800">Selected</span>}
-                  </div>
-                  <p className="text-xs text-ink-500 mt-1">{opt.impact}</p>
-                  {opt.perUnit > 0 && <p className="text-xs text-ink-400 mt-0.5">Per unit: {fmt(opt.perUnit)}</p>}
-                </div>
-              </button>
+              <StrategyCard
+                key={opt.strategyId || opt.source}
+                opt={opt}
+                selected={selectedStrategy === (opt.strategyId || opt.source)}
+                onSelect={() => setSelectedStrategy(opt.strategyId || opt.source)}
+              />
             ))}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-mist-200">
@@ -118,19 +174,18 @@ function FundingAnalysisInline({ caseId, stepTitle, onDecisionRecorded }: Fundin
               <p className={`text-sm font-bold ${ctx.reservePctFunded >= 70 ? 'text-sage-700' : ctx.reservePctFunded >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>{ctx.reservePctFunded}%</p>
             </div>
           </div>
-          {/* Record Decision */}
-          {selectedSource && !recorded && (
+          {selectedStrategy && !recorded && (
             <button
               onClick={handleRecordDecision}
               className="w-full py-2.5 rounded-lg bg-accent-600 text-white text-sm font-semibold hover:bg-accent-700 transition-colors"
             >
-              Record Funding Decision
+              Record Funding Strategy
             </button>
           )}
           {recorded && (
             <div className="bg-sage-50 border border-sage-200 rounded-lg p-3 flex items-center gap-2">
               <span className="text-sage-600">✓</span>
-              <p className="text-sm text-sage-800 font-medium">Funding decision recorded — visible in Financial → Spending Decisions</p>
+              <p className="text-sm text-sage-800 font-medium">Funding strategy recorded — visible in Financial → Spending Decisions</p>
             </div>
           )}
         </>

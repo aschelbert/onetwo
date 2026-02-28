@@ -22,11 +22,18 @@ export interface FundingAnalysis {
 
 export interface FundingOption {
   source: SpendingApproval['fundingSource'];
+  strategyId?: string;             // unique strategy key (e.g., 'phase-project')
   label: string;
   available: boolean;
   impact: string;                  // plain-english impact description
   perUnit: number;
   recommended: boolean;
+  timeline?: string;               // e.g., "Phase 1 immediate; Phase 2 in 12-18 months"
+  pros?: string[];
+  cons?: string[];
+  nextSteps?: string[];            // downstream workflow implications
+  approvalType?: 'board' | 'owner';
+  monthlyPerUnit?: number;         // ongoing monthly per-unit impact
 }
 
 interface SpendingState {
