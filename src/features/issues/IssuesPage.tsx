@@ -53,8 +53,14 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   const [commIssueId, setCommIssueId] = useState<string | null>(null);
   const [iTitle, setITitle] = useState('');
   const [iDesc, setIDesc] = useState('');
-  const [iCat, setICat] = useState('Maintenance');
+  const [iCat, setICat] = useState('Maintenance Request');
   const [iPrio, setIPrio] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+
+  const REQ_CATS = [
+    'Maintenance Request', 'Noise Complaint', 'Common Area Issue', 'Parking Issue',
+    'Safety Concern', 'Resale Certificate Request', 'Records Inspection Request',
+    'Architectural Modification Request', 'General Question', 'Other',
+  ];
 
   const handleCreateIssue = () => {
     if (!iTitle.trim()) return;
@@ -64,13 +70,22 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
       reportedBy: user.id, reporterName: user.name, reporterEmail: user.email,
       unitNumber: user.linkedUnits?.[0] || '', submittedDate: new Date().toISOString().split('T')[0]
     });
-    setITitle(''); setIDesc(''); setShowCreate(false);
+    setITitle(''); setIDesc(''); setICat('Maintenance Request'); setIPrio('MEDIUM'); setShowCreate(false);
   };
 
   const handleConvertToCase = (issue: any) => {
-    const catMap: Record<string, string> = { Maintenance: 'maintenance', Safety: 'safety', Noise: 'noise', 'Common Area': 'common-area', Parking: 'parking', Other: 'other' };
+    const catMap: Record<string, string> = {
+      'Maintenance': 'maintenance', 'Maintenance Request': 'maintenance',
+      'Safety': 'enforcement', 'Safety Concern': 'enforcement',
+      'Noise': 'enforcement', 'Noise Complaint': 'enforcement',
+      'Common Area': 'maintenance', 'Common Area Issue': 'maintenance',
+      'Parking': 'enforcement', 'Parking Issue': 'enforcement',
+      'Resale Certificate Request': 'admin', 'Records Inspection Request': 'admin',
+      'Architectural Modification Request': 'enforcement',
+      'General Question': 'admin', 'Other': 'admin',
+    };
     const prioMap: Record<string, string> = { HIGH: 'high', MEDIUM: 'medium', LOW: 'low', URGENT: 'urgent' };
-    const catId = catMap[issue.category] || 'other';
+    const catId = catMap[issue.category] || 'admin';
     const sits = CATS.find(c => c.id === catId)?.sits || CATS[0].sits;
     const id = store.createCase({
       catId, sitId: sits[0]?.id || 'other', approach: 'pre' as CaseApproach,
@@ -275,17 +290,24 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
           </div>
           {showCreate && (
             <div className="bg-mist-50 rounded-xl border border-mist-200 p-5 space-y-3">
-              <input value={iTitle} onChange={e => setITitle(e.target.value)} placeholder="Issue title" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
-              <textarea value={iDesc} onChange={e => setIDesc(e.target.value)} placeholder="Description..." rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
-              <div className="flex gap-3 flex-wrap">
-                <select value={iCat} onChange={e => setICat(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
-                  {['Maintenance', 'Safety', 'Noise', 'Common Area', 'Parking', 'Other'].map(c => <option key={c}>{c}</option>)}
-                </select>
-                <select value={iPrio} onChange={e => setIPrio(e.target.value as any)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
-                  <option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option>
-                </select>
-                <button onClick={handleCreateIssue} className="px-6 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">Submit</button>
+              <p className="text-xs font-bold text-ink-700">Submit a Request</p>
+              <select value={iCat} onChange={e => setICat(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                {REQ_CATS.map(c => <option key={c}>{c}</option>)}
+              </select>
+              <input value={iTitle} onChange={e => setITitle(e.target.value)} placeholder="Brief summary of the request" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
+              <textarea value={iDesc} onChange={e => setIDesc(e.target.value)} placeholder="Provide details — what, where, when, any relevant unit number..." rows={4} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white" />
+              <div className="flex items-center gap-3">
+                <div>
+                  <label className="text-[10px] font-medium text-ink-500 uppercase tracking-wider">Priority</label>
+                  <select value={iPrio} onChange={e => setIPrio(e.target.value as any)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white mt-0.5">
+                    <option value="HIGH">High — Urgent issue</option>
+                    <option value="MEDIUM">Medium — Normal request</option>
+                    <option value="LOW">Low — When convenient</option>
+                  </select>
+                </div>
+                <button onClick={handleCreateIssue} className="px-6 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700 mt-4">Submit Request</button>
               </div>
+              <p className="text-[10px] text-ink-400">Requests are sent to the board and/or property management. Response required within 14 days per DC Code § 42-1903.14(c).</p>
             </div>
           )}
           <div className="divide-y divide-ink-50">

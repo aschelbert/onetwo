@@ -11,7 +11,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function FLChartOfAccounts() {
-  const { chartOfAccounts, acctStatus, acctBalance, glByAccount, getAcctChildren, addCoASection, addCoAAccount, updateCoAAccount, deleteCoAAccount } = useFinancialStore();
+  const { chartOfAccounts, acctStatus, acctBalance, glByAccount, getAcctChildren, addCoASection, addCoAAccount, updateCoAAccount, deleteCoAAccount, setActiveTab, setGlFilter } = useFinancialStore();
   const [modal, setModal] = useState<null | 'section' | 'account' | { type: 'edit'; num: string }>(null);
   const [parentNum, setParentNum] = useState('');
   const [formData, setFormData] = useState({ num: '', name: '', type: 'expense', parent: '', sub: 'operating' });
@@ -36,7 +36,7 @@ export default function FLChartOfAccounts() {
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {!isHeader && entries > 0 && (
-              <span className="text-xs text-ink-400">{entries} entries</span>
+              <button onClick={() => { setGlFilter({ account: acct.num, source: '', search: '' }); setActiveTab('ledger'); }} className="text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer">{entries} entries →</button>
             )}
             {!isHeader && bal !== 0 && (
               <span className={`text-sm font-semibold ${bal >= 0 ? 'text-ink-900' : 'text-red-600'}`}>
