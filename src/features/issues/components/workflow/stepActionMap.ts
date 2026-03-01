@@ -79,6 +79,11 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
     actions.push({ id: `comm-${step.id}`, icon: '✉️', label: 'Send Communication', description: 'Draft and send a notice or letter', type: 'modal', target: 'send-comm', isAction: true });
   }
 
+  // 4b. Physical mail — "Send Notice" for steps with notice/letter keywords
+  if (s.includes('notice') || s.includes('letter')) {
+    actions.push({ id: `mail-${step.id}`, icon: '📮', label: 'Send Notice via Mail', description: 'Generate and send physical notice via USPS', type: 'modal', target: 'send-notice', isAction: true });
+  }
+
   // 5. Owner vote (conduct vote, hold vote — step-level)
   if (/owner vote|conduct.*vote|hold.*vote/.test(s) && !usedTargets.has('owner-vote')) {
     actions.push({ id: `owner-vote-${step.id}`, icon: '🗳️', label: 'Record Owner Vote', description: 'Record the owner vote and resolution', type: 'modal', target: 'owner-vote', isAction: true });

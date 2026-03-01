@@ -10,9 +10,10 @@ import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
 import VendorsTab from './tabs/VendorsTab';
 import PMScorecardTab from './tabs/PMScorecardTab';
+import MailingSettingsTab from './tabs/MailingSettingsTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors','scorecard'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', scorecard:'PM Scorecard' };
+const TABS = ['details','contacts','units','legal','insurance','vendors','scorecard','mailing'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', scorecard:'PM Scorecard', mailing:'Mailing' };
 
 type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor';
 
@@ -22,7 +23,7 @@ export default function BuildingPage() {
   const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const [tab, setTab] = useTabParam<typeof TABS[number]>('tab', 'details', [...TABS]);
-  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'scorecard');
+  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'scorecard' && t !== 'mailing');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
@@ -162,6 +163,9 @@ export default function BuildingPage() {
 
           {/* PM SCORECARD */}
           {tab === 'scorecard' && isBoard && <PMScorecardTab />}
+
+          {/* MAILING */}
+          {tab === 'mailing' && isBoard && <MailingSettingsTab />}
         </div>
 
       {/* MODALS */}

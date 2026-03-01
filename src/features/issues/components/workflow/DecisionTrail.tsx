@@ -19,6 +19,8 @@ const iconMap: Record<TrailEntryType, string> = {
   work_order_linked: '\u{1F517}',
   note_added: '\u{1F4DD}',
   approach_added: '\u2795',
+  notice_sent: '\u{1F4EE}',
+  notice_delivered: '\u{1F4EC}',
 };
 
 interface DecisionTrailProps {

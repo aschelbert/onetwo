@@ -102,7 +102,8 @@ export type TrailEntryType =
   | 'spending_decision' | 'bid_uploaded' | 'bid_selected'
   | 'conflict_check' | 'communication_sent' | 'document_attached'
   | 'case_held' | 'case_resumed' | 'case_closed' | 'work_order_linked'
-  | 'note_added' | 'approach_added';
+  | 'note_added' | 'approach_added'
+  | 'notice_sent' | 'notice_delivered';
 
 export interface DecisionTrailEntry {
   id: string;

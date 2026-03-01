@@ -11,6 +11,7 @@ import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseCompo
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal, AddBidModal } from './components/CaseModals';
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
 import DecisionTrail from './components/workflow/DecisionTrail';
+import SendNoticePanel from './components/SendNoticePanel';
 import { OwnerCaseView } from './components/OwnerCaseView';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -717,6 +718,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
   const [bidTargetStep, setBidTargetStep] = useState<number | null>(null);
+  const [showSendNotice, setShowSendNotice] = useState(false);
+  const [noticeStepIdx, setNoticeStepIdx] = useState<number | null>(null);
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
@@ -770,6 +773,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         setShowMeetingModal(true);
       } else if (action.target === 'create-invoice') {
         setShowInvoiceModal(true);
+      } else if (action.target === 'send-notice') {
+        setNoticeStepIdx(stepIdx);
+        setShowSendNotice(true);
       }
     } else if (action.type === 'inline') {
       setInlineStepIdx(inlineStepIdx === stepIdx ? null : stepIdx);
@@ -1062,6 +1068,14 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showCloseModal && c.steps && <CloseCaseModal caseId={caseId} store={store} incompleteCount={c.steps.filter(s => !s.done).length} totalCount={c.steps.length} onClose={() => setShowCloseModal(false)} />}
       {showDeleteModal && <DeleteCaseModal caseId={caseId} store={store} onClose={() => setShowDeleteModal(false)} onDeleted={onBack} />}
       {showBidModal && bidTargetStep != null && <AddBidModal caseId={caseId} stepIdx={bidTargetStep} store={store} onClose={() => { setShowBidModal(false); setBidTargetStep(null); }} />}
+      {showSendNotice && c && (
+        <SendNoticePanel
+          caseId={caseId}
+          caseData={c}
+          stepIdx={noticeStepIdx}
+          onClose={() => { setShowSendNotice(false); setNoticeStepIdx(null); }}
+        />
+      )}
       {editingAssignment && (
         <Modal title="Edit Assignment" onClose={() => setEditingAssignment(false)} onSave={() => {
           store.updateCaseAssignment(caseId, {
