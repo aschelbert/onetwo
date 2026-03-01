@@ -738,6 +738,16 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
     if (action.type === 'navigate') {
       const nav = ACTION_NAV[action.target];
       if (nav) {
+        if (c) {
+          const stepTitle = c.steps?.[stepIdx]?.s || '';
+          store.setActiveCaseContext({
+            caseId: c.id,
+            caseTitle: c.title,
+            stepTitle,
+            stepIdx,
+            returnPath: `/issues?view=case:${c.id}`,
+          });
+        }
         if (nav.tab) fin.setActiveTab(nav.tab);
         navigate(nav.route);
       }
@@ -765,6 +775,14 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       setInlineStepIdx(inlineStepIdx === stepIdx ? null : stepIdx);
     }
   };
+
+  // Clear floating widget when viewing this case
+  const activeCaseContext = store.activeCaseContext;
+  useEffect(() => {
+    if (activeCaseContext?.caseId === caseId) {
+      store.clearActiveCaseContext();
+    }
+  }, [caseId, activeCaseContext?.caseId]);
 
   if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Case not found.</p></div>;
 

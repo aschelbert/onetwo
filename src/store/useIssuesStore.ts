@@ -41,13 +41,14 @@ export const CATS: Category[] = [
       { id:'annual-budgeting', title:'Annual Budgeting', desc:'Setting assessments, forecasting costs, funding reserves',
         tags:['Setting annual assessments','Forecasting operating costs','Funding reserves','Budget ratification'],
         pre:[
-          {s:'Review current year financials: actual vs budget variance, reserve balances, collection rate, outstanding receivables',t:'90 days before fiscal year-end',d:'Fiscal Lens: Dashboard & Reports',detail:'Key questions: (1) Which budget categories went over or under? (2) Is the collection rate above 90%? (3) What is the reserve percent funded? (4) Are there any delinquent accounts affecting cash flow? This data drives next year\'s budget decisions.',action:{type:'navigate',target:'financial:dashboard',label:'Open Financial Overview'},ph:'gather',ck:['Compare actual vs budget variance','Review reserve balances','Check collection rate','Review outstanding receivables']},
-          {s:'Review reserve study: what capital projects are coming in the next 1-5 years? Is the reserve contribution adequate?',t:'60-90 days out',d:'Reserve study & Fiscal Lens: Reserves',detail:'This is the most important budget decision. If reserve funding is below 70%, you should increase the annual contribution — even if it means a slightly higher assessment. Every dollar NOT contributed to reserves today becomes a dollar in a future special assessment. Check the reserve study\'s recommended annual contribution and compare to your current amount.',action:{type:'navigate',target:'financial:reserves',label:'Open Reserves'},ph:'gather',ck:['Review upcoming capital projects (1-5 year horizon)','Check reserve percent funded','Compare current contribution to study recommendation']},
-          {s:'Build a 3-year financial outlook: what known costs are coming and how will you fund them?',t:'60-90 days out',detail:'Beyond next year\'s budget, think 3 years ahead. Are there: major contracts expiring (management, insurance, elevator)? Capital projects in the reserve study within 3 years? Insurance premium increases expected? A 3-year outlook prevents surprise assessments and gives the board time to plan. Share this outlook with owners — it builds confidence.',ph:'gather',ck:['Identify expiring contracts','List capital projects due within 3 years','Estimate insurance premium changes','Draft 3-year cost projection']},
-          {s:'Obtain bids, contract renewals, and cost estimates for all operating expenses',t:'60-90 days out',d:'Vendor contracts',detail:'Review each vendor contract for renewal terms and rate changes. Obtain competitive bids for expiring contracts. Factor in inflation (typically 3-5% for utilities, insurance often higher). Don\'t just roll forward last year\'s numbers — cost assumptions should be justified.',ph:'gather',ck:['Review vendor contract renewal terms','Obtain competitive bids for expiring contracts','Factor in inflation for utilities and insurance']},
-          {s:'Draft proposed budget: operating expenses + reserve contribution + contingency = total; calculate per-unit assessment',t:'60 days out',detail:'Budget structure: (1) Operating expenses by category (use Fiscal Lens Budget tab). (2) Reserve contribution (per reserve study recommendation). (3) Contingency (3-5% of operating budget — covers unexpected costs without raiding reserves). (4) Total divided by total percentage interests = per-unit assessment. Show the per-unit impact clearly.',action:{type:'navigate',target:'financial:budget',label:'Open Budget'},ph:'draft',ck:['Itemize operating expenses by category','Set reserve contribution per study','Add 3-5% contingency','Calculate per-unit assessment']},
-          {s:'Check whether assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. If you need a large increase, consider phasing it over 2 years (e.g., 10% this year, 8% next year) to stay within the cap.',ph:'draft'},
+          {s:'Review current year financials: actual vs budget variance, reserve balances, collection rate, outstanding receivables',t:'90 days before fiscal year-end',d:'Fiscal Lens: Dashboard & Reports',detail:'Key questions: (1) Which budget categories went over or under? (2) Is the collection rate above 90%? (3) What is the reserve percent funded? (4) Are there any delinquent accounts affecting cash flow? This data drives next year\'s budget decisions.',action:{type:'inline',target:'budget-review',label:'Review Financial Data'},ph:'gather',ck:['Compare actual vs budget variance','Review reserve balances','Check collection rate','Review outstanding receivables']},
+          {s:'Review reserve study: what capital projects are coming in the next 1-5 years? Is the reserve contribution adequate?',t:'60-90 days out',d:'Reserve study & Fiscal Lens: Reserves',detail:'This is the most important budget decision. If reserve funding is below 70%, you should increase the annual contribution — even if it means a slightly higher assessment. Every dollar NOT contributed to reserves today becomes a dollar in a future special assessment. Check the reserve study\'s recommended annual contribution and compare to your current amount.',action:{type:'inline',target:'reserve-study',label:'Review Reserve Study'},ph:'gather',ck:['Review upcoming capital projects (1-5 year horizon)','Check reserve percent funded','Compare current contribution to study recommendation']},
+          {s:'Build a 3-year financial outlook: what known costs are coming and how will you fund them?',t:'60-90 days out',detail:'Beyond next year\'s budget, think 3 years ahead. Are there: major contracts expiring (management, insurance, elevator)? Capital projects in the reserve study within 3 years? Insurance premium increases expected? A 3-year outlook prevents surprise assessments and gives the board time to plan. Share this outlook with owners — it builds confidence.',action:{type:'inline',target:'three-year-outlook',label:'Generate 3-Year Outlook'},ph:'gather',ck:['Identify expiring contracts','List capital projects due within 3 years','Estimate insurance premium changes','Draft 3-year cost projection']},
+          {s:'Obtain bids, contract renewals, and cost estimates for all operating expenses',t:'60-90 days out',d:'Vendor contracts',detail:'Review each vendor contract for renewal terms and rate changes. Obtain competitive bids for expiring contracts. Factor in inflation (typically 3-5% for utilities, insurance often higher). Don\'t just roll forward last year\'s numbers — cost assumptions should be justified.',action:{type:'inline',target:'contract-renewals',label:'Review Contracts & Renewals'},ph:'gather',ck:['Review vendor contract renewal terms','Obtain competitive bids for expiring contracts','Factor in inflation for utilities and insurance']},
+          {s:'Draft proposed budget: operating expenses + reserve contribution + contingency = total; calculate per-unit assessment',t:'60 days out',detail:'Budget structure: (1) Operating expenses by category (use Fiscal Lens Budget tab). (2) Reserve contribution (per reserve study recommendation). (3) Contingency (3-5% of operating budget — covers unexpected costs without raiding reserves). (4) Total divided by total percentage interests = per-unit assessment. Show the per-unit impact clearly.',action:{type:'inline',target:'budget-drafter',label:'Draft Budget'},ph:'draft',ck:['Itemize operating expenses by category','Set reserve contribution per study','Add 3-5% contingency','Calculate per-unit assessment']},
+          {s:'Check whether assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. If you need a large increase, consider phasing it over 2 years (e.g., 10% this year, 8% next year) to stay within the cap.',action:{type:'inline',target:'bylaws-review',label:'Check Assessment Limits'},ph:'draft'},
           {s:'Present proposed budget at open board meeting in plain language; explain the "why" behind every increase',t:'30 days before adoption',d:'DC Code § 29-1135.02',detail:'DC requires 30-day notice before budget adoption. Owners don\'t need to understand every line item — they need to know: (1) What is my assessment? (2) Why is it changing? (3) What am I getting for it? (4) What happens to reserves? Present in these terms, not accounting jargon. Allow written questions from owners who cannot attend.',ph:'present'},
+          {s:'Collect owner feedback and conduct owner vote if required by bylaws',t:'14-21 days after presentation',d:'Bylaws: Owner voting provisions',detail:'After presenting the budget, allow a formal feedback period. Collect written owner questions and respond in writing. If the assessment increase exceeds the bylaws cap (see Step 6), conduct an owner vote — typically requiring 2/3 (66.7%) approval in DC. Record vote results including quorum count.',action:{type:'modal',target:'owner-vote',label:'Record Owner Vote'},ph:'present',ck:['Open feedback period (min 14 days)','Collect written owner questions','Conduct owner vote if required','Record vote results and quorum']},
           {s:'Distribute formal budget package and assessment notice to all owners',t:'30 days before effective',d:'DC Code § 29-1135.02 & Bylaws',detail:'Package should include: proposed budget with prior year comparison, reserve funding status, assessment amount and effective date, explanation of changes, and a summary of upcoming capital needs from the reserve study. Send via method required by bylaws.',ph:'present',ck:['Prepare budget with prior year comparison','Include reserve funding status','Include assessment amount and effective date','Include explanation of changes','Send via required method']},
           {s:'Board votes to adopt budget',t:'Before fiscal year start',d:'Bylaws: Voting & DC Code § 29-1135.02',detail:'Record vote in minutes with full budget attached. If the assessment increase exceeds the bylaws cap (see Step 6), present at annual meeting for owner ratification. If owners reject the budget, operate under prior year budget until a revised budget is adopted.',w:'Owner ratification required when assessment increase exceeds bylaws cap — see Bylaws & DC Code § 29-1135.02',ph:'present'}
         ],
@@ -1125,12 +1126,21 @@ const seedIssues: Issue[] = [
 ];
 
 // ─── Store ─────────────────────────────────────────────────
+export interface ActiveCaseContext {
+  caseId: string;
+  caseTitle: string;
+  stepTitle: string;
+  stepIdx: number;
+  returnPath: string;
+}
+
 interface IssuesState {
   issues: Issue[];
   cases: CaseTrackerCase[];
   nextCaseNum: number;
   nextIssueNum: number;
   nextCommNum: number;
+  activeCaseContext: ActiveCaseContext | null;
 
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
@@ -1205,6 +1215,13 @@ interface IssuesState {
 
   // Decision trail
   addTrailEntry: (caseId: string, entry: Omit<DecisionTrailEntry, 'id'>) => void;
+
+  // Active case context (floating widget)
+  setActiveCaseContext: (ctx: ActiveCaseContext) => void;
+  clearActiveCaseContext: () => void;
+
+  // Budget drafting
+  saveBudgetDraft: (caseId: string, stepIdx: number, draft: NonNullable<import('@/types/issues').CaseStep['budgetDraft']>) => void;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -1213,6 +1230,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   nextCaseNum: 8,
   nextIssueNum: 3,
   nextCommNum: 6,
+  activeCaseContext: null,
 
   loadFromDb: async (tenantId: string) => {
     const [issues, cases] = await Promise.all([
@@ -1805,9 +1823,33 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, decisionTrail: [...(c.decisionTrail || []), { ...entry, id: 'te' + Date.now() }] };
       })
     }));
-  }
+  },
+
+  // ─── Active Case Context (floating widget) ────────────
+  setActiveCaseContext: (ctx) => set({ activeCaseContext: ctx }),
+  clearActiveCaseContext: () => set({ activeCaseContext: null }),
+
+  // ─── Budget Drafting ──────────────────────────────────
+  saveBudgetDraft: (caseId, stepIdx, draft) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], budgetDraft: draft };
+        return { ...c, steps };
+      })
+    }));
+  },
 }), {
   name: 'onetwo-issues',
+  partialize: (state: IssuesState) => ({
+    issues: state.issues,
+    cases: state.cases,
+    nextCaseNum: state.nextCaseNum,
+    nextIssueNum: state.nextIssueNum,
+    nextCommNum: state.nextCommNum,
+    activeCaseContext: state.activeCaseContext,
+  }),
   merge: (persisted: any, current: any) => {
     const merged = { ...current, ...(persisted || {}) };
     // Ensure existing localStorage cases get default empty arrays for new fields

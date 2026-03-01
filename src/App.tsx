@@ -17,6 +17,7 @@ import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import AIAdvisor from '@/components/AIAdvisor';
+import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 
@@ -61,6 +62,12 @@ function AIAdvisorWrapper() {
   return <AIAdvisor />;
 }
 
+function ActiveCaseWidgetWrapper() {
+  const { isAuthenticated } = useAuthStore();
+  if (!isAuthenticated) return null;
+  return <ActiveCaseWidget />;
+}
+
 export default function App() {
   return (
     <HydrationGate>
@@ -93,6 +100,7 @@ export default function App() {
         <Route path="*" element={<CatchAll />} />
       </Routes>
       <AIAdvisorWrapper />
+      <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
   );

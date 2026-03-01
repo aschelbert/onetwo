@@ -173,6 +173,16 @@ export interface CaseStep {
   minimumBids?: number;
   bidCollection?: BidCollection;
   requiresConflictCheck?: boolean;
+  budgetDraft?: {
+    proposedCategories: Array<{ categoryId: string; name: string; current: number; proposed: number }>;
+    proposedReserveContribution: number;
+    contingencyPct: number;
+    contingencyAmount: number;
+    totalProposed: number;
+    perUnitAnnual: number;
+    perUnitMonthly: number;
+    savedDate: string | null;
+  };
 }
 
 export interface AdditionalApproach {

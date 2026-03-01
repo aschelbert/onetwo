@@ -35,6 +35,13 @@ export interface BuildingDetails {
   entityType: 'incorporated' | 'unincorporated';
 }
 
+export interface BylawsConfig {
+  assessmentCapPct: number;
+  ownerVoteThreshold: number;
+  boardSpendingLimit: number;
+  quorumPct: number;
+}
+
 interface BuildingState {
   name: string;
   address: BuildingAddress;
@@ -45,6 +52,8 @@ interface BuildingState {
   legalDocuments: LegalDocument[];
   insurance: InsurancePolicy[];
   vendors: Vendor[];
+  bylawsConfig: BylawsConfig;
+  updateBylawsConfig: (config: Partial<BylawsConfig>) => void;
 
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
@@ -158,6 +167,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     { id: 'v4', name: 'Metro Elevator Co', service: 'Elevator', contact: 'James Metro', phone: '202-555-4004', email: 'james@metroelevator.com', contract: 'Annual inspection, $950/yr', status: 'active' },
     { id: 'v5', name: 'Quick Fix Plumbing', service: 'Plumbing', contact: 'Pete Quick', phone: '202-555-4005', email: 'pete@quickfix.com', contract: 'On-call', status: 'active' },
   ],
+  bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51 },
 
   // ─── DB Hydration ─────────────────────────────
   loadFromDb: async (tenantId: string) => {
@@ -302,6 +312,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) }));
     syncVendor(id);
   },
+  updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
   partialize: (state) => ({
@@ -314,6 +325,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     legalDocuments: state.legalDocuments,
     insurance: state.insurance,
     vendors: state.vendors,
+    bylawsConfig: state.bylawsConfig,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

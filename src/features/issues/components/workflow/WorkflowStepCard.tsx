@@ -8,6 +8,12 @@ import { SpendingDecisionPanel } from './SpendingDecisionPanel';
 import { BidComparisonPanel } from './BidComparisonPanel';
 import { ConflictCheckPanel } from './ConflictCheckPanel';
 import { BudgetWarning } from './BudgetWarning';
+import { BudgetReviewPanel } from './BudgetReviewPanel';
+import { ReserveStudyPanel } from './ReserveStudyPanel';
+import { ThreeYearOutlookPanel } from './ThreeYearOutlookPanel';
+import { ContractRenewalPanel } from './ContractRenewalPanel';
+import { BudgetDraftPanel } from './BudgetDraftPanel';
+import { BylawsReviewPanel } from './BylawsReviewPanel';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
@@ -385,8 +391,17 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                 </>
               )}
 
-              {/* Inline funding analysis */}
-              {inlineOpen && step.action?.type === 'inline' && <FundingAnalysisInline caseId={caseId} stepTitle={step.s} />}
+              {/* Inline panels */}
+              {inlineOpen && step.action?.type === 'inline' && (
+                step.action.target === 'funding-analysis' ? <FundingAnalysisInline caseId={caseId} stepTitle={step.s} /> :
+                step.action.target === 'budget-review' ? <BudgetReviewPanel /> :
+                step.action.target === 'reserve-study' ? <ReserveStudyPanel /> :
+                step.action.target === 'three-year-outlook' ? <ThreeYearOutlookPanel /> :
+                step.action.target === 'contract-renewals' ? <ContractRenewalPanel /> :
+                step.action.target === 'budget-drafter' ? <BudgetDraftPanel caseId={caseId} stepIdx={index} step={step} /> :
+                step.action.target === 'bylaws-review' ? <BylawsReviewPanel caseId={caseId} step={step} /> :
+                null
+              )}
 
               {/* Step attachments */}
               {(step.stepAttachments?.length ?? 0) > 0 && (
