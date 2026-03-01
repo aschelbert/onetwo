@@ -1131,7 +1131,13 @@ export interface ActiveCaseContext {
   caseTitle: string;
   stepTitle: string;
   stepIdx: number;
+  stepTiming?: string;
   returnPath: string;
+  phaseLabel?: string;
+  phaseColor?: string;
+  progress?: { done: number; total: number };
+  stepProgress?: { done: number; total: number };
+  minimized?: boolean;
 }
 
 interface IssuesState {

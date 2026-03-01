@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
+import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import type { StepAction } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -742,13 +742,28 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       const nav = ACTION_NAV[action.target];
       if (nav) {
         if (c) {
-          const stepTitle = c.steps?.[stepIdx]?.s || '';
+          const step = c.steps?.[stepIdx];
+          const stepTitle = step?.s || '';
+          const phases = SITUATION_PHASES[c.sitId] || [];
+          const stepPhaseId = step?.phaseId;
+          const phaseIdx = stepPhaseId ? phases.findIndex(p => p.id === stepPhaseId) : -1;
+          const phase = phaseIdx >= 0 ? phases[phaseIdx] : undefined;
+          const phaseColor = phaseIdx >= 0 ? (PHASE_COLORS[phaseIdx % PHASE_COLORS.length]) : '#e53e3e';
+          const steps = c.steps || [];
+          const doneCount = steps.filter(s => s.done).length;
+          const checksDone = step?.checks?.filter(ck => ck.checked).length || 0;
+          const checksTotal = step?.checks?.length || 0;
           store.setActiveCaseContext({
             caseId: c.id,
             caseTitle: c.title,
             stepTitle,
             stepIdx,
+            stepTiming: step?.t || undefined,
             returnPath: `/issues?view=case:${c.id}`,
+            phaseLabel: phase?.label,
+            phaseColor,
+            progress: { done: doneCount, total: steps.length },
+            stepProgress: checksTotal > 0 ? { done: checksDone, total: checksTotal } : undefined,
           });
         }
         if (nav.tab) fin.setActiveTab(nav.tab);
