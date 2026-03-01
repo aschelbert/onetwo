@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTabParam } from '@/hooks/useTabParam';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
@@ -13,10 +11,8 @@ import { computeFiduciaryAlerts } from '@/lib/fiduciaryAlerts';
 import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
 import { FiduciaryAlerts } from './FiduciaryAlerts';
-import ReportsTab from './tabs/ReportsTab';
 
 export default function DashboardPage() {
-  const [dashView, setDashView] = useTabParam<'dashboard' | 'reports'>('view', 'dashboard', ['dashboard', 'reports']);
   const { currentUser, currentRole } = useAuthStore();
   const fin = useFinancialStore();
   const { meetings } = useMeetingsStore();
@@ -101,16 +97,11 @@ export default function DashboardPage() {
   }) : [];
   const budgetAlerts = isBoard ? getBudgetAlerts(fin.getBudgetVariance()) : [];
 
-  // ─── BOARD / MANAGEMENT DASHBOARD ───
-  if (isBoard) {
-    const attentionItems: { label: string; count: number; color: string; path: string; icon: string }[] = [];
-    if (overdueFilings.length > 0) attentionItems.push({ label: 'Overdue Filings', count: overdueFilings.length, color: 'red', path: '/boardroom', icon: '📅' });
-    if (urgentCases.length > 0) attentionItems.push({ label: 'Urgent Cases', count: urgentCases.length, color: 'red', path: '/issues', icon: '🚨' });
-    if (submittedIssues.length > 0) attentionItems.push({ label: 'New Requests', count: submittedIssues.length, color: 'amber', path: '/issues', icon: '📥' });
-    if (expiringInsurance.length > 0) attentionItems.push({ label: 'Insurance Expiring', count: expiringInsurance.length, color: 'amber', path: '/building', icon: '🛡' });
-    if (aging.days90plus.length > 0) attentionItems.push({ label: '90+ Days Past Due', count: aging.days90plus.length, color: 'red', path: '/building', icon: '⚠' });
-    if (reservePct < 50) attentionItems.push({ label: 'Low Reserves', count: reservePct, color: 'amber', path: '/financial', icon: '💰' });
+  // Deep link helper for Financial page (uses Zustand store-based tabs)
+  const goFinancial = (tab: string) => { fin.setActiveTab(tab); navigate('/financial'); };
 
+  // Shared activity feed builder
+  const buildActivities = () => {
     type Activity = { icon: string; text: string; date: string; path: string };
     const activities: Activity[] = [];
     pastMeetings.slice(0, 2).forEach(m => activities.push({ icon: '🗓', text: `${m.title} completed`, date: m.date, path: '/boardroom' }));
@@ -118,9 +109,38 @@ export default function DashboardPage() {
     recentComms.slice(0, 2).forEach(c => activities.push({ icon: '📨', text: c.subject, date: c.date, path: '/boardroom' }));
     archives.archives.slice(0, 1).forEach(a => activities.push({ icon: '📦', text: `${a.label} archived`, date: a.createdAt.split('T')[0], path: '/archives' }));
     activities.sort((a, b) => b.date.localeCompare(a.date));
+    return activities;
+  };
+
+  // Work orders data (used by management dashboard)
+  const openWorkOrders = fin.workOrders.filter(w => w.status !== 'paid');
+  const openWoTotal = openWorkOrders.reduce((s, w) => s + w.amount, 0);
+
+  // Vendor data
+  const activeVendors = building.vendors.filter(v => v.status === 'active');
+  const expiringContracts = building.vendors.filter(v => {
+    if (!v.contract || v.status !== 'active') return false;
+    const match = v.contract.match(/\d{4}-\d{2}-\d{2}/);
+    if (!match) return false;
+    const exp = new Date(match[0]);
+    return exp > now && exp < in90;
+  });
+
+  // ─── BOARD MEMBER DASHBOARD ───
+  if (currentRole === 'BOARD_MEMBER') {
+    const attentionItems: { label: string; count: number; color: string; onClick: () => void; icon: string }[] = [];
+    if (overdueFilings.length > 0) attentionItems.push({ label: 'Overdue Filings', count: overdueFilings.length, color: 'red', onClick: () => navigate('/boardroom?tab=runbook'), icon: '📅' });
+    if (urgentCases.length > 0) attentionItems.push({ label: 'Urgent Cases', count: urgentCases.length, color: 'red', onClick: () => navigate('/issues'), icon: '🚨' });
+    if (submittedIssues.length > 0) attentionItems.push({ label: 'New Requests', count: submittedIssues.length, color: 'amber', onClick: () => navigate('/issues'), icon: '📥' });
+    if (expiringInsurance.length > 0) attentionItems.push({ label: 'Insurance Expiring', count: expiringInsurance.length, color: 'amber', onClick: () => navigate('/building?tab=insurance'), icon: '🛡' });
+    if (aging.days90plus.length > 0) attentionItems.push({ label: '90+ Days Past Due', count: aging.days90plus.length, color: 'red', onClick: () => goFinancial('unitLedgers'), icon: '⚠' });
+    if (reservePct < 50) attentionItems.push({ label: 'Low Reserves', count: reservePct, color: 'amber', onClick: () => goFinancial('reserves'), icon: '💰' });
+
+    const activities = buildActivities();
 
     return (
       <div className="space-y-5">
+        {/* Header with grade badges */}
         <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -142,18 +162,11 @@ export default function DashboardPage() {
 
         {fiduciaryAlerts.length > 0 && <FiduciaryAlerts alerts={fiduciaryAlerts} />}
 
-        {/* View Toggle */}
-        <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit">
-          <button onClick={() => setDashView('dashboard')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dashView === 'dashboard' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Dashboard</button>
-          <button onClick={() => setDashView('reports')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dashView === 'reports' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Reports</button>
-        </div>
-
-        {dashView === 'reports' && <ReportsTab />}
-
-        {dashView === 'dashboard' && attentionItems.length > 0 && (
+        {/* Attention Pills */}
+        {attentionItems.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {attentionItems.map(item => (
-              <button key={item.label} onClick={() => navigate(item.path)} className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}>
+              <button key={item.label} onClick={item.onClick} className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}>
                 <span>{item.icon}</span>
                 <span className="font-bold">{item.count}</span>
                 <span>{item.label}</span>
@@ -162,33 +175,36 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ─── ACTION ITEMS ─── */}
-        {dashView === 'dashboard' && (() => {
+        {/* 2x2 KPI Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => goFinancial('dashboard')} />
+          <MetricCard label="Reserve Funding" value={`${reservePct}%`} sub={`${fmt(totalReserveFunded)} funded`} color={reservePct >= 70 ? 'sage' : reservePct >= 50 ? 'yellow' : 'red'} onClick={() => goFinancial('reserves')} />
+          <MetricCard label="Compliance Score" value={`${complianceScore}%`} sub={`${complianceGrade} grade · ${completedItems}/${totalItems}`} color={complianceScore >= 75 ? 'sage' : complianceScore >= 60 ? 'yellow' : 'red'} onClick={() => navigate('/boardroom?tab=runbook')} />
+          <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/issues')} />
+        </div>
+
+        {/* Action Items */}
+        {(() => {
           const memberRecord = building.board.find(b => b.name === currentUser.name);
           const userRole = memberRecord?.role || 'President';
-          // Runbook items: not completed, not auto-pass, filtered to user role
           const allRunbookItems = refreshResult.categories.flatMap(c => c.items);
           const myRunbookItems = allRunbookItems.filter(i => !comp.completions[i.id] && !i.autoPass && i.role === userRole);
-          // Overdue filings assigned to user role
           const myOverdueFilings = comp.filings.filter(f => f.status === 'pending' && new Date(f.dueDate) < new Date() && f.responsible === userRole);
-          // Cases assigned to user (open, high/urgent priority)
           const myCases = openCases.filter(c => c.priority === 'urgent' || c.priority === 'high');
-          // Next meeting needing prep
           const nextMtg = upcoming[0];
-          // Total action count
           const totalActions = myRunbookItems.length + myOverdueFilings.length + myCases.length + (nextMtg ? 1 : 0);
 
           if (totalActions === 0) return null;
 
           type ActionItem = { icon: string; label: string; sub: string; path: string; color: string; priority: number };
           const actionItems: ActionItem[] = [];
-          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/boardroom', color: 'red', priority: 1 }));
+          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/boardroom?tab=runbook', color: 'red', priority: 1 }));
           myCases.forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, path: '/issues', color: 'red', priority: 2 }));
           if (nextMtg) {
             const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
+            if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom?tab=meetings', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
           }
-          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/boardroom', color: i.critical ? 'red' : 'amber', priority: 4 }));
+          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/boardroom?tab=runbook', color: i.critical ? 'red' : 'amber', priority: 4 }));
           actionItems.sort((a, b) => a.priority - b.priority);
 
           return (
@@ -218,8 +234,9 @@ export default function DashboardPage() {
           );
         })()}
 
-        {dashView === 'dashboard' && budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0 && (
-          <div className="bg-white rounded-xl border border-ink-100 p-4">
+        {/* Budget Alerts */}
+        {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0 && (
+          <div onClick={() => goFinancial('budget')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-base">💰</span>
               <h2 className="text-sm font-bold text-ink-700">Budget Alerts</h2>
@@ -241,58 +258,19 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {dashView === 'dashboard' && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
-          <MetricCard label="Operating Cash" value={fmt(bs.assets.operating)} sub={`${fmt(bs.assets.totalReceivable)} AR`} color="accent" onClick={() => navigate('/financial')} />
-          <MetricCard label="Delinquent" value={`${metrics.delinquentUnits}`} sub={`${fmt(aging.totalOutstanding)} owed`} color={metrics.delinquentUnits === 0 ? 'sage' : 'red'} onClick={() => navigate('/building')} />
-          <MetricCard label="Reserve Fund" value={`${reservePct}%`} sub={`${fmt(totalReserveFunded)} funded`} color={reservePct >= 70 ? 'sage' : reservePct >= 50 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
-          <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/boardroom')} />
-        </div>}
-
-        {dashView === 'dashboard' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
-            <div className="grid grid-cols-2 gap-3">
-              <div onClick={() => navigate('/boardroom')} className="bg-white rounded-xl border border-ink-100 p-5 cursor-pointer hover:border-sage-300 hover:shadow-sm transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-ink-700">Compliance Runbook</h3>
-                  <span className={`text-2xl font-bold ${complianceScore >= 75 ? 'text-sage-600' : complianceScore >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>{complianceScore}%</span>
-                </div>
-                <div className="w-full h-2 bg-ink-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${complianceScore >= 75 ? 'bg-sage-500' : complianceScore >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${complianceScore}%` }} /></div>
-                <p className="text-xs text-ink-400 mt-2">{completedItems}/{totalItems} items · {overdueFilings.length > 0 ? `${overdueFilings.length} overdue filings` : 'No overdue filings'}</p>
-              </div>
-              <div onClick={() => navigate('/building')} className="bg-white rounded-xl border border-ink-100 p-5 cursor-pointer hover:border-accent-300 hover:shadow-sm transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-ink-700">Building Health</h3>
-                  <span className={`text-2xl font-bold ${buildingHealth >= 80 ? 'text-sage-600' : buildingHealth >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>{buildingGrade}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <MiniStat label="Legal" val={`${legalScore}%`} good={legalScore >= 80} />
-                  <MiniStat label="Insurance" val={`${insScore}%`} good={insScore >= 80} />
-                  <MiniStat label="Governance" val={`${govScore}%`} good={govScore >= 80} />
-                </div>
-                <p className="text-xs text-ink-400 mt-2">{expiringInsurance.length > 0 ? `⚠ ${expiringInsurance.length} policy expiring soon` : '✓ All policies current'}</p>
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-sm font-bold text-ink-700 mb-3">Quick Actions</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <QAction icon="⚙️" label="Daily Operations" sub={`${openCases.length} open`} onClick={() => navigate('/boardroom')} />
-                <QAction icon="💰" label="Fiscal Lens" sub={`${metrics.collectionRate}% rate`} onClick={() => navigate('/financial')} />
-                <QAction icon="✅" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/boardroom')} />
-                <QAction icon="🏢" label="Building" sub={`${buildingGrade} health`} onClick={() => navigate('/building')} />
-              </div>
-            </div>
-
+            {/* Upcoming Meetings */}
             {upcoming.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-bold text-ink-700">Upcoming Meetings</h2>
-                  <button onClick={() => navigate('/boardroom')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
+                  <button onClick={() => navigate('/boardroom?tab=meetings')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
                 </div>
                 <div className="space-y-2">
                   {upcoming.slice(0, 3).map(m => (
-                    <div key={m.id} onClick={() => navigate('/boardroom')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
+                    <div key={m.id} onClick={() => navigate('/boardroom?tab=meetings')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-accent-50 rounded-lg flex flex-col items-center justify-center">
                           <span className="text-[10px] font-bold text-accent-600 leading-none">{new Date(m.date + 'T12:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
@@ -306,9 +284,21 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+
+            {/* Quick Actions */}
+            <div>
+              <h2 className="text-sm font-bold text-ink-700 mb-3">Quick Actions</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <QAction icon="📋" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/boardroom?tab=runbook')} />
+                <QAction icon="💰" label="Fiscal Lens" sub={`${metrics.collectionRate}% rate`} onClick={() => goFinancial('dashboard')} />
+                <QAction icon="🚨" label="Cases" sub={`${openCases.length} open`} onClick={() => navigate('/issues')} />
+                <QAction icon="🏢" label="Building" sub={`${buildingGrade} health`} onClick={() => navigate('/building')} />
+              </div>
+            </div>
           </div>
 
           <div>
+            {/* Recent Activity */}
             <h2 className="text-sm font-bold text-ink-700 mb-3">Recent Activity</h2>
             <div className="bg-white rounded-xl border border-ink-100 divide-y divide-ink-50">
               {activities.length === 0 ? (
@@ -325,10 +315,11 @@ export default function DashboardPage() {
               )}
             </div>
 
+            {/* Delinquency Aging */}
             {aging.totalOutstanding > 0 && (
               <div className="mt-4">
                 <h2 className="text-sm font-bold text-ink-700 mb-3">Delinquency Aging</h2>
-                <div onClick={() => navigate('/building')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-red-200 hover:shadow-sm transition-all space-y-2">
+                <div onClick={() => goFinancial('unitLedgers')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-red-200 hover:shadow-sm transition-all space-y-2">
                   <AgingRow label="Current (0-30)" count={aging.current.length} total={metrics.delinquentUnits} color="yellow" />
                   <AgingRow label="30-60 Days" count={aging.days30.length} total={metrics.delinquentUnits} color="orange" />
                   <AgingRow label="60-90 Days" count={aging.days60.length} total={metrics.delinquentUnits} color="red" />
@@ -338,7 +329,195 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PROPERTY MANAGER DASHBOARD ───
+  if (currentRole === 'PROPERTY_MANAGER') {
+    const attentionItems: { label: string; count: number; color: string; onClick: () => void; icon: string }[] = [];
+    if (submittedIssues.length > 0) attentionItems.push({ label: 'New Requests', count: submittedIssues.length, color: 'amber', onClick: () => navigate('/issues'), icon: '📥' });
+    if (openWorkOrders.length > 0) attentionItems.push({ label: 'Open Work Orders', count: openWorkOrders.length, color: 'amber', onClick: () => goFinancial('workorders'), icon: '🔧' });
+    if (urgentCases.length > 0) attentionItems.push({ label: 'Urgent Cases', count: urgentCases.length, color: 'red', onClick: () => navigate('/issues'), icon: '🚨' });
+    if (expiringContracts.length > 0) attentionItems.push({ label: 'Contracts Expiring', count: expiringContracts.length, color: 'amber', onClick: () => navigate('/building?tab=vendors'), icon: '📄' });
+
+    const activities = buildActivities();
+
+    return (
+      <div className="space-y-5">
+        {/* Header — Operations Overview */}
+        <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Welcome back, {currentUser.name.split(' ')[0]}</h1>
+              <p className="text-accent-200 text-sm mt-1">{building.name} · Operations Overview</p>
+            </div>
+            <div className="text-right">
+              <p className="text-accent-200 text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Attention Pills */}
+        {attentionItems.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {attentionItems.map(item => (
+              <button key={item.label} onClick={item.onClick} className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}>
+                <span>{item.icon}</span>
+                <span className="font-bold">{item.count}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 2x2 KPI Grid — Operational Metrics */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricCard label="Open Work Orders" value={`${openWorkOrders.length}`} sub={`${fmt(openWoTotal)} pending`} color={openWorkOrders.length > 5 ? 'red' : openWorkOrders.length > 0 ? 'amber' : 'sage'} onClick={() => goFinancial('workorders')} />
+          <MetricCard label="New Requests" value={`${submittedIssues.length}`} sub="Submitted issues" color={submittedIssues.length > 0 ? 'amber' : 'sage'} onClick={() => navigate('/issues')} />
+          <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => goFinancial('dashboard')} />
+          <MetricCard label="Delinquent Units" value={`${metrics.delinquentUnits}`} sub={`${fmt(aging.totalOutstanding)} owed`} color={metrics.delinquentUnits === 0 ? 'sage' : 'red'} onClick={() => goFinancial('unitLedgers')} />
+        </div>
+
+        {/* Action Items */}
+        {(() => {
+          const myCases = openCases.filter(c => c.priority === 'urgent' || c.priority === 'high');
+          const nextMtg = upcoming[0];
+          const totalActions = submittedIssues.length + openWorkOrders.length + myCases.length + expiringContracts.length + (nextMtg ? 1 : 0);
+
+          if (totalActions === 0) return null;
+
+          type ActionItem = { icon: string; label: string; sub: string; onClick: () => void; color: string; priority: number };
+          const actionItems: ActionItem[] = [];
+          submittedIssues.slice(0, 3).forEach(i => actionItems.push({ icon: '📥', label: i.title || 'New Request', sub: `${i.type} · ${i.status}`, onClick: () => navigate('/issues'), color: 'amber', priority: 1 }));
+          openWorkOrders.slice(0, 3).forEach(w => actionItems.push({ icon: '🔧', label: w.title, sub: `${w.vendor} · ${fmt(w.amount)}`, onClick: () => goFinancial('workorders'), color: 'amber', priority: 2 }));
+          myCases.slice(0, 2).forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, onClick: () => navigate('/issues'), color: 'red', priority: 3 }));
+          expiringContracts.slice(0, 2).forEach(v => actionItems.push({ icon: '📄', label: v.name, sub: `Contract: ${v.contract}`, onClick: () => navigate('/building?tab=vendors'), color: 'amber', priority: 4 }));
+          if (nextMtg) {
+            const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, onClick: () => navigate('/boardroom?tab=meetings'), color: daysUntil <= 3 ? 'red' : 'amber', priority: 5 });
+          }
+          actionItems.sort((a, b) => a.priority - b.priority);
+
+          return (
+            <div className="bg-white rounded-xl border border-ink-100 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <h2 className="text-sm font-bold text-ink-700">Your Action Items</h2>
+                  <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{Math.min(totalActions, 99)}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {actionItems.slice(0, 6).map((item, idx) => (
+                  <button key={idx} onClick={item.onClick} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border border-red-100 hover:border-red-200' : 'bg-amber-50 border border-amber-100 hover:border-amber-200'}`}>
+                    <span className="text-base shrink-0">{item.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-ink-900 truncate">{item.label}</p>
+                      <p className="text-[10px] text-ink-500">{item.sub}</p>
+                    </div>
+                    <span className="text-ink-300 text-xs">→</span>
+                  </button>
+                ))}
+              </div>
+              {totalActions > 6 && <p className="text-[10px] text-ink-400 mt-2 text-center">+ {totalActions - 6} more items</p>}
+            </div>
+          );
+        })()}
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
+            {/* Open Cases Summary */}
+            {openCases.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-bold text-ink-700">Open Cases</h2>
+                  <button onClick={() => navigate('/issues')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
+                </div>
+                <div className="space-y-2">
+                  {openCases.slice(0, 5).map(c => (
+                    <div key={c.id} onClick={() => navigate('/issues')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold ${c.priority === 'urgent' ? 'bg-red-100 text-red-700' : c.priority === 'high' ? 'bg-orange-100 text-orange-700' : c.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-ink-100 text-ink-600'}`}>{c.priority}</span>
+                        <div><p className="text-sm font-medium text-ink-900">{c.title}</p><p className="text-xs text-ink-400">{c.unit ? `Unit ${c.unit} · ` : ''}{c.created}</p></div>
+                      </div>
+                      <span className="text-ink-300 text-xs">→</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming Meetings */}
+            {upcoming.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-bold text-ink-700">Upcoming Meetings</h2>
+                  <button onClick={() => navigate('/boardroom?tab=meetings')} className="text-xs text-accent-600 hover:text-accent-700 font-medium">View all →</button>
+                </div>
+                <div className="space-y-2">
+                  {upcoming.slice(0, 3).map(m => (
+                    <div key={m.id} onClick={() => navigate('/boardroom?tab=meetings')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-accent-50 rounded-lg flex flex-col items-center justify-center">
+                          <span className="text-[10px] font-bold text-accent-600 leading-none">{new Date(m.date + 'T12:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
+                          <span className="text-sm font-bold text-accent-800 leading-none">{new Date(m.date + 'T12:00').getDate()}</span>
+                        </div>
+                        <div><p className="text-sm font-medium text-ink-900">{m.title}</p><p className="text-xs text-ink-400">{m.time} · {m.location}</p></div>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-lg font-semibold bg-accent-50 text-accent-700">{m.type}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {/* Vendor Status */}
+            <div>
+              <h2 className="text-sm font-bold text-ink-700 mb-3">Vendor Status</h2>
+              <div onClick={() => navigate('/building?tab=vendors')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all space-y-3">
+                <div className="flex justify-between text-xs">
+                  <span className="text-ink-500">Active Vendors</span>
+                  <span className="font-bold text-ink-700">{activeVendors.length}</span>
+                </div>
+                {expiringContracts.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    <p className="text-xs font-semibold text-amber-800">{expiringContracts.length} contract{expiringContracts.length !== 1 ? 's' : ''} expiring soon</p>
+                    {expiringContracts.slice(0, 3).map(v => (
+                      <p key={v.name} className="text-[10px] text-amber-700 mt-0.5">{v.name} · {v.contract}</p>
+                    ))}
+                  </div>
+                )}
+                {expiringContracts.length === 0 && (
+                  <p className="text-xs text-sage-600">All contracts current</p>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div>
+              <h2 className="text-sm font-bold text-ink-700 mb-3">Recent Activity</h2>
+              <div className="bg-white rounded-xl border border-ink-100 divide-y divide-ink-50">
+                {activities.length === 0 ? (
+                  <p className="p-4 text-xs text-ink-400 text-center">No recent activity</p>
+                ) : (
+                  activities.slice(0, 8).map((a, i) => (
+                    <div key={i} onClick={() => navigate(a.path)} className="px-4 py-3 cursor-pointer hover:bg-mist-50 transition-colors">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-base mt-0.5">{a.icon}</span>
+                        <div className="flex-1 min-w-0"><p className="text-xs font-medium text-ink-800 truncate">{a.text}</p><p className="text-[10px] text-ink-400">{a.date}</p></div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

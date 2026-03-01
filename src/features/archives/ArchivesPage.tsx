@@ -7,6 +7,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import Modal from '@/components/ui/Modal';
+import ReportsTab from '@/features/dashboard/tabs/ReportsTab';
 
 const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -34,6 +35,7 @@ export default function ArchivesPage() {
   const finStore = useFinancialStore();
 
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
+  const [topView, setTopView] = useState<'archives' | 'reports'>('archives');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [section, setSection] = useState<Section>('overview');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -141,11 +143,31 @@ export default function ArchivesPage() {
     </div>
   );
 
+  // ─── Reports view (board/PM only) ───
+  if (isBoard && topView === 'reports') {
+    return (
+      <div className="space-y-5">
+        <ArchiveHeader rounded="rounded-xl" />
+        <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit">
+          <button onClick={() => setTopView('archives')} className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-ink-500 hover:text-ink-700">Archives</button>
+          <button className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-ink-900 shadow-sm">Reports</button>
+        </div>
+        <ReportsTab />
+      </div>
+    );
+  }
+
   // ─── Empty state ───
   if (archiveStore.archives.length === 0 && !showCreateModal) {
     return (
       <div className="space-y-0">
         <ArchiveHeader rounded="rounded-t-xl" />
+        {isBoard && (
+          <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit mt-4 mb-2">
+            <button className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-ink-900 shadow-sm">Archives</button>
+            <button onClick={() => setTopView('reports')} className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-ink-500 hover:text-ink-700">Reports</button>
+          </div>
+        )}
         <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-12 text-center">
           <p className="text-5xl mb-4">📦</p>
           <h3 className="text-lg font-bold text-ink-900 mb-2">No archives yet</h3>
@@ -170,6 +192,12 @@ export default function ArchivesPage() {
     return (
       <div className="space-y-0">
         <ArchiveHeader />
+        {isBoard && (
+          <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit mt-4 mb-2">
+            <button className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-ink-900 shadow-sm">Archives</button>
+            <button onClick={() => setTopView('reports')} className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-ink-500 hover:text-ink-700">Reports</button>
+          </div>
+        )}
         <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
           <div className="grid gap-4">
             {archiveStore.archives.map(a => (
