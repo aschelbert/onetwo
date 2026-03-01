@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function ActiveCaseWidget() {
   const ctx = useIssuesStore(s => s.activeCaseContext);
+  const cases = useIssuesStore(s => s.cases);
   const update = useIssuesStore(s => s.setActiveCaseContext);
   const clear = useIssuesStore(s => s.clearActiveCaseContext);
   const navigate = useNavigate();
@@ -21,6 +22,29 @@ export default function ActiveCaseWidget() {
 
   const minimized = ctx.minimized ?? false;
   const phaseColor = ctx.phaseColor || '#e53e3e';
+
+  // Get case steps for prev/next navigation
+  const caseData = cases.find(c => c.id === ctx.caseId);
+  const steps = caseData?.steps || [];
+  const totalSteps = steps.length;
+  const canPrev = ctx.stepIdx > 0;
+  const canNext = ctx.stepIdx < totalSteps - 1;
+
+  const navigateStep = (newIdx: number) => {
+    const step = steps[newIdx];
+    if (!step) return;
+    const checksDone = step.checks?.filter(ck => ck.checked).length || 0;
+    const checksTotal = step.checks?.length || 0;
+    const doneCount = steps.filter(s => s.done).length;
+    update({
+      ...ctx,
+      stepIdx: newIdx,
+      stepTitle: step.s,
+      stepTiming: step.t || undefined,
+      progress: { done: doneCount, total: totalSteps },
+      stepProgress: checksTotal > 0 ? { done: checksDone, total: checksTotal } : undefined,
+    });
+  };
 
   const handleReturn = () => {
     navigate(ctx.returnPath);
@@ -154,6 +178,43 @@ export default function ActiveCaseWidget() {
             </div>
           </div>
         </div>
+
+        {/* Step navigation */}
+        {totalSteps > 1 && (
+          <div className="flex items-center justify-between mt-2">
+            <button
+              onClick={() => canPrev && navigateStep(ctx.stepIdx - 1)}
+              disabled={!canPrev}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                canPrev
+                  ? 'text-ink-600 hover:bg-ink-100 hover:text-ink-800'
+                  : 'text-ink-200 cursor-not-allowed'
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+              Prev
+            </button>
+            <span className="text-[10px] font-medium text-ink-400">
+              Step {ctx.stepIdx + 1} of {totalSteps}
+            </span>
+            <button
+              onClick={() => canNext && navigateStep(ctx.stepIdx + 1)}
+              disabled={!canNext}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                canNext
+                  ? 'text-ink-600 hover:bg-ink-100 hover:text-ink-800'
+                  : 'text-ink-200 cursor-not-allowed'
+              }`}
+            >
+              Next
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Return button */}
