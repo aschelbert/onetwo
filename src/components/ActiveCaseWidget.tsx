@@ -40,7 +40,7 @@ export default function ActiveCaseWidget() {
     return (
       <button
         onClick={handleExpand}
-        className="fixed bottom-24 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-110"
+        className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-110"
         style={{
           background: `linear-gradient(135deg, #1a1f25 0%, #6b1a1a 100%)`,
           boxShadow: '0 4px 20px rgba(0,0,0,0.25), 0 0 0 3px rgba(229,62,62,0.15)',
@@ -61,7 +61,7 @@ export default function ActiveCaseWidget() {
   // ── Full pill state ──────────────────────────────────
   return (
     <div
-      className="fixed bottom-24 right-6 z-50 w-[340px] bg-white rounded-2xl overflow-hidden transition-all duration-300 group"
+      className="fixed bottom-6 right-6 z-50 w-[340px] bg-white rounded-2xl overflow-hidden transition-all duration-300 group"
       style={{
         boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
         transform: mounted ? 'translateY(0)' : 'translateY(40px)',
