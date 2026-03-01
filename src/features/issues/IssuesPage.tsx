@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
-import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal } from './components/CaseModals';
+import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal } from './components/CaseModals';
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -21,14 +21,15 @@ export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useTabParam<string>('view', 'tabs');
+  const [wizardPrefill, setWizardPrefill] = useState<{ source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string } | undefined>();
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
 
-  if (view === 'new') return <WizardView onDone={(id) => setView(`case:${id}`)} onBack={() => setView('tabs')} />;
+  if (view === 'new') return <WizardView onDone={(id) => { setWizardPrefill(undefined); setView(`case:${id}`); }} onBack={() => { setWizardPrefill(undefined); setView('tabs'); }} prefill={wizardPrefill} />;
   if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;
 
-  const open = cases.filter(c => c.status === 'open');
+  const open = cases.filter(c => c.status === 'open' || c.status === 'on-hold');
   const closed = cases.filter(c => c.status === 'closed');
   const urgent = open.filter(c => c.priority === 'urgent');
   const high = open.filter(c => c.priority === 'high');
@@ -37,14 +38,16 @@ export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
     open={open} closed={closed} urgent={urgent} high={high}
     issues={issues} isBoard={isBoard} user={user}
     onNav={setView} store={store} embedded={embedded}
+    onWizardPrefill={(pf) => { setWizardPrefill(pf); setView('new'); }}
   />;
 }
 
 type CaseTab = 'open' | 'issues' | 'archive';
 
-function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store, embedded }: {
+function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav, store, embedded, onWizardPrefill }: {
   open: any[]; closed: any[]; urgent: any[]; high: any[]; issues: any[];
   isBoard: boolean; user: any; onNav: (v: string) => void; store: any; embedded?: boolean;
+  onWizardPrefill?: (pf: { source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string }) => void;
 }) {
   const [tab, setTab] = useTabParam<CaseTab>('caseTab', 'open', ['open', 'issues', 'archive']);
   const [search, setSearch] = useState('');
@@ -88,10 +91,25 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
       'General Question': 'admin', 'Other': 'admin',
     };
     const prioMap: Record<string, string> = { HIGH: 'high', MEDIUM: 'medium', LOW: 'low', URGENT: 'urgent' };
-    const catId = catMap[issue.category] || 'admin';
-    const sits = CATS.find(c => c.id === catId)?.sits || CATS[0].sits;
+    const mappedCatId = catMap[issue.category] || 'admin';
+    const sits = CATS.find(c => c.id === mappedCatId)?.sits || CATS[0].sits;
+
+    // Navigate to wizard with pre-populated data
+    if (onWizardPrefill) {
+      store.updateIssueStatus(issue.id, 'IN_PROGRESS');
+      onWizardPrefill({
+        source: 'issue', sourceId: issue.id,
+        catId: mappedCatId, sitId: sits[0]?.id,
+        title: issue.title, unit: issue.unitNumber || '', owner: issue.reporterName,
+        priority: (prioMap[issue.priority] || 'medium') as CasePriority,
+        notes: `Converted from issue ${issue.id}. ${issue.description}`,
+      });
+      return;
+    }
+
+    // Fallback: direct creation
     const id = store.createCase({
-      catId, sitId: sits[0]?.id || 'other', approach: 'pre' as CaseApproach,
+      catId: mappedCatId, sitId: sits[0]?.id || 'other', approach: 'pre' as CaseApproach,
       title: issue.title, unit: issue.unitNumber || '', owner: issue.reporterName,
       priority: (prioMap[issue.priority] || 'medium') as CasePriority, notes: `Converted from issue ${issue.id}. ${issue.description}`,
       source: 'issue', sourceId: issue.id
@@ -433,23 +451,23 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 }
 
 // ─── Creation Wizard ───────────────────────────────────────
-function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: () => void }) {
+function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void; onBack: () => void; prefill?: { source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string } }) {
   const { createCase } = useIssuesStore();
   const { board: boardMembers } = useBuildingStore();
   const units = useFinancialStore(s => s.units);
-  const [step, setStep] = useState(1);
-  const [catId, setCatId] = useState<string | null>(null);
-  const [sitId, setSitId] = useState<string | null>(null);
+  const [step, setStep] = useState(prefill?.catId && prefill?.sitId ? 2 : 1);
+  const [catId, setCatId] = useState<string | null>(prefill?.catId || null);
+  const [sitId, setSitId] = useState<string | null>(prefill?.sitId || null);
   const [approach, setApproach] = useState<CaseApproach>('pre');
-  const [title, setTitle] = useState('');
-  const [unit, setUnit] = useState('');
-  const [owner, setOwner] = useState('');
-  const [priority, setPriority] = useState<CasePriority>('medium');
-  const [notes, setNotes] = useState('');
+  const [title, setTitle] = useState(prefill?.title || '');
+  const [unit, setUnit] = useState(prefill?.unit || '');
+  const [owner, setOwner] = useState(prefill?.owner || '');
+  const [priority, setPriority] = useState<CasePriority>(prefill?.priority || 'medium');
+  const [notes, setNotes] = useState(prefill?.notes || '');
   const [assignedTo, setAssignedTo] = useState('');
   const [assignedRole, setAssignedRole] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [source, setSource] = useState('');
+  const [source, setSource] = useState(prefill?.source || '');
   const [daciSuggested, setDaciSuggested] = useState(false);
 
   const selCat = CATS.find(c => c.id === catId);
@@ -487,7 +505,7 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
 
   const handleCreate = () => {
     if (!catId || !sitId || !title.trim()) return;
-    const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || undefined });
+    const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
     onDone(id);
   };
 
@@ -495,6 +513,11 @@ function WizardView({ onDone, onBack }: { onDone: (id: string) => void; onBack: 
     <div className="space-y-5">
       <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Back to Dashboard</button>
       <h2 className="text-2xl font-bold text-ink-900">New Case</h2>
+      {prefill?.sourceId && (
+        <div className="inline-flex items-center gap-2 bg-accent-50 border border-accent-200 rounded-lg px-3 py-1.5">
+          <span className="text-xs font-semibold text-accent-700">From {prefill.source === 'issue' ? `Request #${prefill.sourceId}` : `#${prefill.sourceId}`}</span>
+        </div>
+      )}
       <div className="flex gap-2 mb-4">
         {[1, 2, 3].map(s => (
           <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-accent-500' : 'bg-ink-100'}`} />
@@ -685,6 +708,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showLinkInvoiceModal, setShowLinkInvoiceModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
@@ -779,11 +805,15 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           onToggleStep={(idx) => store.toggleStep(caseId, idx)}
           onAddNote={(idx, note) => store.addStepNote(caseId, idx, note)}
           onAction={handleAction}
-          onClose={() => { if (confirm('Close this case?')) store.closeCase(caseId); }}
+          onClose={() => setShowCloseModal(true)}
           onReopen={() => store.reopenCase(caseId)}
           onEditAssignment={openAssignmentEditor}
           onAddApproach={() => setShowApproachModal(true)}
-          onDelete={() => { if (confirm('Delete this case?')) { store.deleteCase(caseId); onBack(); } }}
+          onDelete={() => setShowDeleteModal(true)}
+          onToggleCheck={(cid, stepIdx, checkId) => store.toggleCheck(cid, stepIdx, checkId)}
+          onCompleteAllChecks={(cid, stepIdx) => store.completeAllChecks(cid, stepIdx)}
+          onPutOnHold={() => setShowHoldModal(true)}
+          onResume={() => store.resumeCase(caseId)}
         >
           {/* Board Vote */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
@@ -998,6 +1028,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showInvoiceModal && <InvoiceCreateModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowInvoiceModal(false)} />}
       {showLinkInvoiceModal && <LinkInvoiceModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkInvoiceModal(false)} />}
       {showMeetingModal && <LinkMeetingModal caseId={caseId} store={store} onClose={() => setShowMeetingModal(false)} />}
+      {showHoldModal && <HoldCaseModal caseId={caseId} store={store} onClose={() => setShowHoldModal(false)} />}
+      {showCloseModal && c.steps && <CloseCaseModal caseId={caseId} store={store} incompleteCount={c.steps.filter(s => !s.done).length} totalCount={c.steps.length} onClose={() => setShowCloseModal(false)} />}
+      {showDeleteModal && <DeleteCaseModal caseId={caseId} store={store} onClose={() => setShowDeleteModal(false)} onDeleted={onBack} />}
       {editingAssignment && (
         <Modal title="Edit Assignment" onClose={() => setEditingAssignment(false)} onSave={() => {
           store.updateCaseAssignment(caseId, {

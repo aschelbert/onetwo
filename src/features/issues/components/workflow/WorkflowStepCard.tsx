@@ -3,6 +3,7 @@ import type { CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
 import type { FundingOption } from '@/store/useSpendingStore';
 import { deriveActionsForStep, type RichAction } from './stepActionMap';
+import { StepChecklist } from './StepChecklist';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
@@ -20,6 +21,8 @@ interface WorkflowStepCardProps {
   onAction: (action: StepAction, idx: number) => void;
   onContinue?: () => void;
   totalSteps: number;
+  onToggleCheck?: (checkId: string) => void;
+  onCompleteAllChecks?: () => void;
 }
 
 interface FundingAnalysisInlineProps {
@@ -224,7 +227,7 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onCompleteAllChecks },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -246,6 +249,10 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
     onNote(noteText);
     setEditingNote(false);
   };
+
+  const hasChecks = step.checks && step.checks.length > 0;
+  const checkedCount = hasChecks ? step.checks!.filter(ck => ck.checked).length : 0;
+  const totalChecks = hasChecks ? step.checks!.length : 0;
 
   // Status indicator
   const StatusIndicator = () => {
@@ -297,6 +304,7 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
             {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">💡 Guidance</span>}
+            {hasChecks && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
             {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
           </div>
         </div>
@@ -375,27 +383,39 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
             <div className="lg:col-span-1">
               <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2.5">Completion</p>
               <div className="bg-mist-50 rounded-xl p-4 border border-mist-100 space-y-3">
-                {/* Done toggle */}
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <button
-                    onClick={(e) => { e.preventDefault(); onToggleDone(); }}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                      step.done ? 'bg-sage-500 border-sage-500' : 'border-ink-300 group-hover:border-accent-400'
-                    }`}
-                  >
-                    {step.done && (
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                {/* Checklist or done toggle */}
+                {hasChecks && onToggleCheck ? (
+                  <>
+                    <p className="text-xs font-medium text-ink-500 mb-1">Tasks ({checkedCount}/{totalChecks})</p>
+                    <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />
+                    {step.done && step.doneDate && (
+                      <p className="text-[10px] text-sage-500">All tasks complete — {step.doneDate}</p>
                     )}
-                  </button>
-                  <span className={`text-sm font-medium ${step.done ? 'text-sage-700' : 'text-ink-700'}`}>
-                    {step.done ? 'Step Complete' : 'Mark as Done'}
-                  </span>
-                </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <button
+                        onClick={(e) => { e.preventDefault(); onToggleDone(); }}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                          step.done ? 'bg-sage-500 border-sage-500' : 'border-ink-300 group-hover:border-accent-400'
+                        }`}
+                      >
+                        {step.done && (
+                          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <span className={`text-sm font-medium ${step.done ? 'text-sage-700' : 'text-ink-700'}`}>
+                        {step.done ? 'Step Complete' : 'Mark as Done'}
+                      </span>
+                    </label>
 
-                {step.done && step.doneDate && (
-                  <p className="text-[10px] text-sage-500 pl-9">Completed {step.doneDate}</p>
+                    {step.done && step.doneDate && (
+                      <p className="text-[10px] text-sage-500 pl-9">Completed {step.doneDate}</p>
+                    )}
+                  </>
                 )}
 
                 {/* Inline note */}
@@ -447,7 +467,10 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                 {/* Continue button — inside completion column */}
                 {!step.done && onContinue && index < totalSteps - 1 && (
                   <button
-                    onClick={onContinue}
+                    onClick={() => {
+                      if (hasChecks && onCompleteAllChecks) onCompleteAllChecks();
+                      onContinue();
+                    }}
                     className="w-full py-2.5 rounded-xl bg-accent-500 text-white text-sm font-semibold hover:bg-accent-600 transition-colors shadow-sm"
                   >
                     Continue →

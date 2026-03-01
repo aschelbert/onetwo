@@ -9,7 +9,18 @@ export interface RichAction {
   target: string;
   primary?: boolean;
   isAction?: boolean;  // true = in-step action, false = navigates away
+  destination?: string;
+  destinationRoute?: string;
 }
+
+const DESTINATION_MAP: Record<string, { destination: string; route: string }> = {
+  'financial:dashboard': { destination: 'Fiscal Lens → Dashboard', route: '/financial?tab=dashboard' },
+  'financial:reserves': { destination: 'Fiscal Lens → Reserves', route: '/financial?tab=reserves' },
+  'financial:budget': { destination: 'Fiscal Lens → Budget', route: '/financial?tab=budget' },
+  'financial:workorders': { destination: 'Fiscal Lens → Work Orders', route: '/financial?tab=workorders' },
+  'financial:approvals': { destination: 'Fiscal Lens → Spending', route: '/financial?tab=approvals' },
+  'financial:ledger': { destination: 'Fiscal Lens → Ledger', route: '/financial?tab=ledger' },
+};
 
 export function deriveActionsForStep(step: CaseStep): RichAction[] {
   const actions: RichAction[] = [];
@@ -18,6 +29,7 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
   // 1. Existing step.action becomes primary
   if (step.action) {
     const isAction = step.action.type !== 'navigate';
+    const dest = DESTINATION_MAP[step.action.target];
     actions.push({
       id: `action-${step.id}`,
       icon: step.action.type === 'navigate' ? '↗' : step.action.type === 'inline' ? '📊' : '➕',
@@ -27,6 +39,7 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
       target: step.action.target,
       primary: true,
       isAction,
+      ...(dest && { destination: dest.destination, destinationRoute: dest.route }),
     });
     usedTargets.add(step.action.target);
   }
@@ -36,19 +49,24 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
 
   // 2. Fiscal Lens references in d field
   if (d.includes('fiscal lens: dashboard') || d.includes('fiscal lens:dashboard')) {
-    actions.push({ id: `fl-dash-${step.id}`, icon: '📊', label: 'Open Financial Dashboard', description: 'View financial overview in Fiscal Lens', type: 'navigate', target: 'financial:dashboard', isAction: false });
+    const dest = DESTINATION_MAP['financial:dashboard'];
+    actions.push({ id: `fl-dash-${step.id}`, icon: '📊', label: 'Open Financial Dashboard', description: 'View financial overview in Fiscal Lens', type: 'navigate', target: 'financial:dashboard', isAction: false, destination: dest.destination, destinationRoute: dest.route });
   }
   if (d.includes('fiscal lens: reserves') || d.includes('fiscal lens:reserves')) {
-    actions.push({ id: `fl-res-${step.id}`, icon: '🏦', label: 'Open Reserves', description: 'Review reserve fund status and projections', type: 'navigate', target: 'financial:reserves', isAction: false });
+    const dest = DESTINATION_MAP['financial:reserves'];
+    actions.push({ id: `fl-res-${step.id}`, icon: '🏦', label: 'Open Reserves', description: 'Review reserve fund status and projections', type: 'navigate', target: 'financial:reserves', isAction: false, destination: dest.destination, destinationRoute: dest.route });
   }
   if (d.includes('fiscal lens: budget') || d.includes('fiscal lens:budget')) {
-    actions.push({ id: `fl-bud-${step.id}`, icon: '📋', label: 'Open Budget', description: 'Review budget allocations and spending', type: 'navigate', target: 'financial:budget', isAction: false });
+    const dest = DESTINATION_MAP['financial:budget'];
+    actions.push({ id: `fl-bud-${step.id}`, icon: '📋', label: 'Open Budget', description: 'Review budget allocations and spending', type: 'navigate', target: 'financial:budget', isAction: false, destination: dest.destination, destinationRoute: dest.route });
   }
   if (d.includes('fiscal lens: work orders') || d.includes('fiscal lens:work orders')) {
-    actions.push({ id: `fl-wo-${step.id}`, icon: '🔧', label: 'Open Work Orders', description: 'View and manage work orders', type: 'navigate', target: 'financial:workorders', isAction: false });
+    const dest = DESTINATION_MAP['financial:workorders'];
+    actions.push({ id: `fl-wo-${step.id}`, icon: '🔧', label: 'Open Work Orders', description: 'View and manage work orders', type: 'navigate', target: 'financial:workorders', isAction: false, destination: dest.destination, destinationRoute: dest.route });
   }
   if (d.includes('fiscal lens: spending') || d.includes('fiscal lens:spending')) {
-    actions.push({ id: `fl-spend-${step.id}`, icon: '💳', label: 'Open Spending Approvals', description: 'Review spending and approvals', type: 'navigate', target: 'financial:approvals', isAction: false });
+    const dest = DESTINATION_MAP['financial:approvals'];
+    actions.push({ id: `fl-spend-${step.id}`, icon: '💳', label: 'Open Spending Approvals', description: 'Review spending and approvals', type: 'navigate', target: 'financial:approvals', isAction: false, destination: dest.destination, destinationRoute: dest.route });
   }
 
   // 3. Work Order from step text (if no WO action already)

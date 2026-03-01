@@ -34,7 +34,14 @@ export interface Issue {
 
 export type CasePriority = 'urgent' | 'high' | 'medium' | 'low';
 export type CaseApproach = 'pre' | 'self' | 'legal';
-export type CaseStatus = 'open' | 'closed';
+export type CaseStatus = 'open' | 'on-hold' | 'closed';
+
+export interface CaseCheckItem {
+  id: string;
+  label: string;
+  checked: boolean;
+  checkedDate: string | null;
+}
 
 export interface CaseStep {
   id: string;
@@ -48,6 +55,8 @@ export interface CaseStep {
   doneDate: string | null;
   userNotes: string;
   stepAttachments?: CaseAttachment[];
+  phaseId?: string;
+  checks?: CaseCheckItem[];
 }
 
 export interface AdditionalApproach {
@@ -108,4 +117,7 @@ export interface CaseTrackerCase {
   source?: string;
   sourceId?: string;
   completedAt?: string;
+  holdReason?: string;
+  closeReason?: string;
+  closeNotes?: string;
 }

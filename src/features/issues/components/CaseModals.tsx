@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Modal from '@/components/ui/Modal';
 import { CATS, APPR_LABELS, APPR_COLORS } from '@/store/useIssuesStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -693,5 +694,90 @@ export function LinkMeetingModal({ caseId, store, onClose }: ModalProps & { case
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Hold Case Modal ──────────────────────────────────────
+export function HoldCaseModal({ caseId, store, onClose }: ModalProps & { caseId: string; store: any }) {
+  const [reason, setReason] = useState('');
+
+  const handleSave = () => {
+    if (!reason.trim()) return;
+    store.putOnHold(caseId, reason.trim());
+    onClose();
+  };
+
+  return (
+    <Modal title="Put Case On Hold" subtitle="This case will be paused until resumed." onClose={onClose} onSave={handleSave} saveLabel="Put On Hold" saveColor="bg-amber-600 hover:bg-amber-700">
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-ink-700 mb-1">Reason for hold *</label>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Waiting for owner response, pending legal review..." autoFocus />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Close Case Modal ─────────────────────────────────────
+const CLOSE_REASONS = ['Resolved', 'Withdrawn by Owner', 'Duplicate Case', 'No Action Required', 'Referred to Legal', 'Other'];
+
+export function CloseCaseModal({ caseId, store, incompleteCount, totalCount, onClose }: ModalProps & { caseId: string; store: any; incompleteCount: number; totalCount: number }) {
+  const [reason, setReason] = useState('Resolved');
+  const [notes, setNotes] = useState('');
+
+  const handleSave = () => {
+    if (!reason) return;
+    store.closeCaseWithReason(caseId, reason, notes.trim());
+    onClose();
+  };
+
+  return (
+    <Modal title="Close Case" subtitle="This case will be marked as closed." onClose={onClose} onSave={handleSave} saveLabel="Close Case">
+      <div className="space-y-4">
+        {incompleteCount > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-sm font-medium text-amber-800">{incompleteCount} of {totalCount} tasks are still incomplete.</p>
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium text-ink-700 mb-1">Reason *</label>
+          <select value={reason} onChange={e => setReason(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+            {CLOSE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-ink-700 mb-1">Notes (optional)</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Additional context..." />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Delete Case Modal ────────────────────────────────────
+export function DeleteCaseModal({ caseId, store, onClose, onDeleted }: ModalProps & { caseId: string; store: any; onDeleted: () => void }) {
+  const [confirmText, setConfirmText] = useState('');
+  const confirmed = confirmText === caseId;
+
+  const handleDelete = () => {
+    if (!confirmed) return;
+    store.deleteCase(caseId);
+    onClose();
+    onDeleted();
+  };
+
+  return (
+    <Modal title="Delete Case" onClose={onClose} onSave={handleDelete} saveLabel="Delete Permanently" saveColor={confirmed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 opacity-50 cursor-not-allowed'}>
+      <div className="space-y-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-sm font-medium text-red-800">This action cannot be undone. All attachments, notes, and progress will be permanently removed.</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-ink-700 mb-1">Type <span className="font-mono font-bold">{caseId}</span> to confirm</label>
+          <input value={confirmText} onChange={e => setConfirmText(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" placeholder={caseId} autoFocus />
+        </div>
+      </div>
+    </Modal>
   );
 }

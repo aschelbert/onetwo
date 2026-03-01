@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, type ReactNode } from 'react';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
-import { APPR_LABELS, APPR_COLORS } from '@/store/useIssuesStore';
+import { APPR_LABELS, APPR_COLORS, SITUATION_PHASES } from '@/store/useIssuesStore';
 import { CaseSidebar } from './CaseSidebar';
 import { WorkflowStepCard } from './WorkflowStepCard';
+import { PhaseHeader } from './PhaseHeader';
 
 interface CaseWorkflowProps {
   c: CaseTrackerCase;
@@ -16,12 +17,18 @@ interface CaseWorkflowProps {
   onEditAssignment: () => void;
   onAddApproach: () => void;
   onDelete: () => void;
+  onToggleCheck?: (caseId: string, stepIdx: number, checkId: string) => void;
+  onCompleteAllChecks?: (caseId: string, stepIdx: number) => void;
+  onPutOnHold?: () => void;
+  onResume?: () => void;
   children?: ReactNode;
 }
 
 export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
-  onClose, onReopen, onEditAssignment, onAddApproach, onDelete, children,
+  onClose, onReopen, onEditAssignment, onAddApproach, onDelete,
+  onToggleCheck, onCompleteAllChecks, onPutOnHold, onResume,
+  children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const activeStepIdx = steps.findIndex(s => !s.done);
@@ -45,6 +52,55 @@ export function CaseWorkflow({
     }
   }, [steps, scrollToStep]);
 
+  // Phase grouping
+  const phases = SITUATION_PHASES[c.sitId] || [];
+  const hasPhases = phases.length > 0 && steps.some(s => s.phaseId);
+
+  const stepsByPhase = hasPhases
+    ? phases.map(p => ({
+        ...p,
+        steps: steps.map((s, i) => ({ step: s, idx: i })).filter(x => x.step.phaseId === p.id),
+      }))
+    : [];
+  const orphanSteps = hasPhases
+    ? steps.map((s, i) => ({ step: s, idx: i })).filter(x => !x.step.phaseId)
+    : steps.map((s, i) => ({ step: s, idx: i }));
+
+  const renderStepCard = (step: CaseStep, i: number) => (
+    <WorkflowStepCard
+      key={step.id}
+      ref={(el) => { stepRefs.current[i] = el; }}
+      caseId={c.id}
+      step={step}
+      index={i}
+      isActive={i === activeStepIdx}
+      isExpanded={expandedStep === i}
+      onToggleExpand={() => setExpandedStep(expandedStep === i ? -1 : i)}
+      onToggleDone={() => onToggleStep(i)}
+      onNote={(note) => onAddNote(i, note)}
+      onAction={onAction}
+      onContinue={() => handleContinue(i)}
+      totalSteps={steps.length}
+      onToggleCheck={onToggleCheck ? (checkId) => onToggleCheck(c.id, i, checkId) : undefined}
+      onCompleteAllChecks={onCompleteAllChecks ? () => onCompleteAllChecks(c.id, i) : undefined}
+    />
+  );
+
+  // Calculate phase progress counts for PhaseHeader
+  const getPhaseProgress = (phaseSteps: { step: CaseStep; idx: number }[]) => {
+    let done = 0, total = 0;
+    for (const { step } of phaseSteps) {
+      if (step.checks && step.checks.length > 0) {
+        done += step.checks.filter(ck => ck.checked).length;
+        total += step.checks.length;
+      } else {
+        done += step.done ? 1 : 0;
+        total += 1;
+      }
+    }
+    return { done, total };
+  };
+
   return (
     <div className="flex gap-6 items-start">
       {/* Sidebar — case summary, step rail, and supporting sections */}
@@ -59,6 +115,8 @@ export function CaseWorkflow({
         onEditAssignment={onEditAssignment}
         onAddApproach={onAddApproach}
         onDelete={onDelete}
+        onPutOnHold={onPutOnHold}
+        onResume={onResume}
         additionalApproaches={c.additionalApproaches}
       >
         {children}
@@ -66,25 +124,34 @@ export function CaseWorkflow({
 
       {/* Main content — workflow steps */}
       <div className="flex-1 min-w-0 space-y-4">
-        {/* Step cards accordion */}
+        {/* Step cards — grouped by phase or flat */}
         <div className="space-y-3">
-          {steps.map((step, i) => (
-            <WorkflowStepCard
-              key={step.id}
-              ref={(el) => { stepRefs.current[i] = el; }}
-              caseId={c.id}
-              step={step}
-              index={i}
-              isActive={i === activeStepIdx}
-              isExpanded={expandedStep === i}
-              onToggleExpand={() => setExpandedStep(expandedStep === i ? -1 : i)}
-              onToggleDone={() => onToggleStep(i)}
-              onNote={(note) => onAddNote(i, note)}
-              onAction={onAction}
-              onContinue={() => handleContinue(i)}
-              totalSteps={steps.length}
-            />
-          ))}
+          {/* Orphan steps (no phase) render first */}
+          {orphanSteps.length > 0 && !hasPhases && orphanSteps.map(({ step, idx }) => renderStepCard(step, idx))}
+
+          {/* Phase-grouped steps */}
+          {hasPhases && (
+            <>
+              {orphanSteps.length > 0 && orphanSteps.map(({ step, idx }) => renderStepCard(step, idx))}
+              {stepsByPhase.map((phase, pi) => {
+                if (phase.steps.length === 0) return null;
+                const progress = getPhaseProgress(phase.steps);
+                return (
+                  <div key={phase.id}>
+                    <PhaseHeader
+                      label={phase.label}
+                      colorIndex={pi}
+                      doneChecks={progress.done}
+                      totalChecks={progress.total}
+                    />
+                    <div className="space-y-3">
+                      {phase.steps.map(({ step, idx }) => renderStepCard(step, idx))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
 
         {/* Additional approaches */}
