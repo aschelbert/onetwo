@@ -8,8 +8,10 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
-import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal } from './components/CaseModals';
+import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal, AddBidModal } from './components/CaseModals';
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
+import DecisionTrail from './components/workflow/DecisionTrail';
+import { OwnerCaseView } from './components/OwnerCaseView';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
 import { DACI_MATRIX } from '@/data/daciMatrix';
@@ -697,6 +699,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const letterStore = useLetterStore();
   const meetingsStore = useMeetingsStore();
   const navigate = useNavigate();
+  const role = useAuthStore(s => s.currentUser.role);
+  const isBoard = role !== 'RESIDENT';
   const c = store.cases.find(x => x.id === caseId);
 
   const [showVoteModal, setShowVoteModal] = useState(false);
@@ -711,6 +715,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBidModal, setShowBidModal] = useState(false);
+  const [bidTargetStep, setBidTargetStep] = useState<number | null>(null);
   const [woForm, setWOForm] = useState({ title: '', vendor: '', amount: '', acctNum: '6050' });
   const [editingAssignment, setEditingAssignment] = useState(false);
   const [assignForm, setAssignForm] = useState({ assignedTo: '', assignedRole: '', dueDate: '' });
@@ -798,7 +804,9 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       )}
 
       {/* Case Workflow: sidebar + accordion + supporting sections */}
-      {c.steps && (
+      {c.steps && !isBoard ? (
+        <OwnerCaseView c={c} onBack={onBack} />
+      ) : c.steps && (
         <CaseWorkflow
           c={c}
           steps={c.steps}
@@ -814,7 +822,11 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           onCompleteAllChecks={(cid, stepIdx) => store.completeAllChecks(cid, stepIdx)}
           onPutOnHold={() => setShowHoldModal(true)}
           onResume={() => store.resumeCase(caseId)}
+          onOpenBidModal={(stepIdx) => { setBidTargetStep(stepIdx); setShowBidModal(true); }}
         >
+          {/* Decision Trail */}
+          <DecisionTrail entries={c.decisionTrail || []} />
+
           {/* Board Vote */}
           <div className="bg-white rounded-xl border border-ink-100 p-5">
             <div className="flex items-center justify-between mb-4">
@@ -1031,6 +1043,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showHoldModal && <HoldCaseModal caseId={caseId} store={store} onClose={() => setShowHoldModal(false)} />}
       {showCloseModal && c.steps && <CloseCaseModal caseId={caseId} store={store} incompleteCount={c.steps.filter(s => !s.done).length} totalCount={c.steps.length} onClose={() => setShowCloseModal(false)} />}
       {showDeleteModal && <DeleteCaseModal caseId={caseId} store={store} onClose={() => setShowDeleteModal(false)} onDeleted={onBack} />}
+      {showBidModal && bidTargetStep != null && <AddBidModal caseId={caseId} stepIdx={bidTargetStep} store={store} onClose={() => { setShowBidModal(false); setBidTargetStep(null); }} />}
       {editingAssignment && (
         <Modal title="Edit Assignment" onClose={() => setEditingAssignment(false)} onSave={() => {
           store.updateCaseAssignment(caseId, {

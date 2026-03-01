@@ -4,6 +4,10 @@ import type { StepAction } from '@/store/useIssuesStore';
 import type { FundingOption } from '@/store/useSpendingStore';
 import { deriveActionsForStep, type RichAction } from './stepActionMap';
 import { StepChecklist } from './StepChecklist';
+import { SpendingDecisionPanel } from './SpendingDecisionPanel';
+import { BidComparisonPanel } from './BidComparisonPanel';
+import { ConflictCheckPanel } from './ConflictCheckPanel';
+import { BudgetWarning } from './BudgetWarning';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
@@ -23,6 +27,8 @@ interface WorkflowStepCardProps {
   totalSteps: number;
   onToggleCheck?: (checkId: string) => void;
   onCompleteAllChecks?: () => void;
+  onCloseCase?: () => void;
+  onOpenBidModal?: (stepIdx: number) => void;
 }
 
 interface FundingAnalysisInlineProps {
@@ -214,8 +220,8 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
       </div>
       <div className="flex items-center gap-2 ml-auto shrink-0">
         {!action.isAction && (
-          <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${action.primary ? 'bg-white bg-opacity-20 text-white' : 'bg-accent-50 text-accent-600 border border-accent-200'}`}>
-            → {action.target.split(':').pop()}
+          <span className={`text-[10px] px-2 py-0.5 rounded whitespace-nowrap ${action.destination ? 'bg-red-50 text-red-600 border border-red-200' : action.primary ? 'bg-white bg-opacity-20 text-white' : 'bg-accent-50 text-accent-600 border border-accent-200'}`}>
+            → {action.destination ? action.destination.split('→').pop()!.trim() : action.target.split(':').pop()}
           </span>
         )}
         <svg className={`w-4 h-4 mt-0.5 opacity-40 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 ${action.primary ? 'text-white' : 'text-ink-400'}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -227,7 +233,7 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onCompleteAllChecks },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onCompleteAllChecks, onCloseCase, onOpenBidModal },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -253,6 +259,10 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
   const hasChecks = step.checks && step.checks.length > 0;
   const checkedCount = hasChecks ? step.checks!.filter(ck => ck.checked).length : 0;
   const totalChecks = hasChecks ? step.checks!.length : 0;
+
+  // Budget warning context (for spending decision steps)
+  const fin = useFinancialStore();
+  const budgetCtx = step.isSpendingDecision ? getFinancialContext(fin) : null;
 
   // Status indicator
   const StatusIndicator = () => {
@@ -299,11 +309,11 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className={`text-sm font-medium ${step.done ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{step.s}</p>
-            {isActive && <span className="text-[10px] font-semibold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-full">Current Step</span>}
+            {isActive && <span className="text-[10px] font-bold text-white bg-accent-500 uppercase tracking-wider px-2 py-0.5 rounded-full">CURRENT</span>}
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
-            {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">💡 Guidance</span>}
+            {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">📍 Guidance</span>}
             {hasChecks && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
             {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
           </div>
@@ -325,13 +335,13 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
             </div>
           )}
 
-          {/* Guidance banner — accent-colored, below description */}
+          {/* Jurisdiction guidance banner — yellow box, below description */}
           {step.w && (
-            <div className="bg-accent-50 border border-accent-200 rounded-lg p-3 flex items-start gap-2">
-              <span className="text-accent-500 mt-0.5">💡</span>
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 flex items-start gap-2">
+              <span className="mt-0.5">📍</span>
               <div>
-                <p className="text-xs font-semibold text-accent-700 uppercase tracking-wider mb-0.5">Guidance</p>
-                <p className="text-sm text-accent-800">{step.w}</p>
+                <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-0.5">JURISDICTION GUIDANCE</p>
+                <p className="text-sm text-yellow-900">{step.w}</p>
               </div>
             </div>
           )}
@@ -341,6 +351,23 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-medium text-ink-500 bg-ink-50 border border-ink-100 rounded-lg px-3 py-1.5">📋 {step.d}</span>
             </div>
+          )}
+
+          {/* Fiduciary & fiscal panels */}
+          {step.isSpendingDecision && (
+            <SpendingDecisionPanel caseId={caseId} stepIdx={index} step={step} />
+          )}
+
+          {step.requiresBids && (
+            <BidComparisonPanel caseId={caseId} stepIdx={index} step={step} onOpenBidModal={onOpenBidModal ? () => onOpenBidModal(index) : undefined} />
+          )}
+
+          {step.requiresConflictCheck && (
+            <ConflictCheckPanel caseId={caseId} stepId={step.id} />
+          )}
+
+          {step.isSpendingDecision && budgetCtx && (
+            <BudgetWarning ctx={budgetCtx} />
           )}
 
           {/* Two-column layout: Actions (2/3) + Completion (1/3) — matching reference */}
@@ -474,6 +501,16 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                     className="w-full py-2.5 rounded-xl bg-accent-500 text-white text-sm font-semibold hover:bg-accent-600 transition-colors shadow-sm"
                   >
                     Continue →
+                  </button>
+                )}
+
+                {/* Close Case button — last step only */}
+                {!step.done && index === totalSteps - 1 && onCloseCase && (
+                  <button
+                    onClick={onCloseCase}
+                    className="w-full py-2.5 rounded-xl bg-sage-600 text-white text-sm font-semibold hover:bg-sage-700 transition-colors shadow-sm"
+                  >
+                    Close Case ✓
                   </button>
                 )}
               </div>

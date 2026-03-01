@@ -755,6 +755,87 @@ export function CloseCaseModal({ caseId, store, incompleteCount, totalCount, onC
   );
 }
 
+// ─── Add Bid Modal ───────────────────────────────────────
+export function AddBidModal({ caseId, stepIdx, store, onClose }: ModalProps & { caseId: string; stepIdx: number; store: any }) {
+  const [vendorName, setVendorName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [scope, setScope] = useState('');
+  const [timeline, setTimeline] = useState('');
+  const [warranty, setWarranty] = useState('');
+  const [insuranceVerified, setInsuranceVerified] = useState(false);
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [notes, setNotes] = useState('');
+
+  const handleSave = () => {
+    if (!vendorName.trim() || !amount) return alert('Vendor name and amount are required.');
+    store.addBid(caseId, stepIdx, {
+      vendorName: vendorName.trim(),
+      amount: parseFloat(amount),
+      scope: scope.trim(),
+      timeline: timeline.trim(),
+      warranty: warranty.trim(),
+      insuranceVerified,
+      licenseVerified,
+      submittedDate: new Date().toISOString().split('T')[0],
+      notes: notes.trim(),
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="border-b p-6">
+          <h2 className="text-xl font-bold text-ink-900">Add Bid</h2>
+          <p className="text-sm text-ink-500 mt-1">Enter vendor bid details</p>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Vendor Name *</label>
+            <input value={vendorName} onChange={e => setVendorName(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Company name" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Bid Amount *</label>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="0.00" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Scope of Work</label>
+            <textarea value={scope} onChange={e => setScope(e.target.value)} rows={2} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Description of work included..." />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Timeline</label>
+              <input value={timeline} onChange={e => setTimeline(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 4-6 weeks" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Warranty</label>
+              <input value={warranty} onChange={e => setWarranty(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 2 years" />
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={insuranceVerified} onChange={e => setInsuranceVerified(e.target.checked)} className="rounded" />
+              <span className="text-sm text-ink-700">Insurance Verified</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={licenseVerified} onChange={e => setLicenseVerified(e.target.checked)} className="rounded" />
+              <span className="text-sm text-ink-700">License Verified</span>
+            </label>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Additional notes..." />
+          </div>
+        </div>
+        <div className="border-t p-6 flex justify-end space-x-3">
+          <button onClick={onClose} className="px-4 py-2 text-ink-700 font-medium">Cancel</button>
+          <button onClick={handleSave} className="px-6 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 font-medium">Add Bid</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Delete Case Modal ────────────────────────────────────
 export function DeleteCaseModal({ caseId, store, onClose, onDeleted }: ModalProps & { caseId: string; store: any; onDeleted: () => void }) {
   const [confirmText, setConfirmText] = useState('');

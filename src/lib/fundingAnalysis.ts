@@ -1,4 +1,5 @@
 import type { FundingOption } from '@/store/useSpendingStore';
+import type { BudgetAlert, BudgetAlertLevel } from '@/types/issues';
 import { fmt } from '@/lib/formatters';
 
 export interface FundingContext {
@@ -199,4 +200,74 @@ export function analyzeFunding(amount: number, ctx: FundingContext): { options: 
   }
 
   return { options, recommendation };
+}
+
+// ── Budget Alerts ──
+interface BudgetVarianceRow { category?: string; name?: string; budgeted: number; actual: number }
+
+export function getBudgetAlerts(budgetVariance: BudgetVarianceRow[]): BudgetAlert[] {
+  const alerts: BudgetAlert[] = [];
+  for (const row of budgetVariance) {
+    if (row.budgeted <= 0) continue;
+    const pctUsed = Math.round((row.actual / row.budgeted) * 100);
+    let level: BudgetAlertLevel = 'none';
+    if (pctUsed >= 100) level = 'critical';
+    else if (pctUsed >= 95) level = 'high';
+    else if (pctUsed >= 85) level = 'medium';
+    else if (pctUsed >= 75) level = 'low';
+    if (level !== 'none') {
+      alerts.push({
+        categoryName: row.category || row.name || 'Unknown',
+        level,
+        percentUsed: pctUsed,
+        budgeted: row.budgeted,
+        spent: row.actual,
+        remaining: row.budgeted - row.actual,
+      });
+    }
+  }
+  return alerts.sort((a, b) => b.percentUsed - a.percentUsed);
+}
+
+// ── Spending Validation ──
+export function validateSpendingAmount(
+  amount: number,
+  source: string,
+  ctx: FundingContext,
+  bylawsLimit: number = 5000,
+): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (amount <= 0) errors.push('Amount must be greater than zero.');
+  if (amount > bylawsLimit) errors.push(`Amount exceeds board spending authority of ${fmt(bylawsLimit)}. Owner vote required.`);
+  if (source === 'operating' && amount > ctx.operatingBalance) errors.push('Amount exceeds operating cash balance.');
+  if (source === 'reserves' && amount > ctx.reserveBalance) errors.push('Amount exceeds reserve fund balance.');
+  if (source === 'reserves') {
+    const totalReserveNeeded = ctx.reservePctFunded > 0 ? ctx.reserveBalance / (ctx.reservePctFunded / 100) : 0;
+    const afterPct = totalReserveNeeded > 0 ? Math.round(((ctx.reserveBalance - amount) / totalReserveNeeded) * 100) : 0;
+    if (afterPct < 30) warnings.push(`Reserve draw would reduce funding to ${afterPct}%, below the 30% minimum threshold.`);
+    else if (afterPct < 50) warnings.push(`Reserve draw would reduce funding to ${afterPct}%, below the recommended 50% level.`);
+  }
+  if (amount > ctx.budgetRemaining && ctx.budgetRemaining > 0) warnings.push('Amount exceeds remaining budget for the fiscal year.');
+
+  return { errors, warnings };
+}
+
+// ── Reserve Projection ──
+export function projectReserveFunding(
+  currentBalance: number,
+  drawAmount: number,
+  annualContrib: number,
+  years: number = 10,
+): { year: number; withoutDraw: number; withDraw: number }[] {
+  const result: { year: number; withoutDraw: number; withDraw: number }[] = [];
+  let withoutDraw = currentBalance;
+  let withDraw = currentBalance - drawAmount;
+  for (let y = 0; y <= years; y++) {
+    result.push({ year: y, withoutDraw: Math.round(withoutDraw), withDraw: Math.round(withDraw) });
+    withoutDraw += annualContrib;
+    withDraw += annualContrib;
+  }
+  return result;
 }

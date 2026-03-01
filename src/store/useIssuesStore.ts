@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as issuesSvc from '@/lib/services/issues';
 import * as casesSvc from '@/lib/services/cases';
-import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem } from '@/types/issues';
+import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry } from '@/types/issues';
 
 // ─── Situation Templates ───────────────────────────────────
 export interface StepAction {
@@ -17,6 +17,10 @@ export interface SituationStep {
   action?: StepAction;
   ph?: string;
   ck?: string[];
+  isSpendingDecision?: boolean;
+  requiresBids?: boolean;
+  minimumBids?: number;
+  requiresConflictCheck?: boolean;
 }
 export interface Situation {
   id: string; title: string; desc: string;
@@ -167,10 +171,10 @@ export const CATS: Category[] = [
         pre:[
           {s:'Document issue with photos, video, dates, affected areas',t:'Immediately',detail:'Include: location, severity, units affected, date discovered, who reported it. This documentation supports insurance claims and contractor scope.',ph:'document',ck:['Take photos of damage','Record video if applicable','Note dates and affected areas','Identify who reported the issue']},
           {s:'Determine whether common element or unit owner responsibility per CC&Rs',t:'1-3 days',d:'CC&Rs: Maintenance matrix',detail:'CC&Rs define the boundary between HOA and unit owner responsibility. Typically: structure, roof, exterior walls, common pipes = HOA. Interior finishes, fixtures, appliances = owner. If it is an owner responsibility, notify them in writing with the CC&R section cited.',ph:'evaluate'},
-          {s:'Obtain 2-3 qualified contractor bids; verify licenses and insurance',t:'1-2 weeks',detail:'For emergency repairs (active leak, safety hazard), board may authorize immediate work under emergency spending provisions and ratify at next meeting. For non-emergency: always get competitive bids.',ph:'evaluate',ck:['Obtain bid 1','Obtain bid 2','Obtain bid 3','Verify licenses for each bidder','Verify insurance for each bidder']},
-          {s:'FUNDING DECISION: Determine where the money comes from before approving the repair',t:'Before approval',d:'Fiscal Lens: Spending Decisions',detail:'Use the Spending Decisions tab to analyze: (1) Is this a BUDGETED operating expense? If yes, check if the budget category has room — use operating funds. (2) Is this a RESERVE item (e.g., roof, elevator, plumbing risers)? If yes, use reserves — that\'s what they\'re for. (3) Is this covered by INSURANCE (e.g., storm damage, water intrusion from covered peril)? File a claim. (4) Is this UNEXPECTED and large? Create a spending request to see the per-unit impact and options. Never spend money without knowing where it comes from.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'},ph:'approve',ck:['Check if budgeted operating expense','Check if reserve item','Check if covered by insurance','Create spending request if unexpected and large']},
+          {s:'Obtain 2-3 qualified contractor bids; verify licenses and insurance',t:'1-2 weeks',detail:'For emergency repairs (active leak, safety hazard), board may authorize immediate work under emergency spending provisions and ratify at next meeting. For non-emergency: always get competitive bids.',ph:'evaluate',ck:['Obtain bid 1','Obtain bid 2','Obtain bid 3','Verify licenses for each bidder','Verify insurance for each bidder'],requiresBids:true,minimumBids:3},
+          {s:'FUNDING DECISION: Determine where the money comes from before approving the repair',t:'Before approval',d:'Fiscal Lens: Spending Decisions',detail:'Use the Spending Decisions tab to analyze: (1) Is this a BUDGETED operating expense? If yes, check if the budget category has room — use operating funds. (2) Is this a RESERVE item (e.g., roof, elevator, plumbing risers)? If yes, use reserves — that\'s what they\'re for. (3) Is this covered by INSURANCE (e.g., storm damage, water intrusion from covered peril)? File a claim. (4) Is this UNEXPECTED and large? Create a spending request to see the per-unit impact and options. Never spend money without knowing where it comes from.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'},ph:'approve',ck:['Check if budgeted operating expense','Check if reserve item','Check if covered by insurance','Create spending request if unexpected and large'],isSpendingDecision:true},
           {s:'Check bylaws for board spending authority — does this need an owner vote?',t:'Before approval',d:'Bylaws: Spending authority',detail:'Most bylaws authorize the board to spend up to a threshold (e.g., $5K-$25K) without owner vote. If the repair exceeds this threshold and is not an emergency, you need owner approval. If it IS an emergency (health/safety), proceed and ratify at the next meeting.',ph:'approve'},
-          {s:'Board approves expenditure at meeting; document vote, funding source, and contractor selection in minutes',t:'Next board meeting (emergency exception for health/safety)',d:'Bylaws: Spending authority',detail:'Minutes should record: the repair needed, bids received, selected contractor and rationale, total cost, funding source (operating/reserve/insurance), and board vote.',ph:'approve'},
+          {s:'Board approves expenditure at meeting; document vote, funding source, and contractor selection in minutes',t:'Next board meeting (emergency exception for health/safety)',d:'Bylaws: Spending authority',detail:'Minutes should record: the repair needed, bids received, selected contractor and rationale, total cost, funding source (operating/reserve/insurance), and board vote.',ph:'approve',requiresConflictCheck:true},
           {s:'Create Work Order in Fiscal Lens; engage contractor; oversee work and document completion',t:'Per scope',d:'Fiscal Lens: Work Orders',detail:'Create a work order to track the full lifecycle: draft → approved → invoiced → paid. This creates GL entries automatically. Inspect completed work and photograph before releasing final payment.',action:{type:'modal',target:'create-wo',label:'Create Work Order'},ph:'execute'},
           {s:'Charge repair costs back to the responsible unit owner when caused by owner negligence',t:'After repair',d:'CC&Rs: Damage responsibility',detail:'CC&Rs authorize the HOA to charge back repair costs caused by owner negligence. Include: CC&R section cited, repair invoices, photos, and timeline for reimbursement. This reduces the financial impact on all other owners. If the owner disputes, escalate to formal demand.',w:'Required per CC&Rs when investigation determines owner negligence caused the damage',ph:'close'}
         ],
@@ -198,8 +202,8 @@ export const CATS: Category[] = [
           {s:'Notify insurance carrier and file claim within policy timeframe',t:'Within 24-48 hours',d:'Insurance policy: Notice provisions',detail:'Contact carrier claims department. Provide: policy number, date/time of loss, description, initial photos, estimated damage. Request adjuster visit. Do not dispose of damaged materials until adjuster approves. This is your most important financial step — insurance is the first funding source for emergencies.',ph:'evaluate',ck:['Contact carrier claims department','Provide policy number and loss details','Submit initial photos','Request adjuster visit']},
           {s:'Notify affected unit owners in writing; advise on HO-6 claim filing for interior damage',t:'Within 24 hours',detail:'Owners need to file their own HO-6 claims for unit interior damage (flooring, drywall, personal property). Provide: description of incident, areas affected, HOA carrier claim number, contact for questions.',ph:'evaluate'},
           {s:'Track all emergency expenditures in Fiscal Lens immediately — do not wait',t:'As incurred',d:'Fiscal Lens: Work Orders & Spending Decisions',detail:'Create work orders for each contractor/vendor even during the emergency. This is critical for: (1) insurance reimbursement — carrier will want itemized records, (2) board ratification, (3) determining the funding gap later. Sloppy record-keeping during emergencies is the #1 reason HOAs fail to recover full insurance proceeds.',action:{type:'navigate',target:'financial:workorders',label:'Open Work Orders'},ph:'execute'},
-          {s:'Board ratifies emergency expenditure at next meeting; document justification and funding source',t:'Next board meeting',d:'Bylaws: Emergency provisions',detail:'Present: description of emergency, actions taken, contractors engaged, total cost, insurance claim status, funding source. Board votes to ratify. Record in minutes. Even though the board president had authority to act, ratification creates a formal record.',ph:'approve'},
-          {s:'FUNDING THE GAP: After adjuster estimate, determine the shortfall and how to cover it',t:'After adjuster estimate',d:'Fiscal Lens: Spending Decisions',detail:'Calculate: Total repair cost minus insurance proceeds minus HOA deductible = gap. Use the Spending Decisions tab to analyze options: (1) INSURANCE covers most or all — best case, wait for proceeds. (2) OPERATING BUDGET can absorb the deductible + small gap. (3) RESERVES can cover the gap if the item is a designated reserve component. (4) SPECIAL ASSESSMENT needed if gap is large — check bylaws for emergency assessment procedures (often expedited notice/vote). (5) HOA LINE OF CREDIT to bridge until insurance pays.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'},ph:'execute',ck:['Calculate total repair cost','Subtract insurance proceeds','Subtract HOA deductible','Analyze funding options for the gap']},
+          {s:'Board ratifies emergency expenditure at next meeting; document justification and funding source',t:'Next board meeting',d:'Bylaws: Emergency provisions',detail:'Present: description of emergency, actions taken, contractors engaged, total cost, insurance claim status, funding source. Board votes to ratify. Record in minutes. Even though the board president had authority to act, ratification creates a formal record.',ph:'approve',isSpendingDecision:true,requiresConflictCheck:true},
+          {s:'FUNDING THE GAP: After adjuster estimate, determine the shortfall and how to cover it',t:'After adjuster estimate',d:'Fiscal Lens: Spending Decisions',detail:'Calculate: Total repair cost minus insurance proceeds minus HOA deductible = gap. Use the Spending Decisions tab to analyze options: (1) INSURANCE covers most or all — best case, wait for proceeds. (2) OPERATING BUDGET can absorb the deductible + small gap. (3) RESERVES can cover the gap if the item is a designated reserve component. (4) SPECIAL ASSESSMENT needed if gap is large — check bylaws for emergency assessment procedures (often expedited notice/vote). (5) HOA LINE OF CREDIT to bridge until insurance pays.',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Options'},ph:'execute',ck:['Calculate total repair cost','Subtract insurance proceeds','Subtract HOA deductible','Analyze funding options for the gap'],isSpendingDecision:true},
           {s:'Appeal and pursue the insurance claim aggressively when denied or underpaid',t:'Within appeal window',detail:'Insurance carriers frequently underpay first estimates. Steps: (1) Get a detailed independent estimate from your own contractor. (2) File a written appeal with supporting documentation. (3) Request the specific policy provision cited for any denial. (4) Consider a public adjuster (works on contingency, typically 10% of recovery). (5) Escalate to state insurance commissioner if necessary.',w:'Required when carrier denies or underpays — carriers frequently underpay first estimates',ph:'close',ck:['Get independent contractor estimate','File written appeal with documentation','Request policy provision cited for denial','Consider public adjuster','Escalate to state insurance commissioner if needed']},
           {s:'Determine who caused the damage and pursue cost recovery',t:'After emergency stabilized',detail:'If caused by unit owner negligence (e.g., left water running, failed to maintain appliance): the CC&Rs typically allow the HOA to charge the repair cost back to the owner. If caused by a contractor or third party: pursue their insurance. Cost recovery reduces the financial impact on the HOA and all other owners.',w:'Applicable when damage was caused by identifiable negligence',ph:'close'}
         ],
@@ -223,11 +227,11 @@ export const CATS: Category[] = [
         tags:['Hiring contractors','Reviewing bids','Performance disputes','Contract management'],
         pre:[
           {s:'Define scope of work and budget; determine funding source and check spending authority',t:'Before soliciting bids',d:'Bylaws: Spending authority & Fiscal Lens',detail:'Before soliciting bids: (1) Check the budget category in Fiscal Lens — is there room in the operating budget? (2) If this is a capital item, check reserves. (3) Check bylaws for contract value thresholds (typically $10K-$25K requires owner vote). For recurring contracts (landscaping, management), compare the ANNUAL value to the threshold, not the monthly amount.',action:{type:'navigate',target:'financial:budget',label:'Open Budget'},ph:'document',ck:['Define scope of work','Determine budget amount','Identify funding source','Check spending authority threshold']},
-          {s:'Obtain minimum 3 competitive bids from qualified contractors',t:'2-4 weeks',detail:'Provide identical scope to all bidders for fair comparison. Request: itemized pricing, timeline, references, proof of insurance, license number. A good bid process saves the HOA money and demonstrates fiduciary care.',ph:'evaluate'},
+          {s:'Obtain minimum 3 competitive bids from qualified contractors',t:'2-4 weeks',detail:'Provide identical scope to all bidders for fair comparison. Request: itemized pricing, timeline, references, proof of insurance, license number. A good bid process saves the HOA money and demonstrates fiduciary care.',ph:'evaluate',requiresBids:true,minimumBids:3},
           {s:'Verify contractor licenses, insurance (GL + workers comp), and check references',t:'1-2 weeks',d:'Fiduciary duty of care',detail:'Require: current state/local business license, general liability insurance ($1M+ naming HOA as additional insured), workers compensation if they have employees, completed W-9. Call 2-3 references on similar projects.',ph:'evaluate',ck:['Verify business license','Verify GL insurance with HOA as additional insured','Verify workers compensation','Collect W-9','Check 2-3 references']},
           {s:'Review contract terms: scope, fixed price, timeline, payment schedule, warranty, indemnification, termination',t:'1 week',detail:'Key terms: payment tied to milestones (not time), 10% retention on large projects, warranty (1-2 years minimum), insurance requirements, hold-harmless/indemnification, termination for cause and convenience, dispute resolution.',ph:'evaluate',ck:['Review scope and fixed price','Review timeline and payment schedule','Review warranty terms','Review indemnification clause','Review termination provisions']},
-          {s:'Check for conflicts of interest: does any board member have a relationship with the contractor?',t:'Before approval',d:'Fiduciary duty of loyalty',detail:'Any board member with a relationship to the contractor must disclose and recuse from discussion and vote per conflict of interest policy. Document disclosure in minutes. This is a common source of board liability — take it seriously.',ph:'approve'},
-          {s:'Submit Spending Decision request and obtain board approval at meeting',t:'Board meeting',d:'Fiscal Lens: Spending Decisions & Bylaws',detail:'For contracts above $5K: create a spending request in Fiscal Lens so the board can see the funding analysis (operating vs reserves, per-unit impact). Board approves with vote documented in minutes. If value exceeds bylaws threshold, schedule owner vote first.',w:'Required when amount exceeds routine spending threshold',ph:'approve'},
+          {s:'Check for conflicts of interest: does any board member have a relationship with the contractor?',t:'Before approval',d:'Fiduciary duty of loyalty',detail:'Any board member with a relationship to the contractor must disclose and recuse from discussion and vote per conflict of interest policy. Document disclosure in minutes. This is a common source of board liability — take it seriously.',ph:'approve',requiresConflictCheck:true},
+          {s:'Submit Spending Decision request and obtain board approval at meeting',t:'Board meeting',d:'Fiscal Lens: Spending Decisions & Bylaws',detail:'For contracts above $5K: create a spending request in Fiscal Lens so the board can see the funding analysis (operating vs reserves, per-unit impact). Board approves with vote documented in minutes. If value exceeds bylaws threshold, schedule owner vote first.',w:'Required when amount exceeds routine spending threshold',ph:'approve',isSpendingDecision:true},
           {s:'Execute contract; create Work Order in Fiscal Lens; set up payment milestones',t:'After approval',d:'Fiscal Lens: Work Orders',detail:'The WO tracks the financial lifecycle: draft → approved → invoiced → paid, creating GL entries automatically. Set payment milestones tied to completed work — never pay ahead of work.',action:{type:'modal',target:'create-wo',label:'Create Work Order'},ph:'execute'},
           {s:'Monitor performance; document milestones and any deficiencies in writing immediately',t:'Ongoing',detail:'Regular progress check-ins. Photograph completed milestones. Send written notice of any deficiencies immediately — do not wait until project end. Early communication prevents disputes.',ph:'execute'},
           {s:'Final inspection, punch list resolution, retention release, and warranty documentation',t:'At completion',detail:'Walk project with contractor and board representative. Create written punch list. Do not release retention until all items resolved and warranty documentation received. Update the reserve study if this was a capital replacement.',ph:'close',ck:['Conduct final inspection','Create written punch list','Resolve all punch list items','Release retention','Collect warranty documentation']}
@@ -589,15 +593,15 @@ export const CATS: Category[] = [
         pre:[
           {s:'Commission engineering study or professional assessment to define scope, urgency, and whether the project can be phased',t:'6-12 months before project',detail:'Engage a licensed engineer or specialist. Report should include: scope, urgency rating (can it wait 1-2 years?), estimated cost range, recommended timeline, and whether the work can be broken into phases (e.g., elevator #1 this year, #2 next year; east facade this year, west next year). Phasing is the #1 way to reduce per-unit financial impact.',ph:'assess'},
           {s:'Develop detailed project scope, specifications, and timeline for bidding',t:'3-6 months out',detail:'Scope should be detailed enough for apples-to-apples bidding. Include performance standards, warranty requirements, and completion timeline. If phasing, clearly define Phase 1 scope.',ph:'assess',ck:['Define detailed scope','Set performance standards','Define warranty requirements','Set completion timeline']},
-          {s:'Obtain minimum 3 competitive bids from qualified, licensed, and insured contractors',t:'2-3 months out',detail:'Verify: state/local contractor license, general liability insurance ($1M+), workers comp, bonding capacity. Check references on similar projects. Require bids on identical scope.',ph:'assess',ck:['Obtain bid 1','Obtain bid 2','Obtain bid 3','Verify licenses and insurance for each','Check references for each']},
+          {s:'Obtain minimum 3 competitive bids from qualified, licensed, and insured contractors',t:'2-3 months out',detail:'Verify: state/local contractor license, general liability insurance ($1M+), workers comp, bonding capacity. Check references on similar projects. Require bids on identical scope.',ph:'assess',ck:['Obtain bid 1','Obtain bid 2','Obtain bid 3','Verify licenses and insurance for each','Check references for each'],requiresBids:true,minimumBids:3},
           {s:'Board evaluates bids on qualifications, references, price, and timeline — not lowest price alone',t:'Board meeting',d:'Fiduciary duty of care',detail:'Document evaluation criteria and rationale. Lowest bid is not always best — consider experience, warranty, financial stability, and how they handle change orders. Record decision in minutes.',ph:'fund'},
-          {s:'FUNDING STRATEGY: Now that you have actual bids, choose the funding strategy that balances cost, timeline, and owner impact',t:'After bid evaluation',d:'Fiscal Lens: Spending Decisions',detail:'Open Fiscal Lens → Spending Decisions or use the inline analysis below. Enter the actual bid amount to see strategy options: reserves direct, phasing, increased contributions, HOA loan, special assessment, or a combination. Each strategy shows pros/cons, approval requirements, and downstream steps.',w:'Use actual bid amounts — not estimates — for accurate strategy analysis',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Strategies'},ph:'fund',ck:['Evaluate reserves-only option','Evaluate phasing option','Evaluate HOA loan option','Evaluate special assessment option','Select optimal strategy']},
-          {s:'Board approves project from reserves for designated reserve items with sufficient funding',t:'Board meeting',d:'Reserve study & Bylaws',detail:'When the project matches a component in your reserve study AND reserves can cover it while staying above 30% funded, the board can approve without owner vote. This is the simplest path — no special assessment, no owner impact. Check bylaws to confirm.',w:'Applies when funding strategy is reserves-only and reserves are sufficient',ph:'fund'},
+          {s:'FUNDING STRATEGY: Now that you have actual bids, choose the funding strategy that balances cost, timeline, and owner impact',t:'After bid evaluation',d:'Fiscal Lens: Spending Decisions',detail:'Open Fiscal Lens → Spending Decisions or use the inline analysis below. Enter the actual bid amount to see strategy options: reserves direct, phasing, increased contributions, HOA loan, special assessment, or a combination. Each strategy shows pros/cons, approval requirements, and downstream steps.',w:'Use actual bid amounts — not estimates — for accurate strategy analysis',action:{type:'inline',target:'funding-analysis',label:'Analyze Funding Strategies'},ph:'fund',ck:['Evaluate reserves-only option','Evaluate phasing option','Evaluate HOA loan option','Evaluate special assessment option','Select optimal strategy'],isSpendingDecision:true},
+          {s:'Board approves project from reserves for designated reserve items with sufficient funding',t:'Board meeting',d:'Reserve study & Bylaws',detail:'When the project matches a component in your reserve study AND reserves can cover it while staying above 30% funded, the board can approve without owner vote. This is the simplest path — no special assessment, no owner impact. Check bylaws to confirm.',w:'Applies when funding strategy is reserves-only and reserves are sufficient',ph:'fund',requiresConflictCheck:true},
           {s:'Calculate per-unit special assessment impact and design payment options',t:'With funding decision',detail:'Per-unit allocation must follow the percentage interest in the Declaration (NOT equal split). For assessments over $1,000/unit, always offer an installment plan (3-12 months). For assessments over $5,000/unit, consider 12-24 month payment plans and a hardship provision. Present owners with the total cost, per-unit share, and at least 2 payment options.',w:'Required when selected strategy includes a special assessment component',ph:'fund'},
           {s:'Send owner notice with project scope, cost, funding options, and per-unit impact',t:'30-60 days before vote',d:'Bylaws: Notice & DC Code § 29-1135.03',detail:'Notice must clearly explain: (1) What work is needed and why, (2) What happens if we delay, (3) Total cost and per-unit cost, (4) How it will be paid for, (5) Payment options available to owners, (6) Meeting date for vote. Present in plain language — not accounting jargon.',w:'Required when project cost exceeds board spending authority per bylaws — DC Code § 29-1135.03',ph:'fund',ck:['Explain what work is needed and why','Describe consequences of delay','State total cost and per-unit cost','Explain funding plan','List payment options','Include meeting date for vote']},
           {s:'Hold owner vote; present funding plan with per-unit impact and payment options',t:'At meeting per notice',d:'Bylaws & DC Code § 29-1135.03',detail:'If special assessment needed: typically requires 2/3 owner approval in DC. Present: total cost, per-unit share, payment schedule options, what happens if project is deferred. If using reserves for designated purpose per reserve study: board may approve. Document vote results.',w:'Required when project cost exceeds board spending authority per bylaws',ph:'fund'},
           {s:'Execute contract with performance bond and payment/retention schedule',t:'After all approvals',d:'Best practice for projects > $50K',detail:'Contract should include: detailed scope, fixed price or GMP, payment schedule tied to milestones (not time), 10% retention until final completion, performance bond (100% of contract value for large projects), warranty terms, insurance requirements, indemnification.',ph:'execute',ck:['Finalize contract scope and price','Set milestone payment schedule','Set 10% retention terms','Obtain performance bond','Confirm warranty and insurance terms']},
-          {s:'Create Work Order in Fiscal Lens and submit Spending Decision request',t:'Before work begins',d:'Fiscal Lens: Work Orders & Spending Decisions',detail:'Create the WO to track the financial lifecycle: draft → approved → invoiced → paid. This creates the GL entries automatically and gives you a paper trail of the entire project cost.',action:{type:'modal',target:'create-wo',label:'Create Work Order'},ph:'execute'},
+          {s:'Create Work Order in Fiscal Lens and submit Spending Decision request',t:'Before work begins',d:'Fiscal Lens: Work Orders & Spending Decisions',detail:'Create the WO to track the financial lifecycle: draft → approved → invoiced → paid. This creates the GL entries automatically and gives you a paper trail of the entire project cost.',action:{type:'modal',target:'create-wo',label:'Create Work Order'},ph:'execute',isSpendingDecision:true},
           {s:'Monitor construction; track budget vs actual; flag change orders before approving',t:'Weekly during project',detail:'Require written change orders approved by board before extra work. If change orders push total cost above the original approved amount, you may need additional owner approval per bylaws. Track cumulative change order percentage (flag at 10% of contract).',ph:'execute'},
           {s:'Final inspection, punch list, retention release, and reserve study update',t:'At substantial completion',detail:'Walk the project with contractor and independent inspector. Do not release retention until all punch list items resolved. After completion: update the reserve study to reflect the new component and its useful life — this resets the replacement timeline and affects future reserve contributions.',ph:'close',ck:['Conduct final inspection','Create and resolve punch list','Release retention','Update reserve study with new component life']}
         ],
@@ -999,6 +1003,9 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
       checked: c.status === 'closed' ? true : i < 2,
       checkedDate: c.status === 'closed' ? c.created : i < 2 ? '2026-02-10' : null,
     })) }),
+    ...(s.isSpendingDecision && { isSpendingDecision: true }),
+    ...(s.requiresBids && { requiresBids: true, minimumBids: s.minimumBids || 3, bidCollection: { minimumBids: s.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+    ...(s.requiresConflictCheck && { requiresConflictCheck: true }),
   }));
   return c;
 }
@@ -1182,6 +1189,22 @@ interface IssuesState {
   // Meeting linking
   linkMeeting: (caseId: string, meetingId: string) => void;
   unlinkMeeting: (caseId: string, meetingId: string) => void;
+
+  // Fiduciary: spending decisions
+  setSpendingDecision: (caseId: string, stepIdx: number, decision: SpendingDecision) => void;
+
+  // Fiduciary: bid collection
+  initBidCollection: (caseId: string, stepIdx: number, minimumBids: number) => void;
+  addBid: (caseId: string, stepIdx: number, bid: Omit<Bid, 'id'>) => void;
+  removeBid: (caseId: string, stepIdx: number, bidId: string) => void;
+  selectBid: (caseId: string, stepIdx: number, bidId: string, rationale: string) => void;
+
+  // Fiduciary: conflict checks
+  addConflictCheck: (caseId: string, check: Omit<ConflictCheck, 'id'>) => void;
+  updateConflictDeclaration: (caseId: string, checkId: string, memberId: string, declaration: Partial<ConflictDeclaration>) => void;
+
+  // Decision trail
+  addTrailEntry: (caseId: string, entry: Omit<DecisionTrailEntry, 'id'>) => void;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -1294,12 +1317,17 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       ...st, id: 's' + i, done: false, doneDate: null, userNotes: '',
       ...(st.ph && { phaseId: st.ph }),
       ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
+      ...(st.isSpendingDecision && { isSpendingDecision: true }),
+      ...(st.requiresBids && { requiresBids: true, minimumBids: st.minimumBids || 3, bidCollection: { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+      ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
     }));
+    const today = new Date().toISOString().split('T')[0];
     const newCase: CaseTrackerCase = {
       id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,
       unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
-      status: 'open', created: new Date().toISOString().split('T')[0],
+      status: 'open', created: today,
       steps, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+      conflictChecks: [], decisionTrail: [{ id: 'te' + Date.now(), type: 'case_created', date: today, actor: 'Board', summary: `Case created: ${data.title}` }],
       ...(data.assignedTo && { assignedTo: data.assignedTo }),
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
@@ -1316,15 +1344,21 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   toggleStep: (caseId, stepIdx) => {
+    const today = new Date().toISOString().split('T')[0];
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps) return c;
         const steps = [...c.steps];
+        const wasDone = steps[stepIdx].done;
         steps[stepIdx] = {
           ...steps[stepIdx],
-          done: !steps[stepIdx].done,
-          doneDate: !steps[stepIdx].done ? new Date().toISOString().split('T')[0] : null
+          done: !wasDone,
+          doneDate: !wasDone ? today : null
         };
+        if (!wasDone) {
+          const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'step_completed', date: today, actor: 'Board', summary: `Step completed: ${steps[stepIdx].s}` };
+          return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+        }
         return { ...c, steps };
       })
     }));
@@ -1336,12 +1370,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   addStepNote: (caseId, stepIdx, note) => {
+    const today = new Date().toISOString().split('T')[0];
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps) return c;
         const steps = [...c.steps];
         steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
-        return { ...c, steps };
+        const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'note_added', date: today, actor: 'Board', summary: `Note added to step: ${steps[stepIdx].s}` };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
     if (isBackendEnabled) {
@@ -1418,28 +1454,34 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   putOnHold: (caseId, reason) => {
+    const today = new Date().toISOString().split('T')[0];
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_held', date: today, actor: 'Board', summary: `Case put on hold: ${reason}` };
     set(s => ({
-      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'on-hold' as const, holdReason: reason } : c)
+      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'on-hold' as const, holdReason: reason, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
     if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'on-hold', holdReason: reason });
   },
 
   resumeCase: (caseId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_resumed', date: today, actor: 'Board', summary: 'Case resumed from hold' };
     set(s => ({
-      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const, holdReason: undefined } : c)
+      cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const, holdReason: undefined, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
     if (isBackendEnabled) casesSvc.updateCase(caseId, { status: 'open', holdReason: undefined });
   },
 
   closeCaseWithReason: (caseId, reason, notes) => {
     const today = new Date().toISOString().split('T')[0];
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_closed', date: today, actor: 'Board', summary: `Case closed: ${reason}`, details: notes };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
         return {
           ...c, status: 'closed' as const, completedAt: today,
           closeReason: reason, closeNotes: notes, holdReason: undefined,
-          steps: c.steps?.map(st => ({ ...st, done: true, doneDate: st.doneDate || today })) || null
+          steps: c.steps?.map(st => ({ ...st, done: true, doneDate: st.doneDate || today })) || null,
+          decisionTrail: [...(c.decisionTrail || []), trail],
         };
       })
     }));
@@ -1460,16 +1502,18 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       const sit = cat?.sits.find(x => x.id === c.sitId);
       if (!sit) return c;
       const src = approach === 'legal' ? sit.legal : approach === 'self' ? sit.self : sit.pre;
+      const today = new Date().toISOString().split('T')[0];
       const newApproach = {
         approach,
-        addedDate: new Date().toISOString().split('T')[0],
+        addedDate: today,
         steps: src.map((st, i) => ({
           ...st, id: `a${approach[0]}${i}`, done: false, doneDate: null, userNotes: '',
           ...(st.ph && { phaseId: st.ph }),
           ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
         }))
       };
-      return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach] };
+      const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
+      return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
     })
   })),
 
@@ -1501,7 +1545,10 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   saveBoardVote: (caseId, motion, date, votes) => {
     const boardVotes = { motion, date, votes };
-    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes } : c) }));
+    const approves = votes.filter(v => v.vote === 'approve').length;
+    const denies = votes.filter(v => v.vote === 'deny').length;
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'board_vote', date, actor: 'Board', summary: `Board vote: ${approves} approve, ${denies} deny — "${motion}"` };
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes, decisionTrail: [...(c.decisionTrail || []), trail] } : c) }));
     if (isBackendEnabled) casesSvc.updateCase(caseId, { boardVotes });
   },
 
@@ -1510,19 +1557,25 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) casesSvc.updateCase(caseId, { boardVotes: null });
   },
 
-  addDocument: (caseId, doc) => set(s => ({
-    cases: s.cases.map(c => c.id === caseId ? { ...c, attachments: [...c.attachments, doc] } : c)
-  })),
+  addDocument: (caseId, doc) => {
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Document attached: ${doc.name}` };
+    set(s => ({
+      cases: s.cases.map(c => c.id === caseId ? { ...c, attachments: [...c.attachments, doc], decisionTrail: [...(c.decisionTrail || []), trail] } : c)
+    }));
+  },
 
-  addStepDocument: (caseId, stepIdx, doc) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId || !c.steps) return c;
-      const steps = [...c.steps];
-      const existing = steps[stepIdx].stepAttachments || [];
-      steps[stepIdx] = { ...steps[stepIdx], stepAttachments: [...existing, doc] };
-      return { ...c, steps };
-    })
-  })),
+  addStepDocument: (caseId, stepIdx, doc) => {
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Step document attached: ${doc.name}` };
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        const existing = steps[stepIdx].stepAttachments || [];
+        steps[stepIdx] = { ...steps[stepIdx], stepAttachments: [...existing, doc] };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+  },
 
   removeDocument: (caseId, idx) => set(s => ({
     cases: s.cases.map(c => {
@@ -1535,8 +1588,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   addComm: (caseId, comm) => set(s => {
     const id = `cm${s.nextCommNum}`;
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'communication_sent', date: comm.date || new Date().toISOString().split('T')[0], actor: comm.sentBy || 'Board', summary: `Communication sent: ${comm.subject}` };
     return {
-      cases: s.cases.map(c => c.id === caseId ? { ...c, comms: [...c.comms, { ...comm, id }] } : c),
+      cases: s.cases.map(c => c.id === caseId ? { ...c, comms: [...c.comms, { ...comm, id }], decisionTrail: [...(c.decisionTrail || []), trail] } : c),
       nextCommNum: s.nextCommNum + 1
     };
   }),
@@ -1551,7 +1605,8 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   })),
 
   linkWO: (caseId, woId) => {
-    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: [...c.linkedWOs, woId] } : c) }));
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'work_order_linked', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Work order linked: ${woId}`, linkedEntityType: 'work_order', linkedEntityId: woId };
+    set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: [...c.linkedWOs, woId], decisionTrail: [...(c.decisionTrail || []), trail] } : c) }));
     if (isBackendEnabled) {
       const c = get().cases.find(x => x.id === caseId);
       if (c) casesSvc.updateCase(caseId, { linkedWOs: c.linkedWOs });
@@ -1620,6 +1675,136 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       const c = get().cases.find(x => x.id === caseId);
       if (c) casesSvc.updateCase(caseId, { linkedMeetingIds: c.linkedMeetingIds });
     }
+  },
+
+  // ─── Fiduciary: Spending Decisions ──────────────────────
+  setSpendingDecision: (caseId, stepIdx, decision) => {
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], spendingDecision: decision };
+        const trail: DecisionTrailEntry = {
+          id: 'te' + Date.now(), type: 'spending_decision', date: today,
+          actor: decision.recordedBy, summary: `Spending decision: $${decision.amount.toLocaleString()} from ${decision.fundingSource}`,
+          details: decision.rationale,
+        };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+  },
+
+  // ─── Fiduciary: Bid Collection ──────────────────────────
+  initBidCollection: (caseId, stepIdx, minimumBids) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], bidCollection: { minimumBids, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } };
+        return { ...c, steps };
+      })
+    }));
+  },
+
+  addBid: (caseId, stepIdx, bid) => {
+    const today = new Date().toISOString().split('T')[0];
+    const bidId = 'bid' + Date.now();
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        const bc = steps[stepIdx].bidCollection;
+        if (!bc) return c;
+        steps[stepIdx] = { ...steps[stepIdx], bidCollection: { ...bc, bids: [...bc.bids, { ...bid, id: bidId }] } };
+        const trail: DecisionTrailEntry = {
+          id: 'te' + Date.now(), type: 'bid_uploaded', date: today,
+          actor: 'Board', summary: `Bid received from ${bid.vendorName}: $${bid.amount.toLocaleString()}`,
+          linkedEntityType: 'bid', linkedEntityId: bidId,
+        };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+  },
+
+  removeBid: (caseId, stepIdx, bidId) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        const bc = steps[stepIdx].bidCollection;
+        if (!bc) return c;
+        steps[stepIdx] = { ...steps[stepIdx], bidCollection: { ...bc, bids: bc.bids.filter(b => b.id !== bidId), selectedBidId: bc.selectedBidId === bidId ? null : bc.selectedBidId } };
+        return { ...c, steps };
+      })
+    }));
+  },
+
+  selectBid: (caseId, stepIdx, bidId, rationale) => {
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        const bc = steps[stepIdx].bidCollection;
+        if (!bc) return c;
+        const selectedBid = bc.bids.find(b => b.id === bidId);
+        steps[stepIdx] = { ...steps[stepIdx], bidCollection: { ...bc, selectedBidId: bidId, selectionRationale: rationale, completedDate: today } };
+        const trail: DecisionTrailEntry = {
+          id: 'te' + Date.now(), type: 'bid_selected', date: today,
+          actor: 'Board', summary: `Bid selected: ${selectedBid?.vendorName || 'Unknown'} ($${selectedBid?.amount.toLocaleString() || '0'})`,
+          details: rationale, linkedEntityType: 'bid', linkedEntityId: bidId,
+        };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+  },
+
+  // ─── Fiduciary: Conflict Checks ─────────────────────────
+  addConflictCheck: (caseId, check) => {
+    const checkId = 'cc' + Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId) return c;
+        const newCheck = { ...check, id: checkId };
+        const trail: DecisionTrailEntry = {
+          id: 'te' + Date.now(), type: 'conflict_check', date: today,
+          actor: 'Board', summary: 'Conflict of interest check initiated',
+          linkedEntityType: 'conflict_check', linkedEntityId: checkId,
+        };
+        return { ...c, conflictChecks: [...(c.conflictChecks || []), newCheck], decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+  },
+
+  updateConflictDeclaration: (caseId, checkId, memberId, declaration) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId) return c;
+        const checks = (c.conflictChecks || []).map(ck => {
+          if (ck.id !== checkId) return ck;
+          const declarations = ck.declarations.map(d =>
+            d.memberId === memberId ? { ...d, ...declaration } : d
+          );
+          const allDeclared = declarations.every(d => d.hasConflict !== null);
+          const recusedCount = declarations.filter(d => d.recused).length;
+          const quorumMet = (declarations.length - recusedCount) >= ck.quorumRequired;
+          return { ...ck, declarations, quorumMet, completedDate: allDeclared ? new Date().toISOString().split('T')[0] : null };
+        });
+        return { ...c, conflictChecks: checks };
+      })
+    }));
+  },
+
+  // ─── Decision Trail ─────────────────────────────────────
+  addTrailEntry: (caseId, entry) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId) return c;
+        return { ...c, decisionTrail: [...(c.decisionTrail || []), { ...entry, id: 'te' + Date.now() }] };
+      })
+    }));
   }
 }), {
   name: 'onetwo-issues',
@@ -1632,6 +1817,8 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         linkedLetterIds: c.linkedLetterIds || [],
         linkedInvoiceIds: c.linkedInvoiceIds || [],
         linkedMeetingIds: c.linkedMeetingIds || [],
+        conflictChecks: c.conflictChecks || [],
+        decisionTrail: c.decisionTrail || [],
       }));
     }
     if (merged.issues) {

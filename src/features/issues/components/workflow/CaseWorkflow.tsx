@@ -21,6 +21,7 @@ interface CaseWorkflowProps {
   onCompleteAllChecks?: (caseId: string, stepIdx: number) => void;
   onPutOnHold?: () => void;
   onResume?: () => void;
+  onOpenBidModal?: (stepIdx: number) => void;
   children?: ReactNode;
 }
 
@@ -28,15 +29,21 @@ export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
   onClose, onReopen, onEditAssignment, onAddApproach, onDelete,
   onToggleCheck, onCompleteAllChecks, onPutOnHold, onResume,
-  children,
+  onOpenBidModal, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const activeStepIdx = steps.findIndex(s => !s.done);
-  const [expandedStep, setExpandedStep] = useState<number>(activeStepIdx >= 0 ? activeStepIdx : 0);
+  const [expandedSteps, setExpandedSteps] = useState<number[]>([activeStepIdx >= 0 ? activeStepIdx : 0]);
   const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
+  const toggleExpand = useCallback((idx: number) => {
+    setExpandedSteps(prev =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  }, []);
+
   const scrollToStep = useCallback((idx: number) => {
-    setExpandedStep(idx);
+    setExpandedSteps(prev => prev.includes(idx) ? prev : [...prev, idx]);
     setTimeout(() => {
       stepRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
@@ -46,11 +53,18 @@ export function CaseWorkflow({
     // Find next uncompleted step
     const nextIdx = steps.findIndex((s, i) => i > currentIdx && !s.done);
     if (nextIdx >= 0) {
-      scrollToStep(nextIdx);
+      setExpandedSteps(prev => prev.includes(nextIdx) ? prev : [...prev, nextIdx]);
+      setTimeout(() => {
+        stepRefs.current[nextIdx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
     } else if (currentIdx < steps.length - 1) {
-      scrollToStep(currentIdx + 1);
+      const next = currentIdx + 1;
+      setExpandedSteps(prev => prev.includes(next) ? prev : [...prev, next]);
+      setTimeout(() => {
+        stepRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
     }
-  }, [steps, scrollToStep]);
+  }, [steps]);
 
   // Phase grouping
   const phases = SITUATION_PHASES[c.sitId] || [];
@@ -74,8 +88,8 @@ export function CaseWorkflow({
       step={step}
       index={i}
       isActive={i === activeStepIdx}
-      isExpanded={expandedStep === i}
-      onToggleExpand={() => setExpandedStep(expandedStep === i ? -1 : i)}
+      isExpanded={expandedSteps.includes(i)}
+      onToggleExpand={() => toggleExpand(i)}
       onToggleDone={() => onToggleStep(i)}
       onNote={(note) => onAddNote(i, note)}
       onAction={onAction}
@@ -83,6 +97,8 @@ export function CaseWorkflow({
       totalSteps={steps.length}
       onToggleCheck={onToggleCheck ? (checkId) => onToggleCheck(c.id, i, checkId) : undefined}
       onCompleteAllChecks={onCompleteAllChecks ? () => onCompleteAllChecks(c.id, i) : undefined}
+      onCloseCase={onClose}
+      onOpenBidModal={onOpenBidModal}
     />
   );
 
@@ -108,7 +124,7 @@ export function CaseWorkflow({
         c={c}
         steps={steps}
         activeStepIdx={activeStepIdx >= 0 ? activeStepIdx : 0}
-        expandedStep={expandedStep}
+        expandedSteps={expandedSteps}
         onStepClick={scrollToStep}
         onClose={onClose}
         onReopen={onReopen}

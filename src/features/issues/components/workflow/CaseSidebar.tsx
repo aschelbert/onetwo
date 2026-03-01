@@ -6,7 +6,7 @@ interface CaseSidebarProps {
   c: CaseTrackerCase;
   steps: CaseStep[];
   activeStepIdx: number;
-  expandedStep: number;
+  expandedSteps: number[];
   onStepClick: (idx: number) => void;
   onClose: () => void;
   onReopen: () => void;
@@ -44,7 +44,7 @@ function SidebarMenu({ items }: { items: { label: string; onClick: () => void; d
   );
 }
 
-export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, onPutOnHold, onResume, additionalApproaches, children }: CaseSidebarProps) {
+export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, onPutOnHold, onResume, additionalApproaches, children }: CaseSidebarProps) {
   const cat = CATS.find(x => x.id === c.catId);
 
   // Calculate check-based progress
@@ -175,7 +175,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
                             key={step.id}
                             onClick={() => onStepClick(i)}
                             className={`relative z-10 flex items-center gap-3 w-full text-left px-1.5 py-2 rounded-lg transition-all group ${
-                              expandedStep === i ? 'bg-accent-50' : 'hover:bg-mist-50'
+                              expandedSteps.includes(i) ? 'bg-accent-50' : 'hover:bg-mist-50'
                             }`}
                           >
                             {step.done ? (
@@ -191,7 +191,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
                             )}
                             <div className="min-w-0 flex-1">
                               <p className={`text-xs truncate ${
-                                expandedStep === i ? 'text-accent-700 font-semibold'
+                                expandedSteps.includes(i) ? 'text-accent-700 font-semibold'
                                 : step.done ? 'text-ink-400'
                                 : 'text-ink-700 font-medium'
                               }`}>
@@ -212,7 +212,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
                     key={step.id}
                     onClick={() => onStepClick(i)}
                     className={`relative z-10 flex items-center gap-3 w-full text-left px-1.5 py-2 rounded-lg transition-all group ${
-                      expandedStep === i ? 'bg-accent-50' : 'hover:bg-mist-50'
+                      expandedSteps.includes(i) ? 'bg-accent-50' : 'hover:bg-mist-50'
                     }`}
                   >
                     {/* Status dot */}
@@ -229,7 +229,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedStep, onStepClick
                     )}
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs truncate ${
-                        expandedStep === i ? 'text-accent-700 font-semibold'
+                        expandedSteps.includes(i) ? 'text-accent-700 font-semibold'
                         : step.done ? 'text-ink-400'
                         : 'text-ink-700 font-medium'
                       }`}>

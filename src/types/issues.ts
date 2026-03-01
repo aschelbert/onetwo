@@ -43,6 +43,116 @@ export interface CaseCheckItem {
   checkedDate: string | null;
 }
 
+// Spending Decision (stored on CaseStep)
+export interface SpendingDecision {
+  amount: number;
+  fundingSource: 'operating' | 'reserves' | 'special_assessment' | 'insurance' | 'loan';
+  fundingStrategyId?: string;
+  rationale: string;
+  recordedDate: string | null;
+  recordedBy: string;
+  linkedWorkOrderId?: string;
+}
+
+// Bid Collection (stored on CaseStep)
+export interface Bid {
+  id: string;
+  vendorName: string;
+  amount: number;
+  scope: string;
+  timeline: string;
+  warranty: string;
+  insuranceVerified: boolean;
+  licenseVerified: boolean;
+  submittedDate: string;
+  notes: string;
+}
+
+export interface BidCollection {
+  minimumBids: number;
+  bids: Bid[];
+  selectedBidId: string | null;
+  selectionRationale: string;
+  completedDate: string | null;
+}
+
+// Conflict of Interest Check (stored on CaseTrackerCase)
+export interface ConflictDeclaration {
+  memberId: string;
+  memberName: string;
+  memberRole: string;
+  hasConflict: boolean | null;  // null = not yet declared
+  conflictDescription: string;
+  recused: boolean;
+  declaredDate: string | null;
+}
+
+export interface ConflictCheck {
+  id: string;
+  stepId: string;
+  declarations: ConflictDeclaration[];
+  quorumRequired: number;
+  quorumMet: boolean;
+  completedDate: string | null;
+}
+
+// Decision Audit Trail (stored on CaseTrackerCase)
+export type TrailEntryType =
+  | 'case_created' | 'step_completed' | 'board_vote'
+  | 'spending_decision' | 'bid_uploaded' | 'bid_selected'
+  | 'conflict_check' | 'communication_sent' | 'document_attached'
+  | 'case_held' | 'case_resumed' | 'case_closed' | 'work_order_linked'
+  | 'note_added' | 'approach_added';
+
+export interface DecisionTrailEntry {
+  id: string;
+  type: TrailEntryType;
+  date: string;
+  actor: string;
+  summary: string;
+  details?: string;
+  linkedEntityType?: string;
+  linkedEntityId?: string;
+}
+
+// Fiduciary Alert (computed, not stored)
+export type FiduciaryDuty = 'care' | 'loyalty' | 'obedience';
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+export interface FiduciaryAlert {
+  id: string;
+  duty: FiduciaryDuty;
+  severity: AlertSeverity;
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionPath: string;
+}
+
+// Budget Alert (computed from financial data)
+export type BudgetAlertLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
+
+export interface BudgetAlert {
+  categoryName: string;
+  level: BudgetAlertLevel;
+  percentUsed: number;
+  budgeted: number;
+  spent: number;
+  remaining: number;
+}
+
+// View Permissions (role-based)
+export interface ViewPermissions {
+  canViewCaseWorkflow: boolean;
+  canViewDecisionTrail: boolean;
+  canViewBidDetails: boolean;
+  canViewConflictDetails: boolean;
+  canViewFiduciaryAlerts: boolean;
+  canEditCases: boolean;
+  caseDetailLevel: 'full' | 'phase' | 'none';
+  financialDetailLevel: 'full' | 'category' | 'summary';
+}
+
 export interface CaseStep {
   id: string;
   s: string;
@@ -50,13 +160,19 @@ export interface CaseStep {
   d?: string | null;
   detail?: string | null;
   w?: string;
-  action?: { type: 'navigate' | 'modal' | 'inline'; target: string; label: string };
+  action?: { type: 'navigate' | 'modal' | 'inline'; target: string; label: string; destination?: string };
   done: boolean;
   doneDate: string | null;
   userNotes: string;
   stepAttachments?: CaseAttachment[];
   phaseId?: string;
   checks?: CaseCheckItem[];
+  isSpendingDecision?: boolean;
+  spendingDecision?: SpendingDecision;
+  requiresBids?: boolean;
+  minimumBids?: number;
+  bidCollection?: BidCollection;
+  requiresConflictCheck?: boolean;
 }
 
 export interface AdditionalApproach {
@@ -120,4 +236,6 @@ export interface CaseTrackerCase {
   holdReason?: string;
   closeReason?: string;
   closeNotes?: string;
+  conflictChecks?: ConflictCheck[];
+  decisionTrail?: DecisionTrailEntry[];
 }

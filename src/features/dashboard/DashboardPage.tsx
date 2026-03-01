@@ -9,7 +9,10 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
+import { computeFiduciaryAlerts } from '@/lib/fiduciaryAlerts';
+import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
+import { FiduciaryAlerts } from './FiduciaryAlerts';
 import ReportsTab from './tabs/ReportsTab';
 
 export default function DashboardPage() {
@@ -24,6 +27,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
 
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
+
   const metrics = fin.getIncomeMetrics();
   const bs = fin.getBalanceSheet();
   const aging = fin.getDelinquencyAging();
@@ -85,6 +89,18 @@ export default function DashboardPage() {
   // Recent communications (last 5)
   const recentComms = comp.communications.slice(0, 5);
 
+  // Fiduciary alerts
+  const fiduciaryAlerts = isBoard ? computeFiduciaryAlerts({
+    insurance: building.insurance.map(p => ({ type: p.type, expires: p.expires })),
+    reservePctFunded: reservePct,
+    openCases: issues.cases.filter(c => c.status === 'open'),
+    delinquentUnits: aging.days60.concat(aging.days90plus).map(u => ({ number: u.unit || '', balance: u.balance || 0, daysPastDue: 60 })),
+    boardVotesWithoutConflictChecks: 0,
+    bylawsSpendingLimit: 5000,
+    pendingSpendingAboveLimit: 0,
+  }) : [];
+  const budgetAlerts = isBoard ? getBudgetAlerts(fin.getBudgetVariance()) : [];
+
   // ─── BOARD / MANAGEMENT DASHBOARD ───
   if (isBoard) {
     const attentionItems: { label: string; count: number; color: string; path: string; icon: string }[] = [];
@@ -123,6 +139,8 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {fiduciaryAlerts.length > 0 && <FiduciaryAlerts alerts={fiduciaryAlerts} />}
 
         {/* View Toggle */}
         <div className="flex gap-1 bg-mist-50 rounded-lg p-1 w-fit">
@@ -199,6 +217,29 @@ export default function DashboardPage() {
             </div>
           );
         })()}
+
+        {dashView === 'dashboard' && budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0 && (
+          <div className="bg-white rounded-xl border border-ink-100 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-base">💰</span>
+              <h2 className="text-sm font-bold text-ink-700">Budget Alerts</h2>
+            </div>
+            <div className="space-y-2">
+              {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').map(alert => (
+                <div key={alert.categoryName} className={`rounded-lg p-3 ${alert.level === 'critical' ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-ink-700">{alert.categoryName}</span>
+                    <span className={`text-xs font-bold ${alert.level === 'critical' ? 'text-red-700' : 'text-orange-700'}`}>{alert.percentUsed}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${alert.level === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(alert.percentUsed, 100)}%` }} />
+                  </div>
+                  <p className="text-[10px] text-ink-500 mt-1">${alert.spent.toLocaleString()} of ${alert.budgeted.toLocaleString()} · ${alert.remaining.toLocaleString()} remaining</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {dashView === 'dashboard' && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <MetricCard label="Collection Rate" value={`${metrics.collectionRate}%`} sub={`${fmt(metrics.monthlyExpected)}/mo`} color={metrics.collectionRate >= 90 ? 'sage' : metrics.collectionRate >= 75 ? 'yellow' : 'red'} onClick={() => navigate('/financial')} />
@@ -339,6 +380,36 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
+          {/* Active Cases (owner's unit) */}
+          {(() => {
+            const myCases = issues.cases.filter(c => (c.status === 'open' || c.status === 'on-hold') && c.unit && myLinkedUnits.includes(c.unit));
+            if (myCases.length === 0) return null;
+            return (
+              <div>
+                <h2 className="text-sm font-bold text-ink-700 mb-3">Cases Involving Your Unit</h2>
+                <div className="space-y-2">
+                  {myCases.map(c => {
+                    const totalSteps = c.steps?.length || 0;
+                    const doneSteps = c.steps?.filter(s => s.done).length || 0;
+                    const pct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0;
+                    return (
+                      <div key={c.id} onClick={() => navigate('/community')} className="bg-white border border-ink-100 rounded-lg p-4 cursor-pointer hover:border-accent-200 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium text-ink-900">{c.title}</p>
+                          <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${c.status === 'open' ? 'bg-accent-50 text-accent-600' : 'bg-amber-100 text-amber-700'}`}>{c.status}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-accent-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-[10px] text-ink-400 mt-1">{pct}% complete</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div>
             <h2 className="text-sm font-bold text-ink-700 mb-3">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-3">
@@ -383,6 +454,24 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-4">
+          {/* Financial Transparency */}
+          <div>
+            <h2 className="text-sm font-bold text-ink-700 mb-3">Association Finances</h2>
+            <div className="bg-white rounded-xl border border-ink-100 p-4 space-y-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-ink-500">Reserve Fund</span>
+                <span className={`font-bold ${reservePct >= 70 ? 'text-sage-600' : reservePct >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>{reservePct}% funded</span>
+              </div>
+              <div className="w-full h-2 bg-ink-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${reservePct >= 70 ? 'bg-sage-500' : reservePct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(reservePct, 100)}%` }} />
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-ink-500">Collection Rate</span>
+                <span className="font-bold text-ink-700">{metrics.collectionRate}%</span>
+              </div>
+            </div>
+          </div>
+
           <div>
             <h2 className="text-sm font-bold text-ink-700 mb-3">Building Announcements</h2>
             <div className="bg-white rounded-xl border border-ink-100 divide-y divide-ink-50">
