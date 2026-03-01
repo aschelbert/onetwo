@@ -12,6 +12,8 @@ import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, In
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
 import DecisionTrail from './components/workflow/DecisionTrail';
 import SendNoticePanel from './components/SendNoticePanel';
+import ComposePanel from '@/features/boardroom/components/ComposePanel';
+import type { ComposePanelContext } from '@/types/communication';
 import { OwnerCaseView } from './components/OwnerCaseView';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
@@ -706,6 +708,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
 
   const [showVoteModal, setShowVoteModal] = useState(false);
   const [showCommModal, setShowCommModal] = useState(false);
+  const [showComposePanel, setShowComposePanel] = useState(false);
+  const [composePanelContext, setComposePanelContext] = useState<ComposePanelContext | null>(null);
   const [showDocModal, setShowDocModal] = useState(false);
   const [showApproachModal, setShowApproachModal] = useState(false);
   const [showWOModal, setShowWOModal] = useState(false);
@@ -780,7 +784,21 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         setVoteTargetStep(stepIdx);
         setShowVoteModal(true);
       } else if (action.target === 'send-comm') {
-        setShowCommModal(true);
+        // Open ComposePanel with case context for unified compose flow
+        if (c) {
+          const step = c.steps?.[stepIdx];
+          setComposePanelContext({
+            scope: 'unit',
+            scopeLocked: true,
+            recipientUnit: c.unit || undefined,
+            recipientName: c.owner || undefined,
+            caseId: c.id,
+            stepIdx,
+            caseLink: `Case ${c.id} · Step ${stepIdx + 1}`,
+            source: 'case-workflow',
+          });
+          setShowComposePanel(true);
+        }
       } else if (action.target === 'upload-doc') {
         setDocTargetStep(stepIdx);
         setShowDocModal(true);
@@ -911,7 +929,18 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             <div className="flex items-center justify-between mb-4">
               <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Communications</p>
               <ThreeDotMenu items={[
-                { label: 'Send Communication', onClick: () => setShowCommModal(true) },
+                { label: 'Send Communication', onClick: () => {
+                  setComposePanelContext({
+                    scope: 'unit',
+                    scopeLocked: true,
+                    recipientUnit: c.unit || undefined,
+                    recipientName: c.owner || undefined,
+                    caseId: c.id,
+                    caseLink: `Case ${c.id}`,
+                    source: 'case-workflow',
+                  });
+                  setShowComposePanel(true);
+                } },
                 { label: 'Link Letter', onClick: () => setShowLinkLetterModal(true) },
               ]} />
             </div>
@@ -1073,6 +1102,12 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {/* Modals */}
       {showVoteModal && <BoardVoteModal c={c} boardMembers={boardMembers} store={store} defaultMotion={voteTargetStep != null && c.steps?.[voteTargetStep] ? c.steps[voteTargetStep].s : undefined} onClose={() => { setShowVoteModal(false); setVoteTargetStep(null); }} />}
       {showCommModal && <CommModal caseId={caseId} store={store} catId={c.catId} sitId={c.sitId} onClose={() => setShowCommModal(false)} />}
+      {showComposePanel && (
+        <ComposePanel
+          context={composePanelContext}
+          onClose={() => { setShowComposePanel(false); setComposePanelContext(null); }}
+        />
+      )}
       {showDocModal && <DocModal caseId={caseId} store={store} stepIdx={docTargetStep} onClose={() => { setShowDocModal(false); setDocTargetStep(null); }} />}
       {showApproachModal && <ApproachModal c={c} store={store} onClose={() => setShowApproachModal(false)} />}
       {showLinkLetterModal && <LinkLetterModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkLetterModal(false)} />}

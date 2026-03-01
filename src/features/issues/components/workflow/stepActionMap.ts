@@ -74,9 +74,13 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
     actions.push({ id: `wo-${step.id}`, icon: '🔧', label: 'Create Work Order', description: 'Create and link a new work order', type: 'modal', target: 'create-wo', isAction: true });
   }
 
-  // 4. Notice/letter/send
+  // 4. Notice/letter/send — unified compose flow
   if (s.includes('notice') || s.includes('letter') || s.includes('send')) {
-    actions.push({ id: `comm-${step.id}`, icon: '✉️', label: 'Send Communication', description: 'Draft and send a notice or letter', type: 'modal', target: 'send-comm', isAction: true });
+    const actionLabel = s.includes('violation') ? 'Send Violation Notice' :
+      s.includes('hearing') ? 'Send Hearing Notice' :
+      s.includes('decision') || s.includes('fine') ? 'Send Decision Letter' :
+      'Send Communication';
+    actions.push({ id: `comm-${step.id}`, icon: '✉️', label: actionLabel, description: 'Compose and send via email, mail, or announcement', type: 'modal', target: 'send-comm', isAction: true });
   }
 
   // 4b. Physical mail — "Send Notice" for steps with notice/letter keywords

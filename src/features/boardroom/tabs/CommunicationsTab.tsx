@@ -6,19 +6,20 @@ import type { LetterTemplate, GeneratedLetter } from '@/store/useLetterStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { useCommunicationsStore } from '@/store/useCommunicationsStore';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
-import { buildCommunicationsFeed, type CommunicationFeedItem } from './communicationsUtils';
+import ComposePanel from '../components/ComposePanel';
+import type { ComposePanelContext } from '@/types/communication';
+import type { Communication } from '@/types/communication';
 
 // ─── Constants ────────────────────────────────────────
 
 type Category = LetterTemplate['category'];
 type SubView = 'feed' | 'templates';
-type ModalType = null | 'newComm' | 'addAnnouncement' | 'addComm' | 'compose' | 'templateEditor' | 'viewLetter';
-type FeedFilter = 'all' | 'announcement' | 'communication' | 'letter';
-
-const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-700', minutes:'bg-sage-100 text-sage-700', financial:'bg-yellow-100 text-yellow-700', response:'bg-mist-100 text-ink-600', resale:'bg-ink-100 text-ink-600', violation:'bg-red-100 text-red-700', other:'bg-ink-100 text-ink-500' };
-const ANN_CAT_STYLES: Record<string, string> = { general:'bg-ink-100 text-ink-600', maintenance:'bg-amber-100 text-amber-700', financial:'bg-sage-100 text-sage-700', safety:'bg-red-100 text-red-700', rules:'bg-violet-100 text-violet-700', meeting:'bg-accent-100 text-accent-700' };
+type ModalType = null | 'newComm' | 'templateEditor';
+type ScopeFilter = 'all' | 'community' | 'unit';
+type ChannelFilter = 'all' | 'announcement' | 'email' | 'mail';
 
 const CATEGORY_LABELS: Record<Category, string> = { violation: 'Violation', collection: 'Collection', notice: 'Notice', welcome: 'Welcome', maintenance: 'Maintenance', general: 'General' };
 const CATEGORY_COLORS: Record<Category, { bg: string; text: string; border: string }> = {
@@ -29,20 +30,13 @@ const CATEGORY_COLORS: Record<Category, { bg: string; text: string; border: stri
   maintenance: { bg: 'bg-mist-100',   text: 'text-ink-600',    border: 'border-mist-200' },
   general:     { bg: 'bg-ink-100',    text: 'text-ink-600',    border: 'border-ink-200' },
 };
-const STATUS_COLORS: Record<GeneratedLetter['status'], { bg: string; text: string }> = {
-  draft:    { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  sent:     { bg: 'bg-sage-100',   text: 'text-sage-700' },
-  archived: { bg: 'bg-ink-100',    text: 'text-ink-500' },
-};
 const CATEGORY_ORDER: Category[] = ['violation', 'collection', 'notice', 'welcome', 'maintenance', 'general'];
 
-// ─── Helpers ──────────────────────────────────────────
+// Icons for communication log entries
+const SCOPE_ICON: Record<string, string> = { community: '🏢', unit: '🏠' };
+const CHANNEL_ICON: Record<string, string> = { announcement: '📌', email: '📧', mail: '📮' };
 
-function substituteVariables(text: string, values: Record<string, string>): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-    return values[varName] !== undefined && values[varName] !== '' ? values[varName] : match;
-  });
-}
+// ─── Helpers ──────────────────────────────────────────
 
 function highlightVariables(text: string) {
   const parts = text.split(/(\{\{\w+\}\})/g);
@@ -60,26 +54,48 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function getEmailStatusLabel(comm: Communication): string {
+  if (!comm.channels.includes('email')) return '';
+  if (comm.scope === 'community') {
+    const delivered = comm.emailDeliveredCount || 0;
+    const bounced = comm.emailBouncedCount || 0;
+    return `${delivered} delivered${bounced > 0 ? `, ${bounced} bounced` : ''}`;
+  }
+  return comm.emailStatus === 'delivered' ? 'Delivered' :
+    comm.emailStatus === 'sent' ? 'Sending...' :
+    comm.emailStatus === 'bounced' ? 'Bounced' :
+    comm.emailStatus || '';
+}
+
+function getMailStatusLabel(comm: Communication): string {
+  if (!comm.channels.includes('mail')) return '';
+  const method = comm.mailDeliveryMethod === 'certified-electronic-return-receipt' ? 'Certified + ERR'
+    : comm.mailDeliveryMethod === 'certified' ? 'Certified'
+    : 'First Class';
+  return `${comm.mailStatus || 'Pending'} (${method})`;
+}
+
 // ─── Component ────────────────────────────────────────
 
 export default function CommunicationsTab() {
   const comp = useComplianceStore();
-  const { templates, letters, addTemplate, updateTemplate, deleteTemplate, addLetter, updateLetter, deleteLetter } = useLetterStore();
+  const { templates, letters, addTemplate, updateTemplate, deleteTemplate, updateLetter, deleteLetter } = useLetterStore();
   const { currentUser, currentRole, buildingMembers } = useAuthStore();
   const { units } = useFinancialStore();
   const { board } = useBuildingStore();
+  const communications = useCommunicationsStore(s => s.communications);
 
   // ─── View state ─────────────────────────────────────
   const [subView, setSubView] = useState<SubView>('feed');
   const [modal, setModal] = useState<ModalType>(null);
-  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
 
-  // ─── Announcement form state ────────────────────────
-  const [annForm, setAnnForm] = useState({ title: '', body: '', category: 'general', pinned: false, sendEmail: false });
-  const [sendingEmail, setSendingEmail] = useState(false);
+  // Compose panel
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeContext, setComposeContext] = useState<ComposePanelContext | null>(null);
 
-  // ─── Communication log form state ───────────────────
-  const [commForm, setCommForm] = useState({ type: 'notice', subject: '', date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners (50 units)', status: 'sent', notes: '' });
+  // Communications log filters
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
 
   // ─── Template Editor state ──────────────────────────
   const emptyTemplate = { name: '', category: 'general' as Category, subject: '', body: '', variables: [] as Array<{ name: string; label: string; defaultValue: string }> };
@@ -87,33 +103,22 @@ export default function CommunicationsTab() {
   const [templateForm, setTemplateForm] = useState(emptyTemplate);
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
 
-  // ─── Compose state ─────────────────────────────────
-  const [composeTemplateId, setComposeTemplateId] = useState<string | null>(null);
-  const [composeValues, setComposeValues] = useState<Record<string, string>>({});
-  const [composeSentVia, setComposeSentVia] = useState<string>('email');
-  const [composeSelectedUnit, setComposeSelectedUnit] = useState<string>('');
+  // ─── Announcement form state (for legacy quick-post) ─
+  const [annForm, setAnnForm] = useState({ title: '', body: '', category: 'general', pinned: false, sendEmail: false });
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [newCommStep, setNewCommStep] = useState<'choose' | 'announcement' | 'communication'>('choose');
 
-  // ─── View Letter state ──────────────────────────────
-  const [viewLetterId, setViewLetterId] = useState<string | null>(null);
-
-  // ─── New Communication modal step ──────────────────
-  const [newCommStep, setNewCommStep] = useState<'choose' | 'announcement' | 'communication' | 'letter'>('choose');
+  // ─── Communication log form state ───────────────────
+  const [commForm, setCommForm] = useState({ type: 'notice', subject: '', date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners (50 units)', status: 'sent', notes: '' });
 
   // ─── Derived ────────────────────────────────────────
-  const composeTemplate = composeTemplateId ? templates.find(t => t.id === composeTemplateId) : null;
 
-  const feed = useMemo(() => {
-    const items = buildCommunicationsFeed(comp.announcements || [], comp.communications, letters);
-    if (feedFilter === 'all') return items;
-    return items.filter(i => i.type === feedFilter);
-  }, [comp.announcements, comp.communications, letters, feedFilter]);
-
-  const feedCounts = useMemo(() => ({
-    all: buildCommunicationsFeed(comp.announcements || [], comp.communications, letters).length,
-    announcement: (comp.announcements || []).length,
-    communication: comp.communications.length,
-    letter: letters.length,
-  }), [comp.announcements, comp.communications, letters]);
+  const filteredComms = useMemo(() => {
+    let result = communications;
+    if (scopeFilter !== 'all') result = result.filter(c => c.scope === scopeFilter);
+    if (channelFilter !== 'all') result = result.filter(c => c.channels.includes(channelFilter));
+    return result;
+  }, [communications, scopeFilter, channelFilter]);
 
   const templatesByCategory = useMemo(() => {
     const grouped: Record<string, LetterTemplate[]> = {};
@@ -128,14 +133,13 @@ export default function CommunicationsTab() {
     all: letters.length,
     draft: letters.filter(l => l.status === 'draft').length,
     sent: letters.filter(l => l.status === 'sent').length,
-    archived: letters.filter(l => l.status === 'archived').length,
   }), [letters]);
 
   // ─── Actions ────────────────────────────────────────
 
-  function openNewComm() {
-    setNewCommStep('choose');
-    setModal('newComm');
+  function openCompose(ctx?: ComposePanelContext | null) {
+    setComposeContext(ctx || null);
+    setShowCompose(true);
   }
 
   function openTemplateEditor(template?: LetterTemplate) {
@@ -159,51 +163,9 @@ export default function CommunicationsTab() {
     setModal(null);
   }
 
-  function openCompose(template: LetterTemplate) {
-    setComposeTemplateId(template.id);
-    const defaults: Record<string, string> = {};
-    template.variables.forEach(v => { defaults[v.name] = v.defaultValue || ''; });
-    setComposeValues(defaults);
-    setComposeSentVia('email');
-    setComposeSelectedUnit('');
-    setModal('compose');
-  }
-
-  function selectUnit(unitNumber: string) {
-    setComposeSelectedUnit(unitNumber);
-    const unit = units.find(u => u.number === unitNumber);
-    if (unit) {
-      setComposeValues(prev => ({ ...prev, owner_name: unit.owner || prev.owner_name || '', unit_number: unit.number || prev.unit_number || '' }));
-    }
-  }
-
-  function saveDraft() {
-    if (!composeTemplate) return;
-    const selectedUnit = units.find(u => u.number === composeSelectedUnit);
-    addLetter({
-      templateId: composeTemplate.id, templateName: composeTemplate.name,
-      recipient: composeValues.owner_name || selectedUnit?.owner || '',
-      unitNumber: composeSelectedUnit || composeValues.unit_number || '',
-      subject: substituteVariables(composeTemplate.subject, composeValues),
-      body: substituteVariables(composeTemplate.body, composeValues),
-      status: 'draft', sentDate: '', sentVia: composeSentVia, createdBy: currentUser.name,
-    });
-    setModal(null);
-  }
-
-  function sendLetter() {
-    if (!composeTemplate) return;
-    const selectedUnit = units.find(u => u.number === composeSelectedUnit);
-    const today = new Date().toISOString().split('T')[0];
-    addLetter({
-      templateId: composeTemplate.id, templateName: composeTemplate.name,
-      recipient: composeValues.owner_name || selectedUnit?.owner || '',
-      unitNumber: composeSelectedUnit || composeValues.unit_number || '',
-      subject: substituteVariables(composeTemplate.subject, composeValues),
-      body: substituteVariables(composeTemplate.body, composeValues),
-      status: 'sent', sentDate: today, sentVia: composeSentVia, createdBy: currentUser.name,
-    });
-    setModal(null);
+  function openNewComm() {
+    setNewCommStep('choose');
+    setModal('newComm');
   }
 
   async function saveAnnouncement() {
@@ -258,148 +220,126 @@ export default function CommunicationsTab() {
 
   // ─── Render ─────────────────────────────────────────
 
-  const pendingComms = comp.communications.filter(c => c.status === 'pending').length;
-
   return (
     <div className="space-y-5">
-      {/* Header with sub-view toggle and new button */}
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="font-display text-xl font-bold text-ink-900">Communications</h3>
-          <p className="text-sm text-ink-500 mt-0.5">Announcements, owner communications & letter templates</p>
+          <p className="text-sm text-ink-500 mt-0.5">{communications.length} communications sent</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex bg-ink-100 rounded-lg p-0.5">
             <button onClick={() => setSubView('feed')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${subView === 'feed' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
-              All Communications
-              {pendingComms > 0 && <span className="ml-1.5 px-1.5 py-0.5 text-[10px] bg-yellow-100 text-yellow-700 rounded-full font-semibold">{pendingComms}</span>}
+              Communications
             </button>
             <button onClick={() => setSubView('templates')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${subView === 'templates' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
               Templates
             </button>
           </div>
-          <button onClick={openNewComm} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 transition-colors">+ New Communication</button>
+          <button onClick={() => openCompose()} className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors flex items-center gap-1.5">
+            + New Communication
+          </button>
         </div>
       </div>
 
-      {/* ═══════════════ ALL COMMUNICATIONS VIEW ═══════════════ */}
+      {/* ═══════════════ COMMUNICATIONS LOG ═══════════════ */}
       {subView === 'feed' && (
         <div className="space-y-4">
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white rounded-xl border border-ink-100 p-4">
-              <p className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Total Items</p>
-              <p className="text-2xl font-bold text-ink-900 mt-1">{feedCounts.all}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-ink-100 p-4">
-              <p className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-1">{pendingComms}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-ink-100 p-4">
-              <p className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Letters Sent</p>
-              <p className="text-2xl font-bold text-sage-600 mt-1">{letterCounts.sent}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-ink-100 p-4">
-              <p className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Drafts</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-1">{letterCounts.draft}</p>
-            </div>
-          </div>
-
-          {/* Filter pills */}
+          {/* Scope / Channel filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            {([['all', 'All'], ['announcement', 'Announcements'], ['communication', 'Communications'], ['letter', 'Letters']] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setFeedFilter(key)} className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${feedFilter === key ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>
-                {label} <span className="ml-1 opacity-70">({feedCounts[key]})</span>
+            {([['all', 'All'], ['community', 'Community'], ['unit', 'Unit']] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setScopeFilter(key)} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors border ${scopeFilter === key ? 'border-red-500 bg-red-50 text-red-600' : 'border-ink-100 bg-white text-ink-500 hover:bg-ink-50'}`}>
+                {label}
+              </button>
+            ))}
+            <span className="text-ink-200 mx-1">|</span>
+            {([['all', 'All Channels'], ['announcement', 'Announcements'], ['email', 'Email'], ['mail', 'Mail']] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setChannelFilter(key)} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors border ${channelFilter === key ? 'border-red-500 bg-red-50 text-red-600' : 'border-ink-100 bg-white text-ink-500 hover:bg-ink-50'}`}>
+                {label}
               </button>
             ))}
           </div>
 
-          {/* Feed */}
-          {feed.length === 0 && <p className="text-sm text-ink-400 text-center py-8">No communications yet.</p>}
-          <div className="space-y-2">
-            {feed.map(item => {
-              if (item.type === 'announcement') {
-                const a = item.sourceData as Announcement;
-                return (
-                  <div key={item.id} className={`rounded-xl border p-4 ${a.pinned ? 'border-accent-300 bg-accent-50 bg-opacity-30' : 'border-ink-100'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-100 text-accent-700 font-bold">Announcement</span>
-                          {a.pinned && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-100 text-accent-700 font-bold">PINNED</span>}
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ANN_CAT_STYLES[a.category] || ANN_CAT_STYLES.general}`}>{a.category}</span>
-                          <span className="text-sm font-semibold text-ink-900">{a.title}</span>
-                        </div>
-                        <p className="text-xs text-ink-500 mt-1 line-clamp-2">{a.body}</p>
-                        <p className="text-[10px] text-ink-400 mt-1.5">Posted by {a.postedBy} · {a.postedDate}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => comp.togglePinAnnouncement(a.id)} className={`text-[10px] px-2 py-1 rounded font-medium ${a.pinned ? 'bg-accent-100 text-accent-700' : 'bg-ink-50 text-ink-500 hover:bg-ink-100'}`}>{a.pinned ? 'Unpin' : 'Pin'}</button>
-                        <button onClick={() => { if (confirm('Delete this announcement?')) comp.deleteAnnouncement(a.id); }} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
-                      </div>
+          {/* Communications list */}
+          {filteredComms.length === 0 && (
+            <p className="text-sm text-ink-400 text-center py-12">No communications found.</p>
+          )}
+          <div className="space-y-2.5">
+            {filteredComms.map(comm => (
+              <div key={comm.id} className="p-4 bg-white rounded-xl border border-ink-100 hover:border-ink-200 hover:shadow-sm transition-all">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {/* Icon */}
+                    <div className="w-9 h-9 rounded-[10px] bg-ink-50 flex items-center justify-center text-lg shrink-0">
+                      {comm.templateName?.includes('Violation') ? '✉️' :
+                       comm.templateName?.includes('Delinquency') || comm.templateName?.includes('Budget') || comm.templateName?.includes('Assessment') ? '💰' :
+                       comm.templateName?.includes('Meeting') ? '📅' :
+                       comm.scope === 'community' ? '📢' : '✉️'}
                     </div>
-                  </div>
-                );
-              }
+                    <div className="flex-1 min-w-0">
+                      {/* Subject */}
+                      <p className="text-sm font-semibold text-ink-900">{comm.subject}</p>
+                      {/* Meta */}
+                      <p className="text-xs text-ink-400 mt-0.5">
+                        To: {comm.scope === 'community' ? 'All Owners (Community)' : `${comm.recipientName || ''} · Unit ${comm.recipientUnit || ''}`}
+                        {' · '}{formatDate(comm.createdAt)} · Sent by {comm.createdBy}
+                      </p>
 
-              if (item.type === 'communication') {
-                const c = item.sourceData as OwnerCommunication;
-                return (
-                  <div key={item.id} className="rounded-xl border border-ink-100 p-4 hover:bg-mist-50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-200 text-ink-600 font-bold">Communication</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded text-xs ${COMM_TYPES[c.type] || COMM_TYPES.other}`}>{c.type}</span>
-                          <p className="text-sm font-medium text-ink-900">{c.subject}</p>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded text-xs ${c.status === 'sent' ? 'bg-sage-100 text-sage-700' : c.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-ink-100 text-ink-500'}`}>{c.status}</span>
-                        </div>
-                        <p className="text-xs text-ink-500">{c.date} · {c.method} · To: {c.recipients}</p>
-                        {c.notes && <p className="text-xs text-ink-400 mt-1">{c.notes}</p>}
-                      </div>
-                      <button onClick={() => { if (confirm('Remove?')) comp.deleteCommunication(c.id); }} className="text-xs text-red-400 shrink-0">Remove</button>
-                    </div>
-                  </div>
-                );
-              }
-
-              if (item.type === 'letter') {
-                const l = item.sourceData as GeneratedLetter;
-                const statusColor = STATUS_COLORS[l.status];
-                return (
-                  <div key={item.id} className="rounded-xl border border-ink-100 p-4 hover:bg-mist-50 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-bold">Letter</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-mist-100 text-ink-600 font-semibold">{l.templateName}</span>
-                          <span className="text-sm font-bold text-ink-900">{l.recipient || 'No recipient'}</span>
-                          {l.unitNumber && <span className="text-[10px] px-1.5 py-0.5 rounded bg-mist-100 text-ink-600 font-semibold">Unit {l.unitNumber}</span>}
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${statusColor.bg} ${statusColor.text}`}>{l.status.charAt(0).toUpperCase() + l.status.slice(1)}</span>
-                        </div>
-                        <p className="text-xs text-ink-500 truncate">{l.subject}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          {l.sentDate && <span className="text-[11px] text-ink-400">{formatDate(l.sentDate)}</span>}
-                          {l.sentVia && <span className="text-[11px] text-ink-400">via {l.sentVia}</span>}
-                          <span className="text-[11px] text-ink-400">by {l.createdBy}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {l.status === 'draft' && (
-                          <button onClick={() => { const today = new Date().toISOString().split('T')[0]; updateLetter(l.id, { status: 'sent', sentDate: today }); }} className="text-[10px] px-2 py-1 rounded font-medium bg-sage-100 text-sage-700 hover:bg-sage-200">Mark Sent</button>
+                      {/* Delivery channel status badges */}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {comm.channels.includes('announcement') && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-600">
+                            <span>{CHANNEL_ICON.announcement}</span>
+                            <span className="font-medium">Announcement:</span>
+                            <span className="text-ink-400">Published</span>
+                          </span>
                         )}
-                        {l.status !== 'archived' && (
-                          <button onClick={() => updateLetter(l.id, { status: 'archived' })} className="text-[10px] px-2 py-1 rounded font-medium bg-ink-50 text-ink-500 hover:bg-ink-100">Archive</button>
+                        {comm.channels.includes('email') && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-600">
+                            <span>{CHANNEL_ICON.email}</span>
+                            <span className="font-medium">Email:</span>
+                            <span className="text-ink-400">{getEmailStatusLabel(comm)}</span>
+                          </span>
                         )}
-                        <button onClick={() => { if (confirm('Delete this letter?')) { deleteLetter(l.id); } }} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
+                        {comm.channels.includes('mail') && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-ink-600">
+                            <span>{CHANNEL_ICON.mail}</span>
+                            <span className="font-medium">Mail:</span>
+                            <span className="text-ink-400">{getMailStatusLabel(comm)}</span>
+                          </span>
+                        )}
                       </div>
+
+                      {/* Case link */}
+                      {comm.caseId && (
+                        <p className="text-[11px] text-red-600 mt-1.5 flex items-center gap-1">
+                          📋 Case {comm.caseId} · Step {(comm.stepIdx ?? 0) + 1}
+                        </p>
+                      )}
                     </div>
                   </div>
-                );
-              }
 
-              return null;
-            })}
+                  {/* Scope badge */}
+                  <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-2 py-0.5 rounded uppercase shrink-0">
+                    {comm.scope}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Legacy quick-add actions */}
+          <div className="border-t border-ink-100 pt-4 mt-4">
+            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Quick Actions</p>
+            <div className="flex gap-2">
+              <button onClick={openNewComm} className="px-3 py-1.5 bg-ink-50 text-ink-600 border border-ink-100 rounded-lg text-xs font-medium hover:bg-ink-100 transition-colors">
+                Log Communication
+              </button>
+              <button onClick={() => openCompose({ scope: 'community' })} className="px-3 py-1.5 bg-ink-50 text-ink-600 border border-ink-100 rounded-lg text-xs font-medium hover:bg-ink-100 transition-colors">
+                Community Announcement
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -487,7 +427,7 @@ export default function CommunicationsTab() {
                               </div>
                             )}
                             <div className="flex items-center gap-2 pt-1">
-                              <button onClick={(e) => { e.stopPropagation(); openCompose(template); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800 transition-colors">Use Template</button>
+                              <button onClick={(e) => { e.stopPropagation(); openCompose({ autoTemplateId: template.id, scope: 'unit' }); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800 transition-colors">Use Template</button>
                               <button onClick={(e) => { e.stopPropagation(); openTemplateEditor(template); }} className="px-3 py-1.5 text-accent-600 hover:text-accent-700 text-xs font-medium">Edit</button>
                               <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete template "${template.name}"?`)) { deleteTemplate(template.id); setExpandedTemplate(null); } }} className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
                             </div>
@@ -511,9 +451,17 @@ export default function CommunicationsTab() {
         </div>
       )}
 
-      {/* ═══════════════ NEW COMMUNICATION MODAL ═══════════════ */}
+      {/* ═══════════════ COMPOSE PANEL ═══════════════ */}
+      {showCompose && (
+        <ComposePanel
+          context={composeContext}
+          onClose={() => { setShowCompose(false); setComposeContext(null); }}
+        />
+      )}
+
+      {/* ═══════════════ LEGACY NEW COMM MODAL (Log Communication / Quick Announcement) ═══════════════ */}
       {modal === 'newComm' && (
-        <Modal title="New Communication" onClose={() => setModal(null)} onSave={() => {
+        <Modal title="Log Communication" onClose={() => setModal(null)} onSave={() => {
           if (newCommStep === 'announcement') { saveAnnouncement(); return; }
           if (newCommStep === 'communication') { saveCommunication(); return; }
           setModal(null);
@@ -524,22 +472,17 @@ export default function CommunicationsTab() {
         } wide={newCommStep !== 'choose'}>
           {newCommStep === 'choose' && (
             <div className="space-y-4">
-              <p className="text-sm text-ink-500">What type of communication would you like to create?</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <p className="text-sm text-ink-500">What type of communication would you like to log?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button onClick={() => { setAnnForm({ title: '', body: '', category: 'general', pinned: false, sendEmail: false }); setNewCommStep('announcement'); }} className="p-5 bg-accent-50 border border-accent-200 rounded-xl text-center hover:border-accent-400 hover:bg-accent-100 transition-colors">
                   <span className="text-2xl">📢</span>
-                  <p className="text-sm font-semibold text-ink-900 mt-2">Post Announcement</p>
-                  <p className="text-xs text-ink-400 mt-1">Community-wide update visible in Community Room</p>
+                  <p className="text-sm font-semibold text-ink-900 mt-2">Quick Announcement</p>
+                  <p className="text-xs text-ink-400 mt-1">Post directly to Community Room</p>
                 </button>
                 <button onClick={() => { setCommForm({ type: 'notice', subject: '', date: new Date().toISOString().split('T')[0], method: 'email', recipients: 'All owners (50 units)', status: 'sent', notes: '' }); setNewCommStep('communication'); }} className="p-5 bg-mist-50 border border-mist-200 rounded-xl text-center hover:border-accent-400 hover:bg-mist-100 transition-colors">
-                  <span className="text-2xl">✉️</span>
+                  <span className="text-2xl">📋</span>
                   <p className="text-sm font-semibold text-ink-900 mt-2">Log Communication</p>
-                  <p className="text-xs text-ink-400 mt-1">Record a notice, minutes distribution, etc.</p>
-                </button>
-                <button onClick={() => { setModal(null); setSubView('templates'); }} className="p-5 bg-violet-50 border border-violet-200 rounded-xl text-center hover:border-accent-400 hover:bg-violet-100 transition-colors">
-                  <span className="text-2xl">📄</span>
-                  <p className="text-sm font-semibold text-ink-900 mt-2">Send Letter from Template</p>
-                  <p className="text-xs text-ink-400 mt-1">Pick a template, fill variables, and send</p>
+                  <p className="text-xs text-ink-400 mt-1">Record a call, notice, or other communication</p>
                 </button>
               </div>
             </div>
@@ -547,23 +490,23 @@ export default function CommunicationsTab() {
 
           {newCommStep === 'announcement' && (
             <div className="space-y-3">
-              <button onClick={() => setNewCommStep('choose')} className="text-xs text-accent-600 hover:text-accent-700 font-medium mb-1">&larr; Back to options</button>
+              <button onClick={() => setNewCommStep('choose')} className="text-xs text-accent-600 hover:text-accent-700 font-medium mb-1">&larr; Back</button>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Title *</label><input value={annForm.title} onChange={e => setAnnForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Elevator Modernization Project Update" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Category</label><select value={annForm.category} onChange={e => setAnnForm(p => ({ ...p, category: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
                 <option value="general">General</option><option value="maintenance">Maintenance</option><option value="financial">Financial</option><option value="safety">Safety</option><option value="rules">Rules & Policies</option><option value="meeting">Meeting</option>
               </select></div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Message *</label><textarea value={annForm.body} onChange={e => setAnnForm(p => ({ ...p, body: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={5} placeholder="Write the announcement body. This will be visible to all residents in the Community Room." /></div>
-              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={annForm.pinned} onChange={e => setAnnForm(p => ({ ...p, pinned: e.target.checked }))} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">Pin this announcement</span><span className="text-[10px] text-ink-400">(pinned posts appear first)</span></label>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Message *</label><textarea value={annForm.body} onChange={e => setAnnForm(p => ({ ...p, body: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={5} placeholder="Write the announcement body." /></div>
+              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={annForm.pinned} onChange={e => setAnnForm(p => ({ ...p, pinned: e.target.checked }))} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">Pin this announcement</span></label>
               <div className="border-t border-ink-100 pt-3 mt-1">
                 <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={annForm.sendEmail} onChange={e => setAnnForm(p => ({ ...p, sendEmail: e.target.checked }))} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">Also send via email</span><span className="text-[10px] text-ink-400">(to all building members)</span></label>
-                {annForm.sendEmail && <p className="text-[11px] text-ink-400 mt-1.5 ml-6">This announcement will be emailed to {buildingMembers.filter(m => m.email && m.status === 'active').length} active members via Mailjet.</p>}
+                {annForm.sendEmail && <p className="text-[11px] text-ink-400 mt-1.5 ml-6">Will be emailed to {buildingMembers.filter(m => m.email && m.status === 'active').length} active members.</p>}
               </div>
             </div>
           )}
 
           {newCommStep === 'communication' && (
             <div className="space-y-3">
-              <button onClick={() => setNewCommStep('choose')} className="text-xs text-accent-600 hover:text-accent-700 font-medium mb-1">&larr; Back to options</button>
+              <button onClick={() => setNewCommStep('choose')} className="text-xs text-accent-600 hover:text-accent-700 font-medium mb-1">&larr; Back</button>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={commForm.type} onChange={e => setCommForm(p => ({ ...p, type: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['notice','minutes','financial','response','resale','violation','other'].map(t => <option key={t}>{t}</option>)}</select></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Subject *</label><input value={commForm.subject} onChange={e => setCommForm(p => ({ ...p, subject: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div>
               <div className="grid grid-cols-2 gap-3">
@@ -575,72 +518,6 @@ export default function CommunicationsTab() {
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={commForm.notes} onChange={e => setCommForm(p => ({ ...p, notes: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div>
             </div>
           )}
-        </Modal>
-      )}
-
-      {/* ═══════════════ COMPOSE LETTER MODAL ═══════════════ */}
-      {modal === 'compose' && composeTemplate && (
-        <Modal title="Compose Letter" subtitle={`Using template: ${composeTemplate.name}`} onClose={() => setModal(null)} wide
-          footer={
-            <div className="flex items-center gap-3 w-full justify-end">
-              <button onClick={() => setModal(null)} className="px-4 py-2 text-ink-700 hover:text-ink-900 font-medium text-sm">Cancel</button>
-              <button onClick={saveDraft} className="px-5 py-2 border border-ink-300 text-ink-700 rounded-lg font-medium text-sm hover:bg-ink-50 transition-colors">Save as Draft</button>
-              <button onClick={sendLetter} className="px-5 py-2 bg-ink-900 text-white rounded-lg font-medium text-sm hover:bg-ink-800 transition-colors">Send</button>
-            </div>
-          }
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Form */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-ink-700 mb-1">Recipient (Unit)</label>
-                <select value={composeSelectedUnit} onChange={e => selectUnit(e.target.value)} className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-accent-400 focus:border-transparent">
-                  <option value="">-- Select a unit --</option>
-                  {units.map(u => <option key={u.number} value={u.number}>Unit {u.number} - {u.owner} ({u.email})</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-ink-700 mb-1">Send Via</label>
-                <select value={composeSentVia} onChange={e => setComposeSentVia(e.target.value)} className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-accent-400 focus:border-transparent">
-                  <option value="email">Email</option><option value="mail">Mail</option><option value="both">Both</option>
-                </select>
-              </div>
-              {composeTemplate.variables.length > 0 && (
-                <div>
-                  <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mb-2">Template Variables</p>
-                  <div className="space-y-3">
-                    {composeTemplate.variables.map(v => (
-                      <div key={v.name}>
-                        <label className="block text-xs font-medium text-ink-600 mb-1">{v.label}</label>
-                        <input type="text" value={composeValues[v.name] || ''} onChange={e => setComposeValues(prev => ({ ...prev, [v.name]: e.target.value }))} placeholder={v.defaultValue || v.label} className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-accent-400 focus:border-transparent" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Right: Live preview */}
-            <div className="space-y-3">
-              <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold">Live Preview</p>
-              <div className="bg-ink-50 rounded-xl border border-ink-100 overflow-hidden">
-                <div className="bg-white border-b border-ink-100 px-4 py-3">
-                  <div className="flex items-center gap-2 text-xs text-ink-400 mb-1.5">
-                    <span className="font-semibold text-ink-500">To:</span>
-                    <span>{composeValues.owner_name || '(recipient)'}</span>
-                    {(composeSelectedUnit || composeValues.unit_number) && <span className="text-ink-300">| Unit {composeSelectedUnit || composeValues.unit_number}</span>}
-                  </div>
-                  <p className="text-sm font-bold text-ink-900">{substituteVariables(composeTemplate.subject, composeValues)}</p>
-                </div>
-                <div className="px-4 py-3 text-sm text-ink-700 whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
-                  {substituteVariables(composeTemplate.body, composeValues)}
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] text-ink-400">
-                <span>Via: {composeSentVia}</span>
-                <span>By: {currentUser.name}</span>
-              </div>
-            </div>
-          </div>
         </Modal>
       )}
 
