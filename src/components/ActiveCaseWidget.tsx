@@ -46,6 +46,7 @@ export default function ActiveCaseWidget() {
   const [pillState, setPillState] = useState<PillState>(ctx ? 'active' : 'idle');
   const [pickerTab, setPickerTab] = useState<'open' | 'create'>('open');
   const [searchQuery, setSearchQuery] = useState('');
+  const [createSearchQuery, setCreateSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
 
   // New case wizard (single-step: pick situation then fill details)
@@ -56,7 +57,7 @@ export default function ActiveCaseWidget() {
   const [wizApproach, setWizApproach] = useState<CaseApproach>('pre');
   const [wizNotes, setWizNotes] = useState('');
 
-  const resetWiz = () => { setWizSitKey(null); setWizTitle(''); setWizUnit(''); setWizPriority('medium'); setWizApproach('pre'); setWizNotes(''); };
+  const resetWiz = () => { setWizSitKey(null); setWizTitle(''); setWizUnit(''); setWizPriority('medium'); setWizApproach('pre'); setWizNotes(''); setCreateSearchQuery(''); };
 
   // Sync pill state with ctx
   useEffect(() => {
@@ -225,29 +226,52 @@ export default function ActiveCaseWidget() {
         )}
 
         {/* NEW CASE TAB */}
-        {pickerTab === 'create' && !wizSitKey && (
-          <div className="overflow-y-auto" style={{ maxHeight: '440px', scrollbarWidth: 'thin' }}>
-            {CATS.map(cat => (
-              <div key={cat.id} className="px-4 py-2 first:pt-3">
-                <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                  <span>{cat.icon}</span> {cat.label}
-                </p>
-                <div className="space-y-1 mb-2">
-                  {cat.sits.map(sit => (
-                    <button key={sit.id} onClick={() => { setWizSitKey(`${cat.id}:${sit.id}`); setWizTitle(''); }}
-                      className="w-full text-left px-3 py-2 rounded-lg border border-ink-100 hover:border-ink-300 hover:bg-ink-50 transition-all cursor-pointer group">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-ink-800 group-hover:text-ink-900">{sit.title}</span>
-                        <span className="text-ink-200 group-hover:text-ink-400 text-xs">→</span>
-                      </div>
-                      <p className="text-[10px] text-ink-400 mt-0.5 leading-snug">{sit.desc}</p>
-                    </button>
-                  ))}
-                </div>
+        {pickerTab === 'create' && !wizSitKey && (() => {
+          const q = createSearchQuery.toLowerCase().trim();
+          const filteredCats = q
+            ? CATS.map(cat => ({
+                ...cat,
+                sits: cat.sits.filter(sit =>
+                  sit.title.toLowerCase().includes(q) ||
+                  sit.desc.toLowerCase().includes(q) ||
+                  cat.label.toLowerCase().includes(q) ||
+                  sit.tags?.some((t: string) => t.toLowerCase().includes(q))
+                ),
+              })).filter(cat => cat.sits.length > 0)
+            : CATS;
+          return (
+            <div>
+              <div className="px-4 pt-3 pb-2">
+                <input type="text" placeholder="Search situations..." value={createSearchQuery} onChange={e => setCreateSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300" />
               </div>
-            ))}
-          </div>
-        )}
+              <div className="overflow-y-auto" style={{ maxHeight: '380px', scrollbarWidth: 'thin' }}>
+                {filteredCats.length === 0 && (
+                  <p className="text-xs text-ink-400 text-center py-4">No matching situations</p>
+                )}
+                {filteredCats.map(cat => (
+                  <div key={cat.id} className="px-4 py-2 first:pt-1">
+                    <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                      <span>{cat.icon}</span> {cat.label}
+                    </p>
+                    <div className="space-y-1 mb-2">
+                      {cat.sits.map(sit => (
+                        <button key={sit.id} onClick={() => { setWizSitKey(`${cat.id}:${sit.id}`); setWizTitle(''); setCreateSearchQuery(''); }}
+                          className="w-full text-left px-3 py-2 rounded-lg border border-ink-100 hover:border-ink-300 hover:bg-ink-50 transition-all cursor-pointer group">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-ink-800 group-hover:text-ink-900">{sit.title}</span>
+                            <span className="text-ink-200 group-hover:text-ink-400 text-xs">→</span>
+                          </div>
+                          <p className="text-[10px] text-ink-400 mt-0.5 leading-snug">{sit.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* NEW CASE — Details form (after selecting situation) */}
         {pickerTab === 'create' && wizSitKey && selectedCat && selectedSit && (
