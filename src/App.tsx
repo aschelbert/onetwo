@@ -99,7 +99,8 @@ export default function App() {
         {/* Catch-all */}
         <Route path="*" element={<CatchAll />} />
       </Routes>
-      <AIAdvisorWrapper />
+      {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
+      {/* <AIAdvisorWrapper /> */}
       <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
