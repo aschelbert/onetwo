@@ -329,8 +329,9 @@ export async function fetchStripeWebhookEvents(): Promise<StripeWebhookEvent[] |
 
 export async function fetchStripeConfig(): Promise<StripeConfig | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('stripe_config').select('*').eq('id', 'default').single();
+  const { data, error } = await supabase.from('stripe_config').select('*').eq('id', 'default').maybeSingle();
   if (error) { logDbError('fetchStripeConfig error:', error); return null; }
+  if (!data) return null;
   return {
     mode: data.mode as StripeConfig['mode'],
     publishableKey: data.publishable_key as string,
