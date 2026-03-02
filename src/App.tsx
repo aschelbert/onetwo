@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useAuthStore } from '@/store/useAuthStore';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
-import LandingPage from '@/features/landing/LandingPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
@@ -41,14 +40,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function LandingRoute() {
-  const { isAuthenticated, currentRole } = useAuthStore();
-  if (isAuthenticated) {
-    return <Navigate to={currentRole === 'PLATFORM_ADMIN' ? '/admin/console' : '/dashboard'} replace />;
-  }
-  return <LandingPage />;
-}
-
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
@@ -83,9 +74,12 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/" element={<LandingRoute />} />
+        {/* Landing page is served by static index.html via Vite middleware */}
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Admin console — own layout (sidebar nav), outside AppShell */}
+        <Route path="/admin/console" element={<RequireAuth><TenantProvider><PlatformAdminPage /></TenantProvider></RequireAuth>} />
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
@@ -103,7 +97,6 @@ export default function App() {
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
-          <Route path="/admin/console" element={<PlatformAdminPage />} />
         </Route>
 
         {/* Catch-all */}
