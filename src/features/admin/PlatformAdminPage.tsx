@@ -18,10 +18,10 @@ const STATUS_BADGE: Record<string, string> = {
   suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500',
   trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700',
 };
-const TIER_BADGE: Record<string, string> = { essentials: 'bg-ink-100 text-ink-600', compliance_pro: 'bg-accent-100 text-accent-700', advanced_governance: 'bg-sage-100 text-sage-700' };
-const TIER_PRICES: Record<SubscriptionTier, number> = { essentials: 49, compliance_pro: 179, advanced_governance: 299 };
-const TIER_LABELS: Record<string, string> = { essentials: 'Essentials', compliance_pro: 'Compliance Pro', advanced_governance: 'Advanced Governance' };
-const TIER_COLORS: Record<string, string> = { essentials: '#6b7280', compliance_pro: '#c42030', advanced_governance: '#16a34a' };
+const TIER_BADGE: Record<string, string> = { compliance_pro: 'bg-accent-100 text-accent-700', community_plus: 'bg-ink-100 text-ink-600', management_suite: 'bg-sage-100 text-sage-700' };
+const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+const TIER_LABELS: Record<string, string> = { compliance_pro: 'Compliance Pro', community_plus: 'Community Plus', management_suite: 'Management Suite' };
+const TIER_COLORS: Record<string, string> = { compliance_pro: '#c42030', community_plus: '#6b7280', management_suite: '#16a34a' };
 const FEATURE_LABELS: Record<string, string> = {
   fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook',
   aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing',
@@ -215,7 +215,7 @@ export default function PlatformAdminPage() {
                 <div className="bg-white rounded-[10px] border border-ink-200 p-5">
                   <h3 className="font-display text-base font-bold text-ink-900 mb-4">Subscription Mix</h3>
                   <div className="space-y-3">
-                    {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => {
+                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
                       const count = tenants.filter(t => t.subscription.tier === tier).length;
                       return (
                         <div key={tier} className="flex items-center justify-between">
@@ -317,7 +317,7 @@ export default function PlatformAdminPage() {
                 <p className="text-sm text-ink-500 mt-1">Manage plans, pricing, and Stripe product links</p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => {
+                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
                   const count = tenants.filter(t => t.subscription.tier === tier).length;
                   const featureCount = Object.entries(TIER_FEATURES[tier]).filter(([, v]) => v).length;
                   return (
@@ -338,7 +338,7 @@ export default function PlatformAdminPage() {
                       <div className="bg-ink-50 px-5 py-3 flex items-center gap-2 text-xs border-t border-ink-100">
                         <span className="w-2 h-2 rounded-full bg-sage-600" />
                         <span className="text-ink-500">Stripe:</span>
-                        <code className="text-ink-400 text-[0.7rem]">prod_Rk8{tier === 'essentials' ? 'm' : tier === 'compliance_pro' ? 'n' : 'o'}...</code>
+                        <code className="text-ink-400 text-[0.7rem]">{tier === 'compliance_pro' ? 'prod_U1uEALGv7cxbG8' : tier === 'community_plus' ? 'prod_U18qLUrk51rvcH' : 'prod_U1uF4LzxGLbojg'}</code>
                         <span className="ml-auto text-sage-600 font-semibold">Synced</span>
                       </div>
                     </div>
@@ -350,7 +350,7 @@ export default function PlatformAdminPage() {
               <div>
                 <h3 className="font-display text-base font-bold text-ink-900 mb-3">Tenancies by Plan</h3>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => (
+                  {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
                     <div key={tier} className="bg-white rounded-[10px] border border-ink-200 p-4">
                       <p className="text-xs font-bold uppercase mb-3 text-ink-500">{TIER_LABELS[tier]}</p>
                       {tenants.filter(t => t.subscription.tier === tier).map(t => (
@@ -399,7 +399,7 @@ export default function PlatformAdminPage() {
                             <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
                             <td className="px-3 py-3">
                               <div className="flex gap-1.5 flex-wrap">
-                                {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => (
+                                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
                                   TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? (
                                     <span key={tier} className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold"
                                       style={{ backgroundColor: `${TIER_COLORS[tier]}20`, color: TIER_COLORS[tier] }}>
@@ -434,7 +434,7 @@ export default function PlatformAdminPage() {
                   <thead>
                     <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
                       <th className="px-5 py-3 min-w-[250px]">Feature</th>
-                      {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => (
+                      {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
                         <th key={tier} className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[tier] }} />
@@ -457,7 +457,7 @@ export default function PlatformAdminPage() {
                           {groupFeatures.map(featureId => (
                             <tr key={featureId} className="border-b border-ink-100 hover:bg-ink-50">
                               <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
-                              {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => (
+                              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
                                 <td key={tier} className="px-4 py-3 text-center">
                                   <span className={`text-lg ${TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? 'text-sage-600' : 'text-ink-200'}`}>
                                     {TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? '✓' : '—'}
@@ -601,7 +601,7 @@ export default function PlatformAdminPage() {
                     <div><p className="text-xs text-ink-400">Next Billing</p><p className="font-bold text-ink-900">{selected.subscription.nextBillingDate}</p></div>
                   </div>
                   <div className="flex gap-2 mt-4 flex-wrap">
-                    {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).filter(t => t !== selected.subscription.tier).map(tier => (
+                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).filter(t => t !== selected.subscription.tier).map(tier => (
                       <button key={tier} onClick={() => store.changeTier(selected.id, tier, ACTOR)}
                         className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-ink-50">
                         → {TIER_LABELS[tier]} ({fmt(TIER_PRICES[tier])})
@@ -757,7 +757,7 @@ export default function PlatformAdminPage() {
 
             <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Subscription</p></div>
             <div className="grid grid-cols-3 gap-3">
-              {(['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[]).map(tier => (
+              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
                 <button key={tier} type="button" onClick={() => setBldgForm({ ...bldgForm, tier })}
                   className={`p-3 rounded-xl border-2 text-left ${bldgForm.tier === tier ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}>
                   <p className="font-bold text-ink-900">{TIER_LABELS[tier]}</p>

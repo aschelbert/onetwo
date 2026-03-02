@@ -122,7 +122,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           name: t.name,
           subdomain: t.subdomain,
           status: t.status,
-          tier: sub?.tier || 'essentials',
+          tier: sub?.tier || 'compliance_pro',
           features: feat || {},
           address: {
             street: addr.street || '',

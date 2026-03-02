@@ -4,7 +4,7 @@ import * as platformSvc from '@/lib/services/platform';
 
 // ── Types ──────────────────────────────────────────
 
-export type SubscriptionTier = 'essentials' | 'compliance_pro' | 'advanced_governance';
+export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
 export type SubscriptionStatus = 'active' | 'trial' | 'past_due' | 'cancelled' | 'suspended';
 export type BuildingStatus = 'active' | 'onboarding' | 'suspended' | 'archived';
 
@@ -58,18 +58,19 @@ export interface Tenant {
 }
 
 // Feature matrix per tier — determines defaults when creating/changing tiers
+// Tiers match Stripe products: Compliance Pro ($179), Community Plus ($279), Management Suite ($399)
 export const TIER_FEATURES: Record<SubscriptionTier, Record<keyof Tenant['features'], boolean>> = {
-  essentials: {
+  compliance_pro: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: false, documentVault: false, paymentProcessing: false,
     votesResolutions: false, communityPortal: false, vendorManagement: false, reserveStudyTools: false,
   },
-  compliance_pro: {
+  community_plus: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
-    votesResolutions: false, communityPortal: false, vendorManagement: true, reserveStudyTools: false,
+    votesResolutions: false, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
   },
-  advanced_governance: {
+  management_suite: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
@@ -192,9 +193,9 @@ export interface PlatformBudget {
 
 // Role definitions for RBAC
 export const TENANT_ROLES = [
-  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[] },
-  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[] },
-  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['advanced_governance'] as SubscriptionTier[] },
+  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
+  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
+  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['management_suite'] as SubscriptionTier[] },
 ] as const;
 
 export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
@@ -212,56 +213,57 @@ export const FEATURE_GROUPS: { name: string; features: string[] }[] = [
 
 // ── Seed Data ──────────────────────────────────────
 
+// Seed tenants — fallback only when DB is unavailable. Matches real tenants in DB.
 const seedTenants: Tenant[] = [
   {
-    id: 'bld-001', name: 'Sunny Acres Condominium', subdomain: 'sunnyacres',
-    address: { street: '1234 Constitution Ave NW', city: 'Washington', state: 'DC', zip: '20001' },
-    totalUnits: 50, yearBuilt: '1998', status: 'active', createdAt: '2025-03-15',
-    subscription: { tier: 'compliance_pro', status: 'active', startDate: '2025-03-15', nextBillingDate: '2026-03-15', monthlyRate: 179, trialEndsAt: null },
-    stats: { activeUsers: 7, occupiedUnits: 48, collectionRate: 94, complianceScore: 82, openCases: 3, monthlyRevenue: 6860 },
-    primaryContact: { name: 'Robert Mitchell', email: 'robert@example.com', phone: '202-555-0401', role: 'President' },
-    features: { ...TIER_FEATURES.compliance_pro },
-    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: true, firstUserInvited: true, bylawsUploaded: true, financialSetupDone: true, goLive: true },
-  },
-  {
-    id: 'bld-002', name: 'Park View Towers', subdomain: 'parkview',
-    address: { street: '800 Park Road NW', city: 'Washington', state: 'DC', zip: '20010' },
-    totalUnits: 120, yearBuilt: '2005', status: 'active', createdAt: '2025-06-01',
-    subscription: { tier: 'advanced_governance', status: 'active', startDate: '2025-06-01', nextBillingDate: '2026-06-01', monthlyRate: 299, trialEndsAt: null },
-    stats: { activeUsers: 24, occupiedUnits: 115, collectionRate: 97, complianceScore: 91, openCases: 5, monthlyRevenue: 23000 },
-    primaryContact: { name: 'Amanda Torres', email: 'amanda@parkview.com', phone: '202-555-1200', role: 'Property Manager' },
-    features: { ...TIER_FEATURES.advanced_governance },
-    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: true, firstUserInvited: true, bylawsUploaded: true, financialSetupDone: true, goLive: true },
-  },
-  {
-    id: 'bld-003', name: 'Georgetown Gardens HOA', subdomain: 'georgetowngardens',
-    address: { street: '3100 Wisconsin Ave NW', city: 'Washington', state: 'DC', zip: '20016' },
-    totalUnits: 28, yearBuilt: '1962', status: 'active', createdAt: '2025-09-10',
-    subscription: { tier: 'essentials', status: 'active', startDate: '2025-09-10', nextBillingDate: '2026-03-10', monthlyRate: 49, trialEndsAt: null },
-    stats: { activeUsers: 4, occupiedUnits: 26, collectionRate: 88, complianceScore: 65, openCases: 1, monthlyRevenue: 3640 },
-    primaryContact: { name: 'William Chen', email: 'wchen@gtowngardens.com', phone: '202-555-2800', role: 'Treasurer' },
-    features: { ...TIER_FEATURES.essentials },
-    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: true, firstUserInvited: true, bylawsUploaded: false, financialSetupDone: true, goLive: true },
-  },
-  {
-    id: 'bld-004', name: 'Capitol Hill Residences', subdomain: 'capitolhill',
-    address: { street: '500 East Capitol St SE', city: 'Washington', state: 'DC', zip: '20003' },
-    totalUnits: 75, yearBuilt: '2012', status: 'onboarding', createdAt: '2026-02-01',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-01', nextBillingDate: '2026-03-01', monthlyRate: 179, trialEndsAt: '2026-03-01' },
-    stats: { activeUsers: 2, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
-    primaryContact: { name: 'Priya Sharma', email: 'priya@capitolhill.com', phone: '202-555-7500', role: 'President' },
+    id: '02305a79-beb2-4037-b447-5263e955e84c', name: '1302 R ST NW', subdomain: '1302rstnw',
+    address: { street: '1302 R St NW', city: 'Washington', state: 'DC', zip: '20009-4882' },
+    totalUnits: 4, yearBuilt: '', status: 'onboarding', createdAt: '2026-03-02',
+    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
+    stats: { activeUsers: 1, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+    primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
     features: { ...TIER_FEATURES.compliance_pro },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
   {
-    id: 'bld-005', name: 'Dupont Circle Condos', subdomain: 'dupontcircle',
-    address: { street: '1800 Connecticut Ave NW', city: 'Washington', state: 'DC', zip: '20009' },
-    totalUnits: 36, yearBuilt: '1985', status: 'suspended', createdAt: '2025-01-20',
-    subscription: { tier: 'essentials', status: 'past_due', startDate: '2025-01-20', nextBillingDate: '2026-01-20', monthlyRate: 49, trialEndsAt: null },
-    stats: { activeUsers: 3, occupiedUnits: 34, collectionRate: 91, complianceScore: 72, openCases: 2, monthlyRevenue: 4080 },
-    primaryContact: { name: 'James Wilson', email: 'jwilson@dupontcondos.com', phone: '202-555-3600', role: 'Vice President' },
-    features: { ...TIER_FEATURES.essentials },
-    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: true, firstUserInvited: true, bylawsUploaded: true, financialSetupDone: true, goLive: true },
+    id: 'b1280a87-b936-4668-83c4-b75594833f6f', name: 'Castle Condos', subdomain: 'castle',
+    address: { street: '123 Main St', city: 'Washington', state: 'DC', zip: '20009' },
+    totalUnits: 20, yearBuilt: '', status: 'onboarding', createdAt: '2026-02-23',
+    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+    primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
+    features: { ...TIER_FEATURES.compliance_pro },
+    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
+  },
+  {
+    id: '74a6009c-6daa-45b2-bd91-ba5c4d7310cb', name: "Coop's Coop", subdomain: 'coopscoop',
+    address: { street: '', city: '', state: '', zip: '' },
+    totalUnits: 0, yearBuilt: '', status: 'onboarding', createdAt: '2026-02-23',
+    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+    primaryContact: { name: 'Board Member', email: 'boardmember@getonetwo.com', phone: '', role: 'Primary Contact' },
+    features: { ...TIER_FEATURES.compliance_pro },
+    onboardingChecklist: { accountCreated: true, buildingProfileComplete: false, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
+  },
+  {
+    id: '0ed0ce61-98a6-4aaf-922a-749b109889be', name: 'Sunny Acres Condominium', subdomain: 'sunnyacres',
+    address: { street: '1234 Constitution Ave NW', city: 'Washington', state: 'DC', zip: '20001' },
+    totalUnits: 50, yearBuilt: '1998', status: 'onboarding', createdAt: '2026-02-23',
+    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+    primaryContact: { name: 'Robert Mitchell', email: 'robert@example.com', phone: '202-555-0401', role: 'Primary Contact' },
+    features: { ...TIER_FEATURES.compliance_pro },
+    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
+  },
+  {
+    id: '0a5eee55-bb60-4a1c-b623-89fce7ce0b7a', name: 'Test Building', subdomain: 'testbuilding',
+    address: { street: '123 Main St NW', city: 'Washington', state: 'DC', zip: '20009' },
+    totalUnits: 10, yearBuilt: '', status: 'onboarding', createdAt: '2026-03-02',
+    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
+    stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+    primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
+    features: { ...TIER_FEATURES.compliance_pro },
+    onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
 ];
 
@@ -305,7 +307,7 @@ export interface Announcement {
   id: string;
   title: string;
   message: string;
-  audience: 'all' | 'essentials' | 'compliance_pro' | 'advanced_governance' | string;
+  audience: 'all' | 'compliance_pro' | 'community_plus' | 'management_suite' | string;
   status: 'draft' | 'sent';
   createdBy: string;
   createdAt: string;
@@ -340,7 +342,7 @@ const seedTickets: SupportTicket[] = [
 ];
 
 const seedAnnouncements: Announcement[] = [
-  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Advanced Governance subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'advanced_governance', status: 'sent', createdBy: 'Alyssa Schelbert', createdAt: '2026-02-15', sentAt: '2026-02-15' },
+  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Management Suite subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'management_suite', status: 'sent', createdBy: 'Alyssa Schelbert', createdAt: '2026-02-15', sentAt: '2026-02-15' },
   { id: 'ann-002', title: 'Scheduled Maintenance — Feb 28', message: 'Brief downtime expected Feb 28 2-4 AM ET for infrastructure upgrades.', audience: 'all', status: 'draft', createdBy: 'Alex Rivera', createdAt: '2026-02-22', sentAt: null },
 ];
 
@@ -656,7 +658,8 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
 
   // ─── DB Hydration ──────────────────────────────────
   loadFromDb: async () => {
-    const [tickets, templates, announcements, perms, stripePayments, stripeWebhooks, stripeConf, accounts, glEntries, budgets] = await Promise.all([
+    const [tenants, tickets, templates, announcements, perms, stripePayments, stripeWebhooks, stripeConf, accounts, glEntries, budgets] = await Promise.all([
+      platformSvc.fetchTenants(),
       platformSvc.fetchTickets(),
       platformSvc.fetchTemplates(),
       platformSvc.fetchPlatformAnnouncements(),
@@ -669,6 +672,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
       platformSvc.fetchPlatformBudgets(),
     ]);
     const updates: Partial<PlatformAdminState> = {};
+    if (tenants) updates.tenants = tenants;
     if (tickets) updates.supportTickets = tickets;
     if (templates) updates.emailTemplates = templates;
     if (announcements) updates.announcements = announcements;
@@ -718,7 +722,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   changeTier: (id, tier, actor) => set(s => ({
     tenants: s.tenants.map(t => t.id === id ? {
       ...t,
-      subscription: { ...t.subscription, tier, monthlyRate: { essentials: 49, compliance_pro: 179, advanced_governance: 299 }[tier] },
+      subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
       features: { ...TIER_FEATURES[tier] },
     } : t),
     auditLog: [{ id: `aud-${Date.now()}`, timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
@@ -814,7 +818,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     if (isBackendEnabled) platformSvc.updatePermission(roleId, featureId, actions);
   },
   bulkUpdatePermissions: (roleId, mode) => {
-    const allFeatures = Object.keys(TIER_FEATURES.essentials);
+    const allFeatures = Object.keys(TIER_FEATURES.compliance_pro);
     const role = TENANT_ROLES.find(r => r.id === roleId);
     if (!role) return;
     set(s => ({

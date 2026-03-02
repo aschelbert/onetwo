@@ -138,7 +138,7 @@ export function useTenant() {
         name: tenantRow.name,
         subdomain: tenantRow.subdomain,
         status: tenantRow.status,
-        tier: sub?.tier || 'essentials',
+        tier: sub?.tier || 'compliance_pro',
         features: {
           fiscalLens: feat?.fiscal_lens ?? true,
           caseOps: feat?.case_ops ?? true,
@@ -152,9 +152,9 @@ export function useTenant() {
           reserveStudyTools: feat?.reserve_study_tools ?? false,
         },
         subscription: {
-          tier: sub?.tier || 'essentials',
+          tier: sub?.tier || 'compliance_pro',
           status: sub?.status || 'trialing',
-          monthlyRate: (sub?.monthly_rate || 4900) / 100,
+          monthlyRate: (sub?.monthly_rate || 17900) / 100,
           trialEndsAt: sub?.trial_ends_at || null,
         },
         onboarding: {

@@ -90,9 +90,9 @@ export default function StripeTab() {
               <h4 className="font-bold text-ink-900 mb-4">Product ↔ Stripe Mapping</h4>
               <div className="space-y-3">
                 {[
-                  { name: 'Essentials', price: '$49/mo', color: 'bg-ink-100', productId: 'prod_Rk8m...', status: 'synced' },
-                  { name: 'Compliance Pro', price: '$179/mo', color: 'bg-accent-100', productId: 'prod_Rk8n...', status: 'synced' },
-                  { name: 'Advanced Governance', price: '$299/mo', color: 'bg-sage-100', productId: 'prod_Rk8o...', status: 'synced' },
+                  { name: 'Compliance Pro', price: '$179/mo', color: 'bg-accent-100', productId: 'prod_U1uEALGv7cxbG8', status: 'synced' },
+                  { name: 'Community Plus', price: '$279/mo', color: 'bg-ink-100', productId: 'prod_U18qLUrk51rvcH', status: 'synced' },
+                  { name: 'Management Suite', price: '$399/mo', color: 'bg-sage-100', productId: 'prod_U1uF4LzxGLbojg', status: 'synced' },
                 ].map(p => (
                   <div key={p.name} className="flex items-center justify-between py-2 border-b border-ink-50 last:border-0">
                     <div className="flex items-center gap-3">

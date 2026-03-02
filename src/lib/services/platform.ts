@@ -1,10 +1,76 @@
 import { supabase, logDbError } from '@/lib/supabase';
 import type {
+  Tenant, SubscriptionTier,
   SupportTicket, EmailTemplate,
   Announcement as PlatformAnnouncement,
   Permission, StripeWebhookEvent, StripePayment, StripeConfig,
   PlatformAccount, PlatformGLEntry, PlatformBudget,
 } from '@/store/usePlatformAdminStore';
+import { TIER_FEATURES } from '@/store/usePlatformAdminStore';
+
+// ── Tenants ──
+
+const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+
+export async function fetchTenants(): Promise<Tenant[] | null> {
+  if (!supabase) return null;
+  // Fetch tenants and their subscriptions in parallel
+  const [{ data: tenantRows, error: tErr }, { data: subRows, error: sErr }] = await Promise.all([
+    supabase.from('tenants').select('*').order('name'),
+    supabase.from('subscriptions').select('*'),
+  ]);
+  if (tErr) { logDbError('fetchTenants error:', tErr); return null; }
+  if (sErr) { logDbError('fetchTenants subscriptions error:', sErr); return null; }
+
+  const subMap = new Map<string, Record<string, unknown>>();
+  for (const s of subRows || []) subMap.set(s.tenant_id as string, s);
+
+  return (tenantRows || []).map((r): Tenant => {
+    const sub = subMap.get(r.id as string);
+    const tier = ((sub?.tier as string) || 'compliance_pro') as SubscriptionTier;
+    const validTier = (tier in TIER_FEATURES) ? tier : 'compliance_pro' as SubscriptionTier;
+    const addr = typeof r.address === 'string' ? JSON.parse(r.address) : (r.address || {});
+    const subStatus = (sub?.status as string) || 'trialing';
+    // Map DB subscription status to app status
+    const statusMap: Record<string, string> = { trialing: 'trial', active: 'active', past_due: 'past_due', canceled: 'cancelled' };
+    const appSubStatus = (statusMap[subStatus] || subStatus) as Tenant['subscription']['status'];
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      subdomain: r.subdomain as string,
+      address: { street: addr.street || '', city: addr.city || '', state: addr.state || '', zip: addr.zip || '' },
+      totalUnits: (r.total_units as number) || 0,
+      yearBuilt: (r.year_built as string) || '',
+      status: (r.status as Tenant['status']) || 'onboarding',
+      createdAt: ((r.created_at as string) || '').split('T')[0],
+      subscription: {
+        tier: validTier,
+        status: appSubStatus,
+        startDate: ((sub?.created_at as string) || '').split('T')[0],
+        nextBillingDate: ((sub?.current_period_end as string) || (sub?.trial_ends_at as string) || '').split('T')[0],
+        monthlyRate: (sub?.monthly_rate as number) ? ((sub?.monthly_rate as number) / 100) : TIER_PRICES[validTier],
+        trialEndsAt: (sub?.trial_ends_at as string)?.split('T')[0] || null,
+      },
+      stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+      primaryContact: {
+        name: (r.primary_contact_name as string) || '',
+        email: (r.primary_contact_email as string) || '',
+        phone: (r.primary_contact_phone as string) || '',
+        role: 'Primary Contact',
+      },
+      features: { ...TIER_FEATURES[validTier] },
+      onboardingChecklist: {
+        accountCreated: true,
+        buildingProfileComplete: !!(addr.street),
+        unitsConfigured: false,
+        firstUserInvited: false,
+        bylawsUploaded: false,
+        financialSetupDone: false,
+        goLive: (r.status as string) === 'active',
+      },
+    };
+  });
+}
 
 // ── Support Tickets ──
 
