@@ -200,8 +200,14 @@ export const TENANT_ROLES = [
 
 export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
 
+// Core app modules — always available regardless of subscription tier
+export const CORE_FEATURES = [
+  'dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement',
+] as const;
+
 // Feature groups for display in permissions matrix
 export const FEATURE_GROUPS: { name: string; features: string[] }[] = [
+  { name: 'Core Modules', features: ['dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement'] },
   { name: 'Financial', features: ['fiscalLens', 'paymentProcessing'] },
   { name: 'Compliance & Governance', features: ['complianceRunbook'] },
   { name: 'Case & Workflow', features: ['caseOps'] },
@@ -394,6 +400,30 @@ const seedPermissions: Permission[] = [
   { id: 'perm-pm-7', roleId: 'property_manager', featureId: 'communityPortal', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
   { id: 'perm-pm-8', roleId: 'property_manager', featureId: 'vendorManagement', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
   { id: 'perm-pm-9', roleId: 'property_manager', featureId: 'reserveStudyTools', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Core modules — Board Member
+  { id: 'perm-bm-dashboard', roleId: 'board_member', featureId: 'dashboard', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-boardRoom', roleId: 'board_member', featureId: 'boardRoom', actions: ['view','create','edit','delete','approve'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-building', roleId: 'board_member', featureId: 'building', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-propertyLog', roleId: 'board_member', featureId: 'propertyLog', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-archives', roleId: 'board_member', featureId: 'archives', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-myUnit', roleId: 'board_member', featureId: 'myUnit', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-bm-userMgmt', roleId: 'board_member', featureId: 'userManagement', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Core modules — Resident
+  { id: 'perm-res-dashboard', roleId: 'resident', featureId: 'dashboard', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-boardRoom', roleId: 'resident', featureId: 'boardRoom', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-building', roleId: 'resident', featureId: 'building', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-propertyLog', roleId: 'resident', featureId: 'propertyLog', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-archives', roleId: 'resident', featureId: 'archives', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-myUnit', roleId: 'resident', featureId: 'myUnit', actions: ['view','create'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-userMgmt', roleId: 'resident', featureId: 'userManagement', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Core modules — Property Manager
+  { id: 'perm-pm-dashboard', roleId: 'property_manager', featureId: 'dashboard', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-boardRoom', roleId: 'property_manager', featureId: 'boardRoom', actions: ['view','create','edit','delete','approve'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-building', roleId: 'property_manager', featureId: 'building', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-propertyLog', roleId: 'property_manager', featureId: 'propertyLog', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-archives', roleId: 'property_manager', featureId: 'archives', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-myUnit', roleId: 'property_manager', featureId: 'myUnit', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-userMgmt', roleId: 'property_manager', featureId: 'userManagement', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
 ];
 
 const seedStripeConfig: StripeConfig = {
@@ -818,13 +848,13 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     if (isBackendEnabled) platformSvc.updatePermission(roleId, featureId, actions);
   },
   bulkUpdatePermissions: (roleId, mode) => {
-    const allFeatures = Object.keys(TIER_FEATURES.compliance_pro);
     const role = TENANT_ROLES.find(r => r.id === roleId);
     if (!role) return;
     set(s => ({
       permissions: s.permissions.map(p => {
         if (p.roleId !== roleId) return p;
-        const featureAvailable = role.tiers.some(tier => TIER_FEATURES[tier][p.featureId as keyof Tenant['features']]);
+        const isCoreFeature = (CORE_FEATURES as readonly string[]).includes(p.featureId);
+        const featureAvailable = isCoreFeature || role.tiers.some(tier => TIER_FEATURES[tier][p.featureId as keyof Tenant['features']]);
         if (!featureAvailable) return { ...p, actions: [], updatedAt: new Date().toISOString() };
         let newActions: string[];
         if (mode === 'grant') newActions = [...PERMISSION_ACTIONS];
@@ -833,6 +863,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
         return { ...p, actions: newActions, updatedAt: new Date().toISOString(), updatedBy: 'admin' };
       }),
     }));
+    const allFeatures = [...CORE_FEATURES, ...Object.keys(TIER_FEATURES.compliance_pro)];
     if (isBackendEnabled) platformSvc.bulkUpdatePermissions(roleId, mode, allFeatures);
   },
 

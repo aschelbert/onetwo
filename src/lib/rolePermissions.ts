@@ -1,28 +1,4 @@
 import type { Role } from '@/types/auth';
-import type { ViewPermissions } from '@/types/issues';
-
-export const ROLE_PERMISSIONS: Record<Role, ViewPermissions> = {
-  PLATFORM_ADMIN: {
-    canViewCaseWorkflow: true, canViewDecisionTrail: true, canViewBidDetails: true,
-    canViewConflictDetails: true, canViewFiduciaryAlerts: true, canEditCases: true,
-    caseDetailLevel: 'full', financialDetailLevel: 'full',
-  },
-  BOARD_MEMBER: {
-    canViewCaseWorkflow: true, canViewDecisionTrail: true, canViewBidDetails: true,
-    canViewConflictDetails: true, canViewFiduciaryAlerts: true, canEditCases: true,
-    caseDetailLevel: 'full', financialDetailLevel: 'full',
-  },
-  PROPERTY_MANAGER: {
-    canViewCaseWorkflow: true, canViewDecisionTrail: true, canViewBidDetails: true,
-    canViewConflictDetails: true, canViewFiduciaryAlerts: true, canEditCases: true,
-    caseDetailLevel: 'full', financialDetailLevel: 'full',
-  },
-  RESIDENT: {
-    canViewCaseWorkflow: false, canViewDecisionTrail: false, canViewBidDetails: false,
-    canViewConflictDetails: false, canViewFiduciaryAlerts: false, canEditCases: false,
-    caseDetailLevel: 'phase', financialDetailLevel: 'category',
-  },
-};
 
 export interface NavItem {
   id: string;

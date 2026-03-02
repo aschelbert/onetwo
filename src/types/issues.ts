@@ -142,18 +142,6 @@ export interface BudgetAlert {
   remaining: number;
 }
 
-// View Permissions (role-based)
-export interface ViewPermissions {
-  canViewCaseWorkflow: boolean;
-  canViewDecisionTrail: boolean;
-  canViewBidDetails: boolean;
-  canViewConflictDetails: boolean;
-  canViewFiduciaryAlerts: boolean;
-  canEditCases: boolean;
-  caseDetailLevel: 'full' | 'phase' | 'none';
-  financialDetailLevel: 'full' | 'category' | 'summary';
-}
-
 export interface CaseStep {
   id: string;
   s: string;

@@ -1,7 +1,10 @@
 import { useState, Fragment } from 'react';
-import { usePlatformAdminStore, TIER_FEATURES, TENANT_ROLES, PERMISSION_ACTIONS, FEATURE_GROUPS, type SubscriptionTier, type Tenant } from '@/store/usePlatformAdminStore';
+import { usePlatformAdminStore, TIER_FEATURES, TENANT_ROLES, PERMISSION_ACTIONS, FEATURE_GROUPS, CORE_FEATURES, type SubscriptionTier, type Tenant } from '@/store/usePlatformAdminStore';
 
 const FEATURE_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard', boardRoom: 'Board Room', building: 'The Building',
+  propertyLog: 'Property Log', archives: 'The Archives', myUnit: 'My Unit',
+  userManagement: 'User Management',
   fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook',
   aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing',
   votesResolutions: 'Votes & Resolutions', communityPortal: 'Community Portal',
@@ -23,6 +26,7 @@ export default function PermissionsTab() {
   const rolePermissions = permissions.filter(p => p.roleId === selectedRole);
 
   const isFeatureAvailable = (featureId: string) => {
+    if ((CORE_FEATURES as readonly string[]).includes(featureId)) return true;
     return role.tiers.some(tier => TIER_FEATURES[tier][featureId as keyof Tenant['features']]);
   };
 

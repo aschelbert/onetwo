@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useFinancialStore } from '@/store/useFinancialStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 
@@ -44,7 +43,6 @@ const TIERS: { id: SubscriptionTier; name: string; price: number; features: stri
 
 export default function AuthPage() {
   const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, login, buildingMembers, buildingInvites, addMember } = useAuthStore();
-  const onboardingUnits = useFinancialStore(s => s.units);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -157,6 +155,34 @@ export default function AuthPage() {
               setSessionChecking(false);
               return;
             }
+
+            // Check if user is a platform admin
+            const { data: admin } = await supabase!
+              .from('platform_admins')
+              .select('name, role')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+
+            if (admin) {
+              const m = {
+                id: session.user.id,
+                name: admin.name || session.user.email?.split('@')[0] || 'Admin',
+                email: session.user.email || '',
+                phone: '',
+                role: 'PLATFORM_ADMIN' as Role,
+                unit: '',
+                status: 'active' as const,
+                joined: new Date().toISOString().split('T')[0],
+                boardTitle: null,
+              };
+              addMember(m);
+              login(m);
+              setLoginLoading(false);
+              clearTimeout(timeout);
+              setSessionChecking(false);
+              return;
+            }
+
             setLoginLoading(false);
           }
         } catch (err) {
@@ -818,14 +844,7 @@ export default function AuthPage() {
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
                 <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
-                {onboardingUnits.length > 0 ? (
-                  <select value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
-                    <option value="">Select unit...</option>
-                    {onboardingUnits.map(u => <option key={u.number} value={u.number}>Unit {u.number}</option>)}
-                  </select>
-                ) : (
-                  <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" />
-                )}</div>
+                <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Board Role</label>
                 <select value={boardTitle} onChange={e => setBoardTitle(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
                   <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option>
