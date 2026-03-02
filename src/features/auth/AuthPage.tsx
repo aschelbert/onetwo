@@ -34,12 +34,12 @@ const StepIndicator = ({ steps, current }: { steps: string[]; current: number })
   </div>
 );
 
-type SubscriptionTier = 'essentials' | 'compliance_pro' | 'advanced_governance';
+type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
 
 const TIERS: { id: SubscriptionTier; name: string; price: number; features: string[] }[] = [
-  { id: 'essentials', name: 'Essentials', price: 49, features: ['Compliance runbook', 'Financial dashboard', 'Case management'] },
-  { id: 'compliance_pro', name: 'Compliance Pro', price: 179, features: ['Everything in Essentials', 'AI Advisor', 'Document vault', 'Payment processing', 'Vendor management'] },
-  { id: 'advanced_governance', name: 'Advanced Governance', price: 299, features: ['Everything in Pro', 'Votes & Resolutions', 'Community portal', 'Reserve study tools'] },
+  { id: 'compliance_pro', name: 'Compliance Pro', price: 179, features: ['Dashboard with Fiduciary Alerts & compliance grades', 'Board Room: governance calendar, duties & roles', 'Fiscal Lens: double-entry GL, budgets & reserves', 'The Building: contacts, bylaws, insurance, vendors', 'Case Workflow with pre-legal escalation paths', 'Property Log & The Archives', 'DC jurisdiction compliance built in'] },
+  { id: 'community_plus', name: 'Community Plus', price: 279, features: ['Everything in Compliance Pro', 'Resident portal with issue reporting', 'Community voting & resolutions', 'Assessment tracking & processing', 'Communications & notice templates', 'PM Scorecard & vendor management'] },
+  { id: 'management_suite', name: 'Management Suite', price: 399, features: ['Everything in Community Plus', 'Property Manager role & tools', 'Work order & invoice generation', 'Email & postal distributions', 'Mailing list management', 'Priority support'] },
 ];
 
 export default function AuthPage() {
@@ -563,12 +563,12 @@ export default function AuthPage() {
             </div>
             <div className="mt-6 bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-5 text-white">
               <p className="text-xs font-semibold text-accent-300 uppercase tracking-wide mb-2">Plans from</p>
-              <div className="flex items-baseline gap-1 mb-3"><span className="text-3xl font-bold">$49</span><span className="text-ink-300">/month per building</span></div>
+              <div className="flex items-baseline gap-1 mb-3"><span className="text-3xl font-bold">$179</span><span className="text-ink-300">/month per building</span></div>
               <ul className="space-y-1.5 text-sm text-ink-200">
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Resident &amp; Board portals</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Financial dashboard</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Meeting management</li>
-                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Document library &amp; contacts</li>
+                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Fiduciary Alerts &amp; compliance grades</li>
+                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Double-entry GL, budgets &amp; reserves</li>
+                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Case Workflow with escalation paths</li>
+                <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> DC jurisdiction compliance built in</li>
               </ul>
               <button onClick={() => setAuthStep('join-role')}
                 className="w-full mt-4 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 transition-all">Start Free Trial →</button>
