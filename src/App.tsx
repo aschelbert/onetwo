@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useAuthStore } from '@/store/useAuthStore';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
+import LandingPage from '@/features/landing/LandingPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
@@ -40,6 +41,14 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function LandingRoute() {
+  const { isAuthenticated, currentRole } = useAuthStore();
+  if (isAuthenticated) {
+    return <Navigate to={currentRole === 'PLATFORM_ADMIN' ? '/admin/console' : '/dashboard'} replace />;
+  }
+  return <LandingPage />;
+}
+
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
@@ -53,7 +62,7 @@ function CatchAll() {
   if (isAuthenticated) {
     return <Navigate to={currentRole === 'PLATFORM_ADMIN' ? '/admin/console' : '/dashboard'} replace />;
   }
-  return <Navigate to="/login" replace />;
+  return <Navigate to="/" replace />;
 }
 
 function AIAdvisorWrapper() {
@@ -73,7 +82,8 @@ export default function App() {
     <HydrationGate>
     <BrowserRouter>
       <Routes>
-        {/* Login */}
+        {/* Public */}
+        <Route path="/" element={<LandingRoute />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
