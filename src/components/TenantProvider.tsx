@@ -19,6 +19,7 @@ import { useLetterStore } from '@/store/useLetterStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
+import { resetStoresForRealTenant } from '@/store/resetStores';
 
 export interface TenantInfo {
   id: string;
@@ -134,6 +135,11 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         };
 
         setTenant(tenantInfo);
+
+        // Clear all seed/demo data before hydrating with real DB data.
+        // This ensures new buildings start clean even if the schema probe
+        // fails and loadFromDb() calls are skipped.
+        resetStoresForRealTenant();
 
         // Hydrate building store with real tenant data
         updateName(tenantInfo.name);
