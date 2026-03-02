@@ -3,6 +3,9 @@ import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, type Tenant, t
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
+import PermissionsTab from './PermissionsTab';
+import StripeTab from './StripeTab';
+import FinanceTab from './FinanceTab';
 
 const STATUS_BADGE: Record<string, string> = { active: 'bg-sage-100 text-sage-700', onboarding: 'bg-accent-100 text-accent-700', suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500', trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700', cancelled: 'bg-ink-100 text-ink-500' };
 const TIER_BADGE: Record<string, string> = { essentials: 'bg-ink-100 text-ink-600', compliance_pro: 'bg-accent-100 text-accent-700', advanced_governance: 'bg-sage-100 text-sage-700' };
@@ -64,6 +67,9 @@ export default function PlatformAdminPage() {
     { id: 'health', label: '❤️ Health' },
     { id: 'users', label: '👤 Users' },
     { id: 'audit', label: '📋 Audit' },
+    { id: 'permissions', label: '🔐 Permissions' },
+    { id: 'stripe', label: '💳 Stripe' },
+    { id: 'finance', label: '📊 Finance' },
   ];
 
   return (
@@ -195,6 +201,15 @@ export default function PlatformAdminPage() {
           <div className="flex items-center justify-between flex-wrap gap-3"><h3 className="font-display text-lg font-bold text-ink-900">Audit Log ({auditLog.length})</h3><input value={auditFilter} onChange={e => setAuditFilter(e.target.value)} placeholder="Filter..." className="px-3 py-2 border border-ink-200 rounded-lg text-sm w-72" /></div>
           <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-ink-400 uppercase border-b border-ink-100"><th className="py-2 pr-3 w-40">Timestamp</th><th className="py-2 pr-3">Actor</th><th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Action</th><th className="py-2 pr-3">Target</th><th className="py-2">Details</th></tr></thead><tbody>{auditLog.filter(e => !auditFilter || [e.actor, e.action, e.target, e.details].some(f => f.toLowerCase().includes(auditFilter.toLowerCase()))).map(e => (<tr key={e.id} className="border-b border-ink-50 hover:bg-mist-50"><td className="py-2.5 pr-3 text-xs text-ink-400 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</td><td className="py-2.5 pr-3 font-medium text-ink-900 whitespace-nowrap">{e.actor}</td><td className="py-2.5 pr-3"><span className={`pill px-1.5 py-0.5 rounded text-xs ${ROLE_BADGE[e.actorRole]}`}>{e.actorRole.replace('_',' ')}</span></td><td className="py-2.5 pr-3 text-ink-600 font-mono text-xs whitespace-nowrap">{e.action}</td><td className="py-2.5 pr-3 text-ink-700 whitespace-nowrap">{e.target}</td><td className="py-2.5 text-ink-500 truncate max-w-xs">{e.details}</td></tr>))}</tbody></table></div>
         </div>)}
+
+        {/* ═══ PERMISSIONS ═══ */}
+        {tab === 'permissions' && <PermissionsTab />}
+
+        {/* ═══ STRIPE ═══ */}
+        {tab === 'stripe' && <StripeTab />}
+
+        {/* ═══ FINANCE ═══ */}
+        {tab === 'finance' && <FinanceTab />}
       </div>
 
       {/* ═══ MODALS ═══ */}

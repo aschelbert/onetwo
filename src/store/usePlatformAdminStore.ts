@@ -108,6 +108,108 @@ export interface AuditEntry {
   buildingId: string | null;
 }
 
+// ── New Types (Admin Console v2) ──────────────────
+
+export interface Permission {
+  id: string;
+  roleId: string;
+  featureId: string;
+  actions: string[];
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+export interface StripeWebhookEvent {
+  id: string;
+  stripeEventId: string;
+  type: string;
+  status: 'processing' | 'success' | 'failed';
+  tenantId?: string;
+  tenantName?: string;
+  amount?: number;
+  payload: Record<string, unknown>;
+  errorMessage?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface StripePayment {
+  id: string;
+  tenantId?: string;
+  tenantName: string;
+  amount: number;
+  status: 'succeeded' | 'failed' | 'pending' | 'refunded';
+  stripePaymentIntentId?: string;
+  stripeInvoiceId?: string;
+  paymentMethod: string;
+  last4?: string;
+  failureReason?: string;
+  createdAt: string;
+}
+
+export interface StripeConfig {
+  mode: 'test' | 'live';
+  publishableKey: string;
+  webhookUrl: string;
+  connectedAt: string;
+  lastWebhookReceived?: string;
+}
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+
+export interface PlatformAccount {
+  num: string;
+  name: string;
+  type: AccountType;
+  subType: string;
+  parentNum: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface PlatformGLEntry {
+  id: string;
+  date: string;
+  memo: string;
+  debitAcct: string;
+  creditAcct: string;
+  amount: number;
+  source: string;
+  ref: string | null;
+  postedAt: string;
+  postedBy: string | null;
+}
+
+export interface PlatformBudget {
+  id: string;
+  acctNum: string;
+  name: string;
+  budgeted: number;
+  period: string;
+  fiscalYear: number;
+  isActive: boolean;
+}
+
+// Role definitions for RBAC
+export const TENANT_ROLES = [
+  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[] },
+  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['essentials', 'compliance_pro', 'advanced_governance'] as SubscriptionTier[] },
+  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['advanced_governance'] as SubscriptionTier[] },
+] as const;
+
+export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
+
+// Feature groups for display in permissions matrix
+export const FEATURE_GROUPS: { name: string; features: string[] }[] = [
+  { name: 'Financial', features: ['fiscalLens', 'paymentProcessing'] },
+  { name: 'Compliance & Governance', features: ['complianceRunbook'] },
+  { name: 'Case & Workflow', features: ['caseOps'] },
+  { name: 'AI & Intelligence', features: ['aiAdvisor'] },
+  { name: 'Documents & Archives', features: ['documentVault'] },
+  { name: 'Community', features: ['votesResolutions', 'communityPortal'] },
+  { name: 'Management', features: ['vendorManagement', 'reserveStudyTools'] },
+];
+
 // ── Seed Data ──────────────────────────────────────
 
 const seedTenants: Tenant[] = [
@@ -260,6 +362,214 @@ const seedInvoices: Invoice[] = [
   { id: 'inv-007', buildingId: 'bld-005', buildingName: 'Dupont Circle Condos', amount: 49, status: 'overdue', date: '2025-12-20', dueDate: '2026-01-03', paidDate: null },
 ];
 
+// ── Seed Data (Admin Console v2) ──────────────────
+
+const seedPermissions: Permission[] = [
+  // Board Member: full access
+  ...['fiscalLens','caseOps','complianceRunbook','aiAdvisor','documentVault','paymentProcessing','votesResolutions','communityPortal','vendorManagement','reserveStudyTools'].map((f, i) => ({
+    id: `perm-bm-${i}`, roleId: 'board_member', featureId: f,
+    actions: ['view','create','edit','delete','approve'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null,
+  })),
+  // Resident: view-heavy with limited create
+  { id: 'perm-res-0', roleId: 'resident', featureId: 'fiscalLens', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-1', roleId: 'resident', featureId: 'caseOps', actions: ['view','create'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-2', roleId: 'resident', featureId: 'complianceRunbook', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-3', roleId: 'resident', featureId: 'aiAdvisor', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-4', roleId: 'resident', featureId: 'documentVault', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-5', roleId: 'resident', featureId: 'paymentProcessing', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-6', roleId: 'resident', featureId: 'votesResolutions', actions: ['view','create'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-7', roleId: 'resident', featureId: 'communityPortal', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-8', roleId: 'resident', featureId: 'vendorManagement', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-res-9', roleId: 'resident', featureId: 'reserveStudyTools', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Property Manager: operational access
+  { id: 'perm-pm-0', roleId: 'property_manager', featureId: 'fiscalLens', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-1', roleId: 'property_manager', featureId: 'caseOps', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-2', roleId: 'property_manager', featureId: 'complianceRunbook', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-3', roleId: 'property_manager', featureId: 'aiAdvisor', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-4', roleId: 'property_manager', featureId: 'documentVault', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-5', roleId: 'property_manager', featureId: 'paymentProcessing', actions: ['view','create','edit','approve'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-6', roleId: 'property_manager', featureId: 'votesResolutions', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-7', roleId: 'property_manager', featureId: 'communityPortal', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-8', roleId: 'property_manager', featureId: 'vendorManagement', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-pm-9', roleId: 'property_manager', featureId: 'reserveStudyTools', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+];
+
+const seedStripeConfig: StripeConfig = {
+  mode: 'test',
+  publishableKey: 'pk_test_51Pq...xxxxx',
+  webhookUrl: 'https://api.getonetwo.com/webhooks/stripe',
+  connectedAt: '2026-01-15T10:00:00Z',
+  lastWebhookReceived: '2026-03-02T08:45:12Z',
+};
+
+const seedStripePayments: StripePayment[] = [
+  { id: 'pi_001', tenantName: '1302 R Street NW', amount: 179, status: 'succeeded', stripePaymentIntentId: 'pi_seed_001', stripeInvoiceId: 'in_Rk0001', paymentMethod: 'card', last4: '4242', createdAt: '2026-03-01' },
+  { id: 'pi_002', tenantName: 'Capitol Hill Terraces', amount: 2508, status: 'succeeded', stripePaymentIntentId: 'pi_seed_002', stripeInvoiceId: 'in_Rk0002', paymentMethod: 'card', last4: '5555', createdAt: '2026-01-01' },
+  { id: 'pi_003', tenantName: 'Dupont Circle Lofts', amount: 399, status: 'succeeded', stripePaymentIntentId: 'pi_seed_003', stripeInvoiceId: 'in_Rk0003', paymentMethod: 'ach', last4: '9012', createdAt: '2026-02-28' },
+  { id: 'pi_004', tenantName: 'Dupont Circle Lofts', amount: 399, status: 'succeeded', stripePaymentIntentId: 'pi_seed_004', stripeInvoiceId: 'in_Rk0004', paymentMethod: 'ach', last4: '9012', createdAt: '2026-01-28' },
+  { id: 'pi_005', tenantName: '1302 R Street NW', amount: 179, status: 'succeeded', stripePaymentIntentId: 'pi_seed_005', stripeInvoiceId: 'in_Rk0005', paymentMethod: 'card', last4: '4242', createdAt: '2026-02-01' },
+  { id: 'pi_006', tenantName: 'Georgetown Mews', amount: 179, status: 'failed', stripePaymentIntentId: 'pi_seed_006', stripeInvoiceId: 'in_Rk0006', paymentMethod: 'card', last4: '0019', createdAt: '2026-02-15' },
+  { id: 'pi_007', tenantName: '1302 R Street NW', amount: 179, status: 'succeeded', stripePaymentIntentId: 'pi_seed_007', stripeInvoiceId: 'in_Rk0007', paymentMethod: 'card', last4: '4242', createdAt: '2026-01-01' },
+  { id: 'pi_008', tenantName: 'Capitol Hill Terraces', amount: 249, status: 'succeeded', stripePaymentIntentId: 'pi_seed_008', stripeInvoiceId: 'in_Rk0008', paymentMethod: 'card', last4: '5555', createdAt: '2025-12-01' },
+];
+
+const seedStripeWebhookEvents: StripeWebhookEvent[] = [
+  { id: 'evt_001', stripeEventId: 'evt_1PqAb_seed', type: 'invoice.paid', status: 'success', tenantName: '1302 R Street NW Condominium', amount: 179, payload: {}, createdAt: '2026-03-01T10:00:12Z', processedAt: '2026-03-01T10:00:13Z' },
+  { id: 'evt_002', stripeEventId: 'evt_1PqCd_seed', type: 'invoice.paid', status: 'success', tenantName: 'Dupont Circle Lofts', amount: 399, payload: {}, createdAt: '2026-02-28T14:22:45Z', processedAt: '2026-02-28T14:22:46Z' },
+  { id: 'evt_003', stripeEventId: 'evt_1PqEf_seed', type: 'customer.subscription.updated', status: 'success', tenantName: 'Capitol Hill Terraces HOA', payload: {}, createdAt: '2026-02-27T09:11:30Z', processedAt: '2026-02-27T09:11:31Z' },
+  { id: 'evt_004', stripeEventId: 'evt_1PqGh_seed', type: 'invoice.payment_failed', status: 'failed', tenantName: 'Georgetown Mews', amount: 179, payload: {}, createdAt: '2026-02-15T16:30:00Z', processedAt: '2026-02-15T16:30:01Z' },
+  { id: 'evt_005', stripeEventId: 'evt_1PqIj_seed', type: 'customer.subscription.trial_will_end', status: 'success', tenantName: 'Adams Morgan Commons', payload: {}, createdAt: '2026-03-02T08:45:12Z', processedAt: '2026-03-02T08:45:13Z' },
+  { id: 'evt_006', stripeEventId: 'evt_1PqKl_seed', type: 'invoice.paid', status: 'success', tenantName: 'Capitol Hill Terraces HOA', amount: 2508, payload: {}, createdAt: '2026-01-01T00:05:00Z', processedAt: '2026-01-01T00:05:01Z' },
+  { id: 'evt_007', stripeEventId: 'evt_1PqMn_seed', type: 'checkout.session.completed', status: 'success', tenantName: 'Adams Morgan Commons', amount: 0, payload: {}, createdAt: '2026-02-01T11:15:00Z', processedAt: '2026-02-01T11:15:01Z' },
+];
+
+const seedPlatformAccounts: PlatformAccount[] = [
+  { num: '1000', name: 'Assets', type: 'asset', subType: 'header', parentNum: null, isActive: true, sortOrder: 100 },
+  { num: '1010', name: 'Operating Account (Chase)', type: 'asset', subType: 'bank', parentNum: '1000', isActive: true, sortOrder: 110 },
+  { num: '1020', name: 'Stripe Balance', type: 'asset', subType: 'bank', parentNum: '1000', isActive: true, sortOrder: 120 },
+  { num: '1030', name: 'Savings Reserve', type: 'asset', subType: 'bank', parentNum: '1000', isActive: true, sortOrder: 130 },
+  { num: '1100', name: 'Accounts Receivable', type: 'asset', subType: 'receivable', parentNum: '1000', isActive: true, sortOrder: 140 },
+  { num: '1110', name: 'Subscription AR', type: 'asset', subType: 'receivable', parentNum: '1100', isActive: true, sortOrder: 141 },
+  { num: '1120', name: 'Trial Conversions Pending', type: 'asset', subType: 'receivable', parentNum: '1100', isActive: true, sortOrder: 142 },
+  { num: '1200', name: 'Prepaid Expenses', type: 'asset', subType: 'prepaid', parentNum: '1000', isActive: true, sortOrder: 150 },
+  { num: '2000', name: 'Liabilities', type: 'liability', subType: 'header', parentNum: null, isActive: true, sortOrder: 200 },
+  { num: '2010', name: 'Accounts Payable', type: 'liability', subType: 'payable', parentNum: '2000', isActive: true, sortOrder: 210 },
+  { num: '2020', name: 'Accrued Expenses', type: 'liability', subType: 'payable', parentNum: '2000', isActive: true, sortOrder: 220 },
+  { num: '2030', name: 'Deferred Revenue', type: 'liability', subType: 'deferred', parentNum: '2000', isActive: true, sortOrder: 230 },
+  { num: '2040', name: 'Credit Card Payable', type: 'liability', subType: 'payable', parentNum: '2000', isActive: true, sortOrder: 240 },
+  { num: '3000', name: 'Equity', type: 'equity', subType: 'header', parentNum: null, isActive: true, sortOrder: 300 },
+  { num: '3010', name: 'Founder Equity', type: 'equity', subType: 'equity', parentNum: '3000', isActive: true, sortOrder: 310 },
+  { num: '3020', name: 'Retained Earnings', type: 'equity', subType: 'equity', parentNum: '3000', isActive: true, sortOrder: 320 },
+  { num: '4000', name: 'Revenue', type: 'revenue', subType: 'header', parentNum: null, isActive: true, sortOrder: 400 },
+  { num: '4010', name: 'Subscription Revenue - Monthly', type: 'revenue', subType: 'subscription', parentNum: '4000', isActive: true, sortOrder: 410 },
+  { num: '4020', name: 'Subscription Revenue - Annual', type: 'revenue', subType: 'subscription', parentNum: '4000', isActive: true, sortOrder: 420 },
+  { num: '4030', name: 'Setup Fees', type: 'revenue', subType: 'fees', parentNum: '4000', isActive: true, sortOrder: 430 },
+  { num: '4040', name: 'Add-on Services', type: 'revenue', subType: 'services', parentNum: '4000', isActive: true, sortOrder: 440 },
+  { num: '4090', name: 'Refunds & Credits', type: 'revenue', subType: 'contra', parentNum: '4000', isActive: true, sortOrder: 490 },
+  { num: '5000', name: 'Cost of Goods Sold', type: 'expense', subType: 'header', parentNum: null, isActive: true, sortOrder: 500 },
+  { num: '5010', name: 'Cloud Hosting (AWS/GCP)', type: 'expense', subType: 'cogs', parentNum: '5000', isActive: true, sortOrder: 510 },
+  { num: '5020', name: 'Stripe Processing Fees', type: 'expense', subType: 'cogs', parentNum: '5000', isActive: true, sortOrder: 520 },
+  { num: '5030', name: 'Third-party APIs & Services', type: 'expense', subType: 'cogs', parentNum: '5000', isActive: true, sortOrder: 530 },
+  { num: '5040', name: 'Customer Support Tools', type: 'expense', subType: 'cogs', parentNum: '5000', isActive: true, sortOrder: 540 },
+  { num: '6000', name: 'Operating Expenses', type: 'expense', subType: 'header', parentNum: null, isActive: true, sortOrder: 600 },
+  { num: '6010', name: 'Payroll & Benefits', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 610 },
+  { num: '6020', name: 'Contractors & Freelancers', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 620 },
+  { num: '6030', name: 'Software & SaaS Tools', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 630 },
+  { num: '6040', name: 'Legal & Professional', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 640 },
+  { num: '6050', name: 'Marketing & Advertising', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 650 },
+  { num: '6060', name: 'Office & Facilities', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 660 },
+  { num: '6070', name: 'Insurance', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 670 },
+  { num: '6080', name: 'Travel & Conferences', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 680 },
+  { num: '6090', name: 'Bank Fees & Interest', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 690 },
+  { num: '6100', name: 'Miscellaneous', type: 'expense', subType: 'opex', parentNum: '6000', isActive: true, sortOrder: 700 },
+];
+
+const seedGLEntries: PlatformGLEntry[] = [
+  { id: 'PGL5000', date: '2025-06-01', memo: 'Founder initial investment', debitAcct: '1010', creditAcct: '3010', amount: 150000, source: 'equity', ref: null, postedAt: '2025-06-01T00:00:00Z', postedBy: 'system' },
+  { id: 'PGL5001', date: '2025-12-31', memo: 'Retained earnings carry-forward', debitAcct: '1010', creditAcct: '3020', amount: 28000, source: 'equity', ref: null, postedAt: '2025-12-31T00:00:00Z', postedBy: 'system' },
+  { id: 'PGL5002', date: '2026-01-01', memo: 'Subscription - 1302 R Street NW (Jan)', debitAcct: '1020', creditAcct: '4010', amount: 179, source: 'stripe', ref: 'tn-001', postedAt: '2026-01-01T10:00:00Z', postedBy: 'system' },
+  { id: 'PGL5003', date: '2026-01-01', memo: 'Subscription - Capitol Hill Terraces (Annual)', debitAcct: '1020', creditAcct: '4020', amount: 2508, source: 'stripe', ref: 'tn-002', postedAt: '2026-01-01T00:05:00Z', postedBy: 'system' },
+  { id: 'PGL5004', date: '2026-01-01', memo: 'Subscription - Dupont Circle Lofts (Jan)', debitAcct: '1020', creditAcct: '4010', amount: 399, source: 'stripe', ref: 'tn-003', postedAt: '2026-01-01T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5005', date: '2026-01-01', memo: 'Subscription - Georgetown Mews (Jan)', debitAcct: '1020', creditAcct: '4010', amount: 179, source: 'stripe', ref: 'tn-005', postedAt: '2026-01-01T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5006', date: '2026-02-01', memo: 'Subscription - 1302 R Street NW (Feb)', debitAcct: '1020', creditAcct: '4010', amount: 179, source: 'stripe', ref: 'tn-001', postedAt: '2026-02-01T10:00:00Z', postedBy: 'system' },
+  { id: 'PGL5007', date: '2026-02-15', memo: 'Subscription - Dupont Circle Lofts (Feb)', debitAcct: '1020', creditAcct: '4010', amount: 399, source: 'stripe', ref: 'tn-003', postedAt: '2026-02-15T14:22:00Z', postedBy: 'system' },
+  { id: 'PGL5008', date: '2026-03-01', memo: 'Subscription - 1302 R Street NW (Mar)', debitAcct: '1020', creditAcct: '4010', amount: 179, source: 'stripe', ref: 'tn-001', postedAt: '2026-03-01T10:00:00Z', postedBy: 'system' },
+  { id: 'PGL5009', date: '2026-02-28', memo: 'Subscription - Dupont Circle Lofts (Mar)', debitAcct: '1020', creditAcct: '4010', amount: 399, source: 'stripe', ref: 'tn-003', postedAt: '2026-02-28T14:22:00Z', postedBy: 'system' },
+  { id: 'PGL5010', date: '2026-01-15', memo: 'Stripe payout to Chase', debitAcct: '1010', creditAcct: '1020', amount: 3200, source: 'payout', ref: null, postedAt: '2026-01-15T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5011', date: '2026-02-15', memo: 'Stripe payout to Chase', debitAcct: '1010', creditAcct: '1020', amount: 900, source: 'payout', ref: null, postedAt: '2026-02-15T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5012', date: '2026-03-01', memo: 'Stripe payout to Chase', debitAcct: '1010', creditAcct: '1020', amount: 550, source: 'payout', ref: null, postedAt: '2026-03-01T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5013', date: '2026-01-31', memo: 'Stripe fees - January', debitAcct: '5020', creditAcct: '1020', amount: 52.27, source: 'stripe_fee', ref: null, postedAt: '2026-01-31T23:59:00Z', postedBy: 'system' },
+  { id: 'PGL5014', date: '2026-02-28', memo: 'Stripe fees - February', debitAcct: '5020', creditAcct: '1020', amount: 17.48, source: 'stripe_fee', ref: null, postedAt: '2026-02-28T23:59:00Z', postedBy: 'system' },
+  { id: 'PGL5015', date: '2026-01-31', memo: 'AWS hosting - January', debitAcct: '5010', creditAcct: '1010', amount: 2180, source: 'expense', ref: 'aws-jan', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5016', date: '2026-02-28', memo: 'AWS hosting - February', debitAcct: '5010', creditAcct: '1010', amount: 2350, source: 'expense', ref: 'aws-feb', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5017', date: '2026-01-31', memo: 'Twilio + SendGrid - January', debitAcct: '5030', creditAcct: '1010', amount: 285, source: 'expense', ref: 'api-jan', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5018', date: '2026-02-28', memo: 'Twilio + SendGrid - February', debitAcct: '5030', creditAcct: '1010', amount: 310, source: 'expense', ref: 'api-feb', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5019', date: '2026-01-31', memo: 'Intercom - January', debitAcct: '5040', creditAcct: '1010', amount: 189, source: 'expense', ref: 'support-jan', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5020', date: '2026-02-28', memo: 'Intercom - February', debitAcct: '5040', creditAcct: '1010', amount: 189, source: 'expense', ref: 'support-feb', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5021', date: '2026-01-31', memo: 'Payroll - January', debitAcct: '6010', creditAcct: '1010', amount: 17500, source: 'payroll', ref: 'jan', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5022', date: '2026-02-28', memo: 'Payroll - February', debitAcct: '6010', creditAcct: '1010', amount: 17500, source: 'payroll', ref: 'feb', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5023', date: '2026-01-31', memo: '1099 Contractors - January', debitAcct: '6020', creditAcct: '1010', amount: 4200, source: 'payroll', ref: 'jan-1099', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5024', date: '2026-02-28', memo: '1099 Contractors - February', debitAcct: '6020', creditAcct: '1010', amount: 4800, source: 'payroll', ref: 'feb-1099', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5025', date: '2026-01-31', memo: 'SaaS tools (GitHub, Figma, Linear, etc.)', debitAcct: '6030', creditAcct: '2040', amount: 780, source: 'expense', ref: 'tools-jan', postedAt: '2026-01-31T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5026', date: '2026-02-28', memo: 'SaaS tools (GitHub, Figma, Linear, etc.)', debitAcct: '6030', creditAcct: '2040', amount: 780, source: 'expense', ref: 'tools-feb', postedAt: '2026-02-28T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5027', date: '2026-01-15', memo: 'Legal retainer - Q1', debitAcct: '6040', creditAcct: '1010', amount: 4500, source: 'expense', ref: 'legal-q1', postedAt: '2026-01-15T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5028', date: '2026-02-01', memo: 'Google Ads - February', debitAcct: '6050', creditAcct: '2040', amount: 2800, source: 'expense', ref: 'mktg-feb', postedAt: '2026-02-01T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5029', date: '2026-01-01', memo: 'E&O Insurance - Monthly', debitAcct: '6070', creditAcct: '1010', amount: 580, source: 'expense', ref: 'ins-jan', postedAt: '2026-01-01T12:00:00Z', postedBy: 'system' },
+  { id: 'PGL5030', date: '2026-02-01', memo: 'E&O Insurance - Monthly', debitAcct: '6070', creditAcct: '1010', amount: 580, source: 'expense', ref: 'ins-feb', postedAt: '2026-02-01T12:00:00Z', postedBy: 'system' },
+];
+
+const seedPlatformBudgets: PlatformBudget[] = [
+  { id: 'pb1', acctNum: '5010', name: 'Cloud Hosting', budgeted: 2400, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb2', acctNum: '5020', name: 'Stripe Fees', budgeted: 180, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb3', acctNum: '5030', name: 'Third-party APIs', budgeted: 350, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb4', acctNum: '5040', name: 'Support Tools', budgeted: 200, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb5', acctNum: '6010', name: 'Payroll & Benefits', budgeted: 18000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb6', acctNum: '6020', name: 'Contractors', budgeted: 5000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb7', acctNum: '6030', name: 'Software Tools', budgeted: 800, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb8', acctNum: '6040', name: 'Legal & Professional', budgeted: 1500, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb9', acctNum: '6050', name: 'Marketing', budgeted: 3000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb10', acctNum: '6070', name: 'Insurance', budgeted: 600, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+];
+
+// ── Accounting Helper Functions ──────────────────────
+
+export function accountBalance(acctNum: string, accounts: PlatformAccount[], entries: PlatformGLEntry[]): number {
+  const account = accounts.find(a => a.num === acctNum);
+  if (!account) return 0;
+  const isDebitNormal = account.type === 'asset' || account.type === 'expense';
+  let balance = 0;
+  for (const entry of entries) {
+    if (entry.debitAcct === acctNum) balance += entry.amount;
+    if (entry.creditAcct === acctNum) balance -= entry.amount;
+  }
+  return isDebitNormal ? balance : -balance;
+}
+
+export function groupBalance(parentNum: string, accounts: PlatformAccount[], entries: PlatformGLEntry[]): number {
+  const children = accounts.filter(a => a.parentNum === parentNum);
+  if (children.length === 0) return accountBalance(parentNum, accounts, entries);
+  return children.reduce((sum, child) => {
+    const grandchildren = accounts.filter(a => a.parentNum === child.num);
+    return sum + (grandchildren.length > 0
+      ? groupBalance(child.num, accounts, entries)
+      : accountBalance(child.num, accounts, entries));
+  }, 0);
+}
+
+export function getBudgetVariance(budget: PlatformBudget, monthsElapsed: number, accounts: PlatformAccount[], entries: PlatformGLEntry[]) {
+  const actual = Math.abs(accountBalance(budget.acctNum, accounts, entries));
+  const ytdBudget = budget.budgeted * monthsElapsed;
+  const variance = ytdBudget - actual;
+  const burnPct = ytdBudget > 0 ? Math.round((actual / ytdBudget) * 100) : 0;
+  return {
+    name: budget.name, acctNum: budget.acctNum, monthlyBudget: budget.budgeted,
+    avgMonthly: monthsElapsed > 0 ? actual / monthsElapsed : 0,
+    ytdActual: actual, ytdBudget, variance, burnPct,
+    status: burnPct > 100 ? 'over' as const : burnPct > 85 ? 'warning' as const : 'healthy' as const,
+  };
+}
+
+export function generatePnL(fromDate: string, toDate: string, accounts: PlatformAccount[], entries: PlatformGLEntry[]) {
+  const filtered = entries.filter(e => e.date >= fromDate && e.date <= toDate);
+  const revenue = accounts.filter(a => a.type === 'revenue' && a.subType !== 'header' && a.subType !== 'contra')
+    .map(a => ({ num: a.num, name: a.name, amount: accountBalance(a.num, accounts, filtered) }))
+    .filter(a => a.amount !== 0);
+  const cogs = accounts.filter(a => a.parentNum === '5000')
+    .map(a => ({ num: a.num, name: a.name, amount: accountBalance(a.num, accounts, filtered) }))
+    .filter(a => a.amount !== 0);
+  const opex = accounts.filter(a => a.parentNum === '6000')
+    .map(a => ({ num: a.num, name: a.name, amount: accountBalance(a.num, accounts, filtered) }))
+    .filter(a => a.amount !== 0);
+  const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0);
+  const totalCOGS = cogs.reduce((s, r) => s + r.amount, 0);
+  const grossProfit = totalRevenue - totalCOGS;
+  const totalOpEx = opex.reduce((s, r) => s + r.amount, 0);
+  const netIncome = grossProfit - totalOpEx;
+  return { revenue, cogs, opex, totalRevenue, totalCOGS, grossProfit, totalOpEx, netIncome };
+}
+
+// ── Store Interface ──────────────────────────────────
+
 interface PlatformAdminState {
   tenants: Tenant[];
   platformUsers: PlatformUser[];
@@ -269,6 +579,15 @@ interface PlatformAdminState {
   emailTemplates: EmailTemplate[];
   invoices: Invoice[];
   impersonating: string | null; // tenant ID being impersonated
+
+  // Admin Console v2 state
+  permissions: Permission[];
+  stripeWebhookEvents: StripeWebhookEvent[];
+  stripePayments: StripePayment[];
+  stripeConfig: StripeConfig;
+  platformAccounts: PlatformAccount[];
+  glEntries: PlatformGLEntry[];
+  platformBudgets: PlatformBudget[];
 
   // DB sync
   loadFromDb: () => Promise<void>;
@@ -304,6 +623,16 @@ interface PlatformAdminState {
   addTemplate: (t: Omit<EmailTemplate, 'id' | 'lastEdited'>) => void;
   // Impersonation
   setImpersonating: (tenantId: string | null) => void;
+  // Permissions
+  updatePermission: (roleId: string, featureId: string, actions: string[]) => void;
+  bulkUpdatePermissions: (roleId: string, mode: 'grant' | 'viewonly' | 'revoke') => void;
+  // Finance
+  addGLEntry: (entry: Omit<PlatformGLEntry, 'id' | 'postedAt' | 'postedBy'>) => void;
+  addPlatformAccount: (account: PlatformAccount) => void;
+  updateBudget: (id: string, updates: Partial<PlatformBudget>) => void;
+  // Computed
+  getAccountBalance: (acctNum: string) => number;
+  getGroupBalance: (parentNum: string) => number;
 }
 
 export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
@@ -316,17 +645,40 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   invoices: seedInvoices,
   impersonating: null,
 
+  // Admin Console v2 initial state
+  permissions: seedPermissions,
+  stripeWebhookEvents: seedStripeWebhookEvents,
+  stripePayments: seedStripePayments,
+  stripeConfig: seedStripeConfig,
+  platformAccounts: seedPlatformAccounts,
+  glEntries: seedGLEntries,
+  platformBudgets: seedPlatformBudgets,
+
   // ─── DB Hydration ──────────────────────────────────
   loadFromDb: async () => {
-    const [tickets, templates, announcements] = await Promise.all([
+    const [tickets, templates, announcements, perms, stripePayments, stripeWebhooks, stripeConf, accounts, glEntries, budgets] = await Promise.all([
       platformSvc.fetchTickets(),
       platformSvc.fetchTemplates(),
       platformSvc.fetchPlatformAnnouncements(),
+      platformSvc.fetchPermissions(),
+      platformSvc.fetchStripePayments(),
+      platformSvc.fetchStripeWebhookEvents(),
+      platformSvc.fetchStripeConfig(),
+      platformSvc.fetchPlatformAccounts(),
+      platformSvc.fetchPlatformGLEntries(),
+      platformSvc.fetchPlatformBudgets(),
     ]);
     const updates: Partial<PlatformAdminState> = {};
     if (tickets) updates.supportTickets = tickets;
     if (templates) updates.emailTemplates = templates;
     if (announcements) updates.announcements = announcements;
+    if (perms) updates.permissions = perms;
+    if (stripePayments) updates.stripePayments = stripePayments;
+    if (stripeWebhooks) updates.stripeWebhookEvents = stripeWebhooks;
+    if (stripeConf) updates.stripeConfig = stripeConf;
+    if (accounts) updates.platformAccounts = accounts;
+    if (glEntries) updates.glEntries = glEntries;
+    if (budgets) updates.platformBudgets = budgets;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -449,4 +801,64 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   },
   // Impersonation
   setImpersonating: (tenantId) => set({ impersonating: tenantId }),
+
+  // ─── Permissions ───────────────────────────────────
+  updatePermission: (roleId, featureId, actions) => {
+    set(s => ({
+      permissions: s.permissions.map(p =>
+        p.roleId === roleId && p.featureId === featureId
+          ? { ...p, actions, updatedAt: new Date().toISOString(), updatedBy: 'admin' }
+          : p
+      ),
+    }));
+    if (isBackendEnabled) platformSvc.updatePermission(roleId, featureId, actions);
+  },
+  bulkUpdatePermissions: (roleId, mode) => {
+    const allFeatures = Object.keys(TIER_FEATURES.essentials);
+    const role = TENANT_ROLES.find(r => r.id === roleId);
+    if (!role) return;
+    set(s => ({
+      permissions: s.permissions.map(p => {
+        if (p.roleId !== roleId) return p;
+        const featureAvailable = role.tiers.some(tier => TIER_FEATURES[tier][p.featureId as keyof Tenant['features']]);
+        if (!featureAvailable) return { ...p, actions: [], updatedAt: new Date().toISOString() };
+        let newActions: string[];
+        if (mode === 'grant') newActions = [...PERMISSION_ACTIONS];
+        else if (mode === 'viewonly') newActions = ['view'];
+        else newActions = [];
+        return { ...p, actions: newActions, updatedAt: new Date().toISOString(), updatedBy: 'admin' };
+      }),
+    }));
+    if (isBackendEnabled) platformSvc.bulkUpdatePermissions(roleId, mode, allFeatures);
+  },
+
+  // ─── Finance ──────────────────────────────────────
+  addGLEntry: (entry) => {
+    const id = `PGL${Date.now()}`;
+    const now = new Date().toISOString();
+    set(s => ({ glEntries: [{ ...entry, id, postedAt: now, postedBy: 'admin' }, ...s.glEntries] }));
+    if (isBackendEnabled) {
+      platformSvc.createPlatformGLEntry(entry).then(dbRow => {
+        if (dbRow) set(s => ({ glEntries: s.glEntries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  addPlatformAccount: (account) => {
+    set(s => ({ platformAccounts: [...s.platformAccounts, account].sort((a, b) => a.sortOrder - b.sortOrder) }));
+    if (isBackendEnabled) platformSvc.createPlatformAccount(account);
+  },
+  updateBudget: (id, updates) => {
+    set(s => ({ platformBudgets: s.platformBudgets.map(b => b.id === id ? { ...b, ...updates } : b) }));
+    if (isBackendEnabled) platformSvc.updatePlatformBudget(id, updates);
+  },
+
+  // ─── Computed ─────────────────────────────────────
+  getAccountBalance: (acctNum) => {
+    const { platformAccounts, glEntries } = get();
+    return accountBalance(acctNum, platformAccounts, glEntries);
+  },
+  getGroupBalance: (parentNum) => {
+    const { platformAccounts, glEntries } = get();
+    return groupBalance(parentNum, platformAccounts, glEntries);
+  },
 }));
