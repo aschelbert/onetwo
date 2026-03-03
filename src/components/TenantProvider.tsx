@@ -60,8 +60,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     // Demo users (from seed data) — keep demo tenant
     if (!isBackendEnabled || !supabase || currentUser.role === 'PLATFORM_ADMIN') {
       // Hydrate platform admin store if backend is available and user is platform admin
-      if (isBackendEnabled && currentUser.role === 'PLATFORM_ADMIN') {
-        usePlatformAdminStore.getState().loadFromDb().then(() => setLoaded(true));
+      if (isBackendEnabled && supabase && currentUser.role === 'PLATFORM_ADMIN') {
+        // Wait for Supabase session to be ready before querying RLS-protected tables
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            usePlatformAdminStore.getState().loadFromDb().then(() => setLoaded(true));
+          } else {
+            setLoaded(true);
+          }
+        });
         return;
       }
       setLoaded(true);

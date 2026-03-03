@@ -14,6 +14,9 @@ const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, com
 
 export async function fetchTenants(): Promise<Tenant[] | null> {
   if (!supabase) return null;
+  // Ensure we have a valid session before querying RLS-protected tables
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
   // Fetch tenants and their subscriptions in parallel
   const [{ data: tenantRows, error: tErr }, { data: subRows, error: sErr }] = await Promise.all([
     supabase.from('tenants').select('*').order('name'),

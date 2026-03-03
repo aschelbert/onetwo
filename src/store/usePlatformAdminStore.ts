@@ -702,17 +702,18 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
       platformSvc.fetchPlatformBudgets(),
     ]);
     const updates: Partial<PlatformAdminState> = {};
-    if (tenants) updates.tenants = tenants;
-    if (tickets) updates.supportTickets = tickets;
-    if (templates) updates.emailTemplates = templates;
-    if (announcements) updates.announcements = announcements;
-    if (perms) updates.permissions = perms;
-    if (stripePayments) updates.stripePayments = stripePayments;
-    if (stripeWebhooks) updates.stripeWebhookEvents = stripeWebhooks;
+    // Only replace seed data when the DB returns actual rows ([] is truthy but means RLS blocked or table empty)
+    if (tenants && tenants.length > 0) updates.tenants = tenants;
+    if (tickets && tickets.length > 0) updates.supportTickets = tickets;
+    if (templates && templates.length > 0) updates.emailTemplates = templates;
+    if (announcements && announcements.length > 0) updates.announcements = announcements;
+    if (perms && perms.length > 0) updates.permissions = perms;
+    if (stripePayments && stripePayments.length > 0) updates.stripePayments = stripePayments;
+    if (stripeWebhooks && stripeWebhooks.length > 0) updates.stripeWebhookEvents = stripeWebhooks;
     if (stripeConf) updates.stripeConfig = stripeConf;
-    if (accounts) updates.platformAccounts = accounts;
-    if (glEntries) updates.glEntries = glEntries;
-    if (budgets) updates.platformBudgets = budgets;
+    if (accounts && accounts.length > 0) updates.platformAccounts = accounts;
+    if (glEntries && glEntries.length > 0) updates.glEntries = glEntries;
+    if (budgets && budgets.length > 0) updates.platformBudgets = budgets;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
