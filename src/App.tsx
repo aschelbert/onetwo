@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { supabase, isBackendEnabled } from '@/lib/supabase';
+import type { Role } from '@/types/auth';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
@@ -21,14 +23,97 @@ import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 
-// Wait one tick for Zustand persist to hydrate from localStorage
+// Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
-  useEffect(() => { setReady(true); }, []);
+  useEffect(() => {
+    // onFinishHydration fires once the persisted state has been loaded
+    const unsub = useAuthStore.persist.onFinishHydration(() => setReady(true));
+    // If hydration already happened before this effect ran, set ready immediately
+    if (useAuthStore.persist.hasHydrated()) setReady(true);
+    return unsub;
+  }, []);
   if (!ready) {
     return <div className="min-h-screen flex items-center justify-center bg-mist-50"><div className="animate-pulse text-accent-600 font-display text-lg font-bold">Loading...</div></div>;
   }
   return <>{children}</>;
+}
+
+// Global Supabase auth state listener — keeps auth store in sync with session
+function AuthListener() {
+  const ranRef = useRef(false);
+  useEffect(() => {
+    if (!isBackendEnabled || !supabase || ranRef.current) return;
+    ranRef.current = true;
+    const sb = supabase; // narrow for TS inside async callback
+
+    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+      const { isAuthenticated, login, signOut, addMember } = useAuthStore.getState();
+
+      if (event === 'SIGNED_OUT' || !session) {
+        if (isAuthenticated) signOut();
+        return;
+      }
+
+      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set
+      if (session && !isAuthenticated) {
+        try {
+          // Check if platform admin first
+          const { data: admin } = await sb
+            .from('platform_admins')
+            .select('name, role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (admin) {
+            const m = {
+              id: session.user.id,
+              name: admin.name || session.user.email?.split('@')[0] || 'Admin',
+              email: session.user.email || '',
+              phone: '',
+              role: 'PLATFORM_ADMIN' as Role,
+              unit: '',
+              status: 'active' as const,
+              joined: new Date().toISOString().split('T')[0],
+              boardTitle: null,
+            };
+            addMember(m);
+            login(m);
+            return;
+          }
+
+          // Check tenant user
+          const { data: tu } = await sb
+            .from('tenant_users')
+            .select('role, unit_number, tenant_id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (tu) {
+            const m = {
+              id: session.user.id,
+              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || '',
+              phone: '',
+              role: (tu.role || 'RESIDENT') as Role,
+              unit: tu.unit_number || '',
+              status: 'active' as const,
+              joined: new Date().toISOString().split('T')[0],
+              boardTitle: null,
+            };
+            addMember(m);
+            login(m);
+          }
+        } catch {
+          // Session exists but lookup failed — don't crash
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return null;
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -72,6 +157,7 @@ export default function App() {
   return (
     <HydrationGate>
     <BrowserRouter>
+      <AuthListener />
       <Routes>
         {/* Public */}
         {/* Landing page is served by static index.html via Vite middleware */}

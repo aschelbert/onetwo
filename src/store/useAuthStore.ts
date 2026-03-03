@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { User, Role, AuthStep, BuildingMember, BuildingInvite } from '@/types/auth';
 
 interface AuthState {
@@ -59,7 +60,7 @@ const seedInvites: BuildingInvite[] = [
   { id: 'inv2', email: 'kevin@example.com', role: 'RESIDENT', unit: '407', sentBy: 'Robert Mitchell', sentDate: '2026-02-18', code: 'SA-RES-9M2P', status: 'pending' },
 ];
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   isAuthenticated: false,
   authStep: 'welcome',
   authJoinRole: 'RESIDENT',
@@ -171,5 +172,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
     return `SA-${prefix}-${code}`;
   },
+}), {
+  name: 'onetwo-auth',
+  partialize: (state) => ({
+    isAuthenticated: state.isAuthenticated,
+    currentUser: state.currentUser,
+    currentRole: state.currentRole,
+  }),
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+  }),
 }));
 
