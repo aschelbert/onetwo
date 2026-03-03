@@ -19,7 +19,7 @@ export default function PaymentsManager() {
   const resetForm = () => { setForm({}); setSelectedUnits([]); };
 
   const stripeReady = store.stripeConnectId && store.stripeOnboardingComplete;
-  const occupied = store.units.filter(u => u.status === 'OCCUPIED');
+  const occupied = store.units;
   const delinquent = store.units.filter(u => u.balance > 0);
   const monthlyRevenue = store.units.reduce((s, u) => s + u.monthlyFee, 0);
   const totalAR = store.units.reduce((s, u) => s + u.balance, 0);
@@ -203,7 +203,7 @@ export default function PaymentsManager() {
               <th className="px-4 py-2 text-xs font-semibold text-ink-500">Status</th>
             </tr></thead>
             <tbody>
-              {store.units.filter(u => u.status === 'OCCUPIED').map(u => {
+              {store.units.map(u => {
                 const lastPay = u.payments.length > 0 ? [...u.payments].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
                 return (
                   <tr key={u.number} className="border-b border-ink-50 hover:bg-mist-50">
@@ -262,12 +262,12 @@ export default function PaymentsManager() {
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-medium text-ink-700">Apply to units ({selectedUnits.length} selected)</label>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setSelectedUnits(occupied.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Occupied</button>
+                  <button type="button" onClick={() => setSelectedUnits(occupied.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Units</button>
                   <button type="button" onClick={() => setSelectedUnits([])} className="text-[10px] text-ink-400 font-medium">Clear</button>
                 </div>
               </div>
               <div className="max-h-40 overflow-y-auto border border-ink-200 rounded-lg divide-y divide-ink-50">
-                {store.units.filter(u => u.status === 'OCCUPIED').map(u => (
+                {store.units.map(u => (
                   <label key={u.number} className="flex items-center gap-2 px-3 py-2 hover:bg-mist-50 cursor-pointer">
                     <input type="checkbox" checked={selectedUnits.includes(u.number)} onChange={e => {
                       if (e.target.checked) setSelectedUnits(p => [...p, u.number]);
@@ -296,7 +296,7 @@ export default function PaymentsManager() {
               <label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label>
               <select value={f('unitNum')} onChange={e => sf('unitNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
                 <option value="">Select unit...</option>
-                {store.units.filter(u => u.status === 'OCCUPIED').map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}
+                {store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}
               </select>
             </div>
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Amount *</label><input type="number" value={f('amount')} onChange={e => sf('amount', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="500" /></div>

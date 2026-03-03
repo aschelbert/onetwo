@@ -379,7 +379,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
     const election = get().elections.find(e => e.id === electionId);
     if (!election) return null;
 
-    const eligibleUnits = units.filter(u => u.status === 'OCCUPIED');
+    const eligibleUnits = units;
     const totalEligiblePct = eligibleUnits.reduce((s, u) => s + u.votingPct, 0);
     const totalVotedPct = election.ballots.reduce((s, b) => s + b.votingPct, 0);
     const quorumMet = totalVotedPct >= (totalEligiblePct * election.quorumRequired / 100);

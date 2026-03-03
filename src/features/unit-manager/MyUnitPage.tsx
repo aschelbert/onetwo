@@ -34,7 +34,7 @@ export default function MyUnitPage() {
         owner: currentUser.name,
         email: currentUser.email,
         phone: currentUser.phone || '',
-        status: 'OCCUPIED',
+        status: 'ACTIVE',
       });
     }
   };
@@ -162,8 +162,8 @@ export default function MyUnitPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="font-display text-xl font-bold text-ink-900">{activeUnit.owner}</h2>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isDelinquent ? 'bg-red-100 text-red-700' : activeUnit.status === 'VACANT' ? 'bg-ink-100 text-ink-500' : 'bg-sage-100 text-sage-700'}`}>
-                  {isDelinquent ? 'Delinquent' : activeUnit.status}
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${isDelinquent ? 'bg-red-100 text-red-700' : activeUnit.status === 'FOR_SALE' ? 'bg-yellow-100 text-yellow-700' : activeUnit.status === 'UNDER_CONTRACT' ? 'bg-blue-100 text-blue-700' : activeUnit.status === 'TRANSFER_PENDING' ? 'bg-purple-100 text-purple-700' : 'bg-sage-100 text-sage-700'}`}>
+                  {isDelinquent ? 'Delinquent' : activeUnit.status === 'FOR_SALE' ? 'For Sale' : activeUnit.status === 'UNDER_CONTRACT' ? 'Under Contract' : activeUnit.status === 'TRANSFER_PENDING' ? 'Transfer Pending' : 'Active'}
                 </span>
               </div>
               <div className="flex flex-wrap gap-4 text-xs text-ink-500">

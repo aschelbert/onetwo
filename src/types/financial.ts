@@ -55,7 +55,7 @@ export interface Unit {
   phone: string;
   monthlyFee: number;
   votingPct: number;
-  status: 'OCCUPIED' | 'VACANT';
+  status: 'ACTIVE' | 'FOR_SALE' | 'UNDER_CONTRACT' | 'TRANSFER_PENDING';
   balance: number;
   moveIn: string | null;
   sqft: number;

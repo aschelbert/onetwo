@@ -242,19 +242,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
     // 1. Assessment billings
     state.units.forEach((u) => {
-      if (u.status === 'OCCUPIED') {
-        post('2026-01-01', `Assessment - Unit ${u.number} (Jan)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
-        post('2026-02-01', `Assessment - Unit ${u.number} (Feb)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
-      }
+      post('2026-01-01', `Assessment - Unit ${u.number} (Jan)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
+      post('2026-02-01', `Assessment - Unit ${u.number} (Feb)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
     });
 
     // 2. Payments received
     state.units.forEach((u) => {
-      if (u.status === 'OCCUPIED') {
-        post('2026-01-15', `Payment received - Unit ${u.number} (Jan)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
-        if (u.balance === 0) {
-          post('2026-02-10', `Payment received - Unit ${u.number} (Feb)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
-        }
+      post('2026-01-15', `Payment received - Unit ${u.number} (Jan)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
+      if (u.balance === 0) {
+        post('2026-02-10', `Payment received - Unit ${u.number} (Feb)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
       }
     });
 
@@ -283,7 +279,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
     // 6. Opening operating balance
     const totalExpenses = state.budgetCategories.reduce((s, c) => s + c.expenses.reduce((s2, e) => s2 + e.amount, 0), 0);
-    const totalCollected = state.units.filter((u) => u.status === 'OCCUPIED').reduce((s, u) => s + u.monthlyFee * 2, 0);
+    const totalCollected = state.units.reduce((s, u) => s + u.monthlyFee * 2, 0);
     const openingBalance = totalCollected - totalExpenses + 15000;
     post('2025-12-31', 'Opening operating fund balance', '1010', '3010', openingBalance, 'manual', null);
 
@@ -410,7 +406,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const collectionRate = Math.round((monthlyCollected / monthlyExpected) * 100);
     return {
       totalUnits: units.length,
-      occupiedUnits: units.filter((u) => u.status === 'OCCUPIED').length,
+      occupiedUnits: units.length,
       currentUnits: units.filter((u) => u.balance === 0).length,
       delinquentUnits: units.filter((u) => u.balance > 0).length,
       monthlyExpected, monthlyCollected, totalOutstanding, collectionRate,

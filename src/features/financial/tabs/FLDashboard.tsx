@@ -144,8 +144,8 @@ export default function FLDashboard() {
                     <td className="py-2 pr-2 text-right">{fmt(u.monthlyFee)}</td>
                     <td className={`py-2 pr-2 text-right font-semibold ${u.balance > 0 ? 'text-red-600' : 'text-sage-600'}`}>{u.balance > 0 ? fmt(u.balance) : '$0'}</td>
                     <td className="py-2">
-                      <span className={`pill px-2 py-0.5 rounded ${u.balance > 0 ? 'bg-red-100 text-red-700' : u.status === 'VACANT' ? 'bg-ink-100 text-ink-500' : 'bg-sage-100 text-sage-700'}`}>
-                        {u.balance > 0 ? 'Delinquent' : u.status}
+                      <span className={`pill px-2 py-0.5 rounded ${u.balance > 0 ? 'bg-red-100 text-red-700' : u.status === 'FOR_SALE' ? 'bg-yellow-100 text-yellow-700' : u.status === 'UNDER_CONTRACT' ? 'bg-blue-100 text-blue-700' : u.status === 'TRANSFER_PENDING' ? 'bg-purple-100 text-purple-700' : 'bg-sage-100 text-sage-700'}`}>
+                        {u.balance > 0 ? 'Delinquent' : u.status === 'FOR_SALE' ? 'For Sale' : u.status === 'UNDER_CONTRACT' ? 'Under Contract' : u.status === 'TRANSFER_PENDING' ? 'Transfer Pending' : 'Active'}
                       </span>
                       {unpaidFees.length > 0 && <span className="ml-1 text-xs text-red-500">+{unpaidFees.length} fee{unpaidFees.length > 1 ? 's' : ''}</span>}
                     </td>

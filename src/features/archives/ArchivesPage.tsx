@@ -79,7 +79,7 @@ export default function ArchivesPage() {
 
     // 4. Build snapshot
     const metrics = finStore.getIncomeMetrics();
-    const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
+    const occupiedUnits = finStore.units;
     const totalChecklistItems = refreshResult.categories.reduce((s, c) => s + c.items.length, 0);
 
     const snapshot: ArchiveSnapshot = {

@@ -10,10 +10,12 @@ const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigi
 type ModalKind = null | 'addUnit' | 'editUnit' | 'pay' | 'fee' | 'special' | 'detail' | 'stripe'
   | 'editMonthly' | 'bulkAssessment' | 'sendInvoice' | 'editDueDay';
 type SortKey = 'number' | 'owner' | 'balance' | 'accountStatus';
-type AccountFilter = 'all' | 'current' | 'behind' | 'delinquent' | 'vacant';
+type AccountFilter = 'all' | 'current' | 'behind' | 'delinquent' | 'for_sale';
 
 function getAccountStatus(u: Unit): { label: string; color: string; sortOrder: number } {
-  if (u.status === 'VACANT') return { label: 'Vacant', color: 'bg-ink-100 text-ink-500', sortOrder: 4 };
+  if (u.status === 'FOR_SALE') return { label: 'For Sale', color: 'bg-yellow-100 text-yellow-700', sortOrder: 4 };
+  if (u.status === 'UNDER_CONTRACT') return { label: 'Under Contract', color: 'bg-blue-100 text-blue-700', sortOrder: 5 };
+  if (u.status === 'TRANSFER_PENDING') return { label: 'Transfer Pending', color: 'bg-purple-100 text-purple-700', sortOrder: 6 };
   if (u.balance === 0) return { label: 'Current', color: 'bg-sage-100 text-sage-700', sortOrder: 0 };
   const monthsBehind = Math.ceil(u.balance / u.monthlyFee);
   if (monthsBehind <= 1) return { label: '1 Month Behind', color: 'bg-yellow-100 text-yellow-700', sortOrder: 1 };
@@ -85,10 +87,10 @@ export default function TheUnitsTab() {
   const stripeReady = store.stripeConnectId && store.stripeOnboardingComplete;
 
   let filtered = store.units.filter(u => {
-    if (filter === 'current') return u.status === 'OCCUPIED' && u.balance === 0;
-    if (filter === 'behind') return u.status === 'OCCUPIED' && u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) <= 2;
-    if (filter === 'delinquent') return u.status === 'OCCUPIED' && u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) > 2;
-    if (filter === 'vacant') return u.status === 'VACANT';
+    if (filter === 'current') return u.balance === 0;
+    if (filter === 'behind') return u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) <= 2;
+    if (filter === 'delinquent') return u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) > 2;
+    if (filter === 'for_sale') return u.status === 'FOR_SALE';
     return true;
   });
   if (search) {
@@ -103,10 +105,9 @@ export default function TheUnitsTab() {
   });
 
   const totalUnits = store.units.length;
-  const occupied = store.units.filter(u => u.status === 'OCCUPIED');
-  const currentUnits = occupied.filter(u => u.balance === 0).length;
-  const behindUnits = occupied.filter(u => u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) <= 2).length;
-  const delinquentCount = occupied.filter(u => u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) > 2).length;
+  const currentUnits = store.units.filter(u => u.balance === 0).length;
+  const behindUnits = store.units.filter(u => u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) <= 2).length;
+  const delinquentCount = store.units.filter(u => u.balance > 0 && Math.ceil(u.balance / u.monthlyFee) > 2).length;
   const totalAR = store.units.reduce((s, u) => s + u.balance, 0);
   const monthlyRevenue = store.units.reduce((s, u) => s + u.monthlyFee, 0);
   const unpaidSAList = store.units.flatMap(u => u.specialAssessments.filter(a => !a.paid));
@@ -114,7 +115,7 @@ export default function TheUnitsTab() {
 
   const filterCounts: Record<AccountFilter, number> = {
     all: store.units.length, current: currentUnits, behind: behindUnits,
-    delinquent: delinquentCount, vacant: totalUnits - occupied.length,
+    delinquent: delinquentCount, for_sale: store.units.filter(u => u.status === 'FOR_SALE').length,
   };
 
   const openDetail = (unitNum: string) => { setSelected(unitNum); setModal('detail'); };
@@ -126,14 +127,19 @@ export default function TheUnitsTab() {
   const openFee = (unitNum: string) => { setSelected(unitNum); resetForm(); sf('amount', '25'); sf('reason', 'Late payment'); setModal('fee'); };
   const openSpecial = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('special'); };
 
+  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   const handleAddUnit = () => {
-    if (!f('number') || !f('monthlyFee')) return alert('Unit number and monthly fee are required.');
-    store.addUnit({ number: f('number'), owner: f('owner') || 'Vacant', email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as 'OCCUPIED' | 'VACANT' || 'VACANT', balance: 0, moveIn: f('moveIn') || null, sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null });
-    setModal(null); resetForm();
+    for (const row of unitRows) {
+      if (!row.number || !row.monthlyFee || !row.votingPct) return alert('Unit number, monthly fee, and voting % are required for all rows.');
+    }
+    for (const row of unitRows) {
+      store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
+    }
+    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   };
   const handleEditUnit = () => {
     if (!selected) return;
-    store.updateUnit(selected, { owner: f('owner'), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as 'OCCUPIED' | 'VACANT', sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
+    store.updateUnit(selected, { owner: f('owner'), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as Unit['status'], sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
     setModal(null); resetForm();
   };
   const handlePay = () => {
@@ -343,10 +349,10 @@ export default function TheUnitsTab() {
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Due Day</button>
           <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>
-          <button onClick={() => { resetForm(); setSelectedUnits(occupied.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>
+          <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>
           {stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
           <div className="flex-1" />
-          <button onClick={() => { resetForm(); sf('status', 'VACANT'); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
+          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
         </div>
       )}
 
@@ -354,9 +360,9 @@ export default function TheUnitsTab() {
       <div className="flex flex-wrap gap-3 items-center">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search units, owners, email..." className="flex-1 min-w-[200px] px-3 py-2 border border-ink-200 rounded-lg text-sm" />
         <div className="flex gap-1.5">
-          {(['all','current','behind','delinquent','vacant'] as AccountFilter[]).map(fv => (
+          {(['all','current','behind','delinquent','for_sale'] as AccountFilter[]).map(fv => (
             <button key={fv} onClick={() => setFilter(fv)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filter === fv ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-500 hover:border-ink-300'}`}>
-              {fv === 'all' ? 'All' : fv === 'behind' ? 'Behind' : fv.charAt(0).toUpperCase() + fv.slice(1)}
+              {fv === 'all' ? 'All' : fv === 'behind' ? 'Behind' : fv === 'for_sale' ? 'For Sale' : fv.charAt(0).toUpperCase() + fv.slice(1)}
               {fv !== 'all' && filterCounts[fv] > 0 && <span className="ml-1 text-[10px] opacity-70">{filterCounts[fv]}</span>}
             </button>
           ))}
@@ -391,7 +397,7 @@ export default function TheUnitsTab() {
               const unitUnpaidSA = u.specialAssessments.filter(a => !a.paid).length;
               const lastPay = u.payments.length > 0 ? [...u.payments].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
               return (
-                <tr key={u.number} className={`border-b border-ink-50 hover:bg-mist-50 transition-colors ${acct.sortOrder >= 3 && u.status !== 'VACANT' ? 'bg-red-50 bg-opacity-30' : acct.sortOrder >= 1 && u.status !== 'VACANT' ? 'bg-yellow-50 bg-opacity-20' : ''}`}>
+                <tr key={u.number} className={`border-b border-ink-50 hover:bg-mist-50 transition-colors ${acct.sortOrder >= 3 && acct.sortOrder <= 3 ? 'bg-red-50 bg-opacity-30' : acct.sortOrder >= 1 && acct.sortOrder <= 2 ? 'bg-yellow-50 bg-opacity-20' : ''}`}>
                   <td className="py-3 px-3"><button onClick={() => openDetail(u.number)} className="font-bold text-accent-600 hover:text-accent-700">{u.number}</button></td>
                   <td className="py-3 px-3"><div><p className="font-medium text-ink-900">{u.owner}</p><p className="text-xs text-ink-400">{u.email}</p></div></td>
                   <td className="py-3 px-3 font-medium text-ink-900">{fmt(u.monthlyFee)}</td>
@@ -517,9 +523,34 @@ export default function TheUnitsTab() {
         );
       })()}
 
-      {modal === 'addUnit' && <Modal title="Add Unit" onClose={() => { setModal(null); resetForm(); }} onSave={handleAddUnit}><div className="space-y-3"><div className="grid grid-cols-2 gap-3">{field('Unit Number *', 'number', 'text', 'e.g., 601')}{field('Monthly Fee *', 'monthlyFee', 'number', '450')}</div><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Address: {building.address.street}, Unit {f('number') || '___'}, {building.address.city}, {building.address.state} {building.address.zip}</p>{field('Owner Name', 'owner', 'text', 'Owner name or Vacant')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking', 'text', 'P-601')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="VACANT">Vacant</option><option value="OCCUPIED">Occupied</option></select></div>{field('Voting %', 'votingPct', 'number', '2.1')}</div>{field('Move-in Date', 'moveIn', 'date')}</div></Modal>}
+      {modal === 'addUnit' && <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); }} onSave={handleAddUnit}><div className="space-y-3">
+        <p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Add one or more units. You can edit additional details (email, phone, sqft, etc.) after creation.</p>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-ink-200 text-left">
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Unit # *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Monthly Fee *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Voting % *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Owner</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Status</th>
+            <th className="py-2 px-2 w-8"></th>
+          </tr></thead>
+          <tbody>
+            {unitRows.map((row, i) => (
+              <tr key={i} className="border-b border-ink-50">
+                <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="601" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="450" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="2.1" /></td>
+                <td className="py-1.5 px-2"><input value={row.owner} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], owner: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="Owner name" /></td>
+                <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
+                <td className="py-1.5 px-2">{unitRows.length > 1 && <button type="button" onClick={() => setUnitRows(unitRows.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
+      </div></Modal>}
 
-      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="OCCUPIED">Occupied</option><option value="VACANT">Vacant</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { if (confirm(`Delete unit ${selected}?`)) { store.removeUnit(selected!); setModal(null); resetForm(); } }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
+      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { if (confirm(`Delete unit ${selected}?`)) { store.removeUnit(selected!); setModal(null); resetForm(); } }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
 
       {modal === 'pay' && <Modal title={`Record Payment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handlePay}><div className="space-y-3">{field('Amount *', 'amount', 'number', selectedUnit ? String(selectedUnit.balance) : '')}<div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method') || 'ACH'} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACH">ACH / Bank Transfer</option><option value="check">Check</option>{stripeReady && <option value="stripe">Stripe (Online)</option>}<option value="cash">Cash</option><option value="wire">Wire Transfer</option></select></div></div></Modal>}
 
@@ -531,9 +562,9 @@ export default function TheUnitsTab() {
 
       {modal === 'editMonthly' && <Modal title="Edit Unit Monthly Fee" onClose={() => { setModal(null); resetForm(); }} onSave={handleUpdateMonthly}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Select Unit</label><select value={f('unitNum')} onChange={e => { sf('unitNum', e.target.value); const u = store.units.find(x => x.number === e.target.value); if (u) sf('monthlyFee', String(u.monthlyFee)); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner} ({fmt(u.monthlyFee)})</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">New Monthly Fee</label><input type="number" value={f('monthlyFee')} onChange={e => sf('monthlyFee', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
-      {modal === 'bulkAssessment' && <Modal title="Bulk Special Assessment" onClose={() => { setModal(null); resetForm(); }} onSave={handleBulkAssessment} saveLabel="Apply Assessment"><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">Apply a one-time special assessment to multiple units. Invoices will be created for each unit and recorded in the GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Amount per unit *</label><input type="number" value={f('amount')} onChange={e => sf('amount', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="500" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Reason *</label><input value={f('reason')} onChange={e => sf('reason', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Roof emergency repair" /></div><div><div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-ink-700">Apply to units ({selectedUnits.length} selected)</label><div className="flex gap-2"><button type="button" onClick={() => setSelectedUnits(occupied.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Occupied</button><button type="button" onClick={() => setSelectedUnits([])} className="text-[10px] text-ink-400 font-medium">Clear</button></div></div><div className="max-h-40 overflow-y-auto border border-ink-200 rounded-lg divide-y divide-ink-50">{store.units.filter(u => u.status === 'OCCUPIED').map(u => (<label key={u.number} className="flex items-center gap-2 px-3 py-2 hover:bg-mist-50 cursor-pointer"><input type="checkbox" checked={selectedUnits.includes(u.number)} onChange={e => { if (e.target.checked) setSelectedUnits(p => [...p, u.number]); else setSelectedUnits(p => p.filter(n => n !== u.number)); }} className="rounded" /><span className="text-xs font-medium text-ink-700">{u.number}</span><span className="text-xs text-ink-400">{u.owner}</span></label>))}</div></div>{f('amount') && selectedUnits.length > 0 && <div className="bg-white border border-ink-200 rounded-lg p-3 text-center"><p className="text-xs text-ink-500">Total: <strong className="text-ink-900">{fmt(parseFloat(f('amount')) * selectedUnits.length)}</strong> across {selectedUnits.length} units</p></div>}</div></Modal>}
+      {modal === 'bulkAssessment' && <Modal title="Bulk Special Assessment" onClose={() => { setModal(null); resetForm(); }} onSave={handleBulkAssessment} saveLabel="Apply Assessment"><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">Apply a one-time special assessment to multiple units. Invoices will be created for each unit and recorded in the GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Amount per unit *</label><input type="number" value={f('amount')} onChange={e => sf('amount', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="500" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Reason *</label><input value={f('reason')} onChange={e => sf('reason', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Roof emergency repair" /></div><div><div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-ink-700">Apply to units ({selectedUnits.length} selected)</label><div className="flex gap-2"><button type="button" onClick={() => setSelectedUnits(store.units.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Units</button><button type="button" onClick={() => setSelectedUnits([])} className="text-[10px] text-ink-400 font-medium">Clear</button></div></div><div className="max-h-40 overflow-y-auto border border-ink-200 rounded-lg divide-y divide-ink-50">{store.units.map(u => (<label key={u.number} className="flex items-center gap-2 px-3 py-2 hover:bg-mist-50 cursor-pointer"><input type="checkbox" checked={selectedUnits.includes(u.number)} onChange={e => { if (e.target.checked) setSelectedUnits(p => [...p, u.number]); else setSelectedUnits(p => p.filter(n => n !== u.number)); }} className="rounded" /><span className="text-xs font-medium text-ink-700">{u.number}</span><span className="text-xs text-ink-400">{u.owner}</span></label>))}</div></div>{f('amount') && selectedUnits.length > 0 && <div className="bg-white border border-ink-200 rounded-lg p-3 text-center"><p className="text-xs text-ink-500">Total: <strong className="text-ink-900">{fmt(parseFloat(f('amount')) * selectedUnits.length)}</strong> across {selectedUnits.length} units</p></div>}</div></Modal>}
 
-      {modal === 'sendInvoice' && <Modal title="Send Payment Invoice" onClose={() => { setModal(null); resetForm(); }} onSave={handleSendInvoice} saveLabel="Send Invoice"><div className="space-y-3"><p className="text-xs text-ink-500 bg-indigo-50 rounded-lg p-3 border border-indigo-100">Create an invoice and email the payment link to the unit owner. Recorded in GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label><select value={f('unitNum')} onChange={e => sf('unitNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.filter(u => u.status === 'OCCUPIED').map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}</select></div>{field('Amount *', 'amount', 'number', '500')}{field('Description *', 'description', 'text', 'e.g., Window replacement — Unit 301')}</div></Modal>}
+      {modal === 'sendInvoice' && <Modal title="Send Payment Invoice" onClose={() => { setModal(null); resetForm(); }} onSave={handleSendInvoice} saveLabel="Send Invoice"><div className="space-y-3"><p className="text-xs text-ink-500 bg-indigo-50 rounded-lg p-3 border border-indigo-100">Create an invoice and email the payment link to the unit owner. Recorded in GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label><select value={f('unitNum')} onChange={e => sf('unitNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}</select></div>{field('Amount *', 'amount', 'number', '500')}{field('Description *', 'description', 'text', 'e.g., Window replacement — Unit 301')}</div></Modal>}
 
       {modal === 'stripe' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setModal(null)}>

@@ -27,7 +27,7 @@ export default function VotingPage() {
   const isResident = currentRole === 'RESIDENT';
 
   const units = fin.units;
-  const occupiedUnits = units.filter(u => u.status === 'OCCUPIED');
+  const occupiedUnits = units;
   const myLinkedUnits = currentUser?.linkedUnits || [];
   const myUnits = units.filter(u => myLinkedUnits.includes(u.number));
 

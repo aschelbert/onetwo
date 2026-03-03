@@ -12,7 +12,7 @@ function rowToUnit(r: Record<string, unknown>): Unit {
     phone: r.phone as string,
     monthlyFee: Number(r.monthly_fee),
     votingPct: Number(r.voting_pct),
-    status: r.status as 'OCCUPIED' | 'VACANT',
+    status: r.status as Unit['status'],
     balance: Number(r.balance),
     moveIn: (r.move_in as string) || null,
     sqft: Number(r.sqft),

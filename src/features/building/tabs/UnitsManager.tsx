@@ -17,7 +17,7 @@ export default function UnitsManager() {
   const [modal, setModal] = useState<ModalKind>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'occupied' | 'vacant' | 'delinquent'>('all');
+  const [filter, setFilter] = useState<'all' | 'current' | 'delinquent' | 'for_sale'>('all');
   const [sort, setSort] = useState<SortKey>('number');
   const [form, setForm] = useState<Record<string, string>>({});
 
@@ -29,9 +29,9 @@ export default function UnitsManager() {
 
   // Filter + sort
   let filtered = store.units.filter(u => {
-    if (filter === 'occupied') return u.status === 'OCCUPIED';
-    if (filter === 'vacant') return u.status === 'VACANT';
+    if (filter === 'current') return u.balance === 0;
     if (filter === 'delinquent') return u.balance > 0;
+    if (filter === 'for_sale') return u.status === 'FOR_SALE';
     return true;
   });
   if (search) {
@@ -47,7 +47,7 @@ export default function UnitsManager() {
 
   // Stats
   const totalUnits = store.units.length;
-  const occupied = store.units.filter(u => u.status === 'OCCUPIED').length;
+  const currentCount = store.units.filter(u => u.balance === 0).length;
   const delinquent = store.units.filter(u => u.balance > 0);
   const totalAR = store.units.reduce((s, u) => s + u.balance, 0);
   const monthlyRevenue = store.units.reduce((s, u) => s + u.monthlyFee, 0);
@@ -57,17 +57,15 @@ export default function UnitsManager() {
   const openFee = (unitNum: string) => { setSelected(unitNum); resetForm(); sf('amount', '25'); sf('reason', 'Late payment'); setModal('fee'); };
   const openSpecial = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('special'); };
 
+  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   const handleAddUnit = () => {
-    if (!f('number') || !f('monthlyFee')) return alert('Unit number and monthly fee are required.');
-    store.addUnit({
-      number: f('number'), owner: f('owner') || 'Vacant', email: f('email'), phone: f('phone'),
-      monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0,
-      status: f('status') as 'OCCUPIED' | 'VACANT' || 'VACANT',
-      balance: 0, moveIn: f('moveIn') || null,
-      sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0,
-      parking: f('parking') || null,
-    });
-    setModal(null); resetForm();
+    for (const row of unitRows) {
+      if (!row.number || !row.monthlyFee || !row.votingPct) return alert('Unit number, monthly fee, and voting % are required for all rows.');
+    }
+    for (const row of unitRows) {
+      store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
+    }
+    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   };
 
   const handleEditUnit = () => {
@@ -75,7 +73,7 @@ export default function UnitsManager() {
     store.updateUnit(selected, {
       owner: f('owner'), email: f('email'), phone: f('phone'),
       monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0,
-      status: f('status') as 'OCCUPIED' | 'VACANT',
+      status: f('status') as Unit['status'],
       sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0,
       parking: f('parking') || null, moveIn: f('moveIn') || null,
     });
@@ -110,8 +108,8 @@ export default function UnitsManager() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { val: totalUnits, label: 'Total Units', color: 'text-ink-900' },
-          { val: occupied, label: 'Occupied', color: 'text-sage-600' },
-          { val: totalUnits - occupied, label: 'Vacant', color: 'text-ink-400' },
+          { val: currentCount, label: 'Current', color: 'text-sage-600' },
+          { val: store.units.filter(u => u.status === 'FOR_SALE').length, label: 'For Sale', color: 'text-yellow-600' },
           { val: delinquent.length, label: 'Delinquent', color: 'text-red-600' },
           { val: fmt(totalAR), label: 'Total Outstanding', color: 'text-red-600', isStr: true },
         ].map(s => (
@@ -140,9 +138,9 @@ export default function UnitsManager() {
       <div className="flex flex-wrap gap-3 items-center">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search units, owners..." className="flex-1 min-w-[200px] px-3 py-2 border border-ink-200 rounded-lg text-sm" />
         <div className="flex gap-1.5">
-          {(['all', 'occupied', 'vacant', 'delinquent'] as const).map(fv => (
+          {(['all', 'current', 'delinquent', 'for_sale'] as const).map(fv => (
             <button key={fv} onClick={() => setFilter(fv)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${filter === fv ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-500 hover:border-ink-300'}`}>
-              {fv.charAt(0).toUpperCase() + fv.slice(1)}
+              {fv === 'for_sale' ? 'For Sale' : fv.charAt(0).toUpperCase() + fv.slice(1)}
             </button>
           ))}
         </div>
@@ -153,7 +151,7 @@ export default function UnitsManager() {
           <option value="status">Sort: Status</option>
         </select>
         {isBoard && (
-          <button onClick={() => { resetForm(); sf('status', 'VACANT'); setModal('addUnit'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Add Unit</button>
+          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Add Unit</button>
         )}
       </div>
 
@@ -199,7 +197,7 @@ export default function UnitsManager() {
                     </div>
                   </td>
                   <td className="py-3 px-3">
-                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${u.status === 'OCCUPIED' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{u.status}</span>
+                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${u.status === 'FOR_SALE' ? 'bg-yellow-100 text-yellow-700' : u.status === 'UNDER_CONTRACT' ? 'bg-blue-100 text-blue-700' : u.status === 'TRANSFER_PENDING' ? 'bg-purple-100 text-purple-700' : 'bg-sage-100 text-sage-700'}`}>{u.status === 'FOR_SALE' ? 'For Sale' : u.status === 'UNDER_CONTRACT' ? 'Under Contract' : u.status === 'TRANSFER_PENDING' ? 'Transfer Pending' : 'Active'}</span>
                   </td>
                   {isBoard && (
                     <td className="py-3 px-3">
@@ -367,33 +365,32 @@ export default function UnitsManager() {
 
       {/* ─── Add Unit Modal ─── */}
       {modal === 'addUnit' && (
-        <Modal title="Add Unit" onClose={() => { setModal(null); resetForm(); }} onSave={handleAddUnit}>
+        <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); }} onSave={handleAddUnit}>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Unit Number *" k="number" placeholder="e.g., 601" />
-              <Field label="Monthly Fee *" k="monthlyFee" type="number" placeholder="450" />
-            </div>
-            <Field label="Owner Name" k="owner" placeholder="Owner name or Vacant" />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Email" k="email" type="email" />
-              <Field label="Phone" k="phone" />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <Field label="Sq Ft" k="sqft" type="number" />
-              <Field label="Bedrooms" k="bedrooms" type="number" />
-              <Field label="Parking" k="parking" placeholder="P-601" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-ink-700 mb-1">Status</label>
-                <select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                  <option value="VACANT">Vacant</option>
-                  <option value="OCCUPIED">Occupied</option>
-                </select>
-              </div>
-              <Field label="Voting %" k="votingPct" type="number" placeholder="2.1" />
-            </div>
-            <Field label="Move-in Date" k="moveIn" type="date" />
+            <p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Add one or more units. You can edit additional details (email, phone, sqft, etc.) after creation.</p>
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-ink-200 text-left">
+                <th className="py-2 px-2 text-xs font-semibold text-ink-500">Unit # *</th>
+                <th className="py-2 px-2 text-xs font-semibold text-ink-500">Monthly Fee *</th>
+                <th className="py-2 px-2 text-xs font-semibold text-ink-500">Voting % *</th>
+                <th className="py-2 px-2 text-xs font-semibold text-ink-500">Owner</th>
+                <th className="py-2 px-2 text-xs font-semibold text-ink-500">Status</th>
+                <th className="py-2 px-2 w-8"></th>
+              </tr></thead>
+              <tbody>
+                {unitRows.map((row, i) => (
+                  <tr key={i} className="border-b border-ink-50">
+                    <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="601" /></td>
+                    <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="450" /></td>
+                    <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="2.1" /></td>
+                    <td className="py-1.5 px-2"><input value={row.owner} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], owner: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="Owner name" /></td>
+                    <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
+                    <td className="py-1.5 px-2">{unitRows.length > 1 && <button type="button" onClick={() => setUnitRows(unitRows.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
           </div>
         </Modal>
       )}
@@ -420,8 +417,10 @@ export default function UnitsManager() {
               <div>
                 <label className="block text-xs font-medium text-ink-700 mb-1">Status</label>
                 <select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                  <option value="OCCUPIED">Occupied</option>
-                  <option value="VACANT">Vacant</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="FOR_SALE">For Sale</option>
+                  <option value="UNDER_CONTRACT">Under Contract</option>
+                  <option value="TRANSFER_PENDING">Transfer Pending</option>
                 </select>
               </div>
               <Field label="Move-in Date" k="moveIn" type="date" />

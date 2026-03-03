@@ -77,7 +77,7 @@ export default function BuildingPage() {
             { label: 'Insurance', score: insScore, detail: `${activePolicies}/${totalPolicies}`, tab: 'insurance' as typeof TABS[number] },
             { label: 'Governance', score: govScore, detail: `Board ${store.board.length}`, tab: 'contacts' as typeof TABS[number] },
             (() => {
-              const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
+              const occupiedUnits = finStore.units;
               const delinqUnits = occupiedUnits.filter(u => u.balance > 0);
               const delinqRate = occupiedUnits.length > 0 ? Math.round((delinqUnits.length / occupiedUnits.length) * 100) : 0;
               return { label: 'Delinquency Rate', score: 100 - delinqRate, detail: `${delinqUnits.length}/${occupiedUnits.length} units`, tab: 'units' as typeof TABS[number], displayScore: delinqRate };
