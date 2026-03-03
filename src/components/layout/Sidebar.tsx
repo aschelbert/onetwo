@@ -144,7 +144,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Toggle button */}
       <button
         onClick={onToggle}
-        className="border-t border-ink-100 p-3 flex items-center justify-center text-ink-400 hover:text-ink-700 hover:bg-ink-50 transition-colors"
+        className="border-t border-ink-100 p-3 flex items-center justify-end text-ink-400 hover:text-ink-700 hover:bg-ink-50 transition-colors"
       >
         {collapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
       </button>
