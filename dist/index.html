@@ -515,6 +515,11 @@
             .nav-links a:not(.btn) { display: none; }
             .social-proof { justify-content: center; }
             .dc-section .section-inner { padding: 2.5rem 1.5rem; }
+            .diff-grid { grid-template-columns: 1fr !important; }
+            .community-flow { grid-template-columns: 1fr !important; text-align: center; }
+            .community-flow .flow-arrow { transform: rotate(90deg); }
+            .before-after-grid { grid-template-columns: 1fr !important; }
+            .before-after-grid .vs-divider { display: none; }
         }
         @media (min-width: 901px) and (max-width: 1100px) {
             .features-grid { grid-template-columns: repeat(2, 1fr); }
@@ -525,6 +530,227 @@
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes fadeInScreen {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .demo-tab {
+            padding: 0.65rem 1.25rem;
+            border-radius: 100px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            border: 1px solid transparent;
+            background: transparent;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .demo-tab:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
+        .demo-tab.active {
+            color: #fff;
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.2);
+        }
+        .demo-screen { display: none; position: relative; max-height: 420px; overflow: hidden; }
+        .demo-screen.active { display: block; }
+        .demo-screen::after {
+            content: '';
+            position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+            background: linear-gradient(to bottom, transparent, rgba(15,23,42,0.95));
+            pointer-events: none; z-index: 1;
+        }
+        .screen-scroll {
+            animation: autoScroll 10s ease-in-out infinite;
+            animation-delay: 1.5s;
+        }
+        .demo-screen:hover .screen-scroll,
+        .demo-screen:hover .screen-scroll-slow {
+            animation-play-state: paused;
+        }
+        .screen-scroll-slow {
+            animation: autoScroll 14s ease-in-out infinite;
+            animation-delay: 2s;
+        }
+        @keyframes autoScroll {
+            0%, 12% { transform: translateY(0); }
+            42%, 58% { transform: translateY(var(--scroll-y, -120px)); }
+            88%, 100% { transform: translateY(0); }
+        }
+        .demo-desc { display: none; animation: fadeInScreen 0.35s ease-out; }
+        .demo-desc.active { display: block; }
+
+        /* ===== DEMO ANIMATION SYSTEM ===== */
+        /* Base staggered slide-up */
+        .demo-screen.active > .anim { opacity: 0; animation: demoSlideUp 0.5s ease-out forwards; }
+        .demo-screen.active > .anim:nth-child(1) { animation-delay: 0.05s; }
+        .demo-screen.active > .anim:nth-child(2) { animation-delay: 0.18s; }
+        .demo-screen.active > .anim:nth-child(3) { animation-delay: 0.3s; }
+        .demo-screen.active > .anim:nth-child(4) { animation-delay: 0.4s; }
+        .demo-screen.active > .anim:nth-child(5) { animation-delay: 0.5s; }
+        @keyframes demoSlideUp {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Progress bar fill */
+        .demo-screen.active .anim-bar {
+            width: 0% !important;
+            animation: barFill 1.1s cubic-bezier(0.22,1,0.36,1) 0.5s forwards;
+        }
+        @keyframes barFill { to { width: var(--bar-w) !important; } }
+        /* Card scale-in */
+        .demo-screen.active .anim-card { opacity: 0; animation: cardPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .demo-screen.active .anim-card:nth-child(1) { animation-delay: 0.2s; }
+        .demo-screen.active .anim-card:nth-child(2) { animation-delay: 0.32s; }
+        .demo-screen.active .anim-card:nth-child(3) { animation-delay: 0.44s; }
+        .demo-screen.active .anim-card:nth-child(4) { animation-delay: 0.56s; }
+        @keyframes cardPop {
+            from { opacity: 0; transform: scale(0.88) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        /* Row slide-in */
+        .demo-screen.active .anim-row { opacity: 0; animation: rowSlide 0.35s ease-out forwards; }
+        .demo-screen.active .anim-row:nth-child(1) { animation-delay: 0.25s; }
+        .demo-screen.active .anim-row:nth-child(2) { animation-delay: 0.38s; }
+        .demo-screen.active .anim-row:nth-child(3) { animation-delay: 0.5s; }
+        .demo-screen.active .anim-row:nth-child(4) { animation-delay: 0.62s; }
+        @keyframes rowSlide {
+            from { opacity: 0; transform: translateX(-14px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        /* Tag pop */
+        .demo-screen.active .anim-tag { opacity: 0; animation: tagPop 0.3s ease-out forwards; }
+        .demo-screen.active .anim-tag:nth-child(1) { animation-delay: 0.3s; }
+        .demo-screen.active .anim-tag:nth-child(2) { animation-delay: 0.38s; }
+        .demo-screen.active .anim-tag:nth-child(3) { animation-delay: 0.46s; }
+        .demo-screen.active .anim-tag:nth-child(4) { animation-delay: 0.54s; }
+        .demo-screen.active .anim-tag:nth-child(5) { animation-delay: 0.62s; }
+        .demo-screen.active .anim-tag:nth-child(6) { animation-delay: 0.70s; }
+        @keyframes tagPop {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* === DASHBOARD — Radar scan + live counters === */
+        .scan-line {
+            position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(74,222,128,0.08), rgba(74,222,128,0.15), rgba(74,222,128,0.08), transparent);
+            pointer-events: none; border-radius: 12px;
+        }
+        .demo-screen.active .scan-line { animation: radarSweep 2s ease-in-out; }
+        @keyframes radarSweep { from { left: -100%; } to { left: 100%; } }
+        /* Counter elements start blank, JS fills them */
+        .count-up { font-variant-numeric: tabular-nums; }
+        /* Notification drop-in */
+        .demo-screen.active .notif-drop { opacity: 0; animation: notifIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .demo-screen.active .notif-drop:nth-child(1) { animation-delay: 0.6s; }
+        .demo-screen.active .notif-drop:nth-child(2) { animation-delay: 0.8s; }
+        @keyframes notifIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* Grade reveal — "?" fades to letter */
+        .grade-reveal { position: relative; }
+        .grade-reveal .grade-q { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+        .demo-screen.active .grade-reveal .grade-q { animation: gradeHide 0.3s ease-out 0.8s forwards; }
+        .demo-screen.active .grade-reveal .grade-val { opacity: 0; animation: gradeShow 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.9s forwards; }
+        @keyframes gradeHide { to { opacity: 0; transform: scale(0.5) rotateX(90deg); } }
+        @keyframes gradeShow { from { opacity: 0; transform: scale(1.5); } to { opacity: 1; transform: scale(1); } }
+
+        /* === BOARD ROOM — Compliance gauge + duty checkmark draw === */
+        .compliance-ring { transform: rotate(-90deg); }
+        .compliance-ring circle.track { fill: none; stroke: rgba(255,255,255,0.08); }
+        .compliance-ring circle.fill { fill: none; stroke: #4ade80; stroke-linecap: round;
+            stroke-dasharray: var(--circ); stroke-dashoffset: var(--circ); }
+        .demo-screen.active .compliance-ring circle.fill {
+            animation: ringDraw 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
+        }
+        @keyframes ringDraw { to { stroke-dashoffset: var(--offset); } }
+        /* Duty check draw */
+        .duty-check { stroke-dasharray: 20; stroke-dashoffset: 20; }
+        .demo-screen.active .duty-check { animation: checkDraw 0.5s ease-out forwards; }
+        .demo-screen.active .anim-card:nth-child(1) .duty-check { animation-delay: 0.55s; }
+        .demo-screen.active .anim-card:nth-child(2) .duty-check { animation-delay: 0.7s; }
+        .demo-screen.active .anim-card:nth-child(3) .duty-check { animation-delay: 0.85s; }
+        @keyframes checkDraw { to { stroke-dashoffset: 0; } }
+        /* Obligation counter */
+        .oblig-count { font-variant-numeric: tabular-nums; transition: color 0.3s; }
+
+        /* === BUILDING — Assessment scan + health reveal === */
+        .assess-bar-track { background: rgba(255,255,255,0.08); border-radius: 100px; height: 6px; overflow: hidden; }
+        .assess-bar-fill { height: 100%; border-radius: 100px; width: 0%;
+            background: linear-gradient(90deg, #22c55e, #4ade80); position: relative; }
+        .demo-screen.active .assess-bar-fill { animation: assessFill 0.8s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .demo-screen.active .assess-bar-fill.ab1 { animation-delay: 0.3s; }
+        .demo-screen.active .assess-bar-fill.ab2 { animation-delay: 0.55s; }
+        .demo-screen.active .assess-bar-fill.ab3 { animation-delay: 0.8s; }
+        .demo-screen.active .assess-bar-fill.ab4 { animation-delay: 1.05s; }
+        @keyframes assessFill { to { width: var(--bar-w); } }
+        /* Health grade computes after bars */
+        .health-grade { opacity: 0; }
+        .demo-screen.active .health-grade { animation: healthReveal 0.6s cubic-bezier(0.34,1.56,0.64,1) 1.4s forwards; }
+        @keyframes healthReveal { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+
+        /* === FISCAL — Dollar tick counter === */
+        .dollar-tick { font-variant-numeric: tabular-nums; }
+
+        /* === CASES — Step sequence lights === */
+        .step-track { display: flex; gap: 3px; align-items: center; }
+        .step-dot { width: 18px; height: 18px; border-radius: 50%; font-size: 0.5rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.3s; flex-shrink: 0; }
+        .step-dot.lit { background: rgba(34,197,94,0.2); color: #4ade80; border-color: rgba(34,197,94,0.4); }
+        .step-dot.current { background: rgba(251,191,36,0.2); color: #fbbf24; border-color: rgba(251,191,36,0.4);
+            box-shadow: 0 0 8px rgba(251,191,36,0.3); }
+        .step-connector { flex: 1; height: 2px; background: rgba(255,255,255,0.06); min-width: 2px; }
+        .step-connector.done { background: rgba(34,197,94,0.3); }
+        /* Status transition */
+        .status-label { transition: all 0.3s; }
+
+        /* === ARCHIVES — Seal stamp === */
+        .seal-stamp { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(2.5) rotate(-15deg);
+            opacity: 0; pointer-events: none; font-size: 0.7rem; font-weight: 800;
+            color: rgba(239,68,68,0.6); border: 2px solid rgba(239,68,68,0.4);
+            padding: 0.2rem 0.6rem; border-radius: 4px; white-space: nowrap;
+            letter-spacing: 0.15em; text-transform: uppercase; }
+        .demo-screen.active .seal-stamp { animation: stampIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        .demo-screen.active .anim-card:nth-child(1) .seal-stamp { animation-delay: 0.8s; }
+        .demo-screen.active .anim-card:nth-child(2) .seal-stamp { animation-delay: 1.1s; }
+        @keyframes stampIn { to { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(-15deg); } }
+        /* Lock icon */
+        .lock-anim { opacity: 0; }
+        .demo-screen.active .lock-anim { animation: lockIn 0.3s ease-out 0.6s forwards; }
+        @keyframes lockIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .demo-container {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            border-radius: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(15,26,46,0.3);
+        }
+        .demo-browser {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 0 2rem 2rem;
+        }
+        .demo-browser-header {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.6rem 0.9rem;
+            background: rgba(255,255,255,0.04);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .demo-browser-header .dots { display: flex; gap: 5px; }
+        .demo-browser-header .dots span { width: 9px; height: 9px; border-radius: 50%; }
+        .demo-browser-header .url-bar {
+            flex: 1; background: rgba(255,255,255,0.06);
+            border-radius: 6px; padding: 0.3rem 0.7rem;
+            font-size: 0.7rem; color: rgba(255,255,255,0.3);
+        }
+        .demo-body { padding: 1.25rem; }
         .animate {
             animation: slideUp 0.6s ease-out forwards;
             opacity: 0;
@@ -540,189 +766,600 @@
 <!-- NAV -->
 <nav>
     <div class="nav-inner">
-        <a href="#" class="logo">ONE <span>two</span></a><span style="font-family: 'Fraunces', serif; font-size: 1.3rem; color: var(--ink); font-weight: 700; margin-left: 0.4rem;">HOA handled.</span>
+        <div style="display: flex; align-items: center;">
+            <a href="#" class="logo">ONE <span>two</span></a>
+            <span style="font-size: 0.85rem; color: var(--muted); font-weight: 400; margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border);">HOA handled.</span>
+        </div>
         <div class="nav-links">
             <a href="#features">Features</a>
-            <a href="#dc">DC Focus</a>
+            <a href="#differentiators">Why Us</a>
             <a href="#pricing">Pricing</a>
-            <a href="/login" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem; margin-right: 0.25rem;">Sign In</a>
-            <a href="/login?create=1" class="btn btn-primary" style="color: #fff; padding: 0.5rem 1rem; font-size: 0.85rem;">Create Account →</a>
+            <a href="/login?create=1" class="btn btn-primary" style="color: #fff;">Get Started</a>
+            <a href="/login" class="btn btn-outline">Log In</a>
         </div>
     </div>
 </nav>
 
 <!-- HERO -->
-<section class="hero">
-    <div class="animate">
-        <div class="hero-badge">🏛 Built for DC</div>
+<section class="hero" style="grid-template-columns: 1fr; text-align: center; padding-bottom: 3rem;">
+    <div class="animate" style="max-width: 780px; margin: 0 auto;">
+        <div class="hero-badge">🏛 Launching in Washington, DC</div>
         <h1 class="display">
-            The <em>compliance-first</em> operating system for HOA boards
+            Governance on autopilot. Compliance by default. <em>HOA handled.</em>
         </h1>
-        <p>
-            <strong>ONE two</strong> HOA replaces scattered spreadsheets, emails, and guesswork with a single platform that keeps your community legally compliant, financially transparent, and operationally sharp — starting with Washington, DC.
+        <p style="max-width: 620px; margin: 0 auto 2rem;">
+            <strong>ONE two</strong> weaves your HOA bylaws, local codes and fiduciary duties into every step of running your building — guiding through every decision so you can govern with the confidence that you're protecting your community for the long run.
         </p>
-        <div class="hero-actions">
+        <div class="hero-actions" style="justify-content: center;">
             <a href="#pricing" class="btn btn-primary">See Plans & Pricing →</a>
-            <a href="/login?create=1" class="btn btn-outline">Create Account</a>
+            <a href="#features" class="btn btn-outline">See It In Action ↓</a>
         </div>
     </div>
-    <div class="hero-visual animate delay-2">
-        <div class="mock-header">
-            <div class="mock-dot r"></div>
-            <div class="mock-dot y"></div>
-            <div class="mock-dot g"></div>
-            <div class="mock-bar">onetwo.app/dashboard</div>
+</section>
+
+<!-- PLATFORM — INTERACTIVE DEMO + FEATURES -->
+<section id="demo" style="padding: 2rem 2rem 5rem;">
+    <div id="features"></div>
+    <div class="demo-container animate">
+        <!-- Tabs header -->
+        <div style="padding: 2rem 2rem 0; text-align: center;">
+            <div class="section-label" style="color: #a5f3fc;">⚡ Platform Features</div>
+            <h2 class="section-title display" style="color: #fff; max-width: 650px; margin: 0 auto 0.5rem;">Everything your board needs. Nothing it doesn't.</h2>
+            <p style="color: rgba(255,255,255,0.5); font-size: 0.95rem; max-width: 560px; margin: 0 auto 1.5rem;">Here's a look at what you'll find inside <strong style="color: rgba(255,255,255,0.8);">ONE two</strong>.</p>
+            <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
+                <button class="demo-tab active" onclick="showDemo('dashboard')">📊 Dashboard</button>
+                <button class="demo-tab" onclick="showDemo('boardroom')">🏛 Board Room</button>
+                <button class="demo-tab" onclick="showDemo('building')">🏢 The Building</button>
+                <button class="demo-tab" onclick="showDemo('fiscal')">💰 Fiscal Lens</button>
+                <button class="demo-tab" onclick="showDemo('cases')">⚡ Cases</button>
+                <button class="demo-tab" onclick="showDemo('archives')">📦 Archives</button>
+            </div>
         </div>
-        <div class="mock-cards">
-            <div class="mock-card">
-                <div class="mc-icon mc-green">⚖️</div>
-                <h4>Compliance Score</h4>
-                <p>DC Code aligned</p>
-                <div class="mc-stat stat-green">96%</div>
+
+        <!-- Per-tab feature descriptions (update alongside screens) -->
+        <div style="padding: 0 2rem;">
+            <div class="demo-desc active" id="desc-dashboard">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">📊</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Dashboard</div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Your command center. Building and compliance grades, fiduciary alerts, collection rates, reserve funding, open cases, and role-based action items — everything you need at a glance to know where your community stands.</div>
+                    </div>
+                </div>
             </div>
-            <div class="mock-card">
-                <div class="mc-icon mc-blue">💰</div>
-                <h4>Collection Rate</h4>
-                <p>This quarter</p>
-                <div class="mc-stat stat-blue">94%</div>
+            <div class="demo-desc" id="desc-boardroom">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">🏛</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Board Room <span style="font-size: 0.65rem; font-weight: 600; background: rgba(214,40,57,0.2); color: #fca5a5; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Compliance engine</span></div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Governance calendar, fiduciary duties (Care, Loyalty, Obedience), role responsibility matrix, daily operations tracker, votes & resolutions, and communications — all tied to DC jurisdiction requirements.</div>
+                    </div>
+                </div>
             </div>
-            <div class="mock-card">
-                <div class="mc-icon mc-amber">📋</div>
-                <h4>Open Cases</h4>
-                <p>3 need review</p>
-                <div class="mc-stat stat-amber">7</div>
+            <div class="demo-desc" id="desc-building">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">🏢</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">The Building</div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Building health score (A–F), property details, unit directory, contacts, legal & bylaws tracking, insurance status, vendor management, PM scorecard, and mailing tools.</div>
+                    </div>
+                </div>
             </div>
-            <div class="mock-card">
-                <div class="mc-icon mc-purple">🏘</div>
-                <h4>Community</h4>
-                <p>Active reports</p>
-                <div class="mc-stat stat-purple">12</div>
+            <div class="demo-desc" id="desc-fiscal">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">💰</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Fiscal Lens <span style="font-size: 0.65rem; font-weight: 600; background: rgba(34,197,94,0.2); color: #4ade80; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Full accounting</span></div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Double-entry general ledger, chart of accounts, budget burn rate tracking, reserve fund monitoring, delinquency aging, unit ledger with payment actions, work orders & invoices, and financial reports.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-desc" id="desc-cases">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">⚡</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Case Workflow <span style="font-size: 0.65rem; font-weight: 600; background: rgba(251,191,36,0.2); color: #fbbf24; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Unique to ONE two</span></div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Step-by-step case management with priority triage, pre-legal escalation paths, progress tracking, unit or common area association, and compliant resolution workflows. Community Room requests flow directly in.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-desc" id="desc-archives">
+                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">📦</div>
+                    <div>
+                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">The Archives</div>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Permanent, read-only annual snapshots of all compliance, financial, and governance records. Automatic regulatory refresh ensures requirements stay current year over year.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Browser frame -->
+        <div class="demo-browser">
+            <div class="demo-browser-header">
+                <div class="dots"><span style="background:#ef4444;"></span><span style="background:#f59e0b;"></span><span style="background:#22c55e;"></span></div>
+                <div class="url-bar" id="demo-url">getonetwo.com/dashboard</div>
+            </div>
+            <div class="demo-body">
+
+                <!-- DASHBOARD SCREEN — "Live command center" -->
+                <div class="demo-screen active" id="screen-dashboard">
+                    <!-- Welcome banner with radar scan -->
+                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; position: relative; overflow: hidden;">
+                        <div class="scan-line"></div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1;">
+                            <div>
+                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">Welcome back, Sarah</div>
+                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem; margin-top: 0.15rem;">Parkview Terrace HOA · Board President</div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <div class="grade-reveal" style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0.35rem 0.6rem; text-align: center; min-width: 44px;">
+                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.6);">Building</div>
+                                    <div style="font-size: 1.1rem; font-weight: 800; position: relative;">
+                                        <span class="grade-q" style="color: rgba(255,255,255,0.25);">—</span>
+                                        <span class="grade-val" style="color: #4ade80;">A</span>
+                                    </div>
+                                </div>
+                                <div class="grade-reveal" style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0.35rem 0.6rem; text-align: center; min-width: 44px;">
+                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.6);">Compliance</div>
+                                    <div style="font-size: 1.1rem; font-weight: 800; position: relative;">
+                                        <span class="grade-q" style="color: rgba(255,255,255,0.25);">—</span>
+                                        <span class="grade-val" style="color: #4ade80;">A</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Fiduciary alert — status check -->
+                    <div class="anim" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;">
+                        <span style="font-size: 0.75rem; font-weight: 700; color: #4ade80; background: rgba(34,197,94,0.15); padding: 0.2rem 0.5rem; border-radius: 6px;">⚖ Fiduciary Alerts</span>
+                        <span style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">0 critical · 0 total — All obligations current ✓</span>
+                    </div>
+                    <!-- 4 stat cards with counting numbers -->
+                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Collection Rate</div>
+                            <div class="count-up" data-target="97" data-suffix="%" data-delay="300" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">$8,200/mo</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Reserve Funding</div>
+                            <div class="count-up" data-target="82" data-suffix="%" data-delay="450" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">$271K funded</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Compliance Score</div>
+                            <div class="count-up" data-target="92" data-suffix="%" data-delay="600" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">A grade · 39/42</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
+                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Open Cases</div>
+                            <div class="count-up" data-target="2" data-suffix="" data-delay="750" style="font-size: 1.5rem; font-weight: 800; color: #60a5fa; font-family: 'Fraunces', serif;">—</div>
+                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">0 urgent</div>
+                        </div>
+                    </div>
+                    <!-- Action items drop in like notifications -->
+                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
+                            <span style="color: #fff; font-size: 0.8rem; font-weight: 600;">⚡ Your Action Items <span style="background: rgba(34,197,94,0.2); color: #4ade80; padding: 0.15rem 0.4rem; border-radius: 100px; font-size: 0.65rem;">3</span></span>
+                            <span style="color: rgba(255,255,255,0.35); font-size: 0.65rem;">Role: President</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <div class="notif-drop" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.55rem 0.7rem; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 7px; height: 7px; border-radius: 2px; background: #fbbf24;"></span>
+                                    <span style="color: #fff; font-size: 0.75rem; font-weight: 500;">Annual reserve study — schedule vendor</span>
+                                </div>
+                                <span style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">medium · open</span>
+                            </div>
+                            <div class="notif-drop" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.55rem 0.7rem; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="width: 7px; height: 7px; border-radius: 2px; background: #22c55e;"></span>
+                                    <span style="color: #fff; font-size: 0.75rem; font-weight: 500;">Review Q1 financial report</span>
+                                </div>
+                                <span style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">low · open</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOARD ROOM SCREEN — "Compliance tracking engine" -->
+                <div class="demo-screen" id="screen-boardroom">
+                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">🏛 Board Room</div>
+                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Governance calendar, meetings, votes & communications · DC jurisdiction</div>
+                            </div>
+                            <!-- Compliance ring gauge -->
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="position: relative; width: 52px; height: 52px;">
+                                    <svg class="compliance-ring" width="52" height="52" viewBox="0 0 52 52" style="--circ: 138.2; --offset: 11.1;">
+                                        <circle class="track" cx="26" cy="26" r="22" stroke-width="5"/>
+                                        <circle class="fill" cx="26" cy="26" r="22" stroke-width="5"/>
+                                    </svg>
+                                    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+                                        <span class="count-up" data-target="92" data-suffix="%" data-delay="400" style="font-size: 0.75rem; font-weight: 800; color: #4ade80;">—</span>
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5); line-height: 1.4;">Compliance<br><span style="color: #4ade80; font-weight: 700;">39/42 items</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Fiduciary duties with animated checkmarks -->
+                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem;">
+                        <div style="color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem;">⚖ The Three Fiduciary Duties</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem;">
+                            <div class="anim-card" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); border-radius: 10px; padding: 0.9rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 0.9rem;">🔍</span>
+                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div style="color: #fca5a5; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Care</div>
+                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Act as a reasonably prudent person.</div>
+                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="25" data-suffix="/25 current" data-delay="600" style="color: #4ade80; font-size: 0.65rem; font-weight: 600;">0/25 current</span></div>
+                            </div>
+                            <div class="anim-card" style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15); border-radius: 10px; padding: 0.9rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 0.9rem;">🤝</span>
+                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div style="color: #fbbf24; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Loyalty</div>
+                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Put the association's interests first.</div>
+                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="3" data-suffix="/3 current" data-delay="750" style="color: #4ade80; font-size: 0.65rem; font-weight: 600;">0/3 current</span></div>
+                            </div>
+                            <div class="anim-card" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 0.9rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 0.9rem;">📜</span>
+                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </div>
+                                <div style="color: #4ade80; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Obedience</div>
+                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Follow governing documents & law.</div>
+                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="13" data-suffix="/14 — 1 pending" data-delay="900" style="color: #fbbf24; font-size: 0.65rem; font-weight: 600;">0/14 — 1 pending</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Bottom grid -->
+                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
+                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Upcoming Meetings</div>
+                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.5rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+                                <div style="background: rgba(239,68,68,0.2); border-radius: 6px; padding: 0.25rem 0.4rem; text-align: center; font-size: 0.55rem; color: #fca5a5; min-width: 38px;"><span style="display: block; font-weight: 800; font-size: 0.85rem;">15</span>MAR</div>
+                                <div><div style="color: #fff; font-size: 0.75rem; font-weight: 600;">Q1 Board Meeting</div><div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">19:00 · Community Room</div></div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="background: rgba(96,165,250,0.2); border-radius: 6px; padding: 0.25rem 0.4rem; text-align: center; font-size: 0.55rem; color: #93c5fd; min-width: 38px;"><span style="display: block; font-weight: 800; font-size: 0.85rem;">12</span>MAY</div>
+                                <div><div style="color: #fff; font-size: 0.75rem; font-weight: 600;">Annual Meeting</div><div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">18:00 · Community Room</div></div>
+                            </div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
+                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Role Responsibility Matrix</div>
+                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">President</span><span style="color: #4ade80; font-weight: 600;">16 items · 0 overdue</span></div>
+                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">Secretary</span><span style="color: #4ade80; font-weight: 600;">10 items · 0 overdue</span></div>
+                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">Treasurer</span><span style="color: #fbbf24; font-weight: 600;">8 items · 1 overdue</span></div>
+                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">VP</span><span style="color: #4ade80; font-weight: 600;">8 items · 0 overdue</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BUILDING SCREEN — "Property health assessment" -->
+                <div class="demo-screen" id="screen-building">
+                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">🏢 Parkview Terrace</div>
+                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">1420 R Street NW, Washington, DC 20009</div>
+                            </div>
+                            <!-- Health grade reveals AFTER assessment completes -->
+                            <div class="health-grade" style="text-align: right;">
+                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5);">Health Score</div>
+                                <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Fraunces', serif; color: #4ade80; line-height: 1;">A</div>
+                                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">91%</div>
+                            </div>
+                        </div>
+                        <!-- Assessment bars fill sequentially -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.9rem;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Legal & Bylaws</span><span style="color: #4ade80; font-weight: 600;">88%</span></div>
+                                <div class="assess-bar-track"><div class="assess-bar-fill ab1" style="--bar-w: 88%;"></div></div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Insurance</span><span style="color: #4ade80; font-weight: 600;">100%</span></div>
+                                <div class="assess-bar-track"><div class="assess-bar-fill ab2" style="--bar-w: 100%;"></div></div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Governance</span><span style="color: #4ade80; font-weight: 600;">100%</span></div>
+                                <div class="assess-bar-track"><div class="assess-bar-fill ab3" style="--bar-w: 100%;"></div></div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Delinquency</span><span style="color: #4ade80; font-weight: 600;">3%</span></div>
+                                <div class="assess-bar-track"><div class="assess-bar-fill ab4" style="--bar-w: 97%; background: linear-gradient(90deg, #22c55e, #4ade80);"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="anim" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);">Building Details</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Contacts</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">The Units</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Legal & Bylaws</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Insurance</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Vendors</span>
+                    </div>
+                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
+                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Year Built</div><div style="color: #fff; font-weight: 700;">2004</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Units</div><div style="color: #fff; font-weight: 700;">24</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Floors</div><div style="color: #fff; font-weight: 700;">6</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Type</div><div style="color: #fff; font-weight: 700;">Mid-rise Condo</div></div>
+                    </div>
+                    <div class="anim" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Rooftop Deck</span>
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Fitness Center</span>
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Secure Lobby</span>
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Elevator</span>
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Package Room</span>
+                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Garage Parking</span>
+                    </div>
+                </div>
+
+                <!-- FISCAL LENS SCREEN — "Ledger in motion" -->
+                <div class="demo-screen" id="screen-fiscal">
+                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">💰 Fiscal Lens</div>
+                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Double-entry general ledger, chart of accounts, budgets, reserves & reports</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="dollar-tick count-up" data-target="87" data-suffix="%" data-delay="300" style="color: #4ade80; font-size: 1.8rem; font-weight: 900; font-family: 'Fraunces', serif;">—</span>
+                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5);">Financial Health</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem; margin-top: 0.75rem;">
+                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="42100" data-prefix="$" data-suffix="" data-delay="400" data-format="dollar" style="font-weight: 700; color: #fff;">—</div>Operating Cash</div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="97" data-suffix="%" data-delay="500" style="font-weight: 700; color: #4ade80;">—</div>Collection Rate</div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="41" data-suffix="%" data-delay="600" style="font-weight: 700; color: #4ade80;">—</div>Budget Used</div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="82" data-suffix="%" data-delay="700" style="font-weight: 700; color: #4ade80;">—</div>Reserves</div>
+                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="475" data-prefix="$" data-suffix="" data-delay="800" data-format="dollar" style="font-weight: 700; color: #fbbf24;">—</div>Receivables</div>
+                        </div>
+                    </div>
+                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem;">
+                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Budget Burn Rate</div>
+                            <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-bottom: 0.3rem;"><span>Spent</span><span style="color: #fff; font-weight: 600;">$12,340 / $30,000</span></div>
+                            <div style="background: rgba(255,255,255,0.1); border-radius: 100px; height: 8px; overflow: hidden;"><div class="anim-bar" style="--bar-w: 41%; height: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); border-radius: 100px;"></div></div>
+                            <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.3rem;">41% consumed · $17,660 remaining</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem;">
+                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Delinquency Aging</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="color: rgba(255,255,255,0.5);">Current (0–30 days)</span><span style="color: #fbbf24; font-weight: 600;">1 unit · $475</span></div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="color: rgba(255,255,255,0.5);">31–60 days</span><span style="color: #4ade80; font-weight: 600;">0 units · $0</span></div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; padding: 0.4rem 0; font-weight: 700;"><span style="color: rgba(255,255,255,0.7);">Total Outstanding</span><span style="color: #fbbf24;">$475</span></div>
+                        </div>
+                    </div>
+                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📊</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">Chart of Accounts</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📒</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">General Ledger</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📋</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">WO & Invoices</div></div>
+                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📈</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">Financial Reports</div></div>
+                    </div>
+                </div>
+
+                <!-- CASE WORKFLOW SCREEN — "Step-by-step resolution" -->
+                <div class="demo-screen" id="screen-cases">
+                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div>
+                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">⚡ Case Workflow</div>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">Create, open, or resume a case</div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span style="color: #fff; font-size: 0.8rem; font-weight: 600;">Open Cases <span style="background: rgba(96,165,250,0.2); color: #60a5fa; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.25rem;">2</span></span>
+                                <button style="background: var(--accent); color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">+ New Case</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                            <!-- Case 1 with animated step track -->
+                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.6rem;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.2rem;">
+                                            <span style="font-size: 0.65rem; font-weight: 600; background: rgba(251,191,36,0.15); color: #fbbf24; padding: 0.1rem 0.4rem; border-radius: 4px;">medium</span>
+                                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">🏢 Unit Common</span>
+                                        </div>
+                                        <div style="color: #fff; font-size: 0.85rem; font-weight: 600;">Garage door sensor replacement</div>
+                                    </div>
+                                    <div class="count-up" data-target="64" data-suffix="%" data-delay="400" style="font-size: 1.1rem; font-weight: 800; color: #4ade80;">—</div>
+                                </div>
+                                <!-- Step sequence: 9 of 14 lit -->
+                                <div class="step-track case-steps" data-lit="9" data-total="14" style="margin-bottom: 0.3rem;">
+                                    <!-- JS will populate step dots -->
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">Step 9 of 14 · <span style="color: #fbbf24;">Pre-Legal</span></div>
+                                    <div style="color: rgba(255,255,255,0.3); font-size: 0.8rem;">→</div>
+                                </div>
+                            </div>
+                            <!-- Case 2 with animated step track -->
+                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.6rem;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.2rem;">
+                                            <span style="font-size: 0.65rem; font-weight: 600; background: rgba(96,165,250,0.15); color: #60a5fa; padding: 0.1rem 0.4rem; border-radius: 4px;">low</span>
+                                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">👤 Unit 402</span>
+                                        </div>
+                                        <div style="color: #fff; font-size: 0.85rem; font-weight: 600;">Noise complaint — recurring late-night music</div>
+                                    </div>
+                                    <div class="count-up" data-target="21" data-suffix="%" data-delay="600" style="font-size: 1.1rem; font-weight: 800; color: #60a5fa;">—</div>
+                                </div>
+                                <!-- Step sequence: 3 of 14 lit -->
+                                <div class="step-track case-steps" data-lit="3" data-total="14" style="margin-bottom: 0.3rem;">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">Step 3 of 14 · <span style="color: #60a5fa;">Pre-Legal</span></div>
+                                    <div style="color: rgba(255,255,255,0.3); font-size: 0.8rem;">→</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ARCHIVES SCREEN — "Sealed records vault" -->
+                <div class="demo-screen" id="screen-archives">
+                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">📦 The Archives</div>
+                            <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Historical compliance records and audit trail</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="lock-anim" style="font-size: 1rem;">🔒</span>
+                            <button style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">📦 Create Archive</button>
+                        </div>
+                    </div>
+                    <div class="anim" style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);">Archives</span>
+                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.4);">Reports</span>
+                    </div>
+                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <!-- Card 1 — gets SEALED stamp -->
+                        <div class="anim-card" style="position: relative; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; overflow: hidden;">
+                            <div class="seal-stamp">🔒 Sealed</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                                <span style="font-size: 1.3rem;">📦</span>
+                                <span style="font-size: 0.6rem; font-weight: 600; color: #4ade80; background: rgba(34,197,94,0.15); padding: 0.15rem 0.5rem; border-radius: 100px;">Complete</span>
+                            </div>
+                            <div style="color: #fff; font-size: 0.9rem; font-weight: 700;">FY 2025 Annual Archive</div>
+                            <div style="color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.2rem;">Created Jan 15, 2026 · Read-only snapshot</div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);">Compliance: A (94%) · Financial: A (91%) · 42 items archived</div>
+                        </div>
+                        <!-- Card 2 — gets SEALED stamp -->
+                        <div class="anim-card" style="position: relative; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; overflow: hidden;">
+                            <div class="seal-stamp">🔒 Sealed</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                                <span style="font-size: 1.3rem;">📦</span>
+                                <span style="font-size: 0.6rem; font-weight: 600; color: #60a5fa; background: rgba(96,165,250,0.15); padding: 0.15rem 0.5rem; border-radius: 100px;">Complete</span>
+                            </div>
+                            <div style="color: #fff; font-size: 0.9rem; font-weight: 700;">FY 2024 Annual Archive</div>
+                            <div style="color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.2rem;">Created Jan 10, 2025 · Read-only snapshot</div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);">Compliance: B (83%) · Financial: A (88%) · 40 items archived</div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 </section>
 
-<!-- SOCIAL PROOF -->
-<div class="social-proof animate delay-3">
-    <span>Designed for communities like yours:</span>
-    <div class="proof-stat">
-        <strong>2–200</strong>
-        <span>unit condos & HOAs</span>
-    </div>
-    <div class="proof-stat">
-        <strong>50+</strong>
-        <span>DC compliance rules mapped</span>
-    </div>
-    <div class="proof-stat">
-        <strong>3</strong>
-        <span>roles: Board · Resident · Manager</span>
-    </div>
-</div>
 
-<!-- FEATURES -->
-<section id="features">
+<!-- WHAT SETS US APART — BEFORE / AFTER -->
+<section id="differentiators" style="padding: 5rem 2rem;">
     <div class="section-inner">
-        <div class="section-label">⚡ Platform Features</div>
-        <h2 class="section-title display">Everything a board needs. Nothing it doesn't.</h2>
-        <p class="section-desc">
-            Financial tracking, community reporting, compliance workflows, meeting management, and building info — all in one platform with role-based access for boards, residents, and property managers.
-        </p>
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <div class="section-label">🔍 What Sets Us Apart</div>
+            <h2 class="section-title display" style="max-width: 700px; margin: 0 auto 1rem;">Compliance isn't a feature. It's the foundation.</h2>
+            <p class="section-desc" style="margin: 0 auto;">Most HOA tools give you spreadsheets. <strong>ONE two</strong> gives you a governance framework built on fiduciary law.</p>
+        </div>
 
-        <div class="features-grid">
-            <div class="feature-card animate">
-                <div class="feature-icon fi-blue">⚖️</div>
-                <h3>Compliance Corner</h3>
-                <p>15+ state-specific legal workflows covering noise complaints, parking disputes, security issues, developer transitions, and more. Pre-legal steps, self-rep guidance, and attorney escalation paths built in.</p>
-                <span class="feature-tag">Unique to <strong>ONE two</strong></span>
+        <!-- Before / After grid -->
+        <div class="animate before-after-grid" style="display: grid; grid-template-columns: 1fr 56px 1fr; max-width: 1060px; margin: 0 auto;">
+
+            <!-- WITHOUT column -->
+            <div style="background: #f1eeea; border: 1px solid #ddd8d1; border-radius: 20px; padding: 2.25rem;">
+                <div style="font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; color: #94a3b8; padding-bottom: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #ddd8d1;">Without ONE two</div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚖️</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Fiduciary duties are abstract</div>
+                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">You know "duty of care" exists — but which tasks map to it? Which role is responsible? Nobody tracks it.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">💰</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Finances live in spreadsheets</div>
+                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">No double-entry ledger. Budget tracking is manual. Delinquencies surface too late. Reserve fund status is a guess.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚡</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Issues vanish into email threads</div>
+                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">Resident complains about noise. Board member says "I'll handle it." No steps documented, no escalation path, no audit trail.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">🏘</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Residents are in the dark</div>
+                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">No portal, no visibility into what the board is doing. Annual meetings are the only touchpoint. Trust erodes quietly.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">📦</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Records are scattered</div>
+                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">Past decisions live in someone's inbox. New board members start from zero. No institutional memory.</div>
+                    </div>
+                </div>
             </div>
-            <div class="feature-card animate delay-1">
-                <div class="feature-icon fi-amber">🛡️</div>
-                <h3>Case Ops</h3>
-                <p>Board-facing issue management with status tracking (Opened → In Progress → Legal → Closed), priority triage, approach tracking (pre-legal, self-rep, legal counsel), and review notes for full audit trails.</p>
-                <span class="feature-tag">Unique to <strong>ONE two</strong></span>
+
+            <!-- VS divider -->
+            <div class="vs-divider" style="display: flex; align-items: center; justify-content: center; z-index: 1;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; box-shadow: 0 4px 16px rgba(214,40,57,0.25);">VS</div>
             </div>
-            <div class="feature-card animate delay-2">
-                <div class="feature-icon fi-green">💰</div>
-                <h3>Financial Health</h3>
-                <p>Collection rate tracking, reserve fund monitoring, and unit-level payment status for the board. Residents pay dues, set up AutoPay, and view their balance and payment history in their own portal.</p>
-            </div>
-            <div class="feature-card animate delay-1">
-                <div class="feature-icon fi-purple">📧</div>
-                <h3>Community Activity</h3>
-                <p>Residents report maintenance, parking, noise, pet, common area, and rules issues. Upvoting surfaces priorities. Community event postings and idea/suggestion submissions keep engagement high.</p>
-            </div>
-            <div class="feature-card animate delay-2">
-                <div class="feature-icon fi-pink">📅</div>
-                <h3>Meetings & The Building</h3>
-                <p>Meeting schedules, agendas, and past meeting notes in one place. Building info hub with contacts, bylaws, CC&Rs, and building schematics — always accessible to every role.</p>
-            </div>
-            <div class="feature-card animate delay-3">
-                <div class="feature-icon fi-cyan">👥</div>
-                <h3>Role-Based Views</h3>
-                <p>Three distinct portals. Board members see Compliance Corner, Case Ops, and financials. Residents see payments and community activity. Property managers see requests and compliance tools.</p>
+
+            <!-- WITH column -->
+            <div style="background: #fff; border: 2px solid var(--accent); border-radius: 20px; padding: 2.25rem; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--warm), var(--green));"></div>
+                <div style="font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; color: var(--ink); padding-bottom: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border);">With <span style="color: var(--accent);">ONE two</span></div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--accent-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚖️</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Every task tagged to its fiduciary duty <span style="font-size: 0.6rem; font-weight: 700; background: var(--accent-light); color: var(--accent); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Board Room</span></div>
+                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Care, Loyalty, Obedience — 42 obligations mapped to roles, deadlines, and compliance status. You always know <em>why</em> it matters.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">💰</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Full double-entry accounting <span style="font-size: 0.6rem; font-weight: 700; background: var(--green-light); color: var(--green); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Fiscal Lens</span></div>
+                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">GL, chart of accounts, budget burn rate, reserve goals, delinquency aging, unit ledger — with one Financial Health score.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--warm-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚡</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Step-by-step compliant resolution <span style="font-size: 0.6rem; font-weight: 700; background: var(--warm-light); color: #92400e; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Case Workflow</span></div>
+                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Priority triage, pre-legal escalation, progress tracking, full audit trail. Accessible from anywhere in the app.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #dbeafe; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">🏘</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Owners submit → Board resolves → Everyone sees <span style="font-size: 0.6rem; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Community</span></div>
+                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Community Room requests flow into Case Workflow. Residents feel heard, the board has context, and every resolution is documented.</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #ede9fe; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">📦</div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Permanent annual archives <span style="font-size: 0.6rem; font-weight: 700; background: #ede9fe; color: #6d28d9; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Archives</span></div>
+                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Read-only compliance snapshots with automatic regulatory refresh. New board members inherit full institutional memory.</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
-
-<!-- DC FOCUS -->
-<section id="dc" style="padding-bottom: 5rem;">
-    <div class="dc-section">
-        <div class="section-inner">
-            <div class="section-label">🏛 DC-First Launch Market</div>
-            <h2 class="section-title display">Built for DC's unique condo & HOA landscape</h2>
-            <p class="section-desc">
-                Washington, DC has over 2,000 condo and cooperative associations governed by a complex web of local regulations. <strong>ONE two</strong> maps every relevant DC code into actionable workflows.
-            </p>
-
-            <div class="dc-grid">
-                <div class="dc-item">
-                    <div class="dc-icon">📜</div>
-                    <div>
-                        <h4>DC Condominium Act Compliance</h4>
-                        <p>Automated checks against DC Code § 42-19, meeting notice requirements, and board fiduciary obligations.</p>
-                    </div>
-                </div>
-                <div class="dc-item">
-                    <div class="dc-icon">🏗</div>
-                    <div>
-                        <h4>DCRA & Building Permits</h4>
-                        <p>Workflows for architectural modifications, permit tracking, and code violation reporting to DCRA.</p>
-                    </div>
-                </div>
-                <div class="dc-item">
-                    <div class="dc-icon">🔒</div>
-                    <div>
-                        <h4>DC Surveillance & Privacy</h4>
-                        <p>Two-party consent audio rules, camera installation checklists, and footage retention policies aligned to DC regs.</p>
-                    </div>
-                </div>
-                <div class="dc-item">
-                    <div class="dc-icon">🅿️</div>
-                    <div>
-                        <h4>DC Towing & Parking Regs</h4>
-                        <p>DCRA-regulated towing procedures, written authorization templates, and signage compliance checklists.</p>
-                    </div>
-                </div>
-                <div class="dc-item">
-                    <div class="dc-icon">⚡</div>
-                    <div>
-                        <h4>Historic District Awareness</h4>
-                        <p>HPRB review triggers for communities in DC's historic neighborhoods. Prevent costly renovation missteps.</p>
-                    </div>
-                </div>
-                <div class="dc-item">
-                    <div class="dc-icon">🤝</div>
-                    <div>
-                        <h4>Mediation-First Dispute Path</h4>
-                        <p>DC requires mediation before lawsuits. Our compliance workflows route disputes through mediation before legal escalation.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
 <!-- PRICING -->
 <section id="pricing">
     <div class="section-inner">
@@ -737,68 +1374,69 @@
                 <button id="toggle-btn" class="toggle-switch" onclick="toggleBilling()" aria-label="Toggle billing period">
                     <span class="toggle-knob" id="toggle-knob"></span>
                 </button>
-                <span id="label-yearly" class="toggle-label">Yearly <span class="toggle-save">Save up to 17%</span></span>
+                <span id="label-yearly" class="toggle-label">Yearly <span class="toggle-save">Save up to 16%</span></span>
             </div>
         </div>
 
         <div class="pricing-grid">
-            <!-- ESSENTIALS -->
-            <div class="price-card animate">
-                <h3 class="display">Essentials</h3>
-                <div class="price-desc">For simple process governance</div>
-                <div class="price-amount">
-                    <span class="dollar" id="price-essentials">$49</span>
-                    <span class="period" id="period-essentials">/mo</span>
-                </div>
-                <ul class="price-features">
-                    <li>Resident & Board portals</li>
-                    <li>Financial dashboard</li>
-                    <li>Meeting management</li>
-                    <li>Document library & contacts</li>
-                </ul>
-                <a href="/login?create=1&tier=essentials" class="btn btn-outline price-btn">Start Free Trial</a>
-            </div>
-
             <!-- COMPLIANCE PRO -->
-            <div class="price-card featured animate delay-1">
+            <div class="price-card featured animate">
                 <div class="price-badge">Most Popular</div>
                 <h3 class="display">Compliance Pro</h3>
-                <div class="price-desc">Full compliance engine for serious boards</div>
+                <div class="price-desc">Full governance & compliance engine for serious boards</div>
                 <div class="price-amount">
                     <span class="dollar" id="price-compliance">$179</span>
                     <span class="period" id="period-compliance">/mo</span>
                 </div>
                 <ul class="price-features">
-                    <li>Everything in Essentials</li>
-                    <li>Location-specific compliance guidance</li>
-                    <li>Audit trails & compliance scoring</li>
-                    <li>Case Ops with compliant escalation paths</li>
-                    <li>Pre-legal & self-rep guidance</li>
-                    <li>Assessment tracking and processing</li>
-                    <li>Board voting moderation & tracking</li>
-                    <li>Priority email support</li>
-                    <li>Integrated AI task automation & compliance tracking</li>
+                    <li>Dashboard with Fiduciary Alerts & compliance grades</li>
+                    <li>Board Room: governance calendar, duties & roles</li>
+                    <li>Fiscal Lens: double-entry GL, budgets & reserves</li>
+                    <li>The Building: contacts, bylaws, insurance, vendors</li>
+                    <li>Case Workflow with pre-legal escalation paths</li>
+                    <li>Property Log: inspections & condition tracking</li>
+                    <li>The Archives: annual compliance snapshots</li>
+                    <li>DC jurisdiction compliance built in</li>
                 </ul>
-                <a href="/login?create=1&tier=compliance_pro" class="btn btn-primary price-btn">Start Free Trial →</a>
+                <a href="/login?create=1" class="btn btn-primary price-btn">Start Free Trial →</a>
             </div>
 
-            <!-- GROWTH -->
-            <div class="price-card animate delay-2">
-                <h3 class="display">Advanced Governance</h3>
-                <div class="price-desc">For larger communities with full engagement</div>
+            <!-- COMMUNITY PLUS -->
+            <div class="price-card animate delay-1">
+                <h3 class="display">Community Plus</h3>
+                <div class="price-desc">Compliance Pro + full community engagement</div>
                 <div class="price-amount">
-                    <span class="dollar" id="price-growth">$299</span>
-                    <span class="period" id="period-growth">/mo</span>
+                    <span class="dollar" id="price-community">$279</span>
+                    <span class="period" id="period-community">/mo</span>
                 </div>
                 <ul class="price-features">
                     <li>Everything in Compliance Pro</li>
-                    <li>Community issue reporting</li>
-                    <li>Unit voting moderation & tracking</li>
-                    <li>Invoice & work order generation</li>
-                    <li>Email & postal distributions</li>
-                    <li>Property Manager role & tools</li>
+                    <li>Resident portal with issue reporting</li>
+                    <li>Community voting & resolutions</li>
+                    <li>Assessment tracking & processing</li>
+                    <li>Communications & notice templates</li>
+                    <li>PM Scorecard & vendor management</li>
                 </ul>
-                <span class="btn price-btn" style="background: #e2e0dc; color: #94a3b8; cursor: default; border: none;">Coming Soon</span>
+                <a href="/login?create=1" class="btn btn-outline price-btn">Start Free Trial</a>
+            </div>
+
+            <!-- MANAGEMENT SUITE -->
+            <div class="price-card animate delay-2">
+                <h3 class="display">Management Suite</h3>
+                <div class="price-desc">Full platform for managed communities</div>
+                <div class="price-amount">
+                    <span class="dollar" id="price-management">$399</span>
+                    <span class="period" id="period-management">/mo</span>
+                </div>
+                <ul class="price-features">
+                    <li>Everything in Community Plus</li>
+                    <li>Property Manager role & tools</li>
+                    <li>Work order & invoice generation</li>
+                    <li>Email & postal distributions</li>
+                    <li>Mailing list management</li>
+                    <li>Priority support</li>
+                </ul>
+                <a href="/login?create=1" class="btn btn-outline price-btn">Start Free Trial</a>
             </div>
         </div>
 
@@ -826,11 +1464,11 @@
     <div class="section-label">🚀 Get Started</div>
     <h2 class="section-title display" style="margin: 0 auto 1rem;">Stop guessing. Start governing.</h2>
     <p class="section-desc">
-        Join the waitlist for early access when we launch in Washington, DC. The first 20 communities that enroll in Compliance Pro are eligible for an introductory first-year rate of $1,500 — equivalent to $125 per month.
+        Join the waitlist for early access when we launch in Washington, DC. Start with Compliance Pro at $179/mo — full governance, fiduciary tracking, and double-entry accounting from day one.
     </p>
     <div class="cta-actions">
-        <a href="/login?create=1" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Create Account →</a>
-        <a href="/login" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Sign In</a>
+        <a href="/login?create=1" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Join the Waitlist →</a>
+        <a href="#" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Book a Demo</a>
     </div>
 </section>
 
@@ -860,15 +1498,128 @@
     });
 
     // Unstick hero animations immediately
-    document.querySelectorAll('.hero .animate, .social-proof.animate').forEach(el => {
+    document.querySelectorAll('.hero .animate').forEach(el => {
         el.style.animationPlayState = 'running';
     });
     // Billing toggle
     let isYearly = false;
+
+    // Demo tab switching
+    const demoUrls = {
+        dashboard: 'getonetwo.com/dashboard',
+        boardroom: 'getonetwo.com/boardroom',
+        building: 'getonetwo.com/building',
+        fiscal: 'getonetwo.com/financial',
+        cases: 'getonetwo.com/cases',
+        archives: 'getonetwo.com/archives'
+    };
+    function showDemo(id) {
+        // Kill any running animation timers
+        (window._demoTimers || []).forEach(t => clearTimeout(t));
+        window._demoTimers = [];
+
+        document.querySelectorAll('.demo-screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.demo-desc').forEach(d => d.classList.remove('active'));
+        document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+
+        const screen = document.getElementById('screen-' + id);
+
+        // Reset count-up elements to placeholder
+        screen.querySelectorAll('.count-up').forEach(el => { el.textContent = '—'; });
+        // Reset step tracks
+        screen.querySelectorAll('.case-steps').forEach(el => { el.innerHTML = ''; });
+
+        screen.offsetHeight; // force reflow
+        screen.classList.add('active');
+        document.getElementById('desc-' + id).classList.add('active');
+        document.getElementById('demo-url').textContent = demoUrls[id];
+        event.currentTarget.classList.add('active');
+
+        // Run JS-driven animations for this screen
+        runScreenAnimations(screen);
+    }
+
+    /* === COUNT-UP ENGINE === */
+    function animateCountUp(el) {
+        const target = parseInt(el.dataset.target);
+        const suffix = el.dataset.suffix || '';
+        const prefix = el.dataset.prefix || '';
+        const delay = parseInt(el.dataset.delay) || 200;
+        const fmt = el.dataset.format;
+        const duration = 800;
+        const steps = 20;
+        const stepTime = duration / steps;
+
+        window._demoTimers.push(setTimeout(() => {
+            let step = 0;
+            const interval = setInterval(() => {
+                step++;
+                const progress = step / steps;
+                const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+                const current = Math.round(target * eased);
+                let display = current;
+                if (fmt === 'dollar') display = current.toLocaleString();
+                el.textContent = prefix + display + suffix;
+                if (step >= steps) {
+                    clearInterval(interval);
+                    if (fmt === 'dollar') el.textContent = prefix + target.toLocaleString() + suffix;
+                    else el.textContent = prefix + target + suffix;
+                }
+            }, stepTime);
+        }, delay));
+    }
+
+    /* === STEP TRACK BUILDER === */
+    function buildStepTrack(container) {
+        const lit = parseInt(container.dataset.lit);
+        const total = parseInt(container.dataset.total);
+        container.innerHTML = '';
+        for (let i = 1; i <= total; i++) {
+            if (i > 1) {
+                const conn = document.createElement('span');
+                conn.className = 'step-connector';
+                container.appendChild(conn);
+            }
+            const dot = document.createElement('span');
+            dot.className = 'step-dot';
+            dot.textContent = i;
+            container.appendChild(dot);
+        }
+        // Animate dots lighting up sequentially
+        const dots = container.querySelectorAll('.step-dot');
+        const conns = container.querySelectorAll('.step-connector');
+        dots.forEach((dot, idx) => {
+            const delay = 400 + idx * 80;
+            window._demoTimers.push(setTimeout(() => {
+                if (idx < lit - 1) {
+                    dot.classList.add('lit');
+                    if (conns[idx]) conns[idx].classList.add('done');
+                } else if (idx === lit - 1) {
+                    dot.classList.add('current');
+                    if (idx > 0 && conns[idx - 1]) conns[idx - 1].classList.add('done');
+                }
+            }, delay));
+        });
+    }
+
+    /* === RUN ALL ANIMATIONS FOR A SCREEN === */
+    function runScreenAnimations(screen) {
+        // Count-ups
+        screen.querySelectorAll('.count-up').forEach(el => animateCountUp(el));
+        // Step tracks
+        screen.querySelectorAll('.case-steps').forEach(el => buildStepTrack(el));
+    }
+
+    // Initialize dashboard on load
+    document.addEventListener('DOMContentLoaded', () => {
+        window._demoTimers = [];
+        const dash = document.getElementById('screen-dashboard');
+        if (dash) runScreenAnimations(dash);
+    });
     const prices = {
-        essentials: { monthly: '$49', yearly: '$500' },
         compliance: { monthly: '$179', yearly: '$1,800' },
-        growth: { monthly: '$299', yearly: '$3,250' }
+        community: { monthly: '$279', yearly: '$2,850' },
+        management: { monthly: '$399', yearly: '$4,250' }
     };
     const periods = { monthly: '/mo', yearly: '/yr' };
 
@@ -883,7 +1634,7 @@
         labelY.classList.toggle('active', isYearly);
 
         const mode = isYearly ? 'yearly' : 'monthly';
-        ['essentials', 'compliance', 'growth'].forEach(plan => {
+        ['compliance', 'community', 'management'].forEach(plan => {
             document.getElementById('price-' + plan).textContent = prices[plan][mode];
             document.getElementById('period-' + plan).textContent = periods[mode];
         });
@@ -892,4 +1643,3 @@
 
 </body>
 </html>
-

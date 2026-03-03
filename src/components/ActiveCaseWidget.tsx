@@ -132,7 +132,7 @@ export default function ActiveCaseWidget() {
     return (
       <button
         onClick={() => { setPillState('picker'); setPickerTab('open'); setSearchQuery(''); }}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-5 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
+        className="fixed bottom-6 left-6 z-50 flex items-center gap-2.5 px-5 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer"
         style={{ background: 'linear-gradient(135deg, #1a1f25, #2d1b3d)', border: '1px solid rgba(255,255,255,0.1)' }}
       >
         <span className="relative w-7 h-7 flex items-center justify-center">
@@ -156,7 +156,7 @@ export default function ActiveCaseWidget() {
   if (pillState === 'picker') {
     return (
       <div
-        className="fixed bottom-6 right-6 z-50 w-96 rounded-2xl shadow-2xl overflow-hidden"
+        className="fixed bottom-6 left-6 z-50 w-96 rounded-2xl shadow-2xl overflow-hidden"
         style={{ background: '#fff', border: '1px solid #e5e0dc', maxHeight: '600px',
           transform: mounted ? 'translateY(0)' : 'translateY(20px)', opacity: mounted ? 1 : 0,
           transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease',
@@ -344,7 +344,7 @@ export default function ActiveCaseWidget() {
     return (
       <button
         onClick={() => { store.setActiveCaseContext({ ...ctx, minimized: false }); setPillState('active'); }}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all cursor-pointer"
+        className="fixed bottom-6 left-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all cursor-pointer"
         style={{ background: 'linear-gradient(135deg, #1a1f25, #2d1b3d)', border: '1px solid rgba(255,255,255,0.15)',
           transform: mounted ? 'translateY(0)' : 'translateY(20px)', opacity: mounted ? 1 : 0,
           transition: 'transform 0.3s ease, opacity 0.3s ease',
@@ -369,7 +369,7 @@ export default function ActiveCaseWidget() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 w-96 rounded-2xl shadow-2xl overflow-hidden"
+      className="fixed bottom-6 left-6 z-50 w-96 rounded-2xl shadow-2xl overflow-hidden"
       style={{
         background: '#fff', border: '1px solid #e5e0dc',
         transform: mounted ? 'translateY(0)' : 'translateY(40px)',
