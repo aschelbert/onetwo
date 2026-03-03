@@ -8,7 +8,15 @@ import { fmt } from '@/lib/formatters';
 
 export function CaseCard({ c, onClick }: { c: CaseTrackerCase; onClick: () => void }) {
   const cat = CATS.find(x => x.id === c.catId);
-  const pct = c.steps ? Math.round((c.steps.filter(s => s.done).length / c.steps.length) * 100) : 0;
+  let total = 0, done = 0;
+  if (c.steps) {
+    for (const s of c.steps) {
+      if (s.actions?.length) { total += s.actions.length; done += s.actions.filter(a => a.done).length; }
+      else if (s.checks?.length) { total += s.checks.length; done += s.checks.filter(ck => ck.checked).length; }
+      else { total += 1; done += s.done ? 1 : 0; }
+    }
+  }
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
   return (
     <button onClick={onClick} className="text-left bg-white rounded-xl border border-ink-100 p-4 hover:border-accent-300 hover:shadow-sm transition-all group">
       <div className="flex items-center gap-2 mb-2">

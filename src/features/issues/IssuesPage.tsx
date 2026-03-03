@@ -876,10 +876,13 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           onAddApproach={() => setShowApproachModal(true)}
           onDelete={() => setShowDeleteModal(true)}
           onToggleCheck={(cid, stepIdx, checkId) => store.toggleCheck(cid, stepIdx, checkId)}
+          onToggleAction={(cid, stepIdx, actionId) => store.toggleAction(cid, stepIdx, actionId)}
           onCompleteAllChecks={(cid, stepIdx) => store.completeAllChecks(cid, stepIdx)}
           onPutOnHold={() => setShowHoldModal(true)}
           onResume={() => store.resumeCase(caseId)}
           onOpenBidModal={(stepIdx) => { setBidTargetStep(stepIdx); setShowBidModal(true); }}
+          onNavigate={(target) => { const nav = ACTION_NAV[target]; if (nav) navigate(nav.route); }}
+          onUpload={(cid) => setShowDocModal(true)}
         >
           {/* Decision Trail */}
           <DecisionTrail entries={c.decisionTrail || []} />

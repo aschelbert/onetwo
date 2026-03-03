@@ -47,10 +47,13 @@ function SidebarMenu({ items }: { items: { label: string; onClick: () => void; d
 export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, onPutOnHold, onResume, additionalApproaches, children }: CaseSidebarProps) {
   const cat = CATS.find(x => x.id === c.catId);
 
-  // Calculate check-based progress
+  // Calculate progress (actions > checks > step-level)
   let totalProgress = 0, doneProgress = 0;
   for (const step of steps) {
-    if (step.checks && step.checks.length > 0) {
+    if (step.actions && step.actions.length > 0) {
+      totalProgress += step.actions.length;
+      doneProgress += step.actions.filter(a => a.done).length;
+    } else if (step.checks && step.checks.length > 0) {
       totalProgress += step.checks.length;
       doneProgress += step.checks.filter(ck => ck.checked).length;
     } else {

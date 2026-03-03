@@ -142,6 +142,26 @@ export interface BudgetAlert {
   remaining: number;
 }
 
+export type ActionType = 'check' | 'report' | 'link' | 'upload' | 'comm' | 'vote' | 'meeting';
+
+export interface Action {
+  id: string;
+  type: ActionType;
+  label: string;
+  reportType?: string;
+  reportDesc?: string;
+  linkTarget?: string;
+  linkLabel?: string;
+  done: boolean;
+  doneDate: string | null;
+}
+
+export interface PersistentAction {
+  type: 'link' | 'upload';
+  label: string;
+  target?: string;
+}
+
 export interface CaseStep {
   id: string;
   s: string;
@@ -153,6 +173,9 @@ export interface CaseStep {
   done: boolean;
   doneDate: string | null;
   userNotes: string;
+  desc?: string;
+  actions?: Action[];
+  persistent?: PersistentAction[];
   stepAttachments?: CaseAttachment[];
   phaseId?: string;
   checks?: CaseCheckItem[];

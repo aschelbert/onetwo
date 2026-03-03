@@ -4,6 +4,7 @@ import type { StepAction } from '@/store/useIssuesStore';
 import type { FundingOption } from '@/store/useSpendingStore';
 import { deriveActionsForStep, type RichAction } from './stepActionMap';
 import { StepChecklist } from './StepChecklist';
+import { StepActionList } from './StepActionList';
 import { SpendingDecisionPanel } from './SpendingDecisionPanel';
 import { BidComparisonPanel } from './BidComparisonPanel';
 import { ConflictCheckPanel } from './ConflictCheckPanel';
@@ -32,9 +33,12 @@ interface WorkflowStepCardProps {
   onContinue?: () => void;
   totalSteps: number;
   onToggleCheck?: (checkId: string) => void;
+  onToggleAction?: (actionId: string) => void;
   onCompleteAllChecks?: () => void;
   onCloseCase?: () => void;
   onOpenBidModal?: (stepIdx: number) => void;
+  onNavigate?: (target: string) => void;
+  onUpload?: () => void;
 }
 
 interface FundingAnalysisInlineProps {
@@ -239,7 +243,7 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onCompleteAllChecks, onCloseCase, onOpenBidModal },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onToggleAction, onCompleteAllChecks, onCloseCase, onOpenBidModal, onNavigate, onUpload },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -265,6 +269,9 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
   const hasChecks = step.checks && step.checks.length > 0;
   const checkedCount = hasChecks ? step.checks!.filter(ck => ck.checked).length : 0;
   const totalChecks = hasChecks ? step.checks!.length : 0;
+  const hasActions = step.actions && step.actions.length > 0;
+  const actionsDoneCount = hasActions ? step.actions!.filter(a => a.done).length : 0;
+  const actionsTotal = hasActions ? step.actions!.length : 0;
 
   // Budget warning context (for spending decision steps)
   const fin = useFinancialStore();
@@ -320,7 +327,8 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
             {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">📍 Guidance</span>}
-            {hasChecks && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
+            {hasActions && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{actionsDoneCount}/{actionsTotal} actions</span>}
+            {hasChecks && !step.done && !hasActions && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
             {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
           </div>
         </div>
@@ -334,7 +342,12 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
         <div className="px-5 pb-5 space-y-4">
           <div className="border-t border-ink-100 pt-4" />
 
-          {/* Description — prominent at top (matching reference) */}
+          {/* Step description — prominent at top */}
+          {step.desc && (
+            <p className="text-sm text-ink-700 leading-relaxed">{step.desc}</p>
+          )}
+
+          {/* Detail — additional guidance (matching reference) */}
           {step.detail && (
             <div>
               <p className="text-sm text-ink-700 leading-relaxed">{step.detail}</p>
@@ -380,7 +393,20 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Left — Actions */}
             <div className="lg:col-span-2">
-              {richActions.length > 0 && (
+              {/* Rich sub-actions with checkboxes and report buttons */}
+              {hasActions && onToggleAction && (
+                <div className="mb-4">
+                  <StepActionList
+                    actions={step.actions!}
+                    persistent={step.persistent}
+                    onToggleAction={onToggleAction}
+                    onNavigate={onNavigate}
+                    onUpload={onUpload}
+                  />
+                </div>
+              )}
+
+              {richActions.length > 0 && !hasActions && (
                 <>
                   <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2.5">Actions</p>
                   <div className="space-y-2">
@@ -425,8 +451,21 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
             <div className="lg:col-span-1">
               <p className="text-xs font-bold text-ink-400 uppercase tracking-widest mb-2.5">Completion</p>
               <div className="bg-mist-50 rounded-xl p-4 border border-mist-100 space-y-3">
-                {/* Checklist or done toggle */}
-                {hasChecks && onToggleCheck ? (
+                {/* Checklist, actions, or done toggle */}
+                {hasActions ? (
+                  <>
+                    <p className="text-xs font-medium text-ink-500 mb-1">Actions ({actionsDoneCount}/{actionsTotal})</p>
+                    <div className="w-full h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-sage-500 rounded-full transition-all" style={{ width: `${actionsTotal > 0 ? Math.round(actionsDoneCount / actionsTotal * 100) : 0}%` }} />
+                    </div>
+                    {step.done && step.doneDate && (
+                      <p className="text-[10px] text-sage-500">All actions complete — {step.doneDate}</p>
+                    )}
+                    {!step.done && (
+                      <p className="text-[10px] text-ink-400">Completes automatically when all actions are done</p>
+                    )}
+                  </>
+                ) : hasChecks && onToggleCheck ? (
                   <>
                     <p className="text-xs font-medium text-ink-500 mb-1">Tasks ({checkedCount}/{totalChecks})</p>
                     <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />

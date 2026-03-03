@@ -18,18 +18,21 @@ interface CaseWorkflowProps {
   onAddApproach: () => void;
   onDelete: () => void;
   onToggleCheck?: (caseId: string, stepIdx: number, checkId: string) => void;
+  onToggleAction?: (caseId: string, stepIdx: number, actionId: string) => void;
   onCompleteAllChecks?: (caseId: string, stepIdx: number) => void;
   onPutOnHold?: () => void;
   onResume?: () => void;
   onOpenBidModal?: (stepIdx: number) => void;
+  onNavigate?: (target: string) => void;
+  onUpload?: (caseId: string) => void;
   children?: ReactNode;
 }
 
 export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
   onClose, onReopen, onEditAssignment, onAddApproach, onDelete,
-  onToggleCheck, onCompleteAllChecks, onPutOnHold, onResume,
-  onOpenBidModal, children,
+  onToggleCheck, onToggleAction, onCompleteAllChecks, onPutOnHold, onResume,
+  onOpenBidModal, onNavigate, onUpload, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const activeStepIdx = steps.findIndex(s => !s.done);
@@ -96,9 +99,12 @@ export function CaseWorkflow({
       onContinue={() => handleContinue(i)}
       totalSteps={steps.length}
       onToggleCheck={onToggleCheck ? (checkId) => onToggleCheck(c.id, i, checkId) : undefined}
+      onToggleAction={onToggleAction ? (actionId) => onToggleAction(c.id, i, actionId) : undefined}
       onCompleteAllChecks={onCompleteAllChecks ? () => onCompleteAllChecks(c.id, i) : undefined}
       onCloseCase={onClose}
       onOpenBidModal={onOpenBidModal}
+      onNavigate={onNavigate}
+      onUpload={onUpload ? () => onUpload(c.id) : undefined}
     />
   );
 
@@ -106,7 +112,10 @@ export function CaseWorkflow({
   const getPhaseProgress = (phaseSteps: { step: CaseStep; idx: number }[]) => {
     let done = 0, total = 0;
     for (const { step } of phaseSteps) {
-      if (step.checks && step.checks.length > 0) {
+      if (step.actions && step.actions.length > 0) {
+        done += step.actions.filter(a => a.done).length;
+        total += step.actions.length;
+      } else if (step.checks && step.checks.length > 0) {
         done += step.checks.filter(ck => ck.checked).length;
         total += step.checks.length;
       } else {
