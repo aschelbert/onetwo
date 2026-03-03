@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand: #c42030;
+  --color-brand-light: #fee2e2;
+  --color-brand-dark: #991b1b;
+  --color-sand-50: #faf9f7;
+  --color-sand-100: #f5f3f0;
+  --color-sand-200: #e8e5e0;
+  --color-ink-300: #9ca3af;
+  --color-ink-500: #6b7280;
+  --color-ink-800: #1a1a1a;
+  --color-stripe: #635bff;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+}
+
+body {
+  background: #f9fafb;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-serif {
+  font-family: Georgia, 'Times New Roman', serif;
+}
