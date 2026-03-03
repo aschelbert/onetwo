@@ -34,11 +34,12 @@ const StepIndicator = ({ steps, current }: { steps: string[]; current: number })
 );
 
 type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
+type BillingInterval = 'monthly' | 'annual';
 
-const TIERS: { id: SubscriptionTier; name: string; price: number; features: string[] }[] = [
-  { id: 'compliance_pro', name: 'Compliance Pro', price: 179, features: ['Dashboard with Fiduciary Alerts & compliance grades', 'Board Room: governance calendar, duties & roles', 'Fiscal Lens: double-entry GL, budgets & reserves', 'The Building: contacts, bylaws, insurance, vendors', 'Case Workflow with pre-legal escalation paths', 'Property Log & The Archives', 'DC jurisdiction compliance built in'] },
-  { id: 'community_plus', name: 'Community Plus', price: 279, features: ['Everything in Compliance Pro', 'Resident portal with issue reporting', 'Community voting & resolutions', 'Assessment tracking & processing', 'Communications & notice templates', 'PM Scorecard & vendor management'] },
-  { id: 'management_suite', name: 'Management Suite', price: 399, features: ['Everything in Community Plus', 'Property Manager role & tools', 'Work order & invoice generation', 'Email & postal distributions', 'Mailing list management', 'Priority support'] },
+const TIERS: { id: SubscriptionTier; name: string; monthly: number; annual: number; stripePriceMonthly: string; stripePriceAnnual: string; features: string[] }[] = [
+  { id: 'compliance_pro', name: 'Compliance Pro', monthly: 179, annual: 1800, stripePriceMonthly: 'price_1T3qQD2eQBbijDsqxvNiEs8U', stripePriceAnnual: 'price_1T3qQD2eQBbijDsqbcwCMX7v', features: ['Dashboard with Fiduciary Alerts & compliance grades', 'Board Room: governance calendar, duties & roles', 'Fiscal Lens: double-entry GL, budgets & reserves', 'The Building: contacts, bylaws, insurance, vendors', 'Case Workflow with pre-legal escalation paths', 'Property Log & The Archives', 'DC jurisdiction compliance built in'] },
+  { id: 'community_plus', name: 'Community Plus', monthly: 279, annual: 2850, stripePriceMonthly: 'price_1T36YO2eQBbijDsqkULOdtRi', stripePriceAnnual: 'price_1T3qQg2eQBbijDsqHaOVBbtA', features: ['Everything in Compliance Pro', 'Resident portal with issue reporting', 'Community voting & resolutions', 'Assessment tracking & processing', 'Communications & notice templates', 'PM Scorecard & vendor management'] },
+  { id: 'management_suite', name: 'Management Suite', monthly: 399, annual: 4250, stripePriceMonthly: 'price_1T3qRQ2eQBbijDsq7PP4vlxh', stripePriceAnnual: 'price_1T3qSR2eQBbijDsqzVEUuZD4', features: ['Everything in Community Plus', 'Property Manager role & tools', 'Work order & invoice generation', 'Email & postal distributions', 'Mailing list management', 'Priority support'] },
 ];
 
 export default function AuthPage() {
@@ -51,6 +52,7 @@ export default function AuthPage() {
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
 
   // Profile form
   const [firstName, setFirstName] = useState('');
@@ -522,6 +524,8 @@ export default function AuthPage() {
           },
           body: JSON.stringify({
             tier: selectedTier,
+            priceId: TIERS.find(t => t.id === selectedTier)?.[billingInterval === 'annual' ? 'stripePriceAnnual' : 'stripePriceMonthly'],
+            billingInterval,
             buildingName: bldgName,
             subdomain: bldgSubdomain,
             address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
@@ -741,26 +745,48 @@ export default function AuthPage() {
             <Logo />
             <StepIndicator steps={['Plan','Building','Profile & Pay']} current={0} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Choose Your Plan</h2>
-            <p className="text-sm text-ink-400 text-center mb-6">30-day free trial on all plans. Cancel anytime.</p>
-            <div className="space-y-3">
-              {TIERS.map(tier => (
-                <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                    selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
-                  }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-bold text-ink-900">{tier.name}</p>
-                    <p className="text-lg font-bold text-accent-600">${tier.price}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                  </div>
-                  <ul className="space-y-1">
-                    {tier.features.map(f => (
-                      <li key={f} className="text-xs text-ink-500 flex items-center gap-1.5">
-                        <span className="text-sage-500">✓</span> {f}
-                      </li>
-                    ))}
-                  </ul>
+            <p className="text-sm text-ink-400 text-center mb-4">30-day free trial on all plans. Cancel anytime.</p>
+
+            {/* Billing Interval Toggle */}
+            <div className="flex items-center justify-center mb-5">
+              <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
+                <button onClick={() => setBillingInterval('monthly')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
+                <button onClick={() => setBillingInterval('annual')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'annual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
+                  Annual <span className="text-accent-600 text-xs font-bold ml-1">Save ~16%</span>
                 </button>
-              ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {TIERS.map(tier => {
+                const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
+                const annualTotal = tier.annual;
+                return (
+                  <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
+                    className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                      selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                    }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-bold text-ink-900">{tier.name}</p>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-accent-600">${displayPrice}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+                        {billingInterval === 'annual' && (
+                          <p className="text-[10px] text-ink-400">Billed ${annualTotal.toLocaleString()}/yr</p>
+                        )}
+                      </div>
+                    </div>
+                    <ul className="space-y-1">
+                      {tier.features.map(f => (
+                        <li key={f} className="text-xs text-ink-500 flex items-center gap-1.5">
+                          <span className="text-sage-500">✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                );
+              })}
             </div>
             <button onClick={() => setAuthStep('board-building')}
               className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-4">
@@ -855,10 +881,14 @@ export default function AuthPage() {
                 <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Order Summary</p>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-ink-700">{TIERS.find(t => t.id === selectedTier)?.name}</span>
-                  <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.price}/mo</span>
+                  {billingInterval === 'annual' ? (
+                    <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.annual.toLocaleString()}/yr</span>
+                  ) : (
+                    <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.monthly}/mo</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-xs text-ink-400 mt-1">
-                  <span>{bldgName || 'Your building'}</span>
+                  <span>{bldgName || 'Your building'} · {billingInterval === 'annual' ? 'Annual' : 'Monthly'} billing</span>
                   <span>30-day free trial</span>
                 </div>
                 {bldgSubdomain && <p className="text-xs text-ink-400 mt-1">URL: <span className="font-mono text-ink-600">{bldgSubdomain}.getonetwo.com</span></p>}
