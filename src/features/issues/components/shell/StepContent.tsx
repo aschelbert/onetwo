@@ -1,5 +1,9 @@
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
+import type { StepAction } from '@/store/useIssuesStore';
 import { Step1BudgetReview } from './Step1BudgetReview';
+import { StepActionList } from '../workflow/StepActionList';
+import { StepChecklist } from '../workflow/StepChecklist';
+import { deriveActionsForStep } from '../workflow/stepActionMap';
 
 interface StepContentProps {
   c: CaseTrackerCase;
@@ -10,6 +14,10 @@ interface StepContentProps {
   onToggleStep: (idx: number) => void;
   onAddNote: (idx: number) => void;
   onToggleAction?: (actionId: string) => void;
+  onToggleCheck?: (checkId: string) => void;
+  onAction?: (action: StepAction, stepIdx: number) => void;
+  onNavigate?: (target: string) => void;
+  onUpload?: () => void;
 }
 
 /**
@@ -17,7 +25,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
 
@@ -112,6 +120,121 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
               </div>
             )}
           </div>
+
+          {/* Actions, Checks & Rich Actions */}
+          {(() => {
+            const hasActions = step.actions && step.actions.length > 0;
+            const hasChecks = step.checks && step.checks.length > 0;
+            const hasPersistent = step.persistent && step.persistent.length > 0;
+            const richActions = deriveActionsForStep(step);
+            const hasRichActions = richActions.length > 0;
+            const hasInteractiveContent = hasActions || hasChecks || hasPersistent || hasRichActions;
+
+            if (!hasInteractiveContent) return null;
+
+            const actionsDone = hasActions ? step.actions!.filter(a => a.done).length : 0;
+            const actionsTotal = hasActions ? step.actions!.length : 0;
+            const actionsPct = actionsTotal > 0 ? Math.round((actionsDone / actionsTotal) * 100) : 0;
+            const checksDone = hasChecks ? step.checks!.filter(ck => ck.checked).length : 0;
+            const checksTotal = hasChecks ? step.checks!.length : 0;
+
+            const richActionButtons = hasRichActions && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">Quick Actions</p>
+                <div className="flex flex-wrap gap-2">
+                  {richActions.map(ra => (
+                    <button
+                      key={ra.id}
+                      onClick={() => onAction?.({ type: ra.type, target: ra.target, label: ra.label }, stepIndex)}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        ra.primary
+                          ? 'bg-accent-600 text-white hover:bg-accent-700'
+                          : 'bg-white border border-ink-200 text-ink-700 hover:bg-mist-50 hover:border-ink-300'
+                      }`}
+                    >
+                      <span>{ra.icon}</span>
+                      <span>{ra.label}</span>
+                      {ra.destination && (
+                        <span className="text-[10px] opacity-70">→ {ra.destination}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+
+            return (
+              <div className="border-t border-ink-100 px-5 py-4">
+                {(hasActions || hasChecks) ? (
+                  <div className="grid grid-cols-3 gap-5">
+                    {/* Left 2/3 — action list + rich action buttons */}
+                    <div className="col-span-2 space-y-4">
+                      {hasActions && onToggleAction && (
+                        <StepActionList
+                          actions={step.actions!}
+                          persistent={step.persistent}
+                          onToggleAction={onToggleAction}
+                          onNavigate={onNavigate}
+                          onUpload={onUpload}
+                        />
+                      )}
+                      {richActionButtons}
+                    </div>
+
+                    {/* Right 1/3 — completion sidebar */}
+                    <div className="space-y-3">
+                      {hasActions && (
+                        <div>
+                          <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Progress</p>
+                          <div className="bg-ink-50 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-medium text-ink-600">{actionsDone}/{actionsTotal}</span>
+                              <span className="text-[10px] text-ink-400">{actionsPct}%</span>
+                            </div>
+                            <div className="w-full bg-ink-200 rounded-full h-2">
+                              <div
+                                className="bg-sage-500 h-2 rounded-full transition-all"
+                                style={{ width: `${actionsPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {hasChecks && onToggleCheck && (
+                        <div>
+                          <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">
+                            Checklist ({checksDone}/{checksTotal})
+                          </p>
+                          <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* No actions/checks — single column for persistent + rich actions */
+                  <div className="space-y-4">
+                    {hasPersistent && (
+                      <div className="flex flex-wrap gap-2">
+                        {step.persistent!.map((p, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              if (p.type === 'link' && p.target && onNavigate) onNavigate(p.target);
+                              else if (p.type === 'upload' && onUpload) onUpload();
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-mist-50 hover:border-ink-300 transition-colors"
+                          >
+                            {p.type === 'link' ? '↗' : '📎'} {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {richActionButtons}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* User notes */}
           {step.userNotes && (

@@ -960,6 +960,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               onToggleStep={(idx) => store.toggleStep(caseId, idx)}
               onAddNote={handleAddNote}
               onToggleAction={(actionId) => store.toggleAction(caseId, safeStep, actionId)}
+              onToggleCheck={(checkId) => store.toggleCheck(caseId, safeStep, checkId)}
+              onAction={(action, stepIdx) => handleAction(action, stepIdx)}
+              onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, safeStep)}
+              onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, safeStep)}
             />
           </div>
         </div>
