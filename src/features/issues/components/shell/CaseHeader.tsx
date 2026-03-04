@@ -67,7 +67,7 @@ function ThreeDotMenu({ c, onAddApproach, onClose, onReopen, onDelete }: {
           <button onClick={() => { onAddApproach(); setOpen(false); }} className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
             ➕ Add Approach
           </button>
-          {c.status === 'open' ? (
+          {c.status !== 'closed' ? (
             <button onClick={() => { onClose(); setOpen(false); }} className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
               ✓ Close Case
             </button>
@@ -107,7 +107,7 @@ export function CaseHeader({ c, pct, onAddApproach, onClose, onReopen, onDelete 
               {APPR_LABELS[c.approach]}
             </span>
             <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-              c.status === 'open' ? 'bg-accent-50 text-accent-600'
+              c.status === 'open' ? 'bg-yellow-50 text-yellow-700'
               : c.status === 'on-hold' ? 'bg-amber-100 text-amber-700'
               : 'bg-sage-100 text-sage-700'
             }`}>
