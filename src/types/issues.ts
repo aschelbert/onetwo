@@ -130,6 +130,17 @@ export interface FiduciaryAlert {
   actionPath: string;
 }
 
+// Budget Financials (annual-budgeting step 1 enrichment)
+export interface BudgetFinancials {
+  accounts: { num: string; name: string; budget: number; actual: number }[];
+  budgetLines: { label: string; amount: number }[];
+  reserveComponents: { name: string; balance: number; funded: number }[];
+  delinquent: { units: number; total: number; aging: { bucket: string; amount: number }[] };
+  collectionRates: { month: string; rate: number }[];
+  totalUnits: number;
+  currentMonthly: number;
+}
+
 // Budget Alert (computed from financial data)
 export type BudgetAlertLevel = 'none' | 'low' | 'medium' | 'high' | 'critical';
 
@@ -264,6 +275,7 @@ export interface CaseTrackerCase {
     committed: number;
     remaining: number;
   };
+  financials?: BudgetFinancials;
   conflictChecks?: ConflictCheck[];
   decisionTrail?: DecisionTrailEntry[];
 }

@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as issuesSvc from '@/lib/services/issues';
 import * as casesSvc from '@/lib/services/cases';
-import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction } from '@/types/issues';
+import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
+import { ANNUAL_BUDGET_FINANCIALS } from '@/features/issues/components/shell/budgetData';
 
 // ─── Situation Templates ───────────────────────────────────
 export interface StepAction {
@@ -1008,28 +1009,34 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   const sit = cat?.sits.find(x => x.id === c.sitId);
   if (!sit) return c;
   const src = c.approach === 'legal' ? sit.legal : c.approach === 'self' ? sit.self : sit.pre;
-  c.steps = src.map((s, i) => ({
-    ...s, id: 's' + i,
-    done: c.status === 'closed' ? true : i < 2,
-    doneDate: c.status === 'closed' ? c.created : i < 2 ? '2026-02-10' : null,
-    userNotes: '',
-    ...(s.ph && { phaseId: s.ph }),
-    ...(s.ck && s.ck.length > 0 && { checks: hydrateChecks(s.ck)?.map(ck => ({
-      ...ck,
-      checked: c.status === 'closed' ? true : i < 2,
-      checkedDate: c.status === 'closed' ? c.created : i < 2 ? '2026-02-10' : null,
-    })) }),
-    ...(s.actions && { actions: s.actions.map((a: any) => ({
-      ...a,
-      done: c.status === 'closed' ? true : false,
-      doneDate: c.status === 'closed' ? c.created : null
-    })) }),
-    ...(s.persistent && { persistent: s.persistent }),
-    ...(s.desc && { desc: s.desc }),
-    ...(s.isSpendingDecision && { isSpendingDecision: true }),
-    ...(s.requiresBids && { requiresBids: true, minimumBids: s.minimumBids || 3, bidCollection: { minimumBids: s.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
-    ...(s.requiresConflictCheck && { requiresConflictCheck: true }),
-  }));
+  c.steps = src.map((s, i) => {
+    const hasActions = s.actions && s.actions.length > 0;
+    // Steps with actions: done is driven by actions, not by seed index
+    const seedDone = c.status === 'closed' ? true : (!hasActions && i < 2);
+    const seedDate = c.status === 'closed' ? c.created : (!hasActions && i < 2) ? '2026-02-10' : null;
+    return {
+      ...s, id: 's' + i,
+      done: seedDone,
+      doneDate: seedDate,
+      userNotes: '',
+      ...(s.ph && { phaseId: s.ph }),
+      ...(s.ck && s.ck.length > 0 && { checks: hydrateChecks(s.ck)?.map(ck => ({
+        ...ck,
+        checked: c.status === 'closed' ? true : i < 2,
+        checkedDate: c.status === 'closed' ? c.created : i < 2 ? '2026-02-10' : null,
+      })) }),
+      ...(s.actions && { actions: s.actions.map((a: any) => ({
+        ...a,
+        done: c.status === 'closed' ? true : false,
+        doneDate: c.status === 'closed' ? c.created : null
+      })) }),
+      ...(s.persistent && { persistent: s.persistent }),
+      ...(s.desc && { desc: s.desc }),
+      ...(s.isSpendingDecision && { isSpendingDecision: true }),
+      ...(s.requiresBids && { requiresBids: true, minimumBids: s.minimumBids || 3, bidCollection: { minimumBids: s.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+      ...(s.requiresConflictCheck && { requiresConflictCheck: true }),
+    };
+  });
   return c;
 }
 
@@ -1121,6 +1128,15 @@ const seedCases: CaseTrackerCase[] = [
     notes: 'Review and update collection policy. Current version is outdated. Legal counsel review needed before finalizing.',
     steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'David Chen', assignedRole: 'Treasurer', dueDate: '2026-05-01',
+  }),
+  hydrateSteps({
+    id: 'c8', catId: 'financial', sitId: 'annual-budgeting',
+    title: 'FY 2027 Annual Budget', unit: 'Common', owner: 'N/A',
+    approach: 'pre', status: 'open', priority: 'high', created: '2026-02-15',
+    notes: 'Prepare and adopt the FY 2027 operating budget and reserve funding plan.',
+    steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
+    assignedTo: 'David Chen', assignedRole: 'Treasurer', dueDate: '2026-06-01',
+    financials: ANNUAL_BUDGET_FINANCIALS,
   }),
 ];
 
@@ -1264,7 +1280,7 @@ interface IssuesState {
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   issues: seedIssues,
   cases: seedCases,
-  nextCaseNum: 8,
+  nextCaseNum: 9,
   nextIssueNum: 3,
   nextCommNum: 6,
   activeCaseContext: null,

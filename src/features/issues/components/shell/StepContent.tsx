@@ -1,4 +1,5 @@
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
+import { Step1BudgetReview } from './Step1BudgetReview';
 
 interface StepContentProps {
   c: CaseTrackerCase;
@@ -8,6 +9,7 @@ interface StepContentProps {
   stateAbbr: string;
   onToggleStep: (idx: number) => void;
   onAddNote: (idx: number) => void;
+  onToggleAction?: (actionId: string) => void;
 }
 
 /**
@@ -15,9 +17,14 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
+
+  // Annual-budgeting step 1 enrichment
+  if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 0 && onToggleAction) {
+    return <Step1BudgetReview c={c} step={step} onToggleAction={onToggleAction} />;
+  }
 
   return (
     <div className="p-5 md:px-7 md:py-6" style={{ maxWidth: 860 }}>

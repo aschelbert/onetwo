@@ -60,15 +60,28 @@ export function StepList({ c, steps, activeStep, onSelectStep }: StepListProps) 
 
               {/* Step text */}
               <div className="flex-1 min-w-0">
-                <p className={`text-[13px] leading-tight truncate ${
-                  isDone
-                    ? 'text-ink-400 line-through'
-                    : isActive
-                    ? 'font-semibold text-ink-900'
-                    : 'text-ink-700'
-                }`}>
-                  {st.s}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className={`text-[13px] leading-tight truncate ${
+                    isDone
+                      ? 'text-ink-400 line-through'
+                      : isActive
+                      ? 'font-semibold text-ink-900'
+                      : 'text-ink-700'
+                  }`}>
+                    {st.s}
+                  </p>
+                  {/* Action dots for steps with actions */}
+                  {st.actions && st.actions.length > 0 && (
+                    <span className="flex gap-0.5 shrink-0">
+                      {st.actions.map(a => (
+                        <span
+                          key={a.id}
+                          className={`w-1.5 h-1.5 rounded-full ${a.done ? 'bg-mist-500' : 'bg-ink-200'}`}
+                        />
+                      ))}
+                    </span>
+                  )}
+                </div>
                 {st.t && <p className="text-[10px] text-ink-400 mt-0.5">{st.t}</p>}
               </div>
             </button>

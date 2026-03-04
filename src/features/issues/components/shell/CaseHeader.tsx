@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { CaseTrackerCase } from '@/types/issues';
-import { CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS } from '@/store/useIssuesStore';
+import { CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES } from '@/store/useIssuesStore';
+import { PHASES } from './budgetData';
 
 interface CaseHeaderProps {
   c: CaseTrackerCase;
@@ -134,6 +135,49 @@ export function CaseHeader({ c, pct, onAddApproach, onClose, onReopen, onDelete 
           <p className="text-xs text-ink-600 leading-relaxed">{c.notes}</p>
         </div>
       )}
+
+      {/* Phase bar for annual-budgeting */}
+      {c.catId === 'financial' && c.sitId === 'annual-budgeting' && c.steps && (
+        <PhaseBar steps={c.steps} />
+      )}
+    </div>
+  );
+}
+
+function PhaseBar({ steps }: { steps: NonNullable<CaseTrackerCase['steps']> }) {
+  const phases = SITUATION_PHASES['annual-budgeting'] || [];
+  if (phases.length === 0) return null;
+
+  // Count done steps per phase
+  const phaseProgress = phases.map(phase => {
+    const phaseSteps = steps.filter(s => s.phaseId === phase.id);
+    const done = phaseSteps.filter(s => s.done).length;
+    return { ...phase, done, total: phaseSteps.length };
+  });
+
+  // Map phase IDs to colors from PHASES constant
+  const colorMap: Record<string, string> = {};
+  PHASES.forEach(p => { colorMap[p.id] = p.color; });
+
+  return (
+    <div className="mt-3">
+      <div className="flex gap-1">
+        {phaseProgress.map(p => {
+          const color = colorMap[p.id] || '#94a3b8';
+          const filled = p.total > 0 ? p.done / p.total : 0;
+          return (
+            <div key={p.id} className="flex-1">
+              <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${filled * 100}%`, backgroundColor: color }}
+                />
+              </div>
+              <div className="text-[9px] text-ink-400 mt-0.5 text-center">{p.label}</div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

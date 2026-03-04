@@ -950,7 +950,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             className="overflow-y-auto bg-ink-50"
             style={{ height: 'calc(100vh - 140px)' }}
           >
-            <ShellStepHeader step={currentStep} stepNumber={safeStep + 1} />
+            <ShellStepHeader step={currentStep} stepNumber={safeStep + 1} caseSitId={c.sitId} />
             <StepContent
               c={c}
               step={currentStep}
@@ -959,6 +959,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               stateAbbr={stateAbbr}
               onToggleStep={(idx) => store.toggleStep(caseId, idx)}
               onAddNote={handleAddNote}
+              onToggleAction={(actionId) => store.toggleAction(caseId, safeStep, actionId)}
             />
           </div>
         </div>
