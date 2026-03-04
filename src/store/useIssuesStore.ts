@@ -1037,6 +1037,7 @@ const seedCases: CaseTrackerCase[] = [
   hydrateSteps({
     id: 'c1', catId: 'enforcement', sitId: 'covenant-violations',
     title: 'Unit 502 — Unauthorized Balcony Enclosure', unit: '502', owner: 'Lisa Chen',
+    assignedTo: 'Robert Mitchell', assignedRole: 'President',
     approach: 'pre', status: 'open', priority: 'high', created: '2026-01-28',
     notes: 'Owner enclosed balcony without architectural review. Structural concerns.',
     steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [],
@@ -1049,6 +1050,7 @@ const seedCases: CaseTrackerCase[] = [
   hydrateSteps({
     id: 'c2', catId: 'financial', sitId: 'delinquent-accounts',
     title: 'Unit 310 — 90-Day Delinquent Assessment', unit: '310', owner: 'Mark Torres',
+    assignedTo: 'David Chen', assignedRole: 'Treasurer',
     approach: 'self', status: 'open', priority: 'medium', created: '2026-02-01',
     notes: 'Owner $2,700 behind. Payment plan offered but not signed.',
     steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [{ name: 'Delinquency-Notice-Unit310.pdf', type: 'notice', date: '2026-02-01', size: '45 KB' }],
@@ -1061,6 +1063,7 @@ const seedCases: CaseTrackerCase[] = [
   hydrateSteps({
     id: 'c3', catId: 'maintenance', sitId: 'emergency-situations',
     title: 'Burst Pipe — 3rd Floor Riser', unit: 'Common', owner: 'N/A',
+    assignedTo: 'Jennifer Adams', assignedRole: 'Vice President',
     approach: 'pre', status: 'closed', priority: 'urgent', created: '2026-01-15',
     notes: 'Emergency repair completed. Insurance claim filed. Two units affected.',
     steps: null, linkedWOs: ['WO-101'], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [
@@ -1251,6 +1254,11 @@ interface IssuesState {
 
   // Budget drafting
   saveBudgetDraft: (caseId: string, stepIdx: number, draft: NonNullable<import('@/types/issues').CaseStep['budgetDraft']>) => void;
+
+  // Shell refactor: active step in two-column layout
+  shellActiveStep: number;
+  shellActiveStepCaseId: string | null;
+  setShellActiveStep: (caseId: string, stepIdx: number) => void;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -1260,6 +1268,8 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   nextIssueNum: 3,
   nextCommNum: 6,
   activeCaseContext: null,
+  shellActiveStep: 0,
+  shellActiveStepCaseId: null,
 
   loadFromDb: async (tenantId: string) => {
     const [issues, cases] = await Promise.all([
@@ -1891,6 +1901,15 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   // ─── Active Case Context (floating widget) ────────────
   setActiveCaseContext: (ctx) => set({ activeCaseContext: ctx }),
   clearActiveCaseContext: () => set({ activeCaseContext: null }),
+
+  // ─── Shell Refactor: Active Step ─────────────────────
+  setShellActiveStep: (caseId, stepIdx) => {
+    const s = get();
+    const c = s.cases.find(x => x.id === caseId);
+    const maxIdx = c?.steps ? c.steps.length - 1 : 0;
+    const clamped = Math.max(0, Math.min(stepIdx, maxIdx));
+    set({ shellActiveStep: clamped, shellActiveStepCaseId: caseId });
+  },
 
   // ─── Budget Drafting ──────────────────────────────────
   saveBudgetDraft: (caseId, stepIdx, draft) => {

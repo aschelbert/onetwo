@@ -15,6 +15,12 @@ import SendNoticePanel from './components/SendNoticePanel';
 import ComposePanel from '@/features/boardroom/components/ComposePanel';
 import type { ComposePanelContext } from '@/types/communication';
 import { OwnerCaseView } from './components/OwnerCaseView';
+import { BudgetTracker } from './components/shell/BudgetTracker';
+import { CaseHeader } from './components/shell/CaseHeader';
+import { StepList } from './components/shell/StepList';
+import { SideSections } from './components/shell/SideSections';
+import { ShellStepHeader } from './components/shell/StepHeader';
+import { StepContent } from './components/shell/StepContent';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
 import { DACI_MATRIX } from '@/data/daciMatrix';
@@ -730,6 +736,10 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [inlineStepIdx, setInlineStepIdx] = useState<number | null>(null);
   const [docTargetStep, setDocTargetStep] = useState<number | null>(null);
   const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
+  const [activeStep, setActiveStep] = useState(0);
+
+  // Reset active step when navigating to a different case
+  useEffect(() => { setActiveStep(0); }, [caseId]);
 
   const ACTION_NAV: Record<string, { route: string; tab?: string }> = {
     'financial':            { route: '/financial' },
@@ -836,270 +846,124 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
     setEditingAssignment(true);
   };
 
+  // Progress calculation (actions > checks > step-level)
+  const steps = c.steps || [];
+  let totalProgress = 0, doneProgress = 0;
+  for (const step of steps) {
+    if (step.actions && step.actions.length > 0) {
+      totalProgress += step.actions.length;
+      doneProgress += step.actions.filter(a => a.done).length;
+    } else if (step.checks && step.checks.length > 0) {
+      totalProgress += step.checks.length;
+      doneProgress += step.checks.filter(ck => ck.checked).length;
+    } else {
+      totalProgress += 1;
+      doneProgress += step.done ? 1 : 0;
+    }
+  }
+  const pct = totalProgress > 0 ? Math.round((doneProgress / totalProgress) * 100) : 0;
+
+  // Clamp activeStep to valid range
+  const safeStep = Math.max(0, Math.min(activeStep, steps.length - 1));
+  const currentStep = steps[safeStep];
+
+  const stateAbbr = jurisdictionKey === 'DC' ? 'DC' : (buildingState || '');
+
+  const handleAddNote = (idx: number) => {
+    const existing = steps[idx]?.userNotes || '';
+    const note = window.prompt('Step note:', existing);
+    if (note !== null) store.addStepNote(caseId, idx, note);
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `case-${c.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Residents see simplified view
+  if (c.steps && !isBoard) {
+    return <OwnerCaseView c={c} onBack={onBack} />;
+  }
+
   return (
-    <div className="space-y-5">
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 flex-wrap">
+    <div>
+      {/* Breadcrumb bar */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-ink-100 bg-white">
         <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Dashboard</button>
-        <span className="text-ink-300">·</span>
+        <span className="text-ink-300 text-xs">·</span>
         <button onClick={() => onNav('cases')} className="text-xs text-ink-400 hover:text-ink-600">All Cases</button>
-        <span className="text-ink-300">·</span>
-        <span className="text-xs text-ink-500 font-medium">{c.id}</span>
+        <span className="text-ink-300 text-xs">·</span>
+        <span className="text-xs text-ink-500 font-medium truncate">{c.title}</span>
       </div>
 
-      {/* Jurisdiction note */}
-      {stNote && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-start gap-2">
-            <span>📍</span>
-            <div>
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Jurisdiction Guidance</p>
-              <p className="text-sm text-amber-900 mt-1">{stNote}</p>
-            </div>
+      {/* Two-column grid */}
+      {c.steps && currentStep ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr' }}>
+          {/* LEFT COLUMN — sticky, independent scroll */}
+          <div
+            className="border-r border-ink-200 bg-white overflow-y-auto"
+            style={{ height: 'calc(100vh - 140px)', position: 'sticky', top: 140 }}
+          >
+            <BudgetTracker c={c} />
+            <CaseHeader
+              c={c}
+              pct={pct}
+              onAddApproach={() => setShowApproachModal(true)}
+              onClose={() => setShowCloseModal(true)}
+              onReopen={() => store.reopenCase(caseId)}
+              onDelete={() => setShowDeleteModal(true)}
+            />
+            <StepList
+              c={c}
+              steps={steps}
+              activeStep={safeStep}
+              onSelectStep={setActiveStep}
+            />
+            <SideSections
+              c={c}
+              onUploadDoc={() => setShowDocModal(true)}
+              onSendComm={() => {
+                setComposePanelContext({
+                  scope: 'unit',
+                  scopeLocked: true,
+                  recipientUnit: c.unit || undefined,
+                  recipientName: c.owner || undefined,
+                  caseId: c.id,
+                  caseLink: `Case ${c.id}`,
+                  source: 'case-workflow',
+                });
+                setShowComposePanel(true);
+              }}
+              onRecordVote={() => setShowVoteModal(true)}
+              onFiscalLens={() => navigate('/financial')}
+              onExport={handleExport}
+            />
+          </div>
+
+          {/* RIGHT COLUMN — independent scroll */}
+          <div
+            className="overflow-y-auto bg-ink-50"
+            style={{ height: 'calc(100vh - 140px)' }}
+          >
+            <ShellStepHeader step={currentStep} stepNumber={safeStep + 1} />
+            <StepContent
+              c={c}
+              step={currentStep}
+              stepIndex={safeStep}
+              stNote={stNote}
+              stateAbbr={stateAbbr}
+              onToggleStep={(idx) => store.toggleStep(caseId, idx)}
+              onAddNote={handleAddNote}
+            />
           </div>
         </div>
-      )}
-
-      {/* Case Workflow: sidebar + accordion + supporting sections */}
-      {c.steps && !isBoard ? (
-        <OwnerCaseView c={c} onBack={onBack} />
-      ) : c.steps && (
-        <CaseWorkflow
-          c={c}
-          steps={c.steps}
-          onToggleStep={(idx) => store.toggleStep(caseId, idx)}
-          onAddNote={(idx, note) => store.addStepNote(caseId, idx, note)}
-          onAction={handleAction}
-          onClose={() => setShowCloseModal(true)}
-          onReopen={() => store.reopenCase(caseId)}
-          onEditAssignment={openAssignmentEditor}
-          onAddApproach={() => setShowApproachModal(true)}
-          onDelete={() => setShowDeleteModal(true)}
-          onToggleCheck={(cid, stepIdx, checkId) => store.toggleCheck(cid, stepIdx, checkId)}
-          onToggleAction={(cid, stepIdx, actionId) => store.toggleAction(cid, stepIdx, actionId)}
-          onCompleteAllChecks={(cid, stepIdx) => store.completeAllChecks(cid, stepIdx)}
-          onPutOnHold={() => setShowHoldModal(true)}
-          onResume={() => store.resumeCase(caseId)}
-          onOpenBidModal={(stepIdx) => { setBidTargetStep(stepIdx); setShowBidModal(true); }}
-          onNavigate={(target) => { const nav = ACTION_NAV[target]; if (nav) navigate(nav.route); }}
-          onUpload={(cid) => setShowDocModal(true)}
-        >
-          {/* Decision Trail */}
-          <DecisionTrail entries={c.decisionTrail || []} />
-
-          {/* Board Vote */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Board Vote</p>
-              <ThreeDotMenu items={[
-                { label: c.boardVotes ? 'Edit Vote' : 'Record Vote', onClick: () => setShowVoteModal(true) },
-                ...(c.boardVotes ? [{ label: 'Remove Vote', onClick: () => { if (confirm('Remove vote?')) store.clearBoardVote(caseId); }, danger: true }] : []),
-              ]} />
-            </div>
-            {c.boardVotes ? <BoardVoteDisplay vote={c.boardVotes} /> : <p className="text-sm text-ink-400 py-3 text-center">No board vote recorded for this case.</p>}
-          </div>
-
-          {/* Documents */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Documents</p>
-              <ThreeDotMenu items={[
-                { label: 'Upload Document', onClick: () => setShowDocModal(true) },
-              ]} />
-            </div>
-            {c.attachments.length > 0 ? (
-              <div className="space-y-1.5">
-                {c.attachments.map((a, i) => {
-                  const tc: Record<string, string> = { evidence: 'bg-amber-100 text-amber-700', notice: 'bg-accent-100 text-accent-700', legal: 'bg-rose-100 text-rose-700', claim: 'bg-purple-100 text-purple-700' };
-                  return (
-                    <div key={i} className="flex items-center justify-between p-2.5 bg-mist-50 border border-mist-100 rounded-lg group">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-ink-400">📄</span>
-                        <span className="text-sm text-ink-700 truncate">{a.name}</span>
-                        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${tc[a.type] || 'bg-ink-100 text-ink-500'}`}>{a.type}</span>
-                        <span className="text-xs text-ink-300">{a.size}</span>
-                      </div>
-                      <button onClick={() => store.removeDocument(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0 ml-2">✕</button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : <p className="text-sm text-ink-400 py-3 text-center">No documents attached.</p>}
-          </div>
-
-          {/* Communications */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Communications</p>
-              <ThreeDotMenu items={[
-                { label: 'Send Communication', onClick: () => {
-                  setComposePanelContext({
-                    scope: 'unit',
-                    scopeLocked: true,
-                    recipientUnit: c.unit || undefined,
-                    recipientName: c.owner || undefined,
-                    caseId: c.id,
-                    caseLink: `Case ${c.id}`,
-                    source: 'case-workflow',
-                  });
-                  setShowComposePanel(true);
-                } },
-                { label: 'Link Letter', onClick: () => setShowLinkLetterModal(true) },
-              ]} />
-            </div>
-            {c.comms.length > 0 ? (
-              <div className="space-y-2">
-                {[...c.comms].sort((a, b) => b.date.localeCompare(a.date)).map((cm, i) => {
-                  const icons: Record<string, string> = { notice: '📢', response: '✉️', reminder: '⏰', violation: '⚠️', legal: '⚖️' };
-                  return (
-                    <div key={cm.id} className="p-3 bg-mist-50 border border-mist-100 rounded-lg group">
-                      <div className="flex items-start gap-2.5">
-                        <span className="text-base mt-0.5">{icons[cm.type] || '📨'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-medium text-ink-900">{cm.subject}</p>
-                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${cm.status === 'sent' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'}`}>{cm.status}</span>
-                                <span className="text-[11px] text-ink-400">{cm.date} · via {cm.method}</span>
-                                <span className="text-[11px] text-ink-500">→ {cm.recipient}</span>
-                              </div>
-                            </div>
-                            <button onClick={() => store.removeComm(caseId, i)} className="text-xs text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 shrink-0">✕</button>
-                          </div>
-                          {cm.notes && <p className="text-xs text-ink-400 mt-1">{cm.notes}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : <p className="text-sm text-ink-400 py-3 text-center">No communications sent.</p>}
-
-            {/* Linked Letters */}
-            {(c.linkedLetterIds?.length ?? 0) > 0 && (
-              <div className="mt-4 pt-4 border-t border-ink-50">
-                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Linked Letters</p>
-                <div className="space-y-2">
-                  {(c.linkedLetterIds || []).map(letterId => {
-                    const letter = letterStore.letters.find(l => l.id === letterId);
-                    if (!letter) return <div key={letterId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Letter {letterId} not found</div>;
-                    const sc: Record<string, string> = { draft: 'bg-yellow-100 text-yellow-700', sent: 'bg-sage-100 text-sage-700', archived: 'bg-ink-100 text-ink-500' };
-                    return (
-                      <div key={letterId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg group">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[letter.status] || 'bg-ink-100 text-ink-500'}`}>{letter.status}</span>
-                          <span className="text-sm font-medium text-ink-900 truncate">{letter.subject}</span>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs text-ink-400">{letter.recipient} · {letter.sentDate}</span>
-                          <button onClick={() => store.unlinkLetter(caseId, letterId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Financials: Work Orders + Invoices */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Financials</p>
-              <ThreeDotMenu items={[
-                { label: 'Create Work Order', onClick: () => { setWOForm({ title: `${c.title}`, vendor: '', amount: '', acctNum: '6050' }); setShowWOModal(true); } },
-                { label: 'Create Invoice', onClick: () => setShowInvoiceModal(true) },
-                { label: 'Link Invoice', onClick: () => setShowLinkInvoiceModal(true) },
-              ]} />
-            </div>
-
-            {/* Work Orders */}
-            <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Work Orders</p>
-            {c.linkedWOs.length > 0 ? (
-              <div className="space-y-2">
-                {c.linkedWOs.map(woId => {
-                  const wo = workOrders.find(w => w.id === woId);
-                  if (!wo) return <div key={woId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">WO {woId} not found</div>;
-                  const sc: Record<string, string> = { draft: 'bg-ink-100 text-ink-500', approved: 'bg-yellow-100 text-yellow-700', invoiced: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700' };
-                  return (
-                    <div key={woId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${sc[wo.status]}`}>{wo.status}</span>
-                        <span className="text-xs font-mono text-ink-300">{wo.id}</span>
-                        <span className="text-sm font-medium text-ink-900 truncate">{wo.title}</span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm text-ink-500">{wo.vendor}</span>
-                        <span className="font-bold text-ink-900">{fmt(wo.amount)}</span>
-                        <button onClick={() => store.unlinkWO(caseId, woId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : <p className="text-sm text-ink-400 py-2 text-center">No work orders linked.</p>}
-
-            {/* Linked Invoices */}
-            <div className="mt-4 pt-4 border-t border-ink-50">
-              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Invoices</p>
-              {(c.linkedInvoiceIds?.length ?? 0) > 0 ? (
-                <div className="space-y-2">
-                  {(c.linkedInvoiceIds || []).map(invId => {
-                    const inv = fin.unitInvoices.find(i => i.id === invId);
-                    if (!inv) return <div key={invId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Invoice {invId} not found</div>;
-                    const sc: Record<string, string> = { sent: 'bg-accent-100 text-accent-700', paid: 'bg-sage-100 text-sage-700', overdue: 'bg-red-100 text-red-700', void: 'bg-ink-100 text-ink-500' };
-                    return (
-                      <div key={invId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[inv.status] || 'bg-ink-100 text-ink-500'}`}>{inv.status}</span>
-                          <span className="text-xs font-mono text-ink-300">{inv.id}</span>
-                          <span className="text-sm font-medium text-ink-900 truncate">{inv.description}</span>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs text-ink-500">Unit {inv.unitNumber}</span>
-                          <span className="font-bold text-ink-900">{fmt(inv.amount)}</span>
-                          <button onClick={() => store.unlinkInvoice(caseId, invId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : <p className="text-sm text-ink-400 py-2 text-center">No invoices linked.</p>}
-            </div>
-          </div>
-
-          {/* Meetings */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Meetings</p>
-              <ThreeDotMenu items={[
-                { label: 'Link Meeting', onClick: () => setShowMeetingModal(true) },
-              ]} />
-            </div>
-            {(c.linkedMeetingIds?.length ?? 0) > 0 ? (
-              <div className="space-y-2">
-                {(c.linkedMeetingIds || []).map(meetingId => {
-                  const meeting = meetingsStore.meetings.find(m => m.id === meetingId);
-                  if (!meeting) return <div key={meetingId} className="p-3 bg-red-50 rounded-lg text-sm text-red-500">Meeting {meetingId} not found</div>;
-                  const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
-                  return (
-                    <div key={meetingId} className="flex items-center justify-between p-3 bg-mist-50 border border-mist-200 rounded-lg">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[meeting.status] || 'bg-ink-100 text-ink-500'}`}>{meeting.status}</span>
-                        <span className="text-sm font-medium text-ink-900 truncate">{meeting.title}</span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs text-ink-400">{meeting.date} · {meeting.type}</span>
-                        <button onClick={() => store.unlinkMeeting(caseId, meetingId)} className="px-2 py-1 text-xs text-red-400 hover:bg-red-50 rounded font-medium">Unlink</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : <p className="text-sm text-ink-400 py-3 text-center">No meetings linked.</p>}
-          </div>
-        </CaseWorkflow>
+      ) : (
+        <div className="p-8 text-center text-ink-400">No workflow steps for this case.</div>
       )}
 
       {/* Modals */}

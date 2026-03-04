@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, type ReactNode } from 'react';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
-import { APPR_LABELS, APPR_COLORS, SITUATION_PHASES } from '@/store/useIssuesStore';
+import { APPR_LABELS, APPR_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import { CaseSidebar } from './CaseSidebar';
 import { WorkflowStepCard } from './WorkflowStepCard';
-import { PhaseHeader } from './PhaseHeader';
+import { StepHeader } from './StepHeader';
 
 interface CaseWorkflowProps {
   c: CaseTrackerCase;
@@ -35,83 +35,41 @@ export function CaseWorkflow({
   onOpenBidModal, onNavigate, onUpload, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
-  const activeStepIdx = steps.findIndex(s => !s.done);
-  const [expandedSteps, setExpandedSteps] = useState<number[]>([activeStepIdx >= 0 ? activeStepIdx : 0]);
-  const stepRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const firstIncomplete = steps.findIndex(s => !s.done);
+  const activeStepIdx = firstIncomplete >= 0 ? firstIncomplete : 0;
+  const [activeStep, setActiveStep] = useState(activeStepIdx);
 
-  const toggleExpand = useCallback((idx: number) => {
-    setExpandedSteps(prev =>
-      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
-    );
-  }, []);
-
-  const scrollToStep = useCallback((idx: number) => {
-    setExpandedSteps(prev => prev.includes(idx) ? prev : [...prev, idx]);
-    setTimeout(() => {
-      stepRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+  const handleStepSelect = useCallback((idx: number) => {
+    setActiveStep(idx);
   }, []);
 
   const handleContinue = useCallback((currentIdx: number) => {
     // Find next uncompleted step
     const nextIdx = steps.findIndex((s, i) => i > currentIdx && !s.done);
     if (nextIdx >= 0) {
-      setExpandedSteps(prev => prev.includes(nextIdx) ? prev : [...prev, nextIdx]);
-      setTimeout(() => {
-        stepRefs.current[nextIdx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
+      setActiveStep(nextIdx);
     } else if (currentIdx < steps.length - 1) {
-      const next = currentIdx + 1;
-      setExpandedSteps(prev => prev.includes(next) ? prev : [...prev, next]);
-      setTimeout(() => {
-        stepRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 50);
+      setActiveStep(currentIdx + 1);
     }
   }, [steps]);
 
-  // Phase grouping
+  // Bounds safety
+  const safeIdx = Math.min(activeStep, steps.length - 1);
+  const currentStep = steps[Math.max(0, safeIdx)];
+
+  // Phase info for StepHeader
   const phases = SITUATION_PHASES[c.sitId] || [];
-  const hasPhases = phases.length > 0 && steps.some(s => s.phaseId);
+  const currentPhase = currentStep.phaseId
+    ? phases.find(p => p.id === currentStep.phaseId)
+    : undefined;
+  const currentPhaseIndex = currentPhase
+    ? phases.findIndex(p => p.id === currentPhase.id)
+    : -1;
 
-  const stepsByPhase = hasPhases
-    ? phases.map(p => ({
-        ...p,
-        steps: steps.map((s, i) => ({ step: s, idx: i })).filter(x => x.step.phaseId === p.id),
-      }))
-    : [];
-  const orphanSteps = hasPhases
-    ? steps.map((s, i) => ({ step: s, idx: i })).filter(x => !x.step.phaseId)
-    : steps.map((s, i) => ({ step: s, idx: i }));
-
-  const renderStepCard = (step: CaseStep, i: number) => (
-    <WorkflowStepCard
-      key={step.id}
-      ref={(el) => { stepRefs.current[i] = el; }}
-      caseId={c.id}
-      step={step}
-      index={i}
-      isActive={i === activeStepIdx}
-      isExpanded={expandedSteps.includes(i)}
-      onToggleExpand={() => toggleExpand(i)}
-      onToggleDone={() => onToggleStep(i)}
-      onNote={(note) => onAddNote(i, note)}
-      onAction={onAction}
-      onContinue={() => handleContinue(i)}
-      totalSteps={steps.length}
-      onToggleCheck={onToggleCheck ? (checkId) => onToggleCheck(c.id, i, checkId) : undefined}
-      onToggleAction={onToggleAction ? (actionId) => onToggleAction(c.id, i, actionId) : undefined}
-      onCompleteAllChecks={onCompleteAllChecks ? () => onCompleteAllChecks(c.id, i) : undefined}
-      onCloseCase={onClose}
-      onOpenBidModal={onOpenBidModal}
-      onNavigate={onNavigate}
-      onUpload={onUpload ? () => onUpload(c.id) : undefined}
-    />
-  );
-
-  // Calculate phase progress counts for PhaseHeader
-  const getPhaseProgress = (phaseSteps: { step: CaseStep; idx: number }[]) => {
+  // Overall progress (reuse same logic as sidebar)
+  const overallProgress = (() => {
     let done = 0, total = 0;
-    for (const { step } of phaseSteps) {
+    for (const step of steps) {
       if (step.actions && step.actions.length > 0) {
         done += step.actions.filter(a => a.done).length;
         total += step.actions.length;
@@ -124,17 +82,17 @@ export function CaseWorkflow({
       }
     }
     return { done, total };
-  };
+  })();
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6 items-start">
       {/* Sidebar — case summary, step rail, and supporting sections */}
       <CaseSidebar
         c={c}
         steps={steps}
-        activeStepIdx={activeStepIdx >= 0 ? activeStepIdx : 0}
-        expandedSteps={expandedSteps}
-        onStepClick={scrollToStep}
+        activeStepIdx={firstIncomplete >= 0 ? firstIncomplete : 0}
+        selectedStep={safeIdx}
+        onStepClick={handleStepSelect}
         onClose={onClose}
         onReopen={onReopen}
         onEditAssignment={onEditAssignment}
@@ -147,41 +105,45 @@ export function CaseWorkflow({
         {children}
       </CaseSidebar>
 
-      {/* Main content — workflow steps */}
-      <div className="flex-1 min-w-0 space-y-4">
-        {/* Step cards — grouped by phase or flat */}
-        <div className="space-y-3">
-          {/* Orphan steps (no phase) render first */}
-          {orphanSteps.length > 0 && !hasPhases && orphanSteps.map(({ step, idx }) => renderStepCard(step, idx))}
+      {/* Right column — single active step */}
+      <div className="min-w-0">
+        <StepHeader
+          step={currentStep}
+          index={safeIdx}
+          totalSteps={steps.length}
+          phaseName={currentPhase?.label}
+          phaseColor={currentPhaseIndex >= 0 ? PHASE_COLORS[currentPhaseIndex % PHASE_COLORS.length] : undefined}
+          overallProgress={overallProgress}
+        />
 
-          {/* Phase-grouped steps */}
-          {hasPhases && (
-            <>
-              {orphanSteps.length > 0 && orphanSteps.map(({ step, idx }) => renderStepCard(step, idx))}
-              {stepsByPhase.map((phase, pi) => {
-                if (phase.steps.length === 0) return null;
-                const progress = getPhaseProgress(phase.steps);
-                return (
-                  <div key={phase.id}>
-                    <PhaseHeader
-                      label={phase.label}
-                      colorIndex={pi}
-                      doneChecks={progress.done}
-                      totalChecks={progress.total}
-                    />
-                    <div className="space-y-3">
-                      {phase.steps.map(({ step, idx }) => renderStepCard(step, idx))}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
+        <div className="mt-4">
+          <WorkflowStepCard
+            key={currentStep.id}
+            caseId={c.id}
+            step={currentStep}
+            index={safeIdx}
+            isActive={safeIdx === (firstIncomplete >= 0 ? firstIncomplete : 0)}
+            isExpanded={true}
+            alwaysExpanded={true}
+            onToggleExpand={() => {}}
+            onToggleDone={() => onToggleStep(safeIdx)}
+            onNote={(note) => onAddNote(safeIdx, note)}
+            onAction={onAction}
+            onContinue={() => handleContinue(safeIdx)}
+            totalSteps={steps.length}
+            onToggleCheck={onToggleCheck ? (checkId) => onToggleCheck(c.id, safeIdx, checkId) : undefined}
+            onToggleAction={onToggleAction ? (actionId) => onToggleAction(c.id, safeIdx, actionId) : undefined}
+            onCompleteAllChecks={onCompleteAllChecks ? () => onCompleteAllChecks(c.id, safeIdx) : undefined}
+            onCloseCase={onClose}
+            onOpenBidModal={onOpenBidModal}
+            onNavigate={onNavigate}
+            onUpload={onUpload ? () => onUpload(c.id) : undefined}
+          />
         </div>
 
         {/* Additional approaches */}
         {c.additionalApproaches?.map((aa, ai) => (
-          <div key={ai} className="bg-white rounded-xl border border-ink-100 p-5">
+          <div key={ai} className="bg-white rounded-xl border border-ink-100 p-5 mt-4">
             <div className="flex items-center gap-2 mb-4">
               <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${APPR_COLORS[aa.approach]}`}>{APPR_LABELS[aa.approach]}</span>
               <h3 className="text-lg font-semibold text-ink-800">Steps</h3>

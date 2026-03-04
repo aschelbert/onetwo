@@ -39,6 +39,7 @@ interface WorkflowStepCardProps {
   onOpenBidModal?: (stepIdx: number) => void;
   onNavigate?: (target: string) => void;
   onUpload?: () => void;
+  alwaysExpanded?: boolean;
 }
 
 interface FundingAnalysisInlineProps {
@@ -243,7 +244,7 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onToggleAction, onCompleteAllChecks, onCloseCase, onOpenBidModal, onNavigate, onUpload },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onToggleAction, onCompleteAllChecks, onCloseCase, onOpenBidModal, onNavigate, onUpload, alwaysExpanded },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -314,31 +315,50 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
       }`}
     >
       {/* Collapsed header — always visible */}
-      <button
-        className="w-full text-left px-5 py-4 flex items-center gap-4"
-        onClick={onToggleExpand}
-      >
-        <StatusIndicator />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className={`text-sm font-medium ${step.done ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{step.s}</p>
-            {isActive && <span className="text-[10px] font-bold text-white bg-accent-500 uppercase tracking-wider px-2 py-0.5 rounded-full">CURRENT</span>}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
-            {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">📍 Guidance</span>}
-            {hasActions && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{actionsDoneCount}/{actionsTotal} actions</span>}
-            {hasChecks && !step.done && !hasActions && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
-            {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
+      {alwaysExpanded ? (
+        <div className="w-full text-left px-5 py-4 flex items-center gap-4">
+          <StatusIndicator />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-sm font-medium ${step.done ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{step.s}</p>
+              {isActive && <span className="text-[10px] font-bold text-white bg-accent-500 uppercase tracking-wider px-2 py-0.5 rounded-full">CURRENT</span>}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
+              {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">📍 Guidance</span>}
+              {hasActions && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{actionsDoneCount}/{actionsTotal} actions</span>}
+              {hasChecks && !step.done && !hasActions && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
+              {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
+            </div>
           </div>
         </div>
-        <svg className={`w-5 h-5 text-ink-300 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+      ) : (
+        <button
+          className="w-full text-left px-5 py-4 flex items-center gap-4"
+          onClick={onToggleExpand}
+        >
+          <StatusIndicator />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-sm font-medium ${step.done ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{step.s}</p>
+              {isActive && <span className="text-[10px] font-bold text-white bg-accent-500 uppercase tracking-wider px-2 py-0.5 rounded-full">CURRENT</span>}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {step.t && <span className="text-[10px] text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">⏱ {step.t}</span>}
+              {step.w && <span className="text-[10px] text-accent-600 bg-accent-50 px-1.5 py-0.5 rounded">📍 Guidance</span>}
+              {hasActions && !step.done && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{actionsDoneCount}/{actionsTotal} actions</span>}
+              {hasChecks && !step.done && !hasActions && <span className="text-[10px] font-semibold text-ink-400 bg-ink-50 px-1.5 py-0.5 rounded">{checkedCount}/{totalChecks}</span>}
+              {step.done && step.doneDate && <span className="text-[10px] text-sage-600">Completed {step.doneDate}</span>}
+            </div>
+          </div>
+          <svg className={`w-5 h-5 text-ink-300 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
 
       {/* Expanded workspace */}
-      {isExpanded && (
+      {(isExpanded || alwaysExpanded) && (
         <div className="px-5 pb-5 space-y-4">
           <div className="border-t border-ink-100 pt-4" />
 

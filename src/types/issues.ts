@@ -258,6 +258,12 @@ export interface CaseTrackerCase {
   holdReason?: string;
   closeReason?: string;
   closeNotes?: string;
+  budgetBaseline?: {
+    totalBudget: number;
+    spent: number;
+    committed: number;
+    remaining: number;
+  };
   conflictChecks?: ConflictCheck[];
   decisionTrail?: DecisionTrailEntry[];
 }

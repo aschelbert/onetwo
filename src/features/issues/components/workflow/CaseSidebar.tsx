@@ -6,7 +6,7 @@ interface CaseSidebarProps {
   c: CaseTrackerCase;
   steps: CaseStep[];
   activeStepIdx: number;
-  expandedSteps: number[];
+  selectedStep: number;
   onStepClick: (idx: number) => void;
   onClose: () => void;
   onReopen: () => void;
@@ -44,7 +44,7 @@ function SidebarMenu({ items }: { items: { label: string; onClick: () => void; d
   );
 }
 
-export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, onPutOnHold, onResume, additionalApproaches, children }: CaseSidebarProps) {
+export function CaseSidebar({ c, steps, activeStepIdx, selectedStep, onStepClick, onClose, onReopen, onEditAssignment, onAddApproach, onDelete, onPutOnHold, onResume, additionalApproaches, children }: CaseSidebarProps) {
   const cat = CATS.find(x => x.id === c.catId);
 
   // Calculate progress (actions > checks > step-level)
@@ -88,8 +88,14 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClic
   }
 
   return (
-    <aside className="w-72 shrink-0 hidden lg:block">
+    <aside className="w-[340px] shrink-0 hidden lg:block sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
       <div className="space-y-4">
+        {/* Budget tracker stub */}
+        {c.budgetBaseline && (
+          <div className="bg-white rounded-xl border border-ink-100 p-4 shadow-sm">
+            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Budget Tracker</p>
+          </div>
+        )}
         {/* Case Summary Card */}
         <div className="bg-white rounded-xl border border-ink-100 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
@@ -178,7 +184,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClic
                             key={step.id}
                             onClick={() => onStepClick(i)}
                             className={`relative z-10 flex items-center gap-3 w-full text-left px-1.5 py-2 rounded-lg transition-all group ${
-                              expandedSteps.includes(i) ? 'bg-accent-50' : 'hover:bg-mist-50'
+                              i === selectedStep ? 'bg-accent-50 border-l-2 border-accent-500' : 'hover:bg-mist-50'
                             }`}
                           >
                             {step.done ? (
@@ -194,7 +200,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClic
                             )}
                             <div className="min-w-0 flex-1">
                               <p className={`text-xs truncate ${
-                                expandedSteps.includes(i) ? 'text-accent-700 font-semibold'
+                                i === selectedStep ? 'text-accent-700 font-semibold'
                                 : step.done ? 'text-ink-400'
                                 : 'text-ink-700 font-medium'
                               }`}>
@@ -215,7 +221,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClic
                     key={step.id}
                     onClick={() => onStepClick(i)}
                     className={`relative z-10 flex items-center gap-3 w-full text-left px-1.5 py-2 rounded-lg transition-all group ${
-                      expandedSteps.includes(i) ? 'bg-accent-50' : 'hover:bg-mist-50'
+                      i === selectedStep ? 'bg-accent-50 border-l-2 border-accent-500' : 'hover:bg-mist-50'
                     }`}
                   >
                     {/* Status dot */}
@@ -232,7 +238,7 @@ export function CaseSidebar({ c, steps, activeStepIdx, expandedSteps, onStepClic
                     )}
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs truncate ${
-                        expandedSteps.includes(i) ? 'text-accent-700 font-semibold'
+                        i === selectedStep ? 'text-accent-700 font-semibold'
                         : step.done ? 'text-ink-400'
                         : 'text-ink-700 font-medium'
                       }`}>
