@@ -3,7 +3,6 @@ import type { StepAction } from '@/store/useIssuesStore';
 import { Step1BudgetReview } from './Step1BudgetReview';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
-import { StepChecklist } from '../workflow/StepChecklist';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
 
 interface StepContentProps {
@@ -202,26 +201,45 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                   </div>
                 )}
 
-                {/* Checklist as full-width action container */}
+                {/* Checklist — each item as its own action container */}
                 {hasChecks && onToggleCheck && (
-                  <div className="bg-white rounded-lg border border-ink-100 overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-ink-50 border-b border-ink-100">
-                      <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">
-                        Checklist ({checksDone}/{checksTotal} complete)
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-ink-200 rounded-full h-1.5">
-                          <div
-                            className="bg-sage-500 h-1.5 rounded-full transition-all"
-                            style={{ width: `${checksPct}%` }}
-                          />
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">
+                      Checklist ({checksDone}/{checksTotal} complete)
+                    </p>
+                    {step.checks!.map(ck => (
+                      <div
+                        key={ck.id}
+                        className={`bg-white rounded-lg border overflow-hidden transition-all ${
+                          ck.checked ? 'border-sage-200' : 'border-ink-100'
+                        }`}
+                      >
+                        <div className={`flex items-center gap-3 px-4 py-3 ${
+                          ck.checked ? 'bg-sage-50' : 'bg-white'
+                        }`}>
+                          <button
+                            onClick={() => onToggleCheck(ck.id)}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                              ck.checked ? 'bg-sage-500 border-sage-500' : 'border-ink-300 hover:border-accent-400'
+                            }`}
+                          >
+                            {ck.checked && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                          <span className={`text-sm leading-tight flex-1 ${
+                            ck.checked ? 'text-ink-400 line-through' : 'text-ink-700'
+                          }`}>
+                            {ck.label}
+                          </span>
+                          {ck.checked && ck.checkedDate && (
+                            <span className="text-[10px] text-sage-500 shrink-0">{ck.checkedDate}</span>
+                          )}
                         </div>
-                        <span className="text-[10px] text-ink-400">{checksPct}%</span>
                       </div>
-                    </div>
-                    <div className="px-4 py-3">
-                      <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />
-                    </div>
+                    ))}
                   </div>
                 )}
 
