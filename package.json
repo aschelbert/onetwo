@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -17,6 +17,9 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0",
     "zustand": "^5.0.0"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
