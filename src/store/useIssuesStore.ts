@@ -2063,6 +2063,23 @@ export const SITUATION_PHASES: Record<string, { id: string; label: string }[]> =
 };
 
 // ─── Seed data ─────────────────────────────────────────────
+/** Persist additional approaches to a separate localStorage key so they survive
+ *  resetStoresForRealTenant() + loadFromDb() cycles (not yet in DB schema). */
+const AA_STORAGE_KEY = 'onetwo-additional-approaches';
+function syncAdditionalApproachesToStorage(cases: CaseTrackerCase[]) {
+  const map: Record<string, any> = {};
+  for (const c of cases) {
+    if (c.additionalApproaches?.length > 0) map[c.id] = c.additionalApproaches;
+  }
+  try { localStorage.setItem(AA_STORAGE_KEY, JSON.stringify(map)); } catch {}
+}
+function loadAdditionalApproachesFromStorage(): Record<string, any[]> {
+  try {
+    const raw = localStorage.getItem(AA_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
 function hydrateChecks(ck?: string[]): CaseCheckItem[] | undefined {
   if (!ck || ck.length === 0) return undefined;
   return ck.map((label, i) => ({ id: `ck${i}`, label, checked: false, checkedDate: null }));
@@ -2438,7 +2455,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     ]);
     const updates: Record<string, unknown> = {};
     if (issues) updates.issues = issues;
-    if (cases) updates.cases = cases.map(rehydrateCase);
+    if (cases) {
+      // Restore additionalApproaches from separate localStorage key (not yet in DB schema)
+      const savedAA = loadAdditionalApproachesFromStorage();
+      updates.cases = cases.map(c => {
+        if (savedAA[c.id]) c = { ...c, additionalApproaches: savedAA[c.id] };
+        return rehydrateCase(c);
+      });
+    }
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -2742,58 +2766,67 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) casesSvc.updateCase(caseId, updates);
   },
 
-  addApproach: (caseId, approach) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId) return c;
-      const cat = CATS.find(x => x.id === c.catId);
-      const sit = cat?.sits.find(x => x.id === c.sitId);
-      if (!sit) return c;
-      const src = approach === 'legal' ? sit.legal : approach === 'self' ? sit.self : sit.pre;
-      const today = new Date().toISOString().split('T')[0];
-      const newApproach = {
-        approach,
-        addedDate: today,
-        steps: src.map((st, i) => ({
-          ...st, id: `a${approach[0]}${i}`, done: false, doneDate: null, userNotes: '',
-          ...(st.ph && { phaseId: st.ph }),
-          ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
-          ...(st.actions && { actions: st.actions.map((a: any) => ({
-            ...a, done: false, doneDate: null
-          })) }),
-          ...(st.persistent && { persistent: st.persistent }),
-          ...(st.desc && { desc: st.desc }),
-        }))
-      };
-      const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
-      return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
-    })
-  })),
+  addApproach: (caseId, approach) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId) return c;
+        const cat = CATS.find(x => x.id === c.catId);
+        const sit = cat?.sits.find(x => x.id === c.sitId);
+        if (!sit) return c;
+        const src = approach === 'legal' ? sit.legal : approach === 'self' ? sit.self : sit.pre;
+        const today = new Date().toISOString().split('T')[0];
+        const newApproach = {
+          approach,
+          addedDate: today,
+          steps: src.map((st, i) => ({
+            ...st, id: `a${approach[0]}${i}`, done: false, doneDate: null, userNotes: '',
+            ...(st.ph && { phaseId: st.ph }),
+            ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
+            ...(st.actions && { actions: st.actions.map((a: any) => ({
+              ...a, done: false, doneDate: null
+            })) }),
+            ...(st.persistent && { persistent: st.persistent }),
+            ...(st.desc && { desc: st.desc }),
+          }))
+        };
+        const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
+        return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+    syncAdditionalApproachesToStorage(get().cases);
+  },
 
-  toggleAdditionalStep: (caseId, approachIdx, stepIdx) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
-      const aa = [...c.additionalApproaches];
-      const steps = [...aa[approachIdx].steps];
-      steps[stepIdx] = {
-        ...steps[stepIdx],
-        done: !steps[stepIdx].done,
-        doneDate: !steps[stepIdx].done ? new Date().toISOString().split('T')[0] : null
-      };
-      aa[approachIdx] = { ...aa[approachIdx], steps };
-      return { ...c, additionalApproaches: aa };
-    })
-  })),
+  toggleAdditionalStep: (caseId, approachIdx, stepIdx) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        steps[stepIdx] = {
+          ...steps[stepIdx],
+          done: !steps[stepIdx].done,
+          doneDate: !steps[stepIdx].done ? new Date().toISOString().split('T')[0] : null
+        };
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+    syncAdditionalApproachesToStorage(get().cases);
+  },
 
-  addAdditionalStepNote: (caseId, approachIdx, stepIdx, note) => set(s => ({
-    cases: s.cases.map(c => {
-      if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
-      const aa = [...c.additionalApproaches];
-      const steps = [...aa[approachIdx].steps];
-      steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
-      aa[approachIdx] = { ...aa[approachIdx], steps };
-      return { ...c, additionalApproaches: aa };
-    })
-  })),
+  addAdditionalStepNote: (caseId, approachIdx, stepIdx, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+    syncAdditionalApproachesToStorage(get().cases);
+  },
 
   toggleAdditionalCheck: (caseId, approachIdx, stepIdx, checkId) => {
     const today = new Date().toISOString().split('T')[0];
@@ -2815,6 +2848,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, additionalApproaches: aa };
       })
     }));
+    syncAdditionalApproachesToStorage(get().cases);
   },
 
   toggleAdditionalAction: (caseId, approachIdx, stepIdx, actionId) => {
@@ -2837,6 +2871,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, additionalApproaches: aa };
       })
     }));
+    syncAdditionalApproachesToStorage(get().cases);
   },
 
   saveBoardVote: (caseId, motion, date, votes) => {
@@ -3139,6 +3174,8 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   }),
   merge: (persisted: any, current: any) => {
     const merged = { ...current, ...(persisted || {}) };
+    // Restore additional approaches from separate storage key (survives reset cycles)
+    const savedAA = loadAdditionalApproachesFromStorage();
     // Re-hydrate localStorage cases: rebuild steps from templates (preserving user progress)
     // to ensure correct approach-specific steps (self/legal/pre) are always applied
     if (merged.cases) {
@@ -3150,6 +3187,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
           linkedMeetingIds: c.linkedMeetingIds || [],
           conflictChecks: c.conflictChecks || [],
           decisionTrail: c.decisionTrail || [],
+          additionalApproaches: c.additionalApproaches?.length > 0
+            ? c.additionalApproaches
+            : (savedAA[c.id] || []),
         };
         return rehydrateCase(patched);
       });
