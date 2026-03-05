@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as issuesSvc from '@/lib/services/issues';
 import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
@@ -1351,8 +1351,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       issues: [{ ...issue, id: localId, upvotes: [], viewCount: 0, comments: [], reviewNotes: [], comms: [] }, ...s.issues],
       nextIssueNum: s.nextIssueNum + 1
     }));
-    if (isBackendEnabled && tenantId) {
-      issuesSvc.createIssue(tenantId, issue, localId).then(dbId => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      issuesSvc.createIssue(tid, issue, localId).then(dbId => {
         if (dbId) set(s => ({ issues: s.issues.map(i => i.id === localId ? { ...i, id: dbId } : i) }));
       });
     }
@@ -1373,7 +1374,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     }));
     if (isBackendEnabled) {
       if (already) issuesSvc.removeIssueUpvote(issueId, userId);
-      else issuesSvc.addIssueUpvote('', issueId, userId, userName, unitNumber);
+      else issuesSvc.addIssueUpvote(getActiveTenantId() || '', issueId, userId, userName, unitNumber);
     }
   },
 
@@ -1411,7 +1412,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         ...i, comments: [...i.comments, { id: localId, author, text, date }]
       } : i)
     }));
-    if (isBackendEnabled) issuesSvc.addIssueComment('', issueId, localId, author, text, date);
+    if (isBackendEnabled) issuesSvc.addIssueComment(getActiveTenantId() || '', issueId, localId, author, text, date);
   },
 
   addIssueComm: (issueId, comm) => set(s => {
@@ -1460,8 +1461,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       ...(data.sourceId && { sourceId: data.sourceId }),
     };
     set({ cases: [newCase, ...s.cases], nextCaseNum: s.nextCaseNum + 1 });
-    if (isBackendEnabled && tenantId) {
-      casesSvc.createCase(tenantId, newCase).then(dbId => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      casesSvc.createCase(tid, newCase).then(dbId => {
         if (dbId) set(s => ({ cases: s.cases.map(c => c.id === id ? { ...c, id: dbId } : c) }));
       });
     }

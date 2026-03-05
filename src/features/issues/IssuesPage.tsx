@@ -923,6 +923,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               steps={steps}
               activeStep={safeStep}
               onSelectStep={setActiveStep}
+              onToggleAdditionalStep={(ai, si) => store.toggleAdditionalStep(caseId, ai, si)}
             />
             <SideSections
               c={c}

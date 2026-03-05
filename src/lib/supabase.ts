@@ -20,6 +20,13 @@ export const supabase = supabaseUrl && supabaseAnonKey
 
 export const isBackendEnabled = !!supabase;
 
+// ── Active tenant ID ──────────────────────────────────────────────
+// Set once by TenantProvider after tenant is resolved.
+// Stores use this to auto-persist without callers passing tenantId.
+let _activeTenantId: string | null = null;
+export function setActiveTenantId(id: string | null) { _activeTenantId = id; }
+export function getActiveTenantId(): string | null { return _activeTenantId; }
+
 /** Log a Supabase error, suppressing "table not found" (PGRST205) noise. */
 export function logDbError(label: string, error: unknown): void {
   if (error && typeof error === 'object' && (error as any).code === 'PGRST205') return;

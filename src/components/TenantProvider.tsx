@@ -3,7 +3,7 @@
 // and overwrites the building store with real data.
 
 import { useEffect, useState, createContext, useContext } from 'react';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
@@ -142,6 +142,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         };
 
         setTenant(tenantInfo);
+        setActiveTenantId(tenantInfo.id);
 
         // Clear all seed/demo data before hydrating with real DB data.
         // This ensures new buildings start clean even if the schema probe
