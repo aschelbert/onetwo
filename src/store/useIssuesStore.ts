@@ -1053,37 +1053,81 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   return c;
 }
 
-/** Re-hydrate a case loaded from the DB: merge saved progress onto full template steps */
-function rehydrateFromDb(c: CaseTrackerCase): CaseTrackerCase {
+/** Re-hydrate a case from DB or localStorage: merge saved progress onto full template steps.
+ *  Ensures steps always reflect the correct approach-specific template (self/legal/pre). */
+function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
   if (!sit) return c;
   const src = c.approach === 'legal' ? sit.legal : c.approach === 'self' ? sit.self : sit.pre;
 
-  // Map DB-saved steps by id for merging user progress
-  const dbSteps = new Map<string, CaseStep>();
-  (c.steps || []).forEach(s => dbSteps.set(s.id, s));
+  // Map saved steps by id for merging user progress
+  const savedSteps = new Map<string, CaseStep>();
+  (c.steps || []).forEach(s => savedSteps.set(s.id, s));
 
   c.steps = src.map((st, i) => {
     const stepId = 's' + i;
-    const db = dbSteps.get(stepId);
+    const saved = savedSteps.get(stepId);
     return {
       ...st, id: stepId,
-      done: db?.done ?? false,
-      doneDate: db?.doneDate ?? null,
-      userNotes: db?.userNotes ?? '',
+      done: saved?.done ?? false,
+      doneDate: saved?.doneDate ?? null,
+      userNotes: saved?.userNotes ?? '',
       ...(st.ph && { phaseId: st.ph }),
-      ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
-      ...(st.actions && { actions: st.actions.map((a: any) => ({
-        ...a, done: false, doneDate: null
-      })) }),
+      ...(st.ck && st.ck.length > 0 && {
+        checks: (saved?.checks && saved.checks.length > 0)
+          ? saved.checks  // preserve user check progress
+          : hydrateChecks(st.ck)
+      }),
+      ...(st.actions && { actions: st.actions.map((a: any) => {
+        // Preserve action done/doneDate from saved data
+        const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
+        return { ...a, done: savedAction?.done ?? false, doneDate: savedAction?.doneDate ?? null };
+      }) }),
       ...(st.persistent && { persistent: st.persistent }),
       ...(st.desc && { desc: st.desc }),
       ...(st.isSpendingDecision && { isSpendingDecision: true }),
-      ...(st.requiresBids && { requiresBids: true, minimumBids: st.minimumBids || 3, bidCollection: { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+      ...(st.requiresBids && {
+        requiresBids: true,
+        minimumBids: st.minimumBids || 3,
+        bidCollection: saved?.bidCollection || { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null },
+      }),
       ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
     };
   });
+
+  // Re-hydrate additional approaches too
+  if (c.additionalApproaches) {
+    c.additionalApproaches = c.additionalApproaches.map(aa => {
+      const aaSrc = aa.approach === 'legal' ? sit.legal : aa.approach === 'self' ? sit.self : sit.pre;
+      const savedAaSteps = new Map<string, CaseStep>();
+      (aa.steps || []).forEach(s => savedAaSteps.set(s.id, s));
+      return {
+        ...aa,
+        steps: aaSrc.map((st, i) => {
+          const aaStepId = `a${aa.approach[0]}${i}`;
+          const saved = savedAaSteps.get(aaStepId);
+          return {
+            ...st, id: aaStepId,
+            done: saved?.done ?? false,
+            doneDate: saved?.doneDate ?? null,
+            userNotes: saved?.userNotes ?? '',
+            ...(st.ph && { phaseId: st.ph }),
+            ...(st.ck && st.ck.length > 0 && {
+              checks: (saved?.checks && saved.checks.length > 0) ? saved.checks : hydrateChecks(st.ck)
+            }),
+            ...(st.actions && { actions: st.actions.map((a: any) => {
+              const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
+              return { ...a, done: savedAction?.done ?? false, doneDate: savedAction?.doneDate ?? null };
+            }) }),
+            ...(st.persistent && { persistent: st.persistent }),
+            ...(st.desc && { desc: st.desc }),
+          };
+        }),
+      };
+    });
+  }
+
   return c;
 }
 
@@ -1341,7 +1385,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     ]);
     const updates: Record<string, unknown> = {};
     if (issues) updates.issues = issues;
-    if (cases) updates.cases = cases.map(rehydrateFromDb);
+    if (cases) updates.cases = cases.map(rehydrateCase);
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -1998,16 +2042,20 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   }),
   merge: (persisted: any, current: any) => {
     const merged = { ...current, ...(persisted || {}) };
-    // Ensure existing localStorage cases get default empty arrays for new fields
+    // Re-hydrate localStorage cases: rebuild steps from templates (preserving user progress)
+    // to ensure correct approach-specific steps (self/legal/pre) are always applied
     if (merged.cases) {
-      merged.cases = merged.cases.map((c: any) => ({
-        ...c,
-        linkedLetterIds: c.linkedLetterIds || [],
-        linkedInvoiceIds: c.linkedInvoiceIds || [],
-        linkedMeetingIds: c.linkedMeetingIds || [],
-        conflictChecks: c.conflictChecks || [],
-        decisionTrail: c.decisionTrail || [],
-      }));
+      merged.cases = merged.cases.map((c: any) => {
+        const patched = {
+          ...c,
+          linkedLetterIds: c.linkedLetterIds || [],
+          linkedInvoiceIds: c.linkedInvoiceIds || [],
+          linkedMeetingIds: c.linkedMeetingIds || [],
+          conflictChecks: c.conflictChecks || [],
+          decisionTrail: c.decisionTrail || [],
+        };
+        return rehydrateCase(patched);
+      });
     }
     if (merged.issues) {
       merged.issues = merged.issues.map((i: any) => ({
