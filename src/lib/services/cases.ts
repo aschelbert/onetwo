@@ -60,6 +60,9 @@ export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | 
     notes: row.notes,
     steps: stepsByCase.get(row.id) || null,
     linkedWOs: (row.linked_wos || []) as string[],
+    linkedLetterIds: [],
+    linkedInvoiceIds: [],
+    linkedMeetingIds: [],
     attachments: [], // attachments stay in localStorage for now (file storage TBD)
     boardVotes: row.board_votes as CaseTrackerCase['boardVotes'],
     additionalApproaches: [], // derived from situation templates, stays client-side

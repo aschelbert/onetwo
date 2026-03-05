@@ -1053,6 +1053,40 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   return c;
 }
 
+/** Re-hydrate a case loaded from the DB: merge saved progress onto full template steps */
+function rehydrateFromDb(c: CaseTrackerCase): CaseTrackerCase {
+  const cat = CATS.find(x => x.id === c.catId);
+  const sit = cat?.sits.find(x => x.id === c.sitId);
+  if (!sit) return c;
+  const src = c.approach === 'legal' ? sit.legal : c.approach === 'self' ? sit.self : sit.pre;
+
+  // Map DB-saved steps by id for merging user progress
+  const dbSteps = new Map<string, CaseStep>();
+  (c.steps || []).forEach(s => dbSteps.set(s.id, s));
+
+  c.steps = src.map((st, i) => {
+    const stepId = 's' + i;
+    const db = dbSteps.get(stepId);
+    return {
+      ...st, id: stepId,
+      done: db?.done ?? false,
+      doneDate: db?.doneDate ?? null,
+      userNotes: db?.userNotes ?? '',
+      ...(st.ph && { phaseId: st.ph }),
+      ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
+      ...(st.actions && { actions: st.actions.map((a: any) => ({
+        ...a, done: false, doneDate: null
+      })) }),
+      ...(st.persistent && { persistent: st.persistent }),
+      ...(st.desc && { desc: st.desc }),
+      ...(st.isSpendingDecision && { isSpendingDecision: true }),
+      ...(st.requiresBids && { requiresBids: true, minimumBids: st.minimumBids || 3, bidCollection: { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+      ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
+    };
+  });
+  return c;
+}
+
 const seedCases: CaseTrackerCase[] = [
   hydrateSteps({
     id: 'c1', catId: 'enforcement', sitId: 'covenant-violations',
@@ -1307,7 +1341,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     ]);
     const updates: Record<string, unknown> = {};
     if (issues) updates.issues = issues;
-    if (cases) updates.cases = cases;
+    if (cases) updates.cases = cases.map(rehydrateFromDb);
     if (Object.keys(updates).length > 0) set(updates);
   },
 
