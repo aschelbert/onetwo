@@ -738,6 +738,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
   const [activeStep, setActiveStep] = useState(0);
 
+  const buildingState = useBuildingStore(s => s.address.state);
+
   // Reset active step when navigating to a different case
   useEffect(() => { setActiveStep(0); }, [caseId]);
 
@@ -837,7 +839,6 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
 
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
-  const buildingState = useBuildingStore(s => s.address.state);
   const jurisdictionKey = buildingState === 'District of Columbia' ? 'DC' : buildingState;
   const stNote = sit?.notes?.[jurisdictionKey] || sit?.notes?.['_'] || '';
 
