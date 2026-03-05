@@ -759,6 +759,73 @@
         .delay-2 { animation-delay: 0.2s; }
         .delay-3 { animation-delay: 0.3s; }
         .delay-4 { animation-delay: 0.4s; }
+
+        /* WAITLIST MODAL */
+        .wl-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(15,26,46,0.55); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center;
+            animation: wlFadeIn 0.2s ease-out;
+        }
+        .wl-overlay.active { display: flex; }
+        @keyframes wlFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes wlSlideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        .wl-modal {
+            background: var(--card); border-radius: 20px; padding: 2.5rem;
+            max-width: 480px; width: 90%; position: relative;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+            animation: wlSlideUp 0.3s ease-out;
+            max-height: 90vh; overflow-y: auto;
+        }
+        .wl-close {
+            position: absolute; top: 1rem; right: 1rem;
+            background: none; border: none; font-size: 1.5rem;
+            color: var(--muted); cursor: pointer; line-height: 1;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; transition: background 0.15s;
+        }
+        .wl-close:hover { background: var(--accent-light); color: var(--accent); }
+        .wl-modal h2 { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--ink); }
+        .wl-modal .wl-sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.5rem; }
+        .wl-field { margin-bottom: 1rem; }
+        .wl-field label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 0.35rem; }
+        .wl-field input, .wl-field select {
+            width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid var(--border);
+            border-radius: 10px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+            background: var(--paper); color: var(--ink); transition: border-color 0.15s;
+        }
+        .wl-field input:focus, .wl-field select:focus { outline: none; border-color: var(--accent); }
+        .wl-row { display: flex; gap: 1rem; }
+        .wl-row .wl-field { flex: 1; }
+        .wl-error {
+            display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+            padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.85rem; margin-bottom: 1rem;
+        }
+        .wl-error.visible { display: block; }
+        .wl-submit {
+            width: 100%; padding: 0.8rem; background: var(--accent); color: #fff;
+            border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
+            font-family: 'DM Sans', sans-serif; cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .wl-submit:hover { background: #b91c2c; }
+        .wl-submit:active { transform: scale(0.98); }
+        .wl-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        .wl-success { text-align: center; }
+        .wl-success .wl-spot-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100px; height: 100px; border-radius: 50%;
+            background: var(--accent-light); margin: 0.5rem 0 1rem;
+        }
+        .wl-success .wl-spot-num { font-family: 'Fraunces', serif; font-size: 2.5rem; font-weight: 900; color: var(--accent); }
+        .wl-success .wl-spot-of { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .wl-success .wl-confirm-msg { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem; }
+        .wl-gotit {
+            padding: 0.7rem 2rem; background: var(--ink); color: #fff;
+            border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600;
+            font-family: 'DM Sans', sans-serif; cursor: pointer; transition: background 0.2s;
+        }
+        .wl-gotit:hover { background: #1e293b; }
     </style>
 </head>
 <body>
@@ -774,7 +841,7 @@
             <a href="#features">Features</a>
             <a href="#differentiators">Why Us</a>
             <a href="#pricing">Pricing</a>
-            <a href="/login?create=1" class="btn btn-primary" style="color: #fff;">Get Started</a>
+            <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="color: #fff;">Get Started</a>
             <a href="/login" class="btn btn-outline">Log In</a>
         </div>
     </div>
@@ -1398,7 +1465,7 @@
                     <li>The Archives: annual compliance snapshots</li>
                     <li>DC jurisdiction compliance built in</li>
                 </ul>
-                <a href="/login?create=1" class="btn btn-primary price-btn">Start Free Trial →</a>
+                <a href="#" onclick="openWaitlist();return false" class="btn btn-primary price-btn">Join Waitlist →</a>
             </div>
 
             <!-- COMMUNITY PLUS -->
@@ -1417,7 +1484,7 @@
                     <li>Communications & notice templates</li>
                     <li>PM Scorecard & vendor management</li>
                 </ul>
-                <a href="/login?create=1" class="btn btn-outline price-btn">Start Free Trial</a>
+                <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
             </div>
 
             <!-- MANAGEMENT SUITE -->
@@ -1436,7 +1503,7 @@
                     <li>Mailing list management</li>
                     <li>Priority support</li>
                 </ul>
-                <a href="/login?create=1" class="btn btn-outline price-btn">Start Free Trial</a>
+                <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
             </div>
         </div>
 
@@ -1467,7 +1534,7 @@
         Join the waitlist for early access when we launch in Washington, DC. Start with Compliance Pro at $179/mo — full governance, fiduciary tracking, and double-entry accounting from day one.
     </p>
     <div class="cta-actions">
-        <a href="/login?create=1" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Join the Waitlist →</a>
+        <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Join the Waitlist →</a>
         <a href="/demo" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Book a Demo</a>
     </div>
 </section>
@@ -1481,6 +1548,64 @@
         <a href="#">Contact</a>
     </div>
 </footer>
+
+<!-- WAITLIST MODAL -->
+<div class="wl-overlay" id="wl-overlay">
+    <div class="wl-modal">
+        <button class="wl-close" onclick="closeWaitlist()" aria-label="Close">&times;</button>
+
+        <!-- FORM STATE -->
+        <div id="wl-form-state">
+            <h2 class="display">Join the Waitlist</h2>
+            <p class="wl-sub">Secure one of 20 early-adopter spots for your community.</p>
+
+            <div class="wl-error" id="wl-error"></div>
+
+            <form onsubmit="submitWaitlist(event)">
+                <div class="wl-field">
+                    <label for="wl-name">Your Name</label>
+                    <input type="text" id="wl-name" placeholder="Jane Smith" required>
+                </div>
+                <div class="wl-field">
+                    <label for="wl-email">Email</label>
+                    <input type="email" id="wl-email" placeholder="jane@example.com" required>
+                </div>
+                <div class="wl-field">
+                    <label for="wl-community">Community / Building Name</label>
+                    <input type="text" id="wl-community" placeholder="The Wardman Residences" required>
+                </div>
+                <div class="wl-row">
+                    <div class="wl-field">
+                        <label for="wl-units">Unit Count</label>
+                        <input type="number" id="wl-units" placeholder="24" min="1" required>
+                    </div>
+                    <div class="wl-field">
+                        <label for="wl-role">Board Role</label>
+                        <select id="wl-role" required>
+                            <option value="">Select…</option>
+                            <option value="president">President</option>
+                            <option value="treasurer">Treasurer</option>
+                            <option value="secretary">Secretary</option>
+                            <option value="member">Member</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="wl-submit" id="wl-submit-btn">Join the Waitlist →</button>
+            </form>
+        </div>
+
+        <!-- SUCCESS STATE -->
+        <div id="wl-success-state" class="wl-success" style="display:none;">
+            <h2 class="display">You're in!</h2>
+            <div class="wl-spot-badge">
+                <span class="wl-spot-num" id="wl-spot-num">#1</span>
+            </div>
+            <p class="wl-spot-of">of 20 early-adopter communities</p>
+            <p class="wl-confirm-msg">A confirmation email is on its way. We'll reach out soon with next steps as we prepare to launch in Washington, DC.</p>
+            <button class="wl-gotit" onclick="closeWaitlist()">Got it</button>
+        </div>
+    </div>
+</div>
 
 <!-- Scroll animation observer -->
 <script>
@@ -1638,6 +1763,111 @@
             document.getElementById('price-' + plan).textContent = prices[plan][mode];
             document.getElementById('period-' + plan).textContent = periods[mode];
         });
+    }
+</script>
+
+<!-- Supabase client (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- Waitlist modal logic -->
+<script>
+    const SB_URL = 'https://eaalfhrrytnmtzqjruxg.supabase.co';
+    const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhYWxmaHJyeXRubXR6cWpydXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2Mjc5NzAsImV4cCI6MjA4NzIwMzk3MH0.4hxmkKKnKJQtskc6lFN5ltaJl2Ss-W7vjk5myJv8d3o';
+    const sbClient = supabase.createClient(SB_URL, SB_ANON);
+
+    function openWaitlist() {
+        const overlay = document.getElementById('wl-overlay');
+        // Reset to form state
+        document.getElementById('wl-form-state').style.display = '';
+        document.getElementById('wl-success-state').style.display = 'none';
+        document.getElementById('wl-error').className = 'wl-error';
+        document.getElementById('wl-submit-btn').disabled = false;
+        document.getElementById('wl-submit-btn').textContent = 'Join the Waitlist →';
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeWaitlist() {
+        document.getElementById('wl-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Close on overlay click
+    document.getElementById('wl-overlay').addEventListener('click', function(e) {
+        if (e.target === this) closeWaitlist();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeWaitlist();
+    });
+
+    async function submitWaitlist(e) {
+        e.preventDefault();
+        const errEl = document.getElementById('wl-error');
+        const btn = document.getElementById('wl-submit-btn');
+        errEl.className = 'wl-error';
+
+        const name = document.getElementById('wl-name').value.trim();
+        const email = document.getElementById('wl-email').value.trim();
+        const community_name = document.getElementById('wl-community').value.trim();
+        const unit_count = parseInt(document.getElementById('wl-units').value);
+        const board_role = document.getElementById('wl-role').value;
+
+        // Client-side validation
+        if (!name || !email || !community_name || !unit_count || !board_role) {
+            errEl.textContent = 'Please fill in all fields.';
+            errEl.className = 'wl-error visible';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+
+        try {
+            const { data, error } = await sbClient.rpc('join_waitlist', {
+                p_name: name,
+                p_email: email,
+                p_community_name: community_name,
+                p_unit_count: unit_count,
+                p_board_role: board_role
+            });
+
+            if (error) {
+                errEl.textContent = error.message || 'Something went wrong. Please try again.';
+                errEl.className = 'wl-error visible';
+                btn.disabled = false;
+                btn.textContent = 'Join the Waitlist →';
+                return;
+            }
+
+            if (data && data.success === false) {
+                errEl.textContent = data.error || 'Something went wrong. Please try again.';
+                errEl.className = 'wl-error visible';
+                btn.disabled = false;
+                btn.textContent = 'Join the Waitlist →';
+                return;
+            }
+
+            // Success — show spot number
+            const spot = data.spot_number;
+            document.getElementById('wl-spot-num').textContent = '#' + spot;
+            document.getElementById('wl-form-state').style.display = 'none';
+            document.getElementById('wl-success-state').style.display = '';
+
+            // Fire-and-forget: send confirmation email via edge function
+            fetch(SB_URL + '/functions/v1/waitlist-confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON },
+                body: JSON.stringify({ name: data.name, email: data.email, community_name: community_name, spot_number: spot })
+            }).catch(function() { /* non-critical */ });
+
+        } catch (err) {
+            errEl.textContent = 'Something went wrong. Please try again.';
+            errEl.className = 'wl-error visible';
+            btn.disabled = false;
+            btn.textContent = 'Join the Waitlist →';
+        }
     }
 </script>
 
