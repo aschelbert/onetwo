@@ -1429,7 +1429,8 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   createCase: (data, tenantId?) => {
     const s = get();
-    const id = `c${s.nextCaseNum}`;
+    const id = crypto.randomUUID();
+    const caseNum = s.nextCaseNum;
     const cat = CATS.find(x => x.id === data.catId);
     const sit = cat?.sits.find(x => x.id === data.sitId);
     if (!sit) return id;
@@ -1460,12 +1461,10 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       ...(data.source && { source: data.source }),
       ...(data.sourceId && { sourceId: data.sourceId }),
     };
-    set({ cases: [newCase, ...s.cases], nextCaseNum: s.nextCaseNum + 1 });
+    set({ cases: [newCase, ...s.cases], nextCaseNum: caseNum + 1 });
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
-      casesSvc.createCase(tid, newCase).then(dbId => {
-        if (dbId) set(s => ({ cases: s.cases.map(c => c.id === id ? { ...c, id: dbId } : c) }));
-      });
+      casesSvc.createCase(tid, newCase, `c${caseNum}`);
     }
     return id;
   },

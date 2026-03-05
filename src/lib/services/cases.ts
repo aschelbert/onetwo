@@ -76,14 +76,15 @@ export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | 
   }));
 }
 
-export async function createCase(tenantId: string, c: CaseTrackerCase): Promise<string | null> {
+export async function createCase(tenantId: string, c: CaseTrackerCase, localId?: string): Promise<string | null> {
   if (!supabase) return null;
 
   const { data, error } = await supabase
     .from('cases')
     .insert({
+      id: c.id,
       tenant_id: tenantId,
-      local_id: c.id,
+      local_id: localId || c.id,
       cat_id: c.catId,
       sit_id: c.sitId,
       title: c.title,
