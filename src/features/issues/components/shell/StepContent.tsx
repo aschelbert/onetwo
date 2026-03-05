@@ -1,6 +1,7 @@
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
 import { Step1BudgetReview } from './Step1BudgetReview';
+import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
 import { StepChecklist } from '../workflow/StepChecklist';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
@@ -32,6 +33,11 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
   // Annual-budgeting step 1 enrichment
   if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 0 && onToggleAction) {
     return <Step1BudgetReview c={c} step={step} onToggleAction={onToggleAction} />;
+  }
+
+  // Annual-budgeting step 3 enrichment
+  if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 2 && onToggleAction) {
+    return <Step3ThreeYearOutlook c={c} step={step} onToggleAction={onToggleAction} />;
   }
 
   return (
