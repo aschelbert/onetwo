@@ -11,13 +11,19 @@ const APP_ROUTES = [
   '/admin',
 ]
 
+const STATIC_PAGES: Record<string, string> = {
+  '/demo': '/demo.html',
+}
+
 function multiPagePlugin(): Plugin {
   return {
     name: 'multi-page-spa',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const url = req.url?.split('?')[0] || ''
-        if (APP_ROUTES.some(r => url === r || url.startsWith(r + '/'))) {
+        if (STATIC_PAGES[url]) {
+          req.url = STATIC_PAGES[url]
+        } else if (APP_ROUTES.some(r => url === r || url.startsWith(r + '/'))) {
           req.url = '/app.html'
         }
         next()
@@ -38,6 +44,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         app: path.resolve(__dirname, 'app.html'),
+        demo: path.resolve(__dirname, 'demo.html'),
       },
     },
   },
