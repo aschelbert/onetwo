@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": "tsc -b && vite build",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/login", "destination": "/app.html" },
     { "source": "/reset-password", "destination": "/app.html" },
@@ -13,6 +16,7 @@
     { "source": "/community", "destination": "/app.html" },
     { "source": "/my-unit", "destination": "/app.html" },
     { "source": "/account", "destination": "/app.html" },
-    { "source": "/admin/:path*", "destination": "/app.html" }
+    { "source": "/admin/:path*", "destination": "/app.html" },
+    { "source": "/demo", "destination": "/demo.html" }
   ]
 }
