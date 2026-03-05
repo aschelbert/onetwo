@@ -143,6 +143,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             const actionsPct = actionsTotal > 0 ? Math.round((actionsDone / actionsTotal) * 100) : 0;
             const checksDone = hasChecks ? step.checks!.filter(ck => ck.checked).length : 0;
             const checksTotal = hasChecks ? step.checks!.length : 0;
+            const checksPct = checksTotal > 0 ? Math.round((checksDone / checksTotal) * 100) : 0;
 
             const richActionButtons = hasRichActions && (
               <div className="space-y-2">
@@ -170,74 +171,80 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             );
 
             return (
-              <div className="border-t border-ink-100 px-5 py-4">
-                {(hasActions || hasChecks) ? (
+              <div className="border-t border-ink-100 px-5 py-4 space-y-4">
+                {/* Actions container with progress sidebar */}
+                {hasActions && onToggleAction && (
                   <div className="grid grid-cols-3 gap-5">
-                    {/* Left 2/3 — action list + rich action buttons */}
-                    <div className="col-span-2 space-y-4">
-                      {hasActions && onToggleAction && (
-                        <StepActionList
-                          actions={step.actions!}
-                          persistent={step.persistent}
-                          onToggleAction={onToggleAction}
-                          onNavigate={onNavigate}
-                          onUpload={onUpload}
-                        />
-                      )}
-                      {richActionButtons}
+                    <div className="col-span-2">
+                      <StepActionList
+                        actions={step.actions!}
+                        persistent={step.persistent}
+                        onToggleAction={onToggleAction}
+                        onNavigate={onNavigate}
+                        onUpload={onUpload}
+                      />
                     </div>
-
-                    {/* Right 1/3 — completion sidebar */}
-                    <div className="space-y-3">
-                      {hasActions && (
-                        <div>
-                          <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Progress</p>
-                          <div className="bg-ink-50 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs font-medium text-ink-600">{actionsDone}/{actionsTotal}</span>
-                              <span className="text-[10px] text-ink-400">{actionsPct}%</span>
-                            </div>
-                            <div className="w-full bg-ink-200 rounded-full h-2">
-                              <div
-                                className="bg-sage-500 h-2 rounded-full transition-all"
-                                style={{ width: `${actionsPct}%` }}
-                              />
-                            </div>
-                          </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Progress</p>
+                      <div className="bg-ink-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-medium text-ink-600">{actionsDone}/{actionsTotal}</span>
+                          <span className="text-[10px] text-ink-400">{actionsPct}%</span>
                         </div>
-                      )}
-                      {hasChecks && onToggleCheck && (
-                        <div>
-                          <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">
-                            Checklist ({checksDone}/{checksTotal})
-                          </p>
-                          <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />
+                        <div className="w-full bg-ink-200 rounded-full h-2">
+                          <div
+                            className="bg-sage-500 h-2 rounded-full transition-all"
+                            style={{ width: `${actionsPct}%` }}
+                          />
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* No actions/checks — single column for persistent + rich actions */
-                  <div className="space-y-4">
-                    {hasPersistent && (
-                      <div className="flex flex-wrap gap-2">
-                        {step.persistent!.map((p, i) => (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              if (p.type === 'link' && p.target && onNavigate) onNavigate(p.target);
-                              else if (p.type === 'upload' && onUpload) onUpload();
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-mist-50 hover:border-ink-300 transition-colors"
-                          >
-                            {p.type === 'link' ? '↗' : '📎'} {p.label}
-                          </button>
-                        ))}
                       </div>
-                    )}
-                    {richActionButtons}
+                    </div>
                   </div>
                 )}
+
+                {/* Checklist as full-width action container */}
+                {hasChecks && onToggleCheck && (
+                  <div className="bg-white rounded-lg border border-ink-100 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-ink-50 border-b border-ink-100">
+                      <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">
+                        Checklist ({checksDone}/{checksTotal} complete)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 bg-ink-200 rounded-full h-1.5">
+                          <div
+                            className="bg-sage-500 h-1.5 rounded-full transition-all"
+                            style={{ width: `${checksPct}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-ink-400">{checksPct}%</span>
+                      </div>
+                    </div>
+                    <div className="px-4 py-3">
+                      <StepChecklist checks={step.checks!} onToggle={onToggleCheck} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Persistent buttons when no actions */}
+                {!hasActions && hasPersistent && (
+                  <div className="flex flex-wrap gap-2">
+                    {step.persistent!.map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (p.type === 'link' && p.target && onNavigate) onNavigate(p.target);
+                          else if (p.type === 'upload' && onUpload) onUpload();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-mist-50 hover:border-ink-300 transition-colors"
+                      >
+                        {p.type === 'link' ? '↗' : '📎'} {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Rich action buttons */}
+                {richActionButtons}
               </div>
             );
           })()}
