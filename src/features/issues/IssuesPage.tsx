@@ -737,11 +737,12 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [docTargetStep, setDocTargetStep] = useState<number | null>(null);
   const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [activeApproachIdx, setActiveApproachIdx] = useState<number | null>(null);
 
   const buildingState = useBuildingStore(s => s.address.state);
 
   // Reset active step when navigating to a different case
-  useEffect(() => { setActiveStep(0); }, [caseId]);
+  useEffect(() => { setActiveStep(0); setActiveApproachIdx(null); }, [caseId]);
 
   const ACTION_NAV: Record<string, { route: string; tab?: string }> = {
     'financial':            { route: '/financial' },
@@ -864,16 +865,33 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   }
   const pct = totalProgress > 0 ? Math.round((doneProgress / totalProgress) * 100) : 0;
 
+  // Selection handlers
+  const handleSelectPrimaryStep = (i: number) => { setActiveStep(i); setActiveApproachIdx(null); };
+  const handleSelectAdditionalStep = (ai: number, si: number) => { setActiveApproachIdx(ai); setActiveStep(si); };
+
   // Clamp activeStep to valid range
   const safeStep = Math.max(0, Math.min(activeStep, steps.length - 1));
-  const currentStep = steps[safeStep];
+  const additionalApproaches = c.additionalApproaches || [];
+  const isAdditionalActive = activeApproachIdx != null && additionalApproaches[activeApproachIdx];
+  const currentStep = isAdditionalActive
+    ? additionalApproaches[activeApproachIdx!].steps[Math.max(0, Math.min(activeStep, additionalApproaches[activeApproachIdx!].steps.length - 1))]
+    : steps[safeStep];
+  const currentStepIdx = isAdditionalActive
+    ? Math.max(0, Math.min(activeStep, additionalApproaches[activeApproachIdx!].steps.length - 1))
+    : safeStep;
 
   const stateAbbr = jurisdictionKey === 'DC' ? 'DC' : (buildingState || '');
 
   const handleAddNote = (idx: number) => {
-    const existing = steps[idx]?.userNotes || '';
-    const note = window.prompt('Step note:', existing);
-    if (note !== null) store.addStepNote(caseId, idx, note);
+    if (isAdditionalActive) {
+      const existing = additionalApproaches[activeApproachIdx!].steps[idx]?.userNotes || '';
+      const note = window.prompt('Step note:', existing);
+      if (note !== null) store.addAdditionalStepNote(caseId, activeApproachIdx!, idx, note);
+    } else {
+      const existing = steps[idx]?.userNotes || '';
+      const note = window.prompt('Step note:', existing);
+      if (note !== null) store.addStepNote(caseId, idx, note);
+    }
   };
 
   const handleExport = () => {
@@ -922,9 +940,11 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             <StepList
               c={c}
               steps={steps}
-              activeStep={safeStep}
-              onSelectStep={setActiveStep}
+              activeStep={isAdditionalActive ? activeStep : safeStep}
+              onSelectStep={handleSelectPrimaryStep}
               onToggleAdditionalStep={(ai, si) => store.toggleAdditionalStep(caseId, ai, si)}
+              onSelectAdditionalStep={handleSelectAdditionalStep}
+              activeApproachIdx={activeApproachIdx}
             />
             <SideSections
               c={c}
@@ -952,20 +972,35 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             className="overflow-y-auto bg-ink-50"
             style={{ height: 'calc(100vh - 140px)' }}
           >
-            <ShellStepHeader step={currentStep} stepNumber={safeStep + 1} caseSitId={c.sitId} />
+            <ShellStepHeader
+              step={currentStep}
+              stepNumber={currentStepIdx + 1}
+              caseSitId={c.sitId}
+              approachLabel={isAdditionalActive ? APPR_LABELS[additionalApproaches[activeApproachIdx!].approach] : undefined}
+              approachColorClass={isAdditionalActive ? APPR_COLORS[additionalApproaches[activeApproachIdx!].approach] : undefined}
+            />
             <StepContent
               c={c}
               step={currentStep}
-              stepIndex={safeStep}
+              stepIndex={currentStepIdx}
               stNote={stNote}
               stateAbbr={stateAbbr}
-              onToggleStep={(idx) => store.toggleStep(caseId, idx)}
+              onToggleStep={(idx) => {
+                if (isAdditionalActive) store.toggleAdditionalStep(caseId, activeApproachIdx!, idx);
+                else store.toggleStep(caseId, idx);
+              }}
               onAddNote={handleAddNote}
-              onToggleAction={(actionId) => store.toggleAction(caseId, safeStep, actionId)}
-              onToggleCheck={(checkId) => store.toggleCheck(caseId, safeStep, checkId)}
+              onToggleAction={(actionId) => {
+                if (isAdditionalActive) store.toggleAdditionalAction(caseId, activeApproachIdx!, currentStepIdx, actionId);
+                else store.toggleAction(caseId, safeStep, actionId);
+              }}
+              onToggleCheck={(checkId) => {
+                if (isAdditionalActive) store.toggleAdditionalCheck(caseId, activeApproachIdx!, currentStepIdx, checkId);
+                else store.toggleCheck(caseId, safeStep, checkId);
+              }}
               onAction={(action, stepIdx) => handleAction(action, stepIdx)}
-              onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, safeStep)}
-              onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, safeStep)}
+              onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
+              onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}
             />
           </div>
         </div>

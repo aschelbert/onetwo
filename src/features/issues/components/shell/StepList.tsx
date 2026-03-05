@@ -14,6 +14,8 @@ interface StepListProps {
   activeStep: number;
   onSelectStep: (index: number) => void;
   onToggleAdditionalStep?: (approachIdx: number, stepIdx: number) => void;
+  onSelectAdditionalStep?: (approachIdx: number, stepIdx: number) => void;
+  activeApproachIdx?: number | null;
 }
 
 /**
@@ -23,7 +25,7 @@ interface StepListProps {
  * Done steps show green checkmark badge, pending steps show numbered badge.
  * Additional approaches are shown below the primary steps.
  */
-export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditionalStep }: StepListProps) {
+export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditionalStep, onSelectAdditionalStep, activeApproachIdx }: StepListProps) {
   const [collapsedApproaches, setCollapsedApproaches] = useState<Set<number>>(new Set());
 
   if (!steps || steps.length === 0) {
@@ -55,7 +57,7 @@ export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditiona
       {/* Primary step buttons */}
       <div className="flex flex-col gap-0.5">
         {steps.map((st, i) => {
-          const isActive = i === activeStep;
+          const isActive = i === activeStep && activeApproachIdx == null;
           const isDone = st.done;
 
           return (
@@ -133,28 +135,56 @@ export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditiona
 
             {!isCollapsed && (
               <div className="flex flex-col gap-0.5">
-                {aa.steps.map((st, si) => (
-                  <button
-                    key={st.id || si}
-                    onClick={() => onToggleAdditionalStep?.(ai, si)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left border border-transparent hover:bg-ink-50 transition-all"
-                  >
-                    <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${
-                      st.done ? 'bg-sage-500 text-white' : 'bg-ink-50 text-ink-400 border border-ink-200'
-                    }`}>
-                      {st.done ? '✓' : si + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] leading-tight truncate ${
-                        st.done ? 'text-ink-400 line-through' : 'text-ink-700'
+                {aa.steps.map((st, si) => {
+                  const isActiveAdditional = activeApproachIdx === ai && activeStep === si;
+                  return (
+                    <button
+                      key={st.id || si}
+                      onClick={() => onSelectAdditionalStep?.(ai, si)}
+                      className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all ${
+                        isActiveAdditional
+                          ? 'bg-ink-50 border border-ink-200 border-l-[3px] border-l-accent-500'
+                          : 'border border-transparent hover:bg-ink-50'
+                      }`}
+                    >
+                      <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                        st.done
+                          ? 'bg-sage-500 text-white'
+                          : isActiveAdditional
+                          ? 'bg-accent-50 text-accent-600 border border-accent-200'
+                          : 'bg-ink-50 text-ink-400 border border-ink-200'
                       }`}>
-                        {st.s}
-                      </p>
-                      {st.w && <p className="text-[10px] text-accent-500 mt-0.5 truncate">⚠ {st.w}</p>}
-                      {st.done && st.doneDate && <p className="text-[10px] text-sage-500 mt-0.5">Completed {st.doneDate}</p>}
-                    </div>
-                  </button>
-                ))}
+                        {st.done ? '✓' : si + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-[13px] leading-tight truncate ${
+                            st.done
+                              ? 'text-ink-400 line-through'
+                              : isActiveAdditional
+                              ? 'font-semibold text-ink-900'
+                              : 'text-ink-700'
+                          }`}>
+                            {st.s}
+                          </p>
+                          {st.actions && st.actions.length > 0 && (
+                            <span className="flex gap-0.5 shrink-0">
+                              {st.actions.map(a => (
+                                <span
+                                  key={a.id}
+                                  className={`w-1.5 h-1.5 rounded-full ${a.done ? 'bg-mist-500' : 'bg-ink-200'}`}
+                                />
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                        {st.t && <p className="text-[10px] text-ink-400 mt-0.5">{st.t}</p>}
+                        {st.w && <p className="text-[10px] text-accent-500 mt-0.5 truncate">⚠ {st.w}</p>}
+                        {st.done && st.doneDate && <p className="text-[10px] text-sage-500 mt-0.5">Completed {st.doneDate}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

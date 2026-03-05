@@ -4,6 +4,8 @@ interface ShellStepHeaderProps {
   step: CaseStep;
   stepNumber: number;
   caseSitId?: string;
+  approachLabel?: string;
+  approachColorClass?: string;
 }
 
 /**
@@ -12,7 +14,7 @@ interface ShellStepHeaderProps {
  * small progress bar (sage if done, accent if pending), and status text.
  * For steps with actions: shows segmented progress bar + count badge.
  */
-export function ShellStepHeader({ step, stepNumber, caseSitId }: ShellStepHeaderProps) {
+export function ShellStepHeader({ step, stepNumber, caseSitId, approachLabel, approachColorClass }: ShellStepHeaderProps) {
   const hasActions = step.actions && step.actions.length > 0;
   const actionsDone = hasActions ? step.actions!.filter(a => a.done).length : 0;
   const actionsTotal = hasActions ? step.actions!.length : 0;
@@ -25,6 +27,11 @@ export function ShellStepHeader({ step, stepNumber, caseSitId }: ShellStepHeader
             <span className="text-[10px] font-bold text-accent-500 uppercase tracking-wider">
               Step {stepNumber}
             </span>
+            {approachLabel && (
+              <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${approachColorClass || 'text-ink-500 bg-ink-50 border-ink-200'}`}>
+                {approachLabel}
+              </span>
+            )}
             <h2 className="font-display text-base font-bold text-ink-900 truncate">{step.s}</h2>
           </div>
           <div className="flex items-center gap-2 mt-1">

@@ -2362,6 +2362,8 @@ interface IssuesState {
   addApproach: (caseId: string, approach: CaseApproach) => void;
   toggleAdditionalStep: (caseId: string, approachIdx: number, stepIdx: number) => void;
   addAdditionalStepNote: (caseId: string, approachIdx: number, stepIdx: number, note: string) => void;
+  toggleAdditionalCheck: (caseId: string, approachIdx: number, stepIdx: number, checkId: string) => void;
+  toggleAdditionalAction: (caseId: string, approachIdx: number, stepIdx: number, actionId: string) => void;
 
   // Board vote
   saveBoardVote: (caseId: string, motion: string, date: string, votes: BoardVote['votes']) => void;
@@ -2792,6 +2794,50 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       return { ...c, additionalApproaches: aa };
     })
   })),
+
+  toggleAdditionalCheck: (caseId, approachIdx, stepIdx, checkId) => {
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        const step = { ...steps[stepIdx] };
+        if (!step.checks) return c;
+        step.checks = step.checks.map(ck =>
+          ck.id === checkId ? { ...ck, checked: !ck.checked, checkedDate: !ck.checked ? today : null } : ck
+        );
+        const allChecked = step.checks.every(ck => ck.checked);
+        step.done = allChecked;
+        step.doneDate = allChecked ? today : null;
+        steps[stepIdx] = step;
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+  },
+
+  toggleAdditionalAction: (caseId, approachIdx, stepIdx, actionId) => {
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        const step = { ...steps[stepIdx] };
+        if (!step.actions) return c;
+        step.actions = step.actions.map(a =>
+          a.id === actionId ? { ...a, done: !a.done, doneDate: !a.done ? today : null } : a
+        );
+        const allDone = step.actions.every(a => a.done);
+        step.done = allDone;
+        step.doneDate = allDone ? today : null;
+        steps[stepIdx] = step;
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+  },
 
   saveBoardVote: (caseId, motion, date, votes) => {
     const boardVotes = { motion, date, votes };
