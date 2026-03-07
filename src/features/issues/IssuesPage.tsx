@@ -521,16 +521,16 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
   };
 
   const handleCreate = () => {
-    if (!catId || !title.trim()) return;
+    if (!title.trim()) return;
     if (isCustom) {
       const filteredSteps = customSteps.filter(cs => cs.s.trim());
       if (!customSitName.trim() || filteredSteps.length === 0) return;
       const customSitId = `custom-${Date.now()}`;
       const fullNotes = customSitDesc.trim() ? `[Custom: ${customSitDesc.trim()}]\n${notes}` : notes;
-      const id = createCase({ catId, sitId: customSitId, approach: 'pre', title, unit, owner, priority, notes: fullNotes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined, customSteps: filteredSteps.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })) });
+      const id = createCase({ catId: catId || 'general', sitId: customSitId, approach: 'pre', title, unit, owner, priority, notes: fullNotes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined, customSteps: filteredSteps.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })) });
       onDone(id);
     } else {
-      if (!sitId) return;
+      if (!catId || !sitId) return;
       const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
       onDone(id);
     }
@@ -556,11 +556,15 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
           <h3 className="text-lg font-semibold text-ink-800">1. What's the situation?</h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {CATS.map(cat => (
-              <button key={cat.id} onClick={() => { setCatId(cat.id); setSitId(null); }} className={`rounded-xl border-2 p-3 text-center transition-all ${catId === cat.id ? 'border-accent-400 bg-accent-50 shadow-sm' : 'border-ink-100 bg-white hover:border-ink-200'}`}>
+              <button key={cat.id} onClick={() => { setCatId(cat.id); setSitId(null); setIsCustom(false); }} className={`rounded-xl border-2 p-3 text-center transition-all ${catId === cat.id && !isCustom ? 'border-accent-400 bg-accent-50 shadow-sm' : 'border-ink-100 bg-white hover:border-ink-200'}`}>
                 <span className="text-xl">{cat.icon}</span>
                 <p className="text-xs font-semibold text-ink-700 mt-1">{cat.label}</p>
               </button>
             ))}
+            <button onClick={() => { setIsCustom(true); setCatId(null); setSitId(null); }} className={`rounded-xl border-2 border-dashed p-3 text-center transition-all ${isCustom ? 'border-accent-400 bg-accent-50 shadow-sm' : 'border-ink-200 bg-white hover:border-ink-300'}`}>
+              <span className="text-xl">+</span>
+              <p className="text-xs font-semibold text-ink-700 mt-1">Custom</p>
+            </button>
           </div>
           {selCat && (
             <>
@@ -575,15 +579,11 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
                     </div>
                   </button>
                 ))}
-                <button onClick={() => { setIsCustom(true); setSitId('custom'); }} className={`w-full text-left rounded-xl border-2 border-dashed p-4 transition-all ${isCustom ? 'border-accent-400 bg-accent-50' : 'border-ink-200 bg-white hover:border-ink-300'}`}>
-                  <p className="text-sm font-semibold text-ink-700">+ Custom Situation</p>
-                  <p className="text-xs text-ink-400 mt-0.5">Define your own workflow with custom steps</p>
-                </button>
               </div>
             </>
           )}
           <div className="flex justify-end">
-            <button onClick={() => catId && (sitId || isCustom) ? setStep(2) : undefined} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${catId && (sitId || isCustom) ? 'bg-ink-900 text-white hover:bg-ink-800 cursor-pointer' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Next →</button>
+            <button onClick={() => (isCustom || (catId && sitId)) ? setStep(2) : undefined} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${(isCustom || (catId && sitId)) ? 'bg-ink-900 text-white hover:bg-ink-800 cursor-pointer' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Next →</button>
           </div>
         </div>
       )}
@@ -627,6 +627,14 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
           <div>
             <label className="block text-sm font-medium text-ink-700 mb-1">Description</label>
             <textarea value={customSitDesc} onChange={e => setCustomSitDesc(e.target.value)} rows={2} placeholder="Brief description of this situation..." className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Category</label>
+            <select value={catId || ''} onChange={e => setCatId(e.target.value || null)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+              <option value="">General (no category)</option>
+              {CATS.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>)}
+            </select>
+            <p className="text-[10px] text-ink-400 mt-1">Used for DACI auto-assignment</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-ink-700 mb-2">Workflow Steps *</label>
