@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, Grid3X3, Monitor, Users, Building2, CreditCard, ClipboardCheck } from 'lucide-react'
+import { LayoutDashboard, Package, Grid3X3, Monitor, Users, Building2, MessageCircle, Lightbulb, CreditCard, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type NavItem = { href: string; label: string; icon: React.ElementType; count?: number } | { section: string }
@@ -17,6 +17,8 @@ const navItems: NavItem[] = [
   { href: '/admin/roles', label: 'User Roles', icon: Users, count: 4 },
   { section: 'Operations' },
   { href: '/admin/tenancies', label: 'Tenancies', icon: Building2 },
+  { href: '/admin/support', label: 'Support', icon: MessageCircle },
+  { href: '/admin/feedback', label: 'Feedback', icon: Lightbulb },
   { href: '/admin/billing', label: 'Billing Events', icon: CreditCard },
   { href: '/admin/audit', label: 'Audit Log', icon: ClipboardCheck },
 ]

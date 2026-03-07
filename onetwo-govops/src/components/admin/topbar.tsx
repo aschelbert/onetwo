@@ -9,6 +9,8 @@ const pageTitles: Record<string, [string, string]> = {
   '/admin/simulator': ['Permission Simulator', 'Admin Console > Product > Simulator'],
   '/admin/roles': ['User Roles', 'Admin Console > Access Control > Roles'],
   '/admin/tenancies': ['Tenancies', 'Admin Console > Operations > Tenancies'],
+  '/admin/support': ['Support', 'Admin Console > Operations > Support'],
+  '/admin/feedback': ['Feedback', 'Admin Console > Operations > Feedback'],
   '/admin/billing': ['Billing Events', 'Admin Console > Operations > Billing'],
   '/admin/audit': ['Audit Log', 'Admin Console > Operations > Audit'],
 }
