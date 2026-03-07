@@ -32,27 +32,18 @@ export function FiduciaryAlerts({ alerts }: FiduciaryAlertsProps) {
         {criticalCount > 0 && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{criticalCount} critical</span>}
         <span className="text-[10px] bg-ink-100 text-ink-500 px-1.5 py-0.5 rounded-full font-bold">{alerts.length} total</span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {alerts.map(alert => (
-          <div key={alert.id} className={`${SEVERITY_COLORS[alert.severity]} rounded-lg p-3`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${DUTY_COLORS[alert.duty]}`}>
-                    {alert.duty}
-                  </span>
-                  <p className="text-sm font-semibold text-ink-900">{alert.title}</p>
-                </div>
-                <p className="text-xs text-ink-600">{alert.description}</p>
-              </div>
-              <button
-                onClick={() => navigate(alert.actionPath)}
-                className="text-[10px] font-semibold bg-accent-50 text-accent-600 px-2 py-1 rounded hover:bg-accent-100 shrink-0"
-              >
-                {alert.actionLabel} →
-              </button>
+          <button key={alert.id} onClick={() => navigate(alert.actionPath)} className={`${SEVERITY_COLORS[alert.severity]} rounded-lg p-2.5 w-full text-left hover:shadow-sm transition-all`}>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${DUTY_COLORS[alert.duty]}`}>
+                {alert.duty}
+              </span>
+              <p className="text-xs font-semibold text-ink-900 truncate flex-1">{alert.title}</p>
+              <span className="text-ink-300 text-xs shrink-0">→</span>
             </div>
-          </div>
+            <p className="text-[11px] text-ink-600 line-clamp-1">{alert.description}</p>
+          </button>
         ))}
       </div>
     </div>

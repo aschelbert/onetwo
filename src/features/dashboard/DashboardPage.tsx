@@ -160,8 +160,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {fiduciaryAlerts.length > 0 && <FiduciaryAlerts alerts={fiduciaryAlerts} />}
-
         {/* Attention Pills */}
         {attentionItems.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -183,56 +181,60 @@ export default function DashboardPage() {
           <MetricCard label="Open Cases" value={`${openCases.length}`} sub={`${urgentCases.length} urgent/high`} color={urgentCases.length > 0 ? 'red' : openCases.length > 0 ? 'accent' : 'sage'} onClick={() => navigate('/issues')} />
         </div>
 
-        {/* Action Items */}
-        {(() => {
-          const memberRecord = building.board.find(b => b.name === currentUser.name);
-          const userRole = memberRecord?.role || 'President';
-          const allRunbookItems = refreshResult.categories.flatMap(c => c.items);
-          const myRunbookItems = allRunbookItems.filter(i => !comp.completions[i.id] && !i.autoPass && i.role === userRole);
-          const myOverdueFilings = comp.filings.filter(f => f.status === 'pending' && new Date(f.dueDate) < new Date() && f.responsible === userRole);
-          const myCases = openCases.filter(c => c.priority === 'urgent' || c.priority === 'high');
-          const nextMtg = upcoming[0];
-          const totalActions = myRunbookItems.length + myOverdueFilings.length + myCases.length + (nextMtg ? 1 : 0);
+        {/* Fiduciary Alerts + Action Items side-by-side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {fiduciaryAlerts.length > 0 && <FiduciaryAlerts alerts={fiduciaryAlerts} />}
 
-          if (totalActions === 0) return null;
+          {(() => {
+            const memberRecord = building.board.find(b => b.name === currentUser.name);
+            const userRole = memberRecord?.role || 'President';
+            const allRunbookItems = refreshResult.categories.flatMap(c => c.items);
+            const myRunbookItems = allRunbookItems.filter(i => !comp.completions[i.id] && !i.autoPass && i.role === userRole);
+            const myOverdueFilings = comp.filings.filter(f => f.status === 'pending' && new Date(f.dueDate) < new Date() && f.responsible === userRole);
+            const myCases = openCases.filter(c => c.priority === 'urgent' || c.priority === 'high');
+            const nextMtg = upcoming[0];
+            const totalActions = myRunbookItems.length + myOverdueFilings.length + myCases.length + (nextMtg ? 1 : 0);
 
-          type ActionItem = { icon: string; label: string; sub: string; path: string; color: string; priority: number };
-          const actionItems: ActionItem[] = [];
-          myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/boardroom?tab=runbook', color: 'red', priority: 1 }));
-          myCases.forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, path: '/issues', color: 'red', priority: 2 }));
-          if (nextMtg) {
-            const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom?tab=meetings', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
-          }
-          myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/boardroom?tab=runbook', color: i.critical ? 'red' : 'amber', priority: 4 }));
-          actionItems.sort((a, b) => a.priority - b.priority);
+            if (totalActions === 0) return null;
 
-          return (
-            <div className="bg-white rounded-xl border border-ink-100 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">⚡</span>
-                  <h2 className="text-sm font-bold text-ink-700">Your Action Items</h2>
-                  <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{totalActions}</span>
+            type ActionItem = { icon: string; label: string; sub: string; path: string; color: string; priority: number };
+            const actionItems: ActionItem[] = [];
+            myOverdueFilings.forEach(f => actionItems.push({ icon: '📅', label: f.name, sub: `Overdue: ${f.dueDate}`, path: '/boardroom?tab=runbook', color: 'red', priority: 1 }));
+            myCases.forEach(c => actionItems.push({ icon: '🚨', label: c.title, sub: `${c.priority} · ${c.status}`, path: '/issues', color: 'red', priority: 2 }));
+            if (nextMtg) {
+              const daysUntil = Math.ceil((new Date(nextMtg.date + 'T12:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              if (daysUntil <= 14) actionItems.push({ icon: '🏛', label: nextMtg.title, sub: `${daysUntil <= 0 ? 'Today' : `In ${daysUntil} days`} · ${nextMtg.time}`, path: '/boardroom?tab=meetings', color: daysUntil <= 3 ? 'red' : 'amber', priority: 3 });
+            }
+            myRunbookItems.slice(0, 3).forEach(i => actionItems.push({ icon: '📋', label: i.task, sub: `${i.freq} · Due: ${i.due}`, path: '/boardroom?tab=runbook', color: i.critical ? 'red' : 'amber', priority: 4 }));
+            actionItems.sort((a, b) => a.priority - b.priority);
+
+            return (
+              <div className="bg-white rounded-xl border border-ink-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <h2 className="text-sm font-bold text-ink-700">Your Action Items</h2>
+                    <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">{totalActions}</span>
+                  </div>
+                  <span className="text-[10px] text-ink-400 font-medium">Role: {userRole}</span>
                 </div>
-                <span className="text-[10px] text-ink-400 font-medium">Role: {userRole}</span>
+                <div className="space-y-1.5">
+                  {actionItems.slice(0, 5).map((item, idx) => (
+                    <button key={idx} onClick={() => navigate(item.path)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border border-red-100 hover:border-red-200' : 'bg-amber-50 border border-amber-100 hover:border-amber-200'}`}>
+                      <span className="text-sm shrink-0">{item.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-ink-900 truncate text-xs">{item.label}</p>
+                        <p className="text-[10px] text-ink-500">{item.sub}</p>
+                      </div>
+                      <span className="text-ink-300 text-xs">→</span>
+                    </button>
+                  ))}
+                </div>
+                {totalActions > 5 && <p className="text-[10px] text-ink-400 mt-2 text-center">+ {totalActions - 5} more items</p>}
               </div>
-              <div className="space-y-1.5">
-                {actionItems.slice(0, 6).map((item, idx) => (
-                  <button key={idx} onClick={() => navigate(item.path)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm transition-all hover:shadow-sm ${item.color === 'red' ? 'bg-red-50 border border-red-100 hover:border-red-200' : 'bg-amber-50 border border-amber-100 hover:border-amber-200'}`}>
-                    <span className="text-base shrink-0">{item.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-ink-900 truncate">{item.label}</p>
-                      <p className="text-[10px] text-ink-500">{item.sub}</p>
-                    </div>
-                    <span className="text-ink-300 text-xs">→</span>
-                  </button>
-                ))}
-              </div>
-              {totalActions > 6 && <p className="text-[10px] text-ink-400 mt-2 text-center">+ {totalActions - 6} more items</p>}
-            </div>
-          );
-        })()}
+            );
+          })()}
+        </div>
 
         {/* Two-column layout: Financial Health (left) + Meetings & Activity (right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
