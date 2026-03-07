@@ -1,637 +1,706 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { MessageCircle, CheckCircle, Sparkles, Link2, ChevronDown, User } from 'lucide-react'
+import { CheckCircle, Sparkles, User } from 'lucide-react'
 
 // --- Types ---
 
 type Priority = 'high' | 'medium' | 'low'
-type ThreadStatus = 'open' | 'resolved'
+type ThreadStatus = 'open' | 'pending' | 'resolved'
+type PlanName = 'Compliance Pro' | 'Community Plus' | 'Management Suite'
 
 interface Association {
   id: string
   name: string
-  plan: 'Compliance Pro' | 'Community Plus' | 'Management Suite'
-  planColor: string
+  slug: string
   address: string
+  jurisdiction: string
+  plan: PlanName
+  planColor: string
+  status: 'active' | 'trial' | 'suspended'
   units: number
-  boardMembers: number
-  residents: number
-  managers: number
-  staff: number
-  status: 'active' | 'trial'
-  members: { name: string; role: string; email: string }[]
+  billingCycle: string
+  users: { boardMembers: number; residents: number; managers: number; staff: number }
+  primaryContact: { name: string; role: string; email: string }
+  members: { name: string; role: string; email: string; lastActive: string }[]
+  createdAt: string
+}
+
+interface CapturedItem {
+  type: 'bug' | 'feature' | 'docs'
+  title: string
+  feedbackId: string | null
 }
 
 interface Message {
-  id: string
-  from: 'association' | 'support'
-  sender: string
-  content: string
-  timestamp: string
+  id: number
+  from: 'assoc' | 'support'
+  name: string
+  role?: string
+  avatar: string
+  text: string
+  time: string
 }
 
 interface SupportThread {
   id: string
-  associationId: string
+  assocId: string
   subject: string
+  status: ThreadStatus
   priority: Priority
   module: string
-  status: ThreadStatus
   unread: number
+  lastAt: string
+  assignee: string
+  capturedItems: CapturedItem[]
+  aiSummary: string | null
   messages: Message[]
-  createdAt: string
 }
 
-// --- Seed Data ---
+// --- Plan meta ---
 
-const associations: Association[] = [
+const PLAN_META: Record<PlanName, { color: string; bg: string; dot: string }> = {
+  'Compliance Pro':   { color: '#dc2626', bg: '#fef2f2', dot: '#dc2626' },
+  'Community Plus':   { color: '#2563eb', bg: '#eff6ff', dot: '#2563eb' },
+  'Management Suite': { color: '#7c3aed', bg: '#f5f3ff', dot: '#7c3aed' },
+}
+
+const PRIORITY_META: Record<Priority, { color: string; label: string }> = {
+  high:   { color: '#dc2626', label: 'High' },
+  medium: { color: '#d97706', label: 'Medium' },
+  low:    { color: '#6b7280', label: 'Low' },
+}
+
+const THREAD_STATUS_META: Record<ThreadStatus, { label: string; variant: 'amber' | 'blue' | 'green' }> = {
+  open:     { label: 'Open',     variant: 'amber' },
+  pending:  { label: 'Pending',  variant: 'blue' },
+  resolved: { label: 'Resolved', variant: 'green' },
+}
+
+const TYPE_META: Record<string, { label: string; variant: 'red' | 'purple' | 'amber' }> = {
+  bug:     { label: 'Bug',     variant: 'red' },
+  feature: { label: 'Feature', variant: 'purple' },
+  docs:    { label: 'Docs',    variant: 'amber' },
+}
+
+// --- Seed data ---
+
+const ASSOCIATIONS: Association[] = [
   {
-    id: 'assoc-1',
-    name: '1302 R Street NW Condominium',
-    plan: 'Compliance Pro',
-    planColor: '#dc2626',
-    address: '1302 R Street NW, Washington, DC 20009',
-    units: 24,
-    boardMembers: 5,
-    residents: 38,
-    managers: 2,
-    staff: 1,
-    status: 'active',
+    id: 'assoc_1302rstnw', name: '1302 R Street NW Condominium', slug: '1302rstnw',
+    address: '1302 R Street NW, Washington, DC 20009', jurisdiction: 'Washington, DC',
+    plan: 'Compliance Pro', planColor: '#dc2626', status: 'active', units: 12, billingCycle: 'Monthly',
+    users: { boardMembers: 3, residents: 12, managers: 0, staff: 0 },
+    primaryContact: { name: 'Robert Chen', role: 'Board President', email: 'r.chen@1302rstnw.org' },
     members: [
-      { name: 'Patricia Langley', role: 'Board President', email: 'plangley@1302r.org' },
-      { name: 'David Kim', role: 'Treasurer', email: 'dkim@1302r.org' },
-      { name: 'Sandra Okafor', role: 'Property Manager', email: 'sokafor@1302r.org' },
+      { name: 'Robert Chen',    role: 'Board Member', email: 'r.chen@1302rstnw.org',   lastActive: 'today' },
+      { name: 'Patricia Walsh', role: 'Board Member', email: 'p.walsh@1302rstnw.org',  lastActive: '2d ago' },
+      { name: 'James Okafor',   role: 'Resident',     email: 'j.okafor@1302rstnw.org', lastActive: '5d ago' },
+    ],
+    createdAt: 'Mar 2, 2026',
+  },
+  {
+    id: 'assoc_capitolhill', name: 'Capitol Hill Terraces HOA', slug: 'capitolhill',
+    address: '450 E Street SE, Washington, DC 20003', jurisdiction: 'Washington, DC',
+    plan: 'Community Plus', planColor: '#3b82f6', status: 'active', units: 48, billingCycle: 'Monthly',
+    users: { boardMembers: 5, residents: 48, managers: 0, staff: 0 },
+    primaryContact: { name: 'Sandra Osei', role: 'HOA President', email: 's.osei@caphillhoa.org' },
+    members: [
+      { name: 'Sandra Osei',  role: 'Board Member', email: 's.osei@caphillhoa.org',   lastActive: 'today' },
+      { name: 'Marcus Webb',  role: 'Board Member', email: 'm.webb@caphillhoa.org',   lastActive: 'today' },
+      { name: 'Diane Foster', role: 'Resident',     email: 'd.foster@caphillhoa.org', lastActive: '1d ago' },
+    ],
+    createdAt: 'Mar 2, 2026',
+  },
+  {
+    id: 'assoc_dupont', name: 'Dupont Circle Lofts', slug: 'dupontcircle',
+    address: '1600 Q Street NW, Washington, DC 20009', jurisdiction: 'Washington, DC',
+    plan: 'Management Suite', planColor: '#7c3aed', status: 'active', units: 32, billingCycle: 'Monthly',
+    users: { boardMembers: 4, residents: 32, managers: 1, staff: 2 },
+    primaryContact: { name: 'Alicia Moreno', role: 'Property Manager', email: 'a.moreno@mgmt.com' },
+    members: [
+      { name: 'Alicia Moreno', role: 'Property Manager', email: 'a.moreno@mgmt.com',   lastActive: 'today' },
+      { name: 'Tom Nguyen',    role: 'Board Member',     email: 't.nguyen@dupont.org',  lastActive: 'today' },
+      { name: 'Keisha Brown',  role: 'Staff',            email: 'k.brown@mgmt.com',     lastActive: '3d ago' },
+    ],
+    createdAt: 'Mar 2, 2026',
+  },
+  {
+    id: 'assoc_adamsmorg', name: 'Adams Morgan Commons', slug: 'adamsmorgan',
+    address: '2420 18th Street NW, Washington, DC 20009', jurisdiction: 'Washington, DC',
+    plan: 'Compliance Pro', planColor: '#dc2626', status: 'trial', units: 24, billingCycle: 'Monthly',
+    users: { boardMembers: 3, residents: 11, managers: 0, staff: 0 },
+    primaryContact: { name: 'David Kim', role: 'Board Treasurer', email: 'd.kim@amcommons.org' },
+    members: [
+      { name: 'David Kim',     role: 'Board Member', email: 'd.kim@amcommons.org',    lastActive: 'today' },
+      { name: 'Fatima Hassan', role: 'Board Member', email: 'f.hassan@amcommons.org', lastActive: '3d ago' },
+    ],
+    createdAt: 'Mar 2, 2026',
+  },
+  {
+    id: 'assoc_georgemews', name: 'Georgetown Mews', slug: 'georgetownmews',
+    address: '3200 N Street NW, Washington, DC 20007', jurisdiction: 'Washington, DC',
+    plan: 'Compliance Pro', planColor: '#dc2626', status: 'suspended', units: 8, billingCycle: 'Monthly',
+    users: { boardMembers: 2, residents: 8, managers: 0, staff: 0 },
+    primaryContact: { name: 'Linda Park', role: 'Board Secretary', email: 'l.park@georgemews.org' },
+    members: [
+      { name: 'Linda Park', role: 'Board Member', email: 'l.park@georgemews.org', lastActive: '14d ago' },
+    ],
+    createdAt: 'Mar 2, 2026',
+  },
+]
+
+const INITIAL_THREADS: SupportThread[] = [
+  {
+    id: 'SUP-001', assocId: 'assoc_capitolhill',
+    subject: 'Votes & Resolutions — quorum tracking not updating',
+    status: 'open', priority: 'high', module: 'Board Room', unread: 2, lastAt: '12m ago', assignee: 'Alex K.',
+    capturedItems: [
+      { type: 'bug',     title: 'Live quorum count not updating after member joins meeting', feedbackId: 'F-003' },
+      { type: 'feature', title: 'Email notification when quorum is reached',                feedbackId: 'F-004' },
+    ],
+    aiSummary: null,
+    messages: [
+      { id: 1, from: 'assoc',   name: 'Sandra Osei',  role: 'Board Member', avatar: 'SO', text: 'During our meeting last night the quorum tracker stayed stuck at 3/5 even after Marcus and Diane joined. We had to manually count heads. Is this a known issue?', time: '9:14 AM' },
+      { id: 2, from: 'support', name: 'Alex K.',       avatar: 'AK', text: 'Hi Sandra — thanks for flagging. Can you tell me which browser you were using, and was this in the Board Room > Meetings module?', time: '9:28 AM' },
+      { id: 3, from: 'assoc',   name: 'Sandra Osei',  role: 'Board Member', avatar: 'SO', text: "Yes, Meetings module. Chrome on Mac. Marcus was joining from a tablet (Safari) — could that be causing it?", time: '9:41 AM' },
+      { id: 4, from: 'assoc',   name: 'Marcus Webb',  role: 'Board Member', avatar: 'MW', text: "I can confirm — the count showed me as present on my screen but not on Sandra's.", time: '9:44 AM' },
     ],
   },
   {
-    id: 'assoc-2',
-    name: 'Capitol Hill Terraces HOA',
-    plan: 'Community Plus',
-    planColor: '#3b82f6',
-    address: '415 East Capitol Street SE, Washington, DC 20003',
-    units: 48,
-    boardMembers: 7,
-    residents: 112,
-    managers: 3,
-    staff: 2,
-    status: 'active',
-    members: [
-      { name: 'Marcus Thompson', role: 'Board President', email: 'mthompson@chterra.org' },
-      { name: 'Lisa Chen', role: 'Secretary', email: 'lchen@chterra.org' },
-      { name: 'Robert Vasquez', role: 'Community Manager', email: 'rvasquez@chterra.org' },
+    id: 'SUP-002', assocId: 'assoc_1302rstnw',
+    subject: 'Fiscal Lens — reserve fund balance showing incorrect figure',
+    status: 'open', priority: 'high', module: 'Fiscal Lens', unread: 1, lastAt: '1h ago', assignee: 'Maya R.',
+    capturedItems: [
+      { type: 'bug', title: 'Reserve fund balance not reflecting recent general ledger entry', feedbackId: 'F-001' },
+    ],
+    aiSummary: null,
+    messages: [
+      { id: 1, from: 'assoc',   name: 'Robert Chen', role: 'Board Member', avatar: 'RC', text: "Our Reserves balance shows $47,200 but our accountant confirmed it should be $52,400 after last month's deposit. The GL entry is there but Reserves hasn't updated.", time: '8:05 AM' },
+      { id: 2, from: 'support', name: 'Maya R.',      avatar: 'MR', text: "Hi Robert — I can see the GL entry from March 1st. It looks like the sync between the General Ledger and Reserves module may have a propagation delay. Let me check with engineering.", time: '8:22 AM' },
+      { id: 3, from: 'assoc',   name: 'Robert Chen', role: 'Board Member', avatar: 'RC', text: "Our annual meeting is next week and we'll need to present accurate reserve figures. Can this be resolved before then?", time: '8:35 AM' },
     ],
   },
   {
-    id: 'assoc-3',
-    name: 'Meridian Park Estates',
-    plan: 'Management Suite',
-    planColor: '#7c3aed',
-    address: '2800 16th Street NW, Washington, DC 20009',
-    units: 72,
-    boardMembers: 9,
-    residents: 185,
-    managers: 4,
-    staff: 3,
-    status: 'active',
-    members: [
-      { name: 'Angela Rivera', role: 'Board President', email: 'arivera@meridianpark.org' },
-      { name: 'James Worthington', role: 'Treasurer', email: 'jworthington@meridianpark.org' },
-      { name: 'Nina Patel', role: 'General Manager', email: 'npatel@meridianpark.org' },
+    id: 'SUP-003', assocId: 'assoc_dupont',
+    subject: 'Work order workflow — vendor assignment not saving',
+    status: 'open', priority: 'medium', module: 'Fiscal Lens', unread: 0, lastAt: '3h ago', assignee: 'Sam L.',
+    capturedItems: [
+      { type: 'bug',     title: 'Vendor assignment on WO form resets on save',   feedbackId: 'F-005' },
+      { type: 'feature', title: 'Recurring work order templates',                feedbackId: 'F-006' },
+    ],
+    aiSummary: 'Property manager unable to assign vendors to work orders — assignment field resets on save. Also requested recurring WO templates.',
+    messages: [
+      { id: 1, from: 'assoc',   name: 'Alicia Moreno', role: 'Property Manager', avatar: 'AM', text: "When I create a work order and assign a vendor, the assignment is gone when I save. I have to re-assign every time but it doesn't persist.", time: '7:30 AM' },
+      { id: 2, from: 'support', name: 'Sam L.',         avatar: 'SL', text: "Hi Alicia — we're reproducing this on our end. It appears to be a state management issue in the WO form. I'll log it as a bug.", time: '8:15 AM' },
+      { id: 3, from: 'assoc',   name: 'Alicia Moreno', role: 'Property Manager', avatar: 'AM', text: "Also — is there any plan to support recurring work orders? We have monthly HVAC inspections and it'd save a lot of time.", time: '8:30 AM' },
+    ],
+  },
+  {
+    id: 'SUP-004', assocId: 'assoc_dupont',
+    subject: 'Bylaws & Legal — document upload failing for large PDFs',
+    status: 'pending', priority: 'medium', module: 'Board Room', unread: 0, lastAt: '1d ago', assignee: 'Maya R.',
+    capturedItems: [
+      { type: 'bug',  title: 'PDF upload fails silently for files over 10MB',  feedbackId: 'F-002' },
+      { type: 'docs', title: 'Document size limits not stated in upload UI',   feedbackId: null },
+    ],
+    aiSummary: 'Upload fails for PDFs over ~10MB with no error shown. Bylaws document is 14MB. Docs issue: limit not communicated in UI.',
+    messages: [
+      { id: 1, from: 'assoc',   name: 'Tom Nguyen', role: 'Board Member', avatar: 'TN', text: "Trying to upload our 14MB bylaws PDF in the Bylaws & Legal section. Upload shows progress then fails silently — no error, file doesn't appear.", time: 'Yesterday 2:00 PM' },
+      { id: 2, from: 'support', name: 'Maya R.',     avatar: 'MR', text: "Hi Tom — there is a 10MB limit on document uploads currently. Your file at 14MB is exceeding it. We don't surface this clearly in the UI which is a gap we'll fix. For now, can you compress the PDF?", time: 'Yesterday 2:45 PM' },
+      { id: 3, from: 'assoc',   name: 'Tom Nguyen', role: 'Board Member', avatar: 'TN', text: "That worked, thanks. But that limit should definitely be shown upfront — wasted 30 minutes troubleshooting.", time: 'Yesterday 3:10 PM' },
+    ],
+  },
+  {
+    id: 'SUP-005', assocId: 'assoc_adamsmorg',
+    subject: 'Governance Calendar — meeting invitations not sending to residents',
+    status: 'open', priority: 'medium', module: 'Board Room', unread: 1, lastAt: '4h ago', assignee: 'Unassigned',
+    capturedItems: [],
+    aiSummary: null,
+    messages: [
+      { id: 1, from: 'assoc', name: 'David Kim', role: 'Board Member', avatar: 'DK', text: 'We scheduled our annual meeting in Governance Calendar and the system said invitations were sent, but none of our residents received the email. Checked spam too.', time: '11:00 AM' },
+    ],
+  },
+  {
+    id: 'SUP-006', assocId: 'assoc_1302rstnw',
+    subject: 'Permission question — resident access to board minutes',
+    status: 'resolved', priority: 'low', module: 'Access & Permissions', unread: 0, lastAt: '3d ago', assignee: 'Alex K.',
+    capturedItems: [
+      { type: 'docs', title: 'Clarify which modules residents can access per plan', feedbackId: null },
+    ],
+    aiSummary: 'Board wanted to grant residents read access to approved meeting minutes. Resolved via Permission Simulator — resident role has read access to approved minutes by default.',
+    messages: [
+      { id: 1, from: 'assoc',   name: 'Patricia Walsh', role: 'Board Member', avatar: 'PW', text: 'Can residents see approved board meeting minutes in the system? If so, how do we control that?', time: 'Mon 10:00 AM' },
+      { id: 2, from: 'support', name: 'Alex K.',         avatar: 'AK', text: 'Yes — residents with the Resident role can view approved meeting minutes. You can verify and adjust this through the Permission Simulator in your admin panel.', time: 'Mon 10:30 AM' },
+      { id: 3, from: 'assoc',   name: 'Patricia Walsh', role: 'Board Member', avatar: 'PW', text: "Found it — that's exactly what we needed. Thank you!", time: 'Mon 11:00 AM' },
     ],
   },
 ]
 
-const threads: SupportThread[] = [
-  {
-    id: 'thread-1',
-    associationId: 'assoc-1',
-    subject: 'Quorum tracking not registering proxy votes',
-    priority: 'high',
-    module: 'Board Room',
-    status: 'open',
-    unread: 2,
-    createdAt: '2026-03-05T14:30:00Z',
-    messages: [
-      {
-        id: 'msg-1a',
-        from: 'association',
-        sender: 'Patricia Langley',
-        content: 'We held our annual meeting last night and the quorum tracker showed 8/24 units present, but we had 14 owners in the room plus 3 proxy votes submitted through the system. The proxy votes aren\'t being counted toward quorum.',
-        timestamp: '2026-03-05T14:30:00Z',
-      },
-      {
-        id: 'msg-1b',
-        from: 'support',
-        sender: 'Admin Support',
-        content: 'Thank you for reporting this, Patricia. I can see the proxy submissions in the system — they were received but the quorum calculation is filtering them out. This looks like a bug introduced in last week\'s update. Let me escalate to engineering.',
-        timestamp: '2026-03-05T15:12:00Z',
-      },
-      {
-        id: 'msg-1c',
-        from: 'association',
-        sender: 'Patricia Langley',
-        content: 'This is urgent — we need to certify the election results by Friday. Can we get a manual override or a fix before then?',
-        timestamp: '2026-03-06T09:00:00Z',
-      },
-      {
-        id: 'msg-1d',
-        from: 'association',
-        sender: 'David Kim',
-        content: 'Adding on — we also noticed the vote tallies on Resolution 3 (special assessment) don\'t match our hand count. Could be related?',
-        timestamp: '2026-03-06T10:15:00Z',
-      },
-    ],
-  },
-  {
-    id: 'thread-2',
-    associationId: 'assoc-2',
-    subject: 'Reserve fund balance showing $0 after bank sync',
-    priority: 'high',
-    module: 'Fiscal Lens',
-    status: 'open',
-    unread: 1,
-    createdAt: '2026-03-04T11:00:00Z',
-    messages: [
-      {
-        id: 'msg-2a',
-        from: 'association',
-        sender: 'Marcus Thompson',
-        content: 'Our reserve fund account synced this morning and now shows a $0 balance. The actual balance at PNC Bank is $347,250. This is causing panic among board members who can see the dashboard.',
-        timestamp: '2026-03-04T11:00:00Z',
-      },
-      {
-        id: 'msg-2b',
-        from: 'support',
-        sender: 'Admin Support',
-        content: 'Marcus, I\'m looking into this right now. It appears the Plaid connection for your PNC reserve account returned an error during sync and the system zeroed the balance instead of retaining the last known value. I\'m working on restoring the correct figure.',
-        timestamp: '2026-03-04T11:45:00Z',
-      },
-      {
-        id: 'msg-2c',
-        from: 'association',
-        sender: 'Lisa Chen',
-        content: 'Board members are asking about this. Can we get an ETA? We have a finance committee meeting tomorrow.',
-        timestamp: '2026-03-05T08:30:00Z',
-      },
-    ],
-  },
-  {
-    id: 'thread-3',
-    associationId: 'assoc-3',
-    subject: 'Cannot assign vendor to work order — dropdown empty',
-    priority: 'medium',
-    module: 'Compliance',
-    status: 'open',
-    unread: 0,
-    createdAt: '2026-03-03T16:20:00Z',
-    messages: [
-      {
-        id: 'msg-3a',
-        from: 'association',
-        sender: 'Nina Patel',
-        content: 'When I try to assign a vendor to work order #WO-2847 (elevator maintenance), the vendor dropdown is completely empty. We have 12 approved vendors in the system. This started happening after the Tuesday update.',
-        timestamp: '2026-03-03T16:20:00Z',
-      },
-      {
-        id: 'msg-3b',
-        from: 'support',
-        sender: 'Admin Support',
-        content: 'Nina, I can reproduce this. The vendor list query was updated to filter by active contracts, but the contract status field migration didn\'t backfill existing records. I\'m pushing a fix now that will treat null contract status as active.',
-        timestamp: '2026-03-03T17:00:00Z',
-      },
-      {
-        id: 'msg-3c',
-        from: 'association',
-        sender: 'Nina Patel',
-        content: 'Thanks for the quick response. The dropdown is populated again. However, I noticed that vendors without contracts are now showing — should those be filtered out?',
-        timestamp: '2026-03-04T09:15:00Z',
-      },
-    ],
-  },
-  {
-    id: 'thread-4',
-    associationId: 'assoc-1',
-    subject: 'Meeting minutes PDF upload fails over 5MB',
-    priority: 'low',
-    module: 'Board Room',
-    status: 'open',
-    unread: 0,
-    createdAt: '2026-03-02T13:45:00Z',
-    messages: [
-      {
-        id: 'msg-4a',
-        from: 'association',
-        sender: 'Sandra Okafor',
-        content: 'I\'m trying to upload the February board meeting minutes (8.2MB PDF with embedded photos) and keep getting "Upload failed" with no other details. Smaller files work fine.',
-        timestamp: '2026-03-02T13:45:00Z',
-      },
-      {
-        id: 'msg-4b',
-        from: 'support',
-        sender: 'Admin Support',
-        content: 'Sandra, the current upload limit is 5MB per file. I\'ve filed a request to increase this to 25MB. In the meantime, you can compress the PDF using a tool like Smallpdf, or I can upload it for you from our side.',
-        timestamp: '2026-03-02T14:30:00Z',
-      },
-    ],
-  },
-  {
-    id: 'thread-5',
-    associationId: 'assoc-2',
-    subject: 'Resident portal showing wrong unit assignments',
-    priority: 'medium',
-    module: 'Resident Portal',
-    status: 'resolved',
-    unread: 0,
-    createdAt: '2026-02-28T10:00:00Z',
-    messages: [
-      {
-        id: 'msg-5a',
-        from: 'association',
-        sender: 'Robert Vasquez',
-        content: 'Three residents reported they\'re seeing maintenance requests from other units when they log into the portal. Unit 204 can see Unit 312\'s requests, etc. This is a privacy concern.',
-        timestamp: '2026-02-28T10:00:00Z',
-      },
-      {
-        id: 'msg-5b',
-        from: 'support',
-        sender: 'Admin Support',
-        content: 'Robert, this was caused by a caching issue in the unit-to-user mapping. We\'ve cleared the cache and deployed a fix to prevent stale mappings. Can you ask the affected residents to log out and back in?',
-        timestamp: '2026-02-28T11:30:00Z',
-      },
-      {
-        id: 'msg-5c',
-        from: 'association',
-        sender: 'Robert Vasquez',
-        content: 'Confirmed — all three residents now see only their own unit data. Thank you for the fast turnaround.',
-        timestamp: '2026-02-28T14:00:00Z',
-      },
-    ],
-  },
+const FEEDBACK_ITEMS = [
+  { id: 'F-001', title: 'Reserve fund balance sync delay from General Ledger', status: 'In Development' },
+  { id: 'F-002', title: 'PDF upload fails silently over 10MB limit',           status: 'In Development' },
+  { id: 'F-003', title: 'Live quorum count not updating for all participants',  status: 'Exploring' },
+  { id: 'F-004', title: 'Email notification when quorum is reached',           status: 'Backlog' },
+  { id: 'F-005', title: 'Vendor assignment on work order form not persisting',  status: 'In Development' },
+  { id: 'F-006', title: 'Recurring work order templates',                       status: 'In Roadmap' },
+  { id: 'F-007', title: 'Compliance grade breakdown — drill-down detail',       status: 'Planned' },
+  { id: 'F-008', title: 'Resident portal — maintenance request submission',     status: 'In Roadmap' },
+  { id: 'F-009', title: 'Budget vs actuals comparison report',                  status: 'Planned' },
+  { id: 'F-010', title: 'Bulk resident import via CSV',                         status: 'Backlog' },
 ]
 
 // --- Helpers ---
 
-const priorityVariant: Record<Priority, 'red' | 'amber' | 'gray'> = {
-  high: 'red',
-  medium: 'amber',
-  low: 'gray',
+function assocById(id: string) {
+  return ASSOCIATIONS.find(a => a.id === id)
 }
 
-function formatTime(ts: string) {
-  const d = new Date(ts)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+function getInitials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function totalUsers(a: Association) {
+  return a.users.boardMembers + a.users.residents + a.users.managers + a.users.staff
 }
 
 // --- Component ---
 
 export function SupportClient() {
-  const [scopeId, setScopeId] = useState<string | null>(null)
-  const [selectedThreadId, setSelectedThreadId] = useState<string>(threads[0].id)
-  const [rightTab, setRightTab] = useState<'capture' | 'association'>('capture')
+  const [threads, setThreads] = useState(INITIAL_THREADS)
+  const [scopeAssocId, setScopeAssocId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState('all')
   const [replyText, setReplyText] = useState('')
+  const [rightPanel, setRightPanel] = useState<'capture' | 'association'>('capture')
+  const [linkTarget, setLinkTarget] = useState('')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const filteredThreads = scopeId ? threads.filter(t => t.associationId === scopeId) : threads
-  const selectedThread = threads.find(t => t.id === selectedThreadId) || threads[0]
-  const threadAssociation = associations.find(a => a.id === selectedThread.associationId)!
-  const assocThreads = threads.filter(t => t.associationId === selectedThread.associationId)
+  const visible = threads
+    .filter(t => scopeAssocId ? t.assocId === scopeAssocId : true)
+    .filter(t => statusFilter === 'all' ? true : t.status === statusFilter)
+    .sort((a, b) => {
+      const p: Record<string, number> = { high: 0, medium: 1, low: 2 }
+      if (a.status !== 'resolved' && b.status === 'resolved') return -1
+      if (a.status === 'resolved' && b.status !== 'resolved') return 1
+      return (p[a.priority] ?? 2) - (p[b.priority] ?? 2)
+    })
+
+  useEffect(() => {
+    if ((!selectedId || !visible.find(t => t.id === selectedId)) && visible.length) {
+      setSelectedId(visible[0].id)
+    }
+  }, [scopeAssocId, statusFilter])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [selectedId])
+
+  const thread = threads.find(t => t.id === selectedId)
+  const assoc = thread ? assocById(thread.assocId) : null
+  const pm = assoc ? PLAN_META[assoc.plan] : null
+
+  const sendReply = () => {
+    if (!replyText.trim() || !selectedId) return
+    setThreads(prev => prev.map(t =>
+      t.id === selectedId
+        ? { ...t, messages: [...t.messages, { id: Date.now(), from: 'support' as const, name: 'You', avatar: 'YO', text: replyText, time: 'just now' }] }
+        : t
+    ))
+    setReplyText('')
+  }
+
+  const handleSummarize = (threadId: string) => {
+    const t = threads.find(th => th.id === threadId)
+    if (!t) return
+    const summary = t.priority === 'high'
+      ? `Critical issue reported by ${assocById(t.assocId)?.name}. ${t.subject.split('—')[1]?.trim() || t.subject}. Requires engineering escalation.`
+      : `${t.subject.split('—')[1]?.trim() || t.subject}. Issue identified and being tracked.`
+    setThreads(prev => prev.map(th => th.id === threadId ? { ...th, aiSummary: summary } : th))
+  }
+
+  const openThreads = threads.filter(t => t.status === 'open').length
 
   return (
     <div className="-m-8 flex flex-col" style={{ height: 'calc(100vh - 73px)' }}>
       {/* Association scope tabs */}
-      <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-4">
+      <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-6 overflow-x-auto">
         <button
-          onClick={() => setScopeId(null)}
+          onClick={() => setScopeAssocId(null)}
           className={cn(
-            'px-4 py-2.5 text-[0.82rem] font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0',
-            scopeId === null ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-500 border-b-transparent hover:text-gray-700'
+            'px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 whitespace-nowrap',
+            scopeAssocId === null ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-400 border-b-transparent hover:text-gray-700'
           )}
         >
-          All Threads
+          All associations
         </button>
-        {associations.map(a => (
-          <button
-            key={a.id}
-            onClick={() => setScopeId(a.id)}
-            className={cn(
-              'px-4 py-2.5 text-[0.82rem] font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 flex items-center gap-1.5',
-              scopeId === a.id ? 'text-gray-900 font-semibold' : 'text-gray-500 border-b-transparent hover:text-gray-700'
-            )}
-            style={scopeId === a.id ? { borderBottomColor: a.planColor } : undefined}
-          >
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: a.planColor }} />
-            <span className="truncate max-w-[160px]">{a.name}</span>
-          </button>
-        ))}
+        {ASSOCIATIONS.map(a => {
+          const apm = PLAN_META[a.plan]
+          const unread = threads.filter(t => t.assocId === a.id).reduce((s, t) => s + t.unread, 0)
+          const active = scopeAssocId === a.id
+          return (
+            <button
+              key={a.id}
+              onClick={() => setScopeAssocId(active ? null : a.id)}
+              className={cn(
+                'px-3.5 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 flex items-center gap-1.5 whitespace-nowrap',
+                active ? 'font-semibold' : 'text-gray-400 border-b-transparent hover:text-gray-700'
+              )}
+              style={active ? { color: apm.dot, borderBottomColor: apm.dot } : undefined}
+            >
+              <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: apm.dot }} />
+              {a.name.split(' ').slice(0, 3).join(' ')}
+              {unread > 0 && (
+                <span className="bg-[#dc2626] text-white rounded-full w-3.5 h-3.5 text-[8px] font-bold inline-flex items-center justify-center flex-shrink-0">{unread}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* 3-pane layout */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left pane — thread list */}
-        <div className="w-80 border-r border-gray-200 bg-white overflow-y-auto flex-shrink-0">
-          {filteredThreads.length === 0 ? (
-            <div className="p-6 text-center text-gray-400 text-sm">No threads for this association.</div>
-          ) : (
-            filteredThreads.map(t => {
-              const assoc = associations.find(a => a.id === t.associationId)!
-              const isActive = t.id === selectedThreadId
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedThreadId(t.id)}
-                  className={cn(
-                    'px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors',
-                    isActive ? 'bg-gray-50' : 'hover:bg-gray-50/60'
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: assoc.planColor }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className={cn('text-[0.82rem] truncate', isActive ? 'font-semibold text-gray-900' : 'font-medium text-gray-700')}>
-                          {t.subject}
-                        </span>
-                        {t.unread > 0 && (
-                          <span className="ml-auto bg-[#c42030] text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">{t.unread}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant={priorityVariant[t.priority]} className="text-[0.6rem]">{t.priority}</Badge>
-                        <Badge variant="blue" className="text-[0.6rem]">{t.module}</Badge>
-                        {t.status === 'resolved' && <Badge variant="green" className="text-[0.6rem]">resolved</Badge>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Center pane — message thread */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
-          {/* Thread header */}
-          <div className="px-5 py-3 bg-white border-b border-gray-200">
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: threadAssociation.planColor }} />
-              <span>{threadAssociation.name}</span>
-              <span>·</span>
-              <span>{threadAssociation.plan}</span>
-              <span>·</span>
-              <span>{threadAssociation.address}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold">{selectedThread.subject}</h3>
-              <div className="flex items-center gap-2">
-                <Badge variant={priorityVariant[selectedThread.priority]}>{selectedThread.priority}</Badge>
-                <Badge variant="blue">{selectedThread.module}</Badge>
-                {selectedThread.status === 'open' && (
-                  <Button variant="sage" size="sm">
-                    <CheckCircle size={14} />
-                    Resolve
-                  </Button>
+        {/* Left — thread list */}
+        <div className="w-[280px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+          {/* Status filter pills */}
+          <div className="p-2.5 border-b border-gray-100 flex gap-1">
+            {[['all', 'All'], ['open', 'Open'], ['pending', 'Pending'], ['resolved', 'Resolved']].map(([v, l]) => (
+              <button
+                key={v}
+                onClick={() => setStatusFilter(v)}
+                className={cn(
+                  'flex-1 py-1.5 text-[11px] font-medium rounded-[5px] cursor-pointer transition-all border bg-transparent',
+                  statusFilter === v
+                    ? 'text-gray-900 font-semibold border-gray-200 bg-gray-50'
+                    : 'text-gray-400 border-transparent'
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-3">
-            {selectedThread.messages.map(msg => (
-              <div key={msg.id} className={cn('flex', msg.from === 'support' ? 'justify-end' : 'justify-start')}>
-                <div className={cn(
-                  'max-w-[75%] rounded-[10px] px-4 py-3',
-                  msg.from === 'support'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white border border-gray-200'
-                )}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={cn('text-[0.7rem] font-semibold', msg.from === 'support' ? 'text-gray-300' : 'text-gray-500')}>
-                      {msg.sender}
-                    </span>
-                    <span className={cn('text-[0.65rem]', msg.from === 'support' ? 'text-gray-400' : 'text-gray-400')}>
-                      {formatTime(msg.timestamp)}
-                    </span>
-                  </div>
-                  <p className={cn('text-[0.82rem] leading-relaxed m-0', msg.from === 'support' ? 'text-gray-100' : 'text-gray-700')}>
-                    {msg.content}
-                  </p>
-                </div>
-              </div>
+              >
+                {l}
+              </button>
             ))}
           </div>
 
-          {/* Reply box */}
-          {selectedThread.status === 'open' && (
-            <div className="px-5 py-3 bg-white border-t border-gray-200">
-              <div className="flex gap-2">
+          <div className="flex-1 overflow-y-auto">
+            {visible.length === 0 && <div className="p-5 text-[13px] text-gray-400">No threads.</div>}
+            {visible.map(t => {
+              const a = assocById(t.assocId)
+              const ap = a ? PLAN_META[a.plan] : null
+              const isActive = t.id === selectedId
+              const ps = PRIORITY_META[t.priority]
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedId(t.id)}
+                  className={cn(
+                    'px-3.5 py-3 border-b border-gray-100 cursor-pointer transition-colors',
+                    isActive ? 'bg-blue-50' : 'bg-white hover:bg-gray-50/60'
+                  )}
+                  style={{ borderLeft: `3px solid ${isActive ? (ap?.dot || '#3b82f6') : 'transparent'}` }}
+                >
+                  {/* Top row: assoc name + unread + time */}
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      {!scopeAssocId && ap && <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: ap.dot }} />}
+                      <span className={cn('text-xs font-semibold overflow-hidden text-ellipsis whitespace-nowrap flex-1', isActive ? 'text-blue-800' : 'text-gray-900')}>
+                        {scopeAssocId ? t.id : a?.name?.split(' ').slice(0, 3).join(' ')}
+                      </span>
+                      {t.unread > 0 && (
+                        <span className="bg-[#dc2626] text-white rounded-full w-[15px] h-[15px] text-[8px] font-bold inline-flex items-center justify-center flex-shrink-0">{t.unread}</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400 ml-1.5 flex-shrink-0">{t.lastAt}</span>
+                  </div>
+                  {/* Subject */}
+                  <div className="text-xs text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap mb-1.5">{t.subject}</div>
+                  {/* Priority + module + captured */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium" style={{ color: ps.color }}>● {ps.label}</span>
+                    <span className="text-[10px] text-gray-400">· {t.module}</span>
+                    {t.capturedItems.length > 0 && <span className="text-[10px] text-emerald-600 ml-auto">✦ {t.capturedItems.length}</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Center — message thread */}
+        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+          {thread && assoc && pm ? (
+            <>
+              {/* Thread header */}
+              <div className="bg-white border-b border-gray-200 px-5 py-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ background: pm.dot }} />
+                  <span className="text-xs font-semibold" style={{ color: pm.color }}>{assoc.name}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-[11px] text-gray-400">{assoc.plan}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-[11px] text-gray-400">{assoc.address}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-[11px] text-gray-400">{thread.id}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900 mb-1">{thread.subject}</div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={THREAD_STATUS_META[thread.status].variant}>{THREAD_STATUS_META[thread.status].label}</Badge>
+                      <span className="text-[11px] bg-gray-100 border border-gray-200 rounded px-1.5 py-px text-gray-500">{thread.module}</span>
+                      <span className="text-[11px] font-medium" style={{ color: PRIORITY_META[thread.priority].color }}>
+                        ● {PRIORITY_META[thread.priority].label} priority
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 outline-none cursor-pointer">
+                      <option>{thread.assignee || 'Assign…'}</option>
+                      <option>Alex K.</option>
+                      <option>Maya R.</option>
+                      <option>Sam L.</option>
+                    </select>
+                    {thread.status !== 'resolved' && (
+                      <Button
+                        variant="sage"
+                        size="sm"
+                        onClick={() => setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, status: 'resolved' as const } : t))}
+                      >
+                        <CheckCircle size={14} />
+                        Resolve
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3.5">
+                {thread.messages.map(msg => {
+                  const isSupport = msg.from === 'support'
+                  return (
+                    <div key={msg.id} className={cn('flex gap-2.5', isSupport ? 'flex-row-reverse' : 'flex-row')}>
+                      <div
+                        className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
+                        style={{ background: isSupport ? '#6b7280' : pm.dot, color: '#fff' }}
+                      >
+                        {getInitials(msg.name)}
+                      </div>
+                      <div className="max-w-[68%]">
+                        <div className={cn('flex items-baseline gap-1.5 mb-1', isSupport ? 'flex-row-reverse' : 'flex-row')}>
+                          <span className="text-xs font-semibold text-gray-700">{msg.name}</span>
+                          {msg.role && !isSupport && (
+                            <span className="text-[11px] text-gray-400 bg-gray-100 px-1.5 py-px rounded">{msg.role}</span>
+                          )}
+                          <span className="text-[11px] text-gray-300">{msg.time}</span>
+                        </div>
+                        <div
+                          className={cn(
+                            'border px-3.5 py-2.5',
+                            isSupport
+                              ? 'bg-blue-50 border-blue-200 rounded-xl rounded-tr-sm'
+                              : 'bg-white border-gray-200 rounded-xl rounded-tl-sm'
+                          )}
+                        >
+                          <p className="text-[13px] text-gray-700 leading-relaxed m-0">{msg.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Reply box */}
+              <div className="bg-white border-t border-gray-200 px-5 py-3">
                 <textarea
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
-                  placeholder="Type a reply..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 resize-none min-h-[40px] max-h-[120px] focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10"
-                  rows={1}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
+                  placeholder={`Reply to ${assoc.name}…`}
+                  rows={2}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-700 resize-none outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10"
                 />
-                <Button disabled={!replyText.trim()}>Send</Button>
+                <div className="flex justify-end mt-2">
+                  <Button onClick={sendReply} disabled={!replyText.trim()}>Send reply ↑</Button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right pane */}
-        <div className="w-80 border-l border-gray-200 bg-white overflow-y-auto flex-shrink-0 flex flex-col">
-          {/* Right panel tabs */}
-          <div className="flex border-b border-gray-200">
-            <button
-              onClick={() => setRightTab('capture')}
-              className={cn(
-                'flex-1 px-4 py-2.5 text-[0.82rem] font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0',
-                rightTab === 'capture' ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-500 border-b-transparent hover:text-gray-700'
-              )}
-            >
-              Capture
-            </button>
-            <button
-              onClick={() => setRightTab('association')}
-              className={cn(
-                'flex-1 px-4 py-2.5 text-[0.82rem] font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0',
-                rightTab === 'association' ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-500 border-b-transparent hover:text-gray-700'
-              )}
-            >
-              Association
-            </button>
-          </div>
-
-          <div className="p-4 flex-1">
-            {rightTab === 'capture' ? (
-              <CapturePanel thread={selectedThread} />
-            ) : (
-              <AssociationPanel association={threadAssociation} threads={assocThreads} />
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// --- Capture Panel ---
-
-function CapturePanel({ thread }: { thread: SupportThread }) {
-  const [summaryGenerated, setSummaryGenerated] = useState(false)
-  const [itemsCaptured, setItemsCaptured] = useState(false)
-  const [linkOpen, setLinkOpen] = useState(false)
-
-  return (
-    <div className="space-y-5">
-      {/* AI Summary */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">AI Summary</h4>
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-          {summaryGenerated ? (
-            <p className="text-[0.78rem] text-gray-600 leading-relaxed m-0">
-              {thread.priority === 'high'
-                ? 'Critical issue affecting core workflow. Association reports data integrity problem impacting board operations. Engineering escalation recommended.'
-                : 'Moderate issue related to system configuration. User reports unexpected behavior after recent update. Fix identified and being deployed.'}
-            </p>
+            </>
           ) : (
-            <Button variant="secondary" size="sm" onClick={() => setSummaryGenerated(true)} className="w-full justify-center">
-              <Sparkles size={14} />
-              Generate Summary
-            </Button>
+            <div className="flex-1 flex items-center justify-center text-gray-300 text-[13px]">Select a thread</div>
           )}
         </div>
-      </div>
 
-      {/* Captured Items */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Captured Items</h4>
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-          {itemsCaptured ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="red" className="text-[0.6rem]">Bug</Badge>
-                <span className="text-[0.78rem] text-gray-700">{thread.subject}</span>
-              </div>
-              <div className="text-[0.7rem] text-gray-500">Module: {thread.module} · Priority: {thread.priority}</div>
-            </div>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={() => setItemsCaptured(true)} className="w-full justify-center">
-              <MessageCircle size={14} />
-              Analyze Thread
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Link to Feedback */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Link to Feedback</h4>
-        <div className="relative">
-          <button
-            onClick={() => setLinkOpen(!linkOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5">
-              <Link2 size={14} className="text-gray-400" />
-              Select feedback item...
-            </span>
-            <ChevronDown size={14} className="text-gray-400" />
-          </button>
-          {linkOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
-              {['Proxy votes not counted in quorum', 'Bank sync zeroes balances on error', 'Vendor dropdown empty after migration', 'File upload size limit too low'].map((item, i) => (
+        {/* Right panel */}
+        {thread && assoc && pm && (
+          <div className="w-[290px] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col">
+            {/* Panel tabs */}
+            <div className="flex border-b border-gray-200">
+              {[['capture', 'Capture'], ['association', 'Association']].map(([v, l]) => (
                 <button
-                  key={i}
-                  onClick={() => setLinkOpen(false)}
-                  className="w-full text-left px-3 py-2 text-[0.82rem] text-gray-700 hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                  key={v}
+                  onClick={() => setRightPanel(v as 'capture' | 'association')}
+                  className={cn(
+                    'flex-1 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0',
+                    rightPanel === v ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-400 border-b-transparent hover:text-gray-700'
+                  )}
                 >
-                  {item}
+                  {l}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
-// --- Association Panel ---
+            <div className="flex-1 overflow-y-auto">
+              {rightPanel === 'capture' ? (
+                <div className="p-4 flex flex-col gap-3">
+                  {/* AI Summary */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-100 px-3 py-2 flex justify-between items-center">
+                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">AI Summary</span>
+                      <button
+                        onClick={() => handleSummarize(thread.id)}
+                        className="text-[11px] text-blue-600 bg-transparent border-none cursor-pointer font-medium"
+                      >
+                        {thread.aiSummary ? 'Refresh' : 'Generate'}
+                      </button>
+                    </div>
+                    <div className="px-3 py-2.5">
+                      {thread.aiSummary ? (
+                        <p className="text-xs text-gray-700 leading-relaxed m-0">{thread.aiSummary}</p>
+                      ) : (
+                        <p className="text-xs text-gray-300 m-0">Not yet generated.</p>
+                      )}
+                    </div>
+                  </div>
 
-function AssociationPanel({ association, threads }: { association: Association; threads: SupportThread[] }) {
-  return (
-    <div className="space-y-5">
-      {/* Association details card */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Association Details</h4>
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: association.planColor }} />
-            <span className="font-semibold text-[0.82rem]">{association.name}</span>
+                  {/* Captured Items */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-100 px-3 py-2 flex justify-between items-center">
+                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Captured Items</span>
+                      <button className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-px cursor-pointer font-medium">
+                        <Sparkles size={10} className="inline mr-0.5" />
+                        Analyze
+                      </button>
+                    </div>
+                    <div className="py-2">
+                      {thread.capturedItems.length === 0 ? (
+                        <p className="text-xs text-gray-300 m-0 px-3">Run analysis to surface items.</p>
+                      ) : (
+                        thread.capturedItems.map((item, i) => {
+                          const linked = item.feedbackId ? FEEDBACK_ITEMS.find(f => f.id === item.feedbackId) : null
+                          const tm = TYPE_META[item.type]
+                          return (
+                            <div key={i} className="px-3 py-1.5 border-b border-gray-50 last:border-b-0">
+                              <div className="flex items-start gap-1.5 mb-0.5">
+                                <Badge variant={tm?.variant || 'gray'} className="text-[10px]">{tm?.label || item.type}</Badge>
+                                <span className="text-xs text-gray-700 leading-snug">{item.title}</span>
+                              </div>
+                              {linked && (
+                                <div className="ml-0.5 mt-1">
+                                  <span className="text-[11px] text-gray-500">→ </span>
+                                  <span className="text-[11px] text-blue-600 font-medium">{linked.id} · {linked.status}</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Link to Feedback */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-100 px-3 py-2">
+                      <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Link to Feedback</span>
+                    </div>
+                    <div className="px-3 py-2.5 flex gap-1.5">
+                      <select
+                        value={linkTarget}
+                        onChange={e => setLinkTarget(e.target.value)}
+                        className="flex-1 bg-white border border-gray-200 rounded-[5px] px-2 py-1.5 text-[11px] text-gray-700 outline-none"
+                      >
+                        <option value="">Select item…</option>
+                        {FEEDBACK_ITEMS.map(f => (
+                          <option key={f.id} value={f.id}>{f.id}: {f.title.slice(0, 35)}</option>
+                        ))}
+                      </select>
+                      <Button size="xs" onClick={() => setLinkTarget('')} disabled={!linkTarget}>Link</Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 flex flex-col gap-3.5">
+                  {/* Association summary card */}
+                  <div className="rounded-lg p-3.5" style={{ border: `1px solid ${pm.dot}33`, background: pm.bg }}>
+                    <div className="text-sm font-bold text-gray-900 mb-1">{assoc.name}</div>
+                    <div className="text-xs text-gray-500 mb-2.5">{assoc.address}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ background: pm.dot }} />
+                      <span className="text-[13px] text-gray-700">{assoc.plan}</span>
+                      <Badge variant={assoc.status === 'active' ? 'green' : assoc.status === 'trial' ? 'amber' : 'red'}>{assoc.status}</Badge>
+                    </div>
+                  </div>
+
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      ['Units', assoc.units],
+                      ['Total Users', totalUsers(assoc)],
+                      ['Board Members', assoc.users.boardMembers],
+                      ['Residents', assoc.users.residents],
+                    ].map(([k, v]) => (
+                      <div key={k as string} className="bg-gray-50 border border-gray-100 rounded-md p-2.5">
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{k}</div>
+                        <div className="text-lg font-bold text-gray-900">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Members */}
+                  <div>
+                    <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Members</div>
+                    {assoc.members.map(m => (
+                      <div key={m.email} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-b-0">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0"
+                          style={{ background: pm.dot }}
+                        >
+                          {getInitials(m.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-medium text-gray-900">{m.name}</div>
+                          <div className="text-[11px] text-gray-400">{m.role}</div>
+                        </div>
+                        <div className="text-[10px] text-gray-300">{m.lastActive}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* All threads for association */}
+                  <div>
+                    <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">All Threads</div>
+                    {threads.filter(t => t.assocId === assoc.id).map(t => (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedId(t.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-2 py-1.5 rounded-[5px] cursor-pointer',
+                          t.id === selectedId ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        )}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: t.status === 'resolved' ? '#10b981' : '#f59e0b' }} />
+                        <span className="text-xs text-gray-700 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{t.subject}</span>
+                        <span className="text-[10px] text-gray-400">{t.id}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="text-[0.7rem] text-gray-500 mb-3">{association.address}</div>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Badge variant={association.plan === 'Compliance Pro' ? 'red' : association.plan === 'Community Plus' ? 'blue' : 'purple'}>
-              {association.plan}
-            </Badge>
-            <Badge variant="green">{association.status}</Badge>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Unit & User Stats</h4>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: 'Units', value: association.units },
-            { label: 'Board', value: association.boardMembers },
-            { label: 'Residents', value: association.residents },
-            { label: 'Managers', value: association.managers },
-          ].map(s => (
-            <div key={s.label} className="bg-gray-50 rounded-lg border border-gray-200 p-2.5 text-center">
-              <div className="text-lg font-bold font-serif">{s.value}</div>
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-wider">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Members list */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Members</h4>
-        <div className="space-y-2">
-          {association.members.map(m => (
-            <div key={m.email} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
-              <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <User size={14} className="text-gray-500" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[0.78rem] font-semibold text-gray-700 truncate">{m.name}</div>
-                <div className="text-[0.65rem] text-gray-500">{m.role}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* All threads for association */}
-      <div>
-        <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">All Threads ({threads.length})</h4>
-        <div className="space-y-1.5">
-          {threads.map(t => (
-            <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
-              <Badge variant={t.status === 'resolved' ? 'green' : priorityVariant[t.priority]} className="text-[0.6rem] flex-shrink-0">
-                {t.status === 'resolved' ? 'resolved' : t.priority}
-              </Badge>
-              <span className="text-[0.78rem] text-gray-700 truncate">{t.subject}</span>
-            </div>
-          ))}
-        </div>
+        )}
       </div>
     </div>
   )

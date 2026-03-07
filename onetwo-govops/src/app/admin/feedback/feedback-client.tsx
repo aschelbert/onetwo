@@ -2,301 +2,251 @@
 
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ChevronRight, ChevronDown, ThumbsUp, MessageCircle } from 'lucide-react'
+import { MessageCircle, ThumbsUp } from 'lucide-react'
 
 // --- Types ---
 
-type FeedbackType = 'Bug' | 'Feature' | 'Docs'
-type FeedbackStatus = 'open' | 'in_progress' | 'planned' | 'shipped' | 'wont_fix'
-type ThemeName = 'Board Room' | 'Fiscal Lens' | 'Compliance' | 'Resident Portal'
-
-interface AssociationSignal {
-  name: string
-  plan: 'Compliance Pro' | 'Community Plus' | 'Management Suite'
-  planColor: string
-  units: number
-}
-
-interface SourceThread {
-  id: string
-  subject: string
-  association: string
-}
+type FeedbackType = 'bug' | 'feature' | 'docs'
+type FeedbackStatus = 'In Development' | 'In Roadmap' | 'Planned' | 'Exploring' | 'Backlog' | 'Captured'
+type PlanName = 'Compliance Pro' | 'Community Plus' | 'Management Suite'
 
 interface FeedbackItem {
   id: string
-  type: FeedbackType
   title: string
-  description: string
-  theme: ThemeName
-  associations: AssociationSignal[]
-  sourceThreads: SourceThread[]
+  theme: string
+  type: FeedbackType
   status: FeedbackStatus
   votes: number
+  sourceThreads: string[]
+  assocs: string[]
+  impact: 'high' | 'medium' | 'low'
+  quarter: string | null
 }
 
-// --- Seed Data ---
+interface ThreadRef {
+  id: string
+  assocId: string
+  subject: string
+  status: 'open' | 'pending' | 'resolved'
+  lastAt: string
+  capturedItems: { feedbackId: string | null }[]
+}
 
-const feedbackItems: FeedbackItem[] = [
-  {
-    id: 'fb-1',
-    type: 'Bug',
-    title: 'Proxy votes not counted in quorum calculation',
-    description: 'Quorum tracker excludes proxy votes submitted through the system. Proxy submissions are received but filtered out during the quorum percentage calculation. This was introduced in the March 2026 update to the Board Room module.',
-    theme: 'Board Room',
-    associations: [
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-    ],
-    sourceThreads: [
-      { id: 'thread-1', subject: 'Quorum tracking not registering proxy votes', association: '1302 R Street NW Condominium' },
-    ],
-    status: 'in_progress',
-    votes: 12,
-  },
-  {
-    id: 'fb-2',
-    type: 'Bug',
-    title: 'Bank sync zeroes reserve balance on Plaid error',
-    description: 'When the Plaid connection returns an error during bank sync, the system sets the account balance to $0 instead of retaining the last known good value. This causes incorrect data on the Fiscal Lens dashboard.',
-    theme: 'Fiscal Lens',
-    associations: [
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-    ],
-    sourceThreads: [
-      { id: 'thread-2', subject: 'Reserve fund balance showing $0 after bank sync', association: 'Capitol Hill Terraces HOA' },
-    ],
-    status: 'in_progress',
-    votes: 8,
-  },
-  {
-    id: 'fb-3',
-    type: 'Bug',
-    title: 'Vendor dropdown empty after contract status migration',
-    description: 'The vendor assignment dropdown shows no options because the contract status field migration did not backfill existing records. Vendors with null contract status are filtered out.',
-    theme: 'Compliance',
-    associations: [
-      { name: 'Meridian Park Estates', plan: 'Management Suite', planColor: '#7c3aed', units: 72 },
-    ],
-    sourceThreads: [
-      { id: 'thread-3', subject: 'Cannot assign vendor to work order — dropdown empty', association: 'Meridian Park Estates' },
-    ],
-    status: 'shipped',
-    votes: 5,
-  },
-  {
-    id: 'fb-4',
-    type: 'Feature',
-    title: 'Increase document upload size limit to 25MB',
-    description: 'Current 5MB upload limit prevents associations from uploading board meeting minutes with embedded photos and scanned documents. Request to increase to at least 25MB.',
-    theme: 'Board Room',
-    associations: [
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-    ],
-    sourceThreads: [
-      { id: 'thread-4', subject: 'Meeting minutes PDF upload fails over 5MB', association: '1302 R Street NW Condominium' },
-    ],
-    status: 'planned',
-    votes: 19,
-  },
-  {
-    id: 'fb-5',
-    type: 'Feature',
-    title: 'Add reserve study comparison view across years',
-    description: 'Allow board members to compare reserve study data side-by-side across multiple years to see funding trend changes and component cost evolution.',
-    theme: 'Fiscal Lens',
-    associations: [
-      { name: 'Meridian Park Estates', plan: 'Management Suite', planColor: '#7c3aed', units: 72 },
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-    ],
-    sourceThreads: [],
-    status: 'open',
-    votes: 24,
-  },
-  {
-    id: 'fb-6',
-    type: 'Docs',
-    title: 'Add compliance checklist templates for DC regulations',
-    description: 'Associations in DC need pre-built compliance checklist templates that reflect DC Condominium Act requirements, including reserve study filing deadlines and annual meeting notice rules.',
-    theme: 'Compliance',
-    associations: [
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-      { name: 'Meridian Park Estates', plan: 'Management Suite', planColor: '#7c3aed', units: 72 },
-    ],
-    sourceThreads: [],
-    status: 'planned',
-    votes: 15,
-  },
-  {
-    id: 'fb-7',
-    type: 'Bug',
-    title: 'Resident portal shows wrong unit maintenance requests',
-    description: 'Caching issue in unit-to-user mapping causes residents to see maintenance requests from other units. Privacy concern that was resolved by clearing stale cache mappings.',
-    theme: 'Resident Portal',
-    associations: [
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-    ],
-    sourceThreads: [
-      { id: 'thread-5', subject: 'Resident portal showing wrong unit assignments', association: 'Capitol Hill Terraces HOA' },
-    ],
-    status: 'shipped',
-    votes: 7,
-  },
-  {
-    id: 'fb-8',
-    type: 'Feature',
-    title: 'Resident self-service amenity booking',
-    description: 'Allow residents to book common area amenities (pool, meeting room, rooftop) directly through the portal with availability calendar and automatic approval for standard requests.',
-    theme: 'Resident Portal',
-    associations: [
-      { name: 'Meridian Park Estates', plan: 'Management Suite', planColor: '#7c3aed', units: 72 },
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-    ],
-    sourceThreads: [],
-    status: 'open',
-    votes: 31,
-  },
-  {
-    id: 'fb-9',
-    type: 'Feature',
-    title: 'Automated special assessment calculation from reserve shortfall',
-    description: 'When a reserve study reveals underfunding, automatically calculate special assessment amounts per unit based on ownership percentage and present options to the board.',
-    theme: 'Fiscal Lens',
-    associations: [
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-    ],
-    sourceThreads: [],
-    status: 'open',
-    votes: 16,
-  },
-  {
-    id: 'fb-10',
-    type: 'Docs',
-    title: 'Board meeting Robert\'s Rules quick reference guide',
-    description: 'Provide an in-app quick reference for Robert\'s Rules of Order as applied to HOA board meetings, including motion procedures, voting requirements, and quorum rules.',
-    theme: 'Board Room',
-    associations: [
-      { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', planColor: '#3b82f6', units: 48 },
-      { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', planColor: '#dc2626', units: 24 },
-    ],
-    sourceThreads: [],
-    status: 'open',
-    votes: 11,
-  },
+// --- Plan meta ---
+
+const PLAN_META: Record<PlanName, { color: string; dot: string }> = {
+  'Compliance Pro':   { color: '#dc2626', dot: '#dc2626' },
+  'Community Plus':   { color: '#2563eb', dot: '#2563eb' },
+  'Management Suite': { color: '#7c3aed', dot: '#7c3aed' },
+}
+
+const FEEDBACK_STATUS_META: Record<FeedbackStatus, { color: string; bg: string }> = {
+  'In Development': { color: '#1d4ed8', bg: '#dbeafe' },
+  'In Roadmap':     { color: '#065f46', bg: '#d1fae5' },
+  'Planned':        { color: '#5b21b6', bg: '#ede9fe' },
+  'Exploring':      { color: '#92400e', bg: '#fef3c7' },
+  'Backlog':        { color: '#374151', bg: '#f3f4f6' },
+  'Captured':       { color: '#5b21b6', bg: '#ede9fe' },
+}
+
+const TYPE_META: Record<FeedbackType, { label: string; variant: 'red' | 'purple' | 'amber' }> = {
+  bug:     { label: 'Bug',     variant: 'red' },
+  feature: { label: 'Feature', variant: 'purple' },
+  docs:    { label: 'Docs',    variant: 'amber' },
+}
+
+const THREAD_STATUS_VARIANT: Record<string, 'amber' | 'blue' | 'green'> = {
+  open: 'amber',
+  pending: 'blue',
+  resolved: 'green',
+}
+
+// --- Seed data ---
+
+interface AssocRef {
+  id: string
+  name: string
+  plan: PlanName
+  units: number
+}
+
+const ASSOCIATIONS: AssocRef[] = [
+  { id: 'assoc_1302rstnw',  name: '1302 R Street NW Condominium', plan: 'Compliance Pro',   units: 12 },
+  { id: 'assoc_capitolhill', name: 'Capitol Hill Terraces HOA',    plan: 'Community Plus',   units: 48 },
+  { id: 'assoc_dupont',      name: 'Dupont Circle Lofts',          plan: 'Management Suite', units: 32 },
+  { id: 'assoc_adamsmorg',   name: 'Adams Morgan Commons',         plan: 'Compliance Pro',   units: 24 },
+  { id: 'assoc_georgemews',  name: 'Georgetown Mews',              plan: 'Compliance Pro',   units: 8 },
 ]
 
-const themes: ThemeName[] = ['Board Room', 'Fiscal Lens', 'Compliance', 'Resident Portal']
+const THREADS: ThreadRef[] = [
+  { id: 'SUP-001', assocId: 'assoc_capitolhill', subject: 'Votes & Resolutions — quorum tracking not updating',       status: 'open',     lastAt: '12m ago', capturedItems: [{ feedbackId: 'F-003' }, { feedbackId: 'F-004' }] },
+  { id: 'SUP-002', assocId: 'assoc_1302rstnw',   subject: 'Fiscal Lens — reserve fund balance showing incorrect figure', status: 'open',   lastAt: '1h ago',  capturedItems: [{ feedbackId: 'F-001' }] },
+  { id: 'SUP-003', assocId: 'assoc_dupont',       subject: 'Work order workflow — vendor assignment not saving',         status: 'open',     lastAt: '3h ago',  capturedItems: [{ feedbackId: 'F-005' }, { feedbackId: 'F-006' }] },
+  { id: 'SUP-004', assocId: 'assoc_dupont',       subject: 'Bylaws & Legal — document upload failing for large PDFs',   status: 'pending',  lastAt: '1d ago',  capturedItems: [{ feedbackId: 'F-002' }, { feedbackId: null }] },
+  { id: 'SUP-005', assocId: 'assoc_adamsmorg',    subject: 'Governance Calendar — meeting invitations not sending',     status: 'open',     lastAt: '4h ago',  capturedItems: [] },
+  { id: 'SUP-006', assocId: 'assoc_1302rstnw',    subject: 'Permission question — resident access to board minutes',   status: 'resolved', lastAt: '3d ago',  capturedItems: [{ feedbackId: null }] },
+]
+
+const INITIAL_FEEDBACK: FeedbackItem[] = [
+  { id: 'F-001', title: 'Reserve fund balance sync delay from General Ledger',   theme: 'Fiscal Lens',     type: 'bug',     status: 'In Development', votes: 6,  sourceThreads: ['SUP-002'], assocs: ['assoc_1302rstnw'],                                          impact: 'high',   quarter: 'Q2 2026' },
+  { id: 'F-002', title: 'PDF upload fails silently over 10MB limit',             theme: 'Board Room',      type: 'bug',     status: 'In Development', votes: 4,  sourceThreads: ['SUP-004'], assocs: ['assoc_dupont'],                                             impact: 'medium', quarter: 'Q2 2026' },
+  { id: 'F-003', title: 'Live quorum count not updating for all participants',    theme: 'Board Room',      type: 'bug',     status: 'Exploring',      votes: 8,  sourceThreads: ['SUP-001'], assocs: ['assoc_capitolhill'],                                        impact: 'high',   quarter: 'Q2 2026' },
+  { id: 'F-004', title: 'Email notification when quorum is reached',             theme: 'Board Room',      type: 'feature', status: 'Backlog',        votes: 12, sourceThreads: ['SUP-001'], assocs: ['assoc_capitolhill', 'assoc_1302rstnw'],                    impact: 'medium', quarter: null },
+  { id: 'F-005', title: 'Vendor assignment on work order form not persisting',    theme: 'Fiscal Lens',     type: 'bug',     status: 'In Development', votes: 3,  sourceThreads: ['SUP-003'], assocs: ['assoc_dupont'],                                             impact: 'high',   quarter: 'Q2 2026' },
+  { id: 'F-006', title: 'Recurring work order templates',                         theme: 'Fiscal Lens',     type: 'feature', status: 'In Roadmap',     votes: 19, sourceThreads: ['SUP-003'], assocs: ['assoc_dupont', 'assoc_1302rstnw'],                        impact: 'high',   quarter: 'Q3 2026' },
+  { id: 'F-007', title: 'Compliance grade breakdown — drill-down detail',         theme: 'Compliance',      type: 'feature', status: 'Planned',        votes: 9,  sourceThreads: [],          assocs: ['assoc_capitolhill', 'assoc_dupont'],                     impact: 'medium', quarter: 'Q3 2026' },
+  { id: 'F-008', title: 'Resident portal — maintenance request submission',       theme: 'Resident Portal', type: 'feature', status: 'In Roadmap',     votes: 31, sourceThreads: [],          assocs: ['assoc_capitolhill', 'assoc_dupont', 'assoc_1302rstnw'], impact: 'high',   quarter: 'Q2 2026' },
+  { id: 'F-009', title: 'Budget vs actuals comparison report',                    theme: 'Fiscal Lens',     type: 'feature', status: 'Planned',        votes: 14, sourceThreads: [],          assocs: ['assoc_1302rstnw', 'assoc_adamsmorg'],                   impact: 'high',   quarter: 'Q3 2026' },
+  { id: 'F-010', title: 'Bulk resident import via CSV',                           theme: 'Resident Portal', type: 'feature', status: 'Backlog',        votes: 7,  sourceThreads: [],          assocs: ['assoc_capitolhill'],                                    impact: 'medium', quarter: null },
+]
 
 // --- Helpers ---
 
-const typeVariant: Record<FeedbackType, 'red' | 'purple' | 'blue'> = {
-  Bug: 'red',
-  Feature: 'purple',
-  Docs: 'blue',
+function assocById(id: string) {
+  return ASSOCIATIONS.find(a => a.id === id)
 }
 
-const statusConfig: Record<FeedbackStatus, { label: string; variant: 'gray' | 'amber' | 'blue' | 'green' | 'red' }> = {
-  open: { label: 'Open', variant: 'gray' },
-  in_progress: { label: 'In Progress', variant: 'amber' },
-  planned: { label: 'Planned', variant: 'blue' },
-  shipped: { label: 'Shipped', variant: 'green' },
-  wont_fix: { label: "Won't Fix", variant: 'red' },
-}
+const ALL_STATUSES: FeedbackStatus[] = ['Backlog', 'Exploring', 'Planned', 'In Roadmap', 'In Development']
 
 // --- Component ---
 
 export function FeedbackClient() {
-  const [collapsedThemes, setCollapsedThemes] = useState<Record<string, boolean>>({})
+  const [feedbackItems, setFeedbackItems] = useState(INITIAL_FEEDBACK)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const selectedItem = selectedId ? feedbackItems.find(f => f.id === selectedId) : null
+  const themes = [...new Set(feedbackItems.map(f => f.theme))]
+  const filtered = typeFilter === 'all' ? feedbackItems : feedbackItems.filter(f => f.type === typeFilter)
+  const item = selectedId ? feedbackItems.find(f => f.id === selectedId) : null
 
-  function toggleTheme(theme: string) {
-    setCollapsedThemes(prev => ({ ...prev, [theme]: !prev[theme] }))
-  }
+  // Find source threads that have captured items linking to the selected feedback item
+  const srcThreads = item
+    ? THREADS.filter(t => t.capturedItems.some(ci => ci.feedbackId === item.id))
+    : []
 
   return (
     <div className="-m-8 flex" style={{ height: 'calc(100vh - 73px)' }}>
-      {/* Left — theme-grouped list */}
+      {/* Left: grouped list */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-5">
             <div>
               <h2 className="font-serif text-2xl font-bold">Feedback</h2>
               <p className="text-sm text-gray-500 mt-1">{feedbackItems.length} items across {themes.length} themes</p>
             </div>
           </div>
 
-          <div className="space-y-3">
+          {/* Type filter */}
+          <div className="flex gap-1 mb-4">
+            {[['all', 'All'], ['feature', 'Features'], ['bug', 'Bugs'], ['docs', 'Docs']].map(([v, l]) => (
+              <button
+                key={v}
+                onClick={() => setTypeFilter(v)}
+                className={cn(
+                  'px-3.5 py-1.5 rounded-[5px] text-xs cursor-pointer transition-all',
+                  typeFilter === v
+                    ? 'bg-white text-gray-900 font-semibold border border-gray-300 shadow-sm'
+                    : 'bg-transparent text-gray-400 font-normal border border-transparent'
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Theme groups */}
+          <div className="space-y-2.5">
             {themes.map(theme => {
-              const items = feedbackItems.filter(f => f.theme === theme)
-              const isCollapsed = collapsedThemes[theme]
+              const items = filtered.filter(f => f.theme === theme)
+              if (!items.length) return null
+              const isOpen = expanded[theme] !== false
+              const allAssocIds = [...new Set(items.flatMap(f => f.assocs))]
               return (
-                <div key={theme} className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
+                <div key={theme} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                   {/* Theme header */}
                   <button
-                    onClick={() => toggleTheme(theme)}
-                    className="w-full flex items-center gap-2.5 px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer border-none text-left"
+                    onClick={() => setExpanded(prev => ({ ...prev, [theme]: !isOpen }))}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-4 py-3 cursor-pointer border-none text-left bg-transparent',
+                      isOpen ? 'border-b border-gray-100' : ''
+                    )}
                   >
-                    {isCollapsed ? <ChevronRight size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-                    <span className="font-semibold text-[0.82rem] text-gray-900">{theme}</span>
-                    <span className="text-[0.7rem] text-gray-500 ml-1">{items.length} items</span>
+                    <span
+                      className="text-gray-400 text-[10px] transition-transform inline-block"
+                      style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                    >
+                      ▶
+                    </span>
+                    <span className="flex-1 text-sm font-semibold text-gray-900">{theme}</span>
+                    <span className="text-xs text-gray-400">{items.length} items · ▲ {items.reduce((a, f) => a + f.votes, 0)}</span>
+                    <div className="flex gap-1">
+                      {allAssocIds.map(aid => {
+                        const a = assocById(aid)
+                        const pm = a ? PLAN_META[a.plan] : null
+                        return a && pm ? (
+                          <span key={aid} title={a.name} className="w-[7px] h-[7px] rounded-full" style={{ background: pm.dot }} />
+                        ) : null
+                      })}
+                    </div>
                   </button>
 
                   {/* Items */}
-                  {!isCollapsed && (
-                    <div>
-                      {items.map(item => (
-                        <div
-                          key={item.id}
-                          onClick={() => setSelectedId(item.id)}
-                          className={cn(
-                            'flex items-center gap-3 px-4 py-2.5 border-t border-gray-100 cursor-pointer transition-colors',
-                            selectedId === item.id ? 'bg-gray-50' : 'hover:bg-gray-50/60'
-                          )}
-                        >
-                          {/* Type tag */}
-                          <Badge variant={typeVariant[item.type]} className="text-[0.6rem] w-14 justify-center flex-shrink-0">
-                            {item.type}
-                          </Badge>
+                  {isOpen && items.map((f, i) => {
+                    const isSel = selectedId === f.id
+                    const tm = TYPE_META[f.type]
+                    const sm = FEEDBACK_STATUS_META[f.status]
+                    return (
+                      <div
+                        key={f.id}
+                        onClick={() => setSelectedId(isSel ? null : f.id)}
+                        className={cn(
+                          'flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors',
+                          i < items.length - 1 ? 'border-b border-gray-50' : '',
+                          isSel ? 'bg-blue-50' : 'hover:bg-gray-50/60'
+                        )}
+                        style={{ borderLeft: `2px solid ${isSel ? '#2563eb' : 'transparent'}` }}
+                      >
+                        {/* Type tag */}
+                        <Badge variant={tm.variant} className="text-[10px]">{tm.label}</Badge>
 
-                          {/* Title */}
-                          <span className={cn('text-[0.82rem] flex-1 min-w-0 truncate', selectedId === item.id ? 'font-semibold text-gray-900' : 'text-gray-700')}>
-                            {item.title}
-                          </span>
+                        {/* Title */}
+                        <span className={cn('text-[13px] flex-1 min-w-0 truncate', isSel ? 'text-blue-800' : 'text-gray-700')}>
+                          {f.title}
+                        </span>
 
-                          {/* Association dots */}
-                          <div className="flex -space-x-1 flex-shrink-0">
-                            {item.associations.map((a, i) => (
-                              <span key={i} className="w-2.5 h-2.5 rounded-full border-2 border-white" style={{ background: a.planColor }} title={a.name} />
-                            ))}
-                          </div>
-
-                          {/* Source threads count */}
-                          {item.sourceThreads.length > 0 && (
-                            <span className="flex items-center gap-0.5 text-[0.7rem] text-gray-400 flex-shrink-0">
-                              <MessageCircle size={12} />
-                              {item.sourceThreads.length}
-                            </span>
-                          )}
-
-                          {/* Status pill */}
-                          <Badge variant={statusConfig[item.status].variant} className="text-[0.6rem] flex-shrink-0">
-                            {statusConfig[item.status].label}
-                          </Badge>
-
-                          {/* Votes */}
-                          <span className="flex items-center gap-0.5 text-[0.7rem] text-gray-500 font-semibold w-8 justify-end flex-shrink-0">
-                            <ThumbsUp size={12} />
-                            {item.votes}
-                          </span>
+                        {/* Association dots */}
+                        <div className="flex gap-1 flex-shrink-0">
+                          {f.assocs.map(aid => {
+                            const a = assocById(aid)
+                            const pm = a ? PLAN_META[a.plan] : null
+                            return a && pm ? (
+                              <span key={aid} title={a.name} className="w-[7px] h-[7px] rounded-full" style={{ background: pm.dot }} />
+                            ) : null
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  )}
+
+                        {/* Source thread count */}
+                        {f.sourceThreads.length > 0 && (
+                          <span className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-px flex-shrink-0">
+                            {f.sourceThreads.length} thread{f.sourceThreads.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+
+                        {/* Status pill */}
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded flex-shrink-0"
+                          style={{ color: sm.color, background: sm.bg }}
+                        >
+                          {f.status}
+                        </span>
+
+                        {/* Votes */}
+                        <span className="text-[11px] text-gray-400 min-w-[36px] text-right flex-shrink-0">▲ {f.votes}</span>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -304,75 +254,94 @@ export function FeedbackClient() {
         </div>
       </div>
 
-      {/* Right — detail panel */}
-      {selectedItem && (
-        <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto flex-shrink-0">
-          <div className="p-5">
-            {/* Header */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant={typeVariant[selectedItem.type]}>{selectedItem.type}</Badge>
-                <Badge variant={statusConfig[selectedItem.status].variant}>{statusConfig[selectedItem.status].label}</Badge>
+      {/* Right: detail panel */}
+      {item && (
+        <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+          <div className="p-4 flex flex-col gap-3">
+            {/* Header card */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <Badge variant={TYPE_META[item.type].variant}>{TYPE_META[item.type].label}</Badge>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded"
+                  style={{ color: FEEDBACK_STATUS_META[item.status].color, background: FEEDBACK_STATUS_META[item.status].bg }}
+                >
+                  {item.status}
+                </span>
               </div>
-              <h3 className="font-serif text-lg font-bold mb-2">{selectedItem.title}</h3>
-              <p className="text-[0.82rem] text-gray-600 leading-relaxed">{selectedItem.description}</p>
-            </div>
+              <h3 className="text-[15px] font-bold text-gray-900 mb-1">{item.title}</h3>
+              <div className="text-xs text-gray-400 mb-3">{item.theme} · ▲ {item.votes} votes · {item.impact} impact</div>
 
-            {/* Votes */}
-            <div className="flex items-center gap-2 mb-5 pb-4 border-b border-gray-200">
-              <ThumbsUp size={16} className="text-gray-400" />
-              <span className="text-[0.82rem] font-semibold">{selectedItem.votes} votes</span>
-            </div>
-
-            {/* Status changer */}
-            <div className="mb-5">
-              <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Status</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {(Object.keys(statusConfig) as FeedbackStatus[]).map(s => (
-                  <Button
-                    key={s}
-                    variant={selectedItem.status === s ? 'primary' : 'secondary'}
-                    size="xs"
-                  >
-                    {statusConfig[s].label}
-                  </Button>
-                ))}
+              {/* Status changer */}
+              <div className="flex flex-wrap gap-1">
+                {ALL_STATUSES.map(s => {
+                  const meta = FEEDBACK_STATUS_META[s]
+                  const isActive = item.status === s
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setFeedbackItems(prev => prev.map(f => f.id === item.id ? { ...f, status: s } : f))}
+                      className="text-[10px] px-2 py-1 rounded cursor-pointer border transition-all"
+                      style={{
+                        background: isActive ? meta.bg : '#f9fafb',
+                        color: isActive ? meta.color : '#9ca3af',
+                        borderColor: isActive ? '#e5e7eb' : '#f3f4f6',
+                        fontWeight: isActive ? 600 : 400,
+                      }}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Association Signals */}
-            <div className="mb-5">
-              <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Association Signals ({selectedItem.associations.length})</h4>
-              <div className="space-y-2">
-                {selectedItem.associations.map((a, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: a.planColor }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[0.78rem] font-semibold text-gray-700 truncate">{a.name}</div>
-                      <div className="text-[0.65rem] text-gray-500">{a.plan} · {a.units} units</div>
-                    </div>
+            {/* Association Signal */}
+            <div className="bg-white border border-gray-200 rounded-lg p-3.5">
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2.5">Association Signal</div>
+              {item.assocs.map(aid => {
+                const a = assocById(aid)
+                const pm = a ? PLAN_META[a.plan] : null
+                if (!a || !pm) return null
+                return (
+                  <div key={aid} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-b-0">
+                    <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: pm.dot }} />
+                    <span className="text-[13px] text-gray-700 flex-1">{a.name}</span>
+                    <span className="text-[11px] text-gray-400">{a.plan}</span>
+                    <span className="text-[11px] text-gray-700 font-medium">{a.units} units</span>
                   </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
 
             {/* Source Threads */}
-            <div>
-              <h4 className="text-[0.78rem] font-semibold text-gray-700 mb-2">Source Threads ({selectedItem.sourceThreads.length})</h4>
-              {selectedItem.sourceThreads.length === 0 ? (
-                <div className="text-[0.78rem] text-gray-400 p-2">No linked support threads.</div>
+            <div className="bg-white border border-gray-200 rounded-lg p-3.5">
+              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
+                Source Threads {srcThreads.length > 0 && `(${srcThreads.length})`}
+              </div>
+              {srcThreads.length === 0 ? (
+                <span className="text-xs text-gray-300">No threads linked yet.</span>
               ) : (
-                <div className="space-y-1.5">
-                  {selectedItem.sourceThreads.map(t => (
-                    <div key={t.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-                      <MessageCircle size={14} className="text-gray-400 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-[0.78rem] font-semibold text-gray-700 truncate">{t.subject}</div>
-                        <div className="text-[0.65rem] text-gray-500">{t.association}</div>
+                srcThreads.map(t => {
+                  const a = assocById(t.assocId)
+                  const pm = a ? PLAN_META[a.plan] : null
+                  return (
+                    <div
+                      key={t.id}
+                      className="border border-gray-200 rounded-[5px] p-2.5 mb-1.5 last:mb-0"
+                      style={{ borderLeft: `3px solid ${pm?.dot || '#e5e7eb'}` }}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[11px] font-semibold" style={{ color: pm?.color }}>{a?.name?.split(' ').slice(0, 3).join(' ')}</span>
+                        <Badge variant={THREAD_STATUS_VARIANT[t.status] || 'gray'} className="text-[10px]">
+                          {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
+                        </Badge>
                       </div>
+                      <div className="text-xs text-gray-700">{t.subject}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{t.id} · {t.lastAt}</div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })
               )}
             </div>
           </div>
