@@ -234,33 +234,55 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Budget Alerts */}
-        {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0 && (
-          <div onClick={() => goFinancial('budget')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-base">💰</span>
-              <h2 className="text-sm font-bold text-ink-700">Budget Alerts</h2>
-            </div>
-            <div className="space-y-2">
-              {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').map(alert => (
-                <div key={alert.categoryName} className={`rounded-lg p-3 ${alert.level === 'critical' ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-ink-700">{alert.categoryName}</span>
-                    <span className={`text-xs font-bold ${alert.level === 'critical' ? 'text-red-700' : 'text-orange-700'}`}>{alert.percentUsed}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-white rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${alert.level === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(alert.percentUsed, 100)}%` }} />
-                  </div>
-                  <p className="text-[10px] text-ink-500 mt-1">${alert.spent.toLocaleString()} of ${alert.budgeted.toLocaleString()} · ${alert.remaining.toLocaleString()} remaining</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Two-column layout */}
+        {/* Two-column layout: Financial Health (left) + Meetings & Activity (right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-4">
+            {/* Financial Health */}
+            {(aging.totalOutstanding > 0 || budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0) && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">💰</span>
+                  <h2 className="text-sm font-bold text-ink-700">Financial Health</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Delinquency Aging */}
+                  {aging.totalOutstanding > 0 && (
+                    <div onClick={() => goFinancial('unitLedgers')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-red-200 hover:shadow-sm transition-all space-y-2">
+                      <h3 className="text-xs font-bold text-ink-600 mb-2">Delinquency Aging</h3>
+                      <AgingRow label="Current (0-30)" count={aging.current.length} total={metrics.delinquentUnits} color="yellow" />
+                      <AgingRow label="30-60 Days" count={aging.days30.length} total={metrics.delinquentUnits} color="orange" />
+                      <AgingRow label="60-90 Days" count={aging.days60.length} total={metrics.delinquentUnits} color="red" />
+                      <AgingRow label="90+ Days" count={aging.days90plus.length} total={metrics.delinquentUnits} color="red" />
+                      <div className="pt-2 border-t border-ink-100 flex justify-between text-xs"><span className="text-ink-500 font-medium">Total Outstanding</span><span className="font-bold text-red-700">{fmt(aging.totalOutstanding)}</span></div>
+                    </div>
+                  )}
+
+                  {/* Budget Alerts */}
+                  {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').length > 0 && (
+                    <div onClick={() => goFinancial('budget')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all">
+                      <h3 className="text-xs font-bold text-ink-600 mb-2">Budget Alerts</h3>
+                      <div className="space-y-2">
+                        {budgetAlerts.filter(a => a.level === 'high' || a.level === 'critical').map(alert => (
+                          <div key={alert.categoryName} className={`rounded-lg p-3 ${alert.level === 'critical' ? 'bg-red-50 border border-red-200' : 'bg-orange-50 border border-orange-200'}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold text-ink-700">{alert.categoryName}</span>
+                              <span className={`text-xs font-bold ${alert.level === 'critical' ? 'text-red-700' : 'text-orange-700'}`}>{alert.percentUsed}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-white rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${alert.level === 'critical' ? 'bg-red-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(alert.percentUsed, 100)}%` }} />
+                            </div>
+                            <p className="text-[10px] text-ink-500 mt-1">${alert.spent.toLocaleString()} of ${alert.budgeted.toLocaleString()} · ${alert.remaining.toLocaleString()} remaining</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
             {/* Upcoming Meetings */}
             {upcoming.length > 0 && (
               <div>
@@ -270,64 +292,36 @@ export default function DashboardPage() {
                 </div>
                 <div className="space-y-2">
                   {upcoming.slice(0, 3).map(m => (
-                    <div key={m.id} onClick={() => navigate('/boardroom?tab=meetings')} className="bg-white border border-ink-100 rounded-lg p-3.5 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-accent-50 rounded-lg flex flex-col items-center justify-center">
-                          <span className="text-[10px] font-bold text-accent-600 leading-none">{new Date(m.date + 'T12:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
-                          <span className="text-sm font-bold text-accent-800 leading-none">{new Date(m.date + 'T12:00').getDate()}</span>
-                        </div>
-                        <div><p className="text-sm font-medium text-ink-900">{m.title}</p><p className="text-xs text-ink-400">{m.time} · {m.location}</p></div>
+                    <div key={m.id} onClick={() => navigate('/boardroom?tab=meetings')} className="bg-white border border-ink-100 rounded-lg p-3 cursor-pointer hover:border-accent-200 hover:shadow-sm transition-all flex items-center gap-3">
+                      <div className="w-10 h-10 bg-accent-50 rounded-lg flex flex-col items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-accent-600 leading-none">{new Date(m.date + 'T12:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
+                        <span className="text-sm font-bold text-accent-800 leading-none">{new Date(m.date + 'T12:00').getDate()}</span>
                       </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded-lg font-semibold bg-accent-50 text-accent-700">{m.type}</span>
+                      <div className="min-w-0"><p className="text-sm font-medium text-ink-900 truncate">{m.title}</p><p className="text-xs text-ink-400">{m.time} · {m.location}</p></div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Quick Actions */}
-            <div>
-              <h2 className="text-sm font-bold text-ink-700 mb-3">Quick Actions</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <QAction icon="📋" label="Compliance" sub={`${complianceGrade} grade`} onClick={() => navigate('/boardroom?tab=runbook')} />
-                <QAction icon="💰" label="Fiscal Lens" sub={`${metrics.collectionRate}% rate`} onClick={() => goFinancial('dashboard')} />
-                <QAction icon="🚨" label="Cases" sub={`${openCases.length} open`} onClick={() => navigate('/issues')} />
-                <QAction icon="🏢" label="Building" sub={`${buildingGrade} health`} onClick={() => navigate('/building')} />
-              </div>
-            </div>
-          </div>
-
-          <div>
             {/* Recent Activity */}
-            <h2 className="text-sm font-bold text-ink-700 mb-3">Recent Activity</h2>
-            <div className="bg-white rounded-xl border border-ink-100 divide-y divide-ink-50">
-              {activities.length === 0 ? (
-                <p className="p-4 text-xs text-ink-400 text-center">No recent activity</p>
-              ) : (
-                activities.slice(0, 8).map((a, i) => (
-                  <div key={i} onClick={() => navigate(a.path)} className="px-4 py-3 cursor-pointer hover:bg-mist-50 transition-colors">
-                    <div className="flex items-start gap-2.5">
-                      <span className="text-base mt-0.5">{a.icon}</span>
-                      <div className="flex-1 min-w-0"><p className="text-xs font-medium text-ink-800 truncate">{a.text}</p><p className="text-[10px] text-ink-400">{a.date}</p></div>
+            <div>
+              <h2 className="text-sm font-bold text-ink-700 mb-3">Recent Activity</h2>
+              <div className="bg-white rounded-xl border border-ink-100 divide-y divide-ink-50">
+                {activities.length === 0 ? (
+                  <p className="p-4 text-xs text-ink-400 text-center">No recent activity</p>
+                ) : (
+                  activities.slice(0, 4).map((a, i) => (
+                    <div key={i} onClick={() => navigate(a.path)} className="px-4 py-2.5 cursor-pointer hover:bg-mist-50 transition-colors">
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-base mt-0.5">{a.icon}</span>
+                        <div className="flex-1 min-w-0"><p className="text-xs font-medium text-ink-800 truncate">{a.text}</p><p className="text-[10px] text-ink-400">{a.date}</p></div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Delinquency Aging */}
-            {aging.totalOutstanding > 0 && (
-              <div className="mt-4">
-                <h2 className="text-sm font-bold text-ink-700 mb-3">Delinquency Aging</h2>
-                <div onClick={() => goFinancial('unitLedgers')} className="bg-white rounded-xl border border-ink-100 p-4 cursor-pointer hover:border-red-200 hover:shadow-sm transition-all space-y-2">
-                  <AgingRow label="Current (0-30)" count={aging.current.length} total={metrics.delinquentUnits} color="yellow" />
-                  <AgingRow label="30-60 Days" count={aging.days30.length} total={metrics.delinquentUnits} color="orange" />
-                  <AgingRow label="60-90 Days" count={aging.days60.length} total={metrics.delinquentUnits} color="red" />
-                  <AgingRow label="90+ Days" count={aging.days90plus.length} total={metrics.delinquentUnits} color="red" />
-                  <div className="pt-2 border-t border-ink-100 flex justify-between text-xs"><span className="text-ink-500 font-medium">Total Outstanding</span><span className="font-bold text-red-700">{fmt(aging.totalOutstanding)}</span></div>
-                </div>
+                  ))
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
