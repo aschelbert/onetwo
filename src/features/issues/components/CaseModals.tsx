@@ -428,10 +428,14 @@ export function DocModal({ caseId, store, stepIdx, onClose }: ModalProps & { cas
 export function ApproachModal({ c, store, onClose }: ModalProps & { c: CaseTrackerCase; store: any }) {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
-  if (!sit) { onClose(); return null; }
+  const isCustomCase = !sit;
 
   const existing = [c.approach, ...(c.additionalApproaches || []).map((a: any) => a.approach)];
   const available = (['pre', 'self', 'legal'] as const).filter(a => !existing.includes(a));
+
+  // Custom step builder state
+  const [buildingApproach, setBuildingApproach] = useState<'self' | 'legal' | null>(null);
+  const [customSteps, setCustomSteps] = useState<{ s: string; t: string; detail: string }[]>([{ s: '', t: '', detail: '' }]);
 
   if (available.length === 0) {
     return (
@@ -449,6 +453,59 @@ export function ApproachModal({ c, store, onClose }: ModalProps & { c: CaseTrack
     onClose();
   };
 
+  const handleAddCustom = () => {
+    if (!buildingApproach) return;
+    const filtered = customSteps.filter(cs => cs.s.trim());
+    if (filtered.length === 0) return;
+    store.addApproach(c.id, buildingApproach, filtered.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })));
+    onClose();
+  };
+
+  // Custom step builder view
+  if (buildingApproach) {
+    const canAdd = customSteps.some(cs => cs.s.trim());
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-white rounded-xl max-w-lg w-full max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="border-b p-6">
+            <h2 className="text-xl font-bold text-ink-900">Define {APPR_LABELS[buildingApproach]} Steps</h2>
+            <p className="text-sm text-ink-500 mt-1">Add custom steps for this approach</p>
+          </div>
+          <div className="p-6 space-y-3 overflow-y-auto flex-1">
+            {customSteps.map((cs, idx) => (
+              <div key={idx} className="border border-ink-100 rounded-lg p-3 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink-400">Step {idx + 1}</span>
+                  <div className="flex gap-1">
+                    {idx > 0 && (
+                      <button onClick={() => { const arr = [...customSteps]; [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]; setCustomSteps(arr); }} className="text-xs text-ink-400 hover:text-ink-600 px-1">&#8593;</button>
+                    )}
+                    {idx < customSteps.length - 1 && (
+                      <button onClick={() => { const arr = [...customSteps]; [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]; setCustomSteps(arr); }} className="text-xs text-ink-400 hover:text-ink-600 px-1">&#8595;</button>
+                    )}
+                    {customSteps.length > 1 && (
+                      <button onClick={() => setCustomSteps(customSteps.filter((_, i) => i !== idx))} className="text-xs text-red-400 hover:text-red-600 px-1">Remove</button>
+                    )}
+                  </div>
+                </div>
+                <input value={cs.s} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], s: e.target.value }; setCustomSteps(arr); }} placeholder="Step description (required)" className="w-full px-3 py-1.5 border border-ink-200 rounded-lg text-sm" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={cs.t} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], t: e.target.value }; setCustomSteps(arr); }} placeholder="Timing (e.g., Week 1)" className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs" />
+                  <input value={cs.detail} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], detail: e.target.value }; setCustomSteps(arr); }} placeholder="Detail / notes" className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs" />
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setCustomSteps([...customSteps, { s: '', t: '', detail: '' }])} className="text-sm font-medium text-accent-600 hover:text-accent-700">+ Add Step</button>
+          </div>
+          <div className="border-t p-6 flex justify-between">
+            <button onClick={() => { setBuildingApproach(null); setCustomSteps([{ s: '', t: '', detail: '' }]); }} className="px-4 py-2 text-ink-700 font-medium">Back</button>
+            <button onClick={handleAddCustom} className={`px-4 py-2 rounded-lg font-medium ${canAdd ? 'bg-ink-900 text-white hover:bg-ink-800' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Add Approach</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
@@ -458,16 +515,26 @@ export function ApproachModal({ c, store, onClose }: ModalProps & { c: CaseTrack
         </div>
         <div className="p-6 space-y-3">
           {available.map(a => {
-            const src = a === 'legal' ? sit.legal : a === 'self' ? sit.self : sit.pre;
+            const src = sit ? (a === 'legal' ? sit.legal : a === 'self' ? sit.self : sit.pre) : null;
+            if (isCustomCase) {
+              return (
+                <div key={a} onClick={() => { setBuildingApproach(a as 'self' | 'legal'); setCustomSteps([{ s: '', t: '', detail: '' }]); }} className="border border-ink-100 border-dashed rounded-xl p-4 hover:border-accent-300 cursor-pointer transition-all">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${APPR_COLORS[a]}`}>{APPR_LABELS[a]}</span>
+                  </div>
+                  <p className="text-xs text-ink-500">Define custom steps for this approach</p>
+                </div>
+              );
+            }
             return (
               <div key={a} onClick={() => handleAdd(a)} className="border border-ink-100 rounded-xl p-4 hover:border-accent-300 cursor-pointer transition-all">
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded border ${APPR_COLORS[a]}`}>{APPR_LABELS[a]}</span>
-                  <span className="text-xs text-ink-400">{src.length} steps</span>
+                  <span className="text-xs text-ink-400">{src!.length} steps</span>
                 </div>
                 <div className="text-xs text-ink-500 space-y-1">
-                  {src.slice(0, 3).map((s, i) => <p key={i}>{i + 1}. {s.s}</p>)}
-                  {src.length > 3 && <p className="text-ink-300">...+{src.length - 3} more</p>}
+                  {src!.slice(0, 3).map((s, i) => <p key={i}>{i + 1}. {s.s}</p>)}
+                  {src!.length > 3 && <p className="text-ink-300">...+{src!.length - 3} more</p>}
                 </div>
               </div>
             );

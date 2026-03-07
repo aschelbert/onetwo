@@ -2376,7 +2376,7 @@ interface IssuesState {
   closeCaseWithReason: (caseId: string, reason: string, notes: string) => void;
 
   // Approach
-  addApproach: (caseId: string, approach: CaseApproach) => void;
+  addApproach: (caseId: string, approach: CaseApproach, customSteps?: { s: string; t?: string; detail?: string }[]) => void;
   toggleAdditionalStep: (caseId: string, approachIdx: number, stepIdx: number) => void;
   addAdditionalStepNote: (caseId: string, approachIdx: number, stepIdx: number, note: string) => void;
   toggleAdditionalCheck: (caseId: string, approachIdx: number, stepIdx: number, checkId: string) => void;
@@ -2776,19 +2776,24 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) casesSvc.updateCase(caseId, updates);
   },
 
-  addApproach: (caseId, approach) => {
+  addApproach: (caseId, approach, customSteps?) => {
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
-        const cat = CATS.find(x => x.id === c.catId);
-        const sit = cat?.sits.find(x => x.id === c.sitId);
-        if (!sit) return c;
-        const src = approach === 'legal' ? sit.legal : approach === 'self' ? sit.self : sit.pre;
         const today = new Date().toISOString().split('T')[0];
-        const newApproach = {
-          approach,
-          addedDate: today,
-          steps: src.map((st, i) => ({
+        let steps: CaseStep[];
+        if (customSteps && customSteps.length > 0) {
+          steps = customSteps.map((st, i) => ({
+            id: `a${approach[0]}${i}`, s: st.s, done: false, doneDate: null, userNotes: '',
+            ...(st.t && { t: st.t }),
+            ...(st.detail && { detail: st.detail }),
+          }));
+        } else {
+          const cat = CATS.find(x => x.id === c.catId);
+          const sit = cat?.sits.find(x => x.id === c.sitId);
+          if (!sit) return c;
+          const src = approach === 'legal' ? sit.legal : approach === 'self' ? sit.self : sit.pre;
+          steps = src.map((st, i) => ({
             ...st, id: `a${approach[0]}${i}`, done: false, doneDate: null, userNotes: '',
             ...(st.ph && { phaseId: st.ph }),
             ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
@@ -2797,8 +2802,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
             })) }),
             ...(st.persistent && { persistent: st.persistent }),
             ...(st.desc && { desc: st.desc }),
-          }))
-        };
+          }));
+        }
+        const newApproach = { approach, addedDate: today, steps };
         const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
         return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
       })
