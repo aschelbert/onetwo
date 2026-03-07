@@ -57,7 +57,12 @@ export default function ActiveCaseWidget() {
   const [wizApproach, setWizApproach] = useState<CaseApproach>('pre');
   const [wizNotes, setWizNotes] = useState('');
 
-  const resetWiz = () => { setWizSitKey(null); setWizTitle(''); setWizUnit(''); setWizPriority('medium'); setWizApproach('pre'); setWizNotes(''); setCreateSearchQuery(''); };
+  // Custom situation state
+  const [wizIsCustom, setWizIsCustom] = useState(false);
+  const [wizCustomSitName, setWizCustomSitName] = useState('');
+  const [wizCustomSteps, setWizCustomSteps] = useState<{ s: string; t: string; detail: string }[]>([{ s: '', t: '', detail: '' }]);
+
+  const resetWiz = () => { setWizSitKey(null); setWizTitle(''); setWizUnit(''); setWizPriority('medium'); setWizApproach('pre'); setWizNotes(''); setCreateSearchQuery(''); setWizIsCustom(false); setWizCustomSitName(''); setWizCustomSteps([{ s: '', t: '', detail: '' }]); };
 
   // Sync pill state with ctx
   useEffect(() => {
@@ -113,15 +118,29 @@ export default function ActiveCaseWidget() {
   };
 
   const handleCreateCase = () => {
-    if (!wizSitKey || !wizTitle.trim()) return;
-    const [catId, sitId] = wizSitKey.split(':');
-    const newId = store.createCase({
-      catId, sitId, approach: wizApproach, title: wizTitle.trim(),
-      unit: wizUnit || 'N/A', owner: currentUser?.name || 'Board',
-      priority: wizPriority, notes: wizNotes,
-    });
-    resetWiz();
-    openCaseInIssues(newId);
+    if (wizIsCustom) {
+      if (!wizTitle.trim() || !wizCustomSitName.trim()) return;
+      const filtered = wizCustomSteps.filter(cs => cs.s.trim());
+      if (filtered.length === 0) return;
+      const newId = store.createCase({
+        catId: 'general', sitId: `custom-${Date.now()}`, approach: 'pre', title: wizTitle.trim(),
+        unit: wizUnit || 'N/A', owner: currentUser?.name || 'Board',
+        priority: wizPriority, notes: wizNotes,
+        customSteps: filtered.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })),
+      });
+      resetWiz();
+      openCaseInIssues(newId);
+    } else {
+      if (!wizSitKey || !wizTitle.trim()) return;
+      const [catId, sitId] = wizSitKey.split(':');
+      const newId = store.createCase({
+        catId, sitId, approach: wizApproach, title: wizTitle.trim(),
+        unit: wizUnit || 'N/A', owner: currentUser?.name || 'Board',
+        priority: wizPriority, notes: wizNotes,
+      });
+      resetWiz();
+      openCaseInIssues(newId);
+    }
   };
 
   const selectedCat = wizSitKey ? CATS.find(c => c.id === wizSitKey.split(':')[0]) : null;
@@ -226,7 +245,7 @@ export default function ActiveCaseWidget() {
         )}
 
         {/* NEW CASE TAB */}
-        {pickerTab === 'create' && !wizSitKey && (() => {
+        {pickerTab === 'create' && !wizSitKey && !wizIsCustom && (() => {
           const q = createSearchQuery.toLowerCase().trim();
           const filteredCats = q
             ? CATS.map(cat => ({
@@ -246,7 +265,7 @@ export default function ActiveCaseWidget() {
                   className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300" />
               </div>
               <div className="overflow-y-auto" style={{ maxHeight: '380px', scrollbarWidth: 'thin' }}>
-                {filteredCats.length === 0 && (
+                {filteredCats.length === 0 && !q && (
                   <p className="text-xs text-ink-400 text-center py-4">No matching situations</p>
                 )}
                 {filteredCats.map(cat => (
@@ -268,6 +287,19 @@ export default function ActiveCaseWidget() {
                     </div>
                   </div>
                 ))}
+                {/* Custom Situation option */}
+                <div className="px-4 py-2 border-t border-ink-100">
+                  <button onClick={() => { setWizIsCustom(true); setCreateSearchQuery(''); }}
+                    className="w-full text-left px-3 py-2.5 rounded-lg border border-dashed border-ink-200 hover:border-ink-400 hover:bg-ink-50 transition-all cursor-pointer group">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-ink-400 group-hover:text-ink-600">+</span>
+                      <div>
+                        <span className="text-xs font-semibold text-ink-700 group-hover:text-ink-900">Custom Situation</span>
+                        <p className="text-[10px] text-ink-400 mt-0.5">Define your own workflow with custom steps</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -324,6 +356,92 @@ export default function ActiveCaseWidget() {
                   className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300 resize-none" />
               </div>
               <button onClick={handleCreateCase} disabled={!wizTitle.trim()}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                style={{ background: 'linear-gradient(135deg, #d62839, #a61c2a)' }}>
+                Create Case
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NEW CASE — Custom situation form */}
+        {pickerTab === 'create' && wizIsCustom && (
+          <div className="p-4 overflow-y-auto" style={{ maxHeight: '440px', scrollbarWidth: 'thin' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <button onClick={() => setWizIsCustom(false)} className="text-ink-400 hover:text-ink-600 cursor-pointer text-xs font-medium">← Back</button>
+              <span className="text-ink-200">|</span>
+              <span className="text-xs font-semibold text-ink-700">Custom Situation</span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Situation Name</label>
+                <input type="text" value={wizCustomSitName} onChange={e => setWizCustomSitName(e.target.value)}
+                  placeholder="e.g. Pool renovation project"
+                  className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Case Title</label>
+                <input type="text" value={wizTitle} onChange={e => setWizTitle(e.target.value)}
+                  placeholder={wizCustomSitName ? `e.g. Unit 402 — ${wizCustomSitName}` : 'e.g. Unit 402 — Custom situation'}
+                  className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Unit</label>
+                  <input type="text" value={wizUnit} onChange={e => setWizUnit(e.target.value)}
+                    placeholder="e.g. 402" className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Priority</label>
+                  <select value={wizPriority} onChange={e => setWizPriority(e.target.value as CasePriority)}
+                    className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300 bg-white">
+                    <option value="urgent">Urgent</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Workflow Steps</label>
+                <div className="space-y-2">
+                  {wizCustomSteps.map((cs, idx) => (
+                    <div key={idx} className="border border-ink-100 rounded-lg p-2 bg-white space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-semibold text-ink-400">Step {idx + 1}</span>
+                        <div className="flex gap-1">
+                          {idx > 0 && (
+                            <button onClick={() => { const arr = [...wizCustomSteps]; [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]; setWizCustomSteps(arr); }} className="text-[10px] text-ink-400 hover:text-ink-600 px-0.5 cursor-pointer">&#8593;</button>
+                          )}
+                          {idx < wizCustomSteps.length - 1 && (
+                            <button onClick={() => { const arr = [...wizCustomSteps]; [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]; setWizCustomSteps(arr); }} className="text-[10px] text-ink-400 hover:text-ink-600 px-0.5 cursor-pointer">&#8595;</button>
+                          )}
+                          {wizCustomSteps.length > 1 && (
+                            <button onClick={() => setWizCustomSteps(wizCustomSteps.filter((_, i) => i !== idx))} className="text-[10px] text-red-400 hover:text-red-600 px-0.5 cursor-pointer">Remove</button>
+                          )}
+                        </div>
+                      </div>
+                      <input value={cs.s} onChange={e => { const arr = [...wizCustomSteps]; arr[idx] = { ...arr[idx], s: e.target.value }; setWizCustomSteps(arr); }}
+                        placeholder="Step description (required)" className="w-full px-2 py-1.5 border border-ink-200 rounded text-xs focus:outline-none focus:border-accent-300" />
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <input value={cs.t} onChange={e => { const arr = [...wizCustomSteps]; arr[idx] = { ...arr[idx], t: e.target.value }; setWizCustomSteps(arr); }}
+                          placeholder="Timing" className="px-2 py-1 border border-ink-200 rounded text-[11px] focus:outline-none focus:border-accent-300" />
+                        <input value={cs.detail} onChange={e => { const arr = [...wizCustomSteps]; arr[idx] = { ...arr[idx], detail: e.target.value }; setWizCustomSteps(arr); }}
+                          placeholder="Detail" className="px-2 py-1 border border-ink-200 rounded text-[11px] focus:outline-none focus:border-accent-300" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setWizCustomSteps([...wizCustomSteps, { s: '', t: '', detail: '' }])}
+                  className="mt-1.5 text-xs font-medium text-accent-600 hover:text-accent-700 cursor-pointer">+ Add Step</button>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-1">Notes</label>
+                <textarea value={wizNotes} onChange={e => setWizNotes(e.target.value)} rows={2}
+                  placeholder="Additional context..."
+                  className="w-full px-3 py-2 rounded-lg border border-ink-200 text-sm focus:outline-none focus:border-accent-300 resize-none" />
+              </div>
+              <button onClick={handleCreateCase} disabled={!wizTitle.trim() || !wizCustomSitName.trim() || !wizCustomSteps.some(cs => cs.s.trim())}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 style={{ background: 'linear-gradient(135deg, #d62839, #a61c2a)' }}>
                 Create Case
