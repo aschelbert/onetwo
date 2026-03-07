@@ -2359,7 +2359,7 @@ interface IssuesState {
   addIssueComm: (issueId: string, comm: Omit<CaseComm, 'id'>) => void;
 
   // Case actions
-  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string }, tenantId?: string) => string;
+  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string; customSteps?: { s: string; t?: string; d?: string; detail?: string }[] }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
@@ -2552,23 +2552,33 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     const s = get();
     const id = crypto.randomUUID();
     const caseNum = s.nextCaseNum;
-    const cat = CATS.find(x => x.id === data.catId);
-    const sit = cat?.sits.find(x => x.id === data.sitId);
-    if (!sit) return id;
-    const src = data.approach === 'legal' ? sit.legal : data.approach === 'self' ? sit.self : sit.pre;
-    const steps: CaseStep[] = src.map((st, i) => ({
-      ...st, id: 's' + i, done: false, doneDate: null, userNotes: '',
-      ...(st.ph && { phaseId: st.ph }),
-      ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
-      ...(st.actions && { actions: st.actions.map((a: any) => ({
-        ...a, done: false, doneDate: null
-      })) }),
-      ...(st.persistent && { persistent: st.persistent }),
-      ...(st.desc && { desc: st.desc }),
-      ...(st.isSpendingDecision && { isSpendingDecision: true }),
-      ...(st.requiresBids && { requiresBids: true, minimumBids: st.minimumBids || 3, bidCollection: { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
-      ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
-    }));
+
+    let steps: CaseStep[];
+    if (data.customSteps && data.customSteps.length > 0) {
+      steps = data.customSteps.map((st, i) => ({
+        id: 's' + i, s: st.s, done: false, doneDate: null, userNotes: '',
+        ...(st.t && { t: st.t }),
+        ...(st.detail && { detail: st.detail }),
+      }));
+    } else {
+      const cat = CATS.find(x => x.id === data.catId);
+      const sit = cat?.sits.find(x => x.id === data.sitId);
+      if (!sit) return id;
+      const src = data.approach === 'legal' ? sit.legal : data.approach === 'self' ? sit.self : sit.pre;
+      steps = src.map((st, i) => ({
+        ...st, id: 's' + i, done: false, doneDate: null, userNotes: '',
+        ...(st.ph && { phaseId: st.ph }),
+        ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
+        ...(st.actions && { actions: st.actions.map((a: any) => ({
+          ...a, done: false, doneDate: null
+        })) }),
+        ...(st.persistent && { persistent: st.persistent }),
+        ...(st.desc && { desc: st.desc }),
+        ...(st.isSpendingDecision && { isSpendingDecision: true }),
+        ...(st.requiresBids && { requiresBids: true, minimumBids: st.minimumBids || 3, bidCollection: { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null } }),
+        ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
+      }));
+    }
     const today = new Date().toISOString().split('T')[0];
     const newCase: CaseTrackerCase = {
       id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,

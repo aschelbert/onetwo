@@ -481,6 +481,12 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
   const [source, setSource] = useState(prefill?.source || '');
   const [daciSuggested, setDaciSuggested] = useState(false);
 
+  // Custom situation state
+  const [isCustom, setIsCustom] = useState(false);
+  const [customSitName, setCustomSitName] = useState('');
+  const [customSitDesc, setCustomSitDesc] = useState('');
+  const [customSteps, setCustomSteps] = useState<{ s: string; t: string; detail: string }[]>([{ s: '', t: '', detail: '' }]);
+
   const selCat = CATS.find(c => c.id === catId);
   const selSit = selCat?.sits.find(s => s.id === sitId);
 
@@ -515,9 +521,19 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
   };
 
   const handleCreate = () => {
-    if (!catId || !sitId || !title.trim()) return;
-    const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
-    onDone(id);
+    if (!catId || !title.trim()) return;
+    if (isCustom) {
+      const filteredSteps = customSteps.filter(cs => cs.s.trim());
+      if (!customSitName.trim() || filteredSteps.length === 0) return;
+      const customSitId = `custom-${Date.now()}`;
+      const fullNotes = customSitDesc.trim() ? `[Custom: ${customSitDesc.trim()}]\n${notes}` : notes;
+      const id = createCase({ catId, sitId: customSitId, approach: 'pre', title, unit, owner, priority, notes: fullNotes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined, customSteps: filteredSteps.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })) });
+      onDone(id);
+    } else {
+      if (!sitId) return;
+      const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
+      onDone(id);
+    }
   };
 
   return (
@@ -551,7 +567,7 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
               <p className="text-sm font-medium text-ink-600">Select situation type:</p>
               <div className="space-y-2">
                 {selCat.sits.map(sit => (
-                  <button key={sit.id} onClick={() => setSitId(sit.id)} className={`w-full text-left rounded-xl border-2 p-4 transition-all ${sitId === sit.id ? 'border-accent-400 bg-accent-50' : 'border-ink-100 bg-white hover:border-ink-200'}`}>
+                  <button key={sit.id} onClick={() => { setSitId(sit.id); setIsCustom(false); }} className={`w-full text-left rounded-xl border-2 p-4 transition-all ${sitId === sit.id && !isCustom ? 'border-accent-400 bg-accent-50' : 'border-ink-100 bg-white hover:border-ink-200'}`}>
                     <p className="text-sm font-semibold text-ink-900">{sit.title}</p>
                     <p className="text-xs text-ink-400 mt-0.5">{sit.desc}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -559,16 +575,20 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
                     </div>
                   </button>
                 ))}
+                <button onClick={() => { setIsCustom(true); setSitId('custom'); }} className={`w-full text-left rounded-xl border-2 border-dashed p-4 transition-all ${isCustom ? 'border-accent-400 bg-accent-50' : 'border-ink-200 bg-white hover:border-ink-300'}`}>
+                  <p className="text-sm font-semibold text-ink-700">+ Custom Situation</p>
+                  <p className="text-xs text-ink-400 mt-0.5">Define your own workflow with custom steps</p>
+                </button>
               </div>
             </>
           )}
           <div className="flex justify-end">
-            <button onClick={() => catId && sitId ? setStep(2) : undefined} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${catId && sitId ? 'bg-ink-900 text-white hover:bg-ink-800 cursor-pointer' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Next →</button>
+            <button onClick={() => catId && (sitId || isCustom) ? setStep(2) : undefined} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${catId && (sitId || isCustom) ? 'bg-ink-900 text-white hover:bg-ink-800 cursor-pointer' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Next →</button>
           </div>
         </div>
       )}
 
-      {step === 2 && (
+      {step === 2 && !isCustom && (
         <div className="space-y-4">
           <button onClick={() => setStep(1)} className="text-xs text-ink-400 hover:text-ink-600">← Back</button>
           <h3 className="text-lg font-semibold text-ink-800">2. Choose approach</h3>
@@ -596,13 +616,61 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
         </div>
       )}
 
+      {step === 2 && isCustom && (
+        <div className="space-y-4">
+          <button onClick={() => setStep(1)} className="text-xs text-ink-400 hover:text-ink-600">← Back</button>
+          <h3 className="text-lg font-semibold text-ink-800">2. Define your workflow</h3>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Situation Name *</label>
+            <input value={customSitName} onChange={e => setCustomSitName(e.target.value)} placeholder="e.g., Pool renovation project" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Description</label>
+            <textarea value={customSitDesc} onChange={e => setCustomSitDesc(e.target.value)} rows={2} placeholder="Brief description of this situation..." className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-2">Workflow Steps *</label>
+            <div className="space-y-3">
+              {customSteps.map((cs, idx) => (
+                <div key={idx} className="border border-ink-100 rounded-lg p-3 bg-white space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-ink-400">Step {idx + 1}</span>
+                    <div className="flex gap-1">
+                      {idx > 0 && (
+                        <button onClick={() => { const arr = [...customSteps]; [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]; setCustomSteps(arr); }} className="text-xs text-ink-400 hover:text-ink-600 px-1">↑</button>
+                      )}
+                      {idx < customSteps.length - 1 && (
+                        <button onClick={() => { const arr = [...customSteps]; [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]; setCustomSteps(arr); }} className="text-xs text-ink-400 hover:text-ink-600 px-1">↓</button>
+                      )}
+                      {customSteps.length > 1 && (
+                        <button onClick={() => setCustomSteps(customSteps.filter((_, i) => i !== idx))} className="text-xs text-red-400 hover:text-red-600 px-1">Remove</button>
+                      )}
+                    </div>
+                  </div>
+                  <input value={cs.s} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], s: e.target.value }; setCustomSteps(arr); }} placeholder="Step description (required)" className="w-full px-3 py-1.5 border border-ink-200 rounded-lg text-sm" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={cs.t} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], t: e.target.value }; setCustomSteps(arr); }} placeholder="Timing (e.g., Week 1)" className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs" />
+                    <input value={cs.detail} onChange={e => { const arr = [...customSteps]; arr[idx] = { ...arr[idx], detail: e.target.value }; setCustomSteps(arr); }} placeholder="Detail / notes" className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setCustomSteps([...customSteps, { s: '', t: '', detail: '' }])} className="mt-2 text-sm font-medium text-accent-600 hover:text-accent-700">+ Add Step</button>
+          </div>
+          <div className="flex justify-between">
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-lg text-sm font-semibold border border-ink-200 text-ink-600 hover:bg-ink-50">← Back</button>
+            <button onClick={() => customSitName.trim() && customSteps.some(cs => cs.s.trim()) ? setStep(3) : undefined} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${customSitName.trim() && customSteps.some(cs => cs.s.trim()) ? 'bg-ink-900 text-white hover:bg-ink-800' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Next →</button>
+          </div>
+        </div>
+      )}
+
       {step === 3 && (
         <div className="space-y-4">
           <button onClick={() => setStep(2)} className="text-xs text-ink-400 hover:text-ink-600">← Back</button>
           <h3 className="text-lg font-semibold text-ink-800">3. Case details</h3>
           <div>
             <label className="block text-sm font-medium text-ink-700 mb-1">Case Title *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder={`e.g., Unit 502 — ${selSit?.title || 'Issue description'}`} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder={`e.g., Unit 502 — ${isCustom ? customSitName || 'Custom situation' : selSit?.title || 'Issue description'}`} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
