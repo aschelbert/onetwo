@@ -122,10 +122,10 @@ export function FeedbackClient({
   }
 
   return (
-    <div className="-m-8 flex" style={{ height: 'calc(100vh - 73px)' }}>
+    <div className="-m-4 md:-m-8 flex flex-col md:flex-row" style={{ height: 'calc(100vh - 73px)' }}>
       {/* Left: grouped list */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
+        <div className="p-3 md:p-6">
           <div className="flex justify-between items-center mb-5">
             <div>
               <h2 className="font-serif text-2xl font-bold">Feedback</h2>
@@ -238,7 +238,7 @@ export function FeedbackClient({
 
       {/* Right: detail panel */}
       {item && (
-        <div className="w-80 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+        <div className="w-full md:w-80 flex-shrink-0 border-t md:border-t-0 md:border-l border-gray-200 bg-white overflow-y-auto">
           <div className="p-4 flex flex-col gap-3">
             {/* Header card */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">

@@ -29,16 +29,16 @@ export function DashboardClient({ tenancies, plans, recentAudit, recentWebhooks,
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Active Tenancies" value={active} sub={`${trial} in trial`} />
         <StatCard label="Total Users" value={totalUsers} sub={`across ${tenancies.length} tenancies`} />
         <StatCard label="MRR" value={formatCurrency(mrr)} sub="monthly recurring revenue" />
         <StatCard label="Modules" value={8} sub="in product catalog" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {/* Subscription Mix */}
-        <div className="bg-white rounded-[10px] border border-gray-200 p-5">
+        <div className="bg-white rounded-[10px] border border-gray-200 p-3 md:p-5">
           <h3 className="font-serif text-base font-bold mb-3">Subscription Mix</h3>
           {plans.map(s => {
             const cnt = tenancies.filter(t => t.subscription_id === s.id && (t.status === 'active' || t.status === 'trial')).length
@@ -55,7 +55,7 @@ export function DashboardClient({ tenancies, plans, recentAudit, recentWebhooks,
         </div>
 
         {/* Recent Webhook Events */}
-        <div className="bg-white rounded-[10px] border border-gray-200 p-5">
+        <div className="bg-white rounded-[10px] border border-gray-200 p-3 md:p-5">
           <h3 className="font-serif text-base font-bold mb-3">Recent Stripe Events</h3>
           {recentWebhooks.length === 0 ? (
             <p className="text-sm text-gray-400">No webhook events yet</p>
@@ -75,7 +75,7 @@ export function DashboardClient({ tenancies, plans, recentAudit, recentWebhooks,
         </div>
 
         {/* Roles Summary */}
-        <div className="bg-white rounded-[10px] border border-gray-200 p-5">
+        <div className="bg-white rounded-[10px] border border-gray-200 p-3 md:p-5">
           <h3 className="font-serif text-base font-bold mb-3">User Roles</h3>
           {roles.map(r => (
             <div key={r.id} className="py-2 border-b border-gray-100">
@@ -89,7 +89,7 @@ export function DashboardClient({ tenancies, plans, recentAudit, recentWebhooks,
 
       {/* Recent Audit */}
       {recentAudit.length > 0 && (
-        <div className="bg-white rounded-[10px] border border-gray-200 p-5">
+        <div className="bg-white rounded-[10px] border border-gray-200 p-3 md:p-5">
           <h3 className="font-serif text-base font-bold mb-3">Recent Activity</h3>
           {recentAudit.map(a => (
             <div key={a.id} className="flex items-center gap-3 py-2 border-b border-gray-100 text-sm">

@@ -22,15 +22,15 @@ export function AuditClient({ entries }: { entries: AuditEntry[] }) {
           No audit entries yet. Actions will be logged as you manage the platform.
         </div>
       ) : (
-        <div className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-[10px] border border-gray-200 overflow-x-auto">
           <table className="w-full text-[0.82rem]">
             <thead>
               <tr className="bg-gray-50">
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Timestamp</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Action</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Actor</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Entity</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Description</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Timestamp</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Action</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Actor</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Entity</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Description</th>
               </tr>
             </thead>
             <tbody>

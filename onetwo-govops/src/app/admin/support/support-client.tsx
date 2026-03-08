@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, Sparkles, Paperclip, X } from 'lucide-react'
+import { CheckCircle, Sparkles, Paperclip, X, ChevronLeft, Info } from 'lucide-react'
 
 // --- Types ---
 
 type Priority = 'high' | 'medium' | 'low'
 type ThreadStatus = 'open' | 'pending' | 'resolved'
+type MobilePane = 'threads' | 'messages' | 'details'
 
 interface Tenancy {
   id: string
@@ -123,6 +124,7 @@ export function SupportClient({
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null)
+  const [mobilePane, setMobilePane] = useState<MobilePane>('threads')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -201,6 +203,11 @@ export function SupportClient({
   const tenancy = thread ? tenancyById(thread.tenancy_id) : undefined
   const planColor = getPlanColor(tenancy)
   const planName = tenancy?.subscription_plans?.name || 'Unknown'
+
+  const selectThread = (id: string) => {
+    setSelectedId(id)
+    setMobilePane('messages')
+  }
 
   const handleAttachment = (file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -306,13 +313,13 @@ export function SupportClient({
   const threadTenancies = tenancyIds.map(id => tenancyById(id)).filter(Boolean) as Tenancy[]
 
   return (
-    <div className="-m-8 flex flex-col" style={{ height: 'calc(100vh - 73px)' }}>
+    <div className="-m-4 md:-m-8 flex flex-col" style={{ height: 'calc(100vh - 73px)' }}>
       {/* Tenancy scope tabs */}
-      <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-6 overflow-x-auto">
+      <div className="flex items-center gap-0 border-b border-gray-200 bg-white px-3 md:px-6 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <button
           onClick={() => setScopeTenancyId(null)}
           className={cn(
-            'px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 whitespace-nowrap',
+            'px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 whitespace-nowrap min-w-[80px]',
             scopeTenancyId === null ? 'text-gray-900 font-semibold border-b-gray-900' : 'text-gray-400 border-b-transparent hover:text-gray-700'
           )}
         >
@@ -327,7 +334,7 @@ export function SupportClient({
               key={t.id}
               onClick={() => setScopeTenancyId(active ? null : t.id)}
               className={cn(
-                'px-3.5 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 flex items-center gap-1.5 whitespace-nowrap',
+                'px-3.5 py-2.5 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer bg-transparent border-x-0 border-t-0 flex items-center gap-1.5 whitespace-nowrap min-w-[80px]',
                 active ? 'font-semibold' : 'text-gray-400 border-b-transparent hover:text-gray-700'
               )}
               style={active ? { color, borderBottomColor: color } : undefined}
@@ -346,7 +353,10 @@ export function SupportClient({
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* Left — thread list */}
-        <div className="w-[280px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+        <div className={cn(
+          'w-full md:w-[280px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col',
+          mobilePane === 'threads' ? 'flex' : 'hidden md:flex'
+        )}>
           {/* Status filter pills */}
           <div className="p-2.5 border-b border-gray-100 flex gap-1">
             {[['all', 'All'], ['open', 'Open'], ['pending', 'Pending'], ['resolved', 'Resolved']].map(([v, l]) => (
@@ -375,7 +385,7 @@ export function SupportClient({
               return (
                 <div
                   key={t.id}
-                  onClick={() => setSelectedId(t.id)}
+                  onClick={() => selectThread(t.id)}
                   className={cn(
                     'px-3.5 py-3 border-b border-gray-100 cursor-pointer transition-colors',
                     isActive ? 'bg-blue-50' : 'bg-white hover:bg-gray-50/60'
@@ -403,23 +413,34 @@ export function SupportClient({
         </div>
 
         {/* Center — message thread */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+        <div className={cn(
+          'flex-1 flex flex-col min-w-0 bg-gray-50',
+          mobilePane === 'messages' ? 'flex' : 'hidden md:flex'
+        )}>
           {thread && tenancy ? (
             <>
               {/* Thread header */}
-              <div className="bg-white border-b border-gray-200 px-5 py-3">
+              <div className="bg-white border-b border-gray-200 px-3 md:px-5 py-3">
                 <div className="flex items-center gap-2 mb-1.5">
+                  {/* Mobile back button */}
+                  <button
+                    onClick={() => setMobilePane('threads')}
+                    className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-900"
+                    aria-label="Back to threads"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
                   <span className="w-2 h-2 rounded-full" style={{ background: planColor }} />
                   <span className="text-xs font-semibold" style={{ color: planColor }}>{tenancy.name}</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="text-[11px] text-gray-400">{planName}</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="text-[11px] text-gray-400">{thread.id.slice(0, 8)}</span>
+                  <span className="text-gray-300 hidden sm:inline">·</span>
+                  <span className="text-[11px] text-gray-400 hidden sm:inline">{planName}</span>
+                  <span className="text-gray-300 hidden sm:inline">·</span>
+                  <span className="text-[11px] text-gray-400 hidden sm:inline">{thread.id.slice(0, 8)}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                   <div>
                     <div className="text-sm font-semibold text-gray-900 mb-1">{thread.subject}</div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <Badge variant={THREAD_STATUS_META[thread.status].variant}>{THREAD_STATUS_META[thread.status].label}</Badge>
                       <span className="text-[11px] bg-gray-100 border border-gray-200 rounded px-1.5 py-px text-gray-500">{thread.module}</span>
                       <span className="text-[11px] font-medium" style={{ color: PRIORITY_META[thread.priority].color }}>
@@ -431,7 +452,7 @@ export function SupportClient({
                     <select
                       value={thread.assignee_name || ''}
                       onChange={e => handleAssignee(e.target.value)}
-                      className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 outline-none cursor-pointer"
+                      className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 outline-none cursor-pointer min-h-[44px] md:min-h-0"
                     >
                       <option value="">Assign…</option>
                       <option value="Alex K.">Alex K.</option>
@@ -444,12 +465,20 @@ export function SupportClient({
                         Resolve
                       </Button>
                     )}
+                    {/* Mobile info button to show details panel */}
+                    <button
+                      onClick={() => setMobilePane('details')}
+                      className="md:hidden p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+                      aria-label="Thread details"
+                    >
+                      <Info size={18} />
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-3.5">
+              <div className="flex-1 overflow-y-auto px-3 md:px-6 py-5 flex flex-col gap-3.5">
                 {loadingMessages ? (
                   <div className="flex-1 flex items-center justify-center text-gray-300 text-sm">Loading messages...</div>
                 ) : (
@@ -463,7 +492,7 @@ export function SupportClient({
                         >
                           {getInitials(msg.sender_name)}
                         </div>
-                        <div className="max-w-[68%]">
+                        <div className="max-w-[85%] md:max-w-[68%]">
                           <div className={cn('flex items-baseline gap-1.5 mb-1', isSupport ? 'flex-row-reverse' : 'flex-row')}>
                             <span className="text-xs font-semibold text-gray-700">{msg.sender_name}</span>
                             {msg.sender_role && !isSupport && (
@@ -495,15 +524,15 @@ export function SupportClient({
               </div>
 
               {/* Reply box */}
-              <div className="bg-white border-t border-gray-200 px-5 py-3">
+              <div className="bg-white border-t border-gray-200 px-3 md:px-5 py-3">
                 <textarea
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
                   onPaste={handlePaste}
-                  placeholder={`Reply to ${tenancy.name}… (paste an image with Ctrl+V)`}
+                  placeholder={`Reply to ${tenancy.name}…`}
                   rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-700 resize-none outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-700 resize-none outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 min-h-[44px]"
                 />
                 {attachmentPreview && (
                   <div className="mt-2 relative inline-block">
@@ -538,7 +567,25 @@ export function SupportClient({
 
         {/* Right panel */}
         {thread && tenancy && (
-          <div className="w-[290px] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col">
+          <div className={cn(
+            'w-full md:w-[290px] flex-shrink-0 bg-white border-l border-gray-200 flex flex-col',
+            // On mobile: full screen overlay when details pane active
+            mobilePane === 'details'
+              ? 'fixed inset-0 z-50 md:static md:z-auto'
+              : 'hidden md:flex'
+          )}>
+            {/* Mobile back button for details */}
+            <div className="md:hidden flex items-center gap-2 px-3 py-3 border-b border-gray-200 bg-white">
+              <button
+                onClick={() => setMobilePane('messages')}
+                className="p-1 -ml-1 text-gray-500 hover:text-gray-900"
+                aria-label="Back to messages"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-sm font-semibold text-gray-900">Thread Details</span>
+            </div>
+
             {/* Panel tabs */}
             <div className="flex border-b border-gray-200">
               {[['capture', 'Capture'], ['association', 'Association']].map(([v, l]) => (
@@ -622,7 +669,7 @@ export function SupportClient({
                       <select
                         value={linkTarget}
                         onChange={e => setLinkTarget(e.target.value)}
-                        className="flex-1 bg-white border border-gray-200 rounded-[5px] px-2 py-1.5 text-[11px] text-gray-700 outline-none"
+                        className="flex-1 bg-white border border-gray-200 rounded-[5px] px-2 py-1.5 text-[11px] text-gray-700 outline-none min-h-[44px] md:min-h-0"
                       >
                         <option value="">Select item…</option>
                         {feedbackItems.map(f => (
@@ -651,7 +698,7 @@ export function SupportClient({
                     {threads.filter(t => t.tenancy_id === tenancy.id).map(t => (
                       <div
                         key={t.id}
-                        onClick={() => setSelectedId(t.id)}
+                        onClick={() => { setSelectedId(t.id); setMobilePane('messages') }}
                         className={cn(
                           'flex items-center gap-1.5 px-2 py-1.5 rounded-[5px] cursor-pointer',
                           t.id === selectedId ? 'bg-blue-50' : 'hover:bg-gray-50'

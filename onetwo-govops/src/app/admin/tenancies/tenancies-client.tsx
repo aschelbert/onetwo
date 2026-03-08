@@ -58,12 +58,12 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
         <div>
           <h2 className="font-serif text-2xl font-bold">Tenancies</h2>
           <p className="text-sm text-gray-500 mt-1">{tenancies.length} associations managed</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {['all', 'active', 'trial', 'suspended', 'churned'].map(s => (
             <Button key={s} variant={statusFilter === s ? 'primary' : 'secondary'} size="sm" onClick={() => setStatusFilter(s)}>
               {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -73,7 +73,7 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
         </div>
       </div>
 
-      <div className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-gray-200 overflow-x-auto">
         <table className="w-full text-[0.82rem]">
           <thead>
             <tr className="bg-gray-50">
@@ -112,21 +112,21 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
 
       <Dialog open={isOpen} onClose={() => { setEditing(null); setCreating(false) }} title={editing ? 'Edit Tenancy' : 'Add Tenancy'} size="lg"
         footer={<><Button variant="secondary" onClick={() => { setEditing(null); setCreating(false) }}>Cancel</Button><Button onClick={handleSave}>Save</Button></>}>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormGroup label="Association Name"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></FormGroup>
           <FormGroup label="Slug"><Input value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} /></FormGroup>
         </div>
         <FormGroup label="Address"><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></FormGroup>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormGroup label="Units"><Input type="number" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></FormGroup>
           <FormGroup label="Plan"><Select value={form.subscription_id} onChange={e => setForm({ ...form, subscription_id: e.target.value })}>{plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></FormGroup>
           <FormGroup label="Status"><Select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option value="active">Active</option><option value="trial">Trial</option><option value="suspended">Suspended</option><option value="churned">Churned</option></Select></FormGroup>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormGroup label="Billing Cycle"><Select value={form.billing_cycle} onChange={e => setForm({ ...form, billing_cycle: e.target.value })}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></Select></FormGroup>
           <FormGroup label="Jurisdiction"><Input value={form.jurisdiction} onChange={e => setForm({ ...form, jurisdiction: e.target.value })} /></FormGroup>
         </div>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <FormGroup label="Board Members"><Input type="number" value={form.board_members} onChange={e => setForm({ ...form, board_members: e.target.value })} /></FormGroup>
           <FormGroup label="Residents"><Input type="number" value={form.residents} onChange={e => setForm({ ...form, residents: e.target.value })} /></FormGroup>
           <FormGroup label="Managers"><Input type="number" value={form.managers} onChange={e => setForm({ ...form, managers: e.target.value })} /></FormGroup>

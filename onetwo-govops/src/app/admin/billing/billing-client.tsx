@@ -14,15 +14,15 @@ export function BillingClient({ events }: { events: Event[] }) {
           No webhook events recorded yet. Events will appear here once Stripe webhooks are configured.
         </div>
       ) : (
-        <div className="bg-white rounded-[10px] border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-[10px] border border-gray-200 overflow-x-auto">
           <table className="w-full text-[0.82rem]">
             <thead>
               <tr className="bg-gray-50">
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Timestamp</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Event Type</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Tenancy</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Amount</th>
-                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200">Status</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Timestamp</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Event Type</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Tenancy</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Amount</th>
+                <th className="text-left px-3 py-2.5 text-[0.7rem] uppercase tracking-wider text-gray-500 font-semibold border-b-2 border-gray-200 whitespace-nowrap">Status</th>
               </tr>
             </thead>
             <tbody>
