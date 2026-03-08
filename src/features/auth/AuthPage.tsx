@@ -170,10 +170,11 @@ export default function AuthPage() {
     const sbAccess = params.get('sb_access');
     const sbRefresh = params.get('sb_refresh');
     const hasUrlTokens = !!(sbAccess && sbRefresh);
+    const tokenHash = params.get('token_hash');
 
     if (isBackendEnabled && supabase && !urlInvite) {
       // Timeout so the login form is never stuck on loading
-      const timeoutMs = isProvisioned ? 20000 : hasUrlTokens ? 12000 : 3000;
+      const timeoutMs = isProvisioned ? 20000 : (hasUrlTokens || tokenHash) ? 12000 : 3000;
       const timeout = setTimeout(() => {
         setSessionChecking(false);
         setLoginLoading(false);
@@ -188,7 +189,20 @@ export default function AuthPage() {
 
           // If URL tokens are present (subdomain handoff), restore that session
           let user = (await supabase!.auth.getSession()).data.session?.user ?? null;
-          if (hasUrlTokens) {
+
+          // Handle token_hash from admin console (platform admin handoff)
+          if (tokenHash && !user) {
+            const { data, error } = await supabase!.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: 'magiclink',
+            });
+            if (!error && data.user) {
+              user = data.user;
+              window.history.replaceState({}, '', '/login');
+            }
+          }
+
+          if (hasUrlTokens && !user) {
             const { data, error } = await supabase!.auth.setSession({
               access_token: sbAccess!,
               refresh_token: sbRefresh!,

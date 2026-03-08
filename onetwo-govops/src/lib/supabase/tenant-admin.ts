@@ -6,8 +6,8 @@ let _tenantAdmin: SupabaseClient | null = null
 
 export function getTenantSupabaseAdmin() {
   if (!_tenantAdmin) {
-    const url = process.env.TENANT_SUPABASE_URL
-    const key = process.env.TENANT_SUPABASE_SERVICE_ROLE_KEY
+    const url = process.env.TENANT_SUPABASE_URL?.trim()
+    const key = process.env.TENANT_SUPABASE_SERVICE_ROLE_KEY?.replace(/\s/g, '')
     if (!url || !key) throw new Error('Missing TENANT_SUPABASE_URL or TENANT_SUPABASE_SERVICE_ROLE_KEY')
     _tenantAdmin = createClient(url, key)
   }

@@ -143,7 +143,7 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
                                 window.open(`/app/${t.slug}`, '_blank')
                                 return
                               }
-                              // Production: get tenant session tokens via API, then handoff
+                              // Production: get magic link via API, then redirect through Supabase auth
                               try {
                                 const res = await fetch('/api/admin/tenant-auth', {
                                   method: 'POST',
@@ -155,9 +155,8 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
                                   alert('Failed to authenticate: ' + (err.error || res.statusText))
                                   return
                                 }
-                                const { access_token, refresh_token } = await res.json()
-                                const params = new URLSearchParams({ sb_access: access_token, sb_refresh: refresh_token })
-                                window.open(`https://${t.slug}.getonetwo.com/login?${params}`, '_blank')
+                                const { token_hash } = await res.json()
+                                window.open(`https://${t.slug}.getonetwo.com/login?token_hash=${encodeURIComponent(token_hash)}`, '_blank')
                               } catch (err) {
                                 alert('Failed to authenticate: ' + (err instanceof Error ? err.message : 'Unknown error'))
                               }
