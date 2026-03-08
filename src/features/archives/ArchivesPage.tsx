@@ -346,7 +346,7 @@ export default function ArchivesPage() {
     });
 
     const metrics = finStore.getIncomeMetrics();
-    const occupiedUnits = finStore.units.filter(u => u.status === 'OCCUPIED');
+    const occupiedUnits = finStore.units.filter(u => u.status === 'ACTIVE');
     const totalChecklistItems = refreshResult.categories.reduce((s, c) => s + c.items.length, 0);
 
     const snapshot: ArchiveSnapshot = {

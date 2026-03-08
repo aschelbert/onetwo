@@ -2,7 +2,7 @@ import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
-export type ReportCategory = 'case_analysis' | 'financial_statements' | 'board_governance' | 'sales_package';
+export type ReportCategory = 'case_analysis' | 'financial_statements' | 'board_governance' | 'sales_package' | 'operations_risk';
 
 export type ReportType =
   // Board & Governance
@@ -12,7 +12,9 @@ export type ReportType =
   // Financial Statements
   | 'balance_sheet' | 'income_statement' | 'budget_vs_actual' | 'form_1120h' | 'local_tax_forms'
   // Sales Package
-  | 'resale_certificate' | 'budget_summary' | 'reserve_study_summary' | 'insurance_certificate' | 'association_info_sheet';
+  | 'resale_certificate' | 'budget_summary' | 'reserve_study_summary' | 'insurance_certificate' | 'association_info_sheet'
+  // Operations & Risk
+  | 'insurance_summary' | 'vendor_contract_review' | 'violation_enforcement' | 'reserve_study' | 'election_results';
 
 export interface ReportConfig {
   id: string;

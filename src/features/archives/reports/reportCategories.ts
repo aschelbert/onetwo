@@ -14,6 +14,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { id: 'financial_statements', label: 'Financial Statements', description: 'Formal accounting statements and tax forms', color: { bg: 'bg-sage-50', text: 'text-sage-700', border: 'border-sage-200' } },
   { id: 'board_governance', label: 'Board & Governance', description: 'Board packets, summaries, and compliance reports', color: { bg: 'bg-accent-50', text: 'text-accent-700', border: 'border-accent-200' } },
   { id: 'sales_package', label: 'Sales Package', description: 'Resale and estoppel documents for unit transfers', color: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' } },
+  { id: 'operations_risk', label: 'Operations & Risk', description: 'Insurance, vendors, violations, reserves, and elections', color: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' } },
 ];
 
 export const CATEGORY_MAP: Record<ReportCategory, CategoryMeta> = Object.fromEntries(CATEGORIES.map(c => [c.id, c])) as Record<ReportCategory, CategoryMeta>;
@@ -55,6 +56,13 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   { type: 'reserve_study_summary', category: 'sales_package', label: 'Reserve Study Summary', description: 'Reserve fund status and component schedule' },
   { type: 'insurance_certificate', category: 'sales_package', label: 'Insurance Certificate', description: 'Summary of active insurance coverage' },
   { type: 'association_info_sheet', category: 'sales_package', label: 'Association Information Sheet', description: 'General association info, contacts, and rules' },
+
+  // Operations & Risk
+  { type: 'insurance_summary', category: 'operations_risk', label: 'Insurance Summary', description: 'Policy portfolio, coverage gaps, renewal timeline, and premium overview' },
+  { type: 'vendor_contract_review', category: 'operations_risk', label: 'Vendor & Contract Review', description: 'Active contracts, vendor ratings, open bids, and renewal schedule' },
+  { type: 'violation_enforcement', category: 'operations_risk', label: 'Violation & Enforcement', description: 'Violation trends, enforcement actions, open cases, and resolution rates' },
+  { type: 'reserve_study', category: 'operations_risk', label: 'Reserve Study Summary', description: 'Reserve fund adequacy, component funding status, and contribution analysis' },
+  { type: 'election_results', category: 'operations_risk', label: 'Election Results', description: 'Voter participation, ballot results, proxy usage, and compliance checks' },
 ];
 
 export const REPORT_TYPE_MAP: Record<ReportType, ReportTypeMeta> = Object.fromEntries(REPORT_TYPES.map(r => [r.type, r])) as Record<ReportType, ReportTypeMeta>;

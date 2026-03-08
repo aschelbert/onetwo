@@ -5,6 +5,9 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
+import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useLetterStore } from '@/store/useLetterStore';
+import { useElectionStore } from '@/store/useElectionStore';
 import { buildBoardPacketSnapshot } from '@/features/dashboard/tabs/ReportsTab';
 import type { ReportConfig } from '@/lib/services/reports';
 
@@ -211,6 +214,109 @@ function buildSalesPackageSnapshot(type: ReportType, unitNumber?: string, period
   return snapshot;
 }
 
+function buildOperationsSnapshot(type: ReportType, periodStart?: string, periodEnd?: string): Record<string, any> {
+  const start = periodStart || `${new Date().getFullYear()}-01-01`;
+  const end = periodEnd || new Date().toISOString().split('T')[0];
+  const snapshot: Record<string, any> = { reportType: type, period: { start, end } };
+
+  if (type === 'insurance_summary') {
+    const building = useBuildingStore.getState();
+    const now = new Date();
+    const in90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const policies = building.insurance.map(p => {
+      const expDate = new Date(p.expires);
+      return {
+        type: p.type, carrier: p.carrier, policyNum: p.policyNum,
+        coverage: p.coverage, premium: p.premium, expires: p.expires,
+        active: expDate > now,
+      };
+    });
+    snapshot.policies = policies;
+    snapshot.totalPremium = policies.reduce((s, p) => s + (parseFloat(p.premium.replace(/[^0-9.]/g, '')) || 0), 0);
+    snapshot.expiringSoon = policies.filter(p => { const d = new Date(p.expires); return d > now && d <= in90; }).length;
+    snapshot.expiredCount = policies.filter(p => !p.active).length;
+  }
+
+  if (type === 'vendor_contract_review') {
+    const vendor = useVendorTrackerStore.getState();
+    const now = new Date();
+    const in90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    snapshot.contracts = vendor.contracts.map(c => ({
+      name: c.title, vendor: c.vendorName, amount: c.amount,
+      start: c.startDate, end: c.endDate, autoRenew: c.autoRenew, status: c.status,
+    }));
+    snapshot.bids = vendor.bids.map(b => ({
+      vendor: b.vendorName, project: b.project, amount: b.amount, status: b.status,
+    }));
+    const ratings = vendor.reviews.map(r => r.rating);
+    snapshot.reviews = {
+      avgRating: ratings.length > 0 ? Math.round((ratings.reduce((s, r) => s + r, 0) / ratings.length) * 10) / 10 : 0,
+      count: ratings.length,
+    };
+    snapshot.contractsExpiringSoon = vendor.contracts.filter(c => {
+      const d = new Date(c.endDate);
+      return d > now && d <= in90;
+    }).length;
+  }
+
+  if (type === 'violation_enforcement') {
+    const issues = useIssuesStore.getState().issues;
+    const letters = useLetterStore.getState().letters;
+    const open = issues.filter(i => i.status === 'SUBMITTED' || i.status === 'IN_PROGRESS');
+    const closed = issues.filter(i => i.status === 'RESOLVED' || i.status === 'CLOSED');
+    snapshot.openCases = open.length;
+    snapshot.closedCases = closed.length;
+    snapshot.casesByPriority = {
+      URGENT: issues.filter(i => i.priority === 'URGENT').length,
+      HIGH: issues.filter(i => i.priority === 'HIGH').length,
+      MEDIUM: issues.filter(i => i.priority === 'MEDIUM').length,
+      LOW: issues.filter(i => i.priority === 'LOW').length,
+    };
+    const sentLetters = letters.filter(l => l.status === 'sent');
+    const byCategory: Record<string, number> = {};
+    sentLetters.forEach(l => { byCategory[l.templateName] = (byCategory[l.templateName] || 0) + 1; });
+    snapshot.lettersSent = byCategory;
+    snapshot.resolutionRate = issues.length > 0 ? Math.round((closed.length / issues.length) * 100) : 0;
+  }
+
+  if (type === 'reserve_study') {
+    const fin = useFinancialStore.getState();
+    const items = fin.getReserveFundingStatus();
+    const totalFunding = items.reduce((s: number, i: any) => s + i.currentFunding, 0);
+    const totalRequired = items.reduce((s: number, i: any) => s + i.estimatedCost, 0);
+    snapshot.items = items.map((i: any) => ({
+      name: i.name, currentFunding: i.currentFunding, estimatedCost: i.estimatedCost,
+      pctFunded: i.pct, gap: i.gap, annualNeeded: i.annualNeeded,
+    }));
+    snapshot.totalFunding = totalFunding;
+    snapshot.totalRequired = totalRequired;
+    snapshot.overallPctFunded = totalRequired > 0 ? Math.round((totalFunding / totalRequired) * 100) : 100;
+    snapshot.recommendedAnnual = Math.round(fin.calculateRecommendedAnnualReserve());
+    snapshot.currentAnnual = fin.annualReserveContribution;
+    snapshot.gap = snapshot.recommendedAnnual - snapshot.currentAnnual;
+  }
+
+  if (type === 'election_results') {
+    const electionStore = useElectionStore.getState();
+    const fin = useFinancialStore.getState();
+    const units = fin.units.map(u => ({ number: u.number, votingPct: 100 / fin.units.length, status: 'active' }));
+    snapshot.elections = electionStore.elections.map(e => {
+      const results = electionStore.getResults(e.id, units);
+      return {
+        id: e.id, title: e.title, type: e.type, status: e.status,
+        participationPct: results?.totalVotedPct ?? 0,
+        quorumMet: results?.quorumMet ?? false,
+        quorumRequired: e.quorumRequired,
+        itemResults: results?.itemResults ?? [],
+        proxyCount: results?.proxyCount ?? 0,
+        complianceChecks: e.complianceChecks,
+      };
+    });
+  }
+
+  return snapshot;
+}
+
 // ── Main generator function ──
 
 interface GenerateOpts {
@@ -236,6 +342,10 @@ export function generateReportSnapshot(type: ReportType, opts?: GenerateOpts): R
   // Sales Package
   if (['resale_certificate', 'budget_summary', 'reserve_study_summary', 'insurance_certificate', 'association_info_sheet'].includes(type)) {
     return buildSalesPackageSnapshot(type, unitNumber, periodStart, periodEnd);
+  }
+  // Operations & Risk
+  if (['insurance_summary', 'vendor_contract_review', 'violation_enforcement', 'reserve_study', 'election_results'].includes(type)) {
+    return buildOperationsSnapshot(type, periodStart, periodEnd);
   }
   return {};
 }
