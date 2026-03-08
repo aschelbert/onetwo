@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { Bell, BellOff, Menu } from 'lucide-react'
+import { Bell, BellOff, Menu, LogOut } from 'lucide-react'
 import { usePushNotifications } from '@/hooks/use-push-notifications'
 
 const pageTitles: Record<string, [string, string]> = {
@@ -33,8 +33,17 @@ export function Topbar({ profile, onMenuClick }: TopbarProps) {
   const initials = ((profile?.display_name as string) || (profile?.email as string) || 'PA').slice(0, 2).toUpperCase()
   const { permission, isSubscribed, isLoading, subscribe, unsubscribe } = usePushNotifications()
   const [mounted, setMounted] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu) return
+    const close = () => setShowMenu(false)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [showMenu])
 
   const handleBellClick = () => {
     if (isSubscribed) {
@@ -82,8 +91,28 @@ export function Topbar({ profile, onMenuClick }: TopbarProps) {
           <div className="text-sm font-semibold">{(profile?.display_name as string) || 'Platform Admin'}</div>
           <div className="text-[0.72rem] text-gray-500">{(profile?.email as string) || ''}</div>
         </div>
-        <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold">
-          {initials}
+        <div className="relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
+            className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold cursor-pointer hover:bg-gray-700 transition-colors"
+          >
+            {initials}
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-11 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px] z-50">
+              <div className="px-3 py-2 border-b border-gray-100 md:hidden">
+                <div className="text-sm font-semibold">{(profile?.display_name as string) || 'Platform Admin'}</div>
+                <div className="text-[0.72rem] text-gray-500">{(profile?.email as string) || ''}</div>
+              </div>
+              <a
+                href="/auth/logout"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 no-underline"
+              >
+                <LogOut size={15} />
+                Sign out
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>
