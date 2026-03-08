@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useArchiveStore, type ArchiveSnapshot } from '@/store/useArchiveStore';
 import { useReportsStore, type GeneratedReport, type ReportType } from '@/store/useReportsStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -139,6 +139,49 @@ function Card({ label, val, sub }: { label: string; val: string; sub?: string })
       <p className="text-[11px] text-ink-400">{label}</p>
       <p className="text-lg font-bold text-ink-900 mt-0.5">{val}</p>
       {sub && <p className="text-[10px] text-ink-400">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Header three-dot menu ───────────────────────────────────────────────────
+function HeaderMenu({ onNewReport, onNewArchive }: { onNewReport: () => void; onNewArchive: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-9 h-9 rounded-lg bg-white bg-opacity-15 hover:bg-opacity-25 border border-white border-opacity-25 flex items-center justify-center text-white text-lg transition-colors"
+      >
+        ⋮
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 bg-white border border-ink-200 rounded-xl shadow-lg min-w-[180px] z-50 overflow-hidden">
+          <button
+            onClick={() => { onNewReport(); setOpen(false); }}
+            className="w-full text-left px-4 py-3 text-sm font-medium text-ink-700 hover:bg-mist-50 flex items-center gap-2.5"
+          >
+            <span>📄</span> New Report
+          </button>
+          <div className="border-t border-ink-100" />
+          <button
+            onClick={() => { onNewArchive(); setOpen(false); }}
+            className="w-full text-left px-4 py-3 text-sm font-medium text-ink-700 hover:bg-mist-50 flex items-center gap-2.5"
+          >
+            <span>📦</span> New Archive
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -325,20 +368,12 @@ export default function ArchivesPage() {
                 : 'Reports and governance snapshots for your community'}
             </p>
           </div>
-          {/* Action buttons shown per tab when not in archive detail */}
+          {/* Three-dot menu with create actions */}
           {!selectedArchiveId && isBoard && (
-            <div className="flex items-center gap-3">
-              {pageTab === 'reports' && (
-                <button onClick={openReportPanel} className="px-5 py-2.5 bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg text-sm font-semibold border border-white border-opacity-25 transition-colors">
-                  + New Report
-                </button>
-              )}
-              {pageTab === 'archives' && (
-                <button onClick={() => { setArchiveYear(String(new Date().getFullYear() - 1)); setShowCreateArchiveModal(true); }} className="px-5 py-2.5 bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg text-sm font-semibold border border-white border-opacity-25 transition-colors">
-                  + New Archive
-                </button>
-              )}
-            </div>
+            <HeaderMenu
+              onNewReport={openReportPanel}
+              onNewArchive={() => { setArchiveYear(String(new Date().getFullYear() - 1)); setShowCreateArchiveModal(true); }}
+            />
           )}
         </div>
       </div>

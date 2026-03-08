@@ -6,25 +6,33 @@ interface Props {
   snapshot: Record<string, any>;
 }
 
+function formatPeriodHeader(period: { start: string; end: string } | undefined): string | null {
+  if (!period) return null;
+  const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${fmtDate(period.start)} – ${fmtDate(period.end)}`;
+}
+
 export default function SalesPackageRenderer({ type, snapshot }: Props) {
   const data = snapshot.data;
+  const period = snapshot.period;
   if (!data) return <p className="text-sm text-ink-400">No data available.</p>;
 
-  if (type === 'resale_certificate') return <ResaleCertificate data={data} />;
-  if (type === 'budget_summary') return <BudgetSummary data={data} />;
-  if (type === 'reserve_study_summary') return <ReserveStudySummary data={data} />;
+  if (type === 'resale_certificate') return <ResaleCertificate data={data} period={period} />;
+  if (type === 'budget_summary') return <BudgetSummary data={data} period={period} />;
+  if (type === 'reserve_study_summary') return <ReserveStudySummary data={data} period={period} />;
   if (type === 'insurance_certificate') return <InsuranceCertificate data={data} />;
   if (type === 'association_info_sheet') return <AssociationInfoSheet data={data} />;
   return <p className="text-sm text-ink-400">Unknown sales package report type.</p>;
 }
 
-function ResaleCertificate({ data }: { data: any }) {
+function ResaleCertificate({ data, period }: { data: any; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period);
   return (
     <div className="space-y-4">
       <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl overflow-hidden">
         <div className="bg-indigo-900 text-white px-5 py-3">
           <h3 className="font-display text-lg font-bold">Resale / Estoppel Certificate</h3>
-          <p className="text-xs text-indigo-200">{data.buildingName} — Generated {data.generatedDate}</p>
+          <p className="text-xs text-indigo-200">{data.buildingName} — Generated {data.generatedDate}{periodText ? ` — ${periodText}` : ''}</p>
         </div>
         <div className="p-5 space-y-4 text-sm">
           {data.unit ? (
@@ -63,11 +71,12 @@ function ResaleCertificate({ data }: { data: any }) {
   );
 }
 
-function BudgetSummary({ data }: { data: any }) {
+function BudgetSummary({ data, period }: { data: any; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period);
   return (
     <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-ink-100">
-        <h3 className="font-display text-base font-bold text-ink-900">Budget Summary — FY {data.fiscalYear}</h3>
+        <h3 className="font-display text-base font-bold text-ink-900">Budget Summary — FY {data.fiscalYear}{periodText ? ` — ${periodText}` : ''}</h3>
         <p className="text-xs text-ink-400">{data.buildingName} · {data.unitCount} units · Avg fee: {fmt(data.avgMonthlyFee)}/mo</p>
       </div>
       <div className="overflow-x-auto">
@@ -101,12 +110,12 @@ function BudgetSummary({ data }: { data: any }) {
   );
 }
 
-function ReserveStudySummary({ data }: { data: any }) {
+function ReserveStudySummary({ data, period }: { data: any; period?: { start: string; end: string } }) {
   const overallPct = data.totalRequired > 0 ? Math.round((data.totalFunding / data.totalRequired) * 100) : 0;
   return (
     <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-ink-100">
-        <h3 className="font-display text-base font-bold text-ink-900">Reserve Study Summary</h3>
+        <h3 className="font-display text-base font-bold text-ink-900">Reserve Study Summary{period ? ` — ${formatPeriodHeader(period)}` : ''}</h3>
         <p className="text-xs text-ink-400">{data.buildingName} · {overallPct}% funded overall · {fmt(data.annualContribution)}/yr contribution</p>
       </div>
       <div className="overflow-x-auto">

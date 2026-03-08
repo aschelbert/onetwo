@@ -108,6 +108,9 @@ export default function ReportList() {
                         {catMeta && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${catMeta.color.bg} ${catMeta.color.text}`}>{catMeta.label}</span>}
                         {typeMeta && <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 font-semibold">{typeMeta.label}</span>}
                       </div>
+                      {report.periodStart && report.periodEnd && (
+                        <p className="text-xs text-ink-500 mt-0.5">Period: {formatDate(report.periodStart)} – {formatDate(report.periodEnd)}</p>
+                      )}
                       <div className="flex items-center gap-3 mt-1 text-xs text-ink-400">
                         <span>Generated {formatDate(report.generatedAt)}</span>
                         <span>By {report.generatedBy}</span>

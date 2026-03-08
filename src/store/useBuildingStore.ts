@@ -33,6 +33,7 @@ export interface BuildingDetails {
   yearBuilt: string; totalUnits: number; floors: number; type: string; sqft: string; lotSize: string;
   parking: string; architect: string; contractor: string; amenities: string[];
   entityType: 'incorporated' | 'unincorporated';
+  fiscalYearEnd: string; // MM-DD format, e.g. '12-31'
 }
 
 export interface BylawsConfig {
@@ -126,6 +127,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     contractor: 'Pacific Coast Builders Inc.',
     amenities: ['Community Room','Fitness Center','Rooftop Deck','Secure Lobby','Elevator (2)','Package Room'],
     entityType: 'incorporated',
+    fiscalYearEnd: '12-31',
   },
   board: [
     { id: 'bm1', name: 'Robert Mitchell', role: 'President', email: 'robert@example.com', phone: '202-555-0401', term: 'Jan 2025 – Dec 2026' },

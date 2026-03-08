@@ -10,9 +10,11 @@ import type { ReportConfig } from '@/lib/services/reports';
 
 // ── Snapshot generators by report type ──
 
-function buildCaseSnapshot(type: ReportType): Record<string, any> {
+function buildCaseSnapshot(type: ReportType, periodStart?: string, periodEnd?: string): Record<string, any> {
   const fin = useFinancialStore.getState();
-  const snapshot: Record<string, any> = { reportType: type };
+  const start = periodStart || `${new Date().getFullYear()}-01-01`;
+  const end = periodEnd || new Date().toISOString().split('T')[0];
+  const snapshot: Record<string, any> = { reportType: type, period: { start, end } };
 
   if (type === 'reconciliation') {
     const bankAccounts = fin.chartOfAccounts.filter(a => a.num.startsWith('10'));
@@ -57,17 +59,19 @@ function buildCaseSnapshot(type: ReportType): Record<string, any> {
   return snapshot;
 }
 
-function buildFinancialSnapshot(type: ReportType): Record<string, any> {
+function buildFinancialSnapshot(type: ReportType, periodStart?: string, periodEnd?: string): Record<string, any> {
   const fin = useFinancialStore.getState();
   const building = useBuildingStore.getState();
-  const snapshot: Record<string, any> = { reportType: type };
+  const start = periodStart || `${new Date().getFullYear()}-01-01`;
+  const end = periodEnd || `${new Date().getFullYear()}-12-31`;
+  const snapshot: Record<string, any> = { reportType: type, period: { start, end } };
 
   if (type === 'balance_sheet') {
     snapshot.data = fin.getBalanceSheet();
   }
 
   if (type === 'income_statement') {
-    snapshot.data = fin.getIncomeStatement('2026-01-01', '2026-12-31');
+    snapshot.data = fin.getIncomeStatement(start, end);
   }
 
   if (type === 'budget_vs_actual') {
@@ -75,7 +79,7 @@ function buildFinancialSnapshot(type: ReportType): Record<string, any> {
   }
 
   if (type === 'form_1120h') {
-    const pnl = fin.getIncomeStatement('2026-01-01', '2026-12-31');
+    const pnl = fin.getIncomeStatement(start, end);
     const exemptIncome = pnl.totalIncome;
     const nonExemptIncome = 0;
     const totalIncome = exemptIncome + nonExemptIncome;
@@ -90,7 +94,7 @@ function buildFinancialSnapshot(type: ReportType): Record<string, any> {
   }
 
   if (type === 'local_tax_forms') {
-    const pnl = fin.getIncomeStatement('2026-01-01', '2026-12-31');
+    const pnl = fin.getIncomeStatement(start, end);
     snapshot.data = {
       buildingName: building.name, state: building.address.state,
       entityType: building.details.entityType || 'incorporated',
@@ -102,7 +106,7 @@ function buildFinancialSnapshot(type: ReportType): Record<string, any> {
   return snapshot;
 }
 
-function buildBoardSnapshot(type: ReportType): Record<string, any> {
+function buildBoardSnapshot(type: ReportType, periodStart?: string, periodEnd?: string): Record<string, any> {
   const fin = useFinancialStore.getState();
   const comp = useComplianceStore.getState();
   const issues = useIssuesStore.getState();
@@ -131,10 +135,12 @@ function buildBoardSnapshot(type: ReportType): Record<string, any> {
   return buildBoardPacketSnapshot(config, { fin, comp, issues, meetings, building, propertyLog });
 }
 
-function buildSalesPackageSnapshot(type: ReportType, unitNumber?: string): Record<string, any> {
+function buildSalesPackageSnapshot(type: ReportType, unitNumber?: string, periodStart?: string, periodEnd?: string): Record<string, any> {
   const fin = useFinancialStore.getState();
   const building = useBuildingStore.getState();
-  const snapshot: Record<string, any> = { reportType: type };
+  const start = periodStart || `${new Date().getFullYear()}-01-01`;
+  const end = periodEnd || `${new Date().getFullYear()}-12-31`;
+  const snapshot: Record<string, any> = { reportType: type, period: { start, end } };
 
   if (type === 'resale_certificate') {
     const unit = fin.units.find(u => u.number === unitNumber);
@@ -159,7 +165,7 @@ function buildSalesPackageSnapshot(type: ReportType, unitNumber?: string): Recor
     const totalBudgeted = bv.reduce((s, r) => s + r.budgeted, 0);
     const totalActual = bv.reduce((s, r) => s + r.actual, 0);
     snapshot.data = {
-      buildingName: building.name, fiscalYear: '2026',
+      buildingName: building.name, fiscalYear: start.slice(0, 4),
       categories: bv, totalBudgeted, totalActual,
       unitCount: fin.units.length,
       avgMonthlyFee: fin.units.length > 0 ? Math.round(fin.units.reduce((s, u) => s + u.monthlyFee, 0) / fin.units.length) : 0,
@@ -207,22 +213,29 @@ function buildSalesPackageSnapshot(type: ReportType, unitNumber?: string): Recor
 
 // ── Main generator function ──
 
-export function generateReportSnapshot(type: ReportType, unitNumber?: string): Record<string, any> {
+interface GenerateOpts {
+  unitNumber?: string;
+  periodStart?: string;
+  periodEnd?: string;
+}
+
+export function generateReportSnapshot(type: ReportType, opts?: GenerateOpts): Record<string, any> {
+  const { unitNumber, periodStart, periodEnd } = opts || {};
   // Case Analysis
   if (['reconciliation', 'budget_variance', 'collections_delinquency', 'reserve_balances', 'year_end_projections'].includes(type)) {
-    return buildCaseSnapshot(type);
+    return buildCaseSnapshot(type, periodStart, periodEnd);
   }
   // Financial Statements
   if (['balance_sheet', 'income_statement', 'budget_vs_actual', 'form_1120h', 'local_tax_forms'].includes(type)) {
-    return buildFinancialSnapshot(type);
+    return buildFinancialSnapshot(type, periodStart, periodEnd);
   }
   // Board & Governance
   if (['board_packet', 'monthly_summary', 'compliance_report', 'financial_snapshot'].includes(type)) {
-    return buildBoardSnapshot(type);
+    return buildBoardSnapshot(type, periodStart, periodEnd);
   }
   // Sales Package
   if (['resale_certificate', 'budget_summary', 'reserve_study_summary', 'insurance_certificate', 'association_info_sheet'].includes(type)) {
-    return buildSalesPackageSnapshot(type, unitNumber);
+    return buildSalesPackageSnapshot(type, unitNumber, periodStart, periodEnd);
   }
   return {};
 }

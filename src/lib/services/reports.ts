@@ -34,6 +34,8 @@ export interface GeneratedReport {
   generatedAt: string;
   generatedBy: string;
   snapshot: Record<string, any>;
+  periodStart?: string;
+  periodEnd?: string;
 }
 
 // ── Row converters: Configs ──
@@ -75,6 +77,8 @@ function rowToReport(r: Record<string, unknown>): GeneratedReport {
     generatedAt: r.generated_at as string,
     generatedBy: r.generated_by as string,
     snapshot: (r.snapshot || {}) as Record<string, any>,
+    periodStart: r.period_start as string | undefined,
+    periodEnd: r.period_end as string | undefined,
   };
 }
 
@@ -87,6 +91,8 @@ function reportToRow(rp: Partial<GeneratedReport>): Record<string, unknown> {
   if (rp.generatedAt !== undefined) row.generated_at = rp.generatedAt;
   if (rp.generatedBy !== undefined) row.generated_by = rp.generatedBy;
   if (rp.snapshot !== undefined) row.snapshot = rp.snapshot;
+  if (rp.periodStart !== undefined) row.period_start = rp.periodStart;
+  if (rp.periodEnd !== undefined) row.period_end = rp.periodEnd;
   return row;
 }
 

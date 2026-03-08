@@ -86,18 +86,19 @@ function AuthListener() {
           // Check tenant user
           const { data: tu } = await sb
             .from('tenant_users')
-            .select('role, unit_number, tenant_id')
+            .select('role, unit, tenant_id')
             .eq('user_id', session.user.id)
             .maybeSingle();
 
           if (tu) {
+            const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
             const m = {
               id: session.user.id,
               name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
               email: session.user.email || '',
               phone: '',
-              role: (tu.role || 'RESIDENT') as Role,
-              unit: tu.unit_number || '',
+              role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+              unit: tu.unit || '',
               status: 'active' as const,
               joined: new Date().toISOString().split('T')[0],
               boardTitle: null,

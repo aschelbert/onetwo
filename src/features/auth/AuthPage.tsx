@@ -194,7 +194,11 @@ export default function AuthPage() {
         setSessionChecking(false);
       })();
     } else {
-      setSessionChecking(false);
+      // Don't dismiss the loading spinner yet if we're about to restore from URL tokens
+      const willRestore = params.get('sb_access') && params.get('sb_refresh') && isBackendEnabled && supabase;
+      if (!willRestore) {
+        setSessionChecking(false);
+      }
     }
 
     // Restore Supabase session from redirect (subdomain handoff)
@@ -240,6 +244,7 @@ export default function AuthPage() {
           console.warn('Session restore failed:', err);
         }
         setLoginLoading(false);
+        setSessionChecking(false);
       })();
     }
   }, []);
@@ -258,7 +263,13 @@ export default function AuthPage() {
           password,
         });
 
-        if (!error && data.user) {
+        if (error) {
+          alert('Incorrect email or password.');
+          setLoginLoading(false);
+          return;
+        }
+
+        if (data.user) {
           // Check if user is a platform admin
           const { data: admin } = await supabase!
             .from('platform_admins')

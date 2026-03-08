@@ -6,20 +6,28 @@ interface Props {
   snapshot: Record<string, any>;
 }
 
+function formatPeriodHeader(period: { start: string; end: string } | undefined, style: 'range' | 'as-of'): string | null {
+  if (!period) return null;
+  const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (style === 'as-of') return `As of ${fmtDate(period.end)}`;
+  return `${fmtDate(period.start)} – ${fmtDate(period.end)}`;
+}
+
 export default function FinancialStatementRenderer({ type, snapshot }: Props) {
-  if (type === 'balance_sheet' && snapshot.data) return <BalanceSheet data={snapshot.data} />;
-  if (type === 'income_statement' && snapshot.data) return <IncomeStatement data={snapshot.data} />;
-  if (type === 'budget_vs_actual' && snapshot.rows) return <BudgetVsActual rows={snapshot.rows} />;
-  if (type === 'form_1120h' && snapshot.data) return <Form1120H data={snapshot.data} />;
-  if (type === 'local_tax_forms' && snapshot.data) return <LocalTaxForms data={snapshot.data} />;
+  if (type === 'balance_sheet' && snapshot.data) return <BalanceSheet data={snapshot.data} period={snapshot.period} />;
+  if (type === 'income_statement' && snapshot.data) return <IncomeStatement data={snapshot.data} period={snapshot.period} />;
+  if (type === 'budget_vs_actual' && snapshot.rows) return <BudgetVsActual rows={snapshot.rows} period={snapshot.period} />;
+  if (type === 'form_1120h' && snapshot.data) return <Form1120H data={snapshot.data} period={snapshot.period} />;
+  if (type === 'local_tax_forms' && snapshot.data) return <LocalTaxForms data={snapshot.data} period={snapshot.period} />;
   return <p className="text-sm text-ink-400">No data available for this financial statement.</p>;
 }
 
-function BalanceSheet({ data }: { data: any }) {
+function BalanceSheet({ data, period }: { data: any; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period, 'as-of');
   return (
     <div className="bg-sage-50 border border-sage-200 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-sage-200">
-        <h3 className="font-display text-base font-bold text-ink-900">Balance Sheet</h3>
+        <h3 className="font-display text-base font-bold text-ink-900">Balance Sheet{periodText ? ` — ${periodText}` : ''}</h3>
         <p className="text-xs text-ink-400">Snapshot at time of generation</p>
       </div>
       <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
@@ -55,11 +63,12 @@ function BalanceSheet({ data }: { data: any }) {
   );
 }
 
-function IncomeStatement({ data }: { data: any }) {
+function IncomeStatement({ data, period }: { data: any; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period, 'range');
   return (
     <div className="bg-mist-50 border border-mist-200 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-mist-200">
-        <h3 className="font-display text-base font-bold text-ink-900">Income Statement (P&L)</h3>
+        <h3 className="font-display text-base font-bold text-ink-900">Income Statement (P&L){periodText ? ` — ${periodText}` : ''}</h3>
       </div>
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
         <div>
@@ -88,10 +97,11 @@ function IncomeStatement({ data }: { data: any }) {
   );
 }
 
-function BudgetVsActual({ rows }: { rows: any[] }) {
+function BudgetVsActual({ rows, period }: { rows: any[]; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period, 'range');
   return (
     <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-ink-100"><h3 className="font-display text-base font-bold text-ink-900">Budget vs Actual</h3></div>
+      <div className="px-5 py-3 border-b border-ink-100"><h3 className="font-display text-base font-bold text-ink-900">Budget vs Actual{periodText ? ` — ${periodText}` : ''}</h3></div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -118,7 +128,7 @@ function BudgetVsActual({ rows }: { rows: any[] }) {
   );
 }
 
-function Form1120H({ data }: { data: any }) {
+function Form1120H({ data, period: _period }: { data: any; period?: { start: string; end: string } }) {
   return (
     <div className="bg-white border-2 border-ink-900 rounded-xl overflow-hidden">
       <div className="bg-ink-900 text-white px-5 py-3">
@@ -145,11 +155,12 @@ function Form1120H({ data }: { data: any }) {
   );
 }
 
-function LocalTaxForms({ data }: { data: any }) {
+function LocalTaxForms({ data, period }: { data: any; period?: { start: string; end: string } }) {
+  const periodText = formatPeriodHeader(period, 'range');
   return (
     <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-ink-100">
-        <h3 className="font-display text-base font-bold text-ink-900">Local Tax Forms — {data.state}</h3>
+        <h3 className="font-display text-base font-bold text-ink-900">Local Tax Forms — {data.state}{periodText ? ` — ${periodText}` : ''}</h3>
       </div>
       <div className="p-5 space-y-4 text-sm">
         <div className="grid grid-cols-2 gap-3 bg-mist-50 rounded-lg p-3 border border-mist-200">
