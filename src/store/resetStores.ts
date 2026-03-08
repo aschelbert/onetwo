@@ -14,6 +14,7 @@ import { usePropertyLogStore } from './usePropertyLogStore';
 import { useReportStore } from './useReportStore';
 import { useScorecardStore } from './useScorecardStore';
 import { useCommunicationsStore } from './useCommunicationsStore';
+import { useAmenitiesStore } from './useAmenitiesStore';
 
 export function resetStoresForRealTenant() {
   useBuildingStore.setState({
@@ -68,4 +69,6 @@ export function resetStoresForRealTenant() {
   useScorecardStore.setState({ entries: [], reviews: [] });
 
   useCommunicationsStore.setState({ communications: [] });
+
+  useAmenitiesStore.setState({ configs: [], reservations: [], notifications: [] });
 }

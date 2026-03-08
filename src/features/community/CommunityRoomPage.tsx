@@ -6,9 +6,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
+import { useAmenitiesStore } from '@/store/useAmenitiesStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import VotingPage from '@/features/elections/ElectionsPage';
+import AmenitiesTab from '@/features/community/AmenitiesTab';
 
-type TabId = 'announcements' | 'requests' | 'meetings' | 'votes';
+type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities';
 
 const ANN_CATS: Record<string, { icon: string; label: string; bg: string; text: string }> = {
   general: { icon: '📢', label: 'General', bg: 'bg-ink-100', text: 'text-ink-600' },
@@ -26,10 +29,17 @@ const REQ_CATS = [
 ];
 
 export default function CommunityRoomPage() {
-  const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', ['announcements', 'requests', 'meetings', 'votes']);
+  const tenant = useTenantContext();
+  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  const amenitiesStore = useAmenitiesStore();
+  const user = useAuthStore(s => s.currentUser);
+  const amenityUnread = amenitiesStore.getUnreadCount(user.id);
+  const validTabs: TabId[] = isManagementSuite
+    ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
+    : ['announcements', 'requests', 'meetings', 'votes'];
+  const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
   const mtg = useMeetingsStore();
   const elections = useElectionStore();
-  const user = useAuthStore(s => s.currentUser);
   const { board } = useBuildingStore();
   const comp = useComplianceStore();
   const issueStore = useIssuesStore();
@@ -72,6 +82,7 @@ export default function CommunityRoomPage() {
     { id: 'requests', label: 'Requests', badge: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
+    ...(isManagementSuite ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: amenityUnread || undefined }] : []),
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
@@ -124,12 +135,13 @@ export default function CommunityRoomPage() {
             <p className="text-accent-200 text-sm mt-1">Announcements, requests, meetings & vote results</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+        <div className={`grid grid-cols-2 ${isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mt-5`}>
           {[
             { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', icon: '📌', tab: 'announcements' as TabId },
             { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', icon: '📬', tab: 'requests' as TabId },
             { val: upcoming.length, label: 'Upcoming Meetings', icon: '📅', tab: 'meetings' as TabId },
             { val: openElections, label: 'Open Votes', icon: '🗳', tab: 'votes' as TabId },
+            ...(isManagementSuite ? [{ val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', icon: '🏢', tab: 'amenities' as TabId }] : []),
           ].map(s => (
             <div key={s.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(s.tab)}>
               <span className="text-xl">{s.icon}</span>
@@ -343,6 +355,9 @@ export default function CommunityRoomPage() {
 
         {/* ═══ VOTES & RESOLUTIONS ═══ */}
         {tab === 'votes' && <VotingPage />}
+
+        {/* ═══ AMENITIES ═══ */}
+        {tab === 'amenities' && isManagementSuite && <AmenitiesTab />}
 
       </div>
     </div>
