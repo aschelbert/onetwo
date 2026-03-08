@@ -28,6 +28,44 @@ export async function withAdminAuth(
   return handler(supabaseAdmin, user.id, profile.email)
 }
 
+export async function withTenantAuth(
+  tenancyId: string,
+  handler: (
+    db: typeof supabaseAdmin,
+    tenancyId: string,
+    userId: string,
+    userName: string,
+    userRole: string
+  ) => Promise<NextResponse>
+) {
+  const supabase = await createServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: tenantUser } = await supabaseAdmin
+    .from('tenant_users')
+    .select('*')
+    .eq('tenancy_id', tenancyId)
+    .eq('auth_user_id', user.id)
+    .eq('status', 'active')
+    .single()
+
+  if (!tenantUser) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  return handler(
+    supabaseAdmin,
+    tenancyId,
+    user.id,
+    tenantUser.display_name || tenantUser.email?.split('@')[0] || 'User',
+    tenantUser.role_id || 'member'
+  )
+}
+
 export async function logAudit(
   actor: string,
   action: string,

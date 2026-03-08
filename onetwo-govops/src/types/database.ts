@@ -12,6 +12,229 @@ export type Database = {
   }
   public: {
     Tables: {
+      captured_items: {
+        Row: {
+          id: string
+          thread_id: string
+          type: string
+          title: string
+          feedback_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          type: string
+          title: string
+          feedback_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          type?: string
+          title?: string
+          feedback_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "captured_items_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_items_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_assocs: {
+        Row: {
+          feedback_id: string
+          tenancy_id: string
+        }
+        Insert: {
+          feedback_id: string
+          tenancy_id: string
+        }
+        Update: {
+          feedback_id?: string
+          tenancy_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_assocs_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_items: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          theme: string
+          type: string
+          status: string
+          votes: number
+          impact: string | null
+          quarter: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          theme?: string
+          type?: string
+          status?: string
+          votes?: number
+          impact?: string | null
+          quarter?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          theme?: string
+          type?: string
+          status?: string
+          votes?: number
+          impact?: string | null
+          quarter?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      feedback_source_threads: {
+        Row: {
+          feedback_id: string
+          thread_id: string
+        }
+        Insert: {
+          feedback_id: string
+          thread_id: string
+        }
+        Update: {
+          feedback_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_source_threads_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_source_threads_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          id: string
+          thread_id: string
+          sender_type: string
+          sender_id: string | null
+          sender_name: string
+          sender_role: string | null
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          sender_type: string
+          sender_id?: string | null
+          sender_name: string
+          sender_role?: string | null
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          sender_type?: string
+          sender_id?: string | null
+          sender_name?: string
+          sender_role?: string | null
+          body?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_threads: {
+        Row: {
+          id: string
+          tenancy_id: string
+          subject: string
+          status: string
+          priority: string
+          module: string
+          assignee_name: string | null
+          ai_summary: string | null
+          created_by_user_id: string | null
+          created_by_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenancy_id: string
+          subject: string
+          status?: string
+          priority?: string
+          module?: string
+          assignee_name?: string | null
+          ai_summary?: string | null
+          created_by_user_id?: string | null
+          created_by_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenancy_id?: string
+          subject?: string
+          status?: string
+          priority?: string
+          module?: string
+          assignee_name?: string | null
+          ai_summary?: string | null
+          created_by_user_id?: string | null
+          created_by_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: Database["public"]["Enums"]["audit_action"]
