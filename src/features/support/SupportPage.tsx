@@ -1,10 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { ROLE_LABELS } from '@/types/auth';
 import { getInitials } from '@/lib/formatters';
 import { Plus, Send, MessageCircle } from 'lucide-react';
+
+// Secondary Supabase client — connects to admin project for support tables
+const adminUrl = import.meta.env.VITE_ADMIN_SUPABASE_URL as string;
+const adminKey = import.meta.env.VITE_ADMIN_SUPABASE_ANON_KEY as string;
+const adminSupabase = adminUrl && adminKey ? createClient(adminUrl, adminKey) : null;
 
 interface Thread {
   id: string;
@@ -58,6 +63,7 @@ function timeAgo(date: string) {
 export default function SupportPage() {
   const { currentUser, currentRole } = useAuthStore();
   const tenant = useTenantContext();
+  const [tenancyId, setTenancyId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,20 +79,40 @@ export default function SupportPage() {
   const [creating, setCreating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const db = adminSupabase;
   const thread = threads.find(t => t.id === selectedId);
 
-  // Load threads
+  // Resolve tenant subdomain → tenancy_id in admin project
   useEffect(() => {
-    if (!isBackendEnabled || !supabase || tenant.isDemo) {
+    if (!db || tenant.isDemo) {
       setLoadingThreads(false);
       return;
     }
 
     (async () => {
-      const { data } = await supabase
+      const { data: tenancy } = await db
+        .from('tenancies')
+        .select('id')
+        .eq('slug', tenant.subdomain)
+        .maybeSingle();
+
+      if (tenancy) {
+        setTenancyId(tenancy.id);
+      } else {
+        setLoadingThreads(false);
+      }
+    })();
+  }, [tenant.subdomain, tenant.isDemo]);
+
+  // Load threads once tenancyId is resolved
+  useEffect(() => {
+    if (!db || !tenancyId) return;
+
+    (async () => {
+      const { data } = await db
         .from('support_threads')
         .select('*')
-        .eq('tenancy_id', tenant.id)
+        .eq('tenancy_id', tenancyId)
         .order('updated_at', { ascending: false });
 
       if (data) {
@@ -95,13 +121,13 @@ export default function SupportPage() {
       }
       setLoadingThreads(false);
     })();
-  }, [tenant.id, tenant.isDemo]);
+  }, [tenancyId]);
 
   // Load messages for selected thread
   const fetchMessages = useCallback(async (threadId: string) => {
-    if (!supabase) return;
+    if (!db) return;
     setLoadingMessages(true);
-    const { data } = await supabase
+    const { data } = await db
       .from('support_messages')
       .select('*')
       .eq('thread_id', threadId)
@@ -121,8 +147,8 @@ export default function SupportPage() {
 
   // Realtime subscription
   useEffect(() => {
-    if (!supabase) return;
-    const channel = supabase
+    if (!db) return;
+    const channel = db
       .channel('tenant-support-live')
       .on('postgres_changes', {
         event: 'INSERT',
@@ -144,13 +170,13 @@ export default function SupportPage() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { db.removeChannel(channel); };
   }, [selectedId]);
 
   const sendReply = async () => {
-    if (!replyText.trim() || !selectedId || !supabase) return;
+    if (!replyText.trim() || !selectedId || !db) return;
     setSending(true);
-    const { data } = await supabase
+    const { data } = await db
       .from('support_messages')
       .insert({
         thread_id: selectedId,
@@ -165,20 +191,19 @@ export default function SupportPage() {
     if (data) {
       setMessages(prev => [...prev, data as Message]);
       setReplyText('');
-      // Update thread's updated_at
-      await supabase.from('support_threads').update({ updated_at: new Date().toISOString() }).eq('id', selectedId);
+      await db.from('support_threads').update({ updated_at: new Date().toISOString() }).eq('id', selectedId);
     }
     setSending(false);
   };
 
   const createThread = async () => {
-    if (!newSubject.trim() || !newMessage.trim() || !supabase) return;
+    if (!newSubject.trim() || !newMessage.trim() || !db || !tenancyId) return;
     setCreating(true);
 
-    const { data: newThread } = await supabase
+    const { data: newThread } = await db
       .from('support_threads')
       .insert({
-        tenancy_id: tenant.id,
+        tenancy_id: tenancyId,
         subject: newSubject,
         module: newModule,
         priority: newPriority,
@@ -188,8 +213,7 @@ export default function SupportPage() {
       .single();
 
     if (newThread) {
-      // Insert first message
-      await supabase.from('support_messages').insert({
+      await db.from('support_messages').insert({
         thread_id: newThread.id,
         sender_type: 'tenant',
         sender_name: currentUser.name,
@@ -208,7 +232,7 @@ export default function SupportPage() {
     setCreating(false);
   };
 
-  if (tenant.isDemo) {
+  if (tenant.isDemo || !adminSupabase) {
     return (
       <div className="max-w-2xl mx-auto py-16 text-center">
         <MessageCircle className="w-12 h-12 text-ink-300 mx-auto mb-4" />
