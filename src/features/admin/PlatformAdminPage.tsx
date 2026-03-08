@@ -6,10 +6,12 @@ import Modal from '@/components/ui/Modal';
 import PermissionsTab from './PermissionsTab';
 import StripeTab from './StripeTab';
 import FinanceTab from './FinanceTab';
+import FeedbackTab from './FeedbackTab';
+import ProblemsTab from './ProblemsTab';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Page = 'dashboard' | 'subscriptions' | 'features' | 'matrix' | 'permissions' | 'tenancies' | 'roles' | 'stripe' | 'finance';
+type Page = 'dashboard' | 'subscriptions' | 'features' | 'matrix' | 'permissions' | 'tenancies' | 'roles' | 'stripe' | 'finance' | 'support' | 'feedback' | 'problems';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,9 @@ const NAV = [
   { section: 'Operations', items: [
     { id: 'tenancies' as Page, label: 'Tenancies', d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
     { id: 'roles' as Page, label: 'User Roles', d: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+    { id: 'support' as Page, label: 'Support', d: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z' },
+    { id: 'feedback' as Page, label: 'Feedback', d: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
+    { id: 'problems' as Page, label: 'Problem Statements', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   ]},
   { section: 'Billing', items: [
     { id: 'stripe' as Page, label: 'Stripe', d: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
@@ -59,6 +64,9 @@ const PAGE_META: Record<Page, [string, string]> = {
   roles: ['User Roles', 'Admin Console > Operations > User Roles'],
   stripe: ['Stripe Integration', 'Admin Console > Billing > Stripe'],
   finance: ['Platform Finance', 'Admin Console > Billing > Platform Finance'],
+  support: ['Support', 'Admin Console > Operations > Support'],
+  feedback: ['Feedback', 'Admin Console > Operations > Feedback'],
+  problems: ['Problem Statements', 'Admin Console > Operations > Problem Statements'],
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -712,6 +720,25 @@ export default function PlatformAdminPage() {
 
           {/* ═══ FINANCE ═══ */}
           {page === 'finance' && <FinanceTab />}
+
+          {/* ═══ SUPPORT ═══ */}
+          {page === 'support' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-lg font-bold text-ink-900">Support</h2>
+                <p className="text-sm text-ink-500 mt-1">Support tickets and escalations — coming soon</p>
+              </div>
+              <div className="bg-white rounded-[10px] border border-ink-200 p-12 text-center">
+                <p className="text-ink-400 text-sm">Support management page is under development.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ FEEDBACK ═══ */}
+          {page === 'feedback' && <FeedbackTab />}
+
+          {/* ═══ PROBLEM STATEMENTS ═══ */}
+          {page === 'problems' && <ProblemsTab />}
 
         </main>
       </div>
