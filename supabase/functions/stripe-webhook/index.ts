@@ -6,6 +6,10 @@ const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
+// Admin console (govops) project — for syncing tenancies
+const GOVOPS_URL = Deno.env.get("GOVOPS_SUPABASE_URL") || "";
+const GOVOPS_SERVICE_KEY = Deno.env.get("GOVOPS_SUPABASE_SERVICE_ROLE_KEY") || "";
+
 // Supabase REST helper (service role bypasses RLS)
 async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown) {
   const url = new URL(`${SB_URL}/rest/v1/${table}`);
@@ -44,6 +48,58 @@ async function sbRpc(fn: string, args: Record<string, unknown>) {
     throw new Error(`RPC ${fn} failed: ${err}`);
   }
   return await res.json();
+}
+
+// Sync tenancy to admin console (govops) — best-effort, non-blocking
+async function syncToAdminConsole(tenantId: string, meta: Record<string, string>, result: Record<string, unknown>, customerId: string | null, subscriptionId: string | null) {
+  if (!GOVOPS_URL || !GOVOPS_SERVICE_KEY) {
+    console.log("Govops env vars not set, skipping admin console sync");
+    return;
+  }
+  try {
+    const tierToSubscriptionId: Record<string, string> = {
+      compliance_pro: "compliance-pro",
+      community_plus: "community-plus",
+      management_suite: "management-suite",
+    };
+    const address = [meta.address_street, meta.address_city, meta.address_state, meta.address_zip]
+      .filter(Boolean).join(", ") || null;
+    const trialEndsAt = result.trial_ends_at || new Date(Date.now() + 30 * 86400000).toISOString();
+
+    const res = await fetch(`${GOVOPS_URL}/rest/v1/tenancies`, {
+      method: "POST",
+      headers: {
+        "apikey": GOVOPS_SERVICE_KEY,
+        "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        id: tenantId,
+        name: meta.building_name,
+        slug: result.subdomain || meta.subdomain || "",
+        address,
+        units: parseInt(meta.total_units) || 0,
+        subscription_id: tierToSubscriptionId[meta.tier] || "compliance-pro",
+        status: "trial",
+        billing_cycle: "monthly",
+        board_members: 1,
+        residents: 0,
+        managers: 0,
+        staff: 0,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        trial_ends_at: trialEndsAt,
+      }),
+    });
+    if (res.ok) {
+      console.log("Synced tenancy to admin console");
+    } else {
+      console.error("Admin console sync failed:", await res.text());
+    }
+  } catch (err) {
+    console.error("Admin console sync error:", err);
+  }
 }
 
 // Simple Stripe signature verification using Web Crypto
@@ -169,6 +225,15 @@ Deno.serve(async (req) => {
         });
 
         console.log("Provisioned:", JSON.stringify(result));
+
+        // Sync to admin console (best-effort, non-fatal)
+        await syncToAdminConsole(
+          result.tenant_id,
+          meta,
+          result,
+          session.customer || null,
+          session.subscription || null,
+        );
         break;
       }
 
@@ -199,6 +264,15 @@ Deno.serve(async (req) => {
         // Update subscription and tenant status
         await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "active" });
         await sbQuery("PATCH", `tenants?id=eq.${sub.tenant_id}&status=eq.onboarding`, {}, { status: "active" });
+
+        // Sync status to admin console
+        if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
+          await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
+            method: "PATCH",
+            headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "active" }),
+          }).catch(e => console.error("Govops sync (active):", e));
+        }
         break;
       }
 
@@ -252,6 +326,15 @@ Deno.serve(async (req) => {
           action: "subscription.canceled", target: subscription.id,
           details: "Subscription canceled — tenant suspended",
         });
+
+        // Sync status to admin console
+        if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
+          await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
+            method: "PATCH",
+            headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "suspended" }),
+          }).catch(e => console.error("Govops sync (suspended):", e));
+        }
         break;
       }
 

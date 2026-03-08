@@ -87,10 +87,12 @@ supabase db remote commit
 supabase secrets set \
   STRIPE_SECRET_KEY=sk_test_YOUR_KEY \
   STRIPE_WEBHOOK_SECRET=whsec_YOUR_SECRET \
-  STRIPE_PRICE_ESSENTIALS=price_xxx \
   STRIPE_PRICE_COMPLIANCE_PRO=price_xxx \
-  STRIPE_PRICE_ADVANCED_GOVERNANCE=price_xxx \
-  SITE_URL=https://app.getonetwo.com
+  STRIPE_PRICE_COMMUNITY_PLUS=price_xxx \
+  STRIPE_PRICE_MANAGEMENT_SUITE=price_xxx \
+  SITE_URL=https://app.getonetwo.com \
+  GOVOPS_SUPABASE_URL=https://kodfghtwmvadpeyimuvk.supabase.co \
+  GOVOPS_SUPABASE_SERVICE_ROLE_KEY=YOUR_GOVOPS_SERVICE_KEY
 
 # Deploy all three Edge Functions
 supabase functions deploy create-checkout
