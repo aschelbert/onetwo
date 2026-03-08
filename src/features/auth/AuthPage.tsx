@@ -107,12 +107,15 @@ export default function AuthPage() {
     return () => clearTimeout(timer);
   }, [bldgSubdomain]);
 
+  const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('create') === '1' && authStep === 'welcome') {
       setAuthStep('join-role');
     }
-    if (params.get('provisioned') === '1') {
+    const isProvisioned = params.get('provisioned') === '1';
+    if (isProvisioned) {
       setAuthStep('login');
     }
     // Auto-fill invite code from email link
@@ -122,36 +125,121 @@ export default function AuthPage() {
       setAuthStep('join-invite');
     }
 
-    // Check for existing Supabase session (e.g. after password reset)
-    if (isBackendEnabled && supabase && !params.get('sb_access') && !urlInvite) {
-      // Timeout after 3s so the login form is never stuck on "Checking session..."
-      const timeout = setTimeout(() => { setSessionChecking(false); setLoginLoading(false); }, 3000);
+    // Helper: look up tenant_users and log the user in + redirect to subdomain
+    const loginWithTenantUser = async (
+      user: { id: string; email?: string | null; user_metadata?: { full_name?: string } },
+      tu: { tenant_id: string; role: string; board_title: string | null; unit: string | null },
+    ) => {
+      const { data: tenant } = await supabase!
+        .from('tenants')
+        .select('name, subdomain')
+        .eq('id', tu.tenant_id)
+        .maybeSingle();
+
+      const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+      const m = {
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        email: user.email || '',
+        phone: '',
+        role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+        unit: tu.unit || '',
+        status: 'active' as const,
+        joined: new Date().toISOString().split('T')[0],
+        boardTitle: tu.board_title || null,
+      };
+      addMember(m);
+      login(m);
+
+      // Redirect to tenant subdomain if on root domain
+      const hostname = window.location.hostname;
+      if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
+        const { data: sessionData } = await supabase!.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || '';
+        const refreshToken = sessionData?.session?.refresh_token || '';
+        window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
+        return true; // redirecting
+      }
+      return false;
+    };
+
+    // Unified session check — always await getSession() first to avoid
+    // NavigatorLockManager conflicts with Supabase's internal session recovery.
+    const sbAccess = params.get('sb_access');
+    const sbRefresh = params.get('sb_refresh');
+    const hasUrlTokens = !!(sbAccess && sbRefresh);
+
+    if (isBackendEnabled && supabase && !urlInvite) {
+      // Timeout so the login form is never stuck on loading
+      const timeoutMs = isProvisioned ? 20000 : hasUrlTokens ? 12000 : 3000;
+      const timeout = setTimeout(() => {
+        setSessionChecking(false);
+        setLoginLoading(false);
+        setProvisioningStatus(null);
+      }, timeoutMs);
       (async () => {
         try {
-          const { data: { session } } = await supabase!.auth.getSession();
-          if (session?.user) {
-            setLoginLoading(true);
+          setLoginLoading(true);
+
+          // Always wait for internal session lock to resolve first
+          await supabase!.auth.getSession();
+
+          // If URL tokens are present (subdomain handoff), restore that session
+          let user = (await supabase!.auth.getSession()).data.session?.user ?? null;
+          if (hasUrlTokens) {
+            const { data, error } = await supabase!.auth.setSession({
+              access_token: sbAccess!,
+              refresh_token: sbRefresh!,
+            });
+            if (!error && data.user) {
+              user = data.user;
+              window.history.replaceState({}, '', '/login');
+            }
+          }
+
+          if (user) {
+            // If returning from checkout, poll for tenant_users row
+            // (Stripe webhook may not have fired yet)
+            if (isProvisioned) {
+              setProvisioningStatus('Setting up your building...');
+              window.history.replaceState({}, '', '/login');
+              const maxAttempts = 15;
+              for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const { data: tu } = await supabase!
+                  .from('tenant_users')
+                  .select('tenant_id, role, board_title, unit')
+                  .eq('user_id', user.id)
+                  .maybeSingle();
+
+                if (tu) {
+                  setProvisioningStatus('Redirecting to your building...');
+                  await loginWithTenantUser(user, tu);
+                  clearTimeout(timeout);
+                  setSessionChecking(false);
+                  setLoginLoading(false);
+                  setProvisioningStatus(null);
+                  return;
+                }
+
+                // Wait before next attempt
+                await new Promise(r => setTimeout(r, 1200));
+              }
+              // Timed out waiting for webhook — fall through to login form
+              setProvisioningStatus(null);
+              setLoginLoading(false);
+              clearTimeout(timeout);
+              setSessionChecking(false);
+              return;
+            }
+
             const { data: tu } = await supabase!
               .from('tenant_users')
               .select('tenant_id, role, board_title, unit')
-              .eq('user_id', session.user.id)
+              .eq('user_id', user.id)
               .maybeSingle();
 
             if (tu) {
-              const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
-              const m = {
-                id: session.user.id,
-                name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-                email: session.user.email || '',
-                phone: '',
-                role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
-                unit: tu.unit || '',
-                status: 'active' as const,
-                joined: new Date().toISOString().split('T')[0],
-                boardTitle: tu.board_title || null,
-              };
-              addMember(m);
-              login(m);
+              await loginWithTenantUser(user, tu);
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
@@ -162,14 +250,14 @@ export default function AuthPage() {
             const { data: admin } = await supabase!
               .from('platform_admins')
               .select('name, role')
-              .eq('user_id', session.user.id)
+              .eq('user_id', user.id)
               .maybeSingle();
 
             if (admin) {
               const m = {
-                id: session.user.id,
-                name: admin.name || session.user.email?.split('@')[0] || 'Admin',
-                email: session.user.email || '',
+                id: user.id,
+                name: admin.name || user.email?.split('@')[0] || 'Admin',
+                email: user.email || '',
                 phone: '',
                 role: 'PLATFORM_ADMIN' as Role,
                 unit: '',
@@ -192,60 +280,11 @@ export default function AuthPage() {
         }
         clearTimeout(timeout);
         setSessionChecking(false);
+        setProvisioningStatus(null);
+        setLoginLoading(false);
       })();
     } else {
-      // Don't dismiss the loading spinner yet if we're about to restore from URL tokens
-      const willRestore = params.get('sb_access') && params.get('sb_refresh') && isBackendEnabled && supabase;
-      if (!willRestore) {
-        setSessionChecking(false);
-      }
-    }
-
-    // Restore Supabase session from redirect (subdomain handoff)
-    const sbAccess = params.get('sb_access');
-    const sbRefresh = params.get('sb_refresh');
-    if (sbAccess && sbRefresh && isBackendEnabled && supabase) {
-      (async () => {
-        setLoginLoading(true);
-        try {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: sbAccess,
-            refresh_token: sbRefresh,
-          });
-          if (!error && data.user) {
-            // Clean URL
-            window.history.replaceState({}, '', '/login');
-
-            // Look up tenant user and log in
-            const { data: tu } = await supabase!
-              .from('tenant_users')
-              .select('tenant_id, role, board_title, unit')
-              .eq('user_id', data.user.id)
-              .maybeSingle();
-
-            if (tu) {
-              const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
-              const m = {
-                id: data.user.id,
-                name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-                email: data.user.email || '',
-                phone: '',
-                role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
-                unit: tu.unit || '',
-                status: 'active' as const,
-                joined: new Date().toISOString().split('T')[0],
-                boardTitle: tu.board_title || null,
-              };
-              addMember(m);
-              login(m);
-            }
-          }
-        } catch (err) {
-          console.warn('Session restore failed:', err);
-        }
-        setLoginLoading(false);
-        setSessionChecking(false);
-      })();
+      setSessionChecking(false);
     }
   }, []);
 
@@ -582,7 +621,7 @@ export default function AuthPage() {
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-mist-100 via-white to-sage-50">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-ink-300 border-t-ink-900 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-ink-400">Checking session...</p>
+          <p className="text-sm text-ink-400">{provisioningStatus || 'Checking session...'}</p>
         </div>
       </div>
     );
