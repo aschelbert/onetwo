@@ -12,6 +12,96 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_console_modules: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          section: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          section: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          section?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      admin_console_permissions: {
+        Row: {
+          access_level: string
+          created_at: string
+          id: number
+          module_id: string
+          role_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_level?: string
+          created_at?: string
+          id?: number
+          module_id: string
+          role_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          created_at?: string
+          id?: number
+          module_id?: string
+          role_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_console_permissions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "admin_console_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_console_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_console_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_console_roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       captured_items: {
         Row: {
           id: string
@@ -151,34 +241,37 @@ export type Database = {
       }
       support_messages: {
         Row: {
+          attachment_url: string | null
+          body: string
+          created_at: string
           id: string
-          thread_id: string
-          sender_type: string
           sender_id: string | null
           sender_name: string
           sender_role: string | null
-          body: string
-          created_at: string
+          sender_type: string
+          thread_id: string
         }
         Insert: {
-          id?: string
-          thread_id: string
-          sender_type: string
-          sender_id?: string | null
-          sender_name: string
-          sender_role?: string | null
-          body: string
+          attachment_url?: string | null
+          body?: string
           created_at?: string
-        }
-        Update: {
           id?: string
-          thread_id?: string
-          sender_type?: string
           sender_id?: string | null
           sender_name?: string
           sender_role?: string | null
+          sender_type?: string
+          thread_id: string
+        }
+        Update: {
+          attachment_url?: string | null
           body?: string
           created_at?: string
+          id?: string
+          sender_id?: string | null
+          sender_name?: string
+          sender_role?: string | null
+          sender_type?: string
+          thread_id?: string
         }
         Relationships: [
           {
@@ -412,6 +505,7 @@ export type Database = {
       }
       platform_users: {
         Row: {
+          admin_console_role_id: string | null
           created_at: string
           display_name: string | null
           email: string
@@ -420,6 +514,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_console_role_id?: string | null
           created_at?: string
           display_name?: string | null
           email: string
@@ -428,6 +523,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_console_role_id?: string | null
           created_at?: string
           display_name?: string | null
           email?: string
@@ -435,7 +531,15 @@ export type Database = {
           platform_role?: Database["public"]["Enums"]["platform_role"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "platform_users_admin_console_role_id_fkey"
+            columns: ["admin_console_role_id"]
+            isOneToOne: false
+            referencedRelation: "admin_console_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       role_permissions: {
         Row: {

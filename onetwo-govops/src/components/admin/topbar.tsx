@@ -7,6 +7,8 @@ const pageTitles: Record<string, [string, string]> = {
   '/admin/subscriptions': ['Subscriptions', 'Admin Console > Product > Subscriptions'],
   '/admin/modules': ['Module Registry', 'Admin Console > Product > Modules'],
   '/admin/simulator': ['Permission Simulator', 'Admin Console > Product > Simulator'],
+  '/admin/console-users': ['Console Users', 'Admin Console > Access Control > Console Users'],
+  '/admin/console-permissions': ['Console Permissions', 'Admin Console > Access Control > Console Permissions'],
   '/admin/roles': ['User Roles', 'Admin Console > Access Control > Roles'],
   '/admin/tenancies': ['Tenancies', 'Admin Console > Operations > Tenancies'],
   '/admin/support': ['Support', 'Admin Console > Operations > Support'],
