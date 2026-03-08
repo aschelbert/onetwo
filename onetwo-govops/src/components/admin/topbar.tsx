@@ -1,4 +1,5 @@
 'use client'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Bell, BellOff, Menu } from 'lucide-react'
 import { usePushNotifications } from '@/hooks/use-push-notifications'
@@ -31,6 +32,9 @@ export function Topbar({ profile, onMenuClick }: TopbarProps) {
   const [title, breadcrumb] = pageTitles[pathname] || ['Admin', 'Admin Console']
   const initials = ((profile?.display_name as string) || (profile?.email as string) || 'PA').slice(0, 2).toUpperCase()
   const { permission, isSubscribed, isLoading, subscribe, unsubscribe } = usePushNotifications()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   const handleBellClick = () => {
     if (isSubscribed) {
@@ -58,20 +62,22 @@ export function Topbar({ profile, onMenuClick }: TopbarProps) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <button
-          onClick={handleBellClick}
-          disabled={isLoading || permission === 'denied'}
-          className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          title={
-            permission === 'denied'
-              ? 'Notifications blocked in browser settings'
-              : isSubscribed
-                ? 'Disable push notifications'
-                : 'Enable push notifications'
-          }
-        >
-          {isSubscribed ? <Bell size={18} className="text-[#c42030]" /> : <BellOff size={18} />}
-        </button>
+        {mounted && (
+          <button
+            onClick={handleBellClick}
+            disabled={isLoading || permission === 'denied'}
+            className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              permission === 'denied'
+                ? 'Notifications blocked in browser settings'
+                : isSubscribed
+                  ? 'Disable push notifications'
+                  : 'Enable push notifications'
+            }
+          >
+            {isSubscribed ? <Bell size={18} className="text-[#c42030]" /> : <BellOff size={18} />}
+          </button>
+        )}
         <div className="text-right hidden md:block">
           <div className="text-sm font-semibold">{(profile?.display_name as string) || 'Platform Admin'}</div>
           <div className="text-[0.72rem] text-gray-500">{(profile?.email as string) || ''}</div>
