@@ -1,6 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
-import { navigation } from '@/lib/rolePermissions';
+import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
+import { useTenantContext } from '@/components/TenantProvider';
+import { getNavigationForRole, navigation } from '@/lib/rolePermissions';
 import { ROLE_LABELS, type Role } from '@/types/auth';
 import {
   LayoutDashboard,
@@ -11,6 +13,9 @@ import {
   Archive,
   MessageCircle,
   Shield,
+  AlertCircle,
+  Home,
+  Users,
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react';
@@ -24,6 +29,9 @@ const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   archives: Archive,
   community: MessageCircle,
   'admin-console': Shield,
+  issues: AlertCircle,
+  'my-unit': Home,
+  'user-mgmt': Users,
 };
 
 interface SidebarProps {
@@ -33,10 +41,17 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { currentRole, switchRole, isAdminPreview } = useAuthStore();
+  const permissions = usePlatformAdminStore(s => s.permissions);
+  const tenant = useTenantContext();
   const location = useLocation();
   const navigate = useNavigate();
-  const navItems = navigation[currentRole];
   const isAdmin = currentRole === 'PLATFORM_ADMIN';
+
+  // Build navigation dynamically from admin console permissions + tenant features.
+  // Falls back to static navigation if permissions haven't loaded yet.
+  const navItems = permissions.length > 0
+    ? getNavigationForRole(currentRole, permissions, tenant.features)
+    : navigation[currentRole];
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
