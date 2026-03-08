@@ -135,12 +135,32 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
                         </button>
                         {t.status !== 'suspended' && t.status !== 'churned' && (
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation()
                               setOpenMenuId(null)
                               const isDev = process.env.NODE_ENV === 'development'
-                              const url = isDev ? `/app/${t.slug}` : `https://${t.slug}.getonetwo.com`
-                              window.open(url, '_blank')
+                              if (isDev) {
+                                window.open(`/app/${t.slug}`, '_blank')
+                                return
+                              }
+                              // Production: get tenant session tokens via API, then handoff
+                              try {
+                                const res = await fetch('/api/admin/tenant-auth', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ slug: t.slug }),
+                                })
+                                if (!res.ok) {
+                                  const err = await res.json()
+                                  alert('Failed to authenticate: ' + (err.error || res.statusText))
+                                  return
+                                }
+                                const { access_token, refresh_token } = await res.json()
+                                const params = new URLSearchParams({ sb_access: access_token, sb_refresh: refresh_token })
+                                window.open(`https://${t.slug}.getonetwo.com/login?${params}`, '_blank')
+                              } catch (err) {
+                                alert('Failed to authenticate: ' + (err instanceof Error ? err.message : 'Unknown error'))
+                              }
                             }}
                             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none text-left"
                           >
