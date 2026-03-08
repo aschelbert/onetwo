@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useArchiveStore, type ArchiveSnapshot } from '@/store/useArchiveStore';
 import { useReportsStore, type GeneratedReport, type ReportType } from '@/store/useReportsStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -117,33 +117,58 @@ const REPORT_SECTIONS: Record<ReportType, { id: string; label: string; desc: str
   ],
 };
 
-const PERIOD_PRESETS = (() => {
+function buildPeriodPresets(fiscalYearEnd: string) {
   const now = new Date();
-  const y = now.getFullYear();
   const today = now.toISOString().slice(0, 10);
   const pad = (n: number) => String(n).padStart(2, '0');
+  const fmtD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const y = now.getFullYear();
 
-  // This month
+  // This month / Last month (always calendar-based)
   const thisMonthFrom = `${y}-${pad(now.getMonth() + 1)}-01`;
-
-  // Last month
   const lm = new Date(y, now.getMonth() - 1, 1);
   const lmEnd = new Date(y, now.getMonth(), 0);
-  const lastMonthFrom = `${lm.getFullYear()}-${pad(lm.getMonth() + 1)}-01`;
-  const lastMonthTo = `${lmEnd.getFullYear()}-${pad(lmEnd.getMonth() + 1)}-${pad(lmEnd.getDate())}`;
+  const lastMonthFrom = fmtD(lm);
+  const lastMonthTo = fmtD(lmEnd);
+
+  // Fiscal year boundaries
+  const [mm, dd] = fiscalYearEnd.split('-').map(Number);
+  const isCalendarYear = mm === 12 && dd === 31;
+
+  // Determine which FY "today" falls in (the year the FY ends)
+  const fyEndThisYear = new Date(y, mm - 1, dd);
+  const currentFYEnd = now > fyEndThisYear ? y + 1 : y;
+
+  const fyBounds = (endYear: number) => {
+    if (isCalendarYear) return { start: `${endYear}-01-01`, end: `${endYear}-12-31` };
+    const startMonth = mm + 1 > 12 ? 1 : mm + 1;
+    const startYear = mm + 1 > 12 ? endYear : endYear - 1;
+    return {
+      start: `${startYear}-${pad(startMonth)}-01`,
+      end: `${endYear}-${pad(mm)}-${pad(dd)}`,
+    };
+  };
+
+  const fy = fyBounds(currentFYEnd);
+  const py = fyBounds(currentFYEnd - 1);
+
+  // Fiscal quarters: divide the FY into 4 equal 3-month spans
+  const fyStart = new Date(fy.start + 'T00:00:00');
+  const quarters = Array.from({ length: 4 }, (_, qi) => {
+    const qStart = new Date(fyStart.getFullYear(), fyStart.getMonth() + qi * 3, fyStart.getDate());
+    const qEnd = new Date(fyStart.getFullYear(), fyStart.getMonth() + (qi + 1) * 3, fyStart.getDate() - 1);
+    return { label: `Q${qi + 1}`, from: fmtD(qStart), to: fmtD(qEnd) };
+  });
 
   return [
     { label: 'This Month', from: thisMonthFrom, to: today },
     { label: 'Last Month', from: lastMonthFrom, to: lastMonthTo },
-    { label: 'Q1',  from: `${y}-01-01`, to: `${y}-03-31` },
-    { label: 'Q2',  from: `${y}-04-01`, to: `${y}-06-30` },
-    { label: 'Q3',  from: `${y}-07-01`, to: `${y}-09-30` },
-    { label: 'Q4',  from: `${y}-10-01`, to: `${y}-12-31` },
-    { label: 'YTD', from: `${y}-01-01`, to: today },
-    { label: 'FY',  from: `${y}-01-01`, to: `${y}-12-31` },
-    { label: 'PY',  from: `${y - 1}-01-01`, to: `${y - 1}-12-31` },
+    ...quarters,
+    { label: 'YTD', from: fy.start, to: today },
+    { label: 'FY',  from: fy.start, to: fy.end },
+    { label: 'PY',  from: py.start, to: py.end },
   ];
-})();
+}
 
 // ─── Shared UI components ────────────────────────────────────────────────────
 function SlideOver({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
@@ -262,7 +287,9 @@ export default function ArchivesPage() {
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [reportStep, setReportStep] = useState(1);
   const [reportType, setReportType] = useState<ReportType>('board_packet');
-  const ytdPreset = PERIOD_PRESETS.find(p => p.label === 'YTD')!;
+  const fiscalYearEnd = building.details.fiscalYearEnd || '12-31';
+  const periodPresets = useMemo(() => buildPeriodPresets(fiscalYearEnd), [fiscalYearEnd]);
+  const ytdPreset = periodPresets.find(p => p.label === 'YTD')!;
   const [reportFrom, setReportFrom] = useState(ytdPreset.from);
   const [reportTo, setReportTo] = useState(ytdPreset.to);
   const [reportPeriodLabel, setReportPeriodLabel] = useState('YTD');
@@ -286,7 +313,7 @@ export default function ArchivesPage() {
     setReportSections(new Set(REPORT_SECTIONS[t].map(s => s.id)));
   };
 
-  const selectPreset = (p: typeof PERIOD_PRESETS[0]) => {
+  const selectPreset = (p: typeof periodPresets[0]) => {
     setReportFrom(p.from);
     setReportTo(p.to);
     setReportPeriodLabel(p.label);
@@ -636,7 +663,7 @@ export default function ArchivesPage() {
 
               <p className="text-xs font-bold text-ink-600 uppercase tracking-wide mb-3">Period</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {PERIOD_PRESETS.map(p => (
+                {periodPresets.map(p => (
                   <button
                     key={p.label}
                     onClick={() => selectPreset(p)}
