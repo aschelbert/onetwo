@@ -130,7 +130,11 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
-    return <Navigate to={currentRole === 'PLATFORM_ADMIN' ? '/admin/console' : '/dashboard'} replace />;
+    // On tenant subdomains, platform admins should see the tenant dashboard
+    const host = window.location.hostname;
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const target = currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+    return <Navigate to={target} replace />;
   }
   return <AuthPage />;
 }
@@ -138,7 +142,10 @@ function LoginRoute() {
 function CatchAll() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
-    return <Navigate to={currentRole === 'PLATFORM_ADMIN' ? '/admin/console' : '/dashboard'} replace />;
+    const host = window.location.hostname;
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const target = currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+    return <Navigate to={target} replace />;
   }
   return <Navigate to="/" replace />;
 }
