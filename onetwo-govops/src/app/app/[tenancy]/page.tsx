@@ -13,11 +13,18 @@ export default async function TenantHome({
 
   if (!user) redirect('/auth/login')
 
-  // Check onboarding status
+  // Check onboarding status (skip for platform admins)
+  const { data: platformCheck } = await supabase
+    .from('platform_users')
+    .select('id')
+    .eq('id', user.id)
+    .eq('platform_role', 'platform_admin')
+    .maybeSingle()
+
   const cookieStore = await cookies()
   const skipOnboarding = cookieStore.get('skip_onboarding')?.value === 'true'
 
-  if (!skipOnboarding) {
+  if (!skipOnboarding && !platformCheck) {
     const { data: tenancy } = await supabase
       .from('tenancies')
       .select('id')
@@ -25,14 +32,14 @@ export default async function TenantHome({
       .single()
 
     if (tenancy) {
-      const { data: checklist } = await (supabase as any)
+      const { data: checklist, error: checklistError } = await (supabase as any)
         .from('onboarding_checklists')
         .select('go_live')
         .eq('tenancy_id', tenancy.id)
         .maybeSingle()
 
-      // If no checklist exists or go_live is false, redirect to onboarding
-      if (!checklist || !checklist.go_live) {
+      // Redirect to onboarding only if table exists and go_live is false
+      if (!checklistError && (!checklist || !checklist.go_live)) {
         redirect(`/app/onboarding/${slug}`)
       }
     }
