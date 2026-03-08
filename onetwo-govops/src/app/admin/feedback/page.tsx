@@ -16,9 +16,9 @@ export default async function FeedbackPage() {
     .select('id, tenancy_id, subject, status, updated_at')
     .order('updated_at', { ascending: false })
 
-  const { data: tenancies } = await (db as any)
-    .from('tenants')
-    .select('id, name, subdomain')
+  const { data: tenancies } = await db
+    .from('tenancies')
+    .select('id, name, slug, subscription_plans(name, color)')
 
   return (
     <FeedbackClient

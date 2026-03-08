@@ -48,8 +48,8 @@ export async function withTenantAuth(
   const { data: tenantUser } = await supabaseAdmin
     .from('tenant_users')
     .select('*')
-    .eq('tenant_id', tenancyId)
-    .eq('user_id', user.id)
+    .eq('tenancy_id', tenancyId)
+    .eq('auth_user_id', user.id)
     .eq('status', 'active')
     .single()
 
@@ -61,8 +61,8 @@ export async function withTenantAuth(
     supabaseAdmin,
     tenancyId,
     user.id,
-    (tenantUser as any).name || (tenantUser as any).email?.split('@')[0] || 'User',
-    (tenantUser as any).role || 'member'
+    tenantUser.display_name || tenantUser.email?.split('@')[0] || 'User',
+    tenantUser.role_id || 'member'
   )
 }
 

@@ -11,9 +11,9 @@ export default async function SupportPage() {
     .select('*')
     .order('updated_at', { ascending: false })
 
-  const { data: tenancies } = await (db as any)
-    .from('tenants')
-    .select('id, name, subdomain')
+  const { data: tenancies } = await db
+    .from('tenancies')
+    .select('id, name, slug, subscription_plans(name, color)')
 
   const { data: feedbackItems } = await db
     .from('feedback_items')

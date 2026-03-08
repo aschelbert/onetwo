@@ -16,7 +16,8 @@ type ThreadStatus = 'open' | 'pending' | 'resolved'
 interface Tenancy {
   id: string
   name: string
-  subdomain: string
+  slug: string
+  subscription_plans: { name: string; color: string } | null
 }
 
 interface SupportThread {
@@ -125,8 +126,8 @@ export function SupportClient({
     return tenancies.find(t => t.id === id)
   }
 
-  function getPlanColor(_tenancy: Tenancy | undefined): string {
-    return '#6b7280'
+  function getPlanColor(tenancy: Tenancy | undefined): string {
+    return tenancy?.subscription_plans?.color || '#6b7280'
   }
 
   const visible = threads
@@ -195,7 +196,7 @@ export function SupportClient({
   const thread = threads.find(t => t.id === selectedId)
   const tenancy = thread ? tenancyById(thread.tenancy_id) : undefined
   const planColor = getPlanColor(tenancy)
-  const planName = tenancy?.subdomain || 'Unknown'
+  const planName = tenancy?.subscription_plans?.name || 'Unknown'
 
   const sendReply = async () => {
     if (!replyText.trim() || !selectedId) return
@@ -564,7 +565,7 @@ export function SupportClient({
                   {/* Tenancy summary card */}
                   <div className="rounded-lg p-3.5" style={{ border: `1px solid ${planColor}33`, background: `${planColor}08` }}>
                     <div className="text-sm font-bold text-gray-900 mb-1">{tenancy.name}</div>
-                    <div className="text-xs text-gray-500 mb-2.5">{tenancy.subdomain}</div>
+                    <div className="text-xs text-gray-500 mb-2.5">{tenancy.slug}</div>
                     <div className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full" style={{ background: planColor }} />
                       <span className="text-[13px] text-gray-700">{planName}</span>

@@ -2,7 +2,7 @@
 // Wraps the app. After Supabase Auth login, loads the tenant context
 // and overwrites the building store with real data.
 
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect, useState, useRef, createContext, useContext } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -50,6 +50,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   const updateName = useBuildingStore(s => s.updateName);
   const updateAddress = useBuildingStore(s => s.updateAddress);
   const updateDetails = useBuildingStore(s => s.updateDetails);
+  const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser) {
@@ -83,7 +84,11 @@ export default function TenantProvider({ children }: { children: React.ReactNode
       return;
     }
 
-    // Load tenant from Supabase
+    // Load tenant from Supabase (only once per session — prevents re-runs
+    // from wiping in-flight store data via resetStoresForRealTenant)
+    if (hasLoadedDataRef.current) return;
+    hasLoadedDataRef.current = true;
+
     (async () => {
       try {
         // Get user's tenant membership

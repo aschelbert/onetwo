@@ -19,8 +19,8 @@ export function SimulatorClient({ plans, roles }: { plans: Plan[]; roles: Role[]
     setLoading(true)
     fetch(`/api/admin/simulator?plan=${planId}&role=${roleId}`)
       .then(r => r.json())
-      .then(data => { setResults(data); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(data => { setResults(Array.isArray(data) ? data : []); setLoading(false) })
+      .catch(() => { setResults([]); setLoading(false) })
   }, [planId, roleId])
 
   const grouped = results.reduce<Record<string, Result[]>>((acc, r) => {

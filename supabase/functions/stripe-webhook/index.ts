@@ -115,7 +115,6 @@ Deno.serve(async (req) => {
 
         const result = await sbRpc("provision_tenant", {
           p_name: meta.building_name,
-          p_subdomain: meta.subdomain || null,
           p_address: JSON.stringify({
             street: meta.address_street || "",
             city: meta.address_city || "",
