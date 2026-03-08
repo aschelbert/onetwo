@@ -23,23 +23,40 @@ export function createClient() {
       },
       global: {
         fetch: async (url, options) => {
+          const urlStr = typeof url === 'string' ? url : url instanceof Request ? url.url : ''
+
+          // If already recovering, block all auth token requests immediately
+          if (isRecovering && urlStr.includes('/auth/v1/token')) {
+            return new Response(JSON.stringify({ error: 'session_cleared' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          }
+
           const response = await fetch(url, options)
 
-          // Intercept refresh token failures to prevent infinite retry loop
-          const urlStr = typeof url === 'string' ? url : url instanceof Request ? url.url : ''
-          if (urlStr.includes('/auth/v1/token') && response.status === 400 && !isRecovering) {
-            try {
-              const cloned = response.clone()
-              const body = await cloned.json()
-              if (body?.error_description?.includes('Refresh Token Not Found') ||
-                  body?.msg?.includes('Refresh Token Not Found')) {
+          // Catch refresh token failures OR rate limiting on token endpoint
+          if (urlStr.includes('/auth/v1/token') && (response.status === 400 || response.status === 429)) {
+            if (!isRecovering) {
+              if (response.status === 429) {
+                // Already rate limited — stop immediately
                 isRecovering = true
-                console.warn('[Auth] Invalid refresh token — clearing session')
                 clearSupabaseCookies()
                 window.location.href = '/auth/login'
+              } else {
+                try {
+                  const cloned = response.clone()
+                  const body = await cloned.json()
+                  if (body?.error_description?.includes('Refresh Token Not Found') ||
+                      body?.msg?.includes('Refresh Token Not Found')) {
+                    isRecovering = true
+                    clearSupabaseCookies()
+                    window.location.href = '/auth/login'
+                  }
+                } catch {
+                  // ignore parse errors
+                }
               }
-            } catch {
-              // ignore parse errors
             }
           }
 
