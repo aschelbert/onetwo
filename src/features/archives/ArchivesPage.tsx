@@ -19,6 +19,34 @@ const fmtDate = (iso: string) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+// ─── Fiscal year helpers ─────────────────────────────────────────────────────
+/** Given a fiscal year-end in MM-DD format and a label year, return the period start/end.
+ *  E.g. fiscalYearEnd='06-30', year=2025 → FY 2025 = Jul 1 2024 – Jun 30 2025
+ *       fiscalYearEnd='12-31', year=2025 → FY 2025 = Jan 1 2025 – Dec 31 2025 */
+function getFiscalPeriod(fiscalYearEnd: string, year: number) {
+  const [mm, dd] = fiscalYearEnd.split('-').map(Number);
+  const isCalendarYear = mm === 12 && dd === 31;
+  if (isCalendarYear) {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+  }
+  // FY ends on mm/dd of the label year; starts the day after that in the prior year
+  const endDate = new Date(year, mm - 1, dd);
+  const startDate = new Date(year - 1, mm - 1, dd + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { start: fmt(startDate), end: fmt(endDate) };
+}
+
+function formatFiscalLabel(fiscalYearEnd: string, year: number) {
+  const { start, end } = getFiscalPeriod(fiscalYearEnd, year);
+  const s = new Date(start + 'T12:00:00');
+  const e = new Date(end + 'T12:00:00');
+  const f = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `FY ${year} (${f(s)} – ${f(e)})`;
+}
+
+const LAUNCH_YEAR = 2025;
+
 // ─── Archive section nav ─────────────────────────────────────────────────────
 type ArchiveSection = 'overview' | 'compliance' | 'refresh' | 'filings' | 'meetings' | 'communications' | 'financial' | 'insurance' | 'legal' | 'board';
 
@@ -293,8 +321,7 @@ export default function ArchivesPage() {
   // ── Archive creation (existing logic unchanged) ────────────────────────────
   const handleCreateArchive = () => {
     const year = parseInt(archiveYear) || new Date().getFullYear() - 1;
-    const pStart = `${year}-01-01`;
-    const pEnd = `${year}-12-31`;
+    const { start: pStart, end: pEnd } = getFiscalPeriod(building.details.fiscalYearEnd, year);
 
     const refreshResult = refreshComplianceRequirements({
       state: building.address.state,
@@ -324,7 +351,7 @@ export default function ArchivesPage() {
 
     const snapshot: ArchiveSnapshot = {
       id: 'arc_' + Date.now(),
-      label: `FY ${year} (Jan 1, ${year} – Dec 31, ${year})`,
+      label: formatFiscalLabel(building.details.fiscalYearEnd, year),
       periodStart: pStart,
       periodEnd: pEnd,
       createdAt: new Date().toISOString(),
@@ -748,7 +775,9 @@ export default function ArchivesPage() {
           <div>
             <label className="block text-xs font-medium text-ink-700 mb-1">Fiscal Year</label>
             <select value={archiveYear} onChange={e => setArchiveYear(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-              {[2025, 2024, 2023].map(y => <option key={y} value={y}>FY {y} (Jan 1 – Dec 31, {y})</option>)}
+              {Array.from({ length: new Date().getFullYear() - LAUNCH_YEAR + 1 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                <option key={y} value={y}>{formatFiscalLabel(building.details.fiscalYearEnd, y)}</option>
+              ))}
             </select>
           </div>
           <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
