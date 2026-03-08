@@ -11,6 +11,7 @@ const pageTitles: Record<string, [string, string]> = {
   '/admin/tenancies': ['Tenancies', 'Admin Console > Operations > Tenancies'],
   '/admin/support': ['Support', 'Admin Console > Operations > Support'],
   '/admin/feedback': ['Feedback', 'Admin Console > Operations > Feedback'],
+  '/admin/problems': ['Problem Statements', 'Admin Console > Operations > Problem Statements'],
   '/admin/billing': ['Billing Events', 'Admin Console > Operations > Billing'],
   '/admin/audit': ['Audit Log', 'Admin Console > Operations > Audit'],
 }
