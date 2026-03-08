@@ -283,6 +283,11 @@ export default function AuthPage() {
               };
               addMember(m);
               login(m);
+              // On tenant subdomains (via token_hash), switch to board member
+              // view so admin sees all tenant features with role toggle
+              if (tokenHash) {
+                useAuthStore.getState().switchRole('BOARD_MEMBER');
+              }
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
