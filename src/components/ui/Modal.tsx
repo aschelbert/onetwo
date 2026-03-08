@@ -14,7 +14,7 @@ interface ModalProps {
 
 export default function Modal({ title, subtitle, children, onClose, onSave, saveLabel = 'Save', saveColor = 'bg-ink-900 hover:bg-ink-800', footer, wide }: ModalProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4" onClick={onClose}>
       <div className={`bg-white rounded-xl ${wide ? 'max-w-4xl' : 'max-w-md'} w-full max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
           <div className="flex items-center justify-between">

@@ -102,8 +102,8 @@ const PERIOD_PRESETS = [
 function SlideOver({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   return (
     <>
-      {open && <div className="fixed inset-0 bg-black bg-opacity-40 z-40" onClick={onClose} />}
-      <div className={`fixed inset-y-0 right-0 w-[520px] max-w-[95vw] bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      {open && <div className="fixed inset-0 bg-black bg-opacity-40 z-[60]" onClick={onClose} />}
+      <div className={`fixed inset-y-0 right-0 w-[520px] max-w-[95vw] bg-white shadow-2xl z-[70] flex flex-col transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
         {children}
       </div>
     </>
