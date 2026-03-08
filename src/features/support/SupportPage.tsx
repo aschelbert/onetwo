@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { ROLE_LABELS } from '@/types/auth';
 import { getInitials } from '@/lib/formatters';
-import { Plus, Send, MessageCircle } from 'lucide-react';
+import { Plus, Send, MessageCircle, Paperclip, X } from 'lucide-react';
 
 // Secondary Supabase client — connects to admin project for support tables
 const adminUrl = import.meta.env.VITE_ADMIN_SUPABASE_URL as string;
@@ -31,6 +31,7 @@ interface Message {
   sender_name: string;
   sender_role: string | null;
   body: string;
+  attachment_url: string | null;
   created_at: string;
 }
 
@@ -77,7 +78,13 @@ export default function SupportPage() {
   const [newPriority, setNewPriority] = useState('medium');
   const [newMessage, setNewMessage] = useState('');
   const [creating, setCreating] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [newFormAttachmentFile, setNewFormAttachmentFile] = useState<File | null>(null);
+  const [newFormAttachmentPreview, setNewFormAttachmentPreview] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const newFormFileInputRef = useRef<HTMLInputElement>(null);
 
   const db = adminSupabase;
   const thread = threads.find(t => t.id === selectedId);
@@ -173,9 +180,51 @@ export default function SupportPage() {
     return () => { db.removeChannel(channel); };
   }, [selectedId]);
 
+  const handleAttachment = (file: File, setFile: (f: File | null) => void, setPreview: (p: string | null) => void) => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB'); return; }
+    setFile(file);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+  };
+
+  const clearAttachment = (setFile: React.Dispatch<React.SetStateAction<File | null>>, setPreview: React.Dispatch<React.SetStateAction<string | null>>) => {
+    setFile(null);
+    setPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent, setFile: (f: File | null) => void, setPreview: (p: string | null) => void) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) handleAttachment(blob, setFile, setPreview);
+        break;
+      }
+    }
+  };
+
+  const uploadAttachment = async (file: File, threadId: string): Promise<string | null> => {
+    if (!db) return null;
+    const ext = file.name.split('.').pop() || 'png';
+    const path = `${threadId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await db.storage.from('support-attachments').upload(path, file);
+    if (error) { console.error('Upload error:', error); return null; }
+    const { data: urlData } = db.storage.from('support-attachments').getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
   const sendReply = async () => {
-    if (!replyText.trim() || !selectedId || !db) return;
+    if ((!replyText.trim() && !attachmentFile) || !selectedId || !db) return;
     setSending(true);
+
+    let attachment_url: string | null = null;
+    if (attachmentFile) {
+      attachment_url = await uploadAttachment(attachmentFile, selectedId);
+    }
+
     const { data } = await db
       .from('support_messages')
       .insert({
@@ -184,6 +233,7 @@ export default function SupportPage() {
         sender_name: currentUser.name,
         sender_role: ROLE_LABELS[currentRole],
         body: replyText,
+        attachment_url,
       })
       .select()
       .single();
@@ -191,6 +241,7 @@ export default function SupportPage() {
     if (data) {
       setMessages(prev => [...prev, data as Message]);
       setReplyText('');
+      clearAttachment(setAttachmentFile, setAttachmentPreview);
       await db.from('support_threads').update({ updated_at: new Date().toISOString() }).eq('id', selectedId);
     }
     setSending(false);
@@ -213,12 +264,18 @@ export default function SupportPage() {
       .single();
 
     if (newThread) {
+      let attachment_url: string | null = null;
+      if (newFormAttachmentFile) {
+        attachment_url = await uploadAttachment(newFormAttachmentFile, newThread.id);
+      }
+
       await db.from('support_messages').insert({
         thread_id: newThread.id,
         sender_type: 'tenant',
         sender_name: currentUser.name,
         sender_role: ROLE_LABELS[currentRole],
         body: newMessage,
+        attachment_url,
       });
 
       setThreads(prev => [newThread as Thread, ...prev]);
@@ -228,6 +285,7 @@ export default function SupportPage() {
       setNewModule('Board Room');
       setNewPriority('medium');
       setNewMessage('');
+      clearAttachment(setNewFormAttachmentFile, setNewFormAttachmentPreview);
     }
     setCreating(false);
   };
@@ -353,10 +411,37 @@ export default function SupportPage() {
                   <textarea
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
-                    placeholder="Describe what you need help with..."
+                    onPaste={e => handlePaste(e, setNewFormAttachmentFile, setNewFormAttachmentPreview)}
+                    placeholder="Describe what you need help with... (paste an image with Ctrl+V)"
                     rows={5}
                     className="w-full bg-white border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-800 resize-none outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                   />
+                  {newFormAttachmentPreview && (
+                    <div className="mt-2 relative inline-block">
+                      <img src={newFormAttachmentPreview} alt="Preview" className="max-h-[120px] rounded-lg border border-ink-200" />
+                      <button
+                        onClick={() => clearAttachment(setNewFormAttachmentFile, setNewFormAttachmentPreview)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-ink-900 text-white rounded-full flex items-center justify-center hover:bg-ink-700 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={newFormFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f, setNewFormAttachmentFile, setNewFormAttachmentPreview); e.target.value = ''; }}
+                  />
+                  <button
+                    onClick={() => newFormFileInputRef.current?.click()}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ink-500 bg-mist-50 border border-ink-200 rounded-lg hover:bg-mist-100 transition-colors"
+                    type="button"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    Attach screenshot
+                  </button>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -439,7 +524,12 @@ export default function SupportPage() {
                               : 'bg-blue-50 border-blue-200 rounded-xl rounded-tr-sm'
                           }`}
                         >
-                          <p className="text-[13px] text-ink-700 leading-relaxed m-0">{msg.body}</p>
+                          {msg.body && <p className="text-[13px] text-ink-700 leading-relaxed m-0">{msg.body}</p>}
+                          {msg.attachment_url && (
+                            <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="block mt-2">
+                              <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-[300px] rounded-lg border border-ink-100" />
+                            </a>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -456,14 +546,40 @@ export default function SupportPage() {
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
-                  placeholder="Type your reply..."
+                  onPaste={e => handlePaste(e, setAttachmentFile, setAttachmentPreview)}
+                  placeholder="Type your reply... (paste an image with Ctrl+V)"
                   rows={2}
                   className="w-full bg-mist-50 border border-ink-200 rounded-lg px-3 py-2 text-[13px] text-ink-700 resize-none outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                 />
-                <div className="flex justify-end mt-2">
+                {attachmentPreview && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={attachmentPreview} alt="Preview" className="max-h-[120px] rounded-lg border border-ink-200" />
+                    <button
+                      onClick={() => clearAttachment(setAttachmentFile, setAttachmentPreview)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-ink-900 text-white rounded-full flex items-center justify-center hover:bg-ink-700 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f, setAttachmentFile, setAttachmentPreview); e.target.value = ''; }}
+                />
+                <div className="flex justify-end mt-2 gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-ink-500 bg-mist-50 border border-ink-200 rounded-lg hover:bg-mist-100 transition-colors"
+                    title="Attach image"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={sendReply}
-                    disabled={!replyText.trim() || sending}
+                    disabled={(!replyText.trim() && !attachmentFile) || sending}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium text-white bg-ink-900 rounded-lg hover:bg-ink-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send className="w-3.5 h-3.5" />

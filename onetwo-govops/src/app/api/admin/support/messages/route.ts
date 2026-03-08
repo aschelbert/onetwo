@@ -20,9 +20,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return withAdminAuth(async (db, userId, email) => {
     const body = await req.json()
-    const { thread_id, body: messageBody } = body
+    const { thread_id, body: messageBody, attachment_url } = body
 
-    if (!thread_id || !messageBody) {
+    if (!thread_id || (!messageBody && !attachment_url)) {
       return NextResponse.json({ error: 'Missing thread_id or body' }, { status: 400 })
     }
 
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
         sender_type: 'admin',
         sender_id: userId,
         sender_name: email.split('@')[0],
-        body: messageBody,
+        body: messageBody || '',
+        attachment_url: attachment_url || null,
       })
       .select()
       .single()

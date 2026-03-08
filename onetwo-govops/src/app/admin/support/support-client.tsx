@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, Sparkles } from 'lucide-react'
+import { CheckCircle, Sparkles, Paperclip, X } from 'lucide-react'
 
 // --- Types ---
 
@@ -42,6 +42,7 @@ interface Message {
   sender_name: string
   sender_role: string | null
   body: string
+  attachment_url: string | null
   created_at: string
 }
 
@@ -120,7 +121,10 @@ export function SupportClient({
   const [messages, setMessages] = useState<Message[]>([])
   const [capturedItems, setCapturedItems] = useState<CapturedItem[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function tenancyById(id: string) {
     return tenancies.find(t => t.id === id)
@@ -198,17 +202,59 @@ export function SupportClient({
   const planColor = getPlanColor(tenancy)
   const planName = tenancy?.subscription_plans?.name || 'Unknown'
 
+  const handleAttachment = (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB'); return }
+    setAttachmentFile(file)
+    setAttachmentPreview(URL.createObjectURL(file))
+  }
+
+  const clearAttachment = () => {
+    setAttachmentFile(null)
+    setAttachmentPreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const blob = item.getAsFile()
+        if (blob) handleAttachment(blob)
+        break
+      }
+    }
+  }
+
+  const uploadAttachment = async (file: File, threadId: string): Promise<string | null> => {
+    const supabase = createClient()
+    const ext = file.name.split('.').pop() || 'png'
+    const path = `${threadId}/${crypto.randomUUID()}.${ext}`
+    const { error } = await supabase.storage.from('support-attachments').upload(path, file)
+    if (error) { console.error('Upload error:', error); return null }
+    const { data: urlData } = supabase.storage.from('support-attachments').getPublicUrl(path)
+    return urlData.publicUrl
+  }
+
   const sendReply = async () => {
-    if (!replyText.trim() || !selectedId) return
+    if ((!replyText.trim() && !attachmentFile) || !selectedId) return
+
+    let attachment_url: string | null = null
+    if (attachmentFile) {
+      attachment_url = await uploadAttachment(attachmentFile, selectedId)
+    }
+
     const res = await fetch('/api/admin/support/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thread_id: selectedId, body: replyText }),
+      body: JSON.stringify({ thread_id: selectedId, body: replyText, attachment_url }),
     })
     if (res.ok) {
       const msg = await res.json()
       setMessages(prev => [...prev, msg])
       setReplyText('')
+      clearAttachment()
     }
   }
 
@@ -433,7 +479,12 @@ export function SupportClient({
                                 : 'bg-white border-gray-200 rounded-xl rounded-tl-sm'
                             )}
                           >
-                            <p className="text-[13px] text-gray-700 leading-relaxed m-0">{msg.body}</p>
+                            {msg.body && <p className="text-[13px] text-gray-700 leading-relaxed m-0">{msg.body}</p>}
+                            {msg.attachment_url && (
+                              <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="block mt-2">
+                                <img src={msg.attachment_url} alt="Attachment" className="max-w-full max-h-[300px] rounded-lg border border-gray-100" />
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -449,12 +500,34 @@ export function SupportClient({
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-                  placeholder={`Reply to ${tenancy.name}…`}
+                  onPaste={handlePaste}
+                  placeholder={`Reply to ${tenancy.name}… (paste an image with Ctrl+V)`}
                   rows={2}
                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-700 resize-none outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10"
                 />
-                <div className="flex justify-end mt-2">
-                  <Button onClick={sendReply} disabled={!replyText.trim()}>Send reply ↑</Button>
+                {attachmentPreview && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={attachmentPreview} alt="Preview" className="max-h-[120px] rounded-lg border border-gray-200" />
+                    <button
+                      onClick={clearAttachment}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-900 text-white rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = '' }}
+                />
+                <div className="flex justify-end mt-2 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Paperclip size={14} />
+                  </Button>
+                  <Button onClick={sendReply} disabled={!replyText.trim() && !attachmentFile}>Send reply ↑</Button>
                 </div>
               </div>
             </>
