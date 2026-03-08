@@ -89,14 +89,33 @@ const REPORT_SECTIONS: Record<ReportType, { id: string; label: string; desc: str
   ],
 };
 
-const PERIOD_PRESETS = [
-  { label: 'This Month', from: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`, to: new Date().toISOString().slice(0, 10) },
-  { label: 'Last Month', from: (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); })(), to: (() => { const d = new Date(); d.setDate(0); return d.toISOString().slice(0, 10); })() },
-  { label: 'Q1 2025', from: '2025-01-01', to: '2025-03-31' },
-  { label: 'Q4 2024', from: '2024-10-01', to: '2024-12-31' },
-  { label: 'Q3 2024', from: '2024-07-01', to: '2024-09-30' },
-  { label: 'FY 2024', from: '2024-01-01', to: '2024-12-31' },
-];
+const PERIOD_PRESETS = (() => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const today = now.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  // This month
+  const thisMonthFrom = `${y}-${pad(now.getMonth() + 1)}-01`;
+
+  // Last month
+  const lm = new Date(y, now.getMonth() - 1, 1);
+  const lmEnd = new Date(y, now.getMonth(), 0);
+  const lastMonthFrom = `${lm.getFullYear()}-${pad(lm.getMonth() + 1)}-01`;
+  const lastMonthTo = `${lmEnd.getFullYear()}-${pad(lmEnd.getMonth() + 1)}-${pad(lmEnd.getDate())}`;
+
+  return [
+    { label: 'This Month', from: thisMonthFrom, to: today },
+    { label: 'Last Month', from: lastMonthFrom, to: lastMonthTo },
+    { label: 'Q1',  from: `${y}-01-01`, to: `${y}-03-31` },
+    { label: 'Q2',  from: `${y}-04-01`, to: `${y}-06-30` },
+    { label: 'Q3',  from: `${y}-07-01`, to: `${y}-09-30` },
+    { label: 'Q4',  from: `${y}-10-01`, to: `${y}-12-31` },
+    { label: 'YTD', from: `${y}-01-01`, to: today },
+    { label: 'FY',  from: `${y}-01-01`, to: `${y}-12-31` },
+    { label: 'PY',  from: `${y - 1}-01-01`, to: `${y - 1}-12-31` },
+  ];
+})();
 
 // ─── Shared UI components ────────────────────────────────────────────────────
 function SlideOver({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
@@ -215,9 +234,10 @@ export default function ArchivesPage() {
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [reportStep, setReportStep] = useState(1);
   const [reportType, setReportType] = useState<ReportType>('board_packet');
-  const [reportFrom, setReportFrom] = useState('2025-01-01');
-  const [reportTo, setReportTo] = useState(new Date().toISOString().slice(0, 10));
-  const [reportPeriodLabel, setReportPeriodLabel] = useState('Q1 2025');
+  const ytdPreset = PERIOD_PRESETS.find(p => p.label === 'YTD')!;
+  const [reportFrom, setReportFrom] = useState(ytdPreset.from);
+  const [reportTo, setReportTo] = useState(ytdPreset.to);
+  const [reportPeriodLabel, setReportPeriodLabel] = useState('YTD');
   const [reportSections, setReportSections] = useState<Set<string>>(new Set(REPORT_SECTIONS.board_packet.map(s => s.id)));
   const [typeFilter, setTypeFilter] = useState<ReportType | 'all'>('all');
   const [reportDone, setReportDone] = useState<GeneratedReport | null>(null);
@@ -226,9 +246,9 @@ export default function ArchivesPage() {
     setReportType('board_packet');
     setReportStep(1);
     setReportSections(new Set(REPORT_SECTIONS.board_packet.map(s => s.id)));
-    setReportFrom('2025-01-01');
-    setReportTo(new Date().toISOString().slice(0, 10));
-    setReportPeriodLabel('Q1 2025');
+    setReportFrom(ytdPreset.from);
+    setReportTo(ytdPreset.to);
+    setReportPeriodLabel('YTD');
     setReportDone(null);
     setShowReportPanel(true);
   };
