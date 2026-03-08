@@ -34,8 +34,6 @@ export default async function TenantLayout({
     .eq('status', 'active')
     .single()
 
-  let isPlatformAdmin = false
-
   if (!tenantUser) {
     const { data: platformUser } = await supabase
       .from('platform_users')
@@ -45,7 +43,6 @@ export default async function TenantLayout({
       .single()
 
     if (!platformUser) redirect('/unauthorized')
-    isPlatformAdmin = true
 
     const { data: permissions } = await supabase
       .rpc('resolve_permissions', {
@@ -74,14 +71,6 @@ export default async function TenantLayout({
         role_name: 'Platform Admin',
       },
       permissions: permissions || [],
-      canAccess: (atomId: string) => {
-        const p = permissions?.find((x: { atom_id: string }) => x.atom_id === atomId)
-        return !!p && p.effective_access !== 'not_entitled' && p.effective_access !== 'no_access'
-      },
-      canWrite: (atomId: string) => {
-        const p = permissions?.find((x: { atom_id: string; effective_access: string }) => x.atom_id === atomId)
-        return p?.effective_access === 'contributor'
-      },
       accessibleModules,
       isPlatformAdmin: true,
     }
@@ -128,14 +117,6 @@ export default async function TenantLayout({
       role_name: (tenantUser.user_roles as { name: string; icon: string }).name,
     },
     permissions: permissions || [],
-    canAccess: (atomId: string) => {
-      const p = permissions?.find((x: { atom_id: string }) => x.atom_id === atomId)
-      return !!p && p.effective_access !== 'not_entitled' && p.effective_access !== 'no_access'
-    },
-    canWrite: (atomId: string) => {
-      const p = permissions?.find((x: { atom_id: string; effective_access: string }) => x.atom_id === atomId)
-      return p?.effective_access === 'contributor'
-    },
     accessibleModules,
   }
 
