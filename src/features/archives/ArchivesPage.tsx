@@ -7,7 +7,7 @@ import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
-import Modal from '@/components/ui/Modal';
+
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = (n: number | undefined) =>
@@ -103,7 +103,7 @@ function SlideOver({ open, onClose, children }: { open: boolean; onClose: () => 
   return (
     <>
       {open && <div className="fixed inset-0 bg-black bg-opacity-40 z-[60]" onClick={onClose} />}
-      <div className={`fixed inset-y-0 right-0 w-[520px] max-w-[95vw] bg-white shadow-2xl z-[70] flex flex-col transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-[61px] bottom-0 right-0 w-[520px] max-w-[95vw] bg-white shadow-2xl z-[70] flex flex-col transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
         {children}
       </div>
     </>
@@ -709,45 +709,56 @@ export default function ArchivesPage() {
         </div>
       </SlideOver>
 
-      {/* ── Archive create modal (existing) ── */}
-      {showCreateArchiveModal && (
-        <Modal title="📦 Create Annual Archive" onClose={() => setShowCreateArchiveModal(false)} onSave={handleCreateArchive} saveLabel="Create Archive">
-          <div className="space-y-4">
-            <p className="text-sm text-ink-700">Create a permanent read-only snapshot of all compliance, financial, and governance records for a fiscal year.</p>
-            <div className="bg-accent-50 border border-accent-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2"><span className="text-lg">🔄</span><h4 className="text-sm font-bold text-accent-800">Automatic Regulatory Refresh</h4></div>
-              <p className="text-xs text-accent-700">When you create this archive, the system will automatically check current local regulations for <strong>{building.address.state}</strong> and cross-reference all uploaded legal documents to ensure compliance requirements are accurate.</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Fiscal Year</label>
-              <select value={archiveYear} onChange={e => setArchiveYear(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                {[2025, 2024, 2023].map(y => <option key={y} value={y}>FY {y} (Jan 1 – Dec 31, {y})</option>)}
-              </select>
-            </div>
-            <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
-              <p className="text-xs font-bold text-ink-900">What gets archived:</p>
-              {[
-                ['✅', 'Compliance Runbook', 'All checklist completions and health score'],
-                ['🔄', 'Regulatory Refresh', 'Jurisdiction check, detected documents, updated requirements'],
-                ['📅', 'Filings & Deadlines', 'All filings with statuses and proof documents'],
-                ['🗓', 'Meetings', 'Agendas, minutes, attendance, and vote results'],
-                ['📨', 'Communications', 'Owner communication log'],
-                ['💰', 'Fiscal Lens Snapshot', 'Collection rate, budget vs actual, reserve balance'],
-                ['🛡', 'Insurance + Legal Docs', 'Policy records and document versions'],
-                ['👥', 'Board Composition', 'Members, roles, and terms'],
-              ].map(([icon, label, desc]) => (
-                <div key={label as string} className="flex items-start gap-2">
-                  <span className="text-sm">{icon}</span>
-                  <div><span className="text-xs font-semibold text-ink-800">{label}</span><span className="text-xs text-ink-400 ml-1">— {desc}</span></div>
-                </div>
-              ))}
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-800"><strong>Note:</strong> Archives are read-only snapshots visible to all users for transparency and auditing.</p>
-            </div>
+      {/* ── Archive create slide-over ── */}
+      <SlideOver open={showCreateArchiveModal} onClose={() => setShowCreateArchiveModal(false)}>
+        <div className="flex items-center justify-between p-5 border-b border-ink-100 flex-shrink-0">
+          <div>
+            <h3 className="font-display text-lg font-bold text-ink-900">📦 Create Annual Archive</h3>
+            <p className="text-xs text-ink-500 mt-0.5">Capture a permanent, read-only governance snapshot.</p>
           </div>
-        </Modal>
-      )}
+          <button onClick={() => setShowCreateArchiveModal(false)} className="p-1.5 hover:bg-ink-100 rounded-lg text-ink-400 hover:text-ink-700 transition-colors">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <p className="text-sm text-ink-700">Create a permanent read-only snapshot of all compliance, financial, and governance records for a fiscal year.</p>
+          <div className="bg-accent-50 border border-accent-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2"><span className="text-lg">🔄</span><h4 className="text-sm font-bold text-accent-800">Automatic Regulatory Refresh</h4></div>
+            <p className="text-xs text-accent-700">When you create this archive, the system will automatically check current local regulations for <strong>{building.address.state}</strong> and cross-reference all uploaded legal documents to ensure compliance requirements are accurate.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink-700 mb-1">Fiscal Year</label>
+            <select value={archiveYear} onChange={e => setArchiveYear(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+              {[2025, 2024, 2023].map(y => <option key={y} value={y}>FY {y} (Jan 1 – Dec 31, {y})</option>)}
+            </select>
+          </div>
+          <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 space-y-2">
+            <p className="text-xs font-bold text-ink-900">What gets archived:</p>
+            {[
+              ['✅', 'Compliance Runbook', 'All checklist completions and health score'],
+              ['🔄', 'Regulatory Refresh', 'Jurisdiction check, detected documents, updated requirements'],
+              ['📅', 'Filings & Deadlines', 'All filings with statuses and proof documents'],
+              ['🗓', 'Meetings', 'Agendas, minutes, attendance, and vote results'],
+              ['📨', 'Communications', 'Owner communication log'],
+              ['💰', 'Fiscal Lens Snapshot', 'Collection rate, budget vs actual, reserve balance'],
+              ['🛡', 'Insurance + Legal Docs', 'Policy records and document versions'],
+              ['👥', 'Board Composition', 'Members, roles, and terms'],
+            ].map(([icon, label, desc]) => (
+              <div key={label as string} className="flex items-start gap-2">
+                <span className="text-sm">{icon}</span>
+                <div><span className="text-xs font-semibold text-ink-800">{label}</span><span className="text-xs text-ink-400 ml-1">— {desc}</span></div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-xs text-amber-800"><strong>Note:</strong> Archives are read-only snapshots visible to all users for transparency and auditing.</p>
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-ink-100 flex gap-3 flex-shrink-0">
+          <button onClick={() => setShowCreateArchiveModal(false)} className="flex-1 py-2.5 border border-ink-200 rounded-lg text-sm font-medium text-ink-700 hover:bg-mist-50 transition-colors">Cancel</button>
+          <button onClick={handleCreateArchive} className="flex-[2] py-2.5 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800 transition-colors">Create Archive</button>
+        </div>
+      </SlideOver>
     </div>
   );
 }
