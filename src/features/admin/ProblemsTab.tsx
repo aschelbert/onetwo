@@ -13,25 +13,40 @@ interface ProblemFraming {
   hmw: string;
 }
 
-interface DesignLink {
-  title: string;
+interface Attachment {
+  id: string;
+  type: 'link' | 'file';
+  label: string;
   url: string;
-  status: 'ready' | 'in_progress' | 'archived';
+  fileType?: string;
   addedBy: string;
   addedAt: string;
 }
 
-interface IdeationItem {
-  text: string;
+interface ApproachReply {
+  id: string;
   author: string;
-  votes: number;
-  date: string;
+  at: string;
+  text: string;
 }
 
-interface CollabComment {
+interface Approach {
+  id: string;
+  title: string;
+  description: string;
+  status: 'exploring' | 'selected' | 'parked';
   author: string;
+  role: 'Product Manager' | 'Engineer' | 'Designer' | 'Board Member' | 'Property Manager';
+  createdAt: string;
+  attachments: Attachment[];
+  replies: ApproachReply[];
+}
+
+interface GeneralComment {
+  id: string;
+  author: string;
+  at: string;
   text: string;
-  timestamp: string;
 }
 
 interface FeedbackRef {
@@ -87,9 +102,8 @@ interface ProblemStatement {
   successMetrics: string[];
   notes: string;
   solution: {
-    designs: DesignLink[];
-    ideation: IdeationItem[];
-    collab: CollabComment[];
+    approaches: Approach[];
+    discussion: GeneralComment[];
   };
   deploy: { pr: PRInfo | null; environments: Environment[]; rollout: AssocRollout[] };
   history: HistoryEntry[];
@@ -124,8 +138,13 @@ const FEEDBACK_REF: Record<string, FeedbackRef> = {
   'F-010': { id: 'F-010', title: 'Bulk resident import via CSV', type: 'feature', votes: 7 },
 };
 
-const DESIGN_STATUS_LABELS: Record<string, string> = { ready: 'Ready for review', in_progress: 'In progress', archived: 'Archived' };
-const DESIGN_STATUS_COLORS: Record<string, string> = { ready: '#059669', in_progress: '#d97706', archived: '#9ca3af' };
+const ROLE_COLORS: Record<string, { bg: string; text: string; border?: string }> = {
+  'Engineer': { bg: '#eff6ff', text: '#2563eb' },
+  'Product Manager': { bg: '#f5f3ff', text: '#7c3aed' },
+  'Designer': { bg: '#fdf4ff', text: '#a21caf' },
+  'Board Member': { bg: '#fff7ed', text: '#c2410c' },
+  'Property Manager': { bg: '#f0fdf4', text: '#15803d' },
+};
 
 const SEED_PROBLEMS: ProblemStatement[] = [
   {
@@ -145,19 +164,54 @@ const SEED_PROBLEMS: ProblemStatement[] = [
     successMetrics: ['Meeting completion rate > 95%', 'Support threads re: meetings < 2/mo', 'Quorum tracking accuracy 100%'],
     notes: 'Engineering spike completed. WebSocket approach validated for live counts.',
     solution: {
-      designs: [
-        { title: 'Quorum tracker redesign', url: 'https://figma.com/file/abc123', status: 'ready', addedBy: 'Maya R.', addedAt: '2026-02-22' },
-        { title: 'Document upload error states', url: 'https://figma.com/file/def456', status: 'in_progress', addedBy: 'Maya R.', addedAt: '2026-02-28' },
+      approaches: [
+        {
+          id: 'a1',
+          title: 'Optimistic UI with server reconciliation + chunked upload',
+          description: 'Update quorum count locally the moment a participant joins or leaves, then reconcile with the WebSocket server. For uploads, break files into chunks so partial failures are resumable rather than silent. Eliminates the visible freeze while keeping data accuracy.',
+          status: 'selected',
+          author: 'Alex K.',
+          role: 'Engineer',
+          createdAt: 'Mar 3, 2026',
+          attachments: [
+            { id: 'att1', type: 'link', label: 'Figma: Quorum tracker redesign', url: 'https://figma.com/file/abc123', addedBy: 'Maya R.', addedAt: 'Mar 4' },
+            { id: 'att2', type: 'link', label: 'Figma: Upload error states', url: 'https://figma.com/file/def456', addedBy: 'Maya R.', addedAt: 'Mar 5' },
+            { id: 'att3', type: 'file', label: 'WebSocket race condition analysis.pdf', url: '/docs/ws-analysis.pdf', fileType: 'pdf', addedBy: 'Alex K.', addedAt: 'Mar 5' },
+          ],
+          replies: [
+            { id: 'r1', author: 'Maya R.', at: 'Mar 4', text: 'Confirmed with engineering. Progress indicator needs to show per-chunk so boards do not think it is frozen.' },
+            { id: 'r2', author: 'Sam L.', at: 'Mar 5', text: 'Agreed. What is the fallback if WebSocket drops entirely mid-meeting? Should show reconnecting state, not freeze.' },
+          ],
+        },
+        {
+          id: 'a2',
+          title: 'Reconnecting overlay with graceful degradation',
+          description: 'When WebSocket drops, show a persistent Reconnecting banner rather than silently freezing. Quorum count shows last-known state with a timestamp. Boards stay informed without panic.',
+          status: 'exploring',
+          author: 'Sam L.',
+          role: 'Product Manager',
+          createdAt: 'Mar 2, 2026',
+          attachments: [],
+          replies: [
+            { id: 'r3', author: 'Alex K.', at: 'Mar 3', text: 'Good UX but does not fix the underlying race condition. Should be bundled with the optimistic UI fix, not standalone.' },
+          ],
+        },
+        {
+          id: 'a3',
+          title: 'Full WebSocket rewrite with CRDT-based state sync',
+          description: 'Replace the current WebSocket implementation with a CRDT-based approach where each client maintains its own state that converges without a central authority. Eliminates race conditions at the root.',
+          status: 'parked',
+          author: 'Alex K.',
+          role: 'Engineer',
+          createdAt: 'Feb 28, 2026',
+          attachments: [
+            { id: 'att4', type: 'file', label: 'CRDT research notes.md', url: '/docs/crdt-notes.md', fileType: 'md', addedBy: 'Alex K.', addedAt: 'Feb 28' },
+          ],
+          replies: [],
+        },
       ],
-      ideation: [
-        { text: 'Show reconnecting overlay instead of silently freezing', author: 'Sam L.', votes: 3, date: '2026-02-18' },
-        { text: 'Optimistic UI for quorum — update locally and reconcile with server', author: 'Alex K.', votes: 5, date: '2026-02-19' },
-        { text: 'Chunked upload for documents to make failures recoverable', author: 'Maya R.', votes: 4, date: '2026-02-20' },
-      ],
-      collab: [
-        { author: 'Maya R.', text: 'Engineering sync confirmed: WebSocket race is reproducible in staging. Alex is picking up chunked upload.', timestamp: '2026-03-01T10:30:00' },
-        { author: 'Alex K.', text: 'Chunked upload PR is up. Quorum WebSocket fix needs QA pass on Safari.', timestamp: '2026-03-03T14:15:00' },
-        { author: 'Sam L.', text: 'Design review done. Edge case: what happens to quorum count if a participant loses connection mid-meeting?', timestamp: '2026-03-04T09:45:00' },
+      discussion: [
+        { id: 'd1', author: 'Maya R.', at: 'Mar 5 · 14:30', text: 'Engineering sync done — marking optimistic UI + chunked upload as selected direction. Sam picking up the reconnection overlay as a companion UX change.' },
       ],
     },
     deploy: {
@@ -193,13 +247,32 @@ const SEED_PROBLEMS: ProblemStatement[] = [
     successMetrics: ['GL sync latency < 5 min', 'Work order templates adopted by 3+ assocs', 'Budget report accuracy verified'],
     notes: 'Scoping in progress. Need to audit GL sync pipeline.',
     solution: {
-      designs: [],
-      ideation: [
-        { text: 'Event-sourced ledger — derive balances from immutable event log', author: 'Alex K.', votes: 6, date: '2026-02-26' },
-        { text: 'Reconciliation dashboard to surface discrepancies before board meetings', author: 'Sam L.', votes: 2, date: '2026-02-27' },
+      approaches: [
+        {
+          id: 'a1',
+          title: 'Event-sourced ledger with write-through cache',
+          description: 'Treat every financial transaction as an immutable event and derive balances from the event log. Add a write-through cache layer for real-time in-app views so balance reads are instant without waiting for pipeline sync.',
+          status: 'exploring',
+          author: 'Alex K.',
+          role: 'Engineer',
+          createdAt: 'Mar 3, 2026',
+          attachments: [],
+          replies: [],
+        },
+        {
+          id: 'a2',
+          title: 'Reconciliation dashboard for manual spot-checks',
+          description: 'A view that surfaces discrepancies between GL, reserves, and work order costs so finance admins can spot-check before board meetings. Does not fix the sync issue but makes it visible and manageable.',
+          status: 'exploring',
+          author: 'Sam L.',
+          role: 'Product Manager',
+          createdAt: 'Mar 4, 2026',
+          attachments: [],
+          replies: [],
+        },
       ],
-      collab: [
-        { author: 'Alex K.', text: 'Scoping session done. Sync delay is 2-5 minutes worst case. Need write-through cache layer for real-time views.', timestamp: '2026-02-25T11:00:00' },
+      discussion: [
+        { id: 'd1', author: 'Alex K.', at: 'Mar 4 · 11:00', text: 'Scoping session done. Sync delay is 2-5 minutes worst case. Need write-through cache layer for real-time balance views.' },
       ],
     },
     deploy: {
@@ -232,19 +305,7 @@ const SEED_PROBLEMS: ProblemStatement[] = [
     outOfScope: 'Resident payments and dues. Voting and elections for residents. Direct messaging between residents.',
     successMetrics: ['Admin time on requests reduced 50%', 'CSV import success rate > 95%'],
     notes: 'Design mockups in progress. CSV parser spec drafted.',
-    solution: {
-      designs: [
-        { title: 'Resident portal — maintenance request flow', url: 'https://figma.com/file/ghi789', status: 'in_progress', addedBy: 'Sam L.', addedAt: '2026-03-01' },
-      ],
-      ideation: [
-        { text: 'Progressive disclosure onboarding — show residents only features they need on first login', author: 'Sam L.', votes: 4, date: '2026-02-28' },
-        { text: 'Photo upload on maintenance requests', author: 'Maya R.', votes: 7, date: '2026-03-02' },
-      ],
-      collab: [
-        { author: 'Sam L.', text: 'Kicked off design sprint. Starting with maintenance request as anchor flow.', timestamp: '2026-02-28T15:00:00' },
-        { author: 'Maya R.', text: 'First wireframes in Figma. Question: show residents the board response timeline or keep opaque?', timestamp: '2026-03-02T10:30:00' },
-      ],
-    },
+    solution: { approaches: [], discussion: [] },
     deploy: {
       pr: { branch: 'feat/resident-portal', number: 255, title: 'Resident self-service portal', status: 'open', sha: 'c5f3a73', author: 'Sam L.' },
       environments: [
@@ -276,7 +337,7 @@ const SEED_PROBLEMS: ProblemStatement[] = [
     outOfScope: '',
     successMetrics: [],
     notes: '',
-    solution: { designs: [], ideation: [], collab: [] },
+    solution: { approaches: [], discussion: [] },
     deploy: {
       pr: null,
       environments: [{ name: 'Staging', status: 'not_started' }, { name: 'Production', status: 'not_started' }],
@@ -306,14 +367,12 @@ function initials(name: string) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 type DetailTab = 'overview' | 'feedback' | 'metrics' | 'solution' | 'deploy' | 'history';
-type SolutionSub = 'designs' | 'ideation' | 'collab';
 
 export default function ProblemsTab() {
   const [problems, setProblems] = useState<ProblemStatement[]>(SEED_PROBLEMS);
   const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
-  const [solutionSub, setSolutionSub] = useState<SolutionSub>('designs');
 
   // Edit states
   const [editingFraming, setEditingFraming] = useState(false);
@@ -325,11 +384,17 @@ export default function ProblemsTab() {
   const [editingNotes, setEditingNotes] = useState(false);
 
   // Solution form states
-  const [showDesignForm, setShowDesignForm] = useState(false);
-  const [designTitle, setDesignTitle] = useState('');
-  const [designUrl, setDesignUrl] = useState('');
-  const [newIdea, setNewIdea] = useState('');
-  const [newComment, setNewComment] = useState('');
+  const [showApproachForm, setShowApproachForm] = useState(false);
+  const [approachTitle, setApproachTitle] = useState('');
+  const [approachDesc, setApproachDesc] = useState('');
+  const [approachRole, setApproachRole] = useState('');
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [newDiscussion, setNewDiscussion] = useState('');
+  const [attachFormFor, setAttachFormFor] = useState<string | null>(null);
+  const [attachType, setAttachType] = useState<'link' | 'file'>('link');
+  const [attachLabel, setAttachLabel] = useState('');
+  const [attachUrl, setAttachUrl] = useState('');
   const [newMetric, setNewMetric] = useState('');
 
   const detail = problems.find(p => p.id === detailId) || null;
@@ -355,7 +420,7 @@ export default function ProblemsTab() {
 
   const stageCounts = STAGES.map(s => ({ stage: s, count: problems.filter(p => p.stage === s).length }));
 
-  const solutionCount = detail ? detail.solution.designs.length + detail.solution.ideation.length + detail.solution.collab.length : 0;
+  const solutionCount = detail ? detail.solution.approaches.length + detail.solution.discussion.length : 0;
 
   const DETAIL_TABS: { id: DetailTab; label: string; badge?: number }[] = [
     { id: 'overview', label: 'Overview' },
@@ -514,7 +579,7 @@ export default function ProblemsTab() {
             {/* Panel tabs */}
             <div className="px-6 border-b border-ink-200 flex gap-1 shrink-0">
               {DETAIL_TABS.map(tab => (
-                <button key={tab.id} onClick={() => { setDetailTab(tab.id); if (tab.id === 'solution') setSolutionSub('designs'); }}
+                <button key={tab.id} onClick={() => setDetailTab(tab.id)}
                   className={`px-3 py-2.5 text-xs font-semibold capitalize transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
                     detailTab === tab.id ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'
                   }`}>
@@ -837,154 +902,441 @@ export default function ProblemsTab() {
               )}
 
               {/* Solution Tab */}
-              {detailTab === 'solution' && (
-                <div className="space-y-4">
-                  {/* Sub-nav */}
-                  <div className="flex gap-1 border-b border-ink-100">
-                    {(['designs', 'ideation', 'collab'] as SolutionSub[]).map(sub => (
-                      <button key={sub} onClick={() => setSolutionSub(sub)}
-                        className={`px-3 py-2 text-xs font-semibold capitalize border-b-2 -mb-px transition-colors ${
-                          solutionSub === sub ? 'border-[#7c3aed] text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'
-                        }`}>{sub}</button>
-                    ))}
-                  </div>
+              {detailTab === 'solution' && (() => {
+                const sorted = [...detail.solution.approaches].sort((a, b) => {
+                  const order = { selected: 0, exploring: 1, parked: 2 };
+                  return order[a.status] - order[b.status];
+                });
+                const totalApproaches = sorted.length;
+                return (
+                <div className="space-y-0">
+                  {/* Zone 1: Solution Approaches */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <p className="text-sm font-bold text-[#111827]">Solution Approaches</p>
+                        <p className="text-xs text-[#9ca3af]">Propose, discuss and attach supporting material to each approach</p>
+                      </div>
+                      <button onClick={() => setShowApproachForm(!showApproachForm)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors ${showApproachForm ? 'bg-ink-700' : 'bg-ink-900 hover:bg-ink-800'}`}>
+                        + Add Approach
+                      </button>
+                    </div>
 
-                  {/* Designs sub-section */}
-                  {solutionSub === 'designs' && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-ink-500">Link design files, mockups, or prototypes for this problem statement.</p>
-                      {detail.solution.designs.map((d, i) => (
-                        <div key={i} className="bg-white border border-ink-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-sm font-semibold text-ink-900">{d.title}</p>
-                            <span className="text-[0.6rem] px-2 py-0.5 rounded-full font-semibold text-white"
-                              style={{ backgroundColor: DESIGN_STATUS_COLORS[d.status] }}>
-                              {DESIGN_STATUS_LABELS[d.status]}
-                            </span>
+                    {/* Add Approach form */}
+                    {showApproachForm && (
+                      <div className="border border-ink-200 rounded-[10px] p-4 space-y-3 mb-4 mt-3">
+                        <input value={approachTitle} onChange={e => setApproachTitle(e.target.value)}
+                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"
+                          placeholder="Approach title (e.g. Reconnection overlay with graceful fallback)" />
+                        <textarea value={approachDesc} onChange={e => setApproachDesc(e.target.value)}
+                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2}
+                          placeholder="Describe this approach and why it might work..." />
+                        <select value={approachRole} onChange={e => setApproachRole(e.target.value)}
+                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm text-ink-700">
+                          <option value="">Your role...</option>
+                          <option>Product Manager</option>
+                          <option>Engineer</option>
+                          <option>Designer</option>
+                          <option>Board Member</option>
+                          <option>Property Manager</option>
+                        </select>
+                        {/* Inline attach for new approach */}
+                        {attachFormFor === 'new' ? (
+                          <div className="border border-ink-200 rounded-lg p-3 space-y-2">
+                            <div className="flex gap-1">
+                              <button onClick={() => setAttachType('link')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${attachType === 'link' ? 'border-2 border-blue-500 text-blue-700 bg-blue-50' : 'border border-ink-200 text-ink-500'}`}>
+                                Link / URL
+                              </button>
+                              <button onClick={() => setAttachType('file')}
+                                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${attachType === 'file' ? 'border-2 border-blue-500 text-blue-700 bg-blue-50' : 'border border-ink-200 text-ink-500'}`}>
+                                File upload
+                              </button>
+                            </div>
+                            {attachType === 'link' ? (
+                              <div className="space-y-2">
+                                <input value={attachLabel} onChange={e => setAttachLabel(e.target.value)}
+                                  className="w-full px-3 py-1.5 border border-ink-200 rounded-md text-sm" placeholder="Label" />
+                                <input value={attachUrl} onChange={e => setAttachUrl(e.target.value)}
+                                  className="w-full px-3 py-1.5 border border-ink-200 rounded-md text-sm font-mono" placeholder="https://..." />
+                              </div>
+                            ) : (
+                              <div className="border-2 border-dashed border-ink-200 rounded-lg p-6 text-center cursor-pointer hover:border-ink-300">
+                                <p className="text-sm text-ink-500">Drop a file or click to upload</p>
+                                <p className="text-xs text-ink-400 mt-1">PDF, DOCX, XLSX, PNG, JPG — max 20MB</p>
+                              </div>
+                            )}
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => { setAttachFormFor(null); setAttachLabel(''); setAttachUrl(''); }}
+                                className="px-3 py-1 text-xs text-ink-500 font-medium">Cancel</button>
+                              <button onClick={() => { setAttachFormFor(null); setAttachLabel(''); setAttachUrl(''); }}
+                                className="px-3 py-1 bg-ink-900 text-white rounded-md text-xs font-semibold">Attach</button>
+                            </div>
                           </div>
-                          <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all">{d.url}</a>
-                          <p className="text-[0.65rem] text-ink-400 mt-1.5">{d.addedBy} &middot; {fmtDate(d.addedAt)}</p>
+                        ) : (
+                          <button onClick={() => { setAttachFormFor('new'); setAttachType('link'); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-[#d1d5db] rounded-md text-xs text-[#9ca3af] hover:border-ink-400 hover:text-ink-500">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                            Attach file or link
+                          </button>
+                        )}
+                        <div className="flex gap-2 justify-end pt-1">
+                          <button onClick={() => { setShowApproachForm(false); setApproachTitle(''); setApproachDesc(''); setApproachRole(''); setAttachFormFor(null); }}
+                            className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs text-ink-500 font-medium hover:text-ink-700">Cancel</button>
+                          <button onClick={() => {
+                            if (!approachTitle.trim() || !approachDesc.trim() || !approachRole) return;
+                            updateProblem(detail.id, p => ({
+                              ...p,
+                              solution: {
+                                ...p.solution,
+                                approaches: [...p.solution.approaches, {
+                                  id: `a${Date.now()}`,
+                                  title: approachTitle.trim(),
+                                  description: approachDesc.trim(),
+                                  status: 'exploring' as const,
+                                  author: 'Admin',
+                                  role: approachRole as Approach['role'],
+                                  createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                  attachments: [],
+                                  replies: [],
+                                }],
+                              },
+                              updatedAt: new Date().toISOString().split('T')[0],
+                            }));
+                            setShowApproachForm(false); setApproachTitle(''); setApproachDesc(''); setApproachRole('');
+                          }} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Submit Approach</button>
                         </div>
-                      ))}
-                      {!showDesignForm ? (
-                        <button onClick={() => setShowDesignForm(true)}
-                          className="w-full py-3 border-2 border-dashed border-ink-200 rounded-lg text-sm text-ink-400 font-medium hover:border-ink-300 hover:text-ink-500 transition-colors">
-                          + Link design file
-                        </button>
-                      ) : (
-                        <div className="border border-ink-200 rounded-lg p-4 space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-ink-600 mb-1">Title</label>
-                            <input value={designTitle} onChange={e => setDesignTitle(e.target.value)}
-                              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g. Quorum redesign mockup" />
+                      </div>
+                    )}
+
+                    {/* Approach cards */}
+                    <div className="space-y-4 mt-4">
+                      {sorted.map((approach, idx) => {
+                        const approachNum = idx + 1;
+                        const isSelected = approach.status === 'selected';
+                        const isParked = approach.status === 'parked';
+                        const isExploring = approach.status === 'exploring';
+                        const repliesExpanded = isSelected || expandedReplies[approach.id];
+                        const rc = ROLE_COLORS[approach.role] || { bg: '#f3f4f6', text: '#6b7280' };
+
+                        return (
+                          <div key={approach.id}
+                            className="rounded-[10px] overflow-hidden"
+                            style={{
+                              border: isSelected ? '2px solid #059669' : '1px solid #e5e7eb',
+                              opacity: isParked ? 0.65 : 1,
+                            }}>
+                            {/* Header strip */}
+                            <div className="px-4 py-2 flex items-center justify-between"
+                              style={{ backgroundColor: isSelected ? '#f0fdf4' : '#f9fafb' }}>
+                              <div className="flex items-center gap-2">
+                                {isSelected && (
+                                  <span className="text-[0.6rem] px-2 py-0.5 rounded-full font-bold text-white bg-[#059669]">SELECTED</span>
+                                )}
+                                {isExploring && (
+                                  <span className="text-[0.6rem] px-2 py-0.5 rounded-full font-bold"
+                                    style={{ backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' }}>EXPLORING</span>
+                                )}
+                                {isParked && (
+                                  <span className="text-[0.6rem] px-2 py-0.5 rounded-full font-bold bg-ink-200 text-ink-500">PARKED</span>
+                                )}
+                                <span className="text-[0.6rem] text-ink-400">Approach {approachNum} of {totalApproaches}</span>
+                              </div>
+                              <div>
+                                {isSelected && (
+                                  <span className="text-[0.6rem] text-[#059669] font-medium">✓ Chosen direction</span>
+                                )}
+                                {isExploring && (
+                                  <button onClick={() => {
+                                    updateProblem(detail.id, p => ({
+                                      ...p,
+                                      solution: {
+                                        ...p.solution,
+                                        approaches: p.solution.approaches.map(a =>
+                                          a.id === approach.id ? { ...a, status: 'selected' as const } :
+                                          a.status === 'selected' ? { ...a, status: 'exploring' as const } : a
+                                        ),
+                                      },
+                                      updatedAt: new Date().toISOString().split('T')[0],
+                                    }));
+                                  }}
+                                    className="text-[0.65rem] px-2 py-0.5 border border-ink-300 rounded-md text-ink-600 font-medium hover:bg-ink-100">
+                                    Mark as Selected
+                                  </button>
+                                )}
+                                {isParked && (
+                                  <span className="text-[0.6rem] text-ink-400 italic">Deprioritised — revisit post v1</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Body */}
+                            <div className="bg-white px-4 py-3.5">
+                              <p className={`text-sm font-bold mb-1 ${isParked ? 'text-[#6b7280]' : 'text-[#111827]'}`}>{approach.title}</p>
+                              <p className={`text-[13px] leading-[1.6] mb-3 ${isParked ? 'text-[#9ca3af]' : 'text-[#374151]'}`}>{approach.description}</p>
+
+                              {/* Meta row */}
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-[0.65rem] px-2 py-0.5 rounded-full font-medium bg-[#f3f4f6] text-ink-700">{approach.author}</span>
+                                <span className="text-[0.65rem] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: rc.bg, color: rc.text }}>{approach.role}</span>
+                                <span className="text-[0.65rem] text-[#9ca3af] ml-auto">{approach.createdAt}</span>
+                              </div>
+
+                              {/* Attachments section */}
+                              <div className="mb-3">
+                                {approach.attachments.length > 0 ? (
+                                  <div>
+                                    <p className="text-[10px] uppercase text-[#9ca3af] font-medium tracking-[0.06em] mb-1.5">ATTACHMENTS</p>
+                                    <div className="flex flex-wrap gap-1.5 items-center">
+                                      {approach.attachments.map(att => (
+                                        att.type === 'link' ? (
+                                          <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[0.65rem] px-2 py-0.5 rounded-full font-medium"
+                                            style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                                            {att.label}
+                                          </a>
+                                        ) : (
+                                          <span key={att.id}
+                                            className="inline-flex items-center gap-1 text-[0.65rem] px-2 py-0.5 rounded-full font-medium"
+                                            style={{ backgroundColor: '#fef9c3', color: '#ca8a04', border: '1px solid #fde68a' }}>
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                            {att.label}
+                                          </span>
+                                        )
+                                      ))}
+                                      {!isParked && (
+                                        <button onClick={() => { setAttachFormFor(approach.id); setAttachType('link'); setAttachLabel(''); setAttachUrl(''); }}
+                                          className="inline-flex items-center gap-1 text-[0.65rem] px-2 py-1 border border-dashed border-[#d1d5db] rounded-full text-[#9ca3af] bg-white hover:border-ink-400 hover:text-ink-500">
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                          Attach
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[0.65rem] italic text-[#d1d5db]">No attachments yet</span>
+                                    {!isParked && (
+                                      <button onClick={() => { setAttachFormFor(approach.id); setAttachType('link'); setAttachLabel(''); setAttachUrl(''); }}
+                                        className="inline-flex items-center gap-1 text-[0.65rem] px-2 py-1 border border-dashed border-[#d1d5db] rounded-full text-[#9ca3af] bg-white hover:border-ink-400 hover:text-ink-500">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                        Attach
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Inline attach form */}
+                                {attachFormFor === approach.id && (
+                                  <div className="border border-ink-200 rounded-lg p-3 space-y-2 mt-2">
+                                    <div className="flex gap-1">
+                                      <button onClick={() => setAttachType('link')}
+                                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${attachType === 'link' ? 'border-2 border-blue-500 text-blue-700 bg-blue-50' : 'border border-ink-200 text-ink-500'}`}>
+                                        Link / URL
+                                      </button>
+                                      <button onClick={() => setAttachType('file')}
+                                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${attachType === 'file' ? 'border-2 border-blue-500 text-blue-700 bg-blue-50' : 'border border-ink-200 text-ink-500'}`}>
+                                        File upload
+                                      </button>
+                                    </div>
+                                    {attachType === 'link' ? (
+                                      <div className="space-y-2">
+                                        <input value={attachLabel} onChange={e => setAttachLabel(e.target.value)}
+                                          className="w-full px-3 py-1.5 border border-ink-200 rounded-md text-sm" placeholder="Label" />
+                                        <input value={attachUrl} onChange={e => setAttachUrl(e.target.value)}
+                                          className="w-full px-3 py-1.5 border border-ink-200 rounded-md text-sm font-mono" placeholder="https://..." />
+                                      </div>
+                                    ) : (
+                                      <div className="border-2 border-dashed border-ink-200 rounded-lg p-6 text-center cursor-pointer hover:border-ink-300">
+                                        <p className="text-sm text-ink-500">Drop a file or click to upload</p>
+                                        <p className="text-xs text-ink-400 mt-1">PDF, DOCX, XLSX, PNG, JPG — max 20MB</p>
+                                      </div>
+                                    )}
+                                    <div className="flex gap-2 justify-end">
+                                      <button onClick={() => { setAttachFormFor(null); setAttachLabel(''); setAttachUrl(''); }}
+                                        className="px-3 py-1 text-xs text-ink-500 font-medium">Cancel</button>
+                                      <button onClick={() => {
+                                        if (attachType === 'link' && attachLabel.trim() && attachUrl.trim()) {
+                                          updateProblem(detail.id, p => ({
+                                            ...p,
+                                            solution: {
+                                              ...p.solution,
+                                              approaches: p.solution.approaches.map(a =>
+                                                a.id === approach.id ? {
+                                                  ...a,
+                                                  attachments: [...a.attachments, {
+                                                    id: `att${Date.now()}`, type: 'link' as const, label: attachLabel.trim(), url: attachUrl.trim(), addedBy: 'Admin', addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                                  }],
+                                                } : a
+                                              ),
+                                            },
+                                            updatedAt: new Date().toISOString().split('T')[0],
+                                          }));
+                                        }
+                                        setAttachFormFor(null); setAttachLabel(''); setAttachUrl('');
+                                      }} className="px-3 py-1 bg-ink-900 text-white rounded-md text-xs font-semibold">Attach</button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Replies section */}
+                              {!isParked && (
+                                <div className="border-t border-[#f3f4f6] pt-2.5">
+                                  {approach.replies.length > 0 && !repliesExpanded && (
+                                    <button onClick={() => setExpandedReplies(prev => ({ ...prev, [approach.id]: true }))}
+                                      className="text-[11px] text-[#6b7280] font-medium hover:text-ink-700">
+                                      ▸ {approach.replies.length} {approach.replies.length === 1 ? 'reply' : 'replies'}
+                                    </button>
+                                  )}
+                                  {repliesExpanded && (
+                                    <div className="space-y-2.5">
+                                      {approach.replies.length > 1 && (
+                                        <button onClick={() => setExpandedReplies(prev => ({ ...prev, [approach.id]: false }))}
+                                          className="text-[11px] text-[#6b7280] font-medium hover:text-ink-700 mb-1">
+                                          ▾ {approach.replies.length} replies
+                                        </button>
+                                      )}
+                                      {approach.replies.map(reply => (
+                                        <div key={reply.id} className="flex gap-2">
+                                          <div className="w-[22px] h-[22px] rounded-full bg-blue-600 text-white flex items-center justify-center text-[0.5rem] font-bold shrink-0">
+                                            {initials(reply.author)}
+                                          </div>
+                                          <div className="flex-1 bg-[#f9fafb] rounded-[0_7px_7px_7px] px-3 py-2">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                              <span className="text-xs font-bold text-ink-900">{reply.author}</span>
+                                              <span className="text-[0.6rem] text-ink-400">{reply.at}</span>
+                                            </div>
+                                            <p className="text-xs text-ink-700">{reply.text}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <div className="flex gap-2">
+                                        <div className="w-[22px] h-[22px] rounded-full bg-ink-300 text-white flex items-center justify-center text-[0.5rem] font-bold shrink-0">—</div>
+                                        <input
+                                          value={replyTexts[approach.id] || ''}
+                                          onChange={e => setReplyTexts(prev => ({ ...prev, [approach.id]: e.target.value }))}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter' && replyTexts[approach.id]?.trim()) {
+                                              updateProblem(detail.id, p => ({
+                                                ...p,
+                                                solution: {
+                                                  ...p.solution,
+                                                  approaches: p.solution.approaches.map(a =>
+                                                    a.id === approach.id ? {
+                                                      ...a,
+                                                      replies: [...a.replies, { id: `r${Date.now()}`, author: 'Admin', at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), text: replyTexts[approach.id].trim() }],
+                                                    } : a
+                                                  ),
+                                                },
+                                                updatedAt: new Date().toISOString().split('T')[0],
+                                              }));
+                                              setReplyTexts(prev => ({ ...prev, [approach.id]: '' }));
+                                            }
+                                          }}
+                                          className="flex-1 px-3 py-1.5 border border-[#e5e7eb] rounded-md text-xs" placeholder="Reply to this approach..." />
+                                      </div>
+                                    </div>
+                                  )}
+                                  {approach.replies.length === 0 && (
+                                    <div className="flex gap-2">
+                                      <div className="w-[22px] h-[22px] rounded-full bg-ink-300 text-white flex items-center justify-center text-[0.5rem] font-bold shrink-0">—</div>
+                                      <input
+                                        value={replyTexts[approach.id] || ''}
+                                        onChange={e => setReplyTexts(prev => ({ ...prev, [approach.id]: e.target.value }))}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter' && replyTexts[approach.id]?.trim()) {
+                                            updateProblem(detail.id, p => ({
+                                              ...p,
+                                              solution: {
+                                                ...p.solution,
+                                                approaches: p.solution.approaches.map(a =>
+                                                  a.id === approach.id ? {
+                                                    ...a,
+                                                    replies: [...a.replies, { id: `r${Date.now()}`, author: 'Admin', at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), text: replyTexts[approach.id].trim() }],
+                                                  } : a
+                                                ),
+                                              },
+                                              updatedAt: new Date().toISOString().split('T')[0],
+                                            }));
+                                            setReplyTexts(prev => ({ ...prev, [approach.id]: '' }));
+                                          }
+                                        }}
+                                        className="flex-1 px-3 py-1.5 border border-[#e5e7eb] rounded-md text-xs" placeholder="Reply to this approach..." />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-medium text-ink-600 mb-1">URL</label>
-                            <input value={designUrl} onChange={e => setDesignUrl(e.target.value)}
-                              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="https://figma.com/file/..." />
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            <button onClick={() => { setShowDesignForm(false); setDesignTitle(''); setDesignUrl(''); }}
-                              className="px-3 py-1.5 text-xs text-ink-500 font-medium hover:text-ink-700">Cancel</button>
-                            <button onClick={() => {
-                              if (!designTitle.trim() || !designUrl.trim()) return;
-                              updateProblem(detail.id, p => ({
-                                ...p,
-                                solution: { ...p.solution, designs: [...p.solution.designs, { title: designTitle.trim(), url: designUrl.trim(), status: 'in_progress', addedBy: 'Admin', addedAt: new Date().toISOString().split('T')[0] }] },
-                                updatedAt: new Date().toISOString().split('T')[0],
-                              }));
-                              setShowDesignForm(false); setDesignTitle(''); setDesignUrl('');
-                            }} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Add</button>
-                          </div>
+                        );
+                      })}
+
+                      {sorted.length === 0 && (
+                        <div className="bg-ink-50 rounded-lg p-6 text-center">
+                          <p className="text-sm text-ink-400">No approaches yet. Click "+ Add Approach" to start.</p>
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
 
-                  {/* Ideation sub-section */}
-                  {solutionSub === 'ideation' && (
+                  {/* Zone 2: General Discussion */}
+                  <div className="mt-6 pt-4" style={{ borderTop: '2px solid #f3f4f6' }}>
+                    <p className="text-xs font-bold text-[#6b7280] uppercase tracking-[0.06em] mb-3">GENERAL DISCUSSION</p>
                     <div className="space-y-3">
-                      <p className="text-xs text-ink-500">Capture solution ideas and approaches. Vote to surface the strongest thinking.</p>
-                      {[...detail.solution.ideation].sort((a, b) => b.votes - a.votes).map((idea, i) => (
-                        <div key={i} className="flex gap-3 bg-white border border-ink-200 rounded-lg p-4">
-                          <button onClick={() => {
-                            const originalIdx = detail.solution.ideation.findIndex(item => item.text === idea.text && item.author === idea.author);
-                            updateProblem(detail.id, p => ({
-                              ...p,
-                              solution: { ...p.solution, ideation: p.solution.ideation.map((item, idx) => idx === originalIdx ? { ...item, votes: item.votes + 1 } : item) },
-                            }));
-                          }} className="flex flex-col items-center shrink-0 group">
-                            <svg className="w-4 h-4 text-ink-400 group-hover:text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                            <span className="text-sm font-bold text-ink-700">{idea.votes}</span>
-                          </button>
-                          <div className="flex-1">
-                            <p className="text-sm text-ink-900">{idea.text}</p>
-                            <p className="text-[0.65rem] text-ink-400 mt-1">{idea.author} &middot; {fmtDate(idea.date)}</p>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="space-y-2 pt-2">
-                        <textarea value={newIdea} onChange={e => setNewIdea(e.target.value)}
-                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2}
-                          placeholder="Share a solution idea..." />
-                        <div className="flex justify-end">
-                          <button onClick={() => {
-                            if (!newIdea.trim()) return;
-                            updateProblem(detail.id, p => ({
-                              ...p,
-                              solution: { ...p.solution, ideation: [...p.solution.ideation, { text: newIdea.trim(), author: 'Admin', votes: 0, date: new Date().toISOString().split('T')[0] }] },
-                              updatedAt: new Date().toISOString().split('T')[0],
-                            }));
-                            setNewIdea('');
-                          }} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Add Idea</button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Collab sub-section */}
-                  {solutionSub === 'collab' && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-ink-500">Internal team discussion, decisions, and updates.</p>
-                      {detail.solution.collab.map((c, i) => (
-                        <div key={i} className="flex gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[0.65rem] font-bold shrink-0">
+                      {detail.solution.discussion.map(c => (
+                        <div key={c.id} className="flex gap-3">
+                          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-[0.55rem] font-bold shrink-0">
                             {initials(c.author)}
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 bg-white border border-[#e5e7eb] rounded-[0_8px_8px_8px] px-3 py-2">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-sm font-semibold text-ink-900">{c.author}</span>
-                              <span className="text-[0.65rem] text-ink-400">{fmtDateTime(c.timestamp)}</span>
+                              <span className="text-xs font-semibold text-ink-900">{c.author}</span>
+                              <span className="text-[0.6rem] text-ink-400">{c.at}</span>
                             </div>
                             <p className="text-sm text-ink-700">{c.text}</p>
                           </div>
                         </div>
                       ))}
-                      {detail.solution.collab.length === 0 && (
+                      {detail.solution.discussion.length === 0 && (
                         <div className="bg-ink-50 rounded-lg p-4 text-center">
                           <p className="text-sm text-ink-400">No comments yet</p>
                         </div>
                       )}
-                      <div className="space-y-2 pt-2 border-t border-ink-100">
-                        <textarea value={newComment} onChange={e => setNewComment(e.target.value)}
-                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2}
-                          placeholder="Add a comment..." />
-                        <div className="flex justify-end">
-                          <button onClick={() => {
-                            if (!newComment.trim()) return;
-                            updateProblem(detail.id, p => ({
-                              ...p,
-                              solution: { ...p.solution, collab: [...p.solution.collab, { author: 'Admin', text: newComment.trim(), timestamp: new Date().toISOString() }] },
-                              updatedAt: new Date().toISOString().split('T')[0],
-                            }));
-                            setNewComment('');
-                          }} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Post</button>
+                      <div className="flex gap-3 pt-1">
+                        <div className="w-7 h-7 rounded-full bg-ink-300 text-white flex items-center justify-center text-[0.55rem] font-bold shrink-0">—</div>
+                        <div className="flex-1">
+                          <textarea value={newDiscussion} onChange={e => setNewDiscussion(e.target.value)}
+                            className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2}
+                            placeholder="Add a general comment, decision, or update..." />
+                          <div className="flex justify-end mt-1.5">
+                            <button onClick={() => {
+                              if (!newDiscussion.trim()) return;
+                              updateProblem(detail.id, p => ({
+                                ...p,
+                                solution: {
+                                  ...p.solution,
+                                  discussion: [...p.solution.discussion, {
+                                    id: `d${Date.now()}`,
+                                    author: 'Admin',
+                                    at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                    text: newDiscussion.trim(),
+                                  }],
+                                },
+                                updatedAt: new Date().toISOString().split('T')[0],
+                              }));
+                              setNewDiscussion('');
+                            }} className="px-4 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Post</button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Deploy Tab */}
               {detailTab === 'deploy' && (
