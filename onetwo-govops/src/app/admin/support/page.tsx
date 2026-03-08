@@ -1,19 +1,21 @@
-import { createServerSupabase } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { SupportClient } from './support-client'
 
-export default async function SupportPage() {
-  const supabase = await createServerSupabase()
+export const dynamic = 'force-dynamic'
 
-  const { data: threads } = await supabase
+export default async function SupportPage() {
+  const db = supabaseAdmin
+
+  const { data: threads } = await db
     .from('support_threads')
     .select('*')
     .order('updated_at', { ascending: false })
 
-  const { data: tenancies } = await (supabase as any)
+  const { data: tenancies } = await (db as any)
     .from('tenants')
     .select('id, name, subdomain')
 
-  const { data: feedbackItems } = await supabase
+  const { data: feedbackItems } = await db
     .from('feedback_items')
     .select('id, title, status')
     .order('title')
