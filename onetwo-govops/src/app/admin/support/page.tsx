@@ -9,9 +9,9 @@ export default async function SupportPage() {
     .select('*')
     .order('updated_at', { ascending: false })
 
-  const { data: tenancies } = await supabase
-    .from('tenancies')
-    .select('id, name, slug, subscription_plans(name, color)')
+  const { data: tenancies } = await (supabase as any)
+    .from('tenants')
+    .select('id, name, subdomain')
 
   const { data: feedbackItems } = await supabase
     .from('feedback_items')

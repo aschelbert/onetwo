@@ -35,8 +35,7 @@ interface ThreadRef {
 interface Tenancy {
   id: string
   name: string
-  slug: string
-  subscription_plans: { name: string; color: string } | null
+  subdomain: string
 }
 
 // --- Meta ---
@@ -97,8 +96,8 @@ export function FeedbackClient({
     return tenancies.find(t => t.id === id)
   }
 
-  function getPlanColor(t: Tenancy | undefined): string {
-    return t?.subscription_plans?.color || '#6b7280'
+  function getPlanColor(_t: Tenancy | undefined): string {
+    return '#6b7280'
   }
 
   const themes = [...new Set(feedbackItems.map(f => f.theme))]
@@ -289,7 +288,7 @@ export function FeedbackClient({
                   <div key={assoc.tenancy_id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-b-0">
                     <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: color }} />
                     <span className="text-[13px] text-gray-700 flex-1">{t.name}</span>
-                    <span className="text-[11px] text-gray-400">{t.subscription_plans?.name || ''}</span>
+                    <span className="text-[11px] text-gray-400">{t.subdomain || ''}</span>
                   </div>
                 )
               })}

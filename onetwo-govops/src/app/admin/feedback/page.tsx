@@ -14,9 +14,9 @@ export default async function FeedbackPage() {
     .select('id, tenancy_id, subject, status, updated_at')
     .order('updated_at', { ascending: false })
 
-  const { data: tenancies } = await supabase
-    .from('tenancies')
-    .select('id, name, slug, subscription_plans(name, color)')
+  const { data: tenancies } = await (supabase as any)
+    .from('tenants')
+    .select('id, name, subdomain')
 
   return (
     <FeedbackClient
