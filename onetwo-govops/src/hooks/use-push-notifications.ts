@@ -26,13 +26,19 @@ export function usePushNotifications() {
 
     setPermission(Notification.permission)
 
-    // Check existing subscription
-    navigator.serviceWorker?.ready.then((registration) => {
-      registration.pushManager.getSubscription().then((sub) => {
-        setIsSubscribed(!!sub)
-        setIsLoading(false)
-      })
-    }).catch(() => setIsLoading(false))
+    // Check existing subscription only if a SW is already registered
+    const sw = navigator.serviceWorker
+    if (sw?.controller) {
+      sw.ready.then((registration) => {
+        registration.pushManager.getSubscription().then((sub) => {
+          setIsSubscribed(!!sub)
+          setIsLoading(false)
+        })
+      }).catch(() => setIsLoading(false))
+    } else {
+      // No service worker yet — button should be enabled so user can subscribe
+      setIsLoading(false)
+    }
   }, [])
 
   const subscribe = useCallback(async () => {
