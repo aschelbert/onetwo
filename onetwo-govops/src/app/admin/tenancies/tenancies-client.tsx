@@ -135,7 +135,13 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
                         </button>
                         {t.status !== 'suspended' && t.status !== 'churned' && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); window.open(`/app/${t.slug}/`, '_blank') }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setOpenMenuId(null)
+                              const isDev = process.env.NODE_ENV === 'development'
+                              const url = isDev ? `/app/${t.slug}` : `https://${t.slug}.getonetwo.com`
+                              window.open(url, '_blank')
+                            }}
                             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none text-left"
                           >
                             <ExternalLink size={14} className="text-gray-400" />

@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const ADMIN_HOST = 'admin.getonetwo.com'
+const COOKIE_DOMAIN = process.env.NODE_ENV === 'production' ? '.getonetwo.com' : undefined
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
@@ -19,13 +20,61 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options))
+            supabaseResponse.cookies.set(name, value, { ...options, domain: COOKIE_DOMAIN }))
         },
       },
     }
   )
 
+  // Detect tenant subdomains (e.g., 1302rstnw.getonetwo.com)
+  const parts = hostname.split('.')
+  const isTenantSubdomain = parts.length >= 3 && parts[0] !== 'www' && parts[0] !== 'admin'
+  const tenantSlug = isTenantSubdomain ? parts[0] : null
+
   const { data: { user } } = await supabase.auth.getUser()
+
+  // --- Tenant subdomain routing (e.g., slug.getonetwo.com) ---
+  if (tenantSlug) {
+    const path = request.nextUrl.pathname
+
+    // Let auth, api, and static routes pass through
+    if (path.startsWith('/auth') || path.startsWith('/api') || path.startsWith('/_next')) {
+      return supabaseResponse
+    }
+
+    // Strip /app/{slug} prefix if present (from internal redirects/links) to avoid double-nesting
+    const appPrefix = `/app/${tenantSlug}`
+    if (path.startsWith(appPrefix)) {
+      const cleanPath = path.slice(appPrefix.length) || '/'
+      return NextResponse.redirect(new URL(cleanPath, request.url))
+    }
+
+    // Also strip /app/onboarding/{slug} prefix
+    const onboardingPrefix = `/app/onboarding/${tenantSlug}`
+    if (path.startsWith(onboardingPrefix)) {
+      const cleanPath = `/onboarding${path.slice(onboardingPrefix.length)}` || '/onboarding'
+      return NextResponse.redirect(new URL(cleanPath, request.url))
+    }
+
+    // Require login
+    if (!user) {
+      const loginUrl = new URL('/auth/login', request.url)
+      loginUrl.searchParams.set('redirect', path || '/')
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Rewrite /onboarding paths to /app/onboarding/{slug}
+    if (path.startsWith('/onboarding')) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/app/onboarding/${tenantSlug}${path.slice('/onboarding'.length) || ''}`
+      return NextResponse.rewrite(url, { request, headers: supabaseResponse.headers })
+    }
+
+    // Rewrite all other paths to /app/{slug}{path}
+    const url = request.nextUrl.clone()
+    url.pathname = path === '/' ? `/app/${tenantSlug}` : `/app/${tenantSlug}${path}`
+    return NextResponse.rewrite(url, { request, headers: supabaseResponse.headers })
+  }
 
   // --- admin.getonetwo.com routing ---
   if (isAdminDomain) {
@@ -106,10 +155,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/',
-    '/admin/:path*',
-    '/app/:path*',
-    '/auth/:path*',
-    '/login',
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico, icons, manifest
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|icons/|manifest\\.webmanifest).*)',
   ],
 }
