@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, FEATURE_GROUPS, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
@@ -76,6 +76,64 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
     <button onClick={onChange} className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${on ? 'bg-sage-500' : 'bg-ink-200'}`}>
       <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${on ? 'left-[22px]' : 'left-0.5'}`} />
     </button>
+  );
+}
+
+// ── Three-dot menu for tenancy cards ─────────────────────────────────────────
+
+function TenancyMenu({ tenant, isLastRow, onView, onImpersonate, onActivate, onSuspend }: {
+  tenant: Tenant;
+  isLastRow: boolean;
+  onView: () => void;
+  onImpersonate: () => void;
+  onActivate: () => void;
+  onSuspend: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="p-1.5 rounded-lg hover:bg-ink-100 transition-colors text-ink-400 hover:text-ink-600 cursor-pointer">
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+        </svg>
+      </button>
+      {open && (
+        <div className={`absolute right-0 ${isLastRow ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-ink-200 rounded-xl shadow-lg min-w-[180px] z-50 overflow-hidden`}>
+          <button onClick={() => { onView(); setOpen(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50 cursor-pointer">
+            View Tenancy
+          </button>
+          <button onClick={() => { onImpersonate(); setOpen(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50 cursor-pointer">
+            View as Tenant
+          </button>
+          {tenant.status !== 'active' && (
+            <button onClick={() => { onActivate(); setOpen(false); }}
+              className="w-full text-left px-4 py-2.5 text-sm font-medium text-sage-700 hover:bg-sage-50 cursor-pointer">
+              Activate
+            </button>
+          )}
+          {tenant.status !== 'suspended' && (
+            <button onClick={() => { onSuspend(); setOpen(false); }}
+              className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 cursor-pointer">
+              Suspend
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -495,46 +553,57 @@ export default function PlatformAdminPage() {
                   + Add Tenancy
                 </button>
               </div>
-              <div className="bg-white rounded-[10px] border border-ink-200 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
-                      <th className="px-5 py-2.5">Building</th>
-                      <th className="px-3 py-2.5">Plan</th>
-                      <th className="px-3 py-2.5">Status</th>
-                      <th className="px-3 py-2.5">Users</th>
-                      <th className="px-3 py-2.5 text-right">MRR</th>
-                      <th className="px-3 py-2.5">Stripe</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tenants.map(t => (
-                      <tr key={t.id} className="border-b border-ink-100 hover:bg-ink-50 cursor-pointer" onClick={() => setSelectedTenancy(t.id)}>
-                        <td className="px-5 py-3">
-                          <p className="font-semibold text-ink-900">{t.name}</p>
-                          <p className="text-[0.72rem] text-ink-400">{t.address.street ? `${t.address.street}, ${t.address.city}` : `${t.subdomain}.getonetwo.com`}</p>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="text-[0.7rem] px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: `${TIER_COLORS[t.subscription.tier]}20`, color: TIER_COLORS[t.subscription.tier] }}>
-                            {TIER_LABELS[t.subscription.tier]}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_BADGE[t.status] || 'bg-ink-100 text-ink-500'}`}>{t.status}</span>
-                        </td>
-                        <td className="px-3 py-3 text-xs text-ink-600">{t.stats.activeUsers} users</td>
-                        <td className="px-3 py-3 text-right font-semibold text-ink-900">{fmt(t.subscription.monthlyRate)}</td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
-                            <code className="text-[0.7rem] text-ink-400">{t.status === 'active' ? 'Linked' : 'Pending'}</code>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tenants.map((t, idx) => {
+                  const isLastRow = idx >= tenants.length - 2 && tenants.length > 2;
+                  return (
+                    <div key={t.id} className="bg-white border border-ink-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-ink-900 truncate">{t.name}</h4>
+                          <p className="text-xs text-accent-600 font-mono mt-0.5">{t.subdomain}.getonetwo.com</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status] || 'bg-ink-100 text-ink-500'}`}>{t.status}</span>
+                          <TenancyMenu
+                            tenant={t}
+                            isLastRow={isLastRow}
+                            onView={() => setSelectedTenancy(t.id)}
+                            onImpersonate={() => {
+                              store.setImpersonating(t.id);
+                              store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'impersonate.start', target: t.name, details: `Viewing as ${t.name}`, buildingId: t.id });
+                            }}
+                            onActivate={() => {
+                              store.updateTenantStatus(t.id, 'active');
+                              store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: t.name, details: 'Activated', buildingId: t.id });
+                            }}
+                            onSuspend={() => {
+                              store.updateTenantStatus(t.id, 'suspended');
+                              store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.suspend', target: t.name, details: 'Suspended', buildingId: t.id });
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-ink-400 mb-3">{t.address.street ? `${t.address.street}, ${t.address.city}, ${t.address.state} ${t.address.zip}` : 'No address configured'}</p>
+                      <div className="grid grid-cols-4 gap-2 text-xs mb-3">
+                        <div>
+                          <p className="text-ink-400">Plan</p>
+                          <p className="font-semibold" style={{ color: TIER_COLORS[t.subscription.tier] }}>{TIER_LABELS[t.subscription.tier]}</p>
+                        </div>
+                        <div><p className="text-ink-400">Units</p><p className="font-bold text-ink-900">{t.totalUnits}</p></div>
+                        <div><p className="text-ink-400">Users</p><p className="font-bold text-ink-900">{t.stats.activeUsers}</p></div>
+                        <div><p className="text-ink-400">MRR</p><p className="font-bold text-ink-900">{fmt(t.subscription.monthlyRate)}</p></div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-ink-100">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
+                          <span className="text-xs text-ink-400">{t.status === 'active' ? 'Stripe Linked' : 'Stripe Pending'}</span>
+                        </div>
+                        <span className="text-xs text-ink-400">Since {t.createdAt}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
