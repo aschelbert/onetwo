@@ -11,8 +11,6 @@ interface ProblemFraming {
   obstacle: string;
   impact: string;
   hmw: string;
-  scope: string;
-  assumptions: string;
 }
 
 interface FeedbackRef {
@@ -22,29 +20,54 @@ interface FeedbackRef {
   votes: number;
 }
 
-interface DeployInfo {
-  branch: string;
-  status: 'open' | 'merged' | 'draft';
-  sha: string;
+interface DesignLink {
+  title: string;
+  url: string;
+  status: 'ready' | 'in_progress' | 'archived';
+  addedBy: string;
+  addedAt: string;
+}
+
+interface IdeaItem {
+  text: string;
   author: string;
+  votes: number;
+  addedAt: string;
+}
+
+interface CollabComment {
+  author: string;
+  text: string;
+  date: string;
+}
+
+interface DeployPR {
+  branch: string;
+  number: number;
+  title: string;
+  status: 'open' | 'merged' | 'draft';
+  author: string;
+  sha: string;
+  mergedAt?: string;
 }
 
 interface Environment {
   name: string;
-  status: 'deployed' | 'pending' | 'not_started';
+  url: string;
+  status: 'deployed' | 'deploying' | 'pending' | 'not_started';
   deployedAt?: string;
+  sha?: string;
 }
 
 interface AssocRollout {
   id: string;
-  status: 'live' | 'staged' | 'pending';
+  status: 'live' | 'pending' | 'failed';
 }
 
 interface HistoryEntry {
-  from: Stage | 'created';
-  to: Stage;
+  stage: Stage;
   date: string;
-  actor: string;
+  by: string;
 }
 
 interface ProblemStatement {
@@ -57,10 +80,16 @@ interface ProblemStatement {
   linkedAssocs: string[];
   framing: ProblemFraming;
   hypothesis: string;
+  assumptions: string;
+  dependencies: string;
+  outOfScope: string;
+  successMetrics: string[];
   notes: string;
-  metrics: { label: string; done: boolean }[];
-  deploy: { pr: DeployInfo | null; environments: Environment[]; rollout: AssocRollout[] };
-  history: HistoryEntry[];
+  solution: { designs: DesignLink[]; ideation: IdeaItem[]; collab: CollabComment[] };
+  deploy: { pr: DeployPR | null; environments: Environment[]; rollout: AssocRollout[] };
+  stageHistory: HistoryEntry[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -90,78 +119,234 @@ const FEEDBACK_REF: Record<string, FeedbackRef> = {
   'F-010': { id: 'F-010', title: 'Bulk resident import via CSV', type: 'feature', votes: 7 },
 };
 
+const DESIGN_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  ready: { bg: 'bg-green-100', text: 'text-green-700' },
+  in_progress: { bg: 'bg-amber-100', text: 'text-amber-700' },
+  archived: { bg: 'bg-ink-100', text: 'text-ink-500' },
+};
+const DESIGN_STATUS_LABELS: Record<string, string> = { ready: 'Ready for review', in_progress: 'In progress', archived: 'Archived' };
+
 const SEED_PROBLEMS: ProblemStatement[] = [
   {
     id: 'PS-001', title: 'Board meeting workflow is unreliable and error-prone', stage: 'building', owner: 'Maya R.', priority: 'high',
     feedbackIds: ['F-003', 'F-004', 'F-002'], linkedAssocs: ['a2', 'a1'],
-    framing: { who: 'Board members running formal meetings', trying: 'Conduct quorum-verified votes and generate meeting records', obstacle: 'Quorum counts are unreliable and PDF uploads fail silently', impact: 'Invalid votes, missing documentation, legal exposure', hmw: 'How might we ensure board meetings produce reliable, auditable records?', scope: 'Board Room module — meeting lifecycle', assumptions: 'Boards meet monthly; quorum rules are per-bylaws' },
-    hypothesis: 'Fixing real-time quorum tracking and file upload reliability will reduce meeting-related support tickets by 60%.',
-    notes: 'Engineering spike completed. WebSocket approach validated for live counts.',
-    metrics: [{ label: 'Support tickets reduced by 60%', done: false }, { label: 'Zero failed uploads in staging', done: true }, { label: 'Quorum accuracy 100% in test', done: true }],
-    deploy: {
-      pr: { branch: 'feat/board-meeting-reliability', status: 'open', sha: 'a3f2c91', author: 'Maya R.' },
-      environments: [{ name: 'Staging', status: 'deployed', deployedAt: '2026-03-05' }, { name: 'Production', status: 'pending' }],
-      rollout: [{ id: 'a2', status: 'staged' }, { id: 'a1', status: 'pending' }],
+    framing: {
+      who: 'Board members and HOA presidents',
+      trying: 'Run legally compliant board meetings with accurate quorum counts and on-record documents',
+      obstacle: 'Live quorum tracking freezes mid-meeting and documents over 10MB fail to upload silently',
+      impact: 'Boards lose confidence in the platform mid-meeting and risk procedural invalidity if quorum records are wrong',
+      hmw: 'How might we make board meetings run reliably enough that boards forget the platform is even there?',
     },
-    history: [{ from: 'created', to: 'identified', date: '2026-02-10', actor: 'Maya R.' }, { from: 'identified', to: 'scoped', date: '2026-02-14', actor: 'Maya R.' }, { from: 'scoped', to: 'designing', date: '2026-02-20', actor: 'Alex K.' }, { from: 'designing', to: 'building', date: '2026-03-01', actor: 'Maya R.' }],
+    hypothesis: 'Fixing real-time quorum tracking and file upload reliability will reduce meeting-related support tickets by 60%.',
+    assumptions: 'Board members are on a mix of desktop and mobile. Safari compatibility is a known gap. Meetings are typically 60-90 minutes with 5-15 participants.',
+    dependencies: 'WebSocket infrastructure stability (Platform team). Document storage limits (Infra). Safari WebRTC compatibility audit (Engineering).',
+    outOfScope: 'Voting and resolutions workflow. Minutes approval process. Post-meeting distribution of documents.',
+    successMetrics: ['Meeting completion rate > 95%', 'Support threads re: meetings < 2/mo', 'Quorum tracking accuracy 100%'],
+    notes: 'Engineering spike completed. WebSocket approach validated for live counts.',
+    solution: {
+      designs: [
+        { title: 'Quorum tracker redesign', url: 'https://figma.com/file/abc123', status: 'ready', addedBy: 'Maya R.', addedAt: '2026-02-22' },
+        { title: 'Document upload error states', url: 'https://figma.com/file/def456', status: 'in_progress', addedBy: 'Maya R.', addedAt: '2026-02-28' },
+      ],
+      ideation: [
+        { text: 'Show reconnecting overlay instead of silently freezing', author: 'Sam L.', votes: 3, addedAt: '2026-02-15' },
+        { text: 'Optimistic UI for quorum — update locally and reconcile with server', author: 'Alex K.', votes: 5, addedAt: '2026-02-16' },
+        { text: 'Chunked upload for documents to make failures recoverable', author: 'Maya R.', votes: 4, addedAt: '2026-02-18' },
+      ],
+      collab: [
+        { author: 'Maya R.', text: 'Engineering sync confirmed: WebSocket race is reproducible in staging. Alex is picking up chunked upload.', date: '2026-02-20' },
+        { author: 'Alex K.', text: 'Chunked upload PR is up. Quorum WebSocket fix needs QA pass on Safari.', date: '2026-02-25' },
+        { author: 'Sam L.', text: 'Design review done. Edge case: what happens to quorum count if a participant loses connection mid-meeting?', date: '2026-03-01' },
+      ],
+    },
+    deploy: {
+      pr: { branch: 'fix/board-meeting-workflow', number: 247, title: 'Fix board meeting reliability', status: 'merged', author: 'Maya R.', sha: 'a3f2c91', mergedAt: '2026-03-04' },
+      environments: [
+        { name: 'Staging', url: 'staging.getonetwo.com', status: 'deployed', deployedAt: '2026-03-05', sha: 'a3f2c91' },
+        { name: 'Production', url: 'app.getonetwo.com', status: 'deploying', sha: 'a3f2c91' },
+      ],
+      rollout: [{ id: 'a2', status: 'live' }, { id: 'a1', status: 'live' }],
+    },
+    stageHistory: [
+      { stage: 'identified', date: '2026-02-10', by: 'Maya R.' },
+      { stage: 'scoped', date: '2026-02-14', by: 'Maya R.' },
+      { stage: 'designing', date: '2026-02-20', by: 'Alex K.' },
+      { stage: 'building', date: '2026-03-01', by: 'Maya R.' },
+    ],
+    createdAt: '2026-02-10', updatedAt: '2026-03-05',
   },
   {
     id: 'PS-002', title: 'Financial data consistency across Fiscal Lens modules', stage: 'scoped', owner: 'Alex K.', priority: 'high',
     feedbackIds: ['F-001', 'F-005', 'F-006', 'F-009'], linkedAssocs: ['a1', 'a3', 'a4'],
-    framing: { who: 'Property managers and board treasurers', trying: 'View accurate financial data and manage work orders', obstacle: 'Reserve fund sync delays, vendor assignment bugs, and no recurring templates', impact: 'Financial misreporting, duplicated manual work, audit risk', hmw: 'How might we make Fiscal Lens a single source of truth for association finances?', scope: 'Fiscal Lens — GL sync, work orders, budgets', assumptions: 'Most associations reconcile monthly; work orders average 15/month' },
+    framing: {
+      who: 'Property managers and board treasurers',
+      trying: 'View accurate financial data and manage work orders',
+      obstacle: 'Reserve fund sync delays, vendor assignment bugs, and no recurring templates',
+      impact: 'Financial misreporting, duplicated manual work, audit risk',
+      hmw: 'How might we make Fiscal Lens a single source of truth for association finances?',
+    },
     hypothesis: 'Resolving data sync issues and adding work order templates will reduce manual reconciliation time by 40%.',
+    assumptions: 'Some associations have external accountants who export data — export integrity matters as much as in-app display.',
+    dependencies: 'Data pipeline team for eventual consistency fix. Stripe billing module (read-only access for reconciliation).',
+    outOfScope: 'Stripe billing and payment processing. Multi-association consolidated reporting. Tax filing integrations.',
+    successMetrics: ['GL sync latency < 5 min', 'Work order templates adopted by 3+ assocs', 'Budget report accuracy verified'],
     notes: 'Scoping in progress. Need to audit GL sync pipeline.',
-    metrics: [{ label: 'GL sync latency < 5 min', done: false }, { label: 'Work order templates adopted by 3+ assocs', done: false }, { label: 'Budget report accuracy verified', done: false }],
-    deploy: { pr: null, environments: [{ name: 'Staging', status: 'not_started' }, { name: 'Production', status: 'not_started' }], rollout: [{ id: 'a1', status: 'pending' }, { id: 'a3', status: 'pending' }, { id: 'a4', status: 'pending' }] },
-    history: [{ from: 'created', to: 'identified', date: '2026-02-12', actor: 'Alex K.' }, { from: 'identified', to: 'scoped', date: '2026-02-25', actor: 'Alex K.' }],
+    solution: {
+      designs: [],
+      ideation: [
+        { text: 'Event-sourced ledger — derive balances from immutable event log', author: 'Alex K.', votes: 6, addedAt: '2026-02-20' },
+        { text: 'Reconciliation dashboard to surface discrepancies before board meetings', author: 'Sam L.', votes: 2, addedAt: '2026-02-22' },
+      ],
+      collab: [
+        { author: 'Alex K.', text: 'Scoping session done. Sync delay is 2-5 minutes worst case. Need write-through cache layer for real-time views.', date: '2026-02-26' },
+      ],
+    },
+    deploy: {
+      pr: { branch: 'fix/fiscal-lens-consistency', number: 251, title: 'Fix fiscal lens data consistency', status: 'open', author: 'Alex K.', sha: 'b7d4e12' },
+      environments: [
+        { name: 'Staging', url: 'staging.getonetwo.com', status: 'deployed', deployedAt: '2026-03-06', sha: 'b7d4e12' },
+        { name: 'Production', url: 'app.getonetwo.com', status: 'not_started' },
+      ],
+      rollout: [{ id: 'a1', status: 'pending' }, { id: 'a3', status: 'pending' }, { id: 'a4', status: 'pending' }],
+    },
+    stageHistory: [
+      { stage: 'identified', date: '2026-02-12', by: 'Alex K.' },
+      { stage: 'scoped', date: '2026-02-25', by: 'Alex K.' },
+    ],
+    createdAt: '2026-02-12', updatedAt: '2026-03-06',
   },
   {
     id: 'PS-003', title: 'Resident self-service reduces operational burden on boards', stage: 'designing', owner: 'Sam L.', priority: 'medium',
     feedbackIds: ['F-008', 'F-010'], linkedAssocs: ['a2', 'a3', 'a1'],
-    framing: { who: 'Residents needing to submit maintenance requests and board admins onboarding residents', trying: 'Enable self-service maintenance requests and bulk resident imports', obstacle: 'No resident-facing portal for requests; manual one-by-one resident entry', impact: 'High admin overhead, slow response to maintenance issues, resident frustration', hmw: 'How might we empower residents to self-serve while reducing board admin workload?', scope: 'Resident Portal — request submission + CSV import', assumptions: 'Average association has 30 residents; CSV format is standardized' },
+    framing: {
+      who: 'Residents needing to submit maintenance requests and board admins onboarding residents',
+      trying: 'Enable self-service maintenance requests and bulk resident imports',
+      obstacle: 'No resident-facing portal for requests; manual one-by-one resident entry',
+      impact: 'High admin overhead, slow response to maintenance issues, resident frustration',
+      hmw: 'How might we empower residents to self-serve while reducing board admin workload?',
+    },
     hypothesis: 'A resident portal with self-service maintenance requests will cut board admin time on request routing by 50%.',
+    assumptions: 'Residents are less technically sophisticated than board members. Mobile-first is essential. Targeting 60% adoption in year one.',
+    dependencies: 'Authentication system: resident invite flow. Role system: Resident role permissions. Board Room: read access to community documents.',
+    outOfScope: 'Resident payments and dues. Voting and elections for residents. Direct messaging between residents.',
+    successMetrics: ['Admin time on requests reduced 50%', 'CSV import success rate > 95%'],
     notes: 'Design mockups in progress. CSV parser spec drafted.',
-    metrics: [{ label: 'Admin time on requests reduced 50%', done: false }, { label: 'CSV import success rate > 95%', done: false }],
-    deploy: { pr: null, environments: [{ name: 'Staging', status: 'not_started' }, { name: 'Production', status: 'not_started' }], rollout: [{ id: 'a2', status: 'pending' }, { id: 'a3', status: 'pending' }, { id: 'a1', status: 'pending' }] },
-    history: [{ from: 'created', to: 'identified', date: '2026-01-20', actor: 'Sam L.' }, { from: 'identified', to: 'scoped', date: '2026-02-05', actor: 'Sam L.' }, { from: 'scoped', to: 'designing', date: '2026-02-28', actor: 'Sam L.' }],
+    solution: {
+      designs: [
+        { title: 'Resident portal — maintenance request flow', url: 'https://figma.com/file/ghi789', status: 'in_progress', addedBy: 'Sam L.', addedAt: '2026-03-01' },
+      ],
+      ideation: [
+        { text: 'Progressive disclosure onboarding — show residents only features they need on first login', author: 'Sam L.', votes: 4, addedAt: '2026-02-10' },
+        { text: 'Photo upload on maintenance requests', author: 'Maya R.', votes: 7, addedAt: '2026-02-12' },
+      ],
+      collab: [
+        { author: 'Sam L.', text: 'Kicked off design sprint. Starting with maintenance request as anchor flow.', date: '2026-02-28' },
+        { author: 'Maya R.', text: 'First wireframes in Figma. Question: show residents the board response timeline or keep opaque?', date: '2026-03-02' },
+      ],
+    },
+    deploy: {
+      pr: { branch: 'feat/resident-portal', number: 255, title: 'Resident self-service portal', status: 'open', author: 'Sam L.', sha: 'c9e1a34' },
+      environments: [
+        { name: 'Staging', url: 'staging.getonetwo.com', status: 'not_started' },
+        { name: 'Production', url: 'app.getonetwo.com', status: 'not_started' },
+      ],
+      rollout: [],
+    },
+    stageHistory: [
+      { stage: 'identified', date: '2026-01-20', by: 'Sam L.' },
+      { stage: 'scoped', date: '2026-02-05', by: 'Sam L.' },
+      { stage: 'designing', date: '2026-02-28', by: 'Sam L.' },
+    ],
+    createdAt: '2026-01-20', updatedAt: '2026-03-02',
   },
   {
     id: 'PS-004', title: 'Compliance visibility gives boards confidence on governance obligations', stage: 'identified', owner: 'Unassigned', priority: 'medium',
     feedbackIds: ['F-007'], linkedAssocs: ['a2', 'a3'],
-    framing: { who: 'Board members responsible for governance compliance', trying: 'Understand compliance grade breakdowns in detail', obstacle: 'Compliance score is a single number with no drill-down', impact: 'Boards lack visibility into what is driving their score, reducing trust', hmw: 'How might we make compliance scores transparent and actionable?', scope: 'Compliance module — grade detail view', assumptions: 'Compliance grades are updated weekly; boards review monthly' },
-    hypothesis: 'Adding compliance grade drill-down will increase board engagement with compliance tools by 30%.',
+    framing: { who: '', trying: '', obstacle: '', impact: '', hmw: '' },
+    hypothesis: '',
+    assumptions: '',
+    dependencies: '',
+    outOfScope: '',
+    successMetrics: [],
     notes: '',
-    metrics: [{ label: 'Compliance tool engagement up 30%', done: false }],
-    deploy: { pr: null, environments: [{ name: 'Staging', status: 'not_started' }, { name: 'Production', status: 'not_started' }], rollout: [{ id: 'a2', status: 'pending' }, { id: 'a3', status: 'pending' }] },
-    history: [{ from: 'created', to: 'identified', date: '2026-03-02', actor: 'Platform' }],
+    solution: { designs: [], ideation: [], collab: [] },
+    deploy: {
+      pr: null,
+      environments: [
+        { name: 'Staging', url: 'staging.getonetwo.com', status: 'not_started' },
+        { name: 'Production', url: 'app.getonetwo.com', status: 'not_started' },
+      ],
+      rollout: [],
+    },
+    stageHistory: [
+      { stage: 'identified', date: '2026-03-02', by: 'Platform' },
+    ],
+    createdAt: '2026-03-02', updatedAt: '2026-03-02',
   },
 ];
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-[#f9fafb] -mx-6 px-6 py-2 mt-1">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.06em]" style={{ color: '#6b7280' }}>{children}</p>
+    </div>
+  );
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
+
+type DetailTab = 'overview' | 'feedback' | 'metrics' | 'solution' | 'deploy' | 'history';
+type SolutionSub = 'designs' | 'ideation' | 'collab';
 
 export default function ProblemsTab() {
   const [problems, setProblems] = useState<ProblemStatement[]>(SEED_PROBLEMS);
   const [view, setView] = useState<'pipeline' | 'list'>('pipeline');
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'feedback' | 'metrics' | 'deploy' | 'history'>('overview');
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
+  const [solutionSub, setSolutionSub] = useState<SolutionSub>('designs');
+  const [editingFraming, setEditingFraming] = useState(false);
+  const [editFramingDraft, setEditFramingDraft] = useState<ProblemFraming>({ who: '', trying: '', obstacle: '', impact: '', hmw: '' });
+
+  // Solution inline state
+  const [showDesignForm, setShowDesignForm] = useState(false);
+  const [designDraft, setDesignDraft] = useState({ title: '', url: '' });
+  const [ideaDraft, setIdeaDraft] = useState('');
+  const [collabDraft, setCollabDraft] = useState('');
 
   const detail = problems.find(p => p.id === detailId) || null;
 
-  const openDetail = (id: string) => { setDetailId(id); setDetailTab('overview'); };
+  const openDetail = (id: string) => { setDetailId(id); setDetailTab('overview'); setEditingFraming(false); };
+
+  const updateProblem = (id: string, updater: (p: ProblemStatement) => ProblemStatement) => {
+    setProblems(prev => prev.map(p => p.id === id ? updater(p) : p));
+  };
 
   const moveToNextStage = (ps: ProblemStatement) => {
     const idx = STAGES.indexOf(ps.stage);
     if (idx < STAGES.length - 1) {
       const nextStage = STAGES[idx + 1];
-      setProblems(prev => prev.map(p => p.id === ps.id ? {
+      const today = new Date().toISOString().split('T')[0];
+      updateProblem(ps.id, p => ({
         ...p,
         stage: nextStage,
-        history: [...p.history, { from: ps.stage, to: nextStage, date: new Date().toISOString().split('T')[0], actor: 'Admin' }],
-      } : p));
+        updatedAt: today,
+        stageHistory: [...p.stageHistory, { stage: nextStage, date: today, by: 'Admin' }],
+      }));
     }
   };
 
+  const framingFields: (keyof ProblemFraming)[] = ['who', 'trying', 'obstacle', 'impact', 'hmw'];
+  const framingFilled = detail ? framingFields.filter(k => detail.framing[k].trim()).length : 0;
+
   const stageCounts = STAGES.map(s => ({ stage: s, count: problems.filter(p => p.stage === s).length }));
+
+  const solutionCount = detail ? detail.solution.designs.length + detail.solution.ideation.length + detail.solution.collab.length : 0;
 
   return (
     <div className="space-y-6">
@@ -285,13 +470,14 @@ export default function ProblemsTab() {
       {detail && (
         <>
           <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setDetailId(null)} />
-          <div className="fixed top-0 right-0 bottom-0 w-[560px] bg-white z-50 shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed top-0 right-0 bottom-0 w-[580px] bg-white z-50 shadow-2xl flex flex-col overflow-hidden">
             {/* Panel header */}
             <div className="px-6 py-4 border-b border-ink-200 flex items-center justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs text-ink-400">{detail.id}</span>
                   <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-semibold ${PRIORITY_COLORS[detail.priority]}`}>{detail.priority}</span>
+                  <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full font-semibold text-white capitalize" style={{ backgroundColor: STAGE_COLORS[detail.stage] }}>{STAGE_LABELS[detail.stage]}</span>
                 </div>
                 <h3 className="font-display text-base font-bold text-ink-900 mt-1">{detail.title}</h3>
               </div>
@@ -300,11 +486,16 @@ export default function ProblemsTab() {
 
             {/* Panel tabs */}
             <div className="px-6 border-b border-ink-200 flex gap-1 shrink-0">
-              {(['overview', 'feedback', 'metrics', 'deploy', 'history'] as const).map(tab => (
-                <button key={tab} onClick={() => setDetailTab(tab)}
-                  className={`px-3 py-2.5 text-xs font-semibold capitalize transition-colors border-b-2 -mb-px ${
+              {(['overview', 'feedback', 'metrics', 'solution', 'deploy', 'history'] as const).map(tab => (
+                <button key={tab} onClick={() => { setDetailTab(tab); if (tab === 'solution') setSolutionSub('designs'); }}
+                  className={`px-3 py-2.5 text-xs font-semibold capitalize transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
                     detailTab === tab ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'
-                  }`}>{tab}</button>
+                  }`}>
+                  {tab}
+                  {tab === 'solution' && solutionCount > 0 && (
+                    <span className="text-[0.55rem] px-1.5 py-0.5 rounded-full font-bold text-white" style={{ backgroundColor: '#7c3aed' }}>{solutionCount}</span>
+                  )}
+                </button>
               ))}
             </div>
 
@@ -313,10 +504,10 @@ export default function ProblemsTab() {
 
               {/* ─── Overview Tab ─── */}
               {detailTab === 'overview' && (
-                <div className="space-y-5">
-                  {/* Stage progress track */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-3">Stage Progress</p>
+                <div className="space-y-1">
+                  {/* 1. Lifecycle Stage */}
+                  <SectionHeader>Lifecycle Stage</SectionHeader>
+                  <div className="py-4">
                     <div className="flex items-center gap-1">
                       {STAGES.map((s, i) => {
                         const currentIdx = STAGES.indexOf(detail.stage);
@@ -341,62 +532,146 @@ export default function ProblemsTab() {
                     )}
                   </div>
 
-                  {/* Problem Framing */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-3">Problem Framing</p>
-                    <div className="space-y-3">
-                      {([
-                        { key: 'who', label: 'Who', required: true },
-                        { key: 'trying', label: 'Trying to', required: true },
-                        { key: 'obstacle', label: 'Obstacle', required: true },
-                        { key: 'impact', label: 'Impact', required: true },
-                        { key: 'hmw', label: 'How Might We', required: true },
-                        { key: 'scope', label: 'Scope', required: false },
-                        { key: 'assumptions', label: 'Assumptions', required: false },
-                      ] as const).map(field => (
-                        <div key={field.key} className="bg-ink-50 rounded-lg px-4 py-3">
-                          <p className="text-[0.65rem] font-semibold text-ink-500 uppercase mb-0.5">
-                            {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
-                          </p>
-                          <p className="text-sm text-ink-800">{detail.framing[field.key] || <span className="text-ink-300 italic">Not defined</span>}</p>
+                  {/* 2. Problem Framing */}
+                  <SectionHeader>Problem Framing</SectionHeader>
+                  <div className="py-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {framingFields.map((k, i) => (
+                            <div key={k} className={`w-2 h-2 rounded-full ${i < framingFilled ? 'bg-ink-900' : 'bg-ink-200'}`} />
+                          ))}
                         </div>
-                      ))}
+                        <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
+                          framingFilled === 5 ? 'bg-sage-100 text-sage-700' : 'bg-amber-100 text-amber-700'
+                        }`}>{framingFilled === 5 ? 'Complete' : `${framingFilled}/5 filled`}</span>
+                      </div>
+                      <button onClick={() => {
+                        if (editingFraming) { setEditingFraming(false); }
+                        else { setEditFramingDraft({ ...detail.framing }); setEditingFraming(true); }
+                      }} className="text-xs text-ink-500 font-semibold hover:text-ink-700">
+                        {editingFraming ? 'Cancel' : 'Edit'}
+                      </button>
                     </div>
+
+                    {editingFraming ? (
+                      <div className="space-y-3">
+                        {([
+                          { key: 'who' as const, label: 'Who' },
+                          { key: 'trying' as const, label: 'Trying to' },
+                          { key: 'obstacle' as const, label: 'Obstacle' },
+                          { key: 'impact' as const, label: 'Impact' },
+                          { key: 'hmw' as const, label: 'How Might We' },
+                        ]).map(field => (
+                          <div key={field.key}>
+                            <label className="text-[0.65rem] font-semibold text-ink-500 uppercase mb-1 block">{field.label} <span className="text-red-500">*</span></label>
+                            <textarea value={editFramingDraft[field.key]}
+                              onChange={e => setEditFramingDraft({ ...editFramingDraft, [field.key]: e.target.value })}
+                              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2} />
+                          </div>
+                        ))}
+                        <button onClick={() => {
+                          updateProblem(detail.id, p => ({ ...p, framing: { ...editFramingDraft }, updatedAt: new Date().toISOString().split('T')[0] }));
+                          setEditingFraming(false);
+                        }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800">Save Framing</button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {([
+                          { key: 'who' as const, label: 'Who' },
+                          { key: 'trying' as const, label: 'Trying to' },
+                          { key: 'obstacle' as const, label: 'Obstacle' },
+                          { key: 'impact' as const, label: 'Impact' },
+                          { key: 'hmw' as const, label: 'How Might We' },
+                        ]).map(field => (
+                          <div key={field.key} className="bg-ink-50 rounded-lg px-4 py-3">
+                            <p className="text-[0.65rem] font-semibold text-ink-500 uppercase mb-0.5">
+                              {field.label}<span className="text-red-500 ml-0.5">*</span>
+                            </p>
+                            <p className="text-sm text-ink-800">{detail.framing[field.key] || <span className="text-ink-300 italic">Not defined</span>}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Hypothesis */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Hypothesis</p>
+                  {/* 3. Hypothesis */}
+                  <SectionHeader>Hypothesis</SectionHeader>
+                  <div className="py-4">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                       <p className="text-sm text-blue-900">{detail.hypothesis || <span className="text-blue-300 italic">No hypothesis defined</span>}</p>
                     </div>
                   </div>
 
-                  {/* Affected Associations */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Affected Associations</p>
-                    <div className="space-y-2">
-                      {detail.linkedAssocs.map(a => (
-                        <div key={a} className="flex items-center gap-2.5 bg-ink-50 rounded-lg px-3 py-2.5">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ASSOC_MAP[a]?.color }} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-ink-800 truncate">{ASSOC_MAP[a]?.name}</p>
-                            <p className="text-[0.65rem] text-ink-400">{ASSOC_MAP[a]?.plan} · {ASSOC_MAP[a]?.units} units</p>
-                          </div>
-                        </div>
-                      ))}
+                  {/* 4. Assumptions */}
+                  <SectionHeader>
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                      Assumptions
+                    </span>
+                  </SectionHeader>
+                  <div className="py-4">
+                    <div className="bg-ink-50 rounded-lg px-4 py-3">
+                      <p className="text-sm text-ink-700">{detail.assumptions || <span className="text-ink-300 italic">What are we taking as true without full evidence?</span>}</p>
                     </div>
                   </div>
 
-                  {/* Owner */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Owner</p>
-                    <p className="text-sm text-ink-800 font-medium">{detail.owner}</p>
+                  {/* 5. Dependencies */}
+                  <SectionHeader>
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                      Dependencies
+                    </span>
+                  </SectionHeader>
+                  <div className="py-4">
+                    <div className="bg-ink-50 rounded-lg px-4 py-3">
+                      <p className="text-sm text-ink-700">{detail.dependencies || <span className="text-ink-300 italic">What other teams, systems, or work does this rely on?</span>}</p>
+                    </div>
                   </div>
 
-                  {/* Internal Notes */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Internal Notes</p>
+                  {/* 6. Out of Scope */}
+                  <SectionHeader>
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                      Out of Scope
+                    </span>
+                  </SectionHeader>
+                  <div className="py-4">
+                    <div className="bg-ink-50 rounded-lg px-4 py-3">
+                      <p className="text-sm text-ink-700">{detail.outOfScope || <span className="text-ink-300 italic">What are we explicitly NOT solving here?</span>}</p>
+                    </div>
+                  </div>
+
+                  {/* 7. Affected Associations */}
+                  <SectionHeader>Affected Associations</SectionHeader>
+                  <div className="py-4 space-y-2">
+                    {detail.linkedAssocs.map(a => (
+                      <div key={a} className="flex items-center gap-2.5 bg-ink-50 rounded-lg px-3 py-2.5">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ASSOC_MAP[a]?.color }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-ink-800 truncate">{ASSOC_MAP[a]?.name}</p>
+                          <p className="text-[0.65rem] text-ink-400">{ASSOC_MAP[a]?.plan} · {ASSOC_MAP[a]?.units} units</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 8. Owner + Updated */}
+                  <SectionHeader>Details</SectionHeader>
+                  <div className="py-4 grid grid-cols-2 gap-3">
+                    <div className="bg-ink-50 rounded-lg px-4 py-3">
+                      <p className="text-[0.65rem] font-semibold text-ink-500 uppercase mb-0.5">Owner</p>
+                      <p className="text-sm font-medium text-ink-800">{detail.owner}</p>
+                    </div>
+                    <div className="bg-ink-50 rounded-lg px-4 py-3">
+                      <p className="text-[0.65rem] font-semibold text-ink-500 uppercase mb-0.5">Updated</p>
+                      <p className="text-sm font-medium text-ink-800">{detail.updatedAt}</p>
+                    </div>
+                  </div>
+
+                  {/* 9. Internal Notes */}
+                  <SectionHeader>Internal Notes</SectionHeader>
+                  <div className="py-4">
                     <div className="bg-ink-50 rounded-lg px-4 py-3">
                       <p className="text-sm text-ink-700">{detail.notes || <span className="text-ink-300 italic">No notes</span>}</p>
                     </div>
@@ -407,105 +682,295 @@ export default function ProblemsTab() {
               {/* ─── Feedback Tab ─── */}
               {detailTab === 'feedback' && (
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Linked Feedback ({detail.feedbackIds.length})</p>
-                  {detail.feedbackIds.map(fid => {
-                    const fb = FEEDBACK_REF[fid];
-                    if (!fb) return null;
-                    return (
-                      <div key={fid} className="bg-white border border-ink-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-mono text-xs text-ink-400">{fb.id}</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-semibold ${
-                              fb.type === 'bug' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                            }`}>{fb.type}</span>
-                            <span className="text-xs text-ink-500 font-semibold">{fb.votes} votes</span>
+                  <SectionHeader>Linked Feedback ({detail.feedbackIds.length})</SectionHeader>
+                  <div className="pt-2 space-y-3">
+                    {detail.feedbackIds.map(fid => {
+                      const fb = FEEDBACK_REF[fid];
+                      if (!fb) return null;
+                      const feedbackItem = SEED_PROBLEMS.flatMap(() => []).length; // just for assoc dots
+                      return (
+                        <div key={fid} className="bg-white border border-ink-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-mono text-xs text-ink-400">{fb.id}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-semibold ${
+                                fb.type === 'bug' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                              }`}>{fb.type}</span>
+                              <span className="text-xs text-ink-500 font-semibold">{fb.votes} votes</span>
+                            </div>
                           </div>
+                          <p className="text-sm text-ink-900 font-medium">{fb.title}</p>
                         </div>
-                        <p className="text-sm text-ink-900 font-medium">{fb.title}</p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  <button className="w-full py-3 border-2 border-dashed border-ink-200 rounded-lg text-xs font-semibold text-ink-400 hover:text-ink-600 hover:border-ink-300 transition-colors mt-2">
+                    + Add feedback item
+                  </button>
                 </div>
               )}
 
               {/* ─── Metrics Tab ─── */}
               {detailTab === 'metrics' && (
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Success Criteria</p>
-                  {detail.metrics.map((m, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-ink-50 rounded-lg px-4 py-3">
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                        m.done ? 'bg-sage-600 border-sage-600' : 'border-ink-300'
-                      }`}>
-                        {m.done && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                  <SectionHeader>Success Criteria</SectionHeader>
+                  <div className="pt-2 space-y-3">
+                    {detail.successMetrics.map((m, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-ink-50 rounded-lg px-4 py-3">
+                        <div className="w-5 h-5 rounded-md border-2 border-ink-300 flex items-center justify-center shrink-0" />
+                        <span className="text-sm text-ink-800">{m}</span>
                       </div>
-                      <span className={`text-sm ${m.done ? 'text-ink-500 line-through' : 'text-ink-800'}`}>{m.label}</span>
+                    ))}
+                    {detail.successMetrics.length === 0 && (
+                      <p className="text-sm text-ink-400 italic py-2">No success criteria defined yet.</p>
+                    )}
+                  </div>
+                  <button className="w-full py-3 border-2 border-dashed border-ink-200 rounded-lg text-xs font-semibold text-ink-400 hover:text-ink-600 hover:border-ink-300 transition-colors mt-2">
+                    + Add metric
+                  </button>
+                </div>
+              )}
+
+              {/* ─── Solution Tab ─── */}
+              {detailTab === 'solution' && (
+                <div className="space-y-4">
+                  {/* Sub-nav */}
+                  <div className="flex gap-1 bg-ink-100 rounded-lg p-0.5">
+                    {(['designs', 'ideation', 'collab'] as const).map(sub => (
+                      <button key={sub} onClick={() => setSolutionSub(sub)}
+                        className={`flex-1 px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors ${
+                          solutionSub === sub ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'
+                        }`}>{sub}</button>
+                    ))}
+                  </div>
+
+                  {/* Designs */}
+                  {solutionSub === 'designs' && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-ink-500">Link design files, mockups, or prototypes for this problem statement.</p>
+                      {detail.solution.designs.map((d, i) => (
+                        <div key={i} className="bg-white border border-ink-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm font-semibold text-ink-900">{d.title}</p>
+                            <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-semibold ${DESIGN_STATUS_COLORS[d.status]?.bg} ${DESIGN_STATUS_COLORS[d.status]?.text}`}>
+                              {DESIGN_STATUS_LABELS[d.status]}
+                            </span>
+                          </div>
+                          <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all">{d.url}</a>
+                          <p className="text-[0.65rem] text-ink-400 mt-1">Added by {d.addedBy} · {d.addedAt}</p>
+                        </div>
+                      ))}
+                      {detail.solution.designs.length === 0 && !showDesignForm && (
+                        <p className="text-sm text-ink-400 italic py-2">No design files linked yet.</p>
+                      )}
+                      {showDesignForm ? (
+                        <div className="border border-ink-200 rounded-lg p-4 space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-ink-700 mb-1">Title</label>
+                            <input value={designDraft.title} onChange={e => setDesignDraft({ ...designDraft, title: e.target.value })}
+                              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Design file title" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-ink-700 mb-1">URL</label>
+                            <input value={designDraft.url} onChange={e => setDesignDraft({ ...designDraft, url: e.target.value })}
+                              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="https://figma.com/file/..." />
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => {
+                              if (designDraft.title && designDraft.url) {
+                                updateProblem(detail.id, p => ({
+                                  ...p,
+                                  solution: { ...p.solution, designs: [...p.solution.designs, { ...designDraft, status: 'in_progress' as const, addedBy: 'Admin', addedAt: new Date().toISOString().split('T')[0] }] },
+                                }));
+                                setDesignDraft({ title: '', url: '' });
+                                setShowDesignForm(false);
+                              }
+                            }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Add</button>
+                            <button onClick={() => { setShowDesignForm(false); setDesignDraft({ title: '', url: '' }); }}
+                              className="px-3 py-1.5 text-xs font-medium text-ink-500 hover:text-ink-700">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowDesignForm(true)}
+                          className="w-full py-3 border-2 border-dashed border-ink-200 rounded-lg text-xs font-semibold text-ink-400 hover:text-ink-600 hover:border-ink-300 transition-colors">
+                          + Link design file
+                        </button>
+                      )}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Ideation */}
+                  {solutionSub === 'ideation' && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-ink-500">Capture solution ideas and approaches. Vote to surface the strongest thinking.</p>
+                      {[...detail.solution.ideation].sort((a, b) => b.votes - a.votes).map((idea, i) => (
+                        <div key={i} className="flex gap-3 bg-white border border-ink-200 rounded-lg p-4">
+                          <button onClick={() => {
+                            updateProblem(detail.id, p => ({
+                              ...p,
+                              solution: {
+                                ...p.solution,
+                                ideation: p.solution.ideation.map((item, idx) =>
+                                  item.text === idea.text && item.author === idea.author ? { ...item, votes: item.votes + 1 } : item
+                                ),
+                              },
+                            }));
+                          }} className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5">
+                            <svg className="w-4 h-4 text-ink-400 hover:text-ink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                            <span className="text-xs font-bold text-ink-700">{idea.votes}</span>
+                          </button>
+                          <div className="flex-1">
+                            <p className="text-sm text-ink-900">{idea.text}</p>
+                            <p className="text-[0.65rem] text-ink-400 mt-1">{idea.author} · {idea.addedAt}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {detail.solution.ideation.length === 0 && (
+                        <p className="text-sm text-ink-400 italic py-2">No ideas captured yet.</p>
+                      )}
+                      <div className="mt-3">
+                        <textarea value={ideaDraft} onChange={e => setIdeaDraft(e.target.value)}
+                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={2}
+                          placeholder="Describe a solution idea..." />
+                        <button onClick={() => {
+                          if (ideaDraft.trim()) {
+                            updateProblem(detail.id, p => ({
+                              ...p,
+                              solution: {
+                                ...p.solution,
+                                ideation: [...p.solution.ideation, { text: ideaDraft.trim(), author: 'Admin', votes: 0, addedAt: new Date().toISOString().split('T')[0] }],
+                              },
+                            }));
+                            setIdeaDraft('');
+                          }
+                        }} className="mt-2 px-4 py-2 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Add Idea</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Collab */}
+                  {solutionSub === 'collab' && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-ink-500">Internal team discussion, decisions, and updates.</p>
+                      {detail.solution.collab.map((c, i) => (
+                        <div key={i} className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[0.6rem] font-bold shrink-0">
+                            {getInitials(c.author)}
+                          </div>
+                          <div className="flex-1 bg-ink-50 rounded-lg px-4 py-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold text-ink-900">{c.author}</span>
+                              <span className="text-[0.65rem] text-ink-400">{c.date}</span>
+                            </div>
+                            <p className="text-sm text-ink-700">{c.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {detail.solution.collab.length === 0 && (
+                        <p className="text-sm text-ink-400 italic py-2">No discussion yet.</p>
+                      )}
+                      <div className="mt-3">
+                        <textarea value={collabDraft} onChange={e => setCollabDraft(e.target.value)}
+                          className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none" rows={3}
+                          placeholder="Share an update or decision..." />
+                        <button onClick={() => {
+                          if (collabDraft.trim()) {
+                            updateProblem(detail.id, p => ({
+                              ...p,
+                              solution: {
+                                ...p.solution,
+                                collab: [...p.solution.collab, { author: 'Admin', text: collabDraft.trim(), date: new Date().toISOString().split('T')[0] }],
+                              },
+                            }));
+                            setCollabDraft('');
+                          }
+                        }} className="mt-2 px-4 py-2 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">Post</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* ─── Deploy Tab ─── */}
               {detailTab === 'deploy' && (
-                <div className="space-y-5">
+                <div className="space-y-1">
                   {/* PR Info */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Pull Request</p>
+                  <SectionHeader>Pull Request</SectionHeader>
+                  <div className="py-4">
                     {detail.deploy.pr ? (
                       <div className="bg-white border border-ink-200 rounded-lg p-4">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div><p className="text-[0.65rem] text-ink-400 uppercase font-semibold">Branch</p><p className="font-mono text-xs text-ink-700">{detail.deploy.pr.branch}</p></div>
-                          <div><p className="text-[0.65rem] text-ink-400 uppercase font-semibold">Status</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-ink-700">{detail.deploy.pr.branch}</span>
                             <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
                               detail.deploy.pr.status === 'merged' ? 'bg-purple-100 text-purple-700' : detail.deploy.pr.status === 'open' ? 'bg-sage-100 text-sage-700' : 'bg-ink-100 text-ink-500'
                             }`}>{detail.deploy.pr.status}</span>
                           </div>
+                        </div>
+                        <p className="text-sm font-medium text-ink-900 mb-2">#{detail.deploy.pr.number} {detail.deploy.pr.title}</p>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-ink-200 text-ink-600 flex items-center justify-center text-[0.55rem] font-bold">
+                              {getInitials(detail.deploy.pr.author)}
+                            </div>
+                            <span className="text-xs text-ink-700">{detail.deploy.pr.author}</span>
+                          </div>
                           <div><p className="text-[0.65rem] text-ink-400 uppercase font-semibold">SHA</p><p className="font-mono text-xs text-ink-500">{detail.deploy.pr.sha}</p></div>
-                          <div><p className="text-[0.65rem] text-ink-400 uppercase font-semibold">Author</p><p className="text-xs text-ink-700">{detail.deploy.pr.author}</p></div>
+                          {detail.deploy.pr.mergedAt && (
+                            <div><p className="text-[0.65rem] text-ink-400 uppercase font-semibold">Merged</p><p className="text-xs text-ink-700">{detail.deploy.pr.mergedAt}</p></div>
+                          )}
                         </div>
                       </div>
                     ) : (
                       <div className="bg-ink-50 rounded-lg p-4 text-center">
-                        <p className="text-sm text-ink-400">No PR created yet</p>
+                        <p className="text-sm text-ink-400">No branch linked yet</p>
                       </div>
                     )}
                   </div>
 
                   {/* Environments */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Environments</p>
-                    <div className="space-y-2">
-                      {detail.deploy.environments.map(env => (
-                        <div key={env.name} className="flex items-center justify-between bg-white border border-ink-200 rounded-lg px-4 py-3">
-                          <span className="text-sm font-medium text-ink-800">{env.name}</span>
+                  <SectionHeader>Environments</SectionHeader>
+                  <div className="py-4 space-y-2">
+                    {detail.deploy.environments.map(env => (
+                      <div key={env.name} className="bg-white border border-ink-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            {env.deployedAt && <span className="text-[0.65rem] text-ink-400">{env.deployedAt}</span>}
-                            <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
-                              env.status === 'deployed' ? 'bg-sage-100 text-sage-700' : env.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-ink-100 text-ink-500'
-                            }`}>{env.status === 'not_started' ? 'Not Started' : env.status}</span>
+                            <span className={`w-2 h-2 rounded-full ${
+                              env.status === 'deployed' ? 'bg-green-500' : env.status === 'deploying' ? 'bg-amber-500 animate-pulse' : 'bg-ink-300'
+                            }`} />
+                            <span className="text-sm font-medium text-ink-800">{env.name}</span>
                           </div>
+                          <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
+                            env.status === 'deployed' ? 'bg-sage-100 text-sage-700' : env.status === 'deploying' ? 'bg-amber-100 text-amber-700' : env.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-ink-100 text-ink-500'
+                          }`}>{env.status === 'not_started' ? 'Not Started' : env.status}</span>
                         </div>
-                      ))}
-                    </div>
+                        <p className="text-[0.65rem] text-ink-400 mt-1">{env.url}</p>
+                        {(env.deployedAt || env.sha) && (
+                          <div className="flex gap-3 mt-1.5">
+                            {env.deployedAt && <span className="text-[0.65rem] text-ink-400">{env.deployedAt}</span>}
+                            {env.sha && <span className="font-mono text-[0.65rem] text-ink-400">{env.sha}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
 
                   {/* Association Rollout */}
-                  <div>
-                    <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Association Rollout</p>
-                    <div className="space-y-2">
-                      {detail.deploy.rollout.map(r => (
-                        <div key={r.id} className="flex items-center justify-between bg-white border border-ink-200 rounded-lg px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ASSOC_MAP[r.id]?.color }} />
-                            <span className="text-sm font-medium text-ink-800">{ASSOC_MAP[r.id]?.name}</span>
-                          </div>
-                          <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
-                            r.status === 'live' ? 'bg-sage-100 text-sage-700' : r.status === 'staged' ? 'bg-blue-100 text-blue-700' : 'bg-ink-100 text-ink-500'
-                          }`}>{r.status}</span>
+                  <SectionHeader>Association Rollout</SectionHeader>
+                  <div className="py-4 space-y-2">
+                    {detail.deploy.rollout.length > 0 ? detail.deploy.rollout.map(r => (
+                      <div key={r.id} className="flex items-center justify-between bg-white border border-ink-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ASSOC_MAP[r.id]?.color }} />
+                          <span className="text-sm font-medium text-ink-800">{ASSOC_MAP[r.id]?.name}</span>
                         </div>
-                      ))}
-                    </div>
+                        <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${
+                          r.status === 'live' ? 'bg-sage-100 text-sage-700' : r.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-ink-100 text-ink-500'
+                        }`}>{r.status}</span>
+                      </div>
+                    )) : (
+                      <p className="text-sm text-ink-400 italic">No association rollout configured.</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -513,24 +978,24 @@ export default function ProblemsTab() {
               {/* ─── History Tab ─── */}
               {detailTab === 'history' && (
                 <div className="space-y-0">
-                  <p className="text-xs font-semibold text-ink-400 uppercase mb-3">Stage Transition Timeline</p>
-                  {detail.history.map((h, i) => (
-                    <div key={i} className="flex gap-3">
-                      {/* Timeline line */}
-                      <div className="flex flex-col items-center">
-                        <div className="w-3 h-3 rounded-full border-2 shrink-0"
-                          style={{ borderColor: STAGE_COLORS[h.to], backgroundColor: i === detail.history.length - 1 ? STAGE_COLORS[h.to] : 'white' }} />
-                        {i < detail.history.length - 1 && <div className="w-0.5 flex-1 bg-ink-200 my-1" />}
+                  <SectionHeader>Stage Transition Timeline</SectionHeader>
+                  <div className="pt-4">
+                    {[...detail.stageHistory].reverse().map((h, i, arr) => (
+                      <div key={i} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className="w-3 h-3 rounded-full border-2 shrink-0"
+                            style={{ borderColor: STAGE_COLORS[h.stage], backgroundColor: i === 0 ? STAGE_COLORS[h.stage] : 'white' }} />
+                          {i < arr.length - 1 && <div className="w-0.5 flex-1 bg-ink-200 my-1" />}
+                        </div>
+                        <div className="pb-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold text-white capitalize" style={{ backgroundColor: STAGE_COLORS[h.stage] }}>{STAGE_LABELS[h.stage]}</span>
+                          </div>
+                          <p className="text-[0.72rem] text-ink-400 mt-1">{h.date} · {h.by}</p>
+                        </div>
                       </div>
-                      {/* Content */}
-                      <div className="pb-4">
-                        <p className="text-sm font-medium text-ink-900">
-                          {h.from === 'created' ? 'Created' : <><span className="capitalize">{h.from}</span> &rarr;</>} <span className="capitalize" style={{ color: STAGE_COLORS[h.to] }}>{STAGE_LABELS[h.to]}</span>
-                        </p>
-                        <p className="text-[0.72rem] text-ink-400">{h.date} · {h.actor}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
