@@ -10,7 +10,7 @@ create extension if not exists "uuid-ossp";
 -- ENUMS
 -- ────────────────────────────────────────────────────────────────────────────
 
-create type subscription_tier as enum ('essentials', 'compliance_pro', 'advanced_governance');
+create type subscription_tier as enum ('compliance_pro', 'community_plus', 'management_suite');
 create type subscription_status as enum ('active', 'trialing', 'past_due', 'canceled', 'suspended');
 create type tenant_status as enum ('onboarding', 'active', 'suspended', 'archived');
 create type tenant_role as enum ('board_member', 'resident', 'property_manager');
@@ -55,9 +55,9 @@ create index idx_tenants_status on tenants(status);
 create table subscriptions (
   id                uuid primary key default uuid_generate_v4(),
   tenant_id         uuid not null references tenants(id) on delete cascade,
-  tier              subscription_tier not null default 'essentials',
+  tier              subscription_tier not null default 'compliance_pro',
   status            subscription_status not null default 'trialing',
-  monthly_rate      int not null default 4900, -- cents
+  monthly_rate      int not null default 17900, -- cents
   trial_ends_at     timestamptz,
   current_period_start timestamptz,
   current_period_end   timestamptz,
@@ -212,11 +212,11 @@ create or replace function tier_feature_defaults(t subscription_tier)
 returns jsonb as $$
 begin
   case t
-    when 'essentials' then
-      return '{"fiscal_lens":true,"case_ops":true,"compliance_runbook":true,"ai_advisor":false,"document_vault":false,"payment_processing":false,"votes_resolutions":false,"community_portal":false,"vendor_management":false,"reserve_study_tools":false}'::jsonb;
     when 'compliance_pro' then
       return '{"fiscal_lens":true,"case_ops":true,"compliance_runbook":true,"ai_advisor":true,"document_vault":true,"payment_processing":true,"votes_resolutions":false,"community_portal":false,"vendor_management":true,"reserve_study_tools":false}'::jsonb;
-    when 'advanced_governance' then
+    when 'community_plus' then
+      return '{"fiscal_lens":true,"case_ops":true,"compliance_runbook":true,"ai_advisor":true,"document_vault":true,"payment_processing":true,"votes_resolutions":true,"community_portal":true,"vendor_management":true,"reserve_study_tools":false}'::jsonb;
+    when 'management_suite' then
       return '{"fiscal_lens":true,"case_ops":true,"compliance_runbook":true,"ai_advisor":true,"document_vault":true,"payment_processing":true,"votes_resolutions":true,"community_portal":true,"vendor_management":true,"reserve_study_tools":true}'::jsonb;
   end case;
 end;
@@ -238,7 +238,8 @@ create or replace function provision_tenant(
   p_user_id uuid,
   p_stripe_customer_id text default null,
   p_stripe_subscription_id text default null,
-  p_board_title text default 'President'
+  p_board_title text default 'President',
+  p_subdomain text default null
 )
 returns jsonb as $$
 declare
@@ -248,14 +249,18 @@ declare
   v_features jsonb;
   v_trial_end timestamptz;
 begin
-  -- Generate unique subdomain
-  v_subdomain := generate_subdomain(p_name);
+  -- Use user-chosen subdomain if provided and available, otherwise generate one
+  if p_subdomain is not null and p_subdomain != '' and not exists (select 1 from tenants where subdomain = p_subdomain) then
+    v_subdomain := p_subdomain;
+  else
+    v_subdomain := generate_subdomain(p_name);
+  end if;
 
   -- Set monthly rate based on tier
   v_monthly_rate := case p_tier
-    when 'essentials' then 4900
     when 'compliance_pro' then 17900
-    when 'advanced_governance' then 29900
+    when 'community_plus' then 27900
+    when 'management_suite' then 39900
   end;
 
   -- Trial ends in 30 days

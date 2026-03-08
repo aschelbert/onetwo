@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       p_address: JSON.stringify(body.address || {}),
       p_total_units: body.totalUnits || 0,
       p_year_built: body.yearBuilt || null,
-      p_tier: body.tier || "essentials",
+      p_tier: body.tier || "compliance_pro",
       p_contact_name: body.contactName || "",
       p_contact_email: body.contactEmail || "",
       p_contact_phone: body.contactPhone || "",
@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
       p_stripe_customer_id: body.stripeCustomerId || null,
       p_stripe_subscription_id: body.stripeSubscriptionId || null,
       p_board_title: body.boardTitle || "President",
+      p_subdomain: body.subdomain || null,
     });
 
     if (error) {

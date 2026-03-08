@@ -165,6 +165,7 @@ Deno.serve(async (req) => {
           p_stripe_customer_id: session.customer || null,
           p_stripe_subscription_id: session.subscription || null,
           p_board_title: meta.board_title || "President",
+          p_subdomain: meta.subdomain || null,
         });
 
         console.log("Provisioned:", JSON.stringify(result));

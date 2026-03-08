@@ -62,6 +62,8 @@ export default function AuthPage() {
   const [profileUnit, setProfileUnit] = useState('');
   const [boardTitle, setBoardTitle] = useState('President');
 
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   // Building form
   const [bldgName, setBldgName] = useState('');
   const [bldgSubdomain, setBldgSubdomain] = useState('');
@@ -448,6 +450,8 @@ export default function AuthPage() {
 
   const handleCompleteJoin = async () => {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
+    if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+    if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = profileEmail || email;
 
@@ -458,7 +462,7 @@ export default function AuthPage() {
         // Sign up user
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: finalEmail,
-          password: password || 'temp-' + Date.now(),
+          password: password,
           options: { data: { full_name: name } },
         });
 
@@ -536,23 +540,33 @@ export default function AuthPage() {
 
     setCheckoutLoading(true);
     try {
-      // First, sign up the user with Supabase Auth
+      // Validate required fields before creating auth user
       const signupEmail = profileEmail || email;
       if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
+      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+      // Try to sign up — if user already exists (e.g., abandoned checkout), sign them in instead
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: signupEmail,
-        password: password || 'temp-password-' + Date.now(), // Will be set properly later
+        password: password,
+        options: { data: { full_name: fullName } },
       });
 
       if (authError) {
-        // If user already exists, try signing in
         if (authError.message.includes('already registered')) {
+          // User exists from a previous attempt — sign in and continue to checkout
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: signupEmail,
             password: password,
           });
-          if (signInError) { alert('Account exists. Please sign in instead.'); setCheckoutLoading(false); return; }
+          if (signInError) {
+            alert('An account with this email already exists. Please sign in with the correct password, or use a different email.');
+            setCheckoutLoading(false);
+            return;
+          }
         } else {
           alert(authError.message); setCheckoutLoading(false); return;
         }
@@ -561,6 +575,20 @@ export default function AuthPage() {
       // Get the session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+
+      // Check if user already has a tenant (completed checkout before) — skip to login
+      const { data: existingTenant } = await supabase
+        .from('tenant_users')
+        .select('tenant_id')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (existingTenant) {
+        alert('Your account is already set up. Redirecting to login...');
+        setAuthStep('login');
+        setCheckoutLoading(false);
+        return;
+      }
 
       // Call create-checkout Edge Function
       const res = await fetch(
@@ -778,9 +806,9 @@ export default function AuthPage() {
                 <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                  <input type="password" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                  <input type="password" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               </div>
               <button onClick={handleCompleteJoin}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Create Account & Enter</button>
