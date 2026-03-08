@@ -8,6 +8,7 @@ interface AuthState {
   authJoinRole: Role;
   currentUser: User;
   currentRole: Role;
+  isAdminPreview: boolean; // true when a PLATFORM_ADMIN switches to a tenant role for testing
   buildingMembers: BuildingMember[];
   buildingInvites: BuildingInvite[];
 
@@ -66,6 +67,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   authJoinRole: 'RESIDENT',
   currentUser: defaultUser,
   currentRole: 'BOARD_MEMBER',
+  isAdminPreview: false,
   buildingMembers: seedMembers,
   buildingInvites: seedInvites,
 
@@ -76,6 +78,8 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     set((state) => ({
       currentRole: role,
       currentUser: { ...state.currentUser, role },
+      // Track when a platform admin switches to a tenant role for preview/testing
+      isAdminPreview: state.isAdminPreview || state.currentRole === 'PLATFORM_ADMIN',
     })),
 
   login: (member) =>
@@ -92,6 +96,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
         linkedUnits: member.unit ? [member.unit] : [],
       },
       currentRole: member.role,
+      isAdminPreview: false,
     }),
 
   skipToDemo: () =>
@@ -99,6 +104,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       isAuthenticated: true,
       currentUser: defaultUser,
       currentRole: 'BOARD_MEMBER',
+      isAdminPreview: false,
     }),
 
   signOut: () => {
@@ -113,6 +119,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       authStep: 'welcome',
       currentUser: defaultUser,
       currentRole: 'BOARD_MEMBER',
+      isAdminPreview: false,
     });
   },
 
@@ -178,6 +185,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     isAuthenticated: state.isAuthenticated,
     currentUser: state.currentUser,
     currentRole: state.currentRole,
+    isAdminPreview: state.isAdminPreview,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

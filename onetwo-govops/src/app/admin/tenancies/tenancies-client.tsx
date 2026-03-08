@@ -1,11 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input, Select, FormGroup } from '@/components/ui/input'
 import { formatDate } from '@/lib/utils'
+import { MoreVertical, Pencil, ExternalLink } from 'lucide-react'
 
 type Plan = { id: string; name: string }
 type Tenancy = Record<string, unknown> & {
@@ -24,6 +25,18 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
   const [creating, setCreating] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [form, setForm] = useState({ name: '', slug: '', address: '', units: '', subscription_id: '', status: 'active', billing_cycle: 'monthly', jurisdiction: '', board_members: '', residents: '', managers: '', staff: '' })
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    if (openMenuId) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openMenuId])
 
   const filtered = statusFilter === 'all' ? tenancies : tenancies.filter(t => t.status === statusFilter)
 
@@ -103,7 +116,36 @@ export function TenanciesClient({ tenancies, plans }: { tenancies: Tenancy[]; pl
                 <td className="px-3 py-2.5 border-b border-gray-100">{t.units}</td>
                 <td className="px-3 py-2.5 border-b border-gray-100">{t.board_members + t.residents + t.managers + t.staff}</td>
                 <td className="px-3 py-2.5 border-b border-gray-100 text-gray-500">{formatDate(t.created_at)}</td>
-                <td className="px-3 py-2.5 border-b border-gray-100"><Button variant="ghost" size="xs">Edit</Button></td>
+                <td className="px-3 py-2.5 border-b border-gray-100">
+                  <div className="relative" ref={openMenuId === t.id ? menuRef : undefined}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === t.id ? null : t.id) }}
+                      className="p-1 rounded hover:bg-gray-100 transition-colors cursor-pointer bg-transparent border-none"
+                    >
+                      <MoreVertical size={16} className="text-gray-400" />
+                    </button>
+                    {openMenuId === t.id && (
+                      <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); openEdit(t) }}
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none text-left"
+                        >
+                          <Pencil size={14} className="text-gray-400" />
+                          Edit
+                        </button>
+                        {t.status !== 'suspended' && t.status !== 'churned' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); window.open(`/app/${t.slug}/`, '_blank') }}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer bg-transparent border-none text-left"
+                          >
+                            <ExternalLink size={14} className="text-gray-400" />
+                            View Tenancy
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -25,6 +25,7 @@ interface TenantContextType {
   canAccess: (atomId: string) => boolean
   canWrite: (atomId: string) => boolean
   accessibleModules: string[]
+  isPlatformAdmin?: boolean
 }
 
 const TenantContext = createContext<TenantContextType | null>(null)

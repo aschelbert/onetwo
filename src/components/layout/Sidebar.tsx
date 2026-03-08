@@ -32,7 +32,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
-  const { currentRole, switchRole } = useAuthStore();
+  const { currentRole, switchRole, isAdminPreview } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const navItems = navigation[currentRole];
@@ -60,7 +60,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 <p className="text-sm font-bold text-ink-900">Platform Console</p>
                 <p className="text-xs text-ink-400 mt-1">Multi-tenancy management</p>
               </div>
-            ) : (
+            ) : isAdminPreview ? (
               <div className="mb-6 bg-sand-100 rounded-xl p-4 border border-ink-100">
                 <label className="block text-xs font-medium text-ink-700 mb-2">View As:</label>
                 <select
@@ -78,6 +78,11 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   ))}
                 </select>
                 <p className="text-xs text-ink-400 mt-2">Switch roles to see different views</p>
+              </div>
+            ) : (
+              <div className="mb-6 bg-sand-100 rounded-xl p-4 border border-ink-100">
+                <p className="text-sm font-bold text-ink-900">{ROLE_LABELS[currentRole]}</p>
+                <p className="text-xs text-ink-400 mt-1">Your current role</p>
               </div>
             )}
           </>

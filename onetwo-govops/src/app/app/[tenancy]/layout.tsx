@@ -34,7 +34,72 @@ export default async function TenantLayout({
     .eq('status', 'active')
     .single()
 
-  if (!tenantUser) redirect('/unauthorized')
+  let isPlatformAdmin = false
+
+  if (!tenantUser) {
+    const { data: platformUser } = await supabase
+      .from('platform_users')
+      .select('id, email, display_name, platform_role')
+      .eq('id', user.id)
+      .eq('platform_role', 'platform_admin')
+      .single()
+
+    if (!platformUser) redirect('/unauthorized')
+    isPlatformAdmin = true
+
+    const { data: permissions } = await supabase
+      .rpc('resolve_permissions', {
+        p_plan_id: tenancy.subscription_id,
+        p_role_id: 'BOARD_MEMBER',
+      })
+
+    const accessibleModules = [...new Set(
+      permissions
+        ?.filter((p: { effective_access: string }) => p.effective_access !== 'not_entitled' && p.effective_access !== 'no_access')
+        .map((p: { module_name: string }) => p.module_name) || []
+    )]
+
+    const contextValue = {
+      tenancy: {
+        id: tenancy.id,
+        name: tenancy.name,
+        slug: tenancy.slug,
+        subscription_id: tenancy.subscription_id,
+      },
+      user: {
+        id: `platform-admin-${user.id}`,
+        email: platformUser.email,
+        display_name: platformUser.display_name || platformUser.email.split('@')[0],
+        role_id: 'BOARD_MEMBER',
+        role_name: 'Platform Admin',
+      },
+      permissions: permissions || [],
+      canAccess: (atomId: string) => {
+        const p = permissions?.find((x: { atom_id: string }) => x.atom_id === atomId)
+        return !!p && p.effective_access !== 'not_entitled' && p.effective_access !== 'no_access'
+      },
+      canWrite: (atomId: string) => {
+        const p = permissions?.find((x: { atom_id: string; effective_access: string }) => x.atom_id === atomId)
+        return p?.effective_access === 'contributor'
+      },
+      accessibleModules,
+      isPlatformAdmin: true,
+    }
+
+    return (
+      <TenantProvider value={contextValue}>
+        <div className="flex h-screen bg-stone-50">
+          <TenantSidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <TenantTopbar />
+            <main className="flex-1 overflow-y-auto p-6">
+              {children}
+            </main>
+          </div>
+        </div>
+      </TenantProvider>
+    )
+  }
 
   const { data: permissions } = await supabase
     .rpc('resolve_permissions', {
