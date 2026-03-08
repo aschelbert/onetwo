@@ -4,6 +4,7 @@
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
+const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
 // Supabase REST helper (service role bypasses RLS)
 async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown) {
@@ -88,14 +89,37 @@ Deno.serve(async (req) => {
 
   const body = await req.text();
 
-  // Verify webhook signature
-  const valid = await verifyStripeSignature(body, signature, WEBHOOK_SECRET);
-  if (!valid) {
+  // Verify webhook signature (primary: HMAC, fallback: Stripe API retrieval)
+  const sigValid = await verifyStripeSignature(body, signature, WEBHOOK_SECRET);
+  // deno-lint-ignore no-explicit-any
+  let event: any;
+
+  if (sigValid) {
+    event = JSON.parse(body);
+  } else if (STRIPE_KEY) {
+    // Fallback: verify the event by retrieving it from Stripe's API.
+    // This handles signing-secret mismatches (e.g. duplicate webhook endpoints).
+    try {
+      const raw = JSON.parse(body);
+      if (raw.id && typeof raw.id === "string" && raw.id.startsWith("evt_")) {
+        const stripeRes = await fetch(`https://api.stripe.com/v1/events/${raw.id}`, {
+          headers: { "Authorization": `Bearer ${STRIPE_KEY}` },
+        });
+        if (stripeRes.ok) {
+          event = await stripeRes.json();
+          console.log("Signature failed but event verified via Stripe API");
+        }
+      }
+    } catch {
+      // Couldn't parse or verify via API
+    }
+  }
+
+  if (!event) {
     console.error("Webhook signature verification failed");
     return new Response("Invalid signature", { status: 400 });
   }
 
-  const event = JSON.parse(body);
   console.log(`Received event: ${event.type}`);
 
   try {
@@ -108,6 +132,16 @@ Deno.serve(async (req) => {
 
         if (!meta.building_name || !meta.user_id) {
           console.log("Non-onboarding checkout, skipping");
+          break;
+        }
+
+        // Idempotency: skip if user already has a tenant
+        const existing = await sbQuery("GET", "tenant_users", {
+          "user_id": `eq.${meta.user_id}`,
+          "select": "tenant_id",
+        });
+        if (existing?.tenant_id) {
+          console.log(`User ${meta.user_id} already provisioned (tenant ${existing.tenant_id}), skipping`);
           break;
         }
 

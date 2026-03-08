@@ -36,13 +36,14 @@ Deno.serve(async (req) => {
     const user = await userRes.json();
 
     // Parse request
-    const { tier, buildingName, subdomain, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle } = await req.json();
+    const { tier, priceId: frontendPriceId, billingInterval, buildingName, subdomain, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle } = await req.json();
     if (!tier || !buildingName) {
       return new Response(JSON.stringify({ error: "tier and buildingName required" }), {
         status: 400, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
-    const priceId = TIER_PRICES[tier];
+    // Use frontend-provided priceId (from TIERS config) or fall back to env-var lookup
+    const priceId = frontendPriceId || TIER_PRICES[tier];
     if (!priceId) {
       return new Response(JSON.stringify({ error: "Invalid tier" }), {
         status: 400, headers: { ...cors, "Content-Type": "application/json" },
