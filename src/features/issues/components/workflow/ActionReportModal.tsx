@@ -293,6 +293,9 @@ function YearEndProjectionsReport() {
   );
 }
 
+// Named exports for reuse in Archives Reports module
+export { ReconciliationReport, BudgetVarianceReport, CollectionsReport, ReserveBalancesReport, YearEndProjectionsReport };
+
 const REPORT_COMPONENTS: Record<string, () => React.ReactElement> = {
   reconciliation: ReconciliationReport,
   budgetVariance: BudgetVarianceReport,

@@ -2,10 +2,23 @@ import { supabase, logDbError } from '@/lib/supabase';
 
 // ── Types ──
 
+export type ReportCategory = 'case_analysis' | 'financial_statements' | 'board_governance' | 'sales_package';
+
+export type ReportType =
+  // Board & Governance
+  | 'board_packet' | 'monthly_summary' | 'compliance_report' | 'financial_snapshot'
+  // Case Analysis
+  | 'reconciliation' | 'budget_variance' | 'collections_delinquency' | 'reserve_balances' | 'year_end_projections'
+  // Financial Statements
+  | 'balance_sheet' | 'income_statement' | 'budget_vs_actual' | 'form_1120h' | 'local_tax_forms'
+  // Sales Package
+  | 'resale_certificate' | 'budget_summary' | 'reserve_study_summary' | 'insurance_certificate' | 'association_info_sheet';
+
 export interface ReportConfig {
   id: string;
   name: string;
-  type: 'board_packet' | 'monthly_summary' | 'compliance_report' | 'financial_snapshot';
+  type: ReportType;
+  category: ReportCategory;
   sections: Array<{ id: string; label: string; enabled: boolean }>;
   schedule: 'manual' | 'monthly' | 'quarterly';
   lastGenerated: string;
@@ -16,7 +29,8 @@ export interface GeneratedReport {
   id: string;
   configId: string;
   name: string;
-  type: string;
+  type: ReportType;
+  category: ReportCategory;
   generatedAt: string;
   generatedBy: string;
   snapshot: Record<string, any>;
@@ -28,7 +42,8 @@ function rowToConfig(r: Record<string, unknown>): ReportConfig {
   return {
     id: r.id as string,
     name: r.name as string,
-    type: r.type as ReportConfig['type'],
+    type: r.type as ReportType,
+    category: (r.category || 'board_governance') as ReportCategory,
     sections: (r.sections || []) as ReportConfig['sections'],
     schedule: r.schedule as ReportConfig['schedule'],
     lastGenerated: r.last_generated as string,
@@ -40,6 +55,7 @@ function configToRow(c: Partial<ReportConfig>): Record<string, unknown> {
   const row: Record<string, unknown> = {};
   if (c.name !== undefined) row.name = c.name;
   if (c.type !== undefined) row.type = c.type;
+  if (c.category !== undefined) row.category = c.category;
   if (c.sections !== undefined) row.sections = c.sections;
   if (c.schedule !== undefined) row.schedule = c.schedule;
   if (c.lastGenerated !== undefined) row.last_generated = c.lastGenerated;
@@ -54,7 +70,8 @@ function rowToReport(r: Record<string, unknown>): GeneratedReport {
     id: r.id as string,
     configId: r.config_id as string,
     name: r.name as string,
-    type: r.type as string,
+    type: r.type as ReportType,
+    category: (r.category || 'board_governance') as ReportCategory,
     generatedAt: r.generated_at as string,
     generatedBy: r.generated_by as string,
     snapshot: (r.snapshot || {}) as Record<string, any>,
@@ -66,6 +83,7 @@ function reportToRow(rp: Partial<GeneratedReport>): Record<string, unknown> {
   if (rp.configId !== undefined) row.config_id = rp.configId;
   if (rp.name !== undefined) row.name = rp.name;
   if (rp.type !== undefined) row.type = rp.type;
+  if (rp.category !== undefined) row.category = rp.category;
   if (rp.generatedAt !== undefined) row.generated_at = rp.generatedAt;
   if (rp.generatedBy !== undefined) row.generated_by = rp.generatedBy;
   if (rp.snapshot !== undefined) row.snapshot = rp.snapshot;

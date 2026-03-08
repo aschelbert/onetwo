@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as reportsSvc from '@/lib/services/reports';
-import type { ReportConfig, GeneratedReport } from '@/lib/services/reports';
+import type { ReportConfig, GeneratedReport, ReportCategory, ReportType } from '@/lib/services/reports';
 
-export type { ReportConfig, GeneratedReport } from '@/lib/services/reports';
+export type { ReportConfig, GeneratedReport, ReportCategory, ReportType } from '@/lib/services/reports';
 
 interface ReportState {
   configs: ReportConfig[];
@@ -19,7 +19,7 @@ interface ReportState {
 
 export const useReportStore = create<ReportState>()(persist((set) => ({
   configs: [
-    { id: 'rc1', name: 'Monthly Board Packet', type: 'board_packet', sections: [
+    { id: 'rc1', name: 'Monthly Board Packet', type: 'board_packet', category: 'board_governance' as const, sections: [
       { id: 'financial', label: 'Financial Summary', enabled: true },
       { id: 'compliance', label: 'Compliance Status', enabled: true },
       { id: 'maintenance', label: 'Maintenance & Work Orders', enabled: true },

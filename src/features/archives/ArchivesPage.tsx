@@ -7,7 +7,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import Modal from '@/components/ui/Modal';
-import ReportsTab from '@/features/dashboard/tabs/ReportsTab';
+import ArchiveReportsModule from '@/features/archives/reports/ArchiveReportsModule';
 
 const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -152,7 +152,7 @@ export default function ArchivesPage() {
           <button onClick={() => setTopView('archives')} className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-ink-500 hover:text-ink-700">Archives</button>
           <button className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-ink-900 shadow-sm">Reports</button>
         </div>
-        <ReportsTab />
+        <ArchiveReportsModule />
       </div>
     );
   }

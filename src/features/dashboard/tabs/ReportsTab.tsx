@@ -13,17 +13,18 @@ import { fmt } from '@/lib/formatters';
 
 // ─── Constants ────────────────────────────────────────
 
-type ReportType = ReportConfig['type'];
+// Board-governance report types handled by this tab
+type BoardReportType = 'board_packet' | 'monthly_summary' | 'compliance_report' | 'financial_snapshot';
 type Schedule = ReportConfig['schedule'];
 
-const TYPE_LABELS: Record<ReportType, string> = {
+const TYPE_LABELS: Record<BoardReportType, string> = {
   board_packet: 'Board Packet',
   monthly_summary: 'Monthly Summary',
   compliance_report: 'Compliance Report',
   financial_snapshot: 'Financial Snapshot',
 };
 
-const TYPE_COLORS: Record<ReportType, { bg: string; text: string }> = {
+const TYPE_COLORS: Record<BoardReportType, { bg: string; text: string }> = {
   board_packet:       { bg: 'bg-accent-100', text: 'text-accent-700' },
   monthly_summary:    { bg: 'bg-mist-100',   text: 'text-mist-700' },
   compliance_report:  { bg: 'bg-sage-100',   text: 'text-sage-700' },
@@ -57,6 +58,97 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ─── Exported snapshot builder for reuse ──────────────
+
+export function buildBoardPacketSnapshot(
+  config: ReportConfig,
+  stores: {
+    fin: ReturnType<typeof useFinancialStore.getState>;
+    comp: ReturnType<typeof useComplianceStore.getState>;
+    issues: ReturnType<typeof useIssuesStore.getState>;
+    meetings: ReturnType<typeof useMeetingsStore.getState>['meetings'];
+    building: ReturnType<typeof useBuildingStore.getState>;
+    propertyLog: ReturnType<typeof usePropertyLogStore.getState>;
+  },
+): Record<string, any> {
+  const { fin, comp, issues, meetings, building, propertyLog } = stores;
+  const snapshot: Record<string, any> = {};
+  const enabledIds = new Set(config.sections.filter(s => s.enabled).map(s => s.id));
+
+  if (enabledIds.has('financial')) {
+    const bs = fin.getBalanceSheet();
+    const metrics = fin.getIncomeMetrics();
+    const variance = fin.getBudgetVariance();
+    snapshot.financial = {
+      operatingCash: bs.assets.operating, reserveFund: bs.assets.reserves,
+      totalAssets: bs.assets.total, totalLiabilities: bs.liabilities.total, totalEquity: bs.equity.total,
+      monthlyExpected: metrics.monthlyExpected, monthlyCollected: metrics.monthlyCollected,
+      collectionRate: metrics.collectionRate, totalUnits: metrics.totalUnits,
+      budgetCategories: variance.length, overBudget: variance.filter(v => v.pct > 100).length,
+      underBudget: variance.filter(v => v.pct <= 100).length,
+    };
+  }
+  if (enabledIds.has('compliance')) {
+    const pending = comp.filings.filter(f => f.status === 'pending');
+    const filed = comp.filings.filter(f => f.status === 'filed');
+    const overdue = pending.filter(f => new Date(f.dueDate) < new Date());
+    snapshot.compliance = {
+      totalFilings: comp.filings.length, pending: pending.length, filed: filed.length, overdue: overdue.length,
+      filings: comp.filings.map(f => ({ name: f.name, status: f.status, dueDate: f.dueDate, responsible: f.responsible })),
+      communicationsSent: comp.communications.filter(c => c.status === 'sent').length,
+    };
+  }
+  if (enabledIds.has('maintenance')) {
+    const workOrders = fin.workOrders;
+    const open = workOrders.filter(w => w.status !== 'paid');
+    snapshot.maintenance = {
+      totalWorkOrders: workOrders.length, open: open.length, paid: workOrders.filter(w => w.status === 'paid').length,
+      openItems: open.map(w => ({ title: w.title, vendor: w.vendor, status: w.status, amount: w.amount })),
+    };
+  }
+  if (enabledIds.has('issues')) {
+    const openCases = issues.cases.filter(c => c.status === 'open');
+    snapshot.issues = {
+      totalCases: issues.cases.length, open: openCases.length, closed: issues.cases.filter(c => c.status === 'closed').length,
+      urgent: openCases.filter(c => c.priority === 'urgent').length, high: openCases.filter(c => c.priority === 'high').length,
+      medium: openCases.filter(c => c.priority === 'medium').length, low: openCases.filter(c => c.priority === 'low').length,
+      openCases: openCases.map(c => ({ title: c.title, priority: c.priority, unit: c.unit, created: c.created })),
+      submittedIssues: issues.issues.filter(i => i.status === 'SUBMITTED').length,
+    };
+  }
+  if (enabledIds.has('meetings')) {
+    const upcoming = meetings.filter(m => m.status === 'SCHEDULED' || m.status === 'RESCHEDULED').sort((a, b) => a.date.localeCompare(b.date));
+    snapshot.meetings = {
+      upcoming: upcoming.map(m => ({ title: m.title, date: m.date, time: m.time, type: m.type, location: m.location })),
+      upcomingCount: upcoming.length, completedCount: meetings.filter(m => m.status === 'COMPLETED').length, totalMeetings: meetings.length,
+    };
+  }
+  if (enabledIds.has('delinquency')) {
+    const delinquent = fin.units.filter(u => u.balance > 0);
+    snapshot.delinquency = {
+      delinquentUnits: delinquent.length, totalUnits: fin.units.length,
+      totalOwed: delinquent.reduce((s, u) => s + u.balance, 0),
+      units: delinquent.map(u => ({ unit: u.number, owner: u.owner, balance: u.balance })),
+    };
+  }
+  if (enabledIds.has('vendor')) {
+    const activeVendors = building.vendors.filter(v => v.status === 'active');
+    snapshot.vendor = {
+      totalVendors: building.vendors.length, active: activeVendors.length, inactive: building.vendors.filter(v => v.status === 'inactive').length,
+      vendors: activeVendors.map(v => ({ name: v.name, service: v.service, contract: v.contract })),
+    };
+  }
+  if (enabledIds.has('property_log')) {
+    const logs = propertyLog.logs;
+    snapshot.property_log = {
+      totalLogs: logs.length, open: logs.filter(l => l.status === 'open').length,
+      resolved: logs.filter(l => l.status === 'resolved').length,
+      recentLogs: logs.slice(0, 5).map(l => ({ title: l.title, date: l.date, type: l.type, status: l.status })),
+    };
+  }
+  return snapshot;
+}
+
 // ─── Component ────────────────────────────────────────
 
 export default function ReportsTab() {
@@ -77,7 +169,7 @@ export default function ReportsTab() {
   // ─── Config Editor state ────────────────────────
   const emptyForm = {
     name: '',
-    type: 'board_packet' as ReportType,
+    type: 'board_packet' as BoardReportType,
     schedule: 'manual' as Schedule,
     sections: ALL_SECTIONS.map(s => ({ ...s, enabled: true })),
   };
@@ -89,132 +181,10 @@ export default function ReportsTab() {
     [reports],
   );
 
-  // ─── Snapshot builder ─────────────────────────────
+  // ─── Snapshot builder (delegates to exported function) ─
 
   function buildSnapshot(config: ReportConfig): Record<string, any> {
-    const snapshot: Record<string, any> = {};
-    const enabledIds = new Set(config.sections.filter(s => s.enabled).map(s => s.id));
-
-    if (enabledIds.has('financial')) {
-      const bs = fin.getBalanceSheet();
-      const metrics = fin.getIncomeMetrics();
-      const variance = fin.getBudgetVariance();
-      const overBudget = variance.filter(v => v.pct > 100).length;
-      const underBudget = variance.filter(v => v.pct <= 100).length;
-      snapshot.financial = {
-        operatingCash: bs.assets.operating,
-        reserveFund: bs.assets.reserves,
-        totalAssets: bs.assets.total,
-        totalLiabilities: bs.liabilities.total,
-        totalEquity: bs.equity.total,
-        monthlyExpected: metrics.monthlyExpected,
-        monthlyCollected: metrics.monthlyCollected,
-        collectionRate: metrics.collectionRate,
-        totalUnits: metrics.totalUnits,
-        budgetCategories: variance.length,
-        overBudget,
-        underBudget,
-      };
-    }
-
-    if (enabledIds.has('compliance')) {
-      const pending = comp.filings.filter(f => f.status === 'pending');
-      const filed = comp.filings.filter(f => f.status === 'filed');
-      const overdue = pending.filter(f => new Date(f.dueDate) < new Date());
-      snapshot.compliance = {
-        totalFilings: comp.filings.length,
-        pending: pending.length,
-        filed: filed.length,
-        overdue: overdue.length,
-        filings: comp.filings.map(f => ({
-          name: f.name,
-          status: f.status,
-          dueDate: f.dueDate,
-          responsible: f.responsible,
-        })),
-        communicationsSent: comp.communications.filter(c => c.status === 'sent').length,
-      };
-    }
-
-    if (enabledIds.has('maintenance')) {
-      const workOrders = fin.workOrders;
-      const open = workOrders.filter(w => w.status !== 'paid');
-      const paid = workOrders.filter(w => w.status === 'paid');
-      snapshot.maintenance = {
-        totalWorkOrders: workOrders.length,
-        open: open.length,
-        paid: paid.length,
-        openItems: open.map(w => ({ title: w.title, vendor: w.vendor, status: w.status, amount: w.amount })),
-      };
-    }
-
-    if (enabledIds.has('issues')) {
-      const openCases = issues.cases.filter(c => c.status === 'open');
-      const closedCases = issues.cases.filter(c => c.status === 'closed');
-      const urgent = openCases.filter(c => c.priority === 'urgent');
-      const high = openCases.filter(c => c.priority === 'high');
-      const medium = openCases.filter(c => c.priority === 'medium');
-      const low = openCases.filter(c => c.priority === 'low');
-      snapshot.issues = {
-        totalCases: issues.cases.length,
-        open: openCases.length,
-        closed: closedCases.length,
-        urgent: urgent.length,
-        high: high.length,
-        medium: medium.length,
-        low: low.length,
-        openCases: openCases.map(c => ({ title: c.title, priority: c.priority, unit: c.unit, created: c.created })),
-        submittedIssues: issues.issues.filter(i => i.status === 'SUBMITTED').length,
-      };
-    }
-
-    if (enabledIds.has('meetings')) {
-      const upcoming = meetings
-        .filter(m => m.status === 'SCHEDULED' || m.status === 'RESCHEDULED')
-        .sort((a, b) => a.date.localeCompare(b.date));
-      const completed = meetings.filter(m => m.status === 'COMPLETED');
-      snapshot.meetings = {
-        upcoming: upcoming.map(m => ({ title: m.title, date: m.date, time: m.time, type: m.type, location: m.location })),
-        upcomingCount: upcoming.length,
-        completedCount: completed.length,
-        totalMeetings: meetings.length,
-      };
-    }
-
-    if (enabledIds.has('delinquency')) {
-      const delinquent = fin.units.filter(u => u.balance > 0);
-      const totalOwed = delinquent.reduce((s, u) => s + u.balance, 0);
-      snapshot.delinquency = {
-        delinquentUnits: delinquent.length,
-        totalUnits: fin.units.length,
-        totalOwed,
-        units: delinquent.map(u => ({ unit: u.number, owner: u.owner, balance: u.balance })),
-      };
-    }
-
-    if (enabledIds.has('vendor')) {
-      const activeVendors = building.vendors.filter(v => v.status === 'active');
-      const inactiveVendors = building.vendors.filter(v => v.status === 'inactive');
-      snapshot.vendor = {
-        totalVendors: building.vendors.length,
-        active: activeVendors.length,
-        inactive: inactiveVendors.length,
-        vendors: activeVendors.map(v => ({ name: v.name, service: v.service, contract: v.contract })),
-      };
-    }
-
-    if (enabledIds.has('property_log')) {
-      const logs = propertyLog.logs;
-      const openLogs = logs.filter(l => l.status === 'open');
-      snapshot.property_log = {
-        totalLogs: logs.length,
-        open: openLogs.length,
-        resolved: logs.filter(l => l.status === 'resolved').length,
-        recentLogs: logs.slice(0, 5).map(l => ({ title: l.title, date: l.date, type: l.type, status: l.status })),
-      };
-    }
-
-    return snapshot;
+    return buildBoardPacketSnapshot(config, { fin, comp, issues, meetings, building, propertyLog });
   }
 
   // ─── Actions ──────────────────────────────────────
@@ -226,6 +196,7 @@ export default function ReportsTab() {
       configId: config.id,
       name: `${config.name} -- ${today}`,
       type: config.type,
+      category: config.category || 'board_governance',
       generatedAt: today,
       generatedBy: currentUser.name,
       snapshot,
@@ -238,7 +209,7 @@ export default function ReportsTab() {
       setEditingConfigId(config.id);
       setForm({
         name: config.name,
-        type: config.type,
+        type: config.type as BoardReportType,
         schedule: config.schedule,
         sections: ALL_SECTIONS.map(s => ({
           ...s,
@@ -261,6 +232,7 @@ export default function ReportsTab() {
       addConfig({
         name: form.name,
         type: form.type,
+        category: 'board_governance',
         sections,
         schedule: form.schedule,
         lastGenerated: '',
@@ -366,7 +338,7 @@ export default function ReportsTab() {
           ) : (
             <div className="space-y-3">
               {configs.map(config => {
-                const typeColor = TYPE_COLORS[config.type] || TYPE_COLORS.board_packet;
+                const typeColor = TYPE_COLORS[config.type as BoardReportType] || TYPE_COLORS.board_packet;
                 const enabledCount = config.sections.filter(s => s.enabled).length;
                 return (
                   <div
@@ -379,7 +351,7 @@ export default function ReportsTab() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-bold text-ink-900">{config.name}</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${typeColor.bg} ${typeColor.text}`}>
-                              {TYPE_LABELS[config.type]}
+                              {TYPE_LABELS[config.type as BoardReportType] || config.type}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-ink-100 text-ink-600 font-semibold">
                               {SCHEDULE_LABELS[config.schedule]}
@@ -454,7 +426,7 @@ export default function ReportsTab() {
             <div className="space-y-2">
               {sortedReports.map(report => {
                 const isExpanded = expandedReport === report.id;
-                const typeColor = TYPE_COLORS[report.type as ReportType] || TYPE_COLORS.board_packet;
+                const typeColor = TYPE_COLORS[report.type as BoardReportType] || TYPE_COLORS.board_packet;
                 return (
                   <div
                     key={report.id}
@@ -472,7 +444,7 @@ export default function ReportsTab() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-bold text-ink-900">{report.name}</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${typeColor.bg} ${typeColor.text}`}>
-                              {TYPE_LABELS[report.type as ReportType] || report.type}
+                              {TYPE_LABELS[report.type as BoardReportType] || report.type}
                             </span>
                           </div>
                           <div className="flex items-center gap-3 mt-1 text-xs text-ink-400">
@@ -546,10 +518,10 @@ export default function ReportsTab() {
                 <label className="block text-xs font-semibold text-ink-700 mb-1">Report Type</label>
                 <select
                   value={form.type}
-                  onChange={e => setForm(prev => ({ ...prev, type: e.target.value as ReportType }))}
+                  onChange={e => setForm(prev => ({ ...prev, type: e.target.value as BoardReportType }))}
                   className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-accent-400 focus:border-transparent"
                 >
-                  {(Object.keys(TYPE_LABELS) as ReportType[]).map(t => (
+                  {(Object.keys(TYPE_LABELS) as BoardReportType[]).map(t => (
                     <option key={t} value={t}>{TYPE_LABELS[t]}</option>
                   ))}
                 </select>
@@ -606,9 +578,9 @@ export default function ReportsTab() {
   );
 }
 
-// ─── Report Viewer Component ──────────────────────────
+// ─── Report Viewer Component (exported for reuse) ─────
 
-function ReportViewer({ snapshot }: { snapshot: Record<string, any> }) {
+export function ReportViewer({ snapshot }: { snapshot: Record<string, any> }) {
   const sectionOrder = ['financial', 'compliance', 'maintenance', 'issues', 'meetings', 'delinquency', 'vendor', 'property_log'];
   const sectionLabels: Record<string, string> = {
     financial: 'Financial Summary',
