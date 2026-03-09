@@ -18,6 +18,13 @@ import { useAmenitiesStore } from './useAmenitiesStore';
 
 export function resetStoresForRealTenant() {
   useBuildingStore.setState({
+    name: '',
+    address: { street: '', city: '', state: '', zip: '' },
+    details: {
+      yearBuilt: '', totalUnits: 0, floors: 0, type: '', sqft: '',
+      lotSize: '', parking: '', architect: '', contractor: '',
+      amenities: [], entityType: 'incorporated' as const, fiscalYearEnd: '12-31',
+    },
     board: [],
     management: {
       company: '', contact: '', title: '', email: '', phone: '',

@@ -157,7 +157,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   const impersonatingMountedRef = useRef(false);
   useEffect(() => {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'PLATFORM_ADMIN') return;
-    if (!isBackendEnabled || !supabase) return;
 
     // Skip the first run — let the initial useEffect handle loading on mount
     if (!impersonatingMountedRef.current) {
@@ -166,6 +165,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     }
 
     if (impersonating) {
+      // loadTenantById works in both demo and backend mode —
+      // it first checks the platform admin store cache before falling back to Supabase
       loadTenantById(impersonating);
     } else {
       // Reset to default when impersonation ends

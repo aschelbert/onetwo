@@ -41,7 +41,7 @@ export default function AIAdvisor() {
     if (!open && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Welcome! I'm your HOA Compliance Advisor for **${buildingName || 'Sunny Acres Condominiums'}** in **${address.city}, ${address.state}**.
+        content: `Welcome! I'm your HOA Compliance Advisor for **${buildingName || 'your building'}** in **${address.city || 'your city'}, ${address.state || 'your state'}**.
 
 I can help you with:
 • **Bylaws & governing document** questions
