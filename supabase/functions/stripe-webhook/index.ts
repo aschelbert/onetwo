@@ -317,14 +317,14 @@ Deno.serve(async (req) => {
         });
         if (!sub?.tenant_id) break;
 
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "canceled" });
-        await sbQuery("PATCH", `tenants?id=eq.${sub.tenant_id}`, {}, { status: "suspended" });
+        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "canceled", cancel_at_period_end: false });
+        await sbQuery("PATCH", `tenants?id=eq.${sub.tenant_id}`, {}, { status: "churned" });
 
         await sbQuery("POST", "audit_log", {}, {
           tenant_id: sub.tenant_id,
           actor_name: "Stripe", actor_role: "system",
           action: "subscription.canceled", target: subscription.id,
-          details: "Subscription canceled — tenant suspended",
+          details: "Subscription ended — tenant churned",
         });
 
         // Sync status to admin console
@@ -332,8 +332,8 @@ Deno.serve(async (req) => {
           await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
             method: "PATCH",
             headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "suspended" }),
-          }).catch(e => console.error("Govops sync (suspended):", e));
+            body: JSON.stringify({ status: "churned" }),
+          }).catch(e => console.error("Govops sync (churned):", e));
         }
         break;
       }
@@ -343,18 +343,70 @@ Deno.serve(async (req) => {
         const subscription = event.data.object;
         const sub = await sbQuery("GET", "subscriptions", {
           "stripe_subscription_id": `eq.${subscription.id}`,
-          "select": "tenant_id",
+          "select": "tenant_id,tier",
         });
         if (!sub?.tenant_id) break;
 
         const statusMap: Record<string, string> = {
           active: "active", trialing: "trialing", past_due: "past_due",
         };
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, {
+
+        // Price ID → tier lookup
+        const PRICE_TO_TIER: Record<string, string> = {
+          "price_1T3qQD2eQBbijDsqxvNiEs8U": "compliance_pro",
+          "price_1T3qQD2eQBbijDsqbcwCMX7v": "compliance_pro",
+          "price_1T36YO2eQBbijDsqkULOdtRi": "community_plus",
+          "price_1T3qQg2eQBbijDsqHaOVBbtA": "community_plus",
+          "price_1T3qRQ2eQBbijDsq7PP4vlxh": "management_suite",
+          "price_1T3qSR2eQBbijDsqzVEUuZD4": "management_suite",
+        };
+        const TIER_MONTHLY_RATES: Record<string, number> = {
+          compliance_pro: 179, community_plus: 279, management_suite: 399,
+        };
+        const TIER_SUBSCRIPTION_SLUGS: Record<string, string> = {
+          compliance_pro: "compliance-pro", community_plus: "community-plus", management_suite: "management-suite",
+        };
+        const TIER_FEATURES: Record<string, Record<string, boolean>> = {
+          compliance_pro: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: false, voting: false, assessments: false, pm_tools: false, work_orders: false, distributions: false },
+          community_plus: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: true, voting: true, assessments: true, pm_tools: false, work_orders: false, distributions: false },
+          management_suite: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: true, voting: true, assessments: true, pm_tools: true, work_orders: true, distributions: true },
+        };
+
+        // Build update payload
+        const updatePayload: Record<string, unknown> = {
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           status: statusMap[subscription.status] || "canceled",
-        });
+          cancel_at_period_end: subscription.cancel_at_period_end || false,
+        };
+
+        // Detect tier change from price ID
+        const currentPriceId = subscription.items?.data?.[0]?.price?.id;
+        const detectedTier = currentPriceId ? PRICE_TO_TIER[currentPriceId] : null;
+
+        if (detectedTier && detectedTier !== sub.tier) {
+          updatePayload.tier = detectedTier;
+          updatePayload.monthly_rate = TIER_MONTHLY_RATES[detectedTier];
+
+          // Update tenant_features
+          const features = TIER_FEATURES[detectedTier];
+          if (features) {
+            await sbQuery("PATCH", `tenant_features?tenant_id=eq.${sub.tenant_id}`, {}, features);
+          }
+
+          // Sync tier change to govops
+          if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
+            await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
+              method: "PATCH",
+              headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ subscription_id: TIER_SUBSCRIPTION_SLUGS[detectedTier] }),
+            }).catch(e => console.error("Govops sync (tier change):", e));
+          }
+
+          console.log(`Tier changed: ${sub.tier} → ${detectedTier} for tenant ${sub.tenant_id}`);
+        }
+
+        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, updatePayload);
         break;
       }
 

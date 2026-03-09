@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
+import { TIERS } from '@/lib/tiers';
+import type { SubscriptionTier, BillingInterval } from '@/lib/tiers';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -33,14 +35,7 @@ const StepIndicator = ({ steps, current }: { steps: string[]; current: number })
   </div>
 );
 
-type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
-type BillingInterval = 'monthly' | 'annual';
-
-const TIERS: { id: SubscriptionTier; name: string; monthly: number; annual: number; stripePriceMonthly: string; stripePriceAnnual: string; features: string[] }[] = [
-  { id: 'compliance_pro', name: 'Compliance Pro', monthly: 179, annual: 1800, stripePriceMonthly: 'price_1T3qQD2eQBbijDsqxvNiEs8U', stripePriceAnnual: 'price_1T3qQD2eQBbijDsqbcwCMX7v', features: ['Dashboard with Fiduciary Alerts & compliance grades', 'Board Room: governance calendar, duties & roles', 'Fiscal Lens: double-entry GL, budgets & reserves', 'The Building: contacts, bylaws, insurance, vendors', 'Case Workflow with pre-legal escalation paths', 'Property Log & The Archives', 'DC jurisdiction compliance built in'] },
-  { id: 'community_plus', name: 'Community Plus', monthly: 279, annual: 2850, stripePriceMonthly: 'price_1T36YO2eQBbijDsqkULOdtRi', stripePriceAnnual: 'price_1T3qQg2eQBbijDsqHaOVBbtA', features: ['Everything in Compliance Pro', 'Resident portal with issue reporting', 'Community voting & resolutions', 'Assessment tracking & processing', 'Communications & notice templates', 'PM Scorecard & vendor management'] },
-  { id: 'management_suite', name: 'Management Suite', monthly: 399, annual: 4250, stripePriceMonthly: 'price_1T3qRQ2eQBbijDsq7PP4vlxh', stripePriceAnnual: 'price_1T3qSR2eQBbijDsqzVEUuZD4', features: ['Everything in Community Plus', 'Property Manager role & tools', 'Work order & invoice generation', 'Email & postal distributions', 'Mailing list management', 'Priority support'] },
-];
+// TIERS, SubscriptionTier, and BillingInterval imported from @/lib/tiers
 
 export default function AuthPage() {
   const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, login, buildingMembers, buildingInvites, addMember } = useAuthStore();
