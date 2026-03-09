@@ -2,9 +2,9 @@
 // Zero dependencies — uses raw fetch to Stripe API and Supabase Auth API
 
 const TIER_PRICES: Record<string, string> = {
-  essentials: Deno.env.get("STRIPE_PRICE_ESSENTIALS") || "",
   compliance_pro: Deno.env.get("STRIPE_PRICE_COMPLIANCE_PRO") || "",
-  advanced_governance: Deno.env.get("STRIPE_PRICE_ADVANCED_GOVERNANCE") || "",
+  community_plus: Deno.env.get("STRIPE_PRICE_COMMUNITY_PLUS") || "",
+  management_suite: Deno.env.get("STRIPE_PRICE_MANAGEMENT_SUITE") || "",
 };
 
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";

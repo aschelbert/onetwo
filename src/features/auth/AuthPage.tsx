@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -71,10 +71,11 @@ export default function AuthPage() {
 
   // Auto-suggest subdomain from building name
   const sanitizeSubdomain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  const subdomainManuallyEdited = useRef(false);
 
   useEffect(() => {
     // Only auto-suggest if user hasn't manually edited the subdomain
-    if (!bldgSubdomain || bldgSubdomain === sanitizeSubdomain(bldgName.slice(0, -1)) || bldgSubdomain === sanitizeSubdomain(bldgName + 'x')) {
+    if (!subdomainManuallyEdited.current) {
       const suggested = sanitizeSubdomain(
         bldgName.replace(/\b(condominium|condos?|hoa|association|residences|towers|gardens|estates|the|of)\b/gi, '')
       );
@@ -105,6 +106,7 @@ export default function AuthPage() {
   }, [bldgSubdomain]);
 
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
+  const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -253,8 +255,9 @@ export default function AuthPage() {
                 // Wait before next attempt
                 await new Promise(r => setTimeout(r, 1200));
               }
-              // Timed out waiting for webhook — fall through to login form
+              // Timed out waiting for webhook — show error with retry guidance
               setProvisioningStatus(null);
+              setProvisioningTimedOut(true);
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
@@ -731,6 +734,14 @@ export default function AuthPage() {
         {authStep === 'login' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
+            {provisioningTimedOut && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-amber-900 mb-1">Your building is still being set up</p>
+                <p className="text-xs text-amber-700 mb-3">Payment was received but setup is taking longer than usual. Please sign in below — your building will be ready shortly.</p>
+                <button onClick={() => { setProvisioningTimedOut(false); window.location.href = '/login?provisioned=1'; }}
+                  className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700">Retry Setup Check</button>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Email</label>
@@ -926,7 +937,7 @@ export default function AuthPage() {
                 <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
                 <div className="flex items-center gap-0">
                   <input value={bldgSubdomain}
-                    onChange={e => setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20))}
+                    onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
                     className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
                       subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
                       subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
@@ -959,6 +970,7 @@ export default function AuthPage() {
                   if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
                   if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
                   if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
+                  if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
                   setAuthStep('board-profile');
                 }}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Continue →</button>

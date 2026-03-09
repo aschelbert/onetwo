@@ -367,9 +367,9 @@ Deno.serve(async (req) => {
           compliance_pro: "compliance-pro", community_plus: "community-plus", management_suite: "management-suite",
         };
         const TIER_FEATURES: Record<string, Record<string, boolean>> = {
-          compliance_pro: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: false, voting: false, assessments: false, pm_tools: false, work_orders: false, distributions: false },
-          community_plus: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: true, voting: true, assessments: true, pm_tools: false, work_orders: false, distributions: false },
-          management_suite: { dashboard: true, boardroom: true, financial: true, building: true, issues: true, property_log: true, archives: true, community: true, voting: true, assessments: true, pm_tools: true, work_orders: true, distributions: true },
+          compliance_pro: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: false, community_portal: false, vendor_management: true, reserve_study_tools: false },
+          community_plus: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: false },
+          management_suite: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: true },
         };
 
         // Build update payload
