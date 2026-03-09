@@ -210,6 +210,21 @@ export default function AuthPage() {
             }
           }
 
+          // Restore session from pre-checkout save if session was lost during Stripe redirect
+          if (!user && isProvisioned) {
+            try {
+              const saved = localStorage.getItem('onetwo_checkout_tokens');
+              if (saved) {
+                const { access_token, refresh_token } = JSON.parse(saved);
+                const { data, error } = await supabase!.auth.setSession({ access_token, refresh_token });
+                if (!error && data.user) {
+                  user = data.user;
+                }
+                localStorage.removeItem('onetwo_checkout_tokens');
+              }
+            } catch { /* ignore parse errors */ }
+          }
+
           if (user) {
             // If returning from checkout, poll for tenant_users row
             // (Stripe webhook may not have fired yet)
@@ -226,6 +241,7 @@ export default function AuthPage() {
 
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
+                  localStorage.removeItem('onetwo_checkout_tokens');
                   await loginWithTenantUser(user, tu);
                   clearTimeout(timeout);
                   setSessionChecking(false);
@@ -639,6 +655,11 @@ export default function AuthPage() {
 
       // Redirect to Stripe Checkout
       if (data.url) {
+        // Save session tokens so we can restore after Stripe redirect
+        localStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        }));
         window.location.href = data.url;
       } else {
         alert('Failed to create checkout session'); setCheckoutLoading(false);
