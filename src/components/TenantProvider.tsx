@@ -55,46 +55,67 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
   // Load a specific tenant's data into the context and all stores
   const loadTenantById = useCallback(async (tenantId: string) => {
-    if (!supabase) return;
+    // First, try to get tenant info from the platform admin store (already loaded)
+    const adminTenant = usePlatformAdminStore.getState().tenants.find(t => t.id === tenantId);
 
-    const { data: t } = await supabase
-      .from('tenants')
-      .select('id, name, subdomain, status, address, total_units')
-      .eq('id', tenantId)
-      .maybeSingle();
+    let tenantInfo: TenantInfo;
 
-    if (!t) return;
+    if (adminTenant) {
+      // Use data from the platform admin store — already fetched, no extra DB round-trip
+      tenantInfo = {
+        id: adminTenant.id,
+        name: adminTenant.name,
+        subdomain: adminTenant.subdomain,
+        status: adminTenant.status,
+        tier: adminTenant.subscription.tier,
+        features: adminTenant.features as Record<string, boolean>,
+        address: adminTenant.address,
+        totalUnits: adminTenant.totalUnits,
+        isDemo: false,
+      };
+    } else if (supabase) {
+      // Fallback: query DB directly
+      const { data: t } = await supabase
+        .from('tenants')
+        .select('id, name, subdomain, status, address, total_units')
+        .eq('id', tenantId)
+        .maybeSingle();
 
-    const { data: sub } = await supabase
-      .from('subscriptions')
-      .select('tier')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+      if (!t) return;
 
-    const { data: feat } = await supabase
-      .from('tenant_features')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('tier')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
-    const addr = typeof t.address === 'string' ? JSON.parse(t.address) : (t.address || {});
+      const { data: feat } = await supabase
+        .from('tenant_features')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
-    const tenantInfo: TenantInfo = {
-      id: t.id,
-      name: t.name,
-      subdomain: t.subdomain,
-      status: t.status,
-      tier: sub?.tier || 'compliance_pro',
-      features: feat || {},
-      address: {
-        street: addr.street || '',
-        city: addr.city || '',
-        state: addr.state || '',
-        zip: addr.zip || '',
-      },
-      totalUnits: t.total_units || 0,
-      isDemo: false,
-    };
+      const addr = typeof t.address === 'string' ? JSON.parse(t.address) : (t.address || {});
+
+      tenantInfo = {
+        id: t.id,
+        name: t.name,
+        subdomain: t.subdomain,
+        status: t.status,
+        tier: sub?.tier || 'compliance_pro',
+        features: feat || {},
+        address: {
+          street: addr.street || '',
+          city: addr.city || '',
+          state: addr.state || '',
+          zip: addr.zip || '',
+        },
+        totalUnits: t.total_units || 0,
+        isDemo: false,
+      };
+    } else {
+      return;
+    }
 
     setTenant(tenantInfo);
     setActiveTenantId(tenantInfo.id);
@@ -104,34 +125,45 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     updateAddress(tenantInfo.address);
     updateDetails({ totalUnits: tenantInfo.totalUnits });
 
-    // Probe schema before loading stores
-    const { error: schemaProbe } = await supabase
-      .from('cases').select('id').limit(0);
-    const schemaReady = !schemaProbe || schemaProbe.code !== 'PGRST205';
+    // Load per-tenant store data from DB if available
+    if (supabase) {
+      // Probe schema before loading stores
+      const { error: schemaProbe } = await supabase
+        .from('cases').select('id').limit(0);
+      const schemaReady = !schemaProbe || schemaProbe.code !== 'PGRST205';
 
-    if (schemaReady) {
-      await Promise.all([
-        useComplianceStore.getState().loadFromDb(tenantInfo.id),
-        useMeetingsStore.getState().loadFromDb(tenantInfo.id),
-        useIssuesStore.getState().loadFromDb(tenantInfo.id),
-        useElectionStore.getState().loadFromDb(tenantInfo.id),
-        useBuildingStore.getState().loadFromDb(tenantInfo.id),
-        useFinancialStore.getState().loadFromDb(tenantInfo.id),
-        useArchiveStore.getState().loadFromDb(tenantInfo.id),
-        useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
-        useSpendingStore.getState().loadFromDb(tenantInfo.id),
-        useLetterStore.getState().loadFromDb(tenantInfo.id),
-        usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
-        useReportStore.getState().loadFromDb(tenantInfo.id),
-        useScorecardStore.getState().loadFromDb(tenantInfo.id),
-      ]);
+      if (schemaReady) {
+        await Promise.all([
+          useComplianceStore.getState().loadFromDb(tenantInfo.id),
+          useMeetingsStore.getState().loadFromDb(tenantInfo.id),
+          useIssuesStore.getState().loadFromDb(tenantInfo.id),
+          useElectionStore.getState().loadFromDb(tenantInfo.id),
+          useBuildingStore.getState().loadFromDb(tenantInfo.id),
+          useFinancialStore.getState().loadFromDb(tenantInfo.id),
+          useArchiveStore.getState().loadFromDb(tenantInfo.id),
+          useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
+          useSpendingStore.getState().loadFromDb(tenantInfo.id),
+          useLetterStore.getState().loadFromDb(tenantInfo.id),
+          usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
+          useReportStore.getState().loadFromDb(tenantInfo.id),
+          useScorecardStore.getState().loadFromDb(tenantInfo.id),
+        ]);
+      }
     }
   }, [updateName, updateAddress, updateDetails]);
 
-  // When a PLATFORM_ADMIN impersonates a tenant, load that tenant's data
+  // When a PLATFORM_ADMIN impersonates a tenant, load that tenant's data.
+  // Skip on initial mount — the initial useEffect handles that case after loadFromDb.
+  const impersonatingMountedRef = useRef(false);
   useEffect(() => {
     if (!isAuthenticated || !currentUser || currentUser.role !== 'PLATFORM_ADMIN') return;
     if (!isBackendEnabled || !supabase) return;
+
+    // Skip the first run — let the initial useEffect handle loading on mount
+    if (!impersonatingMountedRef.current) {
+      impersonatingMountedRef.current = true;
+      return;
+    }
 
     if (impersonating) {
       loadTenantById(impersonating);
