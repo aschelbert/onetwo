@@ -22,7 +22,6 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
   { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
   { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
-  { featureId: 'userManagement',   nav: { id: 'user-mgmt',    label: 'User Management',path: '/admin/users',   icon: 'user-mgmt' } },
 ];
 
 // Role name in auth store → roleId used in permissions
