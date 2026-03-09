@@ -373,6 +373,7 @@ export default function AuthPage() {
             const roleMap: Record<string, Role> = {
               board_member: 'BOARD_MEMBER',
               resident: 'RESIDENT',
+              staff: 'STAFF',
               property_manager: 'PROPERTY_MANAGER',
             };
 
@@ -440,7 +441,7 @@ export default function AuthPage() {
         const { data, error } = await supabase.rpc('validate_invite_code', { p_code: code });
         if (!error && data?.valid) {
           setInviteData(data);
-          setAuthJoinRole(data.role === 'board_member' ? 'BOARD_MEMBER' : data.role === 'property_manager' ? 'PROPERTY_MANAGER' : 'RESIDENT');
+          setAuthJoinRole(data.role === 'board_member' ? 'BOARD_MEMBER' : data.role === 'property_manager' ? 'PROPERTY_MANAGER' : data.role === 'staff' ? 'STAFF' : 'RESIDENT');
           setProfileEmail(data.email || '');
           setProfileUnit(data.unit || '');
           setInviteLoading(false);
@@ -514,7 +515,7 @@ export default function AuthPage() {
         // Log in and redirect to tenant subdomain
         const member = {
           id: user.id, name, email: finalEmail, phone: profilePhone,
-          role: (inviteData.role === 'board_member' ? 'BOARD_MEMBER' : inviteData.role === 'property_manager' ? 'PROPERTY_MANAGER' : 'RESIDENT') as Role,
+          role: (inviteData.role === 'board_member' ? 'BOARD_MEMBER' : inviteData.role === 'property_manager' ? 'PROPERTY_MANAGER' : inviteData.role === 'staff' ? 'STAFF' : 'RESIDENT') as Role,
           unit: inviteData.unit || profileUnit, status: 'active' as const,
           joined: new Date().toISOString().split('T')[0], boardTitle: null,
         };
@@ -808,7 +809,7 @@ export default function AuthPage() {
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
             {inviteMatch && (
               <p className="text-xs text-accent-600 text-center mb-4">
-                Joining as {inviteMatch.role === 'BOARD_MEMBER' ? 'Board Member' : inviteMatch.role === 'PROPERTY_MANAGER' ? 'Property Manager' : 'Resident'}
+                Joining as {inviteMatch.role === 'BOARD_MEMBER' ? 'Board Member' : inviteMatch.role === 'PROPERTY_MANAGER' ? 'Property Manager' : inviteMatch.role === 'STAFF' ? 'Staff' : 'Resident'}
                 {inviteMatch.unit ? ` · Unit ${inviteMatch.unit}` : ''}
               </p>
             )}

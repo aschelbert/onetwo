@@ -29,6 +29,7 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
 const ROLE_TO_PERMISSION_ID: Record<string, string> = {
   BOARD_MEMBER: 'board_member',
   RESIDENT: 'resident',
+  STAFF: 'staff',
   PROPERTY_MANAGER: 'property_manager',
 };
 
@@ -82,6 +83,12 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'community', label: 'Community Room', path: '/community', icon: 'community' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
+    { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
+  ],
+  STAFF: [
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
+    { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
+    { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   PROPERTY_MANAGER: [

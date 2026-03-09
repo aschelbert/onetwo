@@ -91,7 +91,7 @@ function AuthListener() {
             .maybeSingle();
 
           if (tu) {
-            const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+            const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
             const m = {
               id: session.user.id,
               name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',

@@ -18,7 +18,7 @@ const cors = {
 // Generate a unique invite code: {SUBDOMAIN_PREFIX}-{ROLE_PREFIX}-{4 RANDOM CHARS}
 function generateCode(subdomain: string, role: string): string {
   const sub = subdomain.slice(0, 3).toUpperCase();
-  const rolePrefix = role === "board_member" ? "BRD" : role === "property_manager" ? "MGR" : "RES";
+  const rolePrefix = role === "board_member" ? "BRD" : role === "property_manager" ? "MGR" : role === "staff" ? "STF" : "RES";
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   let rand = "";
   for (let i = 0; i < 4; i++) rand += chars[Math.floor(Math.random() * chars.length)];
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       if (resendCode && invitees.length === 1) {
         const code = resendCode;
         const inviteUrl = `${SITE_URL}/login?invite=${code}`;
-        const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : "Resident";
+        const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : role === "staff" ? "Staff" : "Resident";
         const unitText = unit ? ` (Unit ${unit})` : "";
 
         const htmlBody = `
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       const inviteUrl = `${SITE_URL}/login?invite=${code}`;
 
       // Build email
-      const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : "Resident";
+      const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : role === "staff" ? "Staff" : "Resident";
       const unitText = unit ? ` (Unit ${unit})` : "";
 
       const htmlBody = `

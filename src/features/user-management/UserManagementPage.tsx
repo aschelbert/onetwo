@@ -38,11 +38,13 @@ interface BulkInvitee {
 
 const roleLabel = (r: string) =>
   r === 'board_member' || r === 'BOARD_MEMBER' ? 'Board Member' :
-  r === 'property_manager' || r === 'PROPERTY_MANAGER' ? 'Property Manager' : 'Resident';
+  r === 'property_manager' || r === 'PROPERTY_MANAGER' ? 'Property Manager' :
+  r === 'staff' || r === 'STAFF' ? 'Staff' : 'Resident';
 
 const roleBadge = (r: string) =>
   r === 'board_member' || r === 'BOARD_MEMBER' ? 'bg-sage-100 text-sage-700' :
-  r === 'property_manager' || r === 'PROPERTY_MANAGER' ? 'bg-accent-100 text-accent-700' : 'bg-mist-100 text-ink-600';
+  r === 'property_manager' || r === 'PROPERTY_MANAGER' ? 'bg-accent-100 text-accent-700' :
+  r === 'staff' || r === 'STAFF' ? 'bg-amber-100 text-amber-700' : 'bg-mist-100 text-ink-600';
 
 export default function UserManagementPage() {
   const { currentUser, buildingMembers, buildingInvites, inviteMember, removeMember, revokeInvite } = useAuthStore();
@@ -399,6 +401,7 @@ export default function UserManagementPage() {
               <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg">
                 <option value="resident">Resident</option>
                 <option value="board_member">Board Member</option>
+                <option value="staff">Staff</option>
                 <option value="property_manager">Property Manager</option>
               </select>
             </div>
@@ -422,6 +425,7 @@ export default function UserManagementPage() {
               <select value={bulkRole} onChange={e => setBulkRole(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg">
                 <option value="resident">Resident</option>
                 <option value="board_member">Board Member</option>
+                <option value="staff">Staff</option>
                 <option value="property_manager">Property Manager</option>
               </select>
             </div>

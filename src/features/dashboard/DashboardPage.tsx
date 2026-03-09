@@ -107,7 +107,7 @@ export default function DashboardPage() {
     pastMeetings.slice(0, 2).forEach(m => activities.push({ icon: '🗓', text: `${m.title} completed`, date: m.date, path: '/boardroom' }));
     comp.filings.filter(f => f.status === 'filed').slice(0, 2).forEach(f => activities.push({ icon: '✅', text: `${f.name} filed`, date: f.filedDate || '', path: '/boardroom' }));
     recentComms.slice(0, 2).forEach(c => activities.push({ icon: '📨', text: c.subject, date: c.date, path: '/boardroom' }));
-    archives.archives.slice(0, 1).forEach(a => activities.push({ icon: '📦', text: `${a.label} archived`, date: a.createdAt.split('T')[0], path: '/archives' }));
+    archives.archives.slice(0, 1).forEach(a => activities.push({ icon: '📦', text: `${a.label} archived`, date: a.createdAt?.split('T')[0] ?? '', path: '/archives' }));
     activities.sort((a, b) => b.date.localeCompare(a.date));
     return activities;
   };

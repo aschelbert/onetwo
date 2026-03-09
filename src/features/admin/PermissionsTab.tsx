@@ -14,6 +14,7 @@ const FEATURE_LABELS: Record<string, string> = {
 const ROLE_COLORS: Record<string, string> = {
   board_member: 'border-accent-500 bg-accent-50',
   resident: 'border-sage-500 bg-sage-50',
+  staff: 'border-amber-500 bg-amber-50',
   property_manager: 'border-purple-500 bg-purple-50',
 };
 

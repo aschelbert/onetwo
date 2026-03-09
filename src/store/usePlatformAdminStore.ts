@@ -195,6 +195,7 @@ export interface PlatformBudget {
 export const TENANT_ROLES = [
   { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
   { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
+  { id: 'staff', name: 'Staff', description: 'Building staff such as concierge, maintenance, and building managers', icon: '🔧', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
   { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['management_suite'] as SubscriptionTier[] },
 ] as const;
 
@@ -424,6 +425,25 @@ const seedPermissions: Permission[] = [
   { id: 'perm-pm-archives', roleId: 'property_manager', featureId: 'archives', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
   { id: 'perm-pm-myUnit', roleId: 'property_manager', featureId: 'myUnit', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
   { id: 'perm-pm-userMgmt', roleId: 'property_manager', featureId: 'userManagement', actions: ['view','create','edit','delete'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Staff: operational access — property log, building, cases; no governance or financial
+  { id: 'perm-st-0', roleId: 'staff', featureId: 'fiscalLens', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-1', roleId: 'staff', featureId: 'caseOps', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-2', roleId: 'staff', featureId: 'complianceRunbook', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-3', roleId: 'staff', featureId: 'aiAdvisor', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-4', roleId: 'staff', featureId: 'documentVault', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-5', roleId: 'staff', featureId: 'paymentProcessing', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-6', roleId: 'staff', featureId: 'votesResolutions', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-7', roleId: 'staff', featureId: 'communityPortal', actions: ['view','create'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-8', roleId: 'staff', featureId: 'vendorManagement', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-9', roleId: 'staff', featureId: 'reserveStudyTools', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  // Core modules — Staff
+  { id: 'perm-st-dashboard', roleId: 'staff', featureId: 'dashboard', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-boardRoom', roleId: 'staff', featureId: 'boardRoom', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-building', roleId: 'staff', featureId: 'building', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-propertyLog', roleId: 'staff', featureId: 'propertyLog', actions: ['view','create','edit'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-archives', roleId: 'staff', featureId: 'archives', actions: ['view'], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-myUnit', roleId: 'staff', featureId: 'myUnit', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
+  { id: 'perm-st-userMgmt', roleId: 'staff', featureId: 'userManagement', actions: [], updatedAt: '2026-01-01T00:00:00Z', updatedBy: null },
 ];
 
 const seedStripeConfig: StripeConfig = {

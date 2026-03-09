@@ -1,4 +1,4 @@
-export type Role = 'BOARD_MEMBER' | 'RESIDENT' | 'PROPERTY_MANAGER' | 'PLATFORM_ADMIN';
+export type Role = 'BOARD_MEMBER' | 'RESIDENT' | 'PROPERTY_MANAGER' | 'STAFF' | 'PLATFORM_ADMIN';
 
 export interface User {
   id: string;
@@ -52,6 +52,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   BOARD_MEMBER: 'Board Member',
   RESIDENT: 'Resident',
   PROPERTY_MANAGER: 'Property Manager',
+  STAFF: 'Staff',
   PLATFORM_ADMIN: 'Platform Admin',
 };
 
