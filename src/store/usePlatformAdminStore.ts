@@ -203,7 +203,7 @@ export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'
 
 // Core app modules — always available regardless of subscription tier
 export const CORE_FEATURES = [
-  'dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement',
+  'dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement', 'fiscalLens',
 ] as const;
 
 // Feature groups for display in permissions matrix
