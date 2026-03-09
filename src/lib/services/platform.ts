@@ -17,10 +17,23 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
   // Ensure we have a valid session before querying RLS-protected tables
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return null;
-  // Fetch tenants and their subscriptions in parallel
-  const [{ data: tenantRows, error: tErr }, { data: subRows, error: sErr }] = await Promise.all([
+  // Fetch tenants and all per-tenant data in parallel
+  const [
+    { data: tenantRows, error: tErr },
+    { data: subRows, error: sErr },
+    { data: featureRows },
+    { data: checklistRows },
+    { data: userRows },
+    { data: caseRows },
+    { data: unitRows },
+  ] = await Promise.all([
     supabase.from('tenants').select('*').order('name'),
     supabase.from('subscriptions').select('*'),
+    supabase.from('tenant_features').select('*'),
+    supabase.from('onboarding_checklists').select('*'),
+    supabase.from('tenant_users').select('tenant_id, status'),
+    supabase.from('cases').select('tenant_id, status'),
+    supabase.from('units').select('tenant_id, status'),
   ]);
   if (tErr) { logDbError('fetchTenants error:', tErr); return null; }
   if (sErr) { logDbError('fetchTenants subscriptions error:', sErr); return null; }
@@ -28,8 +41,40 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
   const subMap = new Map<string, Record<string, unknown>>();
   for (const s of subRows || []) subMap.set(s.tenant_id as string, s);
 
+  const featMap = new Map<string, Record<string, unknown>>();
+  for (const f of featureRows || []) featMap.set(f.tenant_id as string, f);
+
+  const checklistMap = new Map<string, Record<string, unknown>>();
+  for (const c of checklistRows || []) checklistMap.set(c.tenant_id as string, c);
+
+  // Aggregate per-tenant stats
+  const userCounts = new Map<string, number>();
+  for (const u of userRows || []) {
+    const tid = u.tenant_id as string;
+    userCounts.set(tid, (userCounts.get(tid) || 0) + 1);
+  }
+
+  const openCaseCounts = new Map<string, number>();
+  for (const c of caseRows || []) {
+    if ((c.status as string) !== 'closed') {
+      const tid = c.tenant_id as string;
+      openCaseCounts.set(tid, (openCaseCounts.get(tid) || 0) + 1);
+    }
+  }
+
+  const unitCounts = new Map<string, number>();
+  const occupiedCounts = new Map<string, number>();
+  for (const u of unitRows || []) {
+    const tid = u.tenant_id as string;
+    unitCounts.set(tid, (unitCounts.get(tid) || 0) + 1);
+    if ((u.status as string) === 'occupied') {
+      occupiedCounts.set(tid, (occupiedCounts.get(tid) || 0) + 1);
+    }
+  }
+
   return (tenantRows || []).map((r): Tenant => {
-    const sub = subMap.get(r.id as string);
+    const id = r.id as string;
+    const sub = subMap.get(id);
     const tier = ((sub?.tier as string) || 'compliance_pro') as SubscriptionTier;
     const validTier = (tier in TIER_FEATURES) ? tier : 'compliance_pro' as SubscriptionTier;
     const addr = typeof r.address === 'string' ? JSON.parse(r.address) : (r.address || {});
@@ -37,8 +82,44 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
     // Map DB subscription status to app status
     const statusMap: Record<string, string> = { trialing: 'trial', active: 'active', past_due: 'past_due', canceled: 'cancelled' };
     const appSubStatus = (statusMap[subStatus] || subStatus) as Tenant['subscription']['status'];
+
+    // Per-tenant features from DB, falling back to tier defaults
+    const feat = featMap.get(id);
+    const features: Tenant['features'] = feat ? {
+      fiscalLens: feat.fiscal_lens as boolean,
+      caseOps: feat.case_ops as boolean,
+      complianceRunbook: feat.compliance_runbook as boolean,
+      aiAdvisor: feat.ai_advisor as boolean,
+      documentVault: feat.document_vault as boolean,
+      paymentProcessing: feat.payment_processing as boolean,
+      votesResolutions: feat.votes_resolutions as boolean,
+      communityPortal: feat.community_portal as boolean,
+      vendorManagement: feat.vendor_management as boolean,
+      reserveStudyTools: feat.reserve_study_tools as boolean,
+    } : { ...TIER_FEATURES[validTier] };
+
+    // Per-tenant onboarding from DB
+    const cl = checklistMap.get(id);
+    const onboardingChecklist: Tenant['onboardingChecklist'] = cl ? {
+      accountCreated: cl.account_created as boolean,
+      buildingProfileComplete: cl.building_profile_complete as boolean,
+      unitsConfigured: cl.units_configured as boolean,
+      firstUserInvited: cl.first_user_invited as boolean,
+      bylawsUploaded: cl.bylaws_uploaded as boolean,
+      financialSetupDone: cl.financial_setup_done as boolean,
+      goLive: cl.go_live as boolean,
+    } : {
+      accountCreated: true,
+      buildingProfileComplete: !!(addr.street),
+      unitsConfigured: false,
+      firstUserInvited: false,
+      bylawsUploaded: false,
+      financialSetupDone: false,
+      goLive: (r.status as string) === 'active',
+    };
+
     return {
-      id: r.id as string,
+      id,
       name: r.name as string,
       subdomain: r.subdomain as string,
       address: { street: addr.street || '', city: addr.city || '', state: addr.state || '', zip: addr.zip || '' },
@@ -54,23 +135,22 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
         monthlyRate: (sub?.monthly_rate as number) ? ((sub?.monthly_rate as number) / 100) : TIER_PRICES[validTier],
         trialEndsAt: (sub?.trial_ends_at as string)?.split('T')[0] || null,
       },
-      stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
+      stats: {
+        activeUsers: userCounts.get(id) || 0,
+        occupiedUnits: occupiedCounts.get(id) || 0,
+        collectionRate: 0,
+        complianceScore: 0,
+        openCases: openCaseCounts.get(id) || 0,
+        monthlyRevenue: 0,
+      },
       primaryContact: {
         name: (r.primary_contact_name as string) || '',
         email: (r.primary_contact_email as string) || '',
         phone: (r.primary_contact_phone as string) || '',
         role: 'Primary Contact',
       },
-      features: { ...TIER_FEATURES[validTier] },
-      onboardingChecklist: {
-        accountCreated: true,
-        buildingProfileComplete: !!(addr.street),
-        unitsConfigured: false,
-        firstUserInvited: false,
-        bylawsUploaded: false,
-        financialSetupDone: false,
-        goLive: (r.status as string) === 'active',
-      },
+      features,
+      onboardingChecklist,
     };
   });
 }
