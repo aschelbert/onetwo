@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const user = await userRes.json();
 
     // Parse request
-    const { tier, priceId: frontendPriceId, billingInterval, buildingName, subdomain, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle } = await req.json();
+    const { tier, priceId: frontendPriceId, billingInterval, buildingName, subdomain, address, totalUnits, yearBuilt, contactName, contactPhone, boardTitle, origin } = await req.json();
     if (!tier || !buildingName) {
       return new Response(JSON.stringify({ error: "tier and buildingName required" }), {
         status: 400, headers: { ...cors, "Content-Type": "application/json" },
@@ -59,8 +59,9 @@ Deno.serve(async (req) => {
     p.append("subscription_data[trial_period_days]", "30");
     p.append("customer_email", user.email || "");
     p.append("client_reference_id", user.id);
-    p.append("success_url", `${SITE_URL}/login?provisioned=1&session_id={CHECKOUT_SESSION_ID}`);
-    p.append("cancel_url", `${SITE_URL}/login?canceled=1`);
+    const returnUrl = origin || SITE_URL;
+    p.append("success_url", `${returnUrl}/login?provisioned=1&session_id={CHECKOUT_SESSION_ID}`);
+    p.append("cancel_url", `${returnUrl}/login?canceled=1`);
     // Metadata
     const meta: Record<string, string> = {
       user_id: user.id, tier, building_name: buildingName, subdomain: subdomain || "",

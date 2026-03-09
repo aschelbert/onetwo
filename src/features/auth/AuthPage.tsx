@@ -629,6 +629,7 @@ export default function AuthPage() {
             contactName: `${firstName} ${lastName}`.trim(),
             contactPhone: profilePhone,
             boardTitle,
+            origin: window.location.origin,
           }),
         }
       );
