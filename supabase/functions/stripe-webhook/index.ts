@@ -205,12 +205,13 @@ Deno.serve(async (req) => {
 
         const result = await sbRpc("provision_tenant", {
           p_name: meta.building_name,
-          p_address: JSON.stringify({
+          p_subdomain: meta.subdomain || null,
+          p_address: {
             street: meta.address_street || "",
             city: meta.address_city || "",
             state: meta.address_state || "",
             zip: meta.address_zip || "",
-          }),
+          },
           p_total_units: parseInt(meta.total_units) || 0,
           p_year_built: meta.year_built || null,
           p_tier: meta.tier,
@@ -221,7 +222,6 @@ Deno.serve(async (req) => {
           p_stripe_customer_id: session.customer || null,
           p_stripe_subscription_id: session.subscription || null,
           p_board_title: meta.board_title || "President",
-          p_subdomain: meta.subdomain || null,
         });
 
         console.log("Provisioned:", JSON.stringify(result));
