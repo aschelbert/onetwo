@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { getInitials } from '@/lib/formatters';
 import { ROLE_LABELS } from '@/types/auth';
-import { ChevronDown, User, Home, Users, HelpCircle, LogOut } from 'lucide-react';
+import { ChevronDown, User, Home, Users, HelpCircle, LogOut, CreditCard } from 'lucide-react';
 
 export default function TopNav() {
   const { currentUser, currentRole, signOut } = useAuthStore();
@@ -96,6 +96,15 @@ export default function TopNav() {
                     >
                       <Users className="w-4 h-4 text-ink-400" />
                       User Management
+                    </button>
+                  )}
+                  {currentRole === 'BOARD_MEMBER' && !tenant.isDemo && (
+                    <button
+                      onClick={() => goTo('/subscription')}
+                      className="w-full text-left px-4 py-2.5 text-sm text-ink-700 hover:bg-mist-50 flex items-center gap-3"
+                    >
+                      <CreditCard className="w-4 h-4 text-ink-400" />
+                      Subscription
                     </button>
                   )}
                   <button

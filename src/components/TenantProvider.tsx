@@ -301,6 +301,45 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     );
   }
 
+  // Block access for churned tenants
+  if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
+    return (
+      <TenantContext.Provider value={tenant}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-ink-50 via-white to-mist-50">
+          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8 max-w-md mx-4 text-center">
+            <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="font-display text-xl font-bold text-ink-900 mb-2">Account Inactive</h2>
+            <p className="text-sm text-ink-500 mb-6">
+              Your subscription has ended and access to {tenant.name} is no longer available.
+              Please contact support or a board member to reactivate your account.
+            </p>
+            <div className="flex flex-col gap-3">
+              <a
+                href="mailto:support@getonetwo.com"
+                className="w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 transition-all text-center"
+              >
+                Contact Support
+              </a>
+              <button
+                onClick={() => {
+                  useAuthStore.getState().signOut();
+                  window.location.href = '/login';
+                }}
+                className="w-full py-3 border border-ink-200 text-ink-600 rounded-xl font-semibold text-sm hover:bg-ink-50 transition-all"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </TenantContext.Provider>
+    );
+  }
+
   return (
     <TenantContext.Provider value={tenant}>
       {children}

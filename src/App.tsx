@@ -19,6 +19,7 @@ import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import SupportPage from '@/features/support/SupportPage';
+import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
@@ -192,6 +193,7 @@ export default function App() {
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
         </Route>
 
