@@ -2,7 +2,7 @@
 // Wraps the app. After Supabase Auth login, loads the tenant context
 // and overwrites the building store with real data.
 
-import { useEffect, useState, useRef, createContext, useContext } from 'react';
+import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -51,6 +51,96 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   const updateAddress = useBuildingStore(s => s.updateAddress);
   const updateDetails = useBuildingStore(s => s.updateDetails);
   const hasLoadedDataRef = useRef(false);
+  const impersonating = usePlatformAdminStore(s => s.impersonating);
+
+  // Load a specific tenant's data into the context and all stores
+  const loadTenantById = useCallback(async (tenantId: string) => {
+    if (!supabase) return;
+
+    const { data: t } = await supabase
+      .from('tenants')
+      .select('id, name, subdomain, status, address, total_units')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (!t) return;
+
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('tier')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const { data: feat } = await supabase
+      .from('tenant_features')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const addr = typeof t.address === 'string' ? JSON.parse(t.address) : (t.address || {});
+
+    const tenantInfo: TenantInfo = {
+      id: t.id,
+      name: t.name,
+      subdomain: t.subdomain,
+      status: t.status,
+      tier: sub?.tier || 'compliance_pro',
+      features: feat || {},
+      address: {
+        street: addr.street || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        zip: addr.zip || '',
+      },
+      totalUnits: t.total_units || 0,
+      isDemo: false,
+    };
+
+    setTenant(tenantInfo);
+    setActiveTenantId(tenantInfo.id);
+    resetStoresForRealTenant();
+
+    updateName(tenantInfo.name);
+    updateAddress(tenantInfo.address);
+    updateDetails({ totalUnits: tenantInfo.totalUnits });
+
+    // Probe schema before loading stores
+    const { error: schemaProbe } = await supabase
+      .from('cases').select('id').limit(0);
+    const schemaReady = !schemaProbe || schemaProbe.code !== 'PGRST205';
+
+    if (schemaReady) {
+      await Promise.all([
+        useComplianceStore.getState().loadFromDb(tenantInfo.id),
+        useMeetingsStore.getState().loadFromDb(tenantInfo.id),
+        useIssuesStore.getState().loadFromDb(tenantInfo.id),
+        useElectionStore.getState().loadFromDb(tenantInfo.id),
+        useBuildingStore.getState().loadFromDb(tenantInfo.id),
+        useFinancialStore.getState().loadFromDb(tenantInfo.id),
+        useArchiveStore.getState().loadFromDb(tenantInfo.id),
+        useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
+        useSpendingStore.getState().loadFromDb(tenantInfo.id),
+        useLetterStore.getState().loadFromDb(tenantInfo.id),
+        usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
+        useReportStore.getState().loadFromDb(tenantInfo.id),
+        useScorecardStore.getState().loadFromDb(tenantInfo.id),
+      ]);
+    }
+  }, [updateName, updateAddress, updateDetails]);
+
+  // When a PLATFORM_ADMIN impersonates a tenant, load that tenant's data
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser || currentUser.role !== 'PLATFORM_ADMIN') return;
+    if (!isBackendEnabled || !supabase) return;
+
+    if (impersonating) {
+      loadTenantById(impersonating);
+    } else {
+      // Reset to default when impersonation ends
+      setTenant(defaultTenant);
+      setActiveTenantId(null);
+    }
+  }, [impersonating, isAuthenticated, currentUser, loadTenantById]);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser) {
@@ -65,7 +155,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         // Wait for Supabase session to be ready before querying RLS-protected tables
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (session) {
-            usePlatformAdminStore.getState().loadFromDb().then(() => setLoaded(true));
+            usePlatformAdminStore.getState().loadFromDb().then(() => {
+              // If already impersonating on load, hydrate that tenant
+              const impersonatingId = usePlatformAdminStore.getState().impersonating;
+              if (impersonatingId) {
+                loadTenantById(impersonatingId).then(() => setLoaded(true));
+              } else {
+                setLoaded(true);
+              }
+            });
           } else {
             setLoaded(true);
           }

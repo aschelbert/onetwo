@@ -199,7 +199,7 @@ export default function PlatformAdminPage() {
             <div key={section.section} className="mt-4 first:mt-2">
               <p className="text-[0.6rem] uppercase tracking-[0.1em] text-ink-500 font-semibold px-3 mb-1.5">{section.section}</p>
               {section.items.map(item => (
-                <button key={item.id} onClick={() => { setPage(item.id); setSelectedTenancy(null); }}
+                <button key={item.id} onClick={() => { setPage(item.id); setSelectedTenancy(null); store.setImpersonating(null); }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[0.82rem] font-medium transition-colors mb-0.5 ${
                     page === item.id ? 'text-white bg-white/10 font-semibold' : 'text-ink-400 hover:text-white hover:bg-white/[0.06]'
                   }`}>
@@ -350,7 +350,7 @@ export default function PlatformAdminPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-5">
                   {tenants.map(t => (
-                    <div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md cursor-pointer" onClick={() => { setPage('tenancies'); setSelectedTenancy(t.id); }}>
+                    <div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md cursor-pointer" onClick={() => { setPage('tenancies'); setSelectedTenancy(t.id); store.setImpersonating(t.id); }}>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-semibold text-ink-900 truncate">{t.name}</h4>
                         <div className="flex gap-1.5 shrink-0">
@@ -568,7 +568,7 @@ export default function PlatformAdminPage() {
                           <TenancyMenu
                             tenant={t}
                             isLastRow={isLastRow}
-                            onView={() => setSelectedTenancy(t.id)}
+                            onView={() => { setSelectedTenancy(t.id); store.setImpersonating(t.id); }}
                             onImpersonate={() => {
                               store.setImpersonating(t.id);
                               store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'impersonate.start', target: t.name, details: `Viewing as ${t.name}`, buildingId: t.id });
@@ -611,7 +611,7 @@ export default function PlatformAdminPage() {
           {/* ═══ TENANCY DETAIL ═══ */}
           {page === 'tenancies' && selected && (
             <div className="space-y-6">
-              <button onClick={() => setSelectedTenancy(null)} className="text-sm text-accent-600 font-medium hover:underline">← Back to Tenancies</button>
+              <button onClick={() => { setSelectedTenancy(null); store.setImpersonating(null); }} className="text-sm text-accent-600 font-medium hover:underline">← Back to Tenancies</button>
 
               {/* Header */}
               <div className="flex items-start justify-between">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { getInitials } from '@/lib/formatters';
+import { isBackendEnabled } from '@/lib/supabase';
 
 export default function AccountSettingsPage() {
   const { currentUser, updateProfile } = useAuthStore();
@@ -11,6 +12,42 @@ export default function AccountSettingsPage() {
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [saved, setSaved] = useState(false);
   const [linkUnit, setLinkUnit] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetError, setResetError] = useState('');
+
+  const handleChangePassword = async () => {
+    if (!isBackendEnabled) { setResetError('Backend not configured.'); return; }
+    if (!currentUser?.email) { setResetError('No email address found.'); return; }
+
+    setResetLoading(true);
+    setResetError('');
+    setResetMessage('');
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ email: currentUser.email }),
+        }
+      );
+
+      const data = await res.json();
+      if (data.error) {
+        setResetError(data.error);
+      } else {
+        setResetMessage('Password reset link sent to your email.');
+      }
+    } catch (err: any) {
+      setResetError(err.message || 'Something went wrong.');
+    }
+    setResetLoading(false);
+  };
 
   const handleSave = () => {
     updateProfile({ name, email, phone });
@@ -104,8 +141,18 @@ export default function AccountSettingsPage() {
       {/* Security */}
       <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6 space-y-4">
         <h3 className="font-display text-lg font-bold text-ink-900">Security</h3>
-        <button className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-mist-50 font-medium text-sm">Change Password</button>
-        <button className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-mist-50 font-medium text-sm ml-3">Enable Two-Factor Authentication</button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleChangePassword}
+            disabled={resetLoading}
+            className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-mist-50 font-medium text-sm disabled:opacity-50"
+          >
+            {resetLoading ? 'Sending...' : 'Change Password'}
+          </button>
+          <button className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-mist-50 font-medium text-sm">Enable Two-Factor Authentication</button>
+        </div>
+        {resetMessage && <p className="text-sm text-sage-700 bg-sage-50 border border-sage-200 rounded-lg px-3 py-2">{resetMessage}</p>}
+        {resetError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{resetError}</p>}
       </div>
     </div>
   );
