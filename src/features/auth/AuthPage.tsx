@@ -108,8 +108,10 @@ export default function AuthPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('create') === '1' && authStep === 'welcome') {
-      setAuthStep('join-role');
+    // Direct /login visit (e.g. "Log In" button) — go straight to login form
+    // /login?create=1 (e.g. "Get Started" button) — stay on welcome/CTA page
+    if (params.get('create') !== '1' && authStep === 'welcome') {
+      setAuthStep('login');
     }
     const isProvisioned = params.get('provisioned') === '1';
     if (isProvisioned) {
@@ -698,7 +700,7 @@ export default function AuthPage() {
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
             <div className="border-t border-ink-100 mt-4 pt-4 flex items-center justify-center">
-              <a href="/" className="text-xs text-accent-600 hover:text-accent-700 font-medium">← Back to website</a>
+              <a href="https://getonetwo.com" className="text-xs text-accent-600 hover:text-accent-700 font-medium">← Back to website</a>
             </div>
           </div>
         )}
