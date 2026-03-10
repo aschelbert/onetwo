@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAmenitiesStore, type AmenityConfig } from '@/store/useAmenitiesStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import Modal from '@/components/ui/Modal';
 
 type SubView = 'all' | 'my-reservations' | 'notifications';
@@ -34,6 +35,14 @@ export default function AmenitiesTab() {
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
+  const buildingAmenities = useBuildingStore(s => s.details.amenities);
+
+  // Sync amenity configs from building amenities list
+  useEffect(() => {
+    if (buildingAmenities.length > 0) {
+      store.initializeFromBuilding(buildingAmenities);
+    }
+  }, [buildingAmenities]);
 
   const [view, setView] = useState<SubView>('all');
   const [configModal, setConfigModal] = useState<AmenityConfig | null>(null);
