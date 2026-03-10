@@ -42,7 +42,7 @@ export interface GLEntry {
   debitAcct: string;
   creditAcct: string;
   amount: number;
-  source: 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee';
+  source: 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee' | 'refund';
   sourceId: string | null;
   posted: string;
   status: 'posted' | 'void';
@@ -112,5 +112,12 @@ export interface UnitInvoice {
   glEntryId: string | null;
   paymentGlEntryId: string | null;
   caseId?: string | null;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  refundAmount?: number | null;
+  refundDate?: string | null;
+  refundReason?: string | null;
+  refundGlEntryId?: string | null;
+  stripeRefundId?: string | null;
 }
 

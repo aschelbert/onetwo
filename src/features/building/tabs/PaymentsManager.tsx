@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-type ModalKind = null | 'stripe' | 'editMonthly' | 'bulkAssessment' | 'sendInvoice' | 'editDueDay';
+type ModalKind = null | 'stripe' | 'editMonthly' | 'bulkAssessment' | 'sendInvoice' | 'editDueDay' | 'refund';
 
 export default function PaymentsManager() {
   const store = useFinancialStore();
@@ -26,29 +27,54 @@ export default function PaymentsManager() {
   const unpaidSA = store.units.flatMap(u => u.specialAssessments.filter(a => !a.paid).map(a => ({ ...a, unit: u.number, owner: u.owner })));
   const totalSAAR = unpaidSA.reduce((s, a) => s + a.amount, 0);
 
-  const handleStripeConnect = () => {
-    // POST /api/stripe/create-account → stripeClient.v2.core.accounts.create({
-    //   display_name: building.name,
-    //   contact_email: building.management.email,
-    //   identity: { country: 'us' },
-    //   dashboard: 'full',
-    //   defaults: { responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe' } },
-    //   configuration: { customer: {}, merchant: { capabilities: { card_payments: { requested: true } } } },
-    // });
-    const demoId = 'acct_' + Math.random().toString(36).slice(2, 14);
-    store.setStripeConnect(demoId);
-    alert(`Demo: Connected Account ${demoId} created.\n\nIn production, this calls stripeClient.v2.core.accounts.create() and redirects to Stripe's onboarding flow.`);
+  const handleStripeConnect = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'create',
+          buildingName: building.name,
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.stripeConnectId) {
+        store.setStripeConnect(data.stripeConnectId);
+      }
+      if (data?.onboardingUrl) {
+        window.location.href = data.onboardingUrl;
+      }
+    } catch (err) {
+      console.error('Stripe Connect error:', err);
+      alert('Failed to create Stripe account. Please try again.');
+    }
   };
 
-  const handleStripeOnboard = () => {
-    // POST /api/stripe/create-account-link → stripeClient.v2.core.accountLinks.create({
-    //   account: stripeConnectId,
-    //   use_case: { type: 'account_onboarding',
-    //     account_onboarding: { configurations: ['merchant','customer'],
-    //       refresh_url: window.location.href, return_url: window.location.href } },
-    // });
-    store.setStripeOnboarding(true);
-    alert('Demo: Onboarding complete.\n\nIn production, redirects to Stripe\'s hosted onboarding via Account Links (V2 API).');
+  const handleStripeOnboard = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'check_status',
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.onboardingComplete) {
+        store.setStripeOnboarding(true);
+      } else if (data?.onboardingUrl) {
+        window.location.href = data.onboardingUrl;
+      }
+    } catch (err) {
+      console.error('Stripe onboarding check error:', err);
+      alert('Failed to check onboarding status. Please try again.');
+    }
   };
 
   const handleBulkAssessment = () => {
@@ -58,20 +84,37 @@ export default function PaymentsManager() {
     setModal(null); resetForm();
   };
 
-  const handleSendInvoice = () => {
+  const handleSendInvoice = async () => {
     if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
-    // In production: POST /api/stripe/create-invoice
-    // stripeClient.checkout.sessions.create({
-    //   line_items: [{ price_data: { unit_amount: amount * 100, currency: 'usd',
-    //     product_data: { name: description } }, quantity: 1 }],
-    //   payment_intent_data: { application_fee_amount: Math.round(amount * 100 * 0.029) },
-    //   mode: 'payment',
-    //   success_url: `${origin}/my-unit?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-    // }, { stripeAccount: stripeConnectId });
     const amount = parseFloat(f('amount'));
     const unit = store.units.find(u => u.number === f('unitNum'));
-    alert(`Demo: Invoice sent to ${unit?.owner || f('unitNum')} for ${fmt(amount)}.\n\nDescription: ${f('description')}\n\nIn production, this creates a Stripe Checkout session (direct charge) and emails the payment link to the unit owner.`);
-    store.addSpecialAssessment(f('unitNum'), amount, f('description'));
+    if (!unit) return;
+
+    // Create the invoice in the store (posts GL entry, updates balance)
+    const invoice = store.createUnitInvoice(f('unitNum'), 'fee', amount, f('description'));
+
+    // Send to Stripe + email via edge function
+    if (supabase) {
+      try {
+        await supabase.functions.invoke('send-unit-invoice', {
+          body: {
+            invoiceId: invoice.id,
+            unitNumber: unit.number,
+            ownerName: unit.owner,
+            ownerEmail: unit.email,
+            amount,
+            description: f('description'),
+            type: 'fee',
+            buildingName: building.name,
+            stripeConnectId: store.stripeConnectId,
+            tenantId: store.tenantId,
+          },
+        });
+      } catch (err) {
+        console.error('send-unit-invoice error:', err);
+      }
+    }
+
     setModal(null); resetForm();
   };
 
@@ -141,6 +184,49 @@ export default function PaymentsManager() {
         )}
       </div>
 
+      {/* Billing Automation & Late Fee Settings */}
+      {stripeReady && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Billing Automation */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold text-ink-800">Billing Automation</h4>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={store.autoBillingEnabled} onChange={e => store.setAutoBilling(e.target.checked)} className="sr-only peer" />
+                <div className="w-9 h-5 bg-ink-200 rounded-full peer peer-checked:bg-sage-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+            <p className="text-xs text-ink-500 mb-2">Auto-generate monthly invoices on the 1st of each month at 6 AM UTC. Each unit with a monthly fee will receive a Stripe payment link via email.</p>
+            {store.lastBillingRun && <p className="text-[10px] text-ink-400">Last run: {store.lastBillingRun}</p>}
+          </div>
+
+          {/* Late Fee Settings */}
+          <div className="bg-white rounded-xl border border-ink-100 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold text-ink-800">Late Fee Automation</h4>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={store.lateFeeEnabled} onChange={e => store.setLateFeeSettings(e.target.checked, store.lateFeeAmount, store.lateFeeGraceDays)} className="sr-only peer" />
+                <div className="w-9 h-5 bg-ink-200 rounded-full peer peer-checked:bg-sage-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-medium text-ink-500 mb-0.5">Fee Amount ($)</label>
+                  <input type="number" value={store.lateFeeAmount} onChange={e => store.setLateFeeSettings(store.lateFeeEnabled, parseFloat(e.target.value) || 0, store.lateFeeGraceDays)} className="w-full px-2 py-1.5 border border-ink-200 rounded text-xs" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] font-medium text-ink-500 mb-0.5">Grace Days</label>
+                  <input type="number" value={store.lateFeeGraceDays} onChange={e => store.setLateFeeSettings(store.lateFeeEnabled, store.lateFeeAmount, parseInt(e.target.value) || 0)} className="w-full px-2 py-1.5 border border-ink-200 rounded text-xs" />
+                </div>
+              </div>
+              <p className="text-[10px] text-ink-400">Checked daily at 7 AM UTC. Invoices past due date + grace period get a late fee.</p>
+              {store.lastLateFeeRun && <p className="text-[10px] text-ink-400">Last run: {store.lastLateFeeRun}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delinquent units list */}
       {delinquent.length > 0 && (
         <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
@@ -156,8 +242,28 @@ export default function PaymentsManager() {
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-red-600 text-sm">{fmt(u.balance)}</span>
                   {stripeReady && (
-                    <button onClick={() => {
-                      alert(`Demo: Payment link sent to ${u.owner} (${u.email}) for ${fmt(u.balance)}.\n\nIn production, creates a Stripe Checkout session and emails the link.`);
+                    <button onClick={async () => {
+                      const invoice = store.createUnitInvoice(u.number, 'monthly', u.balance, `Outstanding balance — Unit ${u.number}`);
+                      if (supabase) {
+                        try {
+                          await supabase.functions.invoke('send-unit-invoice', {
+                            body: {
+                              invoiceId: invoice.id,
+                              unitNumber: u.number,
+                              ownerName: u.owner,
+                              ownerEmail: u.email,
+                              amount: u.balance,
+                              description: `Outstanding balance — Unit ${u.number}`,
+                              type: 'monthly',
+                              buildingName: building.name,
+                              stripeConnectId: store.stripeConnectId,
+                              tenantId: store.tenantId,
+                            },
+                          });
+                        } catch (err) {
+                          console.error('send-unit-invoice error:', err);
+                        }
+                      }
                     }} className="px-3 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700">Send Link</button>
                   )}
                 </div>
@@ -224,6 +330,52 @@ export default function PaymentsManager() {
           </table>
         </div>
       </div>
+
+      {/* Invoice History */}
+      {store.unitInvoices.length > 0 && (
+        <div className="bg-white rounded-xl border border-ink-100 overflow-hidden">
+          <div className="border-b px-5 py-3"><h4 className="text-sm font-bold text-ink-800">Invoice History</h4></div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-ink-100 bg-ink-50 text-left">
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Invoice</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Unit</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Type</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Amount</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Status</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Date</th>
+                <th className="px-4 py-2 text-xs font-semibold text-ink-500">Actions</th>
+              </tr></thead>
+              <tbody>
+                {[...store.unitInvoices].sort((a, b) => b.createdDate.localeCompare(a.createdDate)).slice(0, 20).map(inv => (
+                  <tr key={inv.id} className="border-b border-ink-50 hover:bg-mist-50">
+                    <td className="px-4 py-2.5 text-xs font-mono text-ink-500">{inv.id.slice(0, 12)}</td>
+                    <td className="px-4 py-2.5 font-medium text-ink-900">{inv.unitNumber}</td>
+                    <td className="px-4 py-2.5 text-xs text-ink-500">{inv.type.replace('_', ' ')}</td>
+                    <td className="px-4 py-2.5 font-medium">{fmt(inv.amount)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                        inv.status === 'paid' ? 'bg-sage-100 text-sage-700' :
+                        inv.status === 'void' ? 'bg-ink-100 text-ink-500' :
+                        inv.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {inv.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-ink-400">{inv.createdDate}</td>
+                    <td className="px-4 py-2.5">
+                      {inv.status === 'paid' && (
+                        <button onClick={() => { resetForm(); sf('refundInvoiceId', inv.id); sf('refundAmount', String(inv.amount)); sf('refundUnit', inv.unitNumber); setModal('refund'); }} className="px-2 py-1 bg-red-50 text-red-600 rounded text-[10px] font-semibold hover:bg-red-100 border border-red-200">Refund</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ─── Modals ─── */}
 
@@ -303,6 +455,25 @@ export default function PaymentsManager() {
             <div><label className="block text-xs font-medium text-ink-700 mb-1">Description *</label><input value={f('description')} onChange={e => sf('description', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Window replacement — Unit 301" /></div>
             <div className="bg-sand-100 rounded-lg p-3 border border-ink-100">
               <p className="text-xs text-ink-500"><strong>Stripe flow:</strong> Creates a Checkout Session (direct charge with application fee) and emails the payment link. Payment auto-reconciles via webhook.</p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal === 'refund' && (
+        <Modal title="Refund Invoice" onClose={() => { setModal(null); resetForm(); }} onSave={() => {
+          if (!f('refundInvoiceId')) return;
+          store.refundUnitInvoice(f('refundInvoiceId'), f('refundReason') || 'Board-initiated refund');
+          setModal(null); resetForm();
+        }} saveLabel="Process Refund">
+          <div className="space-y-3">
+            <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+              <p className="text-xs text-red-700 font-medium">This will issue a full refund of {fmt(parseFloat(f('refundAmount') || '0'))} to Unit {f('refundUnit')}.</p>
+              <p className="text-[10px] text-red-600 mt-1">If the payment was made via Stripe, a refund will be issued to the original payment method. A reversal GL entry will be posted and the invoice will be voided.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink-700 mb-1">Reason for refund</label>
+              <input value={f('refundReason')} onChange={e => sf('refundReason', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Duplicate charge, service not rendered" />
             </div>
           </div>
         </Modal>

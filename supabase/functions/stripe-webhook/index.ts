@@ -181,11 +181,27 @@ Deno.serve(async (req) => {
   try {
     switch (event.type) {
 
-      // ═══ CHECKOUT COMPLETED → Provision tenant ═══
+      // ═══ CHECKOUT COMPLETED → Unit payment or Provision tenant ═══
       case "checkout.session.completed": {
         const session = event.data.object;
         const meta = session.metadata || {};
 
+        // ═══ UNIT PAYMENT checkout ═══
+        if (meta.invoice_id && meta.tenant_id) {
+          console.log(`Unit payment checkout: invoice=${meta.invoice_id} tenant=${meta.tenant_id}`);
+          try {
+            const result = await sbRpc("reconcile_unit_payment", {
+              p_stripe_session_id: session.id,
+              p_stripe_payment_intent_id: session.payment_intent || null,
+            });
+            console.log("Reconciliation result:", JSON.stringify(result));
+          } catch (err) {
+            console.error("Unit payment reconciliation failed:", err);
+          }
+          break;
+        }
+
+        // ═══ ONBOARDING checkout ═══
         if (!meta.building_name || !meta.user_id) {
           console.log("Non-onboarding checkout, skipping");
           break;
@@ -407,6 +423,79 @@ Deno.serve(async (req) => {
         }
 
         await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, updatePayload);
+        break;
+      }
+
+      // ═══ CHARGE REFUNDED ═══
+      case "charge.refunded": {
+        const charge = event.data.object;
+        const paymentIntentId = charge.payment_intent;
+        if (!paymentIntentId) {
+          console.log("charge.refunded without payment_intent, skipping");
+          break;
+        }
+
+        // Find invoice by stripe_payment_intent_id
+        const refundInvoice = await sbQuery("GET", "unit_invoices", {
+          "stripe_payment_intent_id": `eq.${paymentIntentId}`,
+          "select": "id,tenant_id,unit_number,amount,status,type",
+        });
+
+        if (!refundInvoice?.id) {
+          console.log(`No invoice found for payment_intent ${paymentIntentId}`);
+          break;
+        }
+
+        if (refundInvoice.status === "void") {
+          console.log(`Invoice ${refundInvoice.id} already voided`);
+          break;
+        }
+
+        // Determine AR account
+        const refundArAcct = refundInvoice.type === "fee" || refundInvoice.type === "amenity_fee" ? "1130"
+          : refundInvoice.type === "special_assessment" ? "1120" : "1110";
+        const refundGlId = "GL" + Date.now();
+
+        // Post reversal GL entry: debit AR, credit 1010 (cash)
+        await sbQuery("POST", "general_ledger", {}, {
+          tenant_id: refundInvoice.tenant_id,
+          local_id: refundGlId,
+          date: new Date().toISOString().split("T")[0],
+          memo: `Refund - Invoice ${refundInvoice.id} Unit ${refundInvoice.unit_number}`,
+          debit_acct: refundArAcct,
+          credit_acct: "1010",
+          amount: refundInvoice.amount,
+          source: "payment",
+          source_id: refundInvoice.unit_number,
+          posted: new Date().toISOString(),
+          status: "posted",
+        });
+
+        // Update invoice to void with refund info
+        const stripeRefundId = charge.refunds?.data?.[0]?.id || null;
+        await sbQuery("PATCH", `unit_invoices?id=eq.${refundInvoice.id}`, {}, {
+          status: "void",
+          refund_amount: refundInvoice.amount,
+          refund_date: new Date().toISOString().split("T")[0],
+          refund_reason: "Stripe refund",
+          refund_gl_entry_id: refundGlId,
+          stripe_refund_id: stripeRefundId,
+        });
+
+        // Update unit balance (increase by refund amount)
+        // Use raw SQL via RPC since we need an increment
+        const currentUnit = await sbQuery("GET", "units", {
+          "tenant_id": `eq.${refundInvoice.tenant_id}`,
+          "number": `eq.${refundInvoice.unit_number}`,
+          "select": "balance",
+        });
+        if (currentUnit) {
+          await sbQuery("PATCH", `units?tenant_id=eq.${refundInvoice.tenant_id}&number=eq.${refundInvoice.unit_number}`, {}, {
+            balance: (currentUnit.balance || 0) + refundInvoice.amount,
+          });
+        }
+
+        console.log(`Refund processed for invoice ${refundInvoice.id}, amount: ${refundInvoice.amount}`);
         break;
       }
 

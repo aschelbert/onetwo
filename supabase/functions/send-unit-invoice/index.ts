@@ -5,6 +5,8 @@ const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
 const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
+const SB_URL = Deno.env.get("SUPABASE_URL") || "";
+const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +30,7 @@ Deno.serve(async (req) => {
       type, // 'fee' | 'special_assessment'
       buildingName,
       buildingAddress,
+      tenantId,
     } = body;
 
     if (!ownerEmail || !amount || !description) {
@@ -56,6 +59,7 @@ Deno.serve(async (req) => {
       stripeParams.append("metadata[invoice_id]", invoiceId || "");
       stripeParams.append("metadata[unit_number]", unitNumber || "");
       stripeParams.append("metadata[type]", type || "invoice");
+      if (tenantId) stripeParams.append("metadata[tenant_id]", tenantId);
 
       // If a real Stripe Connect account ID is provided, create the session on that account
       // with an application fee. Otherwise, create on the platform account.
@@ -82,6 +86,27 @@ Deno.serve(async (req) => {
         paymentUrl = session.url || "";
         stripeSessionId = session.id || "";
         console.log("Stripe session created:", stripeSessionId, "url:", paymentUrl);
+
+        // Save stripe session ID and payment link to unit_invoices
+        if (invoiceId && SB_URL && SB_SERVICE_KEY) {
+          const patchUrl = `${SB_URL}/rest/v1/unit_invoices?id=eq.${invoiceId}`;
+          await fetch(patchUrl, {
+            method: "PATCH",
+            headers: {
+              "apikey": SB_SERVICE_KEY,
+              "Authorization": `Bearer ${SB_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=minimal",
+            },
+            body: JSON.stringify({
+              stripe_checkout_session_id: stripeSessionId,
+              stripe_payment_link: paymentUrl,
+            }),
+          }).then(r => {
+            if (!r.ok) console.error("Failed to patch unit_invoices:", r.status);
+            else console.log("Saved stripe session to invoice:", invoiceId);
+          }).catch(e => console.error("Patch error:", e));
+        }
       } else {
         const errBody = await stripeRes.text();
         console.error("Stripe error:", stripeRes.status, errBody);

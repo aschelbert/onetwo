@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
@@ -85,7 +85,7 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
-  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee', amount: number, description: string, caseId?: string) => UnitInvoice;
+  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string, caseId?: string) => UnitInvoice;
   payUnitInvoice: (invoiceId: string, method: string) => void;
 
   // CoA mutations
@@ -110,6 +110,21 @@ interface FinancialState {
   stripeOnboardingComplete: boolean;
   setStripeConnect: (id: string) => void;
   setStripeOnboarding: (complete: boolean) => void;
+
+  // Billing automation
+  autoBillingEnabled: boolean;
+  lastBillingRun: string | null;
+  setAutoBilling: (enabled: boolean) => void;
+
+  // Late fee settings
+  lateFeeEnabled: boolean;
+  lateFeeAmount: number;
+  lateFeeGraceDays: number;
+  lastLateFeeRun: string | null;
+  setLateFeeSettings: (enabled: boolean, amount: number, graceDays: number) => void;
+
+  // Refund
+  refundUnitInvoice: (invoiceId: string, reason: string) => void;
 }
 
 // ── Sync helpers ──
@@ -145,6 +160,10 @@ function syncSettings() {
     annualReserveContribution: s.annualReserveContribution,
     stripeConnectId: s.stripeConnectId,
     stripeOnboardingComplete: s.stripeOnboardingComplete,
+    autoBillingEnabled: s.autoBillingEnabled,
+    lateFeeEnabled: s.lateFeeEnabled,
+    lateFeeAmount: s.lateFeeAmount,
+    lateFeeGraceDays: s.lateFeeGraceDays,
   });
 }
 
@@ -194,6 +213,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.annualReserveContribution = data.settings.annualReserveContribution;
       updates.stripeConnectId = data.settings.stripeConnectId;
       updates.stripeOnboardingComplete = data.settings.stripeOnboardingComplete;
+      updates.autoBillingEnabled = data.settings.autoBillingEnabled;
+      updates.lastBillingRun = data.settings.lastBillingRun;
+      updates.lateFeeEnabled = data.settings.lateFeeEnabled;
+      updates.lateFeeAmount = data.settings.lateFeeAmount;
+      updates.lateFeeGraceDays = data.settings.lateFeeGraceDays;
+      updates.lastLateFeeRun = data.settings.lastLateFeeRun;
     }
     if (Object.keys(updates).length > 0) set(updates);
   },
@@ -710,6 +735,58 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     syncUnit(unitNum);
   },
 
+  // Billing automation
+  autoBillingEnabled: false,
+  lastBillingRun: null,
+  setAutoBilling: (enabled) => {
+    set({ autoBillingEnabled: enabled });
+    syncSettings();
+  },
+
+  // Late fee settings
+  lateFeeEnabled: false,
+  lateFeeAmount: 25,
+  lateFeeGraceDays: 15,
+  lastLateFeeRun: null,
+  setLateFeeSettings: (enabled, amount, graceDays) => {
+    set({ lateFeeEnabled: enabled, lateFeeAmount: amount, lateFeeGraceDays: graceDays });
+    syncSettings();
+  },
+
+  // Refund
+  refundUnitInvoice: (invoiceId, reason) => {
+    const today = new Date().toISOString().split('T')[0];
+    const inv = get().unitInvoices.find(i => i.id === invoiceId);
+    if (!inv || inv.status !== 'paid') return;
+
+    // Post reversal GL entry: debit AR, credit 1010 (cash)
+    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? '1130' : inv.type === 'special_assessment' ? '1120' : '1110';
+    const glEntry = get().glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}`, arAcct, '1010', inv.amount, 'refund', inv.unitNumber);
+
+    // Update invoice in state
+    set(s => ({
+      unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
+        ...i,
+        status: 'void' as const,
+        refundAmount: inv.amount,
+        refundDate: today,
+        refundReason: reason,
+        refundGlEntryId: glEntry?.id || null,
+      } : i),
+      units: s.units.map(u => u.number === inv.unitNumber ? {
+        ...u,
+        balance: u.balance + inv.amount,
+      } : u),
+    }));
+
+    // Call refund edge function (handles Stripe refund + server-side DB updates)
+    if (isBackendEnabled && supabase) {
+      supabase.functions.invoke('refund-unit-payment', {
+        body: { invoiceId, reason },
+      }).catch(err => console.error('refund-unit-payment error:', err));
+    }
+  },
+
   // Stripe Connect
   stripeConnectId: null,
   stripeOnboardingComplete: false,
@@ -786,6 +863,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     unitInvoices: state.unitInvoices,
     stripeConnectId: state.stripeConnectId,
     stripeOnboardingComplete: state.stripeOnboardingComplete,
+    autoBillingEnabled: state.autoBillingEnabled,
+    lateFeeEnabled: state.lateFeeEnabled,
+    lateFeeAmount: state.lateFeeAmount,
+    lateFeeGraceDays: state.lateFeeGraceDays,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

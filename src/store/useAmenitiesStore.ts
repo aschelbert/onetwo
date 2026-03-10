@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { sendInvoiceToStripe } from '@/lib/services/invoicing';
+import { useBuildingStore } from '@/store/useBuildingStore';
 
 export interface AmenityConfig {
   id: string;
@@ -359,18 +361,28 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
     // If no approval needed and has fees, create invoices immediately
     if (!needsApproval && fee > 0 && r.reservedByUnit) {
-      const inv = useFinancialStore.getState().createUnitInvoice(
+      const finStore = useFinancialStore.getState();
+      const inv = finStore.createUnitInvoice(
         r.reservedByUnit, 'amenity_fee', fee,
         `Amenity: ${r.amenityName} reservation ${r.date}`,
       );
       invoiceId = inv.id;
+      const unit = finStore.units.find(u => u.number === r.reservedByUnit);
+      if (unit && finStore.tenantId) {
+        sendInvoiceToStripe(inv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+      }
     }
     if (!needsApproval && deposit > 0 && r.reservedByUnit) {
-      const depInv = useFinancialStore.getState().createUnitInvoice(
+      const finStore = useFinancialStore.getState();
+      const depInv = finStore.createUnitInvoice(
         r.reservedByUnit, 'amenity_fee', deposit,
         `Amenity deposit: ${r.amenityName}`,
       );
       depositInvoiceId = depInv.id;
+      const unit = finStore.units.find(u => u.number === r.reservedByUnit);
+      if (unit && finStore.tenantId) {
+        sendInvoiceToStripe(depInv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+      }
     }
 
     const reservation: Reservation = {
@@ -452,18 +464,28 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
     // Create invoices on approval if fees exist
     if (res.fee > 0 && !invoiceId && res.reservedByUnit) {
-      const inv = useFinancialStore.getState().createUnitInvoice(
+      const finStore = useFinancialStore.getState();
+      const inv = finStore.createUnitInvoice(
         res.reservedByUnit, 'amenity_fee', res.fee,
         `Amenity: ${res.amenityName} reservation ${res.date}`,
       );
       invoiceId = inv.id;
+      const unit = finStore.units.find(u => u.number === res.reservedByUnit);
+      if (unit && finStore.tenantId) {
+        sendInvoiceToStripe(inv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+      }
     }
     if (res.deposit > 0 && !depositInvoiceId && res.reservedByUnit) {
-      const depInv = useFinancialStore.getState().createUnitInvoice(
+      const finStore = useFinancialStore.getState();
+      const depInv = finStore.createUnitInvoice(
         res.reservedByUnit, 'amenity_fee', res.deposit,
         `Amenity deposit: ${res.amenityName}`,
       );
       depositInvoiceId = depInv.id;
+      const unit = finStore.units.find(u => u.number === res.reservedByUnit);
+      if (unit && finStore.tenantId) {
+        sendInvoiceToStripe(depInv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+      }
     }
 
     set(s => ({
@@ -530,18 +552,28 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
       // Create invoices for non-approval-required reservations
       if (!needsApproval && fee > 0 && base.reservedByUnit) {
-        const inv = useFinancialStore.getState().createUnitInvoice(
+        const finStore = useFinancialStore.getState();
+        const inv = finStore.createUnitInvoice(
           base.reservedByUnit, 'amenity_fee', fee,
           `Amenity: ${base.amenityName} reservation ${date}`,
         );
         reservation.invoiceId = inv.id;
+        const unit = finStore.units.find(u => u.number === base.reservedByUnit);
+        if (unit && finStore.tenantId) {
+          sendInvoiceToStripe(inv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+        }
       }
       if (!needsApproval && deposit > 0 && base.reservedByUnit) {
-        const depInv = useFinancialStore.getState().createUnitInvoice(
+        const finStore = useFinancialStore.getState();
+        const depInv = finStore.createUnitInvoice(
           base.reservedByUnit, 'amenity_fee', deposit,
           `Amenity deposit: ${base.amenityName}`,
         );
         reservation.depositInvoiceId = depInv.id;
+        const unit = finStore.units.find(u => u.number === base.reservedByUnit);
+        if (unit && finStore.tenantId) {
+          sendInvoiceToStripe(depInv, unit, useBuildingStore.getState().name, finStore.stripeConnectId, finStore.tenantId);
+        }
       }
 
       created.push(reservation);

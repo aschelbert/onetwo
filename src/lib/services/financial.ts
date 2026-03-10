@@ -338,6 +338,13 @@ function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
     stripePaymentLink: (r.stripe_payment_link as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
     paymentGlEntryId: (r.payment_gl_entry_id as string) || null,
+    stripeCheckoutSessionId: (r.stripe_checkout_session_id as string) || null,
+    stripePaymentIntentId: (r.stripe_payment_intent_id as string) || null,
+    refundAmount: r.refund_amount != null ? Number(r.refund_amount) : null,
+    refundDate: (r.refund_date as string) || null,
+    refundReason: (r.refund_reason as string) || null,
+    refundGlEntryId: (r.refund_gl_entry_id as string) || null,
+    stripeRefundId: (r.stripe_refund_id as string) || null,
   };
 }
 
@@ -363,6 +370,8 @@ export async function createUnitInvoice(tenantId: string, inv: UnitInvoice): Pro
       paid_amount: inv.paidAmount, payment_method: inv.paymentMethod,
       stripe_payment_link: inv.stripePaymentLink, gl_entry_id: inv.glEntryId,
       payment_gl_entry_id: inv.paymentGlEntryId,
+      stripe_checkout_session_id: inv.stripeCheckoutSessionId || null,
+      stripe_payment_intent_id: inv.stripePaymentIntentId || null,
     })
     .select()
     .single();
@@ -378,6 +387,13 @@ export async function updateUnitInvoice(id: string, updates: Partial<UnitInvoice
   if (updates.paidAmount !== undefined) row.paid_amount = updates.paidAmount;
   if (updates.paymentMethod !== undefined) row.payment_method = updates.paymentMethod;
   if (updates.paymentGlEntryId !== undefined) row.payment_gl_entry_id = updates.paymentGlEntryId;
+  if (updates.stripeCheckoutSessionId !== undefined) row.stripe_checkout_session_id = updates.stripeCheckoutSessionId;
+  if (updates.stripePaymentIntentId !== undefined) row.stripe_payment_intent_id = updates.stripePaymentIntentId;
+  if (updates.refundAmount !== undefined) row.refund_amount = updates.refundAmount;
+  if (updates.refundDate !== undefined) row.refund_date = updates.refundDate;
+  if (updates.refundReason !== undefined) row.refund_reason = updates.refundReason;
+  if (updates.refundGlEntryId !== undefined) row.refund_gl_entry_id = updates.refundGlEntryId;
+  if (updates.stripeRefundId !== undefined) row.stripe_refund_id = updates.stripeRefundId;
   const { error } = await supabase.from('unit_invoices').update(row).eq('id', id);
   if (error) { logDbError('updateUnitInvoice error:', error); return false; }
   return true;
@@ -390,6 +406,12 @@ export interface FinancialSettingsRow {
   annualReserveContribution: number;
   stripeConnectId: string | null;
   stripeOnboardingComplete: boolean;
+  autoBillingEnabled: boolean;
+  lastBillingRun: string | null;
+  lateFeeEnabled: boolean;
+  lateFeeAmount: number;
+  lateFeeGraceDays: number;
+  lastLateFeeRun: string | null;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -406,6 +428,12 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     annualReserveContribution: Number(data.annual_reserve_contribution),
     stripeConnectId: data.stripe_connect_id || null,
     stripeOnboardingComplete: data.stripe_onboarding_complete as boolean,
+    autoBillingEnabled: data.auto_billing_enabled as boolean ?? false,
+    lastBillingRun: (data.last_billing_run as string) || null,
+    lateFeeEnabled: data.late_fee_enabled as boolean ?? false,
+    lateFeeAmount: Number(data.late_fee_amount ?? 25),
+    lateFeeGraceDays: Number(data.late_fee_grace_days ?? 15),
+    lastLateFeeRun: (data.last_late_fee_run as string) || null,
   };
 }
 
@@ -416,6 +444,12 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.annualReserveContribution !== undefined) row.annual_reserve_contribution = s.annualReserveContribution;
   if (s.stripeConnectId !== undefined) row.stripe_connect_id = s.stripeConnectId;
   if (s.stripeOnboardingComplete !== undefined) row.stripe_onboarding_complete = s.stripeOnboardingComplete;
+  if (s.autoBillingEnabled !== undefined) row.auto_billing_enabled = s.autoBillingEnabled;
+  if (s.lastBillingRun !== undefined) row.last_billing_run = s.lastBillingRun;
+  if (s.lateFeeEnabled !== undefined) row.late_fee_enabled = s.lateFeeEnabled;
+  if (s.lateFeeAmount !== undefined) row.late_fee_amount = s.lateFeeAmount;
+  if (s.lateFeeGraceDays !== undefined) row.late_fee_grace_days = s.lateFeeGraceDays;
+  if (s.lastLateFeeRun !== undefined) row.last_late_fee_run = s.lastLateFeeRun;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
