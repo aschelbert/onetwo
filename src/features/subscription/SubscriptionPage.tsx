@@ -14,6 +14,8 @@ interface SubscriptionData {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   stripe_subscription_id: string | null;
+  trial_ends_at: string | null;
+  created_at: string | null;
 }
 
 function formatDate(iso: string | null): string {
@@ -66,7 +68,7 @@ export default function SubscriptionPage() {
       try {
         const { data, error: fetchErr } = await supabase
           .from('subscriptions')
-          .select('tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id')
+          .select('tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, trial_ends_at, created_at')
           .eq('tenant_id', tenant.id)
           .maybeSingle();
         if (fetchErr) throw fetchErr;
@@ -224,15 +226,23 @@ export default function SubscriptionPage() {
           </div>
           <div>
             <p className="text-ink-400 text-xs mb-0.5">Price</p>
-            <p className="font-semibold text-ink-900">${sub.monthly_rate}/mo</p>
+            <p className="font-semibold text-ink-900">${(sub.monthly_rate / 100).toFixed(0)}/mo</p>
           </div>
           <div>
-            <p className="text-ink-400 text-xs mb-0.5">Current Period</p>
-            <p className="text-ink-700">{formatDate(sub.current_period_start)} — {formatDate(sub.current_period_end)}</p>
+            <p className="text-ink-400 text-xs mb-0.5">{sub.status === 'trialing' ? 'Trial Period' : 'Current Period'}</p>
+            <p className="text-ink-700">
+              {formatDate(sub.current_period_start || (sub.status === 'trialing' ? sub.created_at : null))}
+              {' — '}
+              {formatDate(sub.current_period_end || (sub.status === 'trialing' ? sub.trial_ends_at : null))}
+            </p>
           </div>
           <div>
-            <p className="text-ink-400 text-xs mb-0.5">Next Billing Date</p>
-            <p className="text-ink-700">{sub.cancel_at_period_end ? 'N/A' : formatDate(sub.current_period_end)}</p>
+            <p className="text-ink-400 text-xs mb-0.5">{sub.status === 'trialing' ? 'Trial Ends' : 'Next Billing Date'}</p>
+            <p className="text-ink-700">
+              {sub.cancel_at_period_end
+                ? 'N/A'
+                : formatDate(sub.current_period_end || (sub.status === 'trialing' ? sub.trial_ends_at : null))}
+            </p>
           </div>
         </div>
 
