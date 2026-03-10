@@ -358,6 +358,30 @@ export async function bulkUpdatePermissions(roleId: string, mode: string, featur
   return true;
 }
 
+// ── Tenant Features ──
+
+export async function syncTenantFeatures(tenantId: string, features: Tenant['features']): Promise<boolean> {
+  if (!supabase) return false;
+  const row = {
+    tenant_id: tenantId,
+    fiscal_lens: features.fiscalLens,
+    case_ops: features.caseOps,
+    compliance_runbook: features.complianceRunbook,
+    ai_advisor: features.aiAdvisor,
+    document_vault: features.documentVault,
+    payment_processing: features.paymentProcessing,
+    votes_resolutions: features.votesResolutions,
+    community_portal: features.communityPortal,
+    vendor_management: features.vendorManagement,
+    reserve_study_tools: features.reserveStudyTools,
+  };
+  const { error } = await supabase
+    .from('tenant_features')
+    .upsert(row, { onConflict: 'tenant_id' });
+  if (error) { logDbError('syncTenantFeatures error:', error); return false; }
+  return true;
+}
+
 // ── Stripe Payments ──
 
 function rowToStripePayment(r: Record<string, unknown>): StripePayment {

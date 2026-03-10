@@ -770,14 +770,18 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
 
   addTenant: (tenant) => set(s => ({ tenants: [...s.tenants, tenant] })),
 
-  changeTier: (id, tier, actor) => set(s => ({
-    tenants: s.tenants.map(t => t.id === id ? {
-      ...t,
-      subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
-      features: { ...TIER_FEATURES[tier] },
-    } : t),
-    auditLog: [{ id: `aud-${Date.now()}`, timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
-  })),
+  changeTier: (id, tier, actor) => {
+    const features = { ...TIER_FEATURES[tier] };
+    set(s => ({
+      tenants: s.tenants.map(t => t.id === id ? {
+        ...t,
+        subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
+        features,
+      } : t),
+      auditLog: [{ id: `aud-${Date.now()}`, timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
+    }));
+    if (isBackendEnabled) platformSvc.syncTenantFeatures(id, features);
+  },
 
   updateOnboardingStep: (id, step, done) => set(s => ({
     tenants: s.tenants.map(t => t.id === id ? { ...t, onboardingChecklist: { ...t.onboardingChecklist, [step]: done } } : t),
