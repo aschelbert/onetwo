@@ -12,7 +12,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useElectionStore } from '@/store/useElectionStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
-import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
+import { usePlatformAdminStore, TIER_FEATURES } from '@/store/usePlatformAdminStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useLetterStore } from '@/store/useLetterStore';
@@ -55,7 +55,7 @@ const defaultOnboarding: OnboardingState = {
 
 const defaultTenant: TenantInfo = {
   id: 'demo', name: 'Sunny Acres Condominium', subdomain: 'demo',
-  status: 'active', tier: 'compliance_pro', features: {},
+  status: 'active', tier: 'management_suite', features: { ...TIER_FEATURES['management_suite'] },
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
   totalUnits: 50, isDemo: true, onboarding: defaultOnboarding,
 };
@@ -161,7 +161,18 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         subdomain: t.subdomain,
         status: t.status,
         tier: sub?.tier || 'compliance_pro',
-        features: feat || {},
+        features: feat ? {
+          fiscalLens: feat.fiscal_lens,
+          caseOps: feat.case_ops,
+          complianceRunbook: feat.compliance_runbook,
+          aiAdvisor: feat.ai_advisor,
+          documentVault: feat.document_vault,
+          paymentProcessing: feat.payment_processing,
+          votesResolutions: feat.votes_resolutions,
+          communityPortal: feat.community_portal,
+          vendorManagement: feat.vendor_management,
+          reserveStudyTools: feat.reserve_study_tools,
+        } : {},
         address: {
           street: addr.street || '',
           city: addr.city || '',
@@ -332,7 +343,18 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           subdomain: t.subdomain,
           status: t.status,
           tier: sub?.tier || 'compliance_pro',
-          features: feat || {},
+          features: feat ? {
+            fiscalLens: feat.fiscal_lens,
+            caseOps: feat.case_ops,
+            complianceRunbook: feat.compliance_runbook,
+            aiAdvisor: feat.ai_advisor,
+            documentVault: feat.document_vault,
+            paymentProcessing: feat.payment_processing,
+            votesResolutions: feat.votes_resolutions,
+            communityPortal: feat.community_portal,
+            vendorManagement: feat.vendor_management,
+            reserveStudyTools: feat.reserve_study_tools,
+          } : {},
           address: {
             street: addr.street || '',
             city: addr.city || '',
