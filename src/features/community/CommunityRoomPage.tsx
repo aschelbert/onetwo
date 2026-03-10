@@ -33,7 +33,10 @@ export default function CommunityRoomPage() {
   const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
+  const currentRole = useAuthStore(s => s.currentRole);
+  const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const amenityUnread = amenitiesStore.getUnreadCount(user.id);
+  const amenityPending = amenitiesStore.getPendingApprovals().length;
   const validTabs: TabId[] = isManagementSuite
     ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
     : ['announcements', 'requests', 'meetings', 'votes'];
@@ -82,7 +85,7 @@ export default function CommunityRoomPage() {
     { id: 'requests', label: 'Requests', badge: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
-    ...(isManagementSuite ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: amenityUnread || undefined }] : []),
+    ...(isManagementSuite ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
@@ -135,13 +138,16 @@ export default function CommunityRoomPage() {
             <p className="text-accent-200 text-sm mt-1">Announcements, requests, meetings & vote results</p>
           </div>
         </div>
-        <div className={`grid grid-cols-2 ${isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mt-5`}>
+        <div className={`grid grid-cols-2 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mt-5`}>
           {[
             { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', icon: '📌', tab: 'announcements' as TabId },
             { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', icon: '📬', tab: 'requests' as TabId },
             { val: upcoming.length, label: 'Upcoming Meetings', icon: '📅', tab: 'meetings' as TabId },
             { val: openElections, label: 'Open Votes', icon: '🗳', tab: 'votes' as TabId },
-            ...(isManagementSuite ? [{ val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', icon: '🏢', tab: 'amenities' as TabId }] : []),
+            ...(isManagementSuite ? [
+              { val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', icon: '🏢', tab: 'amenities' as TabId },
+              ...(isBoard ? [{ val: amenityPending, label: 'Pending Approvals', icon: '⏳', tab: 'amenities' as TabId }] : []),
+            ] : []),
           ].map(s => (
             <div key={s.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(s.tab)}>
               <span className="text-xl">{s.icon}</span>

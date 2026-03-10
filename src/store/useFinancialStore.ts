@@ -85,7 +85,7 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
-  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment', amount: number, description: string, caseId?: string) => UnitInvoice;
+  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee', amount: number, description: string, caseId?: string) => UnitInvoice;
   payUnitInvoice: (invoiceId: string, method: string) => void;
 
   // CoA mutations
@@ -727,8 +727,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const id = 'INV-U' + Date.now().toString(36).toUpperCase();
-    const glAcct = type === 'fee' ? '1130' : '1120';
-    const glRev = type === 'fee' ? '4030' : '4020';
+    const glAcct = type === 'fee' || type === 'amenity_fee' ? '1130' : '1120';
+    const glRev = type === 'amenity_fee' ? '4060' : type === 'fee' ? '4030' : '4020';
     const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
     const invoice: UnitInvoice = {
       id, unitNumber: unitNum, type, description, amount,
@@ -750,7 +750,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const today = new Date().toISOString().split('T')[0];
     const inv = get().unitInvoices.find(i => i.id === invoiceId);
     if (!inv || inv.status === 'paid') return;
-    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, '1010', inv.type === 'fee' ? '1130' : '1120', inv.amount, 'payment', inv.unitNumber);
+    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, '1010', inv.type === 'fee' || inv.type === 'amenity_fee' ? '1130' : '1120', inv.amount, 'payment', inv.unitNumber);
     set(s => ({
       unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
         ...i, status: 'paid' as const, paidDate: today, paidAmount: inv.amount,

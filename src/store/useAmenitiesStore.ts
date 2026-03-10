@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useFinancialStore } from '@/store/useFinancialStore';
 
 export interface AmenityConfig {
   id: string;
@@ -8,6 +9,26 @@ export interface AmenityConfig {
   notificationEnabled: boolean;
   icon: string;
   description: string;
+
+  // v2: Fees
+  reservationFee: number;
+  depositAmount: number;
+  feeCurrency: string;
+
+  // v2: Rules & Policies
+  maxDurationMinutes: number;
+  maxAdvanceDays: number;
+  operatingHours: { open: string; close: string } | null;
+  capacity: number;
+  usageRules: string;
+
+  // v2: Approval
+  requiresApproval: boolean;
+}
+
+export interface RecurringPattern {
+  frequency: 'weekly' | 'biweekly' | 'monthly';
+  endDate: string;
 }
 
 export interface Reservation {
@@ -20,9 +41,25 @@ export interface Reservation {
   reservedBy: string;
   reservedByName: string;
   reservedByUnit: string;
-  status: 'active' | 'cancelled';
+  status: 'active' | 'cancelled' | 'pending_approval' | 'denied';
   createdAt: string;
   notes: string;
+
+  // v2: Fees
+  fee: number;
+  deposit: number;
+  invoiceId: string | null;
+  depositInvoiceId: string | null;
+
+  // v2: Approval
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  denialReason: string | null;
+
+  // v2: Recurring
+  recurringGroupId: string | null;
+  recurringPattern: RecurringPattern | null;
 }
 
 export interface AmenityNotification {
@@ -77,14 +114,42 @@ function guessDescription(name: string): string {
   return 'Building amenity';
 }
 
+const v2ConfigDefaults = {
+  reservationFee: 0,
+  depositAmount: 0,
+  feeCurrency: 'USD',
+  maxDurationMinutes: 0,
+  maxAdvanceDays: 0,
+  operatingHours: null,
+  capacity: 0,
+  usageRules: '',
+  requiresApproval: false,
+};
+
+const v2ReservationDefaults = {
+  fee: 0,
+  deposit: 0,
+  invoiceId: null,
+  depositInvoiceId: null,
+  approvedBy: null,
+  approvedByName: null,
+  approvedAt: null,
+  denialReason: null,
+  recurringGroupId: null,
+  recurringPattern: null,
+};
+
+type ConfigUpdateFields = 'reservable' | 'notificationEnabled' | 'reservationFee' | 'depositAmount' |
+  'maxDurationMinutes' | 'maxAdvanceDays' | 'operatingHours' | 'capacity' | 'usageRules' | 'requiresApproval';
+
 interface AmenitiesState {
   configs: AmenityConfig[];
   reservations: Reservation[];
   notifications: AmenityNotification[];
 
   initializeFromBuilding: (names: string[]) => void;
-  updateConfig: (id: string, updates: Partial<Pick<AmenityConfig, 'reservable' | 'notificationEnabled'>>) => void;
-  addReservation: (r: Omit<Reservation, 'id' | 'status' | 'createdAt'>) => Reservation | null;
+  updateConfig: (id: string, updates: Partial<Pick<AmenityConfig, ConfigUpdateFields>>) => void;
+  addReservation: (r: Omit<Reservation, 'id' | 'status' | 'createdAt' | 'fee' | 'deposit' | 'invoiceId' | 'depositInvoiceId' | 'approvedBy' | 'approvedByName' | 'approvedAt' | 'denialReason' | 'recurringGroupId' | 'recurringPattern'>) => Reservation | { error: string };
   cancelReservation: (id: string) => void;
   getReservationsForAmenity: (amenityId: string, date?: string) => Reservation[];
   getReservationsForUser: (userId: string) => Reservation[];
@@ -92,15 +157,55 @@ interface AmenitiesState {
   sendNotification: (n: Omit<AmenityNotification, 'id' | 'readBy'>) => void;
   markNotificationRead: (notifId: string, userId: string) => void;
   getUnreadCount: (userId: string) => number;
+
+  // v2: Approval
+  approveReservation: (id: string, approverUserId: string, approverName: string) => void;
+  denyReservation: (id: string, approverUserId: string, approverName: string, reason: string) => void;
+  getPendingApprovals: () => Reservation[];
+
+  // v2: Recurring
+  addRecurringReservation: (
+    base: Omit<Reservation, 'id' | 'status' | 'createdAt' | 'fee' | 'deposit' | 'invoiceId' | 'depositInvoiceId' | 'approvedBy' | 'approvedByName' | 'approvedAt' | 'denialReason' | 'recurringGroupId' | 'recurringPattern'>,
+    pattern: RecurringPattern,
+  ) => Reservation[];
+  cancelRecurringGroup: (groupId: string) => void;
 }
 
 const seedConfigs: AmenityConfig[] = [
-  { id: 'community-room', name: 'Community Room', reservable: true, notificationEnabled: false, icon: '🏠', description: 'Shared gathering space for residents and events' },
-  { id: 'fitness-center', name: 'Fitness Center', reservable: false, notificationEnabled: false, icon: '💪', description: 'On-site fitness center with exercise equipment' },
-  { id: 'rooftop-deck', name: 'Rooftop Deck', reservable: true, notificationEnabled: false, icon: '🌇', description: 'Rooftop terrace with seating and views' },
-  { id: 'secure-lobby', name: 'Secure Lobby', reservable: false, notificationEnabled: true, icon: '🚪', description: 'Secure building entrance with controlled access' },
-  { id: 'elevator-2', name: 'Elevator (2)', reservable: false, notificationEnabled: true, icon: '🛗', description: 'Building elevator service' },
-  { id: 'package-room', name: 'Package Room', reservable: false, notificationEnabled: true, icon: '📦', description: 'Secure package delivery and pickup area' },
+  {
+    id: 'community-room', name: 'Community Room', reservable: true, notificationEnabled: false,
+    icon: '🏠', description: 'Shared gathering space for residents and events',
+    ...v2ConfigDefaults,
+    reservationFee: 50, depositAmount: 100, maxDurationMinutes: 240,
+    requiresApproval: true, capacity: 40,
+    usageRules: 'No outside catering without approval. Clean-up required within 1 hour of reservation end.',
+  },
+  {
+    id: 'fitness-center', name: 'Fitness Center', reservable: false, notificationEnabled: false,
+    icon: '💪', description: 'On-site fitness center with exercise equipment',
+    ...v2ConfigDefaults,
+  },
+  {
+    id: 'rooftop-deck', name: 'Rooftop Deck', reservable: true, notificationEnabled: false,
+    icon: '🌇', description: 'Rooftop terrace with seating and views',
+    ...v2ConfigDefaults,
+    reservationFee: 25, maxDurationMinutes: 180, maxAdvanceDays: 14, capacity: 20,
+  },
+  {
+    id: 'secure-lobby', name: 'Secure Lobby', reservable: false, notificationEnabled: true,
+    icon: '🚪', description: 'Secure building entrance with controlled access',
+    ...v2ConfigDefaults,
+  },
+  {
+    id: 'elevator-2', name: 'Elevator (2)', reservable: false, notificationEnabled: true,
+    icon: '🛗', description: 'Building elevator service',
+    ...v2ConfigDefaults,
+  },
+  {
+    id: 'package-room', name: 'Package Room', reservable: false, notificationEnabled: true,
+    icon: '📦', description: 'Secure package delivery and pickup area',
+    ...v2ConfigDefaults,
+  },
 ];
 
 const seedReservations: Reservation[] = [
@@ -109,12 +214,22 @@ const seedReservations: Reservation[] = [
     date: '2026-03-15', startTime: '14:00', endTime: '16:00',
     reservedBy: 'user1', reservedByName: 'John Smith', reservedByUnit: '301',
     status: 'active', createdAt: '2026-03-01T10:00:00Z', notes: 'Birthday party setup',
+    ...v2ReservationDefaults, fee: 50, deposit: 100,
   },
   {
     id: 'res2', amenityId: 'rooftop-deck', amenityName: 'Rooftop Deck',
     date: '2026-03-20', startTime: '18:00', endTime: '20:00',
     reservedBy: 'user2', reservedByName: 'Sarah Johnson', reservedByUnit: '204',
     status: 'active', createdAt: '2026-03-02T14:30:00Z', notes: 'Evening gathering with friends',
+    ...v2ReservationDefaults, fee: 25,
+  },
+  {
+    id: 'res3', amenityId: 'community-room', amenityName: 'Community Room',
+    date: '2026-03-22', startTime: '10:00', endTime: '14:00',
+    reservedBy: 'user2', reservedByName: 'Sarah Johnson', reservedByUnit: '204',
+    status: 'pending_approval', createdAt: '2026-03-07T09:00:00Z',
+    notes: 'HOA social committee meeting and brunch setup',
+    ...v2ReservationDefaults, fee: 50, deposit: 100,
   },
 ];
 
@@ -133,6 +248,35 @@ const seedNotifications: AmenityNotification[] = [
   },
 ];
 
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function addDaysToDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function generateRecurringDates(startDate: string, pattern: RecurringPattern): string[] {
+  const dates: string[] = [];
+  const end = new Date(pattern.endDate + 'T23:59:59');
+  let current = new Date(startDate + 'T12:00:00');
+
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0]);
+    if (pattern.frequency === 'weekly') {
+      current.setDate(current.getDate() + 7);
+    } else if (pattern.frequency === 'biweekly') {
+      current.setDate(current.getDate() + 14);
+    } else {
+      current.setMonth(current.getMonth() + 1);
+    }
+  }
+  return dates;
+}
+
 export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => ({
   configs: seedConfigs,
   reservations: seedReservations,
@@ -143,9 +287,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
     const existingIds = new Set(existing.map(c => c.id));
     const newIds = new Set(names.map(n => slugify(n)));
 
-    // Keep existing configs that still exist in building amenities
     const kept = existing.filter(c => newIds.has(c.id));
-    // Add new amenities not yet in configs
     const added = names
       .filter(n => !existingIds.has(slugify(n)))
       .map(n => ({
@@ -155,6 +297,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
         notificationEnabled: false,
         icon: guessIcon(n),
         description: guessDescription(n),
+        ...v2ConfigDefaults,
       }));
 
     set({ configs: [...kept, ...added] });
@@ -167,12 +310,84 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
   },
 
   addReservation: (r) => {
-    if (get().hasConflict(r.amenityId, r.date, r.startTime, r.endTime)) return null;
+    const config = get().configs.find(c => c.id === r.amenityId);
+
+    // Rule validation
+    if (config) {
+      // Max duration check
+      if (config.maxDurationMinutes > 0) {
+        const durationMins = timeToMinutes(r.endTime) - timeToMinutes(r.startTime);
+        if (durationMins > config.maxDurationMinutes) {
+          return { error: `Duration exceeds maximum of ${config.maxDurationMinutes / 60} hours` };
+        }
+      }
+
+      // Advance booking check
+      if (config.maxAdvanceDays > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const bookDate = new Date(r.date + 'T12:00:00');
+        const diffDays = Math.ceil((bookDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > config.maxAdvanceDays) {
+          return { error: `Cannot book more than ${config.maxAdvanceDays} days in advance` };
+        }
+      }
+
+      // Operating hours check
+      if (config.operatingHours) {
+        const startMins = timeToMinutes(r.startTime);
+        const endMins = timeToMinutes(r.endTime);
+        const openMins = timeToMinutes(config.operatingHours.open);
+        const closeMins = timeToMinutes(config.operatingHours.close);
+        if (startMins < openMins || endMins > closeMins) {
+          return { error: `Reservation must be within operating hours: ${config.operatingHours.open} - ${config.operatingHours.close}` };
+        }
+      }
+    }
+
+    // Conflict check
+    if (get().hasConflict(r.amenityId, r.date, r.startTime, r.endTime)) {
+      return { error: 'Time conflict — this slot overlaps with an existing reservation' };
+    }
+
+    const needsApproval = config?.requiresApproval ?? false;
+    const fee = config?.reservationFee ?? 0;
+    const deposit = config?.depositAmount ?? 0;
+
+    let invoiceId: string | null = null;
+    let depositInvoiceId: string | null = null;
+
+    // If no approval needed and has fees, create invoices immediately
+    if (!needsApproval && fee > 0 && r.reservedByUnit) {
+      const inv = useFinancialStore.getState().createUnitInvoice(
+        r.reservedByUnit, 'amenity_fee', fee,
+        `Amenity: ${r.amenityName} reservation ${r.date}`,
+      );
+      invoiceId = inv.id;
+    }
+    if (!needsApproval && deposit > 0 && r.reservedByUnit) {
+      const depInv = useFinancialStore.getState().createUnitInvoice(
+        r.reservedByUnit, 'amenity_fee', deposit,
+        `Amenity deposit: ${r.amenityName}`,
+      );
+      depositInvoiceId = depInv.id;
+    }
+
     const reservation: Reservation = {
       ...r,
       id: 'res' + Date.now(),
-      status: 'active',
+      status: needsApproval ? 'pending_approval' : 'active',
       createdAt: new Date().toISOString(),
+      fee,
+      deposit,
+      invoiceId,
+      depositInvoiceId,
+      approvedBy: null,
+      approvedByName: null,
+      approvedAt: null,
+      denialReason: null,
+      recurringGroupId: null,
+      recurringPattern: null,
     };
     set(s => ({ reservations: [...s.reservations, reservation] }));
     return reservation;
@@ -180,25 +395,29 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
   cancelReservation: (id) => {
     set(s => ({
-      reservations: s.reservations.map(r => r.id === id ? { ...r, status: 'cancelled' } : r),
+      reservations: s.reservations.map(r => r.id === id ? { ...r, status: 'cancelled' as const } : r),
     }));
   },
 
   getReservationsForAmenity: (amenityId, date?) => {
     return get().reservations.filter(r =>
-      r.amenityId === amenityId && r.status === 'active' && (!date || r.date === date)
+      r.amenityId === amenityId &&
+      (r.status === 'active' || r.status === 'pending_approval') &&
+      (!date || r.date === date)
     );
   },
 
   getReservationsForUser: (userId) => {
-    return get().reservations.filter(r => r.reservedBy === userId && r.status === 'active');
+    return get().reservations.filter(r =>
+      r.reservedBy === userId && r.status !== 'cancelled'
+    );
   },
 
   hasConflict: (amenityId, date, startTime, endTime) => {
     return get().reservations.some(r =>
       r.amenityId === amenityId &&
       r.date === date &&
-      r.status === 'active' &&
+      (r.status === 'active' || r.status === 'pending_approval') &&
       r.startTime < endTime &&
       r.endTime > startTime
     );
@@ -221,5 +440,125 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
   getUnreadCount: (userId) => {
     return get().notifications.filter(n => !n.readBy.includes(userId)).length;
+  },
+
+  // v2: Approval workflow
+  approveReservation: (id, approverUserId, approverName) => {
+    const res = get().reservations.find(r => r.id === id);
+    if (!res || res.status !== 'pending_approval') return;
+
+    let invoiceId = res.invoiceId;
+    let depositInvoiceId = res.depositInvoiceId;
+
+    // Create invoices on approval if fees exist
+    if (res.fee > 0 && !invoiceId && res.reservedByUnit) {
+      const inv = useFinancialStore.getState().createUnitInvoice(
+        res.reservedByUnit, 'amenity_fee', res.fee,
+        `Amenity: ${res.amenityName} reservation ${res.date}`,
+      );
+      invoiceId = inv.id;
+    }
+    if (res.deposit > 0 && !depositInvoiceId && res.reservedByUnit) {
+      const depInv = useFinancialStore.getState().createUnitInvoice(
+        res.reservedByUnit, 'amenity_fee', res.deposit,
+        `Amenity deposit: ${res.amenityName}`,
+      );
+      depositInvoiceId = depInv.id;
+    }
+
+    set(s => ({
+      reservations: s.reservations.map(r => r.id === id ? {
+        ...r,
+        status: 'active' as const,
+        approvedBy: approverUserId,
+        approvedByName: approverName,
+        approvedAt: new Date().toISOString(),
+        invoiceId,
+        depositInvoiceId,
+      } : r),
+    }));
+  },
+
+  denyReservation: (id, approverUserId, approverName, reason) => {
+    set(s => ({
+      reservations: s.reservations.map(r => r.id === id ? {
+        ...r,
+        status: 'denied' as const,
+        approvedBy: approverUserId,
+        approvedByName: approverName,
+        approvedAt: new Date().toISOString(),
+        denialReason: reason,
+      } : r),
+    }));
+  },
+
+  getPendingApprovals: () => {
+    return get().reservations.filter(r => r.status === 'pending_approval');
+  },
+
+  // v2: Recurring reservations
+  addRecurringReservation: (base, pattern) => {
+    const groupId = 'rgrp' + Date.now();
+    const dates = generateRecurringDates(base.date, pattern);
+    const created: Reservation[] = [];
+
+    for (const date of dates) {
+      if (get().hasConflict(base.amenityId, date, base.startTime, base.endTime)) continue;
+
+      const config = get().configs.find(c => c.id === base.amenityId);
+      const needsApproval = config?.requiresApproval ?? false;
+      const fee = config?.reservationFee ?? 0;
+      const deposit = config?.depositAmount ?? 0;
+
+      const reservation: Reservation = {
+        ...base,
+        id: 'res' + Date.now() + Math.random().toString(36).slice(2, 6),
+        date,
+        status: needsApproval ? 'pending_approval' : 'active',
+        createdAt: new Date().toISOString(),
+        fee,
+        deposit,
+        invoiceId: null,
+        depositInvoiceId: null,
+        approvedBy: null,
+        approvedByName: null,
+        approvedAt: null,
+        denialReason: null,
+        recurringGroupId: groupId,
+        recurringPattern: pattern,
+      };
+
+      // Create invoices for non-approval-required reservations
+      if (!needsApproval && fee > 0 && base.reservedByUnit) {
+        const inv = useFinancialStore.getState().createUnitInvoice(
+          base.reservedByUnit, 'amenity_fee', fee,
+          `Amenity: ${base.amenityName} reservation ${date}`,
+        );
+        reservation.invoiceId = inv.id;
+      }
+      if (!needsApproval && deposit > 0 && base.reservedByUnit) {
+        const depInv = useFinancialStore.getState().createUnitInvoice(
+          base.reservedByUnit, 'amenity_fee', deposit,
+          `Amenity deposit: ${base.amenityName}`,
+        );
+        reservation.depositInvoiceId = depInv.id;
+      }
+
+      created.push(reservation);
+      set(s => ({ reservations: [...s.reservations, reservation] }));
+    }
+
+    return created;
+  },
+
+  cancelRecurringGroup: (groupId) => {
+    const today = new Date().toISOString().split('T')[0];
+    set(s => ({
+      reservations: s.reservations.map(r =>
+        r.recurringGroupId === groupId && r.date >= today && r.status !== 'cancelled'
+          ? { ...r, status: 'cancelled' as const }
+          : r
+      ),
+    }));
   },
 }), { name: 'onetwo-amenities' }));

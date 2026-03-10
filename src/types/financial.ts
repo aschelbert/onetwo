@@ -99,7 +99,7 @@ export interface BalanceSheet {
 export interface UnitInvoice {
   id: string;
   unitNumber: string;
-  type: 'fee' | 'special_assessment' | 'monthly';
+  type: 'fee' | 'special_assessment' | 'monthly' | 'amenity_fee';
   description: string;
   amount: number;
   status: 'sent' | 'paid' | 'overdue' | 'void';
