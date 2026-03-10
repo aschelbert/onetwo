@@ -28,6 +28,7 @@
     { "source": "/my-unit", "destination": "/app.html" },
     { "source": "/account", "destination": "/app.html" },
     { "source": "/support", "destination": "/app.html" },
+    { "source": "/subscription", "destination": "/app.html" },
     { "source": "/admin/:path*", "destination": "/app.html" },
     { "source": "/demo", "destination": "/demo.html" }
   ]
