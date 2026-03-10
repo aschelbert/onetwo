@@ -4,7 +4,7 @@ import type { WorkOrder } from '@/data/financial';
 
 // ── Units (composite PK: tenant_id + number) ──
 
-function rowToUnit(r: Record<string, unknown>): Unit {
+export function rowToUnit(r: Record<string, unknown>): Unit {
   return {
     number: r.number as string,
     owner: r.owner as string,
@@ -59,7 +59,7 @@ export async function deleteUnit(tenantId: string, unitNum: string): Promise<boo
 
 // ── Budget Categories ──
 
-function rowToBudgetCategory(r: Record<string, unknown>): BudgetCategory {
+export function rowToBudgetCategory(r: Record<string, unknown>): BudgetCategory {
   return {
     id: r.id as string,
     name: r.name as string,
@@ -109,7 +109,7 @@ export async function deleteBudgetCategory(id: string): Promise<boolean> {
 
 // ── Reserve Items ──
 
-function rowToReserveItem(r: Record<string, unknown>): ReserveItem {
+export function rowToReserveItem(r: Record<string, unknown>): ReserveItem {
   return {
     id: r.id as string,
     name: r.name as string,
@@ -172,7 +172,7 @@ export async function deleteReserveItem(id: string): Promise<boolean> {
 
 // ── Chart of Accounts (composite PK: tenant_id + num) ──
 
-function rowToCoA(r: Record<string, unknown>): ChartOfAccountsEntry {
+export function rowToCoA(r: Record<string, unknown>): ChartOfAccountsEntry {
   return {
     num: r.num as string,
     name: r.name as string,
@@ -215,7 +215,7 @@ export async function deleteCoAEntry(tenantId: string, num: string): Promise<boo
 
 // ── General Ledger ──
 
-function rowToGLEntry(r: Record<string, unknown>): GLEntry {
+export function rowToGLEntry(r: Record<string, unknown>): GLEntry {
   return {
     id: r.local_id as string,
     date: r.date as string,
@@ -254,7 +254,7 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
 
 // ── Work Orders ──
 
-function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
+export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
   return {
     id: r.local_id as string,
     title: r.title as string,
@@ -322,7 +322,7 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
 
 // ── Unit Invoices ──
 
-function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
+export function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
   return {
     id: r.id as string,
     unitNumber: r.unit_number as string,

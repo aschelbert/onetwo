@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
+import { getGLAccountsForInvoice } from '@/lib/financial-logic';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 
@@ -804,8 +805,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const id = 'INV-U' + Date.now().toString(36).toUpperCase();
-    const glAcct = type === 'fee' || type === 'amenity_fee' ? '1130' : '1120';
-    const glRev = type === 'amenity_fee' ? '4060' : type === 'fee' ? '4030' : '4020';
+    const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type);
     const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
     const invoice: UnitInvoice = {
       id, unitNumber: unitNum, type, description, amount,
