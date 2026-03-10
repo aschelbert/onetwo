@@ -17,7 +17,6 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'boardRoom',        nav: { id: 'boardroom',    label: 'Board Room',     path: '/boardroom',     icon: 'boardroom' } },
   { featureId: 'building',         nav: { id: 'contacts',     label: 'The Building',   path: '/building',      icon: 'contacts' } },
   { featureId: 'fiscalLens',       nav: { id: 'financial',    label: 'Fiscal Lens',    path: '/financial',     icon: 'financial' } },
-  { featureId: 'caseOps',          nav: { id: 'issues',       label: 'Case Ops',       path: '/issues',        icon: 'issues' } },
   { featureId: 'propertyLog',      nav: { id: 'property-log', label: 'Property Log',   path: '/property-log',  icon: 'property-log' } },
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
   { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
