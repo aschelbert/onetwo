@@ -11,9 +11,12 @@ import { computeFiduciaryAlerts } from '@/lib/fiduciaryAlerts';
 import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
 import { FiduciaryAlerts } from './FiduciaryAlerts';
+import { useTenantContext } from '@/components/TenantProvider';
+import OnboardingSetupWidget from '@/components/OnboardingSetupWidget';
 
 export default function DashboardPage() {
   const { currentUser, currentRole } = useAuthStore();
+  const tenant = useTenantContext();
   const fin = useFinancialStore();
   const { meetings } = useMeetingsStore();
   const comp = useComplianceStore();
@@ -140,6 +143,9 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-5">
+        {/* Onboarding widget for new tenancies */}
+        {tenant.status === 'onboarding' && <OnboardingSetupWidget />}
+
         {/* Header with grade badges */}
         <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
           <div className="flex items-center justify-between">

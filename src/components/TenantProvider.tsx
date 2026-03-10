@@ -21,6 +21,16 @@ import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
+export interface OnboardingState {
+  accountCreated: boolean;
+  buildingProfileComplete: boolean;
+  unitsConfigured: boolean;
+  firstUserInvited: boolean;
+  bylawsUploaded: boolean;
+  financialSetupDone: boolean;
+  goLive: boolean;
+}
+
 export interface TenantInfo {
   id: string;
   name: string;
@@ -31,16 +41,31 @@ export interface TenantInfo {
   address: { street: string; city: string; state: string; zip: string };
   totalUnits: number;
   isDemo: boolean;
+  onboarding: OnboardingState;
 }
+
+interface TenantContextValue extends TenantInfo {
+  updateOnboardingStep: (step: keyof OnboardingState, value: boolean) => Promise<void>;
+}
+
+const defaultOnboarding: OnboardingState = {
+  accountCreated: true, buildingProfileComplete: true, unitsConfigured: true,
+  firstUserInvited: true, bylawsUploaded: true, financialSetupDone: true, goLive: true,
+};
 
 const defaultTenant: TenantInfo = {
   id: 'demo', name: 'Sunny Acres Condominium', subdomain: 'demo',
   status: 'active', tier: 'compliance_pro', features: {},
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
-  totalUnits: 50, isDemo: true,
+  totalUnits: 50, isDemo: true, onboarding: defaultOnboarding,
 };
 
-const TenantContext = createContext<TenantInfo>(defaultTenant);
+const defaultContextValue: TenantContextValue = {
+  ...defaultTenant,
+  updateOnboardingStep: async () => {},
+};
+
+const TenantContext = createContext<TenantContextValue>(defaultContextValue);
 export const useTenantContext = () => useContext(TenantContext);
 
 export default function TenantProvider({ children }: { children: React.ReactNode }) {
@@ -52,6 +77,39 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   const updateDetails = useBuildingStore(s => s.updateDetails);
   const hasLoadedDataRef = useRef(false);
   const impersonating = usePlatformAdminStore(s => s.impersonating);
+
+  // Map camelCase step keys to snake_case DB columns
+  const stepToColumn: Record<keyof OnboardingState, string> = {
+    accountCreated: 'account_created',
+    buildingProfileComplete: 'building_profile_complete',
+    unitsConfigured: 'units_configured',
+    firstUserInvited: 'first_user_invited',
+    bylawsUploaded: 'bylaws_uploaded',
+    financialSetupDone: 'financial_setup_done',
+    goLive: 'go_live',
+  };
+
+  const updateOnboardingStep = useCallback(async (step: keyof OnboardingState, value: boolean) => {
+    if (!supabase || tenant.isDemo) return;
+
+    const { error } = await supabase
+      .from('onboarding_checklists')
+      .update({ [stepToColumn[step]]: value })
+      .eq('tenant_id', tenant.id);
+
+    if (error) {
+      console.warn('Failed to update onboarding step:', error);
+      return;
+    }
+
+    // If going live, also update tenant status to 'active'
+    if (step === 'goLive' && value) {
+      await supabase.from('tenants').update({ status: 'active' }).eq('id', tenant.id);
+      setTenant(prev => ({ ...prev, status: 'active', onboarding: { ...prev.onboarding, [step]: value } }));
+    } else {
+      setTenant(prev => ({ ...prev, onboarding: { ...prev.onboarding, [step]: value } }));
+    }
+  }, [tenant.id, tenant.isDemo]);
 
   // Load a specific tenant's data into the context and all stores
   const loadTenantById = useCallback(async (tenantId: string) => {
@@ -72,6 +130,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         address: adminTenant.address,
         totalUnits: adminTenant.totalUnits,
         isDemo: false,
+        onboarding: defaultOnboarding,
       };
     } else if (supabase) {
       // Fallback: query DB directly
@@ -89,11 +148,10 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
-      const { data: feat } = await supabase
-        .from('tenant_features')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
+      const [{ data: feat }, { data: onb }] = await Promise.all([
+        supabase.from('tenant_features').select('*').eq('tenant_id', tenantId).maybeSingle(),
+        supabase.from('onboarding_checklists').select('*').eq('tenant_id', tenantId).maybeSingle(),
+      ]);
 
       const addr = typeof t.address === 'string' ? JSON.parse(t.address) : (t.address || {});
 
@@ -112,6 +170,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         },
         totalUnits: t.total_units || 0,
         isDemo: false,
+        onboarding: {
+          accountCreated: onb?.account_created ?? true,
+          buildingProfileComplete: onb?.building_profile_complete ?? false,
+          unitsConfigured: onb?.units_configured ?? false,
+          firstUserInvited: onb?.first_user_invited ?? false,
+          bylawsUploaded: onb?.bylaws_uploaded ?? false,
+          financialSetupDone: onb?.financial_setup_done ?? false,
+          goLive: onb?.go_live ?? false,
+        },
       };
     } else {
       return;
@@ -252,11 +319,10 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           .eq('tenant_id', tu.tenant_id)
           .maybeSingle();
 
-        const { data: feat } = await supabase
-          .from('tenant_features')
-          .select('*')
-          .eq('tenant_id', tu.tenant_id)
-          .maybeSingle();
+        const [{ data: feat }, { data: onb }] = await Promise.all([
+          supabase.from('tenant_features').select('*').eq('tenant_id', tu.tenant_id).maybeSingle(),
+          supabase.from('onboarding_checklists').select('*').eq('tenant_id', tu.tenant_id).maybeSingle(),
+        ]);
 
         const addr = typeof t.address === 'string' ? JSON.parse(t.address) : (t.address || {});
 
@@ -275,6 +341,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           },
           totalUnits: t.total_units || 0,
           isDemo: false,
+          onboarding: {
+            accountCreated: onb?.account_created ?? true,
+            buildingProfileComplete: onb?.building_profile_complete ?? false,
+            unitsConfigured: onb?.units_configured ?? false,
+            firstUserInvited: onb?.first_user_invited ?? false,
+            bylawsUploaded: onb?.bylaws_uploaded ?? false,
+            financialSetupDone: onb?.financial_setup_done ?? false,
+            goLive: onb?.go_live ?? false,
+          },
         };
 
         setTenant(tenantInfo);
@@ -323,6 +398,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     })();
   }, [isAuthenticated, currentUser?.id]);
 
+  const contextValue: TenantContextValue = { ...tenant, updateOnboardingStep };
+
   if (!loaded) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-white">
@@ -337,7 +414,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   // Block access for churned tenants
   if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
     return (
-      <TenantContext.Provider value={tenant}>
+      <TenantContext.Provider value={contextValue}>
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-ink-50 via-white to-mist-50">
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8 max-w-md mx-4 text-center">
             <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
@@ -374,7 +451,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   }
 
   return (
-    <TenantContext.Provider value={tenant}>
+    <TenantContext.Provider value={contextValue}>
       {children}
     </TenantContext.Provider>
   );
