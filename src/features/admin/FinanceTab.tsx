@@ -1,10 +1,23 @@
 import { useState, Fragment } from 'react';
-import { usePlatformAdminStore, accountBalance, groupBalance, getBudgetVariance, generatePnL, type PlatformAccount, type PlatformGLEntry } from '@/store/usePlatformAdminStore';
+import { usePlatformAdminStore, accountBalance, groupBalance, getBudgetVariance, generatePnL, type PlatformAccount, type PlatformApprovalCategory } from '@/store/usePlatformAdminStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
-const SUB_TABS = ['Dashboard', 'Chart of Accounts', 'General Ledger', 'Budget', 'P&L Statement'] as const;
+const SUB_TABS = ['Dashboard', 'Chart of Accounts', 'General Ledger', 'Budget', 'Spending Decisions', 'Balance Sheet', 'Budget Variance', 'P&L Statement'] as const;
 type SubTab = typeof SUB_TABS[number];
+
+const CATEGORY_LABELS: Record<PlatformApprovalCategory, string> = {
+  engineering: 'Engineering', marketing: 'Marketing', operations: 'Operations',
+  legal: 'Legal', infrastructure: 'Infrastructure',
+};
+const CATEGORY_COLORS: Record<PlatformApprovalCategory, string> = {
+  engineering: 'bg-blue-100 text-blue-700', marketing: 'bg-purple-100 text-purple-700',
+  operations: 'bg-amber-100 text-amber-700', legal: 'bg-ink-100 text-ink-600',
+  infrastructure: 'bg-teal-100 text-teal-700',
+};
+const PRIORITY_COLORS: Record<string, string> = {
+  low: 'text-ink-400', normal: 'text-ink-600', high: 'text-amber-600', urgent: 'text-red-600',
+};
 
 function fmtDate(d: string) {
   if (!d) return '--';
@@ -13,16 +26,20 @@ function fmtDate(d: string) {
 
 export default function FinanceTab() {
   const store = usePlatformAdminStore();
-  const { platformAccounts, glEntries, platformBudgets, tenants } = store;
+  const { platformAccounts, glEntries, platformBudgets, platformApprovals, tenants } = store;
   const [subTab, setSubTab] = useState<SubTab>('Dashboard');
   const [modal, setModal] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['1000', '2000', '3000', '4000', '5000', '6000']));
+  const [expandedApproval, setExpandedApproval] = useState<string | null>(null);
 
   // GL modal form
   const [glForm, setGlForm] = useState({ date: '', memo: '', debitAcct: '', creditAcct: '', amount: '', source: 'manual' });
 
   // Account modal form
   const [acctForm, setAcctForm] = useState({ num: '', name: '', type: 'expense' as PlatformAccount['type'], subType: '', parentNum: '' });
+
+  // Spending approval form
+  const [approvalForm, setApprovalForm] = useState({ title: '', description: '', amount: '', category: 'engineering' as PlatformApprovalCategory, priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent', requestedBy: '' });
 
   const monthsElapsed = 2; // Jan + Feb 2026
 
@@ -36,6 +53,19 @@ export default function FinanceTab() {
   const monthlyBurn = monthsElapsed > 0 ? (totalCOGS + totalOpEx) / monthsElapsed : 0;
   const runway = monthlyBurn > 0 ? Math.round(cashBalance / monthlyBurn) : 999;
   const grossMargin = totalRevenue > 0 ? Math.round(((totalRevenue - totalCOGS) / totalRevenue) * 100) : 0;
+
+  // Health score
+  const healthScore = store.getPlatformHealthScore();
+  const hc = healthScore >= 80 ? 'sage' : healthScore >= 60 ? 'yellow' : 'red';
+
+  // Balance sheet
+  const bs = store.getPlatformBalanceSheet();
+
+  // Budget burn rate for header KPI
+  const activeBudgets = platformBudgets.filter(b => b.isActive);
+  const totalBudgeted = activeBudgets.reduce((s, b) => s + b.budgeted * monthsElapsed, 0);
+  const totalActual = activeBudgets.reduce((s, b) => s + Math.abs(accountBalance(b.acctNum, platformAccounts, glEntries)), 0);
+  const budgetBurnPct = totalBudgeted > 0 ? Math.round((totalActual / totalBudgeted) * 100) : 0;
 
   // Header (parent) accounts
   const headerAccounts = platformAccounts.filter(a => a.parentNum === null && a.subType === 'header').sort((a, b) => a.sortOrder - b.sortOrder);
@@ -81,25 +111,78 @@ export default function FinanceTab() {
     setModal(null);
   };
 
+  const handleAddApproval = () => {
+    const amount = parseFloat(approvalForm.amount);
+    if (!approvalForm.title.trim()) { alert('Title is required'); return; }
+    if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
+    if (!approvalForm.requestedBy.trim()) { alert('Requester name is required'); return; }
+    store.addPlatformApproval({
+      title: approvalForm.title.trim(),
+      description: approvalForm.description.trim(),
+      amount,
+      category: approvalForm.category,
+      priority: approvalForm.priority,
+      requestedBy: approvalForm.requestedBy.trim(),
+    });
+    setApprovalForm({ title: '', description: '', amount: '', category: 'engineering', priority: 'normal', requestedBy: '' });
+    setModal(null);
+  };
+
   // P&L report
   const pnl = generatePnL('2026-01-01', '2026-12-31', platformAccounts, glEntries);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="font-display text-lg font-bold text-ink-900">Platform Finance</h3>
-        <p className="text-sm text-ink-500 mt-1">Financial tracking for the SaaS business — revenue, expenses, budgets, and P&L.</p>
+    <div className="space-y-0">
+      {/* ═══ Fiscal Lens Header ═══ */}
+      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold">Fiscal Lens</h2>
+            <p className="text-accent-200 text-sm mt-1">Platform financial management — GL, budgets, spending approvals & reports</p>
+          </div>
+          <div className="text-center">
+            <div className={`text-4xl font-bold ${hc === 'sage' ? 'text-green-300' : hc === 'yellow' ? 'text-yellow-300' : 'text-red-300'}`}>{healthScore}%</div>
+            <div className="text-accent-200 text-xs">Financial Health</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setSubTab('Dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Cash Position</p>
+            <p className="text-sm font-bold text-white mt-1">{fmt(cashBalance)}</p>
+          </div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setSubTab('Dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Revenue YTD</p>
+            <p className="text-sm font-bold text-white mt-1">{fmt(totalRevenue)}</p>
+          </div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setSubTab('P&L Statement')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Net Income</p>
+            <p className={`text-sm font-bold mt-1 ${netIncome >= 0 ? 'text-green-300' : 'text-red-300'}`}>{fmt(netIncome)}</p>
+          </div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setSubTab('Dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Gross Margin</p>
+            <p className={`text-sm font-bold mt-1 ${grossMargin >= 60 ? 'text-green-300' : grossMargin >= 40 ? 'text-yellow-300' : 'text-red-300'}`}>{grossMargin}%</p>
+          </div>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setSubTab('Dashboard')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Runway</p>
+            <p className={`text-sm font-bold mt-1 ${runway >= 12 ? 'text-green-300' : runway >= 6 ? 'text-yellow-300' : 'text-red-300'}`}>{runway} mo</p>
+          </div>
+        </div>
       </div>
 
       {/* Sub-tab nav */}
-      <div className="flex gap-1 border-b border-ink-100 overflow-x-auto">
-        {SUB_TABS.map(t => (
-          <button key={t} onClick={() => setSubTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${subTab === t ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>
-            {t}
-          </button>
-        ))}
+      <div className="bg-white border-x border-b border-ink-100 overflow-x-auto">
+        <div className="flex min-w-max px-4">
+          {SUB_TABS.map(t => (
+            <button key={t} onClick={() => setSubTab(t)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${subTab === t ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Content area */}
+      <div className="bg-white border-x border-b border-ink-100 rounded-b-xl p-6">
 
       {/* ═══ Dashboard ═══ */}
       {subTab === 'Dashboard' && (
@@ -118,6 +201,24 @@ export default function FinanceTab() {
                 <p className="text-xs text-ink-400">{m.sub}</p>
               </div>
             ))}
+          </div>
+
+          {/* Budget Burn Rate Overview */}
+          <div className="bg-white border border-ink-100 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-ink-900">Budget Burn Rate — YTD</h4>
+              <span className={`text-sm font-bold ${budgetBurnPct > 100 ? 'text-red-600' : budgetBurnPct > 85 ? 'text-amber-600' : 'text-sage-600'}`}>
+                {budgetBurnPct}% of YTD budget used
+              </span>
+            </div>
+            <div className="h-3 bg-ink-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${budgetBurnPct > 100 ? 'bg-red-500' : budgetBurnPct > 85 ? 'bg-amber-500' : 'bg-sage-500'}`}
+                style={{ width: `${Math.min(budgetBurnPct, 100)}%` }} />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-ink-400">
+              <span>Spent: {fmt(totalActual)}</span>
+              <span>Budget: {fmt(totalBudgeted)}</span>
+            </div>
           </div>
 
           {/* 3-column: Revenue, Expenses, Key Metrics */}
@@ -338,13 +439,287 @@ export default function FinanceTab() {
         </div>
       )}
 
+      {/* ═══ Spending Decisions ═══ */}
+      {subTab === 'Spending Decisions' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-bold text-ink-900">Spending Decisions</h4>
+              <p className="text-xs text-ink-400 mt-1">
+                {platformApprovals.filter(a => a.status === 'pending').length} pending &middot; {fmt(platformApprovals.filter(a => a.status === 'pending').reduce((s, a) => s + a.amount, 0))} total requested
+              </p>
+            </div>
+            <button onClick={() => setModal('addApproval')} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium">+ New Request</button>
+          </div>
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-4">
+            {(['pending', 'approved', 'denied'] as const).map(status => {
+              const items = platformApprovals.filter(a => a.status === status);
+              const total = items.reduce((s, a) => s + a.amount, 0);
+              const colors = { pending: 'bg-yellow-50 border-yellow-200 text-yellow-700', approved: 'bg-sage-50 border-sage-200 text-sage-700', denied: 'bg-red-50 border-red-200 text-red-700' };
+              return (
+                <div key={status} className={`border rounded-xl p-4 ${colors[status]}`}>
+                  <p className="text-xs font-semibold uppercase">{status}</p>
+                  <p className="text-2xl font-bold mt-1">{items.length}</p>
+                  <p className="text-xs mt-0.5">{fmt(total)}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Approval list */}
+          <div className="space-y-3">
+            {platformApprovals.map(a => {
+              const isExpanded = expandedApproval === a.id;
+              const statusColors = { pending: 'bg-yellow-100 text-yellow-700', approved: 'bg-sage-100 text-sage-700', denied: 'bg-red-100 text-red-700' };
+              return (
+                <div key={a.id} className="border border-ink-100 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-ink-50" onClick={() => setExpandedApproval(isExpanded ? null : a.id)}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs text-ink-400">{isExpanded ? '▼' : '▶'}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-ink-900">{a.title}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${CATEGORY_COLORS[a.category]}`}>{CATEGORY_LABELS[a.category]}</span>
+                          <span className={`text-xs font-semibold ${PRIORITY_COLORS[a.priority]}`}>{a.priority}</span>
+                        </div>
+                        <p className="text-xs text-ink-400 mt-0.5">by {a.requestedBy} &middot; {fmtDate(a.createdAt)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                      <span className="text-lg font-bold text-ink-900">{fmt(a.amount)}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusColors[a.status]}`}>{a.status}</span>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div className="px-5 pb-4 border-t border-ink-100 bg-ink-50">
+                      {a.description && <p className="text-sm text-ink-600 mt-3 mb-3">{a.description}</p>}
+                      {/* Votes */}
+                      <div className="mb-3">
+                        <p className="text-xs font-semibold text-ink-500 uppercase mb-2">Votes ({a.votes.length})</p>
+                        {a.votes.length === 0 ? (
+                          <p className="text-xs text-ink-400 italic">No votes yet</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {a.votes.map((v, i) => (
+                              <div key={i} className="flex items-center gap-2 text-sm">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white ${v.vote === 'approve' ? 'bg-sage-500' : 'bg-red-500'}`}>
+                                  {v.vote === 'approve' ? '✓' : '✗'}
+                                </span>
+                                <span className="text-ink-700">{v.voter}</span>
+                                <span className="text-ink-400 text-xs">{fmtDate(v.date)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Actions */}
+                      {a.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); store.castPlatformVote(a.id, 'Admin', 'approve'); }}
+                            className="px-3 py-1.5 bg-sage-600 text-white rounded-lg text-xs font-semibold hover:bg-sage-700">Approve</button>
+                          <button onClick={(e) => { e.stopPropagation(); store.castPlatformVote(a.id, 'Admin', 'deny'); }}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700">Deny</button>
+                          <button onClick={(e) => { e.stopPropagation(); store.deletePlatformApproval(a.id); }}
+                            className="px-3 py-1.5 border border-ink-200 text-ink-500 rounded-lg text-xs font-semibold hover:bg-ink-100 ml-auto">Delete</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {platformApprovals.length === 0 && (
+              <div className="text-center py-12 text-ink-400 text-sm">No spending requests yet.</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Balance Sheet ═══ */}
+      {subTab === 'Balance Sheet' && (
+        <div className="max-w-[700px]">
+          <div className="text-center mb-6">
+            <h4 className="font-display text-xl font-bold text-ink-900">ONE two GovOps Platform</h4>
+            <p className="text-sm text-ink-500">Balance Sheet</p>
+            <p className="text-xs text-ink-400 mt-1">As of March 11, 2026</p>
+          </div>
+
+          {/* Assets */}
+          <div className="mb-4">
+            <div className="bg-sage-50 px-4 py-2 rounded-t-lg">
+              <h5 className="font-bold text-sage-800 text-sm uppercase">Assets</h5>
+            </div>
+            <div className="border-x border-ink-100 px-4">
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Cash & Bank Accounts</span>
+                <span className="text-sm font-mono">{fmt(bs.assets.cash)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Accounts Receivable</span>
+                <span className="text-sm font-mono">{fmt(bs.assets.receivables)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Prepaid Expenses</span>
+                <span className="text-sm font-mono">{fmt(bs.assets.prepaid)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 font-bold text-ink-900">
+                <span>Total Assets</span>
+                <span className="font-mono">{fmt(bs.assets.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Liabilities */}
+          <div className="mb-4">
+            <div className="bg-accent-50 px-4 py-2">
+              <h5 className="font-bold text-accent-800 text-sm uppercase">Liabilities</h5>
+            </div>
+            <div className="border-x border-ink-100 px-4">
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Accounts Payable & Credit Cards</span>
+                <span className="text-sm font-mono">{fmt(bs.liabilities.payables)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Accrued Expenses</span>
+                <span className="text-sm font-mono">{fmt(bs.liabilities.accrued)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Deferred Revenue</span>
+                <span className="text-sm font-mono">{fmt(bs.liabilities.deferred)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 font-bold text-ink-900">
+                <span>Total Liabilities</span>
+                <span className="font-mono">{fmt(bs.liabilities.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Equity */}
+          <div className="mb-4">
+            <div className="bg-ink-50 px-4 py-2">
+              <h5 className="font-bold text-ink-600 text-sm uppercase">Equity</h5>
+            </div>
+            <div className="border-x border-ink-100 px-4">
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Founder Equity</span>
+                <span className="text-sm font-mono">{fmt(bs.equity.founder)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-ink-50">
+                <span className="text-sm text-ink-600">Retained Earnings</span>
+                <span className="text-sm font-mono">{fmt(bs.equity.retained)}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 font-bold text-ink-900">
+                <span>Total Equity</span>
+                <span className="font-mono">{fmt(bs.equity.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Total L+E */}
+          <div className="border-x border-b border-ink-100 px-4 rounded-b-lg" style={{ borderTop: '3px double #111827' }}>
+            <div className="flex items-center justify-between py-3 text-ink-900">
+              <span className="text-lg font-bold">Total Liabilities + Equity</span>
+              <span className="text-lg font-bold font-mono">{fmt(bs.liabilities.total + bs.equity.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Budget Variance ═══ */}
+      {subTab === 'Budget Variance' && (
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-bold text-ink-900">Budget Variance Report — FY 2026</h4>
+            <p className="text-xs text-ink-400 mt-1">{monthsElapsed} months elapsed &middot; Overall burn: {budgetBurnPct}%</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-ink-400 uppercase border-b border-ink-200">
+                  <th className="py-3 pr-3">Category</th>
+                  <th className="py-3 pr-3 text-right">Monthly Budget</th>
+                  <th className="py-3 pr-3 text-right">Avg/Mo Actual</th>
+                  <th className="py-3 pr-3 text-right">YTD Actual</th>
+                  <th className="py-3 pr-3 text-right">YTD Budget</th>
+                  <th className="py-3 pr-3 text-right">Variance ($)</th>
+                  <th className="py-3 pr-3 text-right">Variance (%)</th>
+                  <th className="py-3 w-32">Burn Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {platformBudgets.filter(b => b.isActive).map(b => {
+                  const v = getBudgetVariance(b, monthsElapsed, platformAccounts, glEntries);
+                  const barColor = v.status === 'over' ? 'bg-red-500' : v.status === 'warning' ? 'bg-amber-500' : 'bg-sage-500';
+                  const varColor = v.variance >= 0 ? 'text-sage-600' : 'text-red-600';
+                  const variancePct = v.ytdBudget > 0 ? Math.round((v.variance / v.ytdBudget) * 100) : 0;
+                  return (
+                    <tr key={b.id} className={`border-b border-ink-50 ${v.status === 'over' ? 'bg-red-50' : ''}`}>
+                      <td className="py-3 pr-3">
+                        <span className="font-medium text-ink-700">{v.name}</span>
+                        {v.status === 'over' && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">OVER</span>}
+                      </td>
+                      <td className="py-3 pr-3 text-right text-ink-600">{fmt(v.monthlyBudget)}</td>
+                      <td className="py-3 pr-3 text-right text-ink-600">{fmt(v.avgMonthly)}</td>
+                      <td className="py-3 pr-3 text-right font-semibold">{fmt(v.ytdActual)}</td>
+                      <td className="py-3 pr-3 text-right text-ink-500">{fmt(v.ytdBudget)}</td>
+                      <td className={`py-3 pr-3 text-right font-semibold ${varColor}`}>
+                        {v.variance >= 0 ? '+' : ''}{fmt(v.variance)}
+                      </td>
+                      <td className={`py-3 pr-3 text-right font-semibold ${varColor}`}>
+                        {variancePct >= 0 ? '+' : ''}{variancePct}%
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-ink-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(v.burnPct, 100)}%` }} />
+                          </div>
+                          <span className={`text-xs font-bold w-10 text-right ${v.status === 'over' ? 'text-red-600' : v.status === 'warning' ? 'text-amber-600' : 'text-sage-600'}`}>
+                            {v.burnPct}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-ink-200 font-bold">
+                  <td className="py-3 pr-3 text-ink-900">Total</td>
+                  <td className="py-3 pr-3 text-right text-ink-600">{fmt(activeBudgets.reduce((s, b) => s + b.budgeted, 0))}</td>
+                  <td className="py-3 pr-3 text-right text-ink-600">{fmt(monthsElapsed > 0 ? totalActual / monthsElapsed : 0)}</td>
+                  <td className="py-3 pr-3 text-right">{fmt(totalActual)}</td>
+                  <td className="py-3 pr-3 text-right text-ink-500">{fmt(totalBudgeted)}</td>
+                  <td className={`py-3 pr-3 text-right ${totalBudgeted - totalActual >= 0 ? 'text-sage-600' : 'text-red-600'}`}>
+                    {totalBudgeted - totalActual >= 0 ? '+' : ''}{fmt(totalBudgeted - totalActual)}
+                  </td>
+                  <td className="py-3 pr-3"></td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-ink-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${budgetBurnPct > 100 ? 'bg-red-500' : budgetBurnPct > 85 ? 'bg-amber-500' : 'bg-sage-500'}`}
+                          style={{ width: `${Math.min(budgetBurnPct, 100)}%` }} />
+                      </div>
+                      <span className={`text-xs font-bold w-10 text-right ${budgetBurnPct > 100 ? 'text-red-600' : budgetBurnPct > 85 ? 'text-amber-600' : 'text-sage-600'}`}>
+                        {budgetBurnPct}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ═══ P&L Statement ═══ */}
       {subTab === 'P&L Statement' && (
         <div className="max-w-[700px]">
           <div className="text-center mb-6">
             <h4 className="font-display text-xl font-bold text-ink-900">ONE two GovOps Platform</h4>
             <p className="text-sm text-ink-500">Income Statement</p>
-            <p className="text-xs text-ink-400 mt-1">January 1 — March 2, 2026</p>
+            <p className="text-xs text-ink-400 mt-1">January 1 — March 11, 2026</p>
           </div>
 
           {/* Revenue */}
@@ -413,6 +788,8 @@ export default function FinanceTab() {
           </div>
         </div>
       )}
+
+      </div>
 
       {/* ═══ Modals ═══ */}
       {modal === 'addGL' && (
@@ -508,6 +885,58 @@ export default function FinanceTab() {
                   {platformAccounts.filter(a => a.subType === 'header' || getChildren(a.num).length > 0).map(a =>
                     <option key={a.num} value={a.num}>{a.num} — {a.name}</option>
                   )}
+                </select>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal === 'addApproval' && (
+        <Modal title="New Spending Request" subtitle="Submit a spending request for team approval" onClose={() => setModal(null)} onSave={handleAddApproval} saveLabel="Submit Request">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Title *</label>
+              <input value={approvalForm.title} onChange={e => setApprovalForm({ ...approvalForm, title: e.target.value })}
+                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g. Upgrade cloud hosting" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Description</label>
+              <textarea value={approvalForm.description} onChange={e => setApprovalForm({ ...approvalForm, description: e.target.value })}
+                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={3} placeholder="Why is this needed? What's the expected impact?" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Amount *</label>
+                <input type="number" step="0.01" value={approvalForm.amount} onChange={e => setApprovalForm({ ...approvalForm, amount: e.target.value })}
+                  className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Requested By *</label>
+                <input value={approvalForm.requestedBy} onChange={e => setApprovalForm({ ...approvalForm, requestedBy: e.target.value })}
+                  className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Your name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Category</label>
+                <select value={approvalForm.category} onChange={e => setApprovalForm({ ...approvalForm, category: e.target.value as PlatformApprovalCategory })}
+                  className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                  <option value="engineering">Engineering</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="operations">Operations</option>
+                  <option value="legal">Legal</option>
+                  <option value="infrastructure">Infrastructure</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Priority</label>
+                <select value={approvalForm.priority} onChange={e => setApprovalForm({ ...approvalForm, priority: e.target.value as 'low' | 'normal' | 'high' | 'urgent' })}
+                  className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-white">
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
                 </select>
               </div>
             </div>

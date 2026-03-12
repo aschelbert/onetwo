@@ -191,6 +191,22 @@ export interface PlatformBudget {
   isActive: boolean;
 }
 
+export type PlatformApprovalCategory = 'engineering' | 'marketing' | 'operations' | 'legal' | 'infrastructure';
+export type PlatformApprovalStatus = 'pending' | 'approved' | 'denied';
+
+export interface PlatformSpendingApproval {
+  id: string;
+  title: string;
+  description: string;
+  amount: number;
+  category: PlatformApprovalCategory;
+  status: PlatformApprovalStatus;
+  requestedBy: string;
+  votes: Array<{ voter: string; vote: 'approve' | 'deny'; date: string }>;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  createdAt: string;
+}
+
 // Role definitions for RBAC
 export const TENANT_ROLES = [
   { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
@@ -563,6 +579,14 @@ const seedPlatformBudgets: PlatformBudget[] = [
   { id: 'pb10', acctNum: '6070', name: 'Insurance', budgeted: 600, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
 ];
 
+const seedPlatformApprovals: PlatformSpendingApproval[] = [
+  { id: 'pa-001', title: 'Upgrade AWS RDS to r6g.xlarge', description: 'Current DB instance hitting 85% CPU during peak. Need to scale up for growing tenant base.', amount: 1200, category: 'infrastructure', status: 'pending', requestedBy: 'Alex Rivera', votes: [{ voter: 'Alyssa Schelbert', vote: 'approve', date: '2026-02-28' }], priority: 'high', createdAt: '2026-02-27' },
+  { id: 'pa-002', title: 'Google Ads campaign — Q2 push', description: 'Expand PPC campaign targeting DC-area HOA boards. Expected 15-20 new trial signups.', amount: 5000, category: 'marketing', status: 'pending', requestedBy: 'Morgan Lee', votes: [], priority: 'normal', createdAt: '2026-03-01' },
+  { id: 'pa-003', title: 'Annual SOC 2 Type II audit', description: 'Required for enterprise sales pipeline. Vendor: Drata + auditor.', amount: 18000, category: 'operations', status: 'approved', requestedBy: 'Alyssa Schelbert', votes: [{ voter: 'Alex Rivera', vote: 'approve', date: '2026-02-15' }, { voter: 'Jordan Kim', vote: 'approve', date: '2026-02-16' }], priority: 'high', createdAt: '2026-02-10' },
+  { id: 'pa-004', title: 'Outside counsel — HOA compliance review', description: 'Legal review of DC-specific HOA regulations for compliance module.', amount: 7500, category: 'legal', status: 'pending', requestedBy: 'Jordan Kim', votes: [{ voter: 'Alex Rivera', vote: 'approve', date: '2026-03-02' }], priority: 'normal', createdAt: '2026-03-01' },
+  { id: 'pa-005', title: 'Contract UI engineer (3-month)', description: 'Accelerate community portal and voting module build-out.', amount: 24000, category: 'engineering', status: 'denied', requestedBy: 'Alex Rivera', votes: [{ voter: 'Alyssa Schelbert', vote: 'deny', date: '2026-02-20' }, { voter: 'Jordan Kim', vote: 'deny', date: '2026-02-21' }], priority: 'normal', createdAt: '2026-02-18' },
+];
+
 // ── Accounting Helper Functions ──────────────────────
 
 export function accountBalance(acctNum: string, accounts: PlatformAccount[], entries: PlatformGLEntry[]): number {
@@ -640,6 +664,7 @@ interface PlatformAdminState {
   platformAccounts: PlatformAccount[];
   glEntries: PlatformGLEntry[];
   platformBudgets: PlatformBudget[];
+  platformApprovals: PlatformSpendingApproval[];
 
   // DB sync
   loadFromDb: () => Promise<void>;
@@ -682,9 +707,15 @@ interface PlatformAdminState {
   addGLEntry: (entry: Omit<PlatformGLEntry, 'id' | 'postedAt' | 'postedBy'>) => void;
   addPlatformAccount: (account: PlatformAccount) => void;
   updateBudget: (id: string, updates: Partial<PlatformBudget>) => void;
+  // Spending Approvals
+  addPlatformApproval: (approval: Omit<PlatformSpendingApproval, 'id' | 'createdAt' | 'votes' | 'status'>) => void;
+  castPlatformVote: (approvalId: string, voter: string, vote: 'approve' | 'deny') => void;
+  deletePlatformApproval: (id: string) => void;
   // Computed
   getAccountBalance: (acctNum: string) => number;
   getGroupBalance: (parentNum: string) => number;
+  getPlatformBalanceSheet: () => { assets: { cash: number; receivables: number; prepaid: number; total: number }; liabilities: { payables: number; accrued: number; deferred: number; total: number }; equity: { founder: number; retained: number; total: number } };
+  getPlatformHealthScore: () => number;
 }
 
 export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
@@ -705,6 +736,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   platformAccounts: seedPlatformAccounts,
   glEntries: seedGLEntries,
   platformBudgets: seedPlatformBudgets,
+  platformApprovals: seedPlatformApprovals,
 
   // ─── DB Hydration ──────────────────────────────────
   loadFromDb: async () => {
@@ -912,6 +944,30 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     if (isBackendEnabled) platformSvc.updatePlatformBudget(id, updates);
   },
 
+  // ─── Spending Approvals ──────────────────────────
+  addPlatformApproval: (approval) => {
+    const id = `pa-${Date.now()}`;
+    set(s => ({ platformApprovals: [{ ...approval, id, status: 'pending' as const, votes: [], createdAt: new Date().toISOString().split('T')[0] }, ...s.platformApprovals] }));
+  },
+  castPlatformVote: (approvalId, voter, vote) => {
+    set(s => ({
+      platformApprovals: s.platformApprovals.map(a => {
+        if (a.id !== approvalId) return a;
+        const existingIdx = a.votes.findIndex(v => v.voter === voter);
+        const newVotes = existingIdx >= 0
+          ? a.votes.map((v, i) => i === existingIdx ? { voter, vote, date: new Date().toISOString().split('T')[0] } : v)
+          : [...a.votes, { voter, vote, date: new Date().toISOString().split('T')[0] }];
+        const approveCount = newVotes.filter(v => v.vote === 'approve').length;
+        const denyCount = newVotes.filter(v => v.vote === 'deny').length;
+        const newStatus = approveCount >= 2 ? 'approved' as const : denyCount >= 2 ? 'denied' as const : a.status;
+        return { ...a, votes: newVotes, status: newStatus };
+      }),
+    }));
+  },
+  deletePlatformApproval: (id) => {
+    set(s => ({ platformApprovals: s.platformApprovals.filter(a => a.id !== id) }));
+  },
+
   // ─── Computed ─────────────────────────────────────
   getAccountBalance: (acctNum) => {
     const { platformAccounts, glEntries } = get();
@@ -920,5 +976,45 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   getGroupBalance: (parentNum) => {
     const { platformAccounts, glEntries } = get();
     return groupBalance(parentNum, platformAccounts, glEntries);
+  },
+  getPlatformBalanceSheet: () => {
+    const { platformAccounts, glEntries } = get();
+    const cash = accountBalance('1010', platformAccounts, glEntries) + accountBalance('1020', platformAccounts, glEntries) + accountBalance('1030', platformAccounts, glEntries);
+    const receivables = groupBalance('1100', platformAccounts, glEntries);
+    const prepaid = accountBalance('1200', platformAccounts, glEntries);
+    const payables = accountBalance('2010', platformAccounts, glEntries) + accountBalance('2040', platformAccounts, glEntries);
+    const accrued = accountBalance('2020', platformAccounts, glEntries);
+    const deferred = accountBalance('2030', platformAccounts, glEntries);
+    const founder = accountBalance('3010', platformAccounts, glEntries);
+    const retained = accountBalance('3020', platformAccounts, glEntries);
+    return {
+      assets: { cash, receivables, prepaid, total: cash + receivables + prepaid },
+      liabilities: { payables, accrued, deferred, total: payables + accrued + deferred },
+      equity: { founder, retained, total: founder + retained },
+    };
+  },
+  getPlatformHealthScore: () => {
+    const { platformAccounts, glEntries, platformBudgets } = get();
+    const monthsElapsed = 2;
+    // Gross margin component (weight 40%)
+    const revenueAccts = platformAccounts.filter(a => a.type === 'revenue' && a.subType !== 'header' && a.subType !== 'contra');
+    const totalRevenue = revenueAccts.reduce((s, a) => s + accountBalance(a.num, platformAccounts, glEntries), 0);
+    const totalCOGS = groupBalance('5000', platformAccounts, glEntries);
+    const grossMarginPct = totalRevenue > 0 ? ((totalRevenue - totalCOGS) / totalRevenue) * 100 : 0;
+    const marginScore = Math.min(grossMarginPct, 100);
+    // Runway component (weight 30%)
+    const totalOpEx = groupBalance('6000', platformAccounts, glEntries);
+    const cashBal = accountBalance('1010', platformAccounts, glEntries) + accountBalance('1020', platformAccounts, glEntries);
+    const monthlyBurn = monthsElapsed > 0 ? (totalCOGS + totalOpEx) / monthsElapsed : 0;
+    const runway = monthlyBurn > 0 ? cashBal / monthlyBurn : 24;
+    const runwayScore = Math.min((runway / 12) * 100, 100); // 12+ months = 100
+    // Budget adherence component (weight 30%)
+    const activeBudgets = platformBudgets.filter(b => b.isActive);
+    const budgetScores = activeBudgets.map(b => {
+      const v = getBudgetVariance(b, monthsElapsed, platformAccounts, glEntries);
+      return v.burnPct <= 100 ? 100 : Math.max(0, 100 - (v.burnPct - 100));
+    });
+    const budgetScore = budgetScores.length > 0 ? budgetScores.reduce((s, x) => s + x, 0) / budgetScores.length : 100;
+    return Math.round(marginScore * 0.4 + runwayScore * 0.3 + budgetScore * 0.3);
   },
 }));
