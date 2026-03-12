@@ -10,7 +10,7 @@ import {
   type PlatformAccount, type GLEntry, type Budget, type SpendingApproval, type ApprovalCategory,
 } from './data'
 
-const SUB_TABS = ['Dashboard', 'Chart of Accounts', 'General Ledger', 'Budget', 'Spending Decisions', 'Balance Sheet', 'Budget Variance', 'P&L Statement'] as const
+const SUB_TABS = ['Dashboard', 'Chart of Accounts', 'General Ledger', 'Budget', 'Spending Decisions', 'Balance Sheet', 'P&L Statement'] as const
 type SubTab = typeof SUB_TABS[number]
 
 const CATEGORY_LABELS: Record<ApprovalCategory, string> = {
@@ -29,13 +29,18 @@ const PRIORITY_COLORS: Record<string, string> = {
 export function FiscalLensClient() {
   const [accounts, setAccounts] = useState<PlatformAccount[]>(seedAccounts)
   const [glEntries, setGlEntries] = useState<GLEntry[]>(seedGLEntries)
-  const [budgets] = useState<Budget[]>(seedBudgets)
+  const [budgets, setBudgets] = useState<Budget[]>(seedBudgets)
   const [approvals, setApprovals] = useState<SpendingApproval[]>(seedApprovals)
 
   const [subTab, setSubTab] = useState<SubTab>('Dashboard')
   const [modal, setModal] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['1000', '2000', '3000', '4000', '5000', '6000']))
   const [expandedApproval, setExpandedApproval] = useState<string | null>(null)
+  const [expandedBudgetGL, setExpandedBudgetGL] = useState<string | null>(null)
+
+  // Budget form state
+  const [budgetEditId, setBudgetEditId] = useState<string | null>(null)
+  const [budgetForm, setBudgetForm] = useState({ name: '', budgeted: '', acctNum: '', fiscalYear: '2026', period: 'MONTHLY' })
 
   // GL modal form
   const [glForm, setGlForm] = useState({ date: '', memo: '', debitAcct: '', creditAcct: '', amount: '', source: 'manual' })
@@ -137,6 +142,47 @@ export function FiscalLensClient() {
   }
 
   const deleteApproval = (id: string) => setApprovals(prev => prev.filter(a => a.id !== id))
+
+  const openBudgetAdd = () => {
+    setBudgetEditId(null)
+    setBudgetForm({ name: '', budgeted: '', acctNum: '', fiscalYear: '2026', period: 'MONTHLY' })
+    setModal('budgetForm')
+  }
+
+  const openBudgetEdit = (b: Budget) => {
+    setBudgetEditId(b.id)
+    setBudgetForm({ name: b.name, budgeted: String(b.budgeted), acctNum: b.acctNum, fiscalYear: String(b.fiscalYear), period: b.period })
+    setModal('budgetForm')
+  }
+
+  const handleSaveBudget = () => {
+    const amount = parseFloat(budgetForm.budgeted)
+    if (!budgetForm.name.trim() || !amount || amount <= 0 || !budgetForm.acctNum) return
+    if (budgetEditId) {
+      setBudgets(prev => prev.map(b => b.id === budgetEditId ? {
+        ...b, name: budgetForm.name.trim(), budgeted: amount, acctNum: budgetForm.acctNum,
+        fiscalYear: parseInt(budgetForm.fiscalYear), period: budgetForm.period,
+        linkedGLEntryIds: glEntries.filter(e => e.debitAcct === budgetForm.acctNum || e.creditAcct === budgetForm.acctNum).map(e => e.id),
+      } : b))
+    } else {
+      const newBudget: Budget = {
+        id: `pb-${Date.now()}`, name: budgetForm.name.trim(), budgeted: amount,
+        acctNum: budgetForm.acctNum, fiscalYear: parseInt(budgetForm.fiscalYear),
+        period: budgetForm.period, isActive: true,
+        linkedGLEntryIds: glEntries.filter(e => e.debitAcct === budgetForm.acctNum || e.creditAcct === budgetForm.acctNum).map(e => e.id),
+      }
+      setBudgets(prev => [...prev, newBudget])
+    }
+    setModal(null)
+  }
+
+  const handleDeleteBudget = (id: string) => {
+    if (!confirm('Delete this budget item?')) return
+    setBudgets(prev => prev.filter(b => b.id !== id))
+  }
+
+  const getLinkedGLEntries = (b: Budget) =>
+    glEntries.filter(e => e.debitAcct === b.acctNum || e.creditAcct === b.acctNum)
 
   // P&L
   const pnl = generatePnL('2026-01-01', '2026-12-31', accounts, glEntries)
@@ -374,9 +420,12 @@ export function FiscalLensClient() {
         {/* Budget */}
         {subTab === 'Budget' && (
           <div className="space-y-4">
-            <div>
-              <h4 className="font-bold text-gray-900">Monthly Budget vs Actuals — FY 2026</h4>
-              <p className="text-xs text-gray-400 mt-1">{monthsElapsed} months elapsed (Jan-Feb)</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-gray-900">Monthly Budget vs Actuals — FY 2026</h4>
+                <p className="text-xs text-gray-400 mt-1">{monthsElapsed} months elapsed &middot; Overall burn: {budgetBurnPct}%</p>
+              </div>
+              <button onClick={openBudgetAdd} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium">+ Add Budget Item</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -387,8 +436,11 @@ export function FiscalLensClient() {
                     <th className="py-3 pr-3 text-right">Avg/Mo Actual</th>
                     <th className="py-3 pr-3 text-right">YTD Actual</th>
                     <th className="py-3 pr-3 text-right">YTD Budget</th>
-                    <th className="py-3 pr-3 text-right">Variance</th>
+                    <th className="py-3 pr-3 text-right">Variance ($)</th>
+                    <th className="py-3 pr-3 text-right">Variance (%)</th>
+                    <th className="py-3 pr-3 text-center">Linked GL</th>
                     <th className="py-3 w-32">Burn Rate</th>
+                    <th className="py-3 w-20"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -396,30 +448,95 @@ export function FiscalLensClient() {
                     const v = getBudgetVariance(b, monthsElapsed, accounts, glEntries)
                     const barColor = v.status === 'over' ? 'bg-red-500' : v.status === 'warning' ? 'bg-amber-500' : 'bg-green-500'
                     const varColor = v.variance >= 0 ? 'text-green-600' : 'text-red-600'
+                    const variancePct = v.ytdBudget > 0 ? Math.round((v.variance / v.ytdBudget) * 100) : 0
+                    const linked = getLinkedGLEntries(b)
+                    const isGLExpanded = expandedBudgetGL === b.id
                     return (
-                      <tr key={b.id} className="border-b border-gray-50">
-                        <td className="py-3 pr-3 font-medium text-gray-700">{v.name}</td>
-                        <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.monthlyBudget)}</td>
-                        <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.avgMonthly)}</td>
-                        <td className="py-3 pr-3 text-right font-semibold">{fmt(v.ytdActual)}</td>
-                        <td className="py-3 pr-3 text-right text-gray-500">{fmt(v.ytdBudget)}</td>
-                        <td className={cn('py-3 pr-3 text-right font-semibold', varColor)}>
-                          {v.variance >= 0 ? '+' : ''}{fmt(v.variance)}
-                        </td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.min(v.burnPct, 100)}%` }} />
+                      <Fragment key={b.id}>
+                        <tr className={cn('border-b border-gray-50', v.status === 'over' && 'bg-red-50')}>
+                          <td className="py-3 pr-3">
+                            <span className="font-medium text-gray-700">{v.name}</span>
+                            {v.status === 'over' && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">OVER</span>}
+                          </td>
+                          <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.monthlyBudget)}</td>
+                          <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.avgMonthly)}</td>
+                          <td className="py-3 pr-3 text-right font-semibold">{fmt(v.ytdActual)}</td>
+                          <td className="py-3 pr-3 text-right text-gray-500">{fmt(v.ytdBudget)}</td>
+                          <td className={cn('py-3 pr-3 text-right font-semibold', varColor)}>{v.variance >= 0 ? '+' : ''}{fmt(v.variance)}</td>
+                          <td className={cn('py-3 pr-3 text-right font-semibold', varColor)}>{variancePct >= 0 ? '+' : ''}{variancePct}%</td>
+                          <td className="py-3 pr-3 text-center">
+                            <button onClick={() => setExpandedBudgetGL(isGLExpanded ? null : b.id)}
+                              className="text-xs text-blue-600 hover:underline font-medium">
+                              {linked.length} entries
+                            </button>
+                          </td>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.min(v.burnPct, 100)}%` }} />
+                              </div>
+                              <span className={cn('text-xs font-bold w-10 text-right', v.status === 'over' ? 'text-red-600' : v.status === 'warning' ? 'text-amber-600' : 'text-green-600')}>
+                                {v.burnPct}%
+                              </span>
                             </div>
-                            <span className={cn('text-xs font-bold w-10 text-right', v.status === 'over' ? 'text-red-600' : v.status === 'warning' ? 'text-amber-600' : 'text-green-600')}>
-                              {v.burnPct}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => openBudgetEdit(b)} className="p-1 text-gray-400 hover:text-gray-700" title="Edit">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button onClick={() => handleDeleteBudget(b.id)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isGLExpanded && linked.length > 0 && (
+                          <tr>
+                            <td colSpan={10} className="bg-gray-50 px-6 py-3">
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Linked GL Entries — {accounts.find(a => a.num === b.acctNum)?.name || b.acctNum}</p>
+                              <div className="space-y-1">
+                                {linked.map(e => (
+                                  <div key={e.id} className="flex items-center justify-between text-xs text-gray-600 py-1 border-b border-gray-100 last:border-0">
+                                    <span className="text-gray-400 w-20">{fmtDate(e.date)}</span>
+                                    <span className="flex-1 ml-3">{e.memo}</span>
+                                    <span className="font-semibold ml-3">{fmt(e.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     )
                   })}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 font-bold">
+                    <td className="py-3 pr-3 text-gray-900">Total</td>
+                    <td className="py-3 pr-3 text-right text-gray-600">{fmt(activeBudgets.reduce((s, b) => s + b.budgeted, 0))}</td>
+                    <td className="py-3 pr-3 text-right text-gray-600">{fmt(monthsElapsed > 0 ? totalActual / monthsElapsed : 0)}</td>
+                    <td className="py-3 pr-3 text-right">{fmt(totalActual)}</td>
+                    <td className="py-3 pr-3 text-right text-gray-500">{fmt(totalBudgeted)}</td>
+                    <td className={cn('py-3 pr-3 text-right', totalBudgeted - totalActual >= 0 ? 'text-green-600' : 'text-red-600')}>
+                      {totalBudgeted - totalActual >= 0 ? '+' : ''}{fmt(totalBudgeted - totalActual)}
+                    </td>
+                    <td className="py-3 pr-3"></td>
+                    <td className="py-3 pr-3"></td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full', budgetBurnPct > 100 ? 'bg-red-500' : budgetBurnPct > 85 ? 'bg-amber-500' : 'bg-green-500')}
+                            style={{ width: `${Math.min(budgetBurnPct, 100)}%` }} />
+                        </div>
+                        <span className={cn('text-xs font-bold w-10 text-right', budgetBurnPct > 100 ? 'text-red-600' : budgetBurnPct > 85 ? 'text-amber-600' : 'text-green-600')}>
+                          {budgetBurnPct}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -562,88 +679,6 @@ export function FiscalLensClient() {
                 <span className="text-lg font-bold">Total Liabilities + Equity</span>
                 <span className="text-lg font-bold font-mono">{fmt(bs.liabilities.total + bs.equity.total)}</span>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Budget Variance */}
-        {subTab === 'Budget Variance' && (
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-bold text-gray-900">Budget Variance Report — FY 2026</h4>
-              <p className="text-xs text-gray-400 mt-1">{monthsElapsed} months elapsed &middot; Overall burn: {budgetBurnPct}%</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-400 uppercase border-b border-gray-200">
-                    <th className="py-3 pr-3">Category</th>
-                    <th className="py-3 pr-3 text-right">Monthly Budget</th>
-                    <th className="py-3 pr-3 text-right">Avg/Mo Actual</th>
-                    <th className="py-3 pr-3 text-right">YTD Actual</th>
-                    <th className="py-3 pr-3 text-right">YTD Budget</th>
-                    <th className="py-3 pr-3 text-right">Variance ($)</th>
-                    <th className="py-3 pr-3 text-right">Variance (%)</th>
-                    <th className="py-3 w-32">Burn Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeBudgets.map(b => {
-                    const v = getBudgetVariance(b, monthsElapsed, accounts, glEntries)
-                    const barColor = v.status === 'over' ? 'bg-red-500' : v.status === 'warning' ? 'bg-amber-500' : 'bg-green-500'
-                    const varColor = v.variance >= 0 ? 'text-green-600' : 'text-red-600'
-                    const variancePct = v.ytdBudget > 0 ? Math.round((v.variance / v.ytdBudget) * 100) : 0
-                    return (
-                      <tr key={b.id} className={cn('border-b border-gray-50', v.status === 'over' && 'bg-red-50')}>
-                        <td className="py-3 pr-3">
-                          <span className="font-medium text-gray-700">{v.name}</span>
-                          {v.status === 'over' && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">OVER</span>}
-                        </td>
-                        <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.monthlyBudget)}</td>
-                        <td className="py-3 pr-3 text-right text-gray-600">{fmt(v.avgMonthly)}</td>
-                        <td className="py-3 pr-3 text-right font-semibold">{fmt(v.ytdActual)}</td>
-                        <td className="py-3 pr-3 text-right text-gray-500">{fmt(v.ytdBudget)}</td>
-                        <td className={cn('py-3 pr-3 text-right font-semibold', varColor)}>{v.variance >= 0 ? '+' : ''}{fmt(v.variance)}</td>
-                        <td className={cn('py-3 pr-3 text-right font-semibold', varColor)}>{variancePct >= 0 ? '+' : ''}{variancePct}%</td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.min(v.burnPct, 100)}%` }} />
-                            </div>
-                            <span className={cn('text-xs font-bold w-10 text-right', v.status === 'over' ? 'text-red-600' : v.status === 'warning' ? 'text-amber-600' : 'text-green-600')}>
-                              {v.burnPct}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-gray-200 font-bold">
-                    <td className="py-3 pr-3 text-gray-900">Total</td>
-                    <td className="py-3 pr-3 text-right text-gray-600">{fmt(activeBudgets.reduce((s, b) => s + b.budgeted, 0))}</td>
-                    <td className="py-3 pr-3 text-right text-gray-600">{fmt(monthsElapsed > 0 ? totalActual / monthsElapsed : 0)}</td>
-                    <td className="py-3 pr-3 text-right">{fmt(totalActual)}</td>
-                    <td className="py-3 pr-3 text-right text-gray-500">{fmt(totalBudgeted)}</td>
-                    <td className={cn('py-3 pr-3 text-right', totalBudgeted - totalActual >= 0 ? 'text-green-600' : 'text-red-600')}>
-                      {totalBudgeted - totalActual >= 0 ? '+' : ''}{fmt(totalBudgeted - totalActual)}
-                    </td>
-                    <td className="py-3 pr-3"></td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full', budgetBurnPct > 100 ? 'bg-red-500' : budgetBurnPct > 85 ? 'bg-amber-500' : 'bg-green-500')}
-                            style={{ width: `${Math.min(budgetBurnPct, 100)}%` }} />
-                        </div>
-                        <span className={cn('text-xs font-bold w-10 text-right', budgetBurnPct > 100 ? 'text-red-600' : budgetBurnPct > 85 ? 'text-amber-600' : 'text-green-600')}>
-                          {budgetBurnPct}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
             </div>
           </div>
         )}
@@ -794,6 +829,43 @@ export function FiscalLensClient() {
                 {accounts.filter(a => a.subType === 'header' || getChildren(a.num).length > 0).map(a =>
                   <option key={a.num} value={a.num}>{a.num} — {a.name}</option>
                 )}
+              </select>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog open={modal === 'budgetForm'} onClose={() => setModal(null)} title={budgetEditId ? 'Edit Budget Item' : 'Add Budget Item'}
+        footer={<><button onClick={() => setModal(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button><button onClick={handleSaveBudget} className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium">{budgetEditId ? 'Save Changes' : 'Create Budget'}</button></>}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <input value={budgetForm.name} onChange={e => setBudgetForm({ ...budgetForm, name: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="e.g. Cloud Hosting" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Budget Amount *</label>
+              <input type="number" step="0.01" value={budgetForm.budgeted} onChange={e => setBudgetForm({ ...budgetForm, budgeted: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="0.00" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Linked GL Account *</label>
+              <select value={budgetForm.acctNum} onChange={e => setBudgetForm({ ...budgetForm, acctNum: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+                <option value="">Select...</option>
+                {nonHeaderAccounts.map(a => <option key={a.num} value={a.num}>{a.num} — {a.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
+              <input type="number" value={budgetForm.fiscalYear} onChange={e => setBudgetForm({ ...budgetForm, fiscalYear: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+              <select value={budgetForm.period} onChange={e => setBudgetForm({ ...budgetForm, period: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
+                <option value="MONTHLY">Monthly</option>
+                <option value="QUARTERLY">Quarterly</option>
+                <option value="ANNUAL">Annual</option>
               </select>
             </div>
           </div>

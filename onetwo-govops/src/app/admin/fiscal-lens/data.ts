@@ -34,6 +34,7 @@ export interface Budget {
   period: string
   fiscalYear: number
   isActive: boolean
+  linkedGLEntryIds?: string[]
 }
 
 export type ApprovalCategory = 'engineering' | 'marketing' | 'operations' | 'legal' | 'infrastructure'
@@ -130,16 +131,16 @@ export const seedGLEntries: GLEntry[] = [
 ]
 
 export const seedBudgets: Budget[] = [
-  { id: 'pb1', acctNum: '5010', name: 'Cloud Hosting', budgeted: 2400, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb2', acctNum: '5020', name: 'Stripe Fees', budgeted: 180, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb3', acctNum: '5030', name: 'Third-party APIs', budgeted: 350, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb4', acctNum: '5040', name: 'Support Tools', budgeted: 200, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb5', acctNum: '6010', name: 'Payroll & Benefits', budgeted: 18000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb6', acctNum: '6020', name: 'Contractors', budgeted: 5000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb7', acctNum: '6030', name: 'Software Tools', budgeted: 800, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb8', acctNum: '6040', name: 'Legal & Professional', budgeted: 1500, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb9', acctNum: '6050', name: 'Marketing', budgeted: 3000, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
-  { id: 'pb10', acctNum: '6070', name: 'Insurance', budgeted: 600, period: 'MONTHLY', fiscalYear: 2026, isActive: true },
+  { id: 'pb1', acctNum: '5010', name: 'Cloud Hosting', budgeted: 2400, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5015', 'PGL5016'] },
+  { id: 'pb2', acctNum: '5020', name: 'Stripe Fees', budgeted: 180, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5013', 'PGL5014'] },
+  { id: 'pb3', acctNum: '5030', name: 'Third-party APIs', budgeted: 350, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5017', 'PGL5018'] },
+  { id: 'pb4', acctNum: '5040', name: 'Support Tools', budgeted: 200, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5019', 'PGL5020'] },
+  { id: 'pb5', acctNum: '6010', name: 'Payroll & Benefits', budgeted: 18000, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5021', 'PGL5022'] },
+  { id: 'pb6', acctNum: '6020', name: 'Contractors', budgeted: 5000, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5023', 'PGL5024'] },
+  { id: 'pb7', acctNum: '6030', name: 'Software Tools', budgeted: 800, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5025', 'PGL5026'] },
+  { id: 'pb8', acctNum: '6040', name: 'Legal & Professional', budgeted: 1500, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5027'] },
+  { id: 'pb9', acctNum: '6050', name: 'Marketing', budgeted: 3000, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5028'] },
+  { id: 'pb10', acctNum: '6070', name: 'Insurance', budgeted: 600, period: 'MONTHLY', fiscalYear: 2026, isActive: true, linkedGLEntryIds: ['PGL5029', 'PGL5030'] },
 ]
 
 export const seedApprovals: SpendingApproval[] = [
