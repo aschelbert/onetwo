@@ -1,5 +1,5 @@
 // Sub-task configuration for the Setup Hub.
-// Each sub-task has a label, navigation target, and a completion key
+// Each sub-task has a label, navigation target, and a completion check
 // derived from existing onboarding state + building/financial stores.
 
 import type { OnboardingState } from '@/components/TenantProvider';
@@ -31,10 +31,14 @@ export interface CompletionContext {
   unitCount: number;
   hasVotingPct: boolean;
   coaCount: number;
+  glEntryCount: number;
   budgetCount: number;
   reserveCount: number;
   userCount: number;
   hasRoledUsers: boolean;
+  hasDetails: boolean;
+  insuranceCount: number;
+  vendorCount: number;
   allRequiredComplete?: boolean;
 }
 
@@ -51,12 +55,18 @@ export const SETUP_STEPS: StepConfig[] = [
         navigateTo: '/building',
         checkComplete: (ctx) => ctx.onboarding.buildingProfileComplete,
       },
+      {
+        id: 'bp_details',
+        label: 'Add building details & amenities',
+        navigateTo: '/building?tab=details',
+        checkComplete: (ctx) => ctx.hasDetails,
+      },
     ],
   },
   {
     stepNumber: 2,
     title: 'Legal & Compliance',
-    description: 'Upload governing documents and configure bylaws rules.',
+    description: 'Upload governing documents, add insurance policies, and register vendors.',
     required: false,
     subTasks: [
       {
@@ -64,6 +74,18 @@ export const SETUP_STEPS: StepConfig[] = [
         label: 'Upload bylaws & documents',
         navigateTo: '/building?tab=legal',
         checkComplete: (ctx) => ctx.onboarding.bylawsUploaded || ctx.docsCount >= 1,
+      },
+      {
+        id: 'legal_insurance',
+        label: 'Add insurance policies',
+        navigateTo: '/building?tab=insurance',
+        checkComplete: (ctx) => ctx.insuranceCount >= 1,
+      },
+      {
+        id: 'legal_vendors',
+        label: 'Add vendors & service providers',
+        navigateTo: '/building?tab=vendors',
+        checkComplete: (ctx) => ctx.vendorCount >= 1,
       },
     ],
   },
@@ -84,14 +106,32 @@ export const SETUP_STEPS: StepConfig[] = [
   {
     stepNumber: 4,
     title: 'Financial Setup',
-    description: 'Configure chart of accounts, budget categories, and reserve items.',
+    description: 'Set up your chart of accounts, record year-to-date transactions, configure your budget, and define reserve items.',
     required: false,
     subTasks: [
       {
-        id: 'fin_setup',
-        label: 'Set up financials',
+        id: 'fin_coa',
+        label: 'Set up chart of accounts',
         navigateTo: '/financial',
-        checkComplete: (ctx) => ctx.onboarding.financialSetupDone || ctx.coaCount >= 1,
+        checkComplete: (ctx) => ctx.coaCount >= 1,
+      },
+      {
+        id: 'fin_gl',
+        label: 'Enter year-to-date GL transactions',
+        navigateTo: '/financial',
+        checkComplete: (ctx) => ctx.glEntryCount >= 1,
+      },
+      {
+        id: 'fin_budget',
+        label: 'Configure annual budget',
+        navigateTo: '/financial',
+        checkComplete: (ctx) => ctx.budgetCount >= 1,
+      },
+      {
+        id: 'fin_reserves',
+        label: 'Define reserve fund items',
+        navigateTo: '/financial',
+        checkComplete: (ctx) => ctx.reserveCount >= 1,
       },
     ],
   },
@@ -111,13 +151,13 @@ export const SETUP_STEPS: StepConfig[] = [
   },
   {
     stepNumber: 6,
-    title: 'Review & Go Live',
-    description: 'Review your setup and launch your building\'s portal.',
+    title: 'Review & Complete',
+    description: 'Review your setup and complete onboarding.',
     required: true,
     subTasks: [
       {
         id: 'go_live',
-        label: 'Review & go live',
+        label: 'Review & complete setup',
         navigateTo: null,
         checkComplete: (ctx) => ctx.onboarding.goLive,
       },

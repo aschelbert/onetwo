@@ -34,11 +34,15 @@ export default function OnboardingSetupWidget() {
     hasBylawsRules: false,
     unitCount: financial.units?.length ?? 0,
     hasVotingPct: false,
-    coaCount: 0,
-    budgetCount: 0,
+    coaCount: financial.chartOfAccounts?.length ?? 0,
+    glEntryCount: financial.generalLedger?.length ?? 0,
+    budgetCount: financial.budgetCategories?.length ?? 0,
     reserveCount: financial.reserveItems?.length ?? 0,
     userCount: 0,
     hasRoledUsers: false,
+    hasDetails: !!(building.details?.yearBuilt && building.details?.totalUnits),
+    insuranceCount: building.insurance?.length ?? 0,
+    vendorCount: building.vendors?.filter(v => v.status === 'active')?.length ?? 0,
   }), [tenant.onboarding, building, financial]);
 
   // Compute step states
@@ -248,14 +252,14 @@ export default function OnboardingSetupWidget() {
 
                         {allRequiredComplete ? (
                           <div className="bg-sage-50 border border-sage-200 rounded-lg p-4 text-center">
-                            <p className="text-sm font-bold text-ink-900 mb-1">Ready to Go Live</p>
-                            <p className="text-xs text-ink-500 mb-3">All required steps complete.</p>
+                            <p className="text-sm font-bold text-ink-900 mb-1">Ready to Complete Setup</p>
+                            <p className="text-xs text-ink-500 mb-3">All required steps are done.</p>
                             <button
                               onClick={handleGoLive}
                               disabled={goingLive}
                               className="px-6 py-2 bg-accent-600 text-white rounded-lg text-xs font-bold hover:bg-accent-700 transition-all disabled:opacity-50"
                             >
-                              {goingLive ? 'Launching...' : 'Go Live'}
+                              {goingLive ? 'Completing...' : 'Complete Setup'}
                             </button>
                           </div>
                         ) : (
