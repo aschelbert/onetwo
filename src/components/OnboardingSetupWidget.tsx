@@ -73,60 +73,13 @@ export default function OnboardingSetupWidget() {
         />
       </div>
 
-      {/* Checklist */}
-      <div className="space-y-1">
-        {STEPS.map((step, idx) => {
-          const done = tenant.onboarding[step.key];
-          const isGoLive = step.key === 'goLive';
-
-          return (
-            <div
-              key={step.key}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                done
-                  ? 'bg-sage-50'
-                  : isGoLive
-                    ? ''
-                    : 'hover:bg-mist-50 cursor-pointer'
-              }`}
-              onClick={() => {
-                if (!done && step.path) navigate(step.path);
-              }}
-            >
-              {/* Step number / check */}
-              {done ? (
-                <div className="w-6 h-6 rounded-full bg-sage-500 flex items-center justify-center shrink-0">
-                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-ink-200 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-bold text-ink-400">{idx + 1}</span>
-                </div>
-              )}
-
-              {/* Label */}
-              <span className={`text-sm flex-1 ${done ? 'text-ink-400 line-through' : 'text-ink-700 font-medium'}`}>
-                {step.label}
-              </span>
-
-              {/* Action */}
-              {!done && isGoLive ? (
-                <button
-                  onClick={handleGoLive}
-                  disabled={goingLive}
-                  className="px-4 py-1.5 bg-accent-600 text-white rounded-lg text-xs font-semibold hover:bg-accent-700 transition-all disabled:opacity-50"
-                >
-                  {goingLive ? 'Activating...' : 'Go Live'}
-                </button>
-              ) : !done && step.path ? (
-                <span className="text-xs text-accent-600 font-medium">Start →</span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {/* Open Setup Hub */}
+      <button
+        onClick={() => navigate('/setup')}
+        className="w-full py-2.5 bg-accent-600 text-white rounded-xl text-sm font-semibold hover:bg-accent-700 transition-all"
+      >
+        Continue Setup →
+      </button>
     </div>
   );
 }

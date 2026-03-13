@@ -20,6 +20,7 @@ import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
+import SetupPage from '@/features/setup/SetupPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
@@ -195,6 +196,7 @@ export default function App() {
           <Route path="/support" element={<HelpSupportPage />} />
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/setup" element={<SetupPage />} />
         </Route>
 
         {/* Catch-all */}
