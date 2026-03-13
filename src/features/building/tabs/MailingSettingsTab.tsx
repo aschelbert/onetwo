@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useMailStore } from '@/store/useMailStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { PRICING, formatDeliveryMethod } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
+import { supabase } from '@/lib/supabase';
+import StripeCardModal from '../components/StripeCardModal';
 
 const DELIVERY_METHODS: MailDeliveryMethod[] = ['first-class', 'certified', 'certified-return-receipt', 'certified-electronic-return-receipt'];
 
@@ -10,8 +13,78 @@ export default function MailingSettingsTab() {
   const buildingStore = useBuildingStore();
   const settings = mailStore.mailingSettings;
 
+  const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [clientSecret, setClientSecret] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const hasCard = !!settings.stripePaymentMethodId;
+
   const totalMailings = mailStore.mailRecords.length;
   const totalCostCents = mailStore.mailRecords.reduce((sum, r) => sum + r.cost.totalCents, 0);
+
+  const handleAddOrChangeCard = async () => {
+    if (!supabase) {
+      alert('Backend not configured. Set Supabase env vars to enable.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('mailing-billing', {
+        body: { action: 'setup-intent' },
+      });
+      if (fnError || data?.error) {
+        setError(data?.error || fnError?.message || 'Failed to start card setup');
+        return;
+      }
+      setClientSecret(data.clientSecret);
+      setCustomerId(data.customerId);
+      setCardModalOpen(true);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCardSuccess = (cardLast4: string, cardBrand: string, paymentMethodId: string) => {
+    mailStore.updateMailingSettings({
+      stripePaymentMethodId: paymentMethodId,
+      stripeCustomerId: customerId,
+      cardLast4,
+      cardBrand,
+    });
+    setCardModalOpen(false);
+  };
+
+  const handleRemoveCard = async () => {
+    if (!confirm('Remove this payment method? You will not be able to send mail until a new card is added.')) return;
+    if (!supabase) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('mailing-billing', {
+        body: { action: 'detach-method' },
+      });
+      if (fnError || data?.error) {
+        setError(data?.error || fnError?.message || 'Failed to remove payment method');
+        return;
+      }
+      mailStore.updateMailingSettings({
+        stripePaymentMethodId: '',
+        stripeCustomerId: '',
+        cardLast4: '',
+        cardBrand: '',
+      });
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -37,34 +110,56 @@ export default function MailingSettingsTab() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
       {/* Payment Method */}
       <div className="bg-white border border-ink-200 rounded-xl p-5">
         <h4 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-3">Payment Method</h4>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-12 bg-ink-100 rounded flex items-center justify-center text-xs font-bold text-ink-600">
-              {settings.cardBrand}
+        {hasCard ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-12 bg-ink-100 rounded flex items-center justify-center text-xs font-bold text-ink-600">
+                {settings.cardBrand}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-ink-900">{settings.cardBrand} ending in {settings.cardLast4}</p>
+                <p className="text-xs text-ink-500">Billed to {settings.senderName}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-ink-900">{settings.cardBrand} ending in {settings.cardLast4}</p>
-              <p className="text-xs text-ink-500">Billed to {settings.senderName}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddOrChangeCard}
+                disabled={loading}
+                className="text-xs text-accent-600 hover:text-accent-700 font-medium disabled:opacity-50"
+              >
+                {loading ? 'Loading...' : 'Change'}
+              </button>
+              <button
+                onClick={handleRemoveCard}
+                disabled={loading}
+                className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+              >
+                Remove
+              </button>
             </div>
           </div>
-          <div className="flex gap-2">
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-sm text-ink-500 mb-3">No payment method on file. Add a card to enable mailing.</p>
             <button
-              onClick={() => alert('Stripe integration coming soon')}
-              className="text-xs text-accent-600 hover:text-accent-700 font-medium"
+              onClick={handleAddOrChangeCard}
+              disabled={loading}
+              className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
             >
-              Change
-            </button>
-            <button
-              onClick={() => alert('Stripe integration coming soon')}
-              className="text-xs text-red-400 hover:text-red-600 font-medium"
-            >
-              Remove
+              {loading ? 'Loading...' : 'Add Payment Method'}
             </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Return Address */}
@@ -191,6 +286,16 @@ export default function MailingSettingsTab() {
           <p className="text-sm text-ink-400 text-center py-4">No mailings sent yet</p>
         )}
       </div>
+
+      {/* Stripe Card Modal */}
+      {cardModalOpen && (
+        <StripeCardModal
+          clientSecret={clientSecret}
+          customerId={customerId}
+          onSuccess={handleCardSuccess}
+          onClose={() => setCardModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

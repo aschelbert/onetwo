@@ -68,6 +68,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
   const [showPreview, setShowPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   // Merge variables
   const [mergeVars, setMergeVars] = useState<Record<string, string>>(() => {
@@ -118,9 +119,12 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
     [deliveryMethod, pageCount, includeReturnEnvelope],
   );
 
+  const hasPaymentMethod = !!mailStore.mailingSettings.stripePaymentMethodId;
+
   const handleSend = async () => {
     if (!selectedTemplate) return;
     setSending(true);
+    setSendError('');
     try {
       await mailStore.sendNotice({
         caseId,
@@ -136,6 +140,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
         mergeVariables: mergeVars,
       });
       onClose();
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
     }
@@ -342,9 +348,18 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
               <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
             </div>
             <p className="text-[11px] text-ink-400">
-              Charged to {mailStore.mailingSettings.senderName} via saved card ending {mailStore.mailingSettings.cardLast4}
+              {mailStore.mailingSettings.cardLast4
+                ? `Charged to ${mailStore.mailingSettings.senderName} via saved card ending ${mailStore.mailingSettings.cardLast4}`
+                : 'No card on file'}
             </p>
           </div>
+
+          {/* Payment warning */}
+          {!hasPaymentMethod && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-amber-800 font-medium">No payment method on file. Add one in Settings → Mailing.</p>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -356,7 +371,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
             </button>
             <button
               onClick={() => setShowReview(true)}
-              disabled={!selectedTemplate}
+              disabled={!selectedTemplate || !hasPaymentMethod}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Review & Send — ${(cost.totalCents / 100).toFixed(2)}
@@ -457,9 +472,18 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                   <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
                 </div>
                 <p className="text-[11px] text-ink-400">
-                  Charged to {mailStore.mailingSettings.senderName} via saved card ending {mailStore.mailingSettings.cardLast4}
+                  {mailStore.mailingSettings.cardLast4
+                ? `Charged to ${mailStore.mailingSettings.senderName} via saved card ending ${mailStore.mailingSettings.cardLast4}`
+                : 'No card on file'}
                 </p>
               </div>
+
+              {/* Error banner */}
+              {sendError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-red-700 font-medium">{sendError}</p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -471,7 +495,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                 </button>
                 <button
                   onClick={handleSend}
-                  disabled={sending}
+                  disabled={sending || !hasPaymentMethod}
                   className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sending ? 'Sending...' : `Confirm & Send — $${(cost.totalCents / 100).toFixed(2)}`}

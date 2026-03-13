@@ -585,7 +585,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <span>${mailCostDollars.toFixed(2)}</span>
                 </div>
                 <p className="text-[10px] text-ink-400 mt-1">
-                  Charged to {mailingSettings.senderName} via card ending {mailingSettings.cardLast4}
+                  {mailingSettings.cardLast4
+                    ? `Charged to ${mailingSettings.senderName} via card ending ${mailingSettings.cardLast4}`
+                    : 'No card on file'}
                 </p>
               </div>
             ) : (
@@ -754,7 +756,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span>${mailCostDollars.toFixed(2)}</span>
                   </div>
                   <p className="text-[10px] text-ink-400 mt-1">
-                    Charged to {mailingSettings.senderName} via card ending {mailingSettings.cardLast4}
+                    {mailingSettings.cardLast4
+                    ? `Charged to ${mailingSettings.senderName} via card ending ${mailingSettings.cardLast4}`
+                    : 'No card on file'}
                   </p>
                 </div>
               ) : (
