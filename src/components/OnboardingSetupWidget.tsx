@@ -104,42 +104,42 @@ export default function OnboardingSetupWidget() {
     <div className="mb-5">
       {/* Collapsed pill */}
       <div
-        className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl shadow-sm cursor-pointer overflow-hidden"
+        className="bg-white border border-accent-200 rounded-xl shadow-sm cursor-pointer overflow-hidden"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="flex items-center gap-4 px-5 py-3">
           {/* Icon */}
-          <div className="w-8 h-8 rounded-lg bg-white bg-opacity-15 flex items-center justify-center shrink-0">
-            <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-8 h-8 rounded-lg bg-accent-50 flex items-center justify-center shrink-0">
+            <svg className="w-4.5 h-4.5 text-accent-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
 
           {/* Text */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">Set up your building</p>
-            <p className="text-[11px] text-accent-200">{completedSubTasks}/{totalSubTasks} tasks complete · {firstActive ? firstActive.config.title : 'All done'}</p>
+            <p className="text-sm font-bold text-ink-900">Set up your building</p>
+            <p className="text-[11px] text-ink-500">{completedSubTasks}/{totalSubTasks} tasks complete · {firstActive ? firstActive.config.title : 'All done'}</p>
           </div>
 
           {/* Progress ring */}
           <div className="shrink-0 relative w-10 h-10">
             <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="15.5" fill="none" stroke="white" strokeOpacity="0.2" strokeWidth="3" />
-              <circle cx="18" cy="18" r="15.5" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"
+              <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e6e8eb" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.5" fill="none" className="stroke-accent-600" strokeWidth="3" strokeLinecap="round"
                 strokeDasharray={`${pct * 0.974} 100`} />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">{pct}%</span>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-ink-700">{pct}%</span>
           </div>
 
           {/* Expand/collapse chevron */}
-          <svg className={`w-4 h-4 text-accent-200 transition-transform duration-200 shrink-0 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className={`w-4 h-4 text-ink-400 transition-transform duration-200 shrink-0 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
 
           {/* Dismiss */}
           <button
             onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
-            className="text-accent-200 hover:text-white transition-colors shrink-0"
+            className="text-ink-300 hover:text-ink-600 transition-colors shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -149,10 +149,10 @@ export default function OnboardingSetupWidget() {
 
         {/* Progress bar */}
         <div className="px-5 pb-3">
-          <div className="w-full h-1 bg-white bg-opacity-20 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-ink-100 rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#10b981' : '#fff' }}
+              className="h-full rounded-full bg-accent-500 transition-all duration-500"
+              style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#10b981' : undefined }}
             />
           </div>
         </div>
