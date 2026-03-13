@@ -301,7 +301,7 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="-m-6 flex bg-white rounded-xl border border-ink-200 overflow-hidden" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex bg-white rounded-xl border border-ink-200 overflow-hidden h-full">
       {/* Left — thread list */}
       <div className="w-[300px] flex-shrink-0 border-r border-ink-200 flex flex-col">
         <div className="p-3 border-b border-ink-100 flex items-center justify-between">

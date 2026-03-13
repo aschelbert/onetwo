@@ -18,7 +18,7 @@ import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
-import SupportPage from '@/features/support/SupportPage';
+import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
@@ -192,7 +192,7 @@ export default function App() {
           <Route path="/community" element={<CommunityRoomPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />
-          <Route path="/support" element={<SupportPage />} />
+          <Route path="/support" element={<HelpSupportPage />} />
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
         </Route>
