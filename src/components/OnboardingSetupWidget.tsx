@@ -104,7 +104,7 @@ export default function OnboardingSetupWidget() {
     <div className="mb-5">
       {/* Collapsed pill */}
       <div
-        className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl shadow-sm cursor-pointer overflow-hidden"
+        className="bg-amber-500 rounded-xl shadow-sm cursor-pointer overflow-hidden"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="flex items-center gap-4 px-5 py-3">
