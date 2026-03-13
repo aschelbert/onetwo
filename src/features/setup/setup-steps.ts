@@ -9,6 +9,8 @@ export interface SubTaskConfig {
   label: string;
   /** Route path to navigate to, or null for inline (Step 6) */
   navigateTo: string | null;
+  /** If set, call useFinancialStore.setActiveTab(this) before navigating */
+  financialTab?: string;
   /** Function that checks completion from available data */
   checkComplete: (ctx: CompletionContext) => boolean;
 }
@@ -113,24 +115,28 @@ export const SETUP_STEPS: StepConfig[] = [
         id: 'fin_coa',
         label: 'Set up chart of accounts',
         navigateTo: '/financial',
+        financialTab: 'coa',
         checkComplete: (ctx) => ctx.coaCount >= 1,
       },
       {
         id: 'fin_gl',
         label: 'Enter year-to-date GL transactions',
         navigateTo: '/financial',
+        financialTab: 'ledger',
         checkComplete: (ctx) => ctx.glEntryCount >= 1,
       },
       {
         id: 'fin_budget',
         label: 'Configure annual budget',
         navigateTo: '/financial',
+        financialTab: 'budget',
         checkComplete: (ctx) => ctx.budgetCount >= 1,
       },
       {
         id: 'fin_reserves',
         label: 'Define reserve fund items',
         navigateTo: '/financial',
+        financialTab: 'reserves',
         checkComplete: (ctx) => ctx.reserveCount >= 1,
       },
     ],

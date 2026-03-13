@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTenantContext } from './TenantProvider';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { SETUP_STEPS, type CompletionContext, type StepConfig } from '@/features/setup/setup-steps';
+import { SETUP_STEPS, type CompletionContext, type StepConfig, type SubTaskConfig } from '@/features/setup/setup-steps';
 
 const DISMISS_KEY = 'onetwo_onboarding_dismissed';
 
@@ -83,6 +83,14 @@ export default function OnboardingSetupWidget() {
     setGoingLive(true);
     await tenant.updateOnboardingStep('goLive', true);
   }, [tenant]);
+
+  const goToSubTask = useCallback((st: SubTaskConfig) => {
+    if (!st.navigateTo) return;
+    if (st.financialTab) {
+      financial.setActiveTab(st.financialTab);
+    }
+    navigate(st.navigateTo);
+  }, [navigate, financial]);
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISS_KEY, 'true');
@@ -279,7 +287,7 @@ export default function OnboardingSetupWidget() {
                               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all group ${
                                 done ? 'bg-sage-50' : st.navigateTo ? 'hover:bg-mist-50 cursor-pointer' : ''
                               }`}
-                              onClick={() => { if (!done && st.navigateTo) navigate(st.navigateTo); }}
+                              onClick={() => { if (!done && st.navigateTo) goToSubTask(st); }}
                             >
                               {done ? (
                                 <div className="w-5 h-5 rounded-full bg-sage-500 flex items-center justify-center shrink-0">
@@ -298,7 +306,7 @@ export default function OnboardingSetupWidget() {
                               )}
                               {done && st.navigateTo && (
                                 <span className="text-[11px] text-ink-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                  onClick={(e) => { e.stopPropagation(); navigate(st.navigateTo!); }}>View →</span>
+                                  onClick={(e) => { e.stopPropagation(); goToSubTask(st); }}>View →</span>
                               )}
                             </div>
                           );
@@ -310,7 +318,7 @@ export default function OnboardingSetupWidget() {
                               onClick={() => {
                                 const firstIncomplete = step.config.subTasks.find(st => !st.checkComplete(completionCtx) && st.navigateTo);
                                 if (firstIncomplete?.navigateTo) {
-                                  navigate(firstIncomplete.navigateTo);
+                                  goToSubTask(firstIncomplete);
                                 } else {
                                   const next = steps.find(s => s.config.stepNumber > step.config.stepNumber);
                                   if (next) setActiveStep(next.config.stepNumber);
