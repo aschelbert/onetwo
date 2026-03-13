@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { supabase } from '@/lib/supabase';
 import { fmt, getOrdinalSuffix } from '@/lib/formatters';
 import { useNavigate } from 'react-router-dom';
 
@@ -81,43 +82,80 @@ export default function MyUnitPage() {
   const totalPaid = activeUnit.payments.reduce((s, p) => s + p.amount, 0);
   const isDelinquent = activeUnit.balance > 0;
 
-  // Simulate Stripe Checkout for a payment
-  const handleStripePayment = (amount: number, description: string, onSuccess: () => void) => {
-    // In production: POST /api/stripe/create-checkout-session
-    // which calls stripeClient.checkout.sessions.create({
-    //   line_items: [{ price_data: { unit_amount: amount * 100, currency: 'usd',
-    //     product_data: { name: description } }, quantity: 1 }],
-    //   payment_intent_data: { application_fee_amount: Math.round(amount * 100 * 0.029) },
-    //   mode: 'payment',
-    //   success_url: `${window.location.origin}/my-unit?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-    // }, { stripeAccount: stripeConnectId });
-    // Then redirect: window.location.href = session.url
-    if (confirm(`Stripe Checkout: Pay ${fmt(amount)} for "${description}"?\n\nIn production, this redirects to Stripe's hosted checkout page.`)) {
-      onSuccess();
+  const handleStripePayment = async (amount: number, description: string, onSuccess: () => void) => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'create_checkout',
+          amount,
+          description,
+          unitNumber: activeUnit.number,
+          stripeConnectId,
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error('Stripe checkout error:', err);
+      alert('Failed to create checkout session. Please try again.');
     }
   };
 
-  const handleSetupRecurring = () => {
-    // In production: POST /api/stripe/create-subscription-checkout
-    // calls stripeClient.checkout.sessions.create({
-    //   customer_account: stripeConnectId (connected account ID = customer ID for V2 accounts),
-    //   mode: 'subscription',
-    //   line_items: [{ price: MONTHLY_PRICE_ID, quantity: 1 }],
-    //   success_url: `${window.location.origin}/my-unit?subscription=success`,
-    //   cancel_url: `${window.location.origin}/my-unit`,
-    // });
-    setRecurringSetup(true);
-    setModal(null);
-    alert('Demo: Recurring payment enrolled.\n\nIn production, this creates a Stripe Subscription via hosted checkout.\nThe resident is redirected to Stripe to enter payment details, then back to the app.');
+  const handleSetupRecurring = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'create_subscription',
+          amount: activeUnit.monthlyFee,
+          unitNumber: activeUnit.number,
+          stripeConnectId,
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    } catch (err) {
+      console.error('Stripe subscription error:', err);
+      alert('Failed to set up recurring payment. Please try again.');
+    }
   };
 
-  const handleManageBilling = () => {
-    // In production: POST /api/stripe/create-billing-portal
-    // calls stripeClient.billingPortal.sessions.create({
-    //   customer_account: stripeConnectId,
-    //   return_url: `${window.location.origin}/my-unit`,
-    // });
-    alert('Demo: Opens Stripe Billing Portal.\n\nIn production, this redirects to Stripe\'s customer portal where residents can:\n- Update payment method\n- View invoices & receipts\n- Cancel recurring payments');
+  const handleManageBilling = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'create_billing_portal',
+          stripeConnectId,
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.portalUrl) {
+        window.location.href = data.portalUrl;
+      }
+    } catch (err) {
+      console.error('Billing portal error:', err);
+      alert('Failed to open billing portal. Please try again.');
+    }
   };
 
   const StripeIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (

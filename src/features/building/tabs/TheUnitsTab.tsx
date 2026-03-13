@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import type { Unit } from '@/types/financial';
 
@@ -286,14 +287,53 @@ export default function TheUnitsTab() {
     store.updateUnit(f('unitNum'), { monthlyFee: parseInt(f('monthlyFee')) });
     setModal(null); resetForm();
   };
-  const handleStripeConnect = () => {
-    const demoId = 'acct_' + Math.random().toString(36).slice(2, 14);
-    store.setStripeConnect(demoId);
-    alert(`Demo: Connected Account ${demoId} created.`);
+  const handleStripeConnect = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'create',
+          buildingName: building.name,
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.stripeConnectId) {
+        store.setStripeConnect(data.stripeConnectId);
+      }
+      if (data?.onboardingUrl) {
+        window.location.href = data.onboardingUrl;
+      }
+    } catch (err) {
+      console.error('Stripe Connect error:', err);
+      alert('Failed to create Stripe account. Please try again.');
+    }
   };
-  const handleStripeOnboard = () => {
-    store.setStripeOnboarding(true);
-    alert("Demo: Onboarding complete.");
+  const handleStripeOnboard = async () => {
+    if (!supabase) {
+      alert('Backend not connected. Please configure Supabase.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+        body: {
+          action: 'check_status',
+          returnUrl: window.location.href,
+        },
+      });
+      if (error) throw error;
+      if (data?.onboardingComplete) {
+        store.setStripeOnboarding(true);
+      } else if (data?.onboardingUrl) {
+        window.location.href = data.onboardingUrl;
+      }
+    } catch (err) {
+      console.error('Stripe onboarding check error:', err);
+      alert('Failed to check onboarding status. Please try again.');
+    }
   };
 
   // Field helper — stable JSX factory, not a component (avoids remount on re-render)

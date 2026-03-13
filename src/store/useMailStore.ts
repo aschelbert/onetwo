@@ -36,8 +36,8 @@ interface MailState {
 export const useMailStore = create<MailState>()(persist((set, get) => ({
   mailingSettings: {
     enabled: true,
-    stripePaymentMethodId: 'pm_mock_1234',
-    stripeCustomerId: 'cus_mock_5678',
+    stripePaymentMethodId: '',
+    stripeCustomerId: '',
     cardLast4: '6411',
     cardBrand: 'Visa',
     senderAddress: {

@@ -64,7 +64,8 @@ Deno.serve(async (req) => {
     }
     const tenantId = tu.tenant_id;
 
-    const { action, buildingName, returnUrl } = await req.json();
+    const body = await req.json();
+    const { action, buildingName, returnUrl, amount, description, unitNumber, stripeConnectId: bodyConnectId, customerId } = body;
     const effectiveReturnUrl = returnUrl || `${SITE_URL}/building?tab=payments`;
 
     // ═══ ACTION: create ═══
@@ -199,7 +200,134 @@ Deno.serve(async (req) => {
       });
     }
 
-    return jsonResponse({ error: "Invalid action. Use: create, check_status" }, 400);
+    // ═══ ACTION: create_checkout ═══
+    // Creates a Stripe Checkout session for a one-time unit payment on the connected account
+    if (action === "create_checkout") {
+      const settings = await sbQuery("GET", "financial_settings", {
+        "tenant_id": `eq.${tenantId}`,
+        "select": "stripe_connect_id",
+      });
+      const acctId = bodyConnectId || settings?.stripe_connect_id;
+      if (!acctId) {
+        return jsonResponse({ error: "No Stripe Connect account found" }, 404);
+      }
+
+      const params = new URLSearchParams();
+      params.append("mode", "payment");
+      params.append("success_url", `${effectiveReturnUrl}?payment=success`);
+      params.append("cancel_url", `${effectiveReturnUrl}?payment=cancelled`);
+      params.append("line_items[0][price_data][currency]", "usd");
+      params.append("line_items[0][price_data][unit_amount]", String(Math.round((amount || 0) * 100)));
+      params.append("line_items[0][price_data][product_data][name]", description || "HOA Payment");
+      params.append("line_items[0][quantity]", "1");
+      params.append("payment_intent_data[application_fee_amount]", String(Math.round((amount || 0) * 100 * 0.029)));
+      if (unitNumber) params.append("metadata[unit_number]", unitNumber);
+
+      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${STRIPE_KEY}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Stripe-Account": acctId,
+        },
+        body: params.toString(),
+      });
+
+      if (!stripeRes.ok) {
+        const err = await stripeRes.text();
+        console.error("Checkout session creation failed:", err);
+        return jsonResponse({ error: "Failed to create checkout session" }, 500);
+      }
+
+      const session = await stripeRes.json();
+      return jsonResponse({ success: true, checkoutUrl: session.url, sessionId: session.id });
+    }
+
+    // ═══ ACTION: create_subscription ═══
+    // Creates a Stripe Checkout session in subscription mode for recurring HOA payments
+    if (action === "create_subscription") {
+      const settings = await sbQuery("GET", "financial_settings", {
+        "tenant_id": `eq.${tenantId}`,
+        "select": "stripe_connect_id",
+      });
+      const acctId = bodyConnectId || settings?.stripe_connect_id;
+      if (!acctId) {
+        return jsonResponse({ error: "No Stripe Connect account found" }, 404);
+      }
+
+      const params = new URLSearchParams();
+      params.append("mode", "subscription");
+      params.append("success_url", `${effectiveReturnUrl}?subscription=success`);
+      params.append("cancel_url", `${effectiveReturnUrl}?subscription=cancelled`);
+      params.append("line_items[0][price_data][currency]", "usd");
+      params.append("line_items[0][price_data][unit_amount]", String(Math.round((amount || 0) * 100)));
+      params.append("line_items[0][price_data][product_data][name]", "Monthly HOA Fee");
+      params.append("line_items[0][price_data][recurring][interval]", "month");
+      params.append("line_items[0][quantity]", "1");
+      params.append("subscription_data[application_fee_percent]", "2.9");
+      if (unitNumber) params.append("metadata[unit_number]", unitNumber);
+
+      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${STRIPE_KEY}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Stripe-Account": acctId,
+        },
+        body: params.toString(),
+      });
+
+      if (!stripeRes.ok) {
+        const err = await stripeRes.text();
+        console.error("Subscription session creation failed:", err);
+        return jsonResponse({ error: "Failed to create subscription checkout" }, 500);
+      }
+
+      const session = await stripeRes.json();
+      return jsonResponse({ success: true, checkoutUrl: session.url, sessionId: session.id });
+    }
+
+    // ═══ ACTION: create_billing_portal ═══
+    // Creates a Stripe Billing Portal session for residents to manage payment methods
+    if (action === "create_billing_portal") {
+      const settings = await sbQuery("GET", "financial_settings", {
+        "tenant_id": `eq.${tenantId}`,
+        "select": "stripe_connect_id",
+      });
+      const acctId = bodyConnectId || settings?.stripe_connect_id;
+      if (!acctId) {
+        return jsonResponse({ error: "No Stripe Connect account found" }, 404);
+      }
+
+      if (!customerId) {
+        return jsonResponse({ error: "Customer ID required for billing portal" }, 400);
+      }
+
+      const params = new URLSearchParams();
+      params.append("customer", customerId);
+      params.append("return_url", effectiveReturnUrl);
+
+      const stripeRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${STRIPE_KEY}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Stripe-Account": acctId,
+        },
+        body: params.toString(),
+      });
+
+      if (!stripeRes.ok) {
+        const err = await stripeRes.text();
+        console.error("Billing portal creation failed:", err);
+        return jsonResponse({ error: "Failed to create billing portal session" }, 500);
+      }
+
+      const portal = await stripeRes.json();
+      return jsonResponse({ success: true, portalUrl: portal.url });
+    }
+
+    return jsonResponse({ error: "Invalid action. Use: create, check_status, create_checkout, create_subscription, create_billing_portal" }, 400);
 
   } catch (err) {
     console.error("connect-stripe-account error:", err);

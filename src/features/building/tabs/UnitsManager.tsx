@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import type { Unit } from '@/types/financial';
 
@@ -11,6 +13,7 @@ type SortKey = 'number' | 'owner' | 'balance' | 'status';
 
 export default function UnitsManager() {
   const store = useFinancialStore();
+  const building = useBuildingStore();
   const { currentRole } = useAuthStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
@@ -540,22 +543,56 @@ export default function UnitsManager() {
               {/* Action buttons */}
               <div className="flex gap-3">
                 {!store.stripeConnectId ? (
-                  <button onClick={() => {
-                    // In production, this calls your backend: POST /api/stripe/create-account
-                    // which calls stripeClient.v2.core.accounts.create({...})
-                    // and returns the account ID + account link URL
-                    const demoId = 'acct_' + Math.random().toString(36).slice(2, 14);
-                    store.setStripeConnect(demoId);
-                    alert(`Demo: Connected Account ${demoId} created.\n\nIn production, this redirects to Stripe's onboarding flow via Account Links (v2).`);
+                  <button onClick={async () => {
+                    if (!supabase) {
+                      alert('Backend not connected. Please configure Supabase.');
+                      return;
+                    }
+                    try {
+                      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+                        body: {
+                          action: 'create',
+                          buildingName: building.name,
+                          returnUrl: window.location.href,
+                        },
+                      });
+                      if (error) throw error;
+                      if (data?.stripeConnectId) {
+                        store.setStripeConnect(data.stripeConnectId);
+                      }
+                      if (data?.onboardingUrl) {
+                        window.location.href = data.onboardingUrl;
+                      }
+                    } catch (err) {
+                      console.error('Stripe Connect error:', err);
+                      alert('Failed to create Stripe account. Please try again.');
+                    }
                   }} className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm text-center">
                     Connect with Stripe →
                   </button>
                 ) : !store.stripeOnboardingComplete ? (
-                  <button onClick={() => {
-                    // In production: POST /api/stripe/create-account-link
-                    // which calls stripeClient.v2.core.accountLinks.create({...})
-                    store.setStripeOnboarding(true);
-                    alert('Demo: Onboarding marked complete.\n\nIn production, the user is redirected to Stripe\'s hosted onboarding via Account Links.');
+                  <button onClick={async () => {
+                    if (!supabase) {
+                      alert('Backend not connected. Please configure Supabase.');
+                      return;
+                    }
+                    try {
+                      const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
+                        body: {
+                          action: 'check_status',
+                          returnUrl: window.location.href,
+                        },
+                      });
+                      if (error) throw error;
+                      if (data?.onboardingComplete) {
+                        store.setStripeOnboarding(true);
+                      } else if (data?.onboardingUrl) {
+                        window.location.href = data.onboardingUrl;
+                      }
+                    } catch (err) {
+                      console.error('Stripe onboarding check error:', err);
+                      alert('Failed to check onboarding status. Please try again.');
+                    }
                   }} className="flex-1 px-4 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 text-sm text-center">
                     Complete Onboarding →
                   </button>
