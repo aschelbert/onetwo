@@ -85,6 +85,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   const [mergeValues, setMergeValues] = useState<Record<string, string>>({});
 
   const [sending, setSending] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   // ── Auto-select template from context ─────────────────────
   useEffect(() => {
@@ -113,7 +114,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   // ── Cost calculation ──────────────────────────────────────
   const mailPriceCents = PRICING[mailMethod] || 0;
   const mailLetterCount = scope === 'community' ? units.length : 1;
-  const mailCostCents = channels.mail ? mailPriceCents * mailLetterCount : 0;
+  const estimatedPageCount = Math.max(1, Math.ceil((body || '').length / 2800));
+  const additionalPagesCostCents = (estimatedPageCount - 1) * PRICING.additionalPage * mailLetterCount;
+  const mailCostCents = channels.mail ? (mailPriceCents * mailLetterCount) + additionalPagesCostCents : 0;
   const mailCostDollars = mailCostCents / 100;
 
   // ── Template selection handler ────────────────────────────
@@ -231,7 +234,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-ink-100 px-6 py-5 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-ink-900">Compose Communication</h2>
+            <h2 className="text-base font-bold text-ink-900">{showReview ? 'Review Before Sending' : 'Compose Communication'}</h2>
             {context?.caseLink && (
               <p className="text-[11px] text-ink-400 mt-0.5">📋 {context.caseLink}</p>
             )}
@@ -244,6 +247,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
           </button>
         </div>
 
+        {!showReview ? (<>
         {/* ① Scope */}
         <div className="px-6 py-4 border-b border-ink-100">
           <p className="text-[11px] font-bold text-ink-400 uppercase tracking-widest mb-2.5">① Scope</p>
@@ -562,8 +566,17 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
               <div className="p-3 bg-ink-50 rounded-[10px] mb-3 text-xs text-ink-600">
                 <p className="font-semibold mb-1">Cost Summary</p>
                 <div className="flex justify-between">
-                  <span>Physical mail ({mailLetterCount} {mailLetterCount > 1 ? 'letters' : 'letter'} × ${(mailPriceCents / 100).toFixed(2)})</span>
-                  <span className="font-semibold">${mailCostDollars.toFixed(2)}</span>
+                  <span>{formatDeliveryMethod(mailMethod)} ({mailLetterCount} {mailLetterCount > 1 ? 'letters' : 'letter'} × ${(mailPriceCents / 100).toFixed(2)})</span>
+                  <span className="font-semibold">${(mailPriceCents * mailLetterCount / 100).toFixed(2)}</span>
+                </div>
+                {estimatedPageCount > 1 && (
+                  <div className="flex justify-between">
+                    <span>Additional pages ({estimatedPageCount - 1} pg × ${(PRICING.additionalPage / 100).toFixed(2)}{mailLetterCount > 1 ? ` × ${mailLetterCount}` : ''})</span>
+                    <span className="font-semibold">${(additionalPagesCostCents / 100).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1 text-ink-400 mt-0.5">
+                  <span>{estimatedPageCount} {estimatedPageCount === 1 ? 'page' : 'pages'} per letter</span>
                 </div>
                 {channels.email && <p className="text-ink-400">Email: included</p>}
                 {scope === 'community' && <p className="text-ink-400">Announcement: included</p>}
@@ -588,12 +601,182 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                 Cancel
               </button>
               <button
-                onClick={handleSend}
-                disabled={sending || !subject.trim()}
+                onClick={() => setShowReview(true)}
+                disabled={!subject.trim()}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-[10px] text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {channels.mail ? `Send — $${mailCostDollars.toFixed(2)}` : 'Send'}
+                {channels.mail ? `Review & Send — $${mailCostDollars.toFixed(2)}` : 'Review & Send'}
               </button>
+            </div>
+          </div>
+        )}
+        </>) : (
+          /* ── Review Mode ─────────────────────────────────────── */
+          <div className="px-6 py-5 space-y-5">
+            {/* Sending Summary */}
+            <div>
+              <p className="text-[11px] font-bold text-ink-400 uppercase tracking-widest mb-2">Sending To</p>
+              <div className="p-3 bg-ink-50 rounded-[10px] border border-ink-100">
+                {scope === 'community' ? (
+                  <p className="text-[13px] font-semibold text-ink-900">All owners ({units.length} recipients)</p>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                      {selectedUnit?.number}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-semibold text-ink-900">{selectedUnit?.owner} · Unit {selectedUnit?.number}</p>
+                      <p className="text-[11px] text-ink-400">{selectedUnit?.email}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {channels.email && (
+                    <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5">Email</span>
+                  )}
+                  {channels.mail && (
+                    <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">{formatDeliveryMethod(mailMethod)}</span>
+                  )}
+                  {scope === 'community' && (
+                    <span className="text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-0.5">Announcement</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mail Preview */}
+            {channels.mail && (
+              <div>
+                <div className="border border-ink-200 rounded-lg overflow-hidden shadow-sm">
+                  <div className="bg-ink-50 border-b border-ink-200 px-4 py-2 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-ink-500">Mail Preview</span>
+                    <span className="text-[11px] font-semibold text-ink-600 bg-white border border-ink-200 rounded-full px-2.5 py-0.5">
+                      {estimatedPageCount} {estimatedPageCount === 1 ? 'page' : 'pages'}
+                    </span>
+                  </div>
+                  <div className="p-5 bg-white max-h-80 overflow-y-auto">
+                    <div className="space-y-3 text-xs" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                      <div className="text-ink-500">
+                        <p className="font-semibold">{mailingSettings.senderName}</p>
+                        <p>{mailingSettings.senderAddress.line1}</p>
+                        {mailingSettings.senderAddress.line2 && <p>{mailingSettings.senderAddress.line2}</p>}
+                        <p>{mailingSettings.senderAddress.city}, {mailingSettings.senderAddress.state} {mailingSettings.senderAddress.zip}</p>
+                      </div>
+                      <p className="text-ink-400">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      <div className="text-ink-700">
+                        <p className="font-semibold">{scope === 'unit' ? (selectedUnit?.owner || '') : '[Each Owner]'}</p>
+                        {scope === 'unit' ? (
+                          <p>Unit {selectedUnit?.number}</p>
+                        ) : (
+                          <p>[Unit Address]</p>
+                        )}
+                      </div>
+                      <div className="border-t border-ink-100 pt-3">
+                        <p className="font-bold text-ink-900 mb-2">RE: {subject}</p>
+                        <div className="text-ink-700 whitespace-pre-wrap leading-relaxed">{body}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {estimatedPageCount > 1 && (
+                    <div className="border-t border-dashed border-ink-200 px-4 py-2 bg-amber-50">
+                      <p className="text-[10px] text-amber-700 text-center font-medium">
+                        Content spans {estimatedPageCount} pages · Additional page fee: ${((estimatedPageCount - 1) * PRICING.additionalPage / 100).toFixed(2)}/letter
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {scope === 'community' && (
+                  <p className="text-[11px] text-ink-400 mt-1.5">
+                    This letter will be personalized and mailed to each of the {units.length} owners.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Email Preview */}
+            {channels.email && (
+              <div>
+                <div className="border border-ink-200 rounded-lg overflow-hidden">
+                  <div className="bg-ink-50 border-b border-ink-200 px-4 py-2">
+                    <span className="text-[11px] font-semibold text-ink-500">Email Preview</span>
+                  </div>
+                  <div className="px-4 py-2.5 border-b border-ink-100 space-y-1 text-[11px]">
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{mailingSettings.senderName}</span></div>
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">To:</span><span className="text-ink-700 font-medium">{scope === 'unit' ? (selectedUnit?.email || '') : `All owners (${units.length})`}</span></div>
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">Subject:</span><span className="text-ink-900 font-semibold">{subject}</span></div>
+                  </div>
+                  <div className="px-4 py-3 max-h-48 overflow-y-auto">
+                    <div className="text-xs text-ink-700 whitespace-pre-wrap leading-relaxed">{body}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Announcement Preview */}
+            {scope === 'community' && (
+              <div>
+                <div className="border border-ink-200 rounded-lg overflow-hidden">
+                  <div className="bg-ink-50 border-b border-ink-200 px-4 py-2">
+                    <span className="text-[11px] font-semibold text-ink-500">Announcement Preview</span>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      {announcementPriority === 'urgent' && <span className="text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 rounded px-1.5 py-0.5">URGENT</span>}
+                      {announcementPriority === 'important' && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">IMPORTANT</span>}
+                      <p className="text-[13px] font-bold text-ink-900">{subject}</p>
+                    </div>
+                    <p className="text-xs text-ink-600 leading-relaxed line-clamp-4">{body}</p>
+                    <p className="text-[10px] text-ink-400 mt-2">Posted by {currentUser.name} · Visible to all owners</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cost Summary + Confirm */}
+            <div className="sticky bottom-0 bg-white border-t border-ink-100 -mx-6 px-6 py-4 mt-2">
+              {channels.mail ? (
+                <div className="p-3 bg-ink-50 rounded-[10px] mb-3 text-xs text-ink-600">
+                  <p className="font-semibold mb-1">Cost Summary</p>
+                  <div className="flex justify-between">
+                    <span>{formatDeliveryMethod(mailMethod)} ({mailLetterCount} {mailLetterCount > 1 ? 'letters' : 'letter'} × ${(mailPriceCents / 100).toFixed(2)})</span>
+                    <span className="font-semibold">${(mailPriceCents * mailLetterCount / 100).toFixed(2)}</span>
+                  </div>
+                  {estimatedPageCount > 1 && (
+                    <div className="flex justify-between">
+                      <span>Additional pages ({estimatedPageCount - 1} × ${(PRICING.additionalPage / 100).toFixed(2)}{mailLetterCount > 1 ? ` × ${mailLetterCount}` : ''})</span>
+                      <span className="font-semibold">${(additionalPagesCostCents / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {channels.email && <p className="text-ink-400">Email: included</p>}
+                  {scope === 'community' && <p className="text-ink-400">Announcement: included</p>}
+                  <div className="border-t border-ink-200 mt-1.5 pt-1.5 flex justify-between font-bold text-ink-900">
+                    <span>Total</span>
+                    <span>${mailCostDollars.toFixed(2)}</span>
+                  </div>
+                  <p className="text-[10px] text-ink-400 mt-1">
+                    Charged to {mailingSettings.senderName} via card ending {mailingSettings.cardLast4}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg mb-3 text-[11px] text-emerald-700 font-medium">
+                  No charges — email{scope === 'community' ? ' and announcements are' : ' is'} included
+                </div>
+              )}
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setShowReview(false)}
+                  className="px-5 py-2.5 bg-ink-50 text-ink-600 border border-ink-100 rounded-[10px] text-[13px] font-semibold hover:bg-ink-100 transition-colors"
+                >
+                  ← Back to Edit
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={sending}
+                  className="flex-1 py-2.5 bg-red-500 text-white rounded-[10px] text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sending ? 'Sending...' : channels.mail ? `Confirm & Send — $${mailCostDollars.toFixed(2)}` : 'Confirm & Send'}
+                </button>
+              </div>
             </div>
           </div>
         )}
