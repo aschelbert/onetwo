@@ -37,7 +37,7 @@ export function DashboardSetupWidget({ checklist, tenancySlug, showPaymentStep =
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/app/onboarding/${tenancySlug}`} prefetch={false}>
+          <Link href={`/app/onboarding/${tenancySlug}/setup`} prefetch={false}>
             <Button variant="accent" size="sm">
               Continue Setup <ArrowRight size={13} />
             </Button>

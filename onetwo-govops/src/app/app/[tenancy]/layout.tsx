@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation'
 import { TenantProvider } from '@/lib/tenant-context'
 import { TenantSidebar } from '@/components/tenant/sidebar'
 import { TenantTopbar } from '@/components/tenant/topbar'
+import { SetupContextPillProvider } from '@/components/onboarding/context-pill/SetupContextPillProvider'
+import { SetupContextPill } from '@/components/onboarding/context-pill/SetupContextPill'
 
 export default async function TenantLayout({
   children,
@@ -77,15 +79,18 @@ export default async function TenantLayout({
 
     return (
       <TenantProvider value={contextValue}>
-        <div className="flex h-screen bg-stone-50">
-          <TenantSidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <TenantTopbar />
-            <main className="flex-1 overflow-y-auto p-6">
-              {children}
-            </main>
+        <SetupContextPillProvider>
+          <div className="flex h-screen bg-stone-50">
+            <TenantSidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <TenantTopbar />
+              <main className="flex-1 overflow-y-auto p-6">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
+          <SetupContextPill />
+        </SetupContextPillProvider>
       </TenantProvider>
     )
   }
@@ -122,15 +127,18 @@ export default async function TenantLayout({
 
   return (
     <TenantProvider value={contextValue}>
-      <div className="flex h-screen bg-stone-50">
-        <TenantSidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TenantTopbar />
-          <main className="flex-1 overflow-y-auto p-6">
-            {children}
-          </main>
+      <SetupContextPillProvider>
+        <div className="flex h-screen bg-stone-50">
+          <TenantSidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <TenantTopbar />
+            <main className="flex-1 overflow-y-auto p-6">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
+        <SetupContextPill />
+      </SetupContextPillProvider>
     </TenantProvider>
   )
 }

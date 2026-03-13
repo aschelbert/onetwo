@@ -279,3 +279,43 @@ export interface TenantFeatures {
   voting_elections: boolean
   amenity_booking: boolean
 }
+
+// ─── Setup Hub Types ────────────────────────────────────────────────────────
+
+export type SetupStepStatus = 'complete' | 'active' | 'pending'
+
+export interface SetupSubTask {
+  id: string
+  label: string
+  navigateTo: string | null // null = inline (no navigation)
+  isComplete: boolean
+}
+
+export interface SetupStepProgress {
+  stepId: OnboardingStepId
+  stepNumber: number
+  title: string
+  description: string
+  required: boolean
+  status: SetupStepStatus
+  subTasks: SetupSubTask[]
+  completedCount: number
+  totalCount: number
+}
+
+export interface SetupProgress {
+  steps: SetupStepProgress[]
+  totalSubTasks: number
+  completedSubTasks: number
+  percentComplete: number
+  allRequiredComplete: boolean
+  goLive: boolean
+}
+
+export interface SetupContextPillState {
+  activeStepNumber: number
+  activeStepTitle: string
+  completedSubTasks: number
+  totalSubTasks: number
+  setupHubUrl: string
+}

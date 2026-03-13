@@ -760,6 +760,14 @@ export async function setGoLive(tenancyId: string) {
   revalidatePath(`/app`)
 }
 
+// ─── Setup Progress (Setup Hub) ──────────────────────────────────────────────
+
+export async function getSetupProgress(tenancyId: string) {
+  const { computeSetupProgress } = await import('@/lib/setup/compute-setup-progress')
+  const features = await getTenantFeatures(tenancyId)
+  return computeSetupProgress(tenancyId, features)
+}
+
 // ─── Tenant Features ─────────────────────────────────────────────────────────
 
 export async function getTenantFeatures(tenancyId: string) {
