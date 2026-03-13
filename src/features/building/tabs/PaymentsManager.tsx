@@ -73,7 +73,8 @@ export default function PaymentsManager() {
       }
     } catch (err) {
       console.error('Stripe onboarding check error:', err);
-      alert('Failed to check onboarding status. Please try again.');
+      store.setStripeConnect('');
+      store.setStripeOnboarding(false);
     }
   };
 

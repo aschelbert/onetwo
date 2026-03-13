@@ -332,7 +332,9 @@ export default function TheUnitsTab() {
       }
     } catch (err) {
       console.error('Stripe onboarding check error:', err);
-      alert('Failed to check onboarding status. Please try again.');
+      // If the account was invalid, reset local state so user can reconnect
+      store.setStripeConnect('');
+      store.setStripeOnboarding(false);
     }
   };
 

@@ -151,7 +151,13 @@ Deno.serve(async (req) => {
       });
 
       if (!acctRes.ok) {
-        return jsonResponse({ error: "Failed to retrieve Stripe account" }, 500);
+        // Invalid or non-existent Stripe account — clear the stale ID from the database
+        console.error("Stripe account lookup failed for:", stripeConnectId, "status:", acctRes.status);
+        await sbQuery("PATCH", `financial_settings?tenant_id=eq.${tenantId}`, {}, {
+          stripe_connect_id: null,
+          stripe_onboarding_complete: false,
+        });
+        return jsonResponse({ error: "Stripe account not found. Please reconnect.", invalidAccount: true }, 404);
       }
 
       const account = await acctRes.json();

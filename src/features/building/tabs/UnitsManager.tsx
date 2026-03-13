@@ -591,7 +591,8 @@ export default function UnitsManager() {
                       }
                     } catch (err) {
                       console.error('Stripe onboarding check error:', err);
-                      alert('Failed to check onboarding status. Please try again.');
+                      store.setStripeConnect('');
+                      store.setStripeOnboarding(false);
                     }
                   }} className="flex-1 px-4 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 text-sm text-center">
                     Complete Onboarding →
