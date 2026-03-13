@@ -2,7 +2,7 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { TenantProvider } from '@/lib/tenant-context'
 import { OnboardingStepper } from '@/components/onboarding/OnboardingStepper'
-import { getOnboardingChecklist, getTenantFeatures } from './actions'
+import { getOnboardingChecklist, getTenantFeatures } from '../actions'
 import Link from 'next/link'
 
 export default async function OnboardingLayout({

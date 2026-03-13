@@ -15,7 +15,7 @@ import {
   getExistingUsers,
   getTenantFeatures,
   getUserRoles,
-} from '../../actions'
+} from '../../../actions'
 
 import { Step1BuildingProfile } from '@/components/onboarding/steps/Step1BuildingProfile'
 import { Step2Governance } from '@/components/onboarding/steps/Step2Governance'
