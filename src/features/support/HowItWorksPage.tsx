@@ -764,6 +764,7 @@ export default function HowItWorksPage() {
                 {/* Expanded content */}
                 {isOpen && (
                   <div className="px-4 pb-4 border-t border-ink-100">
+                    <ModuleIllustration moduleId={guide.id} />
                     <p className="text-sm text-ink-600 mt-3 mb-4">{guide.summary}</p>
 
                     {/* Tabs / Sections */}
@@ -835,6 +836,442 @@ export default function HowItWorksPage() {
           })
         )}
       </div>
+    </div>
+  );
+}
+
+/* Module illustration — stylized SVG diagram for each module */
+function ModuleIllustration({ moduleId }: { moduleId: string }) {
+  const svgs: Record<string, React.ReactNode> = {
+    /* ── Dashboard ── KPI cards, grade circle, bar chart */
+    dashboard: (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Grade circle */}
+        <circle cx="60" cy="75" r="38" fill="#dceef6" stroke="#3b8dba" strokeWidth="3" />
+        <circle cx="60" cy="75" r="28" fill="white" stroke="#b9dcee" strokeWidth="2" />
+        <text x="60" y="82" textAnchor="middle" fill="#1a1f25" fontSize="22" fontWeight="700" fontFamily="system-ui">A</text>
+        <text x="60" y="122" textAnchor="middle" fill="#929daa" fontSize="9" fontFamily="system-ui">Health Grade</text>
+        {/* KPI cards */}
+        {[
+          { x: 125, label: 'Collection', value: '94%', color: '#659a65' },
+          { x: 230, label: 'Budget Used', value: '67%', color: '#3b8dba' },
+          { x: 335, label: 'Reserves', value: '82%', color: '#3b8dba' },
+          { x: 440, label: 'Open Cases', value: '3', color: '#e53e3e' },
+        ].map((kpi) => (
+          <g key={kpi.x}>
+            <rect x={kpi.x} y="30" width="90" height="60" rx="8" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+            <text x={kpi.x + 45} y="58" textAnchor="middle" fill={kpi.color} fontSize="18" fontWeight="700" fontFamily="system-ui">{kpi.value}</text>
+            <text x={kpi.x + 45} y="76" textAnchor="middle" fill="#929daa" fontSize="8.5" fontFamily="system-ui">{kpi.label}</text>
+          </g>
+        ))}
+        {/* Activity feed lines */}
+        <rect x="125" y="104" width="180" height="6" rx="3" fill="#eef0f2" />
+        <rect x="125" y="116" width="140" height="6" rx="3" fill="#eef0f2" />
+        <rect x="125" y="128" width="160" height="6" rx="3" fill="#eef0f2" />
+        <text x="125" y="100" fill="#929daa" fontSize="8" fontFamily="system-ui">Recent Activity</text>
+        {/* Alert pills */}
+        <rect x="335" y="100" width="70" height="18" rx="9" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
+        <text x="370" y="112.5" textAnchor="middle" fill="#92400e" fontSize="7.5" fontWeight="600" fontFamily="system-ui">2 Overdue</text>
+        <rect x="415" y="100" width="80" height="18" rx="9" fill="#fde3e3" stroke="#e53e3e" strokeWidth="1" />
+        <text x="455" y="112.5" textAnchor="middle" fill="#b91c1c" fontSize="7.5" fontWeight="600" fontFamily="system-ui">1 Urgent Case</text>
+        <rect x="335" y="124" width="86" height="18" rx="9" fill="#dceef6" stroke="#3b8dba" strokeWidth="1" />
+        <text x="378" y="136.5" textAnchor="middle" fill="#255d7e" fontSize="7.5" fontWeight="600" fontFamily="system-ui">Ins. Expiring</text>
+      </svg>
+    ),
+
+    /* ── Board Room ── Runbook checklist, calendar, send icon */
+    boardroom: (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Runbook checklist */}
+        <rect x="20" y="15" width="170" height="120" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="36" y="36" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Compliance Runbook</text>
+        <rect x="36" y="42" width="60" height="12" rx="6" fill="#d1fae5" />
+        <text x="66" y="51" textAnchor="middle" fill="#065f46" fontSize="7" fontWeight="600" fontFamily="system-ui">A — 92%</text>
+        {/* Checked items */}
+        {[
+          { y: 64, text: 'File annual report', done: true },
+          { y: 82, text: 'Review insurance', done: true },
+          { y: 100, text: 'Update bylaws', done: false },
+          { y: 118, text: 'Schedule election', done: false },
+        ].map((item) => (
+          <g key={item.y}>
+            <rect x="36" y={item.y} width="12" height="12" rx="3" fill={item.done ? '#659a65' : 'white'} stroke={item.done ? '#659a65' : '#d8dce1'} strokeWidth="1.5" />
+            {item.done && <path d={`M${39} ${item.y + 6.5}l2.5 2.5 4-4.5`} stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
+            <text x="54" y={item.y + 9.5} fill={item.done ? '#659a65' : '#566370'} fontSize="9" fontFamily="system-ui" textDecoration={item.done ? 'line-through' : 'none'}>{item.text}</text>
+          </g>
+        ))}
+        {/* Calendar block */}
+        <rect x="215" y="20" width="130" height="110" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <rect x="215" y="20" width="130" height="28" rx="10" fill="#3b8dba" />
+        <rect x="215" y="38" width="130" height="10" fill="#3b8dba" />
+        <text x="280" y="40" textAnchor="middle" fill="white" fontSize="10" fontWeight="700" fontFamily="system-ui">March 2026</text>
+        {['S','M','T','W','T','F','S'].map((d, i) => (
+          <text key={d+i} x={228 + i * 16.5} y="62" textAnchor="middle" fill="#929daa" fontSize="7.5" fontWeight="600" fontFamily="system-ui">{d}</text>
+        ))}
+        {/* Calendar grid — simplified */}
+        {[0,1,2,3].map(row => (
+          <g key={row}>
+            {[0,1,2,3,4,5,6].map(col => {
+              const day = row * 7 + col + 1;
+              if (day > 31) return null;
+              const isHighlight = day === 15;
+              return (
+                <g key={col}>
+                  {isHighlight && <circle cx={228 + col * 16.5} cy={76 + row * 14} r="7" fill="#dceef6" />}
+                  <text x={228 + col * 16.5} y={79 + row * 14} textAnchor="middle" fill={isHighlight ? '#1a1f25' : '#6e7b8a'} fontSize="7.5" fontWeight={isHighlight ? '700' : '400'} fontFamily="system-ui">
+                    {day}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
+        {/* Communication / Send panel */}
+        <rect x="370" y="20" width="170" height="110" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="386" y="40" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Communications</text>
+        {/* Channel badges */}
+        <rect x="386" y="50" width="54" height="16" rx="8" fill="#dceef6" />
+        <text x="413" y="61" textAnchor="middle" fill="#255d7e" fontSize="7.5" fontWeight="600" fontFamily="system-ui">Email</text>
+        <rect x="446" y="50" width="54" height="16" rx="8" fill="#f0f5f0" />
+        <text x="473" y="61" textAnchor="middle" fill="#3a663a" fontSize="7.5" fontWeight="600" fontFamily="system-ui">In-App</text>
+        <rect x="386" y="72" width="54" height="16" rx="8" fill="#fef3c7" />
+        <text x="413" y="83" textAnchor="middle" fill="#92400e" fontSize="7.5" fontWeight="600" fontFamily="system-ui">Mail</text>
+        {/* Template lines */}
+        <rect x="386" y="98" width="140" height="6" rx="3" fill="#eef0f2" />
+        <rect x="386" y="108" width="110" height="6" rx="3" fill="#eef0f2" />
+        <rect x="386" y="118" width="125" height="6" rx="3" fill="#eef0f2" />
+      </svg>
+    ),
+
+    /* ── The Building ── Building facade, health bar, documents */
+    building: (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Building silhouette */}
+        <rect x="30" y="25" width="100" height="100" rx="6" fill="#eef0f2" stroke="#d8dce1" strokeWidth="1.5" />
+        <rect x="30" y="25" width="100" height="22" rx="6" fill="#454f5a" />
+        <rect x="30" y="41" width="100" height="6" fill="#454f5a" />
+        <text x="80" y="40" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="system-ui">THE BUILDING</text>
+        {/* Windows grid */}
+        {[0,1,2].map(row => (
+          <g key={row}>
+            {[0,1,2,3].map(col => (
+              <rect key={col} x={40 + col * 22} y={56 + row * 22} width="14" height="14" rx="2" fill="white" stroke="#b8bfc8" strokeWidth="1" />
+            ))}
+          </g>
+        ))}
+        {/* Health Score bar */}
+        <g>
+          <text x="160" y="38" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Building Health</text>
+          <rect x="160" y="44" width="180" height="12" rx="6" fill="#eef0f2" />
+          <rect x="160" y="44" width="144" height="12" rx="6" fill="#659a65" />
+          <text x="350" y="53.5" fill="#659a65" fontSize="9" fontWeight="700" fontFamily="system-ui">B+ 80%</text>
+          {/* Score breakdown */}
+          {[
+            { y: 68, label: 'Legal & Bylaws', pct: 85, w: 35 },
+            { y: 86, label: 'Insurance', pct: 90, w: 35 },
+            { y: 104, label: 'Governance', pct: 60, w: 30 },
+          ].map((item) => (
+            <g key={item.y}>
+              <text x="160" y={item.y + 8} fill="#566370" fontSize="8.5" fontFamily="system-ui">{item.label} ({item.w}%)</text>
+              <rect x="275" y={item.y} width="100" height="10" rx="5" fill="#eef0f2" />
+              <rect x="275" y={item.y} width={item.pct} height="10" rx="5" fill={item.pct >= 80 ? '#659a65' : item.pct >= 60 ? '#d97706' : '#e53e3e'} />
+              <text x="382" y={item.y + 8} fill="#6e7b8a" fontSize="8" fontFamily="system-ui">{item.pct}%</text>
+            </g>
+          ))}
+        </g>
+        {/* Document cards */}
+        <rect x="420" y="25" width="120" height="100" rx="8" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="436" y="42" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Key Records</text>
+        {[
+          { y: 52, label: 'Bylaws', status: 'Current', color: '#659a65' },
+          { y: 68, label: 'Insurance', status: 'Active', color: '#659a65' },
+          { y: 84, label: 'Master Deed', status: 'Current', color: '#659a65' },
+          { y: 100, label: 'Rules', status: 'Outdated', color: '#d97706' },
+        ].map((doc) => (
+          <g key={doc.y}>
+            <rect x="436" y={doc.y} width="7" height="10" rx="1.5" fill="#dceef6" stroke="#3b8dba" strokeWidth="0.8" />
+            <text x="448" y={doc.y + 8} fill="#454f5a" fontSize="8" fontFamily="system-ui">{doc.label}</text>
+            <text x="524" y={doc.y + 8} textAnchor="end" fill={doc.color} fontSize="7" fontWeight="600" fontFamily="system-ui">{doc.status}</text>
+          </g>
+        ))}
+      </svg>
+    ),
+
+    /* ── Fiscal Lens ── Bar chart, ledger rows, pie chart */
+    'fiscal-lens': (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Bar chart */}
+        <text x="30" y="22" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Budget vs Actual</text>
+        <line x1="30" y1="125" x2="195" y2="125" stroke="#d8dce1" strokeWidth="1" />
+        {[
+          { x: 42, h1: 70, h2: 55, label: 'Q1' },
+          { x: 82, h1: 65, h2: 72, label: 'Q2' },
+          { x: 122, h1: 80, h2: 60, label: 'Q3' },
+          { x: 162, h1: 75, h2: 50, label: 'Q4' },
+        ].map((bar) => (
+          <g key={bar.x}>
+            <rect x={bar.x} y={125 - bar.h1} width="14" height={bar.h1} rx="3" fill="#b9dcee" />
+            <rect x={bar.x + 16} y={125 - bar.h2} width="14" height={bar.h2} rx="3" fill={bar.h2 > bar.h1 ? '#e53e3e' : '#659a65'} />
+            <text x={bar.x + 15} y="137" textAnchor="middle" fill="#929daa" fontSize="8" fontFamily="system-ui">{bar.label}</text>
+          </g>
+        ))}
+        {/* Legend */}
+        <rect x="30" y="30" width="8" height="8" rx="2" fill="#b9dcee" />
+        <text x="42" y="37.5" fill="#6e7b8a" fontSize="7.5" fontFamily="system-ui">Budget</text>
+        <rect x="80" y="30" width="8" height="8" rx="2" fill="#659a65" />
+        <text x="92" y="37.5" fill="#6e7b8a" fontSize="7.5" fontFamily="system-ui">Actual</text>
+        {/* Ledger rows */}
+        <rect x="220" y="15" width="170" height="120" rx="8" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="236" y="34" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">General Ledger</text>
+        <line x1="230" y1="40" x2="380" y2="40" stroke="#eef0f2" strokeWidth="1" />
+        {[
+          { y: 52, desc: 'Assessment Income', dr: '', cr: '$4,200', clr: '#659a65' },
+          { y: 66, desc: 'Insurance Premium', dr: '$1,800', cr: '', clr: '#e53e3e' },
+          { y: 80, desc: 'Maintenance Repair', dr: '$650', cr: '', clr: '#e53e3e' },
+          { y: 94, desc: 'Reserve Transfer', dr: '', cr: '$2,000', clr: '#659a65' },
+          { y: 108, desc: 'Vendor Payment', dr: '$980', cr: '', clr: '#e53e3e' },
+        ].map((row) => (
+          <g key={row.y}>
+            <text x="236" y={row.y + 7} fill="#566370" fontSize="7.5" fontFamily="system-ui">{row.desc}</text>
+            <text x="375" y={row.y + 7} textAnchor="end" fill={row.clr} fontSize="8" fontWeight="600" fontFamily="system-ui">{row.dr || row.cr}</text>
+            <line x1="230" y1={row.y + 13} x2="380" y2={row.y + 13} stroke="#f8f9fa" strokeWidth="0.8" />
+          </g>
+        ))}
+        {/* Reserve fund donut */}
+        <g transform="translate(460, 75)">
+          <circle cx="0" cy="0" r="42" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+          <circle cx="0" cy="0" r="34" fill="none" stroke="#eef0f2" strokeWidth="10" />
+          <circle cx="0" cy="0" r="34" fill="none" stroke="#3b8dba" strokeWidth="10" strokeDasharray="175" strokeDashoffset="35" strokeLinecap="round" transform="rotate(-90)" />
+          <text x="0" y="-4" textAnchor="middle" fill="#1a1f25" fontSize="14" fontWeight="700" fontFamily="system-ui">82%</text>
+          <text x="0" y="8" textAnchor="middle" fill="#929daa" fontSize="7" fontFamily="system-ui">Reserves</text>
+          <text x="0" y="18" textAnchor="middle" fill="#929daa" fontSize="7" fontFamily="system-ui">Funded</text>
+        </g>
+      </svg>
+    ),
+
+    /* ── Property Log ── Clipboard with findings and action items */
+    'property-log': (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Clipboard */}
+        <rect x="30" y="10" width="210" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <rect x="85" y="4" width="100" height="16" rx="8" fill="#454f5a" />
+        <text x="135" y="15" textAnchor="middle" fill="white" fontSize="8" fontWeight="600" fontFamily="system-ui">March Walkthrough</text>
+        {/* Header stats */}
+        <text x="46" y="34" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Findings</text>
+        <rect x="94" y="26" width="22" height="12" rx="6" fill="#fef3c7" />
+        <text x="105" y="35" textAnchor="middle" fill="#92400e" fontSize="7" fontWeight="700" fontFamily="system-ui">4</text>
+        {/* Finding rows with condition dots */}
+        {[
+          { y: 44, area: 'Lobby', cond: 'Good', color: '#659a65' },
+          { y: 60, area: 'Stairwell B', cond: 'Fair', color: '#d97706' },
+          { y: 76, area: 'Parking Garage', cond: 'Poor', color: '#e53e3e' },
+          { y: 92, area: 'Roof Access', cond: 'Good', color: '#659a65' },
+        ].map((f) => (
+          <g key={f.y}>
+            <circle cx="52" cy={f.y + 5} r="4" fill={f.color} />
+            <text x="62" y={f.y + 8} fill="#454f5a" fontSize="8.5" fontFamily="system-ui">{f.area}</text>
+            <text x="228" y={f.y + 8} textAnchor="end" fill={f.color} fontSize="7.5" fontWeight="600" fontFamily="system-ui">{f.cond}</text>
+          </g>
+        ))}
+        {/* Severity label */}
+        <text x="46" y="120" fill="#929daa" fontSize="7" fontFamily="system-ui">Severity:</text>
+        {[
+          { x: 88, label: 'High', color: '#e53e3e' },
+          { x: 120, label: 'Med', color: '#d97706' },
+          { x: 148, label: 'Low', color: '#659a65' },
+        ].map(s => (
+          <g key={s.x}>
+            <circle cx={s.x} cy="117" r="3" fill={s.color} />
+            <text x={s.x + 6} y="120" fill="#6e7b8a" fontSize="7" fontFamily="system-ui">{s.label}</text>
+          </g>
+        ))}
+        {/* Action items panel */}
+        <rect x="270" y="10" width="260" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="286" y="30" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Action Items</text>
+        <rect x="366" y="22" width="36" height="12" rx="6" fill="#fde3e3" />
+        <text x="384" y="31" textAnchor="middle" fill="#b91c1c" fontSize="7" fontWeight="700" fontFamily="system-ui">2 open</text>
+        {[
+          { y: 42, text: 'Repair stairwell railing', assignee: 'ABC Maint.', done: true },
+          { y: 62, text: 'Inspect garage cracks', assignee: 'J. Smith', done: false, overdue: true },
+          { y: 82, text: 'Schedule roof repair', assignee: 'Board', done: false, overdue: false },
+          { y: 102, text: 'Replace lobby tiles', assignee: 'XYZ Floors', done: true },
+        ].map((a) => (
+          <g key={a.y}>
+            <rect x="286" y={a.y} width="14" height="14" rx="3" fill={a.done ? '#659a65' : 'white'} stroke={a.done ? '#659a65' : '#d8dce1'} strokeWidth="1.5" />
+            {a.done && <path d={`M${289} ${a.y + 7.5}l3 3 5-5.5`} stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
+            <text x="306" y={a.y + 10} fill={a.done ? '#929daa' : '#454f5a'} fontSize="8.5" fontFamily="system-ui" textDecoration={a.done ? 'line-through' : 'none'}>{a.text}</text>
+            <text x="450" y={a.y + 10} fill="#929daa" fontSize="7.5" fontFamily="system-ui">{a.assignee}</text>
+            {'overdue' in a && a.overdue && (
+              <g>
+                <rect x="490" y={a.y + 1} width="36" height="12" rx="6" fill="#fde3e3" />
+                <text x="508" y={a.y + 10} textAnchor="middle" fill="#b91c1c" fontSize="6" fontWeight="700" fontFamily="system-ui">OVERDUE</text>
+              </g>
+            )}
+          </g>
+        ))}
+      </svg>
+    ),
+
+    /* ── Community Room ── Announcements, request card, upvote */
+    community: (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Announcement cards */}
+        <rect x="20" y="10" width="180" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="36" y="30" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Announcements</text>
+        {/* Pinned announcement */}
+        <rect x="32" y="38" width="156" height="40" rx="6" fill="#f0f7fb" stroke="#b9dcee" strokeWidth="1" />
+        <rect x="38" y="43" width="36" height="10" rx="5" fill="#3b8dba" />
+        <text x="56" y="50.5" textAnchor="middle" fill="white" fontSize="6" fontWeight="700" fontFamily="system-ui">PINNED</text>
+        <rect x="38" y="58" width="120" height="5" rx="2.5" fill="#d8dce1" />
+        <rect x="38" y="66" width="80" height="5" rx="2.5" fill="#eef0f2" />
+        {/* Regular announcement */}
+        <rect x="32" y="84" width="156" height="30" rx="6" fill="#f8f9fa" stroke="#eef0f2" strokeWidth="1" />
+        <rect x="38" y="89" width="44" height="10" rx="5" fill="#fef3c7" />
+        <text x="60" y="96.5" textAnchor="middle" fill="#92400e" fontSize="6" fontWeight="600" fontFamily="system-ui">Financial</text>
+        <rect x="38" y="103" width="100" height="5" rx="2.5" fill="#eef0f2" />
+        <text x="36" y="128" fill="#929daa" fontSize="7" fontFamily="system-ui">Board posted 2h ago</text>
+
+        {/* Request card with upvote */}
+        <rect x="220" y="10" width="180" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="236" y="30" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Requests</text>
+        {/* Request item */}
+        <rect x="232" y="38" width="156" height="52" rx="6" fill="#f8f9fa" stroke="#eef0f2" strokeWidth="1" />
+        <rect x="238" y="43" width="60" height="10" rx="5" fill="#dceef6" />
+        <text x="268" y="50.5" textAnchor="middle" fill="#255d7e" fontSize="6" fontWeight="600" fontFamily="system-ui">Maintenance</text>
+        <rect x="302" y="43" width="42" height="10" rx="5" fill="#fef3c7" />
+        <text x="323" y="50.5" textAnchor="middle" fill="#92400e" fontSize="6" fontWeight="600" fontFamily="system-ui">Medium</text>
+        <rect x="238" y="58" width="130" height="5" rx="2.5" fill="#d8dce1" />
+        <rect x="238" y="67" width="100" height="5" rx="2.5" fill="#eef0f2" />
+        {/* Upvote button */}
+        <rect x="238" y="76" width="28" height="10" rx="5" fill="#f0f5f0" stroke="#659a65" strokeWidth="0.8" />
+        <text x="252" y="83.5" textAnchor="middle" fill="#659a65" fontSize="7" fontWeight="700" fontFamily="system-ui">5</text>
+        {/* SLA indicator */}
+        <rect x="232" y="96" width="156" height="22" rx="6" fill="#fef2f2" stroke="#fbc8c8" strokeWidth="1" />
+        <text x="248" y="110" fill="#b91c1c" fontSize="7.5" fontWeight="600" fontFamily="system-ui">SLA: Response due in 3 days</text>
+        <text x="236" y="128" fill="#929daa" fontSize="7" fontFamily="system-ui">Track status and SLA compliance</text>
+
+        {/* Meeting + Votes mini */}
+        <rect x="420" y="10" width="120" height="58" rx="8" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="436" y="28" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Meetings</text>
+        <rect x="432" y="34" width="42" height="10" rx="5" fill="#3b8dba" />
+        <text x="453" y="41.5" textAnchor="middle" fill="white" fontSize="6" fontWeight="600" fontFamily="system-ui">BOARD</text>
+        <rect x="432" y="48" width="96" height="5" rx="2.5" fill="#eef0f2" />
+        <text x="432" y="60" fill="#929daa" fontSize="7" fontFamily="system-ui">Mar 15 at 7pm</text>
+        {/* Amenities mini */}
+        <rect x="420" y="78" width="120" height="62" rx="8" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="436" y="96" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Amenities</text>
+        <rect x="432" y="102" width="96" height="10" rx="5" fill="#d1fae5" />
+        <text x="480" y="109.5" textAnchor="middle" fill="#065f46" fontSize="6.5" fontWeight="600" fontFamily="system-ui">Approved</text>
+        <rect x="432" y="116" width="96" height="10" rx="5" fill="#fef3c7" />
+        <text x="480" y="123.5" textAnchor="middle" fill="#92400e" fontSize="6.5" fontWeight="600" fontFamily="system-ui">Pending</text>
+      </svg>
+    ),
+
+    /* ── The Archives ── Folder tabs with fiscal years, sections */
+    archives: (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Folder tabs */}
+        <rect x="30" y="40" width="500" height="100" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        {[
+          { x: 40, label: 'FY 2023', active: false },
+          { x: 130, label: 'FY 2024', active: false },
+          { x: 220, label: 'FY 2025', active: true },
+          { x: 310, label: 'FY 2026', active: false },
+        ].map((tab) => (
+          <g key={tab.x}>
+            <rect x={tab.x} y={tab.active ? 22 : 26} width="80" height={tab.active ? 20 : 16} rx="6"
+              fill={tab.active ? 'white' : '#eef0f2'} stroke={tab.active ? '#d8dce1' : '#eef0f2'} strokeWidth="1.5"  />
+            {tab.active && <line x1={tab.x} y1="41" x2={tab.x + 80} y2="41" stroke="white" strokeWidth="2" />}
+            <text x={tab.x + 40} y={tab.active ? 36 : 38} textAnchor="middle" fill={tab.active ? '#1a1f25' : '#929daa'} fontSize="9" fontWeight={tab.active ? '700' : '500'} fontFamily="system-ui">{tab.label}</text>
+          </g>
+        ))}
+        {/* Archive section icons */}
+        <text x="50" y="62" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Archive Sections</text>
+        {[
+          { x: 50, y: 74, label: 'Compliance', icon: 'M50 81 l4 4 8-8', color: '#659a65' },
+          { x: 160, y: 74, label: 'Meetings', icon: '', color: '#3b8dba' },
+          { x: 270, y: 74, label: 'Fiscal', icon: '', color: '#3b8dba' },
+          { x: 380, y: 74, label: 'Insurance', icon: '', color: '#d97706' },
+          { x: 50, y: 104, label: 'Legal Docs', icon: '', color: '#454f5a' },
+          { x: 160, y: 104, label: 'Filings', icon: '', color: '#3b8dba' },
+          { x: 270, y: 104, label: 'Board', icon: '', color: '#454f5a' },
+          { x: 380, y: 104, label: 'Comms', icon: '', color: '#3b8dba' },
+        ].map((sec) => (
+          <g key={sec.label}>
+            <rect x={sec.x} y={sec.y} width="100" height="22" rx="6" fill={sec.color + '15'} stroke={sec.color + '40'} strokeWidth="1" />
+            <circle cx={sec.x + 14} cy={sec.y + 11} r="5" fill={sec.color} opacity="0.3" />
+            <text x={sec.x + 24} y={sec.y + 14} fill="#454f5a" fontSize="8" fontWeight="500" fontFamily="system-ui">{sec.label}</text>
+          </g>
+        ))}
+      </svg>
+    ),
+
+    /* ── My Unit ── Unit card, balance, payment button, autopay */
+    'my-unit': (
+      <svg viewBox="0 0 560 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Unit card */}
+        <rect x="20" y="10" width="160" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <rect x="20" y="10" width="160" height="35" rx="10" fill="#454f5a" />
+        <rect x="20" y="35" width="160" height="10" fill="#454f5a" />
+        <text x="40" y="33" fill="white" fontSize="16" fontWeight="700" fontFamily="system-ui">Unit 4B</text>
+        <rect x="130" y="20" width="40" height="14" rx="7" fill="#659a65" />
+        <text x="150" y="30" textAnchor="middle" fill="white" fontSize="7" fontWeight="700" fontFamily="system-ui">Active</text>
+        <text x="36" y="62" fill="#929daa" fontSize="8" fontFamily="system-ui">Owner</text>
+        <text x="36" y="73" fill="#1a1f25" fontSize="9" fontWeight="600" fontFamily="system-ui">Jane Smith</text>
+        {/* Metrics */}
+        {[
+          { y: 86, label: 'Monthly Fee', value: '$425.00' },
+          { y: 100, label: 'Paid YTD', value: '$1,275.00' },
+          { y: 114, label: 'Balance', value: '$0.00' },
+          { y: 128, label: 'Late Fees', value: '$0.00' },
+        ].map(m => (
+          <g key={m.y}>
+            <text x="36" y={m.y + 4} fill="#929daa" fontSize="7.5" fontFamily="system-ui">{m.label}</text>
+            <text x="168" y={m.y + 4} textAnchor="end" fill="#1a1f25" fontSize="8" fontWeight="600" fontFamily="system-ui">{m.value}</text>
+          </g>
+        ))}
+        {/* Payment section */}
+        <rect x="200" y="10" width="170" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="216" y="32" fill="#1a1f25" fontSize="10" fontWeight="700" fontFamily="system-ui">Payments</text>
+        {/* Balance breakdown */}
+        <rect x="212" y="40" width="146" height="38" rx="6" fill="#f0f7fb" stroke="#b9dcee" strokeWidth="1" />
+        <text x="220" y="54" fill="#566370" fontSize="8" fontFamily="system-ui">Current Balance</text>
+        <text x="348" y="54" textAnchor="end" fill="#659a65" fontSize="12" fontWeight="700" fontFamily="system-ui">$425.00</text>
+        <text x="220" y="70" fill="#929daa" fontSize="7" fontFamily="system-ui">Monthly Assessment due Mar 1</text>
+        {/* Pay Now button */}
+        <rect x="212" y="86" width="146" height="24" rx="8" fill="#454f5a" />
+        <text x="285" y="101" textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="system-ui">Pay Now</text>
+        {/* AutoPay badge */}
+        <rect x="212" y="116" width="146" height="18" rx="9" fill="#d1fae5" stroke="#659a65" strokeWidth="1" />
+        <text x="285" y="128.5" textAnchor="middle" fill="#065f46" fontSize="8" fontWeight="600" fontFamily="system-ui">AutoPay Enrolled — $425/mo</text>
+
+        {/* Payment history */}
+        <rect x="390" y="10" width="150" height="130" rx="10" fill="white" stroke="#d8dce1" strokeWidth="1.5" />
+        <text x="406" y="30" fill="#1a1f25" fontSize="9" fontWeight="700" fontFamily="system-ui">Payment History</text>
+        {[
+          { y: 40, date: 'Mar 1, 2026', amt: '$425.00', method: 'Stripe' },
+          { y: 56, date: 'Feb 1, 2026', amt: '$425.00', method: 'Stripe' },
+          { y: 72, date: 'Jan 1, 2026', amt: '$425.00', method: 'Stripe' },
+          { y: 88, date: 'Dec 1, 2025', amt: '$425.00', method: 'Check' },
+          { y: 104, date: 'Nov 1, 2025', amt: '$425.00', method: 'Stripe' },
+        ].map(p => (
+          <g key={p.y}>
+            <text x="406" y={p.y + 10} fill="#566370" fontSize="7.5" fontFamily="system-ui">{p.date}</text>
+            <text x="484" y={p.y + 10} textAnchor="end" fill="#1a1f25" fontSize="7.5" fontWeight="600" fontFamily="system-ui">{p.amt}</text>
+            <text x="530" y={p.y + 10} textAnchor="end" fill="#929daa" fontSize="6.5" fontFamily="system-ui">{p.method}</text>
+            <line x1="406" y1={p.y + 14} x2="530" y2={p.y + 14} stroke="#f8f9fa" strokeWidth="0.8" />
+          </g>
+        ))}
+      </svg>
+    ),
+  };
+
+  const svg = svgs[moduleId];
+  if (!svg) return null;
+
+  return (
+    <div className="mt-3 mb-2 rounded-lg bg-mist-50 border border-ink-100 p-3 overflow-hidden">
+      <div className="w-full">{svg}</div>
     </div>
   );
 }
