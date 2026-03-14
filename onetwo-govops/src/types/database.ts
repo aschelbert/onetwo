@@ -503,6 +503,27 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: string
+          trial_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          trial_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          trial_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       platform_users: {
         Row: {
           admin_console_role_id: string | null
@@ -1018,6 +1039,7 @@ export type Database = {
         | "user.invited"
         | "user.role_changed"
         | "user.deactivated"
+        | "platform.trial_days_updated"
       billing_cycle: "monthly" | "yearly"
       impl_status: "implemented" | "future" | "tbd"
       inclusion_level: "included" | "not_included" | "tbd"
