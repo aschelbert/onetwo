@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -224,7 +225,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   const showContent = selectedTemplate || isCustom;
 
   // ── Render ────────────────────────────────────────────────
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex justify-end" style={{ fontFamily: '"DM Sans", system-ui, sans-serif' }}>
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
@@ -785,6 +786,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
