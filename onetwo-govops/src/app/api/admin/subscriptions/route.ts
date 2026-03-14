@@ -1,4 +1,5 @@
 import { withAdminAuth, logAudit } from '@/lib/auth'
+import { tenantSupabaseAdmin } from '@/lib/supabase/tenant-admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET() {
@@ -62,11 +63,17 @@ export async function PATCH(req: NextRequest) {
     if (typeof trial_days !== 'number' || trial_days < 0 || trial_days > 365) {
       return NextResponse.json({ error: 'trial_days must be 0-365' }, { status: 400 })
     }
+    const updatePayload = { trial_days, updated_at: new Date().toISOString(), updated_by: email }
     const { error } = await db
       .from('platform_settings')
-      .update({ trial_days, updated_at: new Date().toISOString(), updated_by: email })
+      .update(updatePayload)
       .eq('id', 'default')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Sync to tenant (HOA) project so AuthPage and edge functions read the updated value
+    await tenantSupabaseAdmin
+      .from('platform_settings')
+      .update(updatePayload)
+      .eq('id', 'default')
     await logAudit(email, 'platform.trial_days_updated', 'platform_settings', 'default', `Trial days changed to ${trial_days}`)
     return NextResponse.json({ success: true })
   })
