@@ -2167,6 +2167,10 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
         bidCollection: saved?.bidCollection || { minimumBids: st.minimumBids || 3, bids: [], selectedBidId: null, selectionRationale: '', completedDate: null },
       }),
       ...(st.requiresConflictCheck && { requiresConflictCheck: true }),
+      // Preserve user-generated data from saved steps
+      ...(saved?.stepAttachments && { stepAttachments: saved.stepAttachments }),
+      ...(saved?.spendingDecision && { spendingDecision: saved.spendingDecision }),
+      ...(saved?.budgetDraft && { budgetDraft: saved.budgetDraft }),
     };
   });
 
@@ -2196,6 +2200,9 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
             }) }),
             ...(st.persistent && { persistent: st.persistent }),
             ...(st.desc && { desc: st.desc }),
+            ...(saved?.stepAttachments && { stepAttachments: saved.stepAttachments }),
+            ...(saved?.spendingDecision && { spendingDecision: saved.spendingDecision }),
+            ...(saved?.budgetDraft && { budgetDraft: saved.budgetDraft }),
           };
         }),
       };
