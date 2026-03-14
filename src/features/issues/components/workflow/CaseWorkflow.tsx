@@ -27,6 +27,7 @@ interface CaseWorkflowProps {
   onUpload?: (caseId: string) => void;
   onGenerateCheckDoc?: (caseId: string, stepIdx: number, checkId: string, reportType: string) => void;
   onUploadCheckDoc?: (caseId: string, stepIdx: number, checkId: string) => void;
+  onAttachFromBuilding?: (caseId: string, stepIdx: number, checkId: string, source: 'legal' | 'insurance') => void;
   children?: ReactNode;
 }
 
@@ -34,7 +35,7 @@ export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
   onClose, onReopen, onEditAssignment, onAddApproach, onDelete,
   onToggleCheck, onToggleAction, onCompleteAllChecks, onPutOnHold, onResume,
-  onOpenBidModal, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, children,
+  onOpenBidModal, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const firstIncomplete = steps.findIndex(s => !s.done);
@@ -142,6 +143,7 @@ export function CaseWorkflow({
             onUpload={onUpload ? () => onUpload(c.id) : undefined}
             onGenerateCheckDoc={onGenerateCheckDoc ? (checkId, reportType) => onGenerateCheckDoc(c.id, safeIdx, checkId, reportType) : undefined}
             onUploadCheckDoc={onUploadCheckDoc ? (checkId) => onUploadCheckDoc(c.id, safeIdx, checkId) : undefined}
+            onAttachFromBuilding={onAttachFromBuilding ? (checkId, source) => onAttachFromBuilding(c.id, safeIdx, checkId, source) : undefined}
           />
         </div>
 

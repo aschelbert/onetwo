@@ -1,21 +1,25 @@
 import type { CaseCheckItem } from '@/types/issues';
 import type { ReportType } from '@/lib/services/reports';
-import { isGenerateOrUploadItem, getCleanLabel, getReportMapping } from './checkItemReportMap';
+import { isGenerateOrUploadItem, isLegalDocItem, isInsuranceDocItem, getCleanLabel, getReportMapping } from './checkItemReportMap';
 
 interface StepChecklistProps {
   checks: CaseCheckItem[];
   onToggle: (checkId: string) => void;
   onGenerate?: (checkId: string, reportType: ReportType) => void;
   onUpload?: (checkId: string) => void;
+  onAttachFromBuilding?: (checkId: string, source: 'legal' | 'insurance') => void;
 }
 
-export function StepChecklist({ checks, onToggle, onGenerate, onUpload }: StepChecklistProps) {
+export function StepChecklist({ checks, onToggle, onGenerate, onUpload, onAttachFromBuilding }: StepChecklistProps) {
   return (
     <div className="space-y-1.5">
       {checks.map(ck => {
-        const isDocItem = isGenerateOrUploadItem(ck.label);
+        const isGenUpload = isGenerateOrUploadItem(ck.label);
+        const isLegal = isLegalDocItem(ck.label);
+        const isInsurance = isInsuranceDocItem(ck.label);
+        const isDocItem = isGenUpload || isLegal || isInsurance;
         const cleanLabel = isDocItem ? getCleanLabel(ck.label) : ck.label;
-        const reportType = isDocItem ? getReportMapping(ck.label) : null;
+        const reportType = isGenUpload ? getReportMapping(ck.label) : null;
 
         return (
           <div key={ck.id} className="flex items-start gap-2.5 group">
@@ -47,6 +51,13 @@ export function StepChecklist({ checks, onToggle, onGenerate, onUpload }: StepCh
                     }`}>
                       {ck.attachment.source === 'generated' ? '⚙' : '📎'} {ck.attachment.name}
                     </span>
+                  ) : (isLegal || isInsurance) ? (
+                    <button
+                      onClick={(e) => { e.preventDefault(); onAttachFromBuilding?.(ck.id, isLegal ? 'legal' : 'insurance'); }}
+                      className="text-[11px] font-medium text-sage-700 hover:text-sage-800 bg-sage-50 border border-sage-200 rounded-lg px-2 py-0.5 hover:bg-sage-100 transition-colors"
+                    >
+                      Attach from {isLegal ? 'Legal & Bylaws' : 'Insurance'}
+                    </button>
                   ) : (
                     <div className="flex items-center gap-1.5">
                       {reportType && onGenerate && (

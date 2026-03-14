@@ -4,7 +4,7 @@ import { Step1BudgetReview } from './Step1BudgetReview';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
-import { isGenerateOrUploadItem, getCleanLabel, getReportMapping, aggregateCheckAttachments } from '../workflow/checkItemReportMap';
+import { isGenerateOrUploadItem, isLegalDocItem, isInsuranceDocItem, getCleanLabel, getReportMapping, aggregateCheckAttachments } from '../workflow/checkItemReportMap';
 import { ReserveStudyPanel } from '../workflow/ReserveStudyPanel';
 import { ContractRenewalPanel } from '../workflow/ContractRenewalPanel';
 import { BudgetDraftPanel } from '../workflow/BudgetDraftPanel';
@@ -25,6 +25,7 @@ interface StepContentProps {
   onUpload?: () => void;
   onGenerateCheckDoc?: (checkId: string, reportType: string) => void;
   onUploadCheckDoc?: (checkId: string) => void;
+  onAttachFromBuilding?: (checkId: string, source: 'legal' | 'insurance') => void;
   inlineStepIdx?: number | null;
   caseId?: string;
 }
@@ -34,7 +35,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, inlineStepIdx, caseId }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
 
@@ -217,9 +218,12 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                       Checklist ({checksDone}/{checksTotal} complete)
                     </p>
                     {step.checks!.map(ck => {
-                      const isDocItem = isGenerateOrUploadItem(ck.label);
+                      const isGenUpload = isGenerateOrUploadItem(ck.label);
+                      const isLegal = isLegalDocItem(ck.label);
+                      const isInsurance = isInsuranceDocItem(ck.label);
+                      const isDocItem = isGenUpload || isLegal || isInsurance;
                       const cleanLabel = isDocItem ? getCleanLabel(ck.label) : ck.label;
-                      const reportType = isDocItem ? getReportMapping(ck.label) : null;
+                      const reportType = isGenUpload ? getReportMapping(ck.label) : null;
 
                       return (
                         <div
@@ -259,6 +263,13 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                                     }`}>
                                       {ck.attachment.source === 'generated' ? '⚙' : '📎'} {ck.attachment.name}
                                     </span>
+                                  ) : (isLegal || isInsurance) ? (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onAttachFromBuilding?.(ck.id, isLegal ? 'legal' : 'insurance'); }}
+                                      className="text-[11px] font-medium text-sage-700 hover:text-sage-800 bg-sage-50 border border-sage-200 rounded-lg px-2 py-0.5 hover:bg-sage-100 transition-colors"
+                                    >
+                                      Attach from {isLegal ? 'Legal & Bylaws' : 'Insurance'}
+                                    </button>
                                   ) : (
                                     <div className="flex items-center gap-1.5">
                                       {reportType && onGenerateCheckDoc && (

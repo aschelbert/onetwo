@@ -11,7 +11,7 @@ import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseCompo
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal, AddBidModal } from './components/CaseModals';
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
 import { CheckItemDocModal } from './components/workflow/CheckItemDocModal';
-import { getCleanLabel, getReportMapping } from './components/workflow/checkItemReportMap';
+import { getCleanLabel, getReportMapping, isLegalDocItem, getLegalDocName } from './components/workflow/checkItemReportMap';
 import DecisionTrail from './components/workflow/DecisionTrail';
 import SendNoticePanel from './components/SendNoticePanel';
 import ComposePanel from '@/features/boardroom/components/ComposePanel';
@@ -780,7 +780,7 @@ function ThreeDotMenu({ items }: { items: { label: string; onClick: () => void; 
 // ─── Case Detail ───────────────────────────────────────────
 function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => void; onNav: (v: string) => void }) {
   const store = useIssuesStore();
-  const { board: boardMembers } = useBuildingStore();
+  const { board: boardMembers, legalDocuments, insurance } = useBuildingStore();
   const fin = useFinancialStore();
   const { workOrders } = fin;
   const letterStore = useLetterStore();
@@ -789,6 +789,49 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const role = useAuthStore(s => s.currentUser.role);
   const isBoard = role !== 'RESIDENT';
   const c = store.cases.find(x => x.id === caseId);
+
+  const handleAttachFromBuilding = (targetCaseId: string, stepIdx: number, checkId: string, source: 'legal' | 'insurance') => {
+    const cs = store.cases.find(x => x.id === targetCaseId);
+    if (!cs?.steps) return;
+    const step = cs.steps[stepIdx];
+    if (!step?.checks) return;
+    const ck = step.checks.find(x => x.id === checkId);
+    if (!ck) return;
+
+    if (source === 'legal') {
+      const docName = getLegalDocName(ck.label);
+      if (!docName) return;
+      const legalDoc = legalDocuments.find(d => d.name === docName);
+      if (!legalDoc || !legalDoc.attachments || legalDoc.attachments.length === 0) {
+        alert(`"${docName}" not found in Legal & Bylaws. Please upload it in the Legal & Bylaws tab first.`);
+        return;
+      }
+      const att = legalDoc.attachments[0];
+      store.attachCheckDocument(targetCaseId, stepIdx, checkId, {
+        name: att.name,
+        type: att.type,
+        date: att.uploadedAt,
+        size: att.size,
+        source: 'uploaded',
+      });
+    } else {
+      // Insurance: aggregate all policies into a single certificate attachment
+      const policiesWithAttachments = insurance.filter(p => p.attachments && p.attachments.length > 0);
+      if (policiesWithAttachments.length === 0) {
+        alert('No insurance certificates found. Please upload them in the Insurance tab first.');
+        return;
+      }
+      const firstAtt = policiesWithAttachments[0].attachments[0];
+      const policyNames = policiesWithAttachments.map(p => p.type).join(', ');
+      store.attachCheckDocument(targetCaseId, stepIdx, checkId, {
+        name: `Insurance Certificate (${policyNames})`,
+        type: firstAtt.type,
+        date: firstAtt.uploadedAt,
+        size: firstAtt.size,
+        source: 'uploaded',
+      });
+    }
+  };
 
   const [showVoteModal, setShowVoteModal] = useState(false);
   const [showCommModal, setShowCommModal] = useState(false);
@@ -1092,6 +1135,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
                 const ck = currentStep.checks?.find(x => x.id === checkId);
                 if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType: null });
               }}
+              onAttachFromBuilding={(checkId, source) => handleAttachFromBuilding(caseId, currentStepIdx, checkId, source)}
               inlineStepIdx={inlineStepIdx}
               caseId={caseId}
             />

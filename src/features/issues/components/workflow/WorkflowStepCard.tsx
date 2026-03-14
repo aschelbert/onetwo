@@ -41,6 +41,7 @@ interface WorkflowStepCardProps {
   onUpload?: () => void;
   onGenerateCheckDoc?: (checkId: string, reportType: string) => void;
   onUploadCheckDoc?: (checkId: string) => void;
+  onAttachFromBuilding?: (checkId: string, source: 'legal' | 'insurance') => void;
   alwaysExpanded?: boolean;
 }
 
@@ -246,7 +247,7 @@ function ActionCard({ action, onAction }: { action: RichAction; onAction: (a: Ri
 }
 
 export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps>(function WorkflowStepCard(
-  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onToggleAction, onCompleteAllChecks, onCloseCase, onOpenBidModal, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, alwaysExpanded },
+  { caseId, step, index, isActive, isExpanded, onToggleExpand, onToggleDone, onNote, onAction, onContinue, totalSteps, onToggleCheck, onToggleAction, onCompleteAllChecks, onCloseCase, onOpenBidModal, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, alwaysExpanded },
   ref
 ) {
   const [noteText, setNoteText] = useState(step.userNotes || '');
@@ -490,7 +491,7 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                 ) : hasChecks && onToggleCheck ? (
                   <>
                     <p className="text-xs font-medium text-ink-500 mb-1">Tasks ({checkedCount}/{totalChecks})</p>
-                    <StepChecklist checks={step.checks!} onToggle={onToggleCheck} onGenerate={onGenerateCheckDoc} onUpload={onUploadCheckDoc} />
+                    <StepChecklist checks={step.checks!} onToggle={onToggleCheck} onGenerate={onGenerateCheckDoc} onUpload={onUploadCheckDoc} onAttachFromBuilding={onAttachFromBuilding} />
                     {step.done && step.doneDate && (
                       <p className="text-[10px] text-sage-500">All tasks complete — {step.doneDate}</p>
                     )}

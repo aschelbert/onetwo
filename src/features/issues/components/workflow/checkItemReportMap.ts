@@ -2,14 +2,34 @@ import type { CaseStep, CaseCheckItemAttachment } from '@/types/issues';
 import type { ReportType } from '@/lib/services/reports';
 
 const SUFFIX = ' — generate or upload';
+const LEGAL_SUFFIX = ' — from legal & bylaws';
+const INSURANCE_SUFFIX = ' — from insurance';
 
 export function isGenerateOrUploadItem(label: string): boolean {
   return label.toLowerCase().endsWith(SUFFIX);
 }
 
+export function isLegalDocItem(label: string): boolean {
+  return label.toLowerCase().endsWith(LEGAL_SUFFIX);
+}
+
+export function isInsuranceDocItem(label: string): boolean {
+  return label.toLowerCase().endsWith(INSURANCE_SUFFIX);
+}
+
+export function isDocumentItem(label: string): boolean {
+  return isGenerateOrUploadItem(label) || isLegalDocItem(label) || isInsuranceDocItem(label);
+}
+
 export function getCleanLabel(label: string): string {
   if (isGenerateOrUploadItem(label)) {
     return label.slice(0, -SUFFIX.length);
+  }
+  if (isLegalDocItem(label)) {
+    return label.slice(0, -LEGAL_SUFFIX.length);
+  }
+  if (isInsuranceDocItem(label)) {
+    return label.slice(0, -INSURANCE_SUFFIX.length);
   }
   return label;
 }
@@ -30,6 +50,18 @@ export function getReportMapping(label: string): ReportType | null {
   return null;
 }
 
+/**
+ * Maps a checklist label to the corresponding legal document name in useBuildingStore.legalDocuments.
+ */
+export function getLegalDocName(label: string): string | null {
+  const lower = label.toLowerCase();
+  if (lower.includes('bylaws')) return 'Condominium Bylaws';
+  if (lower.includes('cc&rs') || lower.includes('declaration')) return 'CC&Rs';
+  if (lower.includes('rules & regulations')) return 'Rules & Regulations';
+  if (lower.includes('articles of incorporation')) return 'Articles of Incorporation';
+  return null;
+}
+
 export interface AggregatedDoc {
   stepIdx: number;
   stepLabel: string;
@@ -44,7 +76,7 @@ export function aggregateCheckAttachments(steps: CaseStep[], fromIdx: number, to
     const step = steps[i];
     if (!step.checks) continue;
     for (const ck of step.checks) {
-      if (isGenerateOrUploadItem(ck.label)) {
+      if (isDocumentItem(ck.label)) {
         docs.push({
           stepIdx: i,
           stepLabel: step.s,
