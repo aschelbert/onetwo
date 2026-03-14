@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS } from '@/lib/tiers';
+import { TIERS, DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval } from '@/lib/tiers';
 
 const Logo = () => (
@@ -48,6 +48,14 @@ export default function AuthPage() {
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
+  const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.rpc('get_trial_days').then(({ data }) => {
+      if (typeof data === 'number' && data >= 0) setTrialDays(data);
+    });
+  }, []);
 
   // Profile form
   const [firstName, setFirstName] = useState('');
@@ -873,7 +881,7 @@ export default function AuthPage() {
             <Logo />
             <StepIndicator steps={['Plan','Building','Profile & Pay']} current={0} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Choose Your Plan</h2>
-            <p className="text-sm text-ink-400 text-center mb-4">30-day free trial on all plans. Cancel anytime.</p>
+            <p className="text-sm text-ink-400 text-center mb-4">{trialDays}-day free trial on all plans. Cancel anytime.</p>
 
             {/* Billing Interval Toggle */}
             <div className="flex items-center justify-center mb-5">
@@ -1018,7 +1026,7 @@ export default function AuthPage() {
                 </div>
                 <div className="flex items-center justify-between text-xs text-ink-400 mt-1">
                   <span>{bldgName || 'Your building'} · {billingInterval === 'annual' ? 'Annual' : 'Monthly'} billing</span>
-                  <span>30-day free trial</span>
+                  <span>{trialDays}-day free trial</span>
                 </div>
                 {bldgSubdomain && <p className="text-xs text-ink-400 mt-1">URL: <span className="font-mono text-ink-600">{bldgSubdomain}.getonetwo.com</span></p>}
               </div>

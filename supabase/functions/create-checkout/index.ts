@@ -12,6 +12,27 @@ const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
+const DEFAULT_TRIAL_DAYS = 30;
+
+async function getTrialDays(): Promise<number> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/get_trial_days`, {
+      method: "POST",
+      headers: {
+        "apikey": SB_ANON,
+        "Authorization": `Bearer ${SB_ANON}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    if (res.ok) {
+      const val = await res.json();
+      if (typeof val === "number" && val >= 0) return val;
+    }
+  } catch { /* fall through */ }
+  return DEFAULT_TRIAL_DAYS;
+}
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -50,13 +71,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fetch admin-configured trial length
+    const trialDays = await getTrialDays();
+
     // Build Stripe form body
     const p = new URLSearchParams();
     p.append("mode", "subscription");
     p.append("payment_method_types[0]", "card");
     p.append("line_items[0][price]", priceId);
     p.append("line_items[0][quantity]", "1");
-    p.append("subscription_data[trial_period_days]", "30");
+    p.append("subscription_data[trial_period_days]", String(trialDays));
     p.append("customer_email", user.email || "");
     p.append("client_reference_id", user.id);
     const returnUrl = origin || SITE_URL;

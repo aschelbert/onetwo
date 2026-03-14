@@ -150,6 +150,10 @@ export default function PlatformAdminPage() {
   const [selectedTenancy, setSelectedTenancy] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
   const [bldgForm, setBldgForm] = useState({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' as SubscriptionTier });
+  const [trialDaysInput, setTrialDaysInput] = useState(store.trialDays);
+  const [trialDaysSaving, setTrialDaysSaving] = useState(false);
+
+  useEffect(() => { setTrialDaysInput(store.trialDays); }, [store.trialDays]);
 
   const selected = tenants.find(t => t.id === selectedTenancy);
   const totalRevenueYTD = store.glEntries.filter(e => e.creditAcct.startsWith('4')).reduce((s, e) => s + e.amount, 0);
@@ -158,7 +162,7 @@ export default function PlatformAdminPage() {
     if (!bldgForm.name || !bldgForm.contactEmail) { alert('Building name and contact email required'); return; }
     const id = `bld-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
-    const trialEnd = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    const trialEnd = new Date(Date.now() + store.trialDays * 86400000).toISOString().split('T')[0];
     const subdomain = generateSubdomain(bldgForm.name, tenants.map(t => t.subdomain));
     store.addTenant({
       id, name: bldgForm.name, subdomain,
@@ -428,6 +432,40 @@ export default function PlatformAdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Trial Settings */}
+              <div className="bg-white rounded-[10px] border border-ink-200 p-5">
+                <h3 className="font-display text-base font-bold text-ink-900 mb-1">Trial Settings</h3>
+                <p className="text-sm text-ink-500 mb-4">Configure the default trial period for new tenancies. Changes apply to future sign-ups only.</p>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-600 mb-1">Trial length (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={trialDaysInput}
+                      onChange={e => setTrialDaysInput(Math.max(0, Math.min(365, parseInt(e.target.value) || 0)))}
+                      className="w-24 px-3 py-2 border border-ink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sage-300"
+                    />
+                  </div>
+                  <button
+                    disabled={trialDaysSaving || trialDaysInput === store.trialDays}
+                    onClick={async () => {
+                      setTrialDaysSaving(true);
+                      const ok = await store.updateTrialDays(trialDaysInput);
+                      setTrialDaysSaving(false);
+                      if (ok) {
+                        store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'platform.trial_days_updated', target: 'Platform Settings', details: `Trial days changed to ${trialDaysInput}`, buildingId: null });
+                      }
+                    }}
+                    className="px-4 py-2 bg-ink-900 text-white text-sm font-semibold rounded-lg hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    {trialDaysSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+                <p className="text-xs text-ink-400 mt-2">Set to 0 to disable free trials. Maximum 365 days.</p>
               </div>
             </div>
           )}

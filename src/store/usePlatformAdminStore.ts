@@ -656,6 +656,9 @@ interface PlatformAdminState {
   invoices: Invoice[];
   impersonating: string | null; // tenant ID being impersonated
 
+  // Platform settings
+  trialDays: number;
+
   // Admin Console v2 state
   permissions: Permission[];
   stripeWebhookEvents: StripeWebhookEvent[];
@@ -711,6 +714,8 @@ interface PlatformAdminState {
   addPlatformApproval: (approval: Omit<PlatformSpendingApproval, 'id' | 'createdAt' | 'votes' | 'status'>) => void;
   castPlatformVote: (approvalId: string, voter: string, vote: 'approve' | 'deny') => void;
   deletePlatformApproval: (id: string) => void;
+  // Platform Settings
+  updateTrialDays: (days: number) => Promise<boolean>;
   // Computed
   getAccountBalance: (acctNum: string) => number;
   getGroupBalance: (parentNum: string) => number;
@@ -727,6 +732,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   emailTemplates: seedTemplates,
   invoices: seedInvoices,
   impersonating: null,
+  trialDays: 30,
 
   // Admin Console v2 initial state
   permissions: seedPermissions,
@@ -740,7 +746,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
 
   // ─── DB Hydration ──────────────────────────────────
   loadFromDb: async () => {
-    const [tenants, tickets, templates, announcements, perms, stripePayments, stripeWebhooks, stripeConf, accounts, glEntries, budgets] = await Promise.all([
+    const [tenants, tickets, templates, announcements, perms, stripePayments, stripeWebhooks, stripeConf, accounts, glEntries, budgets, platformSettings] = await Promise.all([
       platformSvc.fetchTenants(),
       platformSvc.fetchTickets(),
       platformSvc.fetchTemplates(),
@@ -752,6 +758,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
       platformSvc.fetchPlatformAccounts(),
       platformSvc.fetchPlatformGLEntries(),
       platformSvc.fetchPlatformBudgets(),
+      platformSvc.fetchPlatformSettings(),
     ]);
     const updates: Partial<PlatformAdminState> = {};
     // Only replace seed data when the DB returns actual rows ([] is truthy but means RLS blocked or table empty)
@@ -766,6 +773,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     if (accounts && accounts.length > 0) updates.platformAccounts = accounts;
     if (glEntries && glEntries.length > 0) updates.glEntries = glEntries;
     if (budgets && budgets.length > 0) updates.platformBudgets = budgets;
+    if (platformSettings) updates.trialDays = platformSettings.trialDays;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -966,6 +974,13 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   },
   deletePlatformApproval: (id) => {
     set(s => ({ platformApprovals: s.platformApprovals.filter(a => a.id !== id) }));
+  },
+
+  // ─── Platform Settings ────────────────────────────
+  updateTrialDays: async (days) => {
+    const ok = await platformSvc.updatePlatformSettings(days);
+    if (ok) set({ trialDays: days });
+    return ok;
   },
 
   // ─── Computed ─────────────────────────────────────

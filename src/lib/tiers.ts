@@ -1,6 +1,8 @@
 // Shared tier configuration — single source of truth for subscription tiers
 // Used by AuthPage (onboarding), SubscriptionPage (management), and edge functions
 
+export const DEFAULT_TRIAL_DAYS = 30;
+
 export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
 export type BillingInterval = 'monthly' | 'annual';
 

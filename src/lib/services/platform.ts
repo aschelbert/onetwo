@@ -8,6 +8,32 @@ import type {
 } from '@/store/usePlatformAdminStore';
 import { TIER_FEATURES } from '@/store/usePlatformAdminStore';
 
+import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+
+// ── Platform Settings ──
+
+export interface PlatformSettings {
+  trialDays: number;
+}
+
+export async function fetchPlatformSettings(): Promise<PlatformSettings | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('platform_settings').select('trial_days').eq('id', 'default').maybeSingle();
+  if (error) { logDbError('fetchPlatformSettings error:', error); return null; }
+  if (!data) return null;
+  return { trialDays: (data.trial_days as number) ?? DEFAULT_TRIAL_DAYS };
+}
+
+export async function updatePlatformSettings(trialDays: number): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('platform_settings')
+    .update({ trial_days: trialDays, updated_at: new Date().toISOString(), updated_by: 'admin' })
+    .eq('id', 'default');
+  if (error) { logDbError('updatePlatformSettings error:', error); return false; }
+  return true;
+}
+
 // ── Tenants ──
 
 const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };

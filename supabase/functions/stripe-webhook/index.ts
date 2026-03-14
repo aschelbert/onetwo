@@ -10,6 +10,27 @@ const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 const GOVOPS_URL = Deno.env.get("GOVOPS_SUPABASE_URL") || "";
 const GOVOPS_SERVICE_KEY = Deno.env.get("GOVOPS_SUPABASE_SERVICE_ROLE_KEY") || "";
 
+const DEFAULT_TRIAL_DAYS = 30;
+
+async function getTrialDays(): Promise<number> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/get_trial_days`, {
+      method: "POST",
+      headers: {
+        "apikey": SB_SERVICE_KEY,
+        "Authorization": `Bearer ${SB_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    if (res.ok) {
+      const val = await res.json();
+      if (typeof val === "number" && val >= 0) return val;
+    }
+  } catch { /* fall through */ }
+  return DEFAULT_TRIAL_DAYS;
+}
+
 // Supabase REST helper (service role bypasses RLS)
 async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown) {
   const url = new URL(`${SB_URL}/rest/v1/${table}`);
@@ -64,7 +85,8 @@ async function syncToAdminConsole(tenantId: string, meta: Record<string, string>
     };
     const address = [meta.address_street, meta.address_city, meta.address_state, meta.address_zip]
       .filter(Boolean).join(", ") || null;
-    const trialEndsAt = result.trial_ends_at || new Date(Date.now() + 30 * 86400000).toISOString();
+    const trialDays = await getTrialDays();
+    const trialEndsAt = result.trial_ends_at || new Date(Date.now() + trialDays * 86400000).toISOString();
 
     const res = await fetch(`${GOVOPS_URL}/rest/v1/tenancies`, {
       method: "POST",
