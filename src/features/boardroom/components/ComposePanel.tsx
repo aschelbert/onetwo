@@ -225,7 +225,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" style={{ fontFamily: '"DM Sans", system-ui, sans-serif' }}>
+    <div className="fixed inset-0 z-[60] flex justify-end" style={{ fontFamily: '"DM Sans", system-ui, sans-serif' }}>
       {/* Overlay */}
       <div className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" onClick={onClose} />
 
