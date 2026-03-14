@@ -2387,6 +2387,9 @@ interface IssuesState {
   saveBoardVote: (caseId: string, motion: string, date: string, votes: BoardVote['votes']) => void;
   clearBoardVote: (caseId: string) => void;
 
+  // Check item documents
+  attachCheckDocument: (caseId: string, stepIdx: number, checkId: string, attachment: import('@/types/issues').CaseCheckItemAttachment) => void;
+
   // Docs & Comms
   addDocument: (caseId: string, doc: CaseAttachment) => void;
   addStepDocument: (caseId: string, stepIdx: number, doc: CaseAttachment) => void;
@@ -2731,6 +2734,27 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         step.doneDate = today;
         steps[stepIdx] = step;
         return { ...c, steps };
+      })
+    }));
+  },
+
+  attachCheckDocument: (caseId, stepIdx, checkId, attachment) => {
+    const today = new Date().toISOString().split('T')[0];
+    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: today, actor: 'Board', summary: `Check document attached: ${attachment.name} (${attachment.source})` };
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        const step = { ...steps[stepIdx] };
+        if (!step.checks) return c;
+        step.checks = step.checks.map(ck =>
+          ck.id === checkId ? { ...ck, checked: true, checkedDate: ck.checkedDate || today, attachment } : ck
+        );
+        const allChecked = step.checks.every(ck => ck.checked);
+        step.done = allChecked;
+        step.doneDate = allChecked ? today : step.doneDate;
+        steps[stepIdx] = step;
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
   },

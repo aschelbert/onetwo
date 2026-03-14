@@ -10,6 +10,8 @@ import { useLetterStore } from '@/store/useLetterStore';
 import { CaseCard, BoardVoteDisplay, StepsSection } from './components/CaseComponents';
 import { BoardVoteModal, CommModal, DocModal, ApproachModal, LinkLetterModal, InvoiceCreateModal, LinkInvoiceModal, LinkMeetingModal, HoldCaseModal, CloseCaseModal, DeleteCaseModal, AddBidModal } from './components/CaseModals';
 import { CaseWorkflow } from './components/workflow/CaseWorkflow';
+import { CheckItemDocModal } from './components/workflow/CheckItemDocModal';
+import { getCleanLabel, getReportMapping } from './components/workflow/checkItemReportMap';
 import DecisionTrail from './components/workflow/DecisionTrail';
 import SendNoticePanel from './components/SendNoticePanel';
 import ComposePanel from '@/features/boardroom/components/ComposePanel';
@@ -815,6 +817,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
   const [activeStep, setActiveStep] = useState(0);
   const [activeApproachIdx, setActiveApproachIdx] = useState<number | null>(null);
+  const [checkDocModal, setCheckDocModal] = useState<{ stepIdx: number; checkId: string; checkLabel: string; reportType: string | null } | null>(null);
 
   const buildingState = useBuildingStore(s => s.address.state);
 
@@ -1082,6 +1085,14 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               onAction={(action, stepIdx) => handleAction(action, stepIdx)}
               onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
               onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}
+              onGenerateCheckDoc={(checkId, reportType) => {
+                const ck = currentStep.checks?.find(x => x.id === checkId);
+                if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType });
+              }}
+              onUploadCheckDoc={(checkId) => {
+                const ck = currentStep.checks?.find(x => x.id === checkId);
+                if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType: null });
+              }}
               inlineStepIdx={inlineStepIdx}
               caseId={caseId}
             />
@@ -1109,6 +1120,18 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showHoldModal && <HoldCaseModal caseId={caseId} store={store} onClose={() => setShowHoldModal(false)} />}
       {showCloseModal && c.steps && <CloseCaseModal caseId={caseId} store={store} incompleteCount={c.steps.filter(s => !s.done).length} totalCount={c.steps.length} onClose={() => setShowCloseModal(false)} />}
       {showDeleteModal && <DeleteCaseModal caseId={caseId} store={store} onClose={() => setShowDeleteModal(false)} onDeleted={onBack} />}
+      {checkDocModal && (
+        <CheckItemDocModal
+          checkLabel={checkDocModal.checkLabel}
+          reportType={checkDocModal.reportType as any}
+          unitNumber={c.unit}
+          onAttach={(attachment) => {
+            store.attachCheckDocument(caseId, checkDocModal.stepIdx, checkDocModal.checkId, attachment);
+            setCheckDocModal(null);
+          }}
+          onClose={() => setCheckDocModal(null)}
+        />
+      )}
       {showBidModal && bidTargetStep != null && <AddBidModal caseId={caseId} stepIdx={bidTargetStep} store={store} onClose={() => { setShowBidModal(false); setBidTargetStep(null); }} />}
       {showSendNotice && c && (
         <SendNoticePanel

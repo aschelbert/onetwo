@@ -36,11 +36,22 @@ export type CasePriority = 'urgent' | 'high' | 'medium' | 'low';
 export type CaseApproach = 'pre' | 'self' | 'legal';
 export type CaseStatus = 'open' | 'on-hold' | 'closed';
 
+export interface CaseCheckItemAttachment {
+  name: string;
+  type: string;
+  date: string;
+  size: string;
+  source: 'generated' | 'uploaded';
+  reportType?: string;
+  dataUrl?: string;
+}
+
 export interface CaseCheckItem {
   id: string;
   label: string;
   checked: boolean;
   checkedDate: string | null;
+  attachment?: CaseCheckItemAttachment;
 }
 
 // Spending Decision (stored on CaseStep)

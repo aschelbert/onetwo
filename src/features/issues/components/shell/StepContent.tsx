@@ -4,6 +4,7 @@ import { Step1BudgetReview } from './Step1BudgetReview';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
+import { isGenerateOrUploadItem, getCleanLabel, getReportMapping, aggregateCheckAttachments } from '../workflow/checkItemReportMap';
 import { ReserveStudyPanel } from '../workflow/ReserveStudyPanel';
 import { ContractRenewalPanel } from '../workflow/ContractRenewalPanel';
 import { BudgetDraftPanel } from '../workflow/BudgetDraftPanel';
@@ -22,6 +23,8 @@ interface StepContentProps {
   onAction?: (action: StepAction, stepIdx: number) => void;
   onNavigate?: (target: string) => void;
   onUpload?: () => void;
+  onGenerateCheckDoc?: (checkId: string, reportType: string) => void;
+  onUploadCheckDoc?: (checkId: string) => void;
   inlineStepIdx?: number | null;
   caseId?: string;
 }
@@ -31,7 +34,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, inlineStepIdx, caseId }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
 
@@ -213,39 +216,79 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                     <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">
                       Checklist ({checksDone}/{checksTotal} complete)
                     </p>
-                    {step.checks!.map(ck => (
-                      <div
-                        key={ck.id}
-                        className={`bg-white rounded-lg border overflow-hidden transition-all ${
-                          ck.checked ? 'border-sage-200' : 'border-ink-100'
-                        }`}
-                      >
-                        <div className={`flex items-center gap-3 px-4 py-3 ${
-                          ck.checked ? 'bg-sage-50' : 'bg-white'
-                        }`}>
-                          <button
-                            onClick={() => onToggleCheck(ck.id)}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                              ck.checked ? 'bg-sage-500 border-sage-500' : 'border-ink-300 hover:border-accent-400'
-                            }`}
-                          >
-                            {ck.checked && (
-                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </button>
-                          <span className={`text-sm leading-tight flex-1 ${
-                            ck.checked ? 'text-ink-400 line-through' : 'text-ink-700'
+                    {step.checks!.map(ck => {
+                      const isDocItem = isGenerateOrUploadItem(ck.label);
+                      const cleanLabel = isDocItem ? getCleanLabel(ck.label) : ck.label;
+                      const reportType = isDocItem ? getReportMapping(ck.label) : null;
+
+                      return (
+                        <div
+                          key={ck.id}
+                          className={`bg-white rounded-lg border overflow-hidden transition-all ${
+                            ck.checked ? 'border-sage-200' : 'border-ink-100'
+                          }`}
+                        >
+                          <div className={`flex items-center gap-3 px-4 py-3 ${
+                            ck.checked ? 'bg-sage-50' : 'bg-white'
                           }`}>
-                            {ck.label}
-                          </span>
-                          {ck.checked && ck.checkedDate && (
-                            <span className="text-[10px] text-sage-500 shrink-0">{ck.checkedDate}</span>
-                          )}
+                            <button
+                              onClick={() => onToggleCheck(ck.id)}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                                ck.checked ? 'bg-sage-500 border-sage-500' : 'border-ink-300 hover:border-accent-400'
+                              }`}
+                            >
+                              {ck.checked && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-sm leading-tight ${
+                                ck.checked ? 'text-ink-400 line-through' : 'text-ink-700'
+                              }`}>
+                                {cleanLabel}
+                              </span>
+                              {isDocItem && (
+                                <div className="mt-1">
+                                  {ck.attachment ? (
+                                    <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg ${
+                                      ck.attachment.source === 'generated'
+                                        ? 'bg-accent-50 text-accent-700 border border-accent-200'
+                                        : 'bg-sage-50 text-sage-700 border border-sage-200'
+                                    }`}>
+                                      {ck.attachment.source === 'generated' ? '⚙' : '📎'} {ck.attachment.name}
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5">
+                                      {reportType && onGenerateCheckDoc && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); onGenerateCheckDoc(ck.id, reportType); }}
+                                          className="text-[11px] font-medium text-accent-600 hover:text-accent-700 bg-accent-50 border border-accent-200 rounded-lg px-2 py-0.5 hover:bg-accent-100 transition-colors"
+                                        >
+                                          Generate
+                                        </button>
+                                      )}
+                                      {onUploadCheckDoc && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); onUploadCheckDoc(ck.id); }}
+                                          className="text-[11px] font-medium text-ink-500 hover:text-ink-600 border border-dashed border-ink-300 rounded-lg px-2 py-0.5 hover:bg-ink-50 transition-colors"
+                                        >
+                                          Upload
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {ck.checked && ck.checkedDate && (
+                              <span className="text-[10px] text-sage-500 shrink-0">{ck.checkedDate}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -310,6 +353,38 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             </div>
           )}
         </div>
+
+        {/* Document aggregation for resale-certs delivery step (step 10, index 9) */}
+        {c.sitId === 'resale-certs' && stepIndex === 9 && c.steps && (() => {
+          const aggregated = aggregateCheckAttachments(c.steps, 2, 7);
+          const attached = aggregated.filter(d => d.attachment);
+          const missing = aggregated.filter(d => !d.attachment);
+          if (aggregated.length === 0) return null;
+          return (
+            <div className="bg-white rounded-xl border border-ink-100 overflow-hidden mt-4">
+              <div className="px-5 py-3 border-b border-ink-100 bg-mist-50">
+                <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">Resale Package Documents</p>
+                <p className="text-[11px] text-ink-500 mt-0.5">{attached.length}/{aggregated.length} documents attached</p>
+              </div>
+              <div className="px-5 py-3 space-y-2">
+                {attached.map(d => (
+                  <div key={d.checkId} className="flex items-center gap-2 p-2 bg-sage-50 border border-sage-100 rounded-lg">
+                    <span className="text-sage-600 text-sm">{d.attachment!.source === 'generated' ? '⚙' : '📎'}</span>
+                    <span className="text-sm text-ink-700 flex-1 truncate">{d.checkLabel}</span>
+                    <span className="text-[10px] text-sage-600 font-medium">{d.attachment!.name}</span>
+                  </div>
+                ))}
+                {missing.map(d => (
+                  <div key={d.checkId} className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-100 rounded-lg">
+                    <span className="text-amber-500 text-sm">⚠</span>
+                    <span className="text-sm text-ink-600 flex-1 truncate">{d.checkLabel}</span>
+                    <span className="text-[10px] text-amber-600 font-medium">Missing</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Navigation hint */}
         <div className="flex justify-center mt-5">

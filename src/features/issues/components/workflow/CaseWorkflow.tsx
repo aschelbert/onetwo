@@ -25,6 +25,8 @@ interface CaseWorkflowProps {
   onOpenBidModal?: (stepIdx: number) => void;
   onNavigate?: (target: string) => void;
   onUpload?: (caseId: string) => void;
+  onGenerateCheckDoc?: (caseId: string, stepIdx: number, checkId: string, reportType: string) => void;
+  onUploadCheckDoc?: (caseId: string, stepIdx: number, checkId: string) => void;
   children?: ReactNode;
 }
 
@@ -32,7 +34,7 @@ export function CaseWorkflow({
   c, steps, onToggleStep, onAddNote, onAction,
   onClose, onReopen, onEditAssignment, onAddApproach, onDelete,
   onToggleCheck, onToggleAction, onCompleteAllChecks, onPutOnHold, onResume,
-  onOpenBidModal, onNavigate, onUpload, children,
+  onOpenBidModal, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, children,
 }: CaseWorkflowProps) {
   // Find first incomplete step
   const firstIncomplete = steps.findIndex(s => !s.done);
@@ -138,6 +140,8 @@ export function CaseWorkflow({
             onOpenBidModal={onOpenBidModal}
             onNavigate={onNavigate}
             onUpload={onUpload ? () => onUpload(c.id) : undefined}
+            onGenerateCheckDoc={onGenerateCheckDoc ? (checkId, reportType) => onGenerateCheckDoc(c.id, safeIdx, checkId, reportType) : undefined}
+            onUploadCheckDoc={onUploadCheckDoc ? (checkId) => onUploadCheckDoc(c.id, safeIdx, checkId) : undefined}
           />
         </div>
 
