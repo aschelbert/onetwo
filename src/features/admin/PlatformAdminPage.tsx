@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, FEATURE_GROUPS, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
+import { TIERS } from '@/lib/tiers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
@@ -398,7 +399,7 @@ export default function PlatformAdminPage() {
                         <div className="flex items-baseline gap-2 mb-3">
                           <span className="text-2xl font-bold text-ink-900">{fmt(TIER_PRICES[tier])}</span>
                           <span className="text-sm text-ink-400">/mo</span>
-                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(TIER_PRICES[tier] * 10)}/yr</span>
+                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(TIERS.find(t => t.id === tier)?.annual ?? TIER_PRICES[tier] * 12)}/yr</span>
                         </div>
                         <p className="text-xs text-ink-500">{count} tenancies · {TENANT_ROLES.length} roles</p>
                       </div>
