@@ -1035,8 +1035,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               onUploadDoc={() => setShowDocModal(true)}
               onSendComm={() => {
                 setComposePanelContext({
-                  scope: 'unit',
-                  scopeLocked: true,
+                  scope: c.unit ? 'unit' : 'community',
                   recipientUnit: c.unit || undefined,
                   recipientName: c.owner || undefined,
                   caseId: c.id,
