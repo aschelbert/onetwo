@@ -2086,6 +2086,11 @@ function hydrateChecks(ck?: string[]): CaseCheckItem[] | undefined {
   return ck.map((label, i) => ({ id: `ck${i}`, label, checked: false, checkedDate: null }));
 }
 
+/** Merge saved check progress with current template labels (keeps labels fresh across template changes). */
+function mergeCheckLabels(saved: CaseCheckItem[], templateCk: string[]): CaseCheckItem[] {
+  return saved.map((ck, i) => i < templateCk.length ? { ...ck, label: templateCk[i] } : ck);
+}
+
 function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
@@ -2145,7 +2150,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
       ...(st.ph && { phaseId: st.ph }),
       ...(st.ck && st.ck.length > 0 && {
         checks: (saved?.checks && saved.checks.length > 0)
-          ? saved.checks  // preserve user check progress
+          ? mergeCheckLabels(saved.checks, st.ck)
           : hydrateChecks(st.ck)
       }),
       ...(st.actions && { actions: st.actions.map((a: any) => {
@@ -2183,7 +2188,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
             userNotes: saved?.userNotes ?? '',
             ...(st.ph && { phaseId: st.ph }),
             ...(st.ck && st.ck.length > 0 && {
-              checks: (saved?.checks && saved.checks.length > 0) ? saved.checks : hydrateChecks(st.ck)
+              checks: (saved?.checks && saved.checks.length > 0) ? mergeCheckLabels(saved.checks, st.ck) : hydrateChecks(st.ck)
             }),
             ...(st.actions && { actions: st.actions.map((a: any) => {
               const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
