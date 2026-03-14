@@ -11,12 +11,15 @@ type Role = { id: string; name: string; icon: string | null }
 type Plan = Record<string, unknown> & { id: string; name: string; slug: string; description: string | null; price_monthly: number; price_yearly: number; status: string; sort_order: number; color: string | null; stripe_product_id: string | null; stripe_sync_status: string; plan_role_availability: { role_id: string }[] }
 type Tenancy = { id: string; subscription_id: string }
 
-export function SubscriptionsClient({ plans, tenancies, roles }: { plans: Plan[]; tenancies: Tenancy[]; roles: Role[] }) {
+export function SubscriptionsClient({ plans, tenancies, roles, trialDays: initialTrialDays }: { plans: Plan[]; tenancies: Tenancy[]; roles: Role[]; trialDays: number }) {
   const router = useRouter()
   const [editing, setEditing] = useState<Plan | null>(null)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({ name: '', slug: '', description: '', price_monthly: '', price_yearly: '', status: 'active', color: '#c42030', roles: [] as string[] })
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [trialDaysInput, setTrialDaysInput] = useState(initialTrialDays)
+  const [trialDaysSaving, setTrialDaysSaving] = useState(false)
+  const [trialDaysSaved, setTrialDaysSaved] = useState(initialTrialDays)
 
   function openEdit(plan: Plan) {
     setForm({
@@ -102,6 +105,39 @@ export function SubscriptionsClient({ plans, tenancies, roles }: { plans: Plan[]
             </div>
           )
         })}
+      </div>
+
+      {/* Trial Settings */}
+      <div className="mt-8 bg-white rounded-[10px] border border-gray-200 p-5">
+        <h3 className="font-serif text-lg font-bold mb-1">Trial Settings</h3>
+        <p className="text-sm text-gray-500 mb-4">Configure the default trial period for new tenancies. Changes apply to future sign-ups only.</p>
+        <div className="flex items-end gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Trial length (days)</label>
+            <Input
+              type="number"
+              value={trialDaysInput}
+              onChange={e => setTrialDaysInput(Math.max(0, Math.min(365, parseInt(e.target.value) || 0)))}
+              className="w-24"
+            />
+          </div>
+          <Button
+            disabled={trialDaysSaving || trialDaysInput === trialDaysSaved}
+            onClick={async () => {
+              setTrialDaysSaving(true)
+              const res = await fetch('/api/admin/subscriptions', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trial_days: trialDaysInput }),
+              })
+              setTrialDaysSaving(false)
+              if (res.ok) { setTrialDaysSaved(trialDaysInput); router.refresh() }
+            }}
+          >
+            {trialDaysSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">Set to 0 to disable free trials. Maximum 365 days.</p>
       </div>
 
       <Dialog open={isOpen} onClose={() => { setEditing(null); setCreating(false) }} title={editing ? 'Edit Subscription Plan' : 'Add Subscription Plan'} size="lg"

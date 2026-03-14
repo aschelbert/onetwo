@@ -56,6 +56,22 @@ export async function PUT(req: NextRequest) {
   })
 }
 
+export async function PATCH(req: NextRequest) {
+  return withAdminAuth(async (db, _uid, email) => {
+    const { trial_days } = await req.json()
+    if (typeof trial_days !== 'number' || trial_days < 0 || trial_days > 365) {
+      return NextResponse.json({ error: 'trial_days must be 0-365' }, { status: 400 })
+    }
+    const { error } = await db
+      .from('platform_settings')
+      .update({ trial_days, updated_at: new Date().toISOString(), updated_by: email })
+      .eq('id', 'default')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    await logAudit(email, 'platform.trial_days_updated', 'platform_settings', 'default', `Trial days changed to ${trial_days}`)
+    return NextResponse.json({ success: true })
+  })
+}
+
 export async function DELETE(req: NextRequest) {
   return withAdminAuth(async (db, _uid, email) => {
     const id = req.nextUrl.searchParams.get('id')
