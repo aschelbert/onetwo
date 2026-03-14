@@ -799,6 +799,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showLinkInvoiceModal, setShowLinkInvoiceModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingModalTab, setMeetingModalTab] = useState<'link' | 'create'>('link');
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -891,7 +892,11 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       } else if (action.target === 'upload-doc') {
         setDocTargetStep(stepIdx);
         setShowDocModal(true);
+      } else if (action.target === 'create-meeting') {
+        setMeetingModalTab('create');
+        setShowMeetingModal(true);
       } else if (action.target === 'link-meeting') {
+        setMeetingModalTab('link');
         setShowMeetingModal(true);
       } else if (action.target === 'create-invoice') {
         setShowInvoiceModal(true);
@@ -1077,6 +1082,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               onAction={(action, stepIdx) => handleAction(action, stepIdx)}
               onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
               onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}
+              inlineStepIdx={inlineStepIdx}
+              caseId={caseId}
             />
           </div>
         </div>
@@ -1098,7 +1105,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       {showLinkLetterModal && <LinkLetterModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkLetterModal(false)} />}
       {showInvoiceModal && <InvoiceCreateModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowInvoiceModal(false)} />}
       {showLinkInvoiceModal && <LinkInvoiceModal caseId={caseId} caseUnit={c.unit} store={store} onClose={() => setShowLinkInvoiceModal(false)} />}
-      {showMeetingModal && <LinkMeetingModal caseId={caseId} store={store} onClose={() => setShowMeetingModal(false)} />}
+      {showMeetingModal && <LinkMeetingModal caseId={caseId} store={store} defaultTab={meetingModalTab} onClose={() => setShowMeetingModal(false)} />}
       {showHoldModal && <HoldCaseModal caseId={caseId} store={store} onClose={() => setShowHoldModal(false)} />}
       {showCloseModal && c.steps && <CloseCaseModal caseId={caseId} store={store} incompleteCount={c.steps.filter(s => !s.done).length} totalCount={c.steps.length} onClose={() => setShowCloseModal(false)} />}
       {showDeleteModal && <DeleteCaseModal caseId={caseId} store={store} onClose={() => setShowDeleteModal(false)} onDeleted={onBack} />}

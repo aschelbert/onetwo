@@ -4,6 +4,10 @@ import { Step1BudgetReview } from './Step1BudgetReview';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
+import { ReserveStudyPanel } from '../workflow/ReserveStudyPanel';
+import { ContractRenewalPanel } from '../workflow/ContractRenewalPanel';
+import { BudgetDraftPanel } from '../workflow/BudgetDraftPanel';
+import { BylawsReviewPanel } from '../workflow/BylawsReviewPanel';
 
 interface StepContentProps {
   c: CaseTrackerCase;
@@ -18,6 +22,8 @@ interface StepContentProps {
   onAction?: (action: StepAction, stepIdx: number) => void;
   onNavigate?: (target: string) => void;
   onUpload?: () => void;
+  inlineStepIdx?: number | null;
+  caseId?: string;
 }
 
 /**
@@ -25,7 +31,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
 
@@ -263,6 +269,15 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
 
                 {/* Rich action buttons */}
                 {richActionButtons}
+
+                {/* Inline panels */}
+                {inlineStepIdx === stepIndex && step.action?.type === 'inline' && (
+                  step.action.target === 'reserve-study' ? <ReserveStudyPanel /> :
+                  step.action.target === 'contract-renewals' ? <ContractRenewalPanel /> :
+                  step.action.target === 'budget-drafter' && caseId ? <BudgetDraftPanel caseId={caseId} stepIdx={stepIndex} step={step} /> :
+                  step.action.target === 'bylaws-review' && caseId ? <BylawsReviewPanel caseId={caseId} step={step} /> :
+                  null
+                )}
               </div>
             );
           })()}

@@ -108,10 +108,18 @@ export function deriveActionsForStep(step: CaseStep): RichAction[] {
 
   // 8. Meeting / hearing
   if (s.includes('meeting') || s.includes('hearing')) {
-    actions.push({ id: `meet-${step.id}`, icon: '📅', label: 'Link Meeting', description: 'Link a meeting or hearing to this case', type: 'modal', target: 'link-meeting', isAction: true });
+    actions.push({ id: `create-meet-${step.id}`, icon: '📅', label: 'Create Meeting', description: 'Create a new meeting for this case', type: 'modal', target: 'create-meeting', isAction: true });
+    actions.push({ id: `meet-${step.id}`, icon: '📅', label: 'Link Existing Meeting', description: 'Link an existing meeting to this case', type: 'modal', target: 'link-meeting', isAction: true });
   }
 
-  // 9. Universal "Upload Document" action — available on every step
+  // 9. Distribution / feedback — mailing actions for budget distribution steps
+  if ((s.includes('distribute') || s.includes('feedback') || s.includes('collect owner')) && !usedTargets.has('send-comm')) {
+    actions.push({ id: `comm-${step.id}`, icon: '✉️', label: 'Send Communication', description: 'Compose and send via email, mail, or announcement', type: 'modal', target: 'send-comm', isAction: true });
+    actions.push({ id: `mail-${step.id}`, icon: '📮', label: 'Send Notice via Mail', description: 'Generate and send physical notice via USPS', type: 'modal', target: 'send-notice', isAction: true });
+    usedTargets.add('send-comm');
+  }
+
+  // 10. Universal "Upload Document" action — available on every step
   if (!usedTargets.has('upload-doc')) {
     actions.push({ id: `upload-${step.id}`, icon: '📎', label: 'Upload Document', description: 'Attach a document to this step', type: 'modal', target: 'upload-doc', isAction: true });
   }

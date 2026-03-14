@@ -718,14 +718,42 @@ export function LinkInvoiceModal({ caseId, caseUnit, store, onClose }: ModalProp
 }
 
 // ─── Link Meeting Modal ───────────────────────────────────
-export function LinkMeetingModal({ caseId, store, onClose }: ModalProps & { caseId: string; store: any }) {
-  const { meetings } = useMeetingsStore();
+export function LinkMeetingModal({ caseId, store, defaultTab, onClose }: ModalProps & { caseId: string; store: any; defaultTab?: 'link' | 'create' }) {
+  const meetingsStore = useMeetingsStore();
+  const { meetings } = meetingsStore;
   const c = store.cases.find((x: CaseTrackerCase) => x.id === caseId);
   const alreadyLinked = new Set(c?.linkedMeetingIds || []);
   const available = meetings.filter(m => !alreadyLinked.has(m.id));
 
+  const [tab, setTab] = useState<'link' | 'create'>(defaultTab || 'link');
+  const [newTitle, setNewTitle] = useState('Budget Presentation Meeting');
+  const [newType, setNewType] = useState('BOARD');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('19:00');
+  const [newLocation, setNewLocation] = useState('');
+  const [newVirtualLink, setNewVirtualLink] = useState('');
+
   const handleLink = (meetingId: string) => {
     store.linkMeeting(caseId, meetingId);
+    onClose();
+  };
+
+  const handleCreate = () => {
+    if (!newTitle.trim() || !newDate) return;
+    meetingsStore.addMeeting({
+      title: newTitle.trim(),
+      type: newType,
+      status: 'scheduled',
+      date: newDate,
+      time: newTime,
+      location: newLocation,
+      virtualLink: newVirtualLink,
+      agenda: [],
+      notes: `Created from case ${caseId}`,
+    });
+    // Link the newly created meeting
+    const latest = meetingsStore.meetings[meetingsStore.meetings.length - 1];
+    if (latest) store.linkMeeting(caseId, latest.id);
     onClose();
   };
 
@@ -733,32 +761,79 @@ export function LinkMeetingModal({ caseId, store, onClose }: ModalProps & { case
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
-          <h2 className="text-xl font-bold text-ink-900">Link Meeting</h2>
-          <p className="text-sm text-ink-500 mt-1">Select a meeting to link to this case</p>
+          <h2 className="text-xl font-bold text-ink-900">Meeting</h2>
+          <div className="flex gap-1 bg-mist-50 rounded-lg p-1 mt-3 w-fit">
+            <button onClick={() => setTab('link')} className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${tab === 'link' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>Link Existing</button>
+            <button onClick={() => setTab('create')} className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${tab === 'create' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>Create New</button>
+          </div>
         </div>
-        <div className="p-6">
-          {available.length === 0 ? (
-            <p className="text-sm text-ink-400 text-center py-8">No available meetings to link.</p>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {available.map(m => {
-                const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
-                return (
-                  <button key={m.id} onClick={() => handleLink(m.id)} className="w-full text-left p-3 bg-mist-50 border border-mist-100 rounded-lg hover:border-accent-300 transition-all">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[m.status] || 'bg-ink-100 text-ink-500'}`}>{m.status}</span>
-                      <span className="text-sm font-medium text-ink-900">{m.title}</span>
-                    </div>
-                    <p className="text-xs text-ink-400 mt-0.5">{m.date} · {m.type}</p>
-                  </button>
-                );
-              })}
+
+        {tab === 'link' ? (
+          <>
+            <div className="p-6">
+              {available.length === 0 ? (
+                <p className="text-sm text-ink-400 text-center py-8">No available meetings to link.</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {available.map(m => {
+                    const sc: Record<string, string> = { scheduled: 'bg-accent-100 text-accent-700', completed: 'bg-sage-100 text-sage-700', cancelled: 'bg-red-100 text-red-700', draft: 'bg-yellow-100 text-yellow-700' };
+                    return (
+                      <button key={m.id} onClick={() => handleLink(m.id)} className="w-full text-left p-3 bg-mist-50 border border-mist-100 rounded-lg hover:border-accent-300 transition-all">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${sc[m.status] || 'bg-ink-100 text-ink-500'}`}>{m.status}</span>
+                          <span className="text-sm font-medium text-ink-900">{m.title}</span>
+                        </div>
+                        <p className="text-xs text-ink-400 mt-0.5">{m.date} · {m.type}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="border-t p-6 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-ink-700 font-medium">Cancel</button>
-        </div>
+            <div className="border-t p-6 flex justify-end">
+              <button onClick={onClose} className="px-4 py-2 text-ink-700 font-medium">Cancel</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Title *</label>
+                <input value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Type</label>
+                <select value={newType} onChange={e => setNewType(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                  <option value="BOARD">Board Meeting</option>
+                  <option value="SPECIAL">Special Meeting</option>
+                  <option value="ANNUAL">Annual Meeting</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Date *</label>
+                  <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Time</label>
+                  <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Location</label>
+                <input value={newLocation} onChange={e => setNewLocation(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Community Room" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Virtual Link</label>
+                <input value={newVirtualLink} onChange={e => setNewVirtualLink(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., https://zoom.us/..." />
+              </div>
+            </div>
+            <div className="border-t p-6 flex justify-end space-x-3">
+              <button onClick={onClose} className="px-4 py-2 text-ink-700 font-medium">Cancel</button>
+              <button onClick={handleCreate} className={`px-6 py-2 rounded-lg font-medium ${newTitle.trim() && newDate ? 'bg-ink-900 text-white hover:bg-ink-800' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Create & Link</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

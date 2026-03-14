@@ -474,6 +474,148 @@
         }
         .price-btn { width: 100%; text-align: center; justify-content: center; }
 
+        /* FEATURE COMPARISON TABLE */
+        .compare-table-wrap {
+            margin-top: 4rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        .compare-table-header {
+            text-align: center;
+            padding: 2.5rem 2rem 1.5rem;
+        }
+        .compare-table-header h3 {
+            font-family: 'Fraunces', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        .compare-table-header p {
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .compare-table thead th {
+            padding: 1rem 1.25rem;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            border-bottom: 2px solid var(--border);
+            text-align: center;
+        }
+        .compare-table thead th:first-child {
+            text-align: left;
+            padding-left: 2rem;
+            color: var(--ink);
+        }
+        .compare-table thead th.featured-col {
+            color: var(--accent);
+        }
+        .compare-table tbody td {
+            padding: 0.85rem 1.25rem;
+            font-size: 0.88rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .compare-table tbody td:first-child {
+            text-align: left;
+            padding-left: 2rem;
+            font-weight: 500;
+            color: var(--ink);
+        }
+        .compare-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .compare-table .section-row td {
+            background: #f8f7f5;
+            font-weight: 700;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            padding: 0.65rem 1.25rem;
+        }
+        .compare-table .section-row td:first-child {
+            padding-left: 2rem;
+            color: var(--ink);
+        }
+        .compare-table .check {
+            color: var(--green);
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+        .compare-table .dash {
+            color: #d1d0cd;
+            font-size: 1rem;
+        }
+
+        /* ROLES SECTION */
+        .roles-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            margin-top: 1.5rem;
+        }
+        .role-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .role-card:hover {
+            box-shadow: 0 8px 24px rgba(15,26,46,0.06);
+        }
+        .role-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+        .role-card h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .role-card .role-desc {
+            font-size: 0.8rem;
+            color: var(--muted);
+            line-height: 1.5;
+            margin-bottom: 0.75rem;
+        }
+        .role-tier-badge {
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 100px;
+        }
+
+        @media (max-width: 768px) {
+            .compare-table-wrap { border-radius: 12px; }
+            .compare-table thead th { padding: 0.75rem 0.5rem; font-size: 0.68rem; }
+            .compare-table thead th:first-child { padding-left: 1rem; }
+            .compare-table tbody td { padding: 0.7rem 0.5rem; font-size: 0.8rem; }
+            .compare-table tbody td:first-child { padding-left: 1rem; }
+            .compare-table .section-row td:first-child { padding-left: 1rem; }
+            .roles-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .roles-grid { grid-template-columns: 1fr; }
+        }
+
         /* CTA */
         .cta-section {
             text-align: center;
@@ -838,9 +980,10 @@
             <span style="font-size: 0.85rem; color: var(--muted); font-weight: 400; margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border);">HOA handled.</span>
         </div>
         <div class="nav-links">
-            <a href="#features">Features</a>
+            <a href="#features">Platform</a>
             <a href="#differentiators">Why Us</a>
             <a href="#pricing">Pricing</a>
+            <a href="#compare-features">Features</a>
             <a href="/login?create=1" class="btn btn-primary" style="color: #fff;">Get Started</a>
             <a href="/login" class="btn btn-outline">Log In</a>
         </div>
@@ -1504,6 +1647,205 @@
                     <li>Priority support</li>
                 </ul>
                 <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
+            </div>
+        </div>
+
+        <!-- FEATURE COMPARISON TABLE -->
+        <div id="compare-features" class="compare-table-wrap animate">
+            <div class="compare-table-header">
+                <h3 class="display">Compare Features</h3>
+                <p>Everything included in each plan at a glance</p>
+            </div>
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th class="featured-col">Compliance Pro</th>
+                        <th>Community Plus</th>
+                        <th>Management Suite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="section-row"><td colspan="4">Core Governance</td></tr>
+                    <tr>
+                        <td>Dashboard with Fiduciary Alerts</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Board Room: calendar, duties & roles</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Compliance Runbook</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>DC jurisdiction compliance</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+
+                    <tr class="section-row"><td colspan="4">Financial & Case Management</td></tr>
+                    <tr>
+                        <td>Fiscal Lens: double-entry GL, budgets & reserves</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Case Workflow with pre-legal escalation</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Assessment tracking & processing</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Payment processing</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Reserve study tools</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+
+                    <tr class="section-row"><td colspan="4">Building & Records</td></tr>
+                    <tr>
+                        <td>The Building: contacts, bylaws, insurance, vendors</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Property Log: inspections & conditions</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>The Archives: annual compliance snapshots</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Document Vault</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+
+                    <tr class="section-row"><td colspan="4">Community & Communication</td></tr>
+                    <tr>
+                        <td>Resident portal with issue reporting</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Community portal</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Communications & notice templates</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Votes & resolutions</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Email & postal distributions</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Mailing list management</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+
+                    <tr class="section-row"><td colspan="4">Management & AI</td></tr>
+                    <tr>
+                        <td>AI Advisor</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>PM Scorecard & vendor management</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Work order & invoice generation</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Priority support</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ROLES BY TIER -->
+        <div style="margin-top: 4rem; text-align: center;" class="animate">
+            <h3 class="display" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Roles Included by Plan</h3>
+            <p style="font-size: 0.9rem; color: var(--muted); max-width: 540px; margin: 0 auto;">Each plan supports different user roles so you can give the right access to the right people.</p>
+            <div class="roles-grid">
+                <div class="role-card">
+                    <div class="role-icon" style="background: var(--accent-light);">&#128737;&#65039;</div>
+                    <h4>Board Member</h4>
+                    <p class="role-desc">Full access to governance, financial tools, and fiduciary oversight</p>
+                    <span class="role-tier-badge" style="background: var(--green-light); color: var(--green);">All Plans</span>
+                </div>
+                <div class="role-card">
+                    <div class="role-icon" style="background: #dbeafe;">&#127968;</div>
+                    <h4>Resident</h4>
+                    <p class="role-desc">View dashboard, report issues, access building info and their unit</p>
+                    <span class="role-tier-badge" style="background: var(--green-light); color: var(--green);">All Plans</span>
+                </div>
+                <div class="role-card">
+                    <div class="role-icon" style="background: var(--warm-light);">&#128295;</div>
+                    <h4>Staff</h4>
+                    <p class="role-desc">Building operations access for concierge, maintenance, and facility teams</p>
+                    <span class="role-tier-badge" style="background: #ede9fe; color: #6d28d9;">Management Suite</span>
+                </div>
+                <div class="role-card">
+                    <div class="role-icon" style="background: #ede9fe;">&#128188;</div>
+                    <h4>Property Manager</h4>
+                    <p class="role-desc">Professional PM tools including work orders, invoices, and vendor management</p>
+                    <span class="role-tier-badge" style="background: #ede9fe; color: #6d28d9;">Management Suite</span>
+                </div>
             </div>
         </div>
 
