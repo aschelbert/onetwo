@@ -5,6 +5,7 @@ import * as financialSvc from '@/lib/services/financial';
 import { getGLAccountsForInvoice } from '@/lib/financial-logic';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
+import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 
 // ─── GL Filter state ─────────────────────────────────
 interface GLFilter {
@@ -752,6 +753,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   setLateFeeSettings: (enabled, amount, graceDays) => {
     set({ lateFeeEnabled: enabled, lateFeeAmount: amount, lateFeeGraceDays: graceDays });
     syncSettings();
+    // Sync late fee amount to fee schedule store
+    const feeStore = useFeeScheduleStore.getState();
+    const lateFee = feeStore.getFeeByName('Late Fee');
+    if (lateFee && lateFee.amount !== amount) {
+      feeStore.updateFee(lateFee.id, { amount });
+    }
   },
 
   // Refund

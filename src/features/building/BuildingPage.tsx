@@ -11,9 +11,10 @@ import InsuranceTab from './tabs/InsuranceTab';
 import VendorsTab from './tabs/VendorsTab';
 import PMScorecardTab from './tabs/PMScorecardTab';
 import MailingSettingsTab from './tabs/MailingSettingsTab';
+import FeeScheduleTab from './tabs/FeeScheduleTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors','scorecard','mailing'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', scorecard:'PM Scorecard', mailing:'Mailing' };
+const TABS = ['details','contacts','units','legal','insurance','vendors','fees','scorecard','mailing'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', scorecard:'PM Scorecard', mailing:'Mailing' };
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
@@ -162,6 +163,9 @@ export default function BuildingPage() {
 
           {/* VENDORS */}
           {tab === 'vendors' && <VendorsTab />}
+
+          {/* FEE SCHEDULE */}
+          {tab === 'fees' && <FeeScheduleTab />}
 
           {/* PM SCORECARD */}
           {tab === 'scorecard' && isBoard && <PMScorecardTab />}
