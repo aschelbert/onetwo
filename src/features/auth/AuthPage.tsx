@@ -156,6 +156,7 @@ export default function AuthPage() {
     // ?demo=1 → show lead capture form before entering demo
     if (params.get('demo') === '1') {
       setAuthStep('demo-lead');
+      setSessionChecking(false);
       return;
     }
 

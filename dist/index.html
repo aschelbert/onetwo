@@ -984,8 +984,9 @@
             <a href="#differentiators">Why Us</a>
             <a href="#pricing">Pricing</a>
             <a href="#compare-features">Features</a>
-            <a href="/login?create=1" class="btn btn-primary" style="color: #fff;">Get Started</a>
-            <a href="/login" class="btn btn-outline">Log In</a>
+            <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="color: #fff;">Get Started</a>
+            <a href="/login?demo=1" style="color: var(--primary); font-weight: 600; text-decoration: none;">Try the Demo</a>
+            <a href="/login" class="btn btn-outline" style="display:none;">Log In</a>
         </div>
     </div>
 </nav>
@@ -1604,9 +1605,14 @@
                     <li>Fiscal Lens: double-entry GL, budgets & reserves</li>
                     <li>The Building: contacts, bylaws, insurance, vendors</li>
                     <li>Case Workflow with pre-legal escalation paths</li>
+                    <li>Payment processing</li>
+                    <li>Reserve study tools</li>
+                    <li>Assessment tracking & processing</li>
+                    <li>Document Vault</li>
                     <li>Property Log: inspections & condition tracking</li>
                     <li>The Archives: annual compliance snapshots</li>
-                    <li>DC jurisdiction compliance built in</li>
+                    <li>Jurisdiction compliance built in</li>
+                    <li>Email distribution</li>
                 </ul>
                 <a href="#" onclick="openWaitlist();return false" class="btn btn-primary price-btn">Join Waitlist →</a>
             </div>
@@ -1623,9 +1629,9 @@
                     <li>Everything in Compliance Pro</li>
                     <li>Resident portal with issue reporting</li>
                     <li>Community voting & resolutions</li>
-                    <li>Assessment tracking & processing</li>
                     <li>Communications & notice templates</li>
                     <li>PM Scorecard & vendor management</li>
+                    <li>Email distribution</li>
                 </ul>
                 <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
             </div>
@@ -1642,8 +1648,10 @@
                     <li>Everything in Community Plus</li>
                     <li>Property Manager role & tools</li>
                     <li>Work order & invoice generation</li>
-                    <li>Email & postal distributions</li>
+                    <li>Email & postal distribution</li>
                     <li>Mailing list management</li>
+                    <li>1099 reporting</li>
+                    <li>Staff management</li>
                     <li>Priority support</li>
                 </ul>
                 <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
@@ -1686,7 +1694,7 @@
                         <td><span class="check">&#10003;</span></td>
                     </tr>
                     <tr>
-                        <td>DC jurisdiction compliance</td>
+                        <td>Jurisdiction compliance</td>
                         <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
@@ -1707,20 +1715,20 @@
                     </tr>
                     <tr>
                         <td>Assessment tracking & processing</td>
-                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                     </tr>
                     <tr>
                         <td>Payment processing</td>
-                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                     </tr>
                     <tr>
                         <td>Reserve study tools</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                     </tr>
 
@@ -1745,7 +1753,7 @@
                     </tr>
                     <tr>
                         <td>Document Vault</td>
-                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                         <td><span class="check">&#10003;</span></td>
                     </tr>
@@ -1776,7 +1784,13 @@
                         <td><span class="check">&#10003;</span></td>
                     </tr>
                     <tr>
-                        <td>Email & postal distributions</td>
+                        <td>Email distribution</td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Postal distribution</td>
                         <td><span class="dash">—</span></td>
                         <td><span class="dash">—</span></td>
                         <td><span class="check">&#10003;</span></td>
@@ -1787,14 +1801,15 @@
                         <td><span class="dash">—</span></td>
                         <td><span class="check">&#10003;</span></td>
                     </tr>
-
-                    <tr class="section-row"><td colspan="4">Management & AI</td></tr>
                     <tr>
-                        <td>AI Advisor</td>
+                        <td>Amenity scheduling & management</td>
+                        <td><span class="dash">—</span></td>
                         <td><span class="dash">—</span></td>
                         <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
                     </tr>
+
+                    <tr class="section-row"><td colspan="4">Management & AI</td></tr>
+                    <!-- AI Advisor hidden for now -->
                     <tr>
                         <td>PM Scorecard & vendor management</td>
                         <td><span class="dash">—</span></td>
@@ -1803,6 +1818,18 @@
                     </tr>
                     <tr>
                         <td>Work order & invoice generation</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>1099 reporting</td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="dash">—</span></td>
+                        <td><span class="check">&#10003;</span></td>
+                    </tr>
+                    <tr>
+                        <td>Staff management</td>
                         <td><span class="dash">—</span></td>
                         <td><span class="dash">—</span></td>
                         <td><span class="check">&#10003;</span></td>
@@ -1877,7 +1904,7 @@
     </p>
     <div class="cta-actions">
         <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Join the Waitlist →</a>
-        <a href="/demo" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Book a Demo</a>
+        <a href="/login?demo=1" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Try the Demo</a>
     </div>
 </section>
 
