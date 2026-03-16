@@ -153,6 +153,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     { id: 'ld6', name: 'Architectural Standards', version: '2.0', size: '1.1 MB', status: 'review-due', attachments: [] },
     { id: 'ld7', name: 'Collection Policy', version: '2.0', size: '280 KB', status: 'review-due', attachments: [] },
     { id: 'ld8', name: 'Reserve Study (2025)', version: '2025 Update', size: '5.8 MB', status: 'current', attachments: [{ name: 'ReserveStudy_2025.pdf', size: '5.8 MB', uploadedAt: '2025-06-15', type: 'application/pdf' }] },
+    { id: 'ld9', name: 'Resale Certificate Policy', version: '1.0', size: '180 KB', status: 'current', attachments: [{ name: 'Resale_Certificate_Policy.pdf', size: '180 KB', uploadedAt: '2025-04-10', type: 'application/pdf' }] },
+    { id: 'ld10', name: 'Document Retention Policy', version: '2.0', size: '210 KB', status: 'current', attachments: [{ name: 'Document_Retention_Policy.pdf', size: '210 KB', uploadedAt: '2025-05-01', type: 'application/pdf' }] },
+    { id: 'ld11', name: 'Emergency Preparedness Plan', version: '2026 Edition', size: '1.5 MB', status: 'current', attachments: [{ name: 'Emergency_Preparedness_Plan_2026.pdf', size: '1.5 MB', uploadedAt: '2026-01-15', type: 'application/pdf' }] },
   ],
   insurance: [
     { id: 'ins1', type: 'Directors & Officers (D&O)', carrier: 'Chubb Insurance', coverage: '$2,000,000', premium: '$3,200/yr', expires: '2026-09-30', policyNum: 'DO-2026-4421', attachments: [{ name: 'DO_Policy_2026.pdf', size: '1.5 MB', uploadedAt: '2025-10-01', type: 'application/pdf' }] },

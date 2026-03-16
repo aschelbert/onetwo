@@ -65,8 +65,14 @@ function syncFiling(id: string) {
 
 export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   completions: {
-    g1: true, g3: true, g4: true, f1: true, f2: true, f4: true, f5: true,
-    i1: true, i2: true, i4: true, m2: true, m3: true, r1: true, r2: true, r4: true,
+    g1: true, g2: true, g3: true, g4: true, g5: true, g6: true, g7: true, g8: true, g9: true,
+    f1: true, f2: true, f3: true, f4: true, f5: true, f6: true, f7: true,
+    i1: true, i2: true, i3: true, i4: true, i5: true, i6: true,
+    m1: true, m2: true, m3: true, m4: true, m5: true, m6: true,
+    r1: true, r2: true, r3: true, r4: true, r5: true,
+    o1: true, o2: true, o3: true, o4: true,
+    e1: true, e2: true, e3: true,
+    l1: true, l2: true,
   },
 
   itemAttachments: {},
