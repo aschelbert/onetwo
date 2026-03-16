@@ -21,6 +21,7 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
   { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
   { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
+  { featureId: 'userManagement',   nav: { id: 'user-mgmt',    label: 'Association Team', path: '/admin/users',  icon: 'user-mgmt' } },
 ];
 
 // Role name in auth store → roleId used in permissions
@@ -75,6 +76,7 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
+    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt' },
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
@@ -96,5 +98,6 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
+    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt' },
   ],
 };
