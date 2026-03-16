@@ -38,11 +38,45 @@ const StepIndicator = ({ steps, current }: { steps: string[]; current: number })
 // TIERS, SubscriptionTier, and BillingInterval imported from @/lib/tiers
 
 export default function AuthPage() {
-  const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, login, buildingMembers, buildingInvites, addMember } = useAuthStore();
+  const { authStep, setAuthStep, setAuthJoinRole, authJoinRole, login, skipToDemo, buildingMembers, buildingInvites, addMember } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
+  // Demo lead form
+  const [demoFirstName, setDemoFirstName] = useState('');
+  const [demoLastName, setDemoLastName] = useState('');
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoCondoName, setDemoCondoName] = useState('');
+  const [demoUnitCount, setDemoUnitCount] = useState('');
+  const [demoMemberType, setDemoMemberType] = useState('board_member');
+  const [demoSubscriptionInterest, setDemoSubscriptionInterest] = useState<SubscriptionTier>('compliance_pro');
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
+
+  const handleDemoLeadSubmit = async () => {
+    if (!demoFirstName.trim() || !demoLastName.trim()) { alert('Please enter your name.'); return; }
+    if (!demoEmail.trim()) { alert('Please enter your email.'); return; }
+    if (!demoCondoName.trim()) { alert('Please enter your condo / community name.'); return; }
+
+    setDemoSubmitting(true);
+    try {
+      if (isBackendEnabled && supabase) {
+        await supabase.rpc('submit_demo_lead', {
+          p_name: `${demoFirstName.trim()} ${demoLastName.trim()}`,
+          p_email: demoEmail.trim(),
+          p_condo_name: demoCondoName.trim(),
+          p_unit_count: demoUnitCount ? parseInt(demoUnitCount) : null,
+          p_member_type: demoMemberType,
+          p_subscription_interest: demoSubscriptionInterest,
+        });
+      }
+    } catch (err) {
+      console.warn('Demo lead submission failed (non-blocking):', err);
+    }
+    setDemoSubmitting(false);
+    skipToDemo();
+  };
+
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
@@ -118,6 +152,13 @@ export default function AuthPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // ?demo=1 → show lead capture form before entering demo
+    if (params.get('demo') === '1') {
+      setAuthStep('demo-lead');
+      return;
+    }
+
     // Direct /login visit (e.g. "Log In" button) — go straight to login form
     // /login?create=1 (e.g. "Get Started" button) — stay on welcome/CTA page
     if (params.get('create') !== '1' && authStep === 'welcome') {
@@ -769,6 +810,48 @@ export default function AuthPage() {
             </div>
             <div className="border-t border-ink-100 mt-6 pt-4 text-center">
               <p className="text-sm text-ink-500">Don&apos;t have an account?{' '}<a onClick={() => setAuthStep('join-role')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Create one</a></p>
+            </div>
+          </div>
+        )}
+
+        {/* ══════ DEMO LEAD CAPTURE ══════ */}
+        {authStep === 'demo-lead' && (
+          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
+            <Logo />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Try the Demo</h2>
+            <p className="text-sm text-ink-400 text-center mb-6">Tell us a bit about yourself, then explore the full platform</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
+                  <input value={demoFirstName} onChange={e => setDemoFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
+                  <input value={demoLastName} onChange={e => setDemoLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
+              </div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
+                <input type="email" value={demoEmail} onChange={e => setDemoEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Condo / Community Name *</label>
+                <input value={demoCondoName} onChange={e => setDemoCondoName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Number of Units</label>
+                <input type="number" value={demoUnitCount} onChange={e => setDemoUnitCount(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 14" /></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Community Member Type *</label>
+                <select value={demoMemberType} onChange={e => setDemoMemberType(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
+                  <option value="resident">Resident</option>
+                  <option value="board_member">Board Member</option>
+                  <option value="property_manager">Property Manager</option>
+                  <option value="other">Other</option>
+                </select></div>
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Subscription Interest *</label>
+                <select value={demoSubscriptionInterest} onChange={e => setDemoSubscriptionInterest(e.target.value as SubscriptionTier)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
+                  {TIERS.map(tier => (
+                    <option key={tier.id} value={tier.id}>{tier.name} — ${tier.monthly}/mo</option>
+                  ))}
+                </select></div>
+              <button onClick={handleDemoLeadSubmit} disabled={demoSubmitting}
+                className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50 mt-2">
+                {demoSubmitting ? 'Loading...' : 'Enter Demo →'}</button>
+            </div>
+            <div className="border-t border-ink-100 mt-6 pt-4 flex items-center justify-center">
+              <a href="https://getonetwo.com" className="text-xs text-accent-600 hover:text-accent-700 font-medium">← Back to website</a>
             </div>
           </div>
         )}

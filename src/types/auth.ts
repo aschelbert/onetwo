@@ -40,6 +40,7 @@ export interface BuildingInvite {
 export type AuthStep =
   | 'welcome'
   | 'login'
+  | 'demo-lead'
   | 'join-role'
   | 'join-invite'
   | 'join-create'
