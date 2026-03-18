@@ -17,6 +17,9 @@ import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
+import PMScorecardPage from '@/features/association-team/PMScorecardPage';
+import TaskTrackingPage from '@/features/association-team/TaskTrackingPage';
+import PayrollPage from '@/features/association-team/PayrollPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
@@ -189,6 +192,9 @@ export default function App() {
           <Route path="/boardroom" element={<BoardRoomPage />} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
           <Route path="/property-log" element={<PropertyLogPage />} />
+          <Route path="/task-tracking" element={<TaskTrackingPage />} />
+          <Route path="/pm-scorecard" element={<PMScorecardPage />} />
+          <Route path="/payroll" element={<PayrollPage />} />
           <Route path="/community" element={<CommunityRoomPage />} />
           <Route path="/my-unit" element={<MyUnitPage />} />
           <Route path="/account" element={<AccountSettingsPage />} />

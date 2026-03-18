@@ -20,6 +20,9 @@ import {
   PanelLeftClose,
   PanelLeft,
   ChevronDown,
+  ListChecks,
+  Star,
+  Receipt,
 } from 'lucide-react';
 
 const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -34,6 +37,9 @@ const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   issues: AlertCircle,
   'my-unit': Home,
   'user-mgmt': Users,
+  'task-tracking': ListChecks,
+  'pm-scorecard': Star,
+  'payroll': Receipt,
 };
 
 interface SidebarProps {
