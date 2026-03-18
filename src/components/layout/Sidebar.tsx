@@ -4,7 +4,6 @@ import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { getNavigationForRole, navigation } from '@/lib/rolePermissions';
 import { ROLE_LABELS, type Role } from '@/types/auth';
-import { useState } from 'react';
 import {
   LayoutDashboard,
   Gavel,
@@ -19,10 +18,6 @@ import {
   Users,
   PanelLeftClose,
   PanelLeft,
-  ChevronDown,
-  ListChecks,
-  Star,
-  Receipt,
 } from 'lucide-react';
 
 const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -37,9 +32,6 @@ const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   issues: AlertCircle,
   'my-unit': Home,
   'user-mgmt': Users,
-  'task-tracking': ListChecks,
-  'pm-scorecard': Star,
-  'payroll': Receipt,
 };
 
 interface SidebarProps {
@@ -54,7 +46,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const isAdmin = currentRole === 'PLATFORM_ADMIN';
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Build navigation dynamically from admin console permissions + tenant features.
   // Falls back to static navigation if permissions haven't loaded yet.
@@ -65,22 +56,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
-  };
-
-  // Check if any child of a parent is active
-  const isGroupActive = (item: typeof navItems[number]) => {
-    if (item.children) return item.children.some(child => isActive(child.path));
-    return isActive(item.path);
-  };
-
-  const toggleGroup = (id: string) => {
-    setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // Auto-expand groups that have an active child
-  const isExpanded = (item: typeof navItems[number]) => {
-    if (expandedGroups[item.id] !== undefined) return expandedGroups[item.id];
-    return isGroupActive(item);
   };
 
   return (
@@ -138,72 +113,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               );
             }
 
-            const Icon = item.icon ? NAV_ICONS[item.icon] : null;
-
-            // Parent with children — expandable group
-            if (item.children && item.children.length > 0) {
-              const groupActive = isGroupActive(item);
-              const expanded = isExpanded(item);
-
-              if (collapsed) {
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(item.children![0].path)}
-                    title={item.label}
-                    className={`w-full flex items-center justify-center py-2.5 rounded-lg transition-colors ${
-                      groupActive
-                        ? isAdmin ? 'bg-red-700 text-white' : 'bg-ink-900 text-white'
-                        : 'text-ink-700 hover:bg-ink-50'
-                    }`}
-                  >
-                    {Icon && <Icon className="w-5 h-5" />}
-                  </button>
-                );
-              }
-
-              return (
-                <div key={item.id}>
-                  <button
-                    onClick={() => toggleGroup(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors ${
-                      groupActive
-                        ? 'bg-ink-100 text-ink-900'
-                        : 'text-ink-700 hover:bg-ink-50'
-                    }`}
-                  >
-                    {Icon && <Icon className="w-5 h-5 shrink-0" />}
-                    <span className="flex-1">{item.label}</span>
-                    <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                  </button>
-                  {expanded && (
-                    <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-ink-100 pl-3">
-                      {item.children.map(child => {
-                        const childActive = isActive(child.path);
-                        const ChildIcon = child.icon ? NAV_ICONS[child.icon] : null;
-                        return (
-                          <button
-                            key={child.id}
-                            onClick={() => navigate(child.path)}
-                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm transition-colors ${
-                              childActive
-                                ? isAdmin ? 'bg-red-700 text-white' : 'bg-ink-900 text-white'
-                                : 'text-ink-600 hover:bg-ink-50'
-                            }`}
-                          >
-                            {ChildIcon && <ChildIcon className="w-4 h-4 shrink-0" />}
-                            {child.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            // Regular nav item (no children)
             const active = isActive(item.path);
+            const Icon = item.icon ? NAV_ICONS[item.icon] : null;
 
             if (collapsed) {
               return (

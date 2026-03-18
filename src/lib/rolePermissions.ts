@@ -8,7 +8,6 @@ export interface NavItem {
   path: string;
   separator?: boolean;
   icon?: string;
-  children?: NavItem[];
 }
 
 // Maps featureId (from admin console permissions) → sidebar nav item.
@@ -21,12 +20,7 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
   { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
   { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
-  { featureId: 'userManagement',   nav: { id: 'association-team', label: 'Association Team', path: '/property-log', icon: 'user-mgmt', children: [
-    { id: 'property-log',  label: 'Property Log',             path: '/property-log',  icon: 'property-log' },
-    { id: 'task-tracking',  label: 'Task Tracking',            path: '/task-tracking',  icon: 'task-tracking' },
-    { id: 'pm-scorecard',   label: 'PM Scorecard', path: '/pm-scorecard',   icon: 'pm-scorecard' },
-    { id: 'payroll',        label: 'Payroll & 1099s',          path: '/payroll',        icon: 'payroll' },
-  ] } },
+  { featureId: 'userManagement',   nav: { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' } },
 ];
 
 // Role name in auth store → roleId used in permissions
@@ -35,12 +29,6 @@ const ROLE_TO_PERMISSION_ID: Record<string, string> = {
   RESIDENT: 'resident',
   STAFF: 'staff',
   PROPERTY_MANAGER: 'property_manager',
-};
-
-// Maps child nav item id → featureId for permission checks.
-// Children not listed here inherit access from the parent.
-const CHILD_FEATURE_MAP: Record<string, string> = {
-  'property-log': 'propertyLog',
 };
 
 /**
@@ -64,22 +52,12 @@ export function getNavigationForRole(
   const rolePerms = permissions.filter(p => p.roleId === permRoleId);
   const coreSet = new Set<string>(CORE_FEATURES as readonly string[]);
 
-  const hasFeatureAccess = (featureId: string) => {
+  return FEATURE_NAV_MAP.filter(({ featureId }) => {
     const perm = rolePerms.find(p => p.featureId === featureId);
     if (!perm || !perm.actions.includes('view')) return false;
     if (coreSet.has(featureId)) return true;
     return tenantFeatures[featureId] === true;
-  };
-
-  return FEATURE_NAV_MAP.filter(({ featureId }) => hasFeatureAccess(featureId))
-    .map(({ nav }) => {
-      if (!nav.children) return nav;
-      const filteredChildren = nav.children.filter(child => {
-        const childFeatureId = CHILD_FEATURE_MAP[child.id];
-        return !childFeatureId || hasFeatureAccess(childFeatureId);
-      });
-      return { ...nav, children: filteredChildren };
-    });
+  }).map(({ nav }) => nav);
 }
 
 // Legacy static navigation — kept as fallback
@@ -93,12 +71,7 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
-    { id: 'association-team', label: 'Association Team', path: '/property-log', icon: 'user-mgmt', children: [
-      { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
-      { id: 'task-tracking', label: 'Task Tracking', path: '/task-tracking', icon: 'task-tracking' },
-      { id: 'pm-scorecard', label: 'PM Scorecard', path: '/pm-scorecard', icon: 'pm-scorecard' },
-      { id: 'payroll', label: 'Payroll & 1099s', path: '/payroll', icon: 'payroll' },
-    ] },
+    { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
@@ -118,11 +91,6 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
-    { id: 'association-team', label: 'Association Team', path: '/property-log', icon: 'user-mgmt', children: [
-      { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
-      { id: 'task-tracking', label: 'Task Tracking', path: '/task-tracking', icon: 'task-tracking' },
-      { id: 'pm-scorecard', label: 'PM Scorecard', path: '/pm-scorecard', icon: 'pm-scorecard' },
-      { id: 'payroll', label: 'Payroll & 1099s', path: '/payroll', icon: 'payroll' },
-    ] },
+    { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
   ],
 };
