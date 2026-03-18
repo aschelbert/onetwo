@@ -82,6 +82,8 @@ export const seedChartOfAccounts: ChartOfAccountsEntry[] = [
   {num:'5080',name:'Security',type:'expense',sub:'operating',parent:'5000'},
   {num:'5090',name:'Cleaning & Janitorial',type:'expense',sub:'operating',parent:'5000'},
   {num:'5100',name:'Pest Control',type:'expense',sub:'operating',parent:'5000'},
+  {num:'5200',name:'Wages & Salaries',type:'expense',sub:'operating',parent:'5000'},
+  {num:'5210',name:'Contract Labor',type:'expense',sub:'operating',parent:'5000'},
   // RESERVE EXPENSES
   {num:'6000',name:'Reserve Expenses',type:'expense',sub:'header',parent:null},
   {num:'6010',name:'Roof Replacement',type:'expense',sub:'reserve',parent:'6000',reserveItem:'res1'},
