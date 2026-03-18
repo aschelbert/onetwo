@@ -8,6 +8,7 @@ export interface NavItem {
   path: string;
   separator?: boolean;
   icon?: string;
+  children?: NavItem[];
 }
 
 // Maps featureId (from admin console permissions) → sidebar nav item.
@@ -17,11 +18,13 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'boardRoom',        nav: { id: 'boardroom',    label: 'Board Room',     path: '/boardroom',     icon: 'boardroom' } },
   { featureId: 'building',         nav: { id: 'contacts',     label: 'The Building',   path: '/building',      icon: 'contacts' } },
   { featureId: 'fiscalLens',       nav: { id: 'financial',    label: 'Fiscal Lens',    path: '/financial',     icon: 'financial' } },
-  { featureId: 'propertyLog',      nav: { id: 'property-log', label: 'Property Log',   path: '/property-log',  icon: 'property-log' } },
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
   { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
   { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
-  { featureId: 'userManagement',   nav: { id: 'user-mgmt',    label: 'Association Team', path: '/admin/users',  icon: 'user-mgmt' } },
+  { featureId: 'userManagement',   nav: { id: 'user-mgmt',    label: 'Association Team', path: '/admin/users',  icon: 'user-mgmt', children: [
+    { id: 'members',      label: 'Members',      path: '/admin/users',  icon: 'user-mgmt' },
+    { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
+  ] } },
 ];
 
 // Role name in auth store → roleId used in permissions
@@ -30,6 +33,12 @@ const ROLE_TO_PERMISSION_ID: Record<string, string> = {
   RESIDENT: 'resident',
   STAFF: 'staff',
   PROPERTY_MANAGER: 'property_manager',
+};
+
+// Maps child nav item id → featureId for permission checks
+const CHILD_FEATURE_MAP: Record<string, string> = {
+  'members': 'userManagement',
+  'property-log': 'propertyLog',
 };
 
 /**
@@ -53,15 +62,22 @@ export function getNavigationForRole(
   const rolePerms = permissions.filter(p => p.roleId === permRoleId);
   const coreSet = new Set<string>(CORE_FEATURES as readonly string[]);
 
-  return FEATURE_NAV_MAP.filter(({ featureId }) => {
-    // Check RBAC: role must have 'view' permission for this feature
+  const hasFeatureAccess = (featureId: string) => {
     const perm = rolePerms.find(p => p.featureId === featureId);
     if (!perm || !perm.actions.includes('view')) return false;
-
-    // Core features are always available; non-core must be enabled on the tenant
     if (coreSet.has(featureId)) return true;
     return tenantFeatures[featureId] === true;
-  }).map(({ nav }) => nav);
+  };
+
+  return FEATURE_NAV_MAP.filter(({ featureId }) => hasFeatureAccess(featureId))
+    .map(({ nav }) => {
+      if (!nav.children) return nav;
+      const filteredChildren = nav.children.filter(child => {
+        const childFeatureId = CHILD_FEATURE_MAP[child.id];
+        return !childFeatureId || hasFeatureAccess(childFeatureId);
+      });
+      return { ...nav, children: filteredChildren };
+    });
 }
 
 // Legacy static navigation — kept as fallback
@@ -74,9 +90,11 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
-    { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
-    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt' },
+    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt', children: [
+      { id: 'members', label: 'Members', path: '/admin/users', icon: 'user-mgmt' },
+      { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
+    ] },
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
@@ -88,7 +106,6 @@ export const navigation: Record<Role, NavItem[]> = {
   STAFF: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
-    { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   PROPERTY_MANAGER: [
@@ -96,8 +113,10 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
-    { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
-    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt' },
+    { id: 'user-mgmt', label: 'Association Team', path: '/admin/users', icon: 'user-mgmt', children: [
+      { id: 'members', label: 'Members', path: '/admin/users', icon: 'user-mgmt' },
+      { id: 'property-log', label: 'Property Log', path: '/property-log', icon: 'property-log' },
+    ] },
   ],
 };
