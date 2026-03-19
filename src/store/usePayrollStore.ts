@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useFinancialStore } from './useFinancialStore';
+import { supabase } from '@/lib/supabase';
 
 /* ── Types ─────────────────────────────────────────────────── */
 
@@ -15,6 +16,8 @@ export interface StaffMember {
   taxId: string;        // masked e.g. "***-**-1234"
   startDate: string;
   status: 'active' | 'inactive';
+  stripeAccountId: string | null;
+  stripeOnboardingComplete: boolean;
 }
 
 export interface TimeEntry {
@@ -35,9 +38,12 @@ export interface PayRun {
   deductions: number;
   withholdingPct: number;
   netPay: number;
-  status: 'draft' | 'paid';
+  status: 'draft' | 'processing' | 'paid' | 'failed';
   paidDate: string | null;
   glEntryId: string | null;
+  paymentMethod: 'stripe' | 'manual' | null;
+  stripeTransferId: string | null;
+  withholdingGlEntryId: string | null;
 }
 
 export interface Form1099 {
@@ -53,9 +59,9 @@ export interface Form1099 {
 /* ── Seed data ─────────────────────────────────────────────── */
 
 const seedStaff: StaffMember[] = [
-  { id: 'staff1', name: 'Carlos Mendez', type: 'employee', role: 'Superintendent', rate: 32, email: 'carlos.m@example.com', phone: '202-555-0601', taxId: '***-**-4821', startDate: '2023-03-15', status: 'active' },
-  { id: 'staff2', name: 'Bright Shine Cleaning LLC', type: 'contractor', role: 'Cleaning Service', rate: 45, email: 'info@brightshine.com', phone: '202-555-0602', taxId: '***-**-7733', startDate: '2024-01-10', status: 'active' },
-  { id: 'staff3', name: 'Tony Russo', type: 'contractor', role: 'Handyman', rate: 55, email: 'tony.r@example.com', phone: '202-555-0603', taxId: '***-**-9156', startDate: '2024-06-01', status: 'active' },
+  { id: 'staff1', name: 'Carlos Mendez', type: 'employee', role: 'Superintendent', rate: 32, email: 'carlos.m@example.com', phone: '202-555-0601', taxId: '***-**-4821', startDate: '2023-03-15', status: 'active', stripeAccountId: null, stripeOnboardingComplete: false },
+  { id: 'staff2', name: 'Bright Shine Cleaning LLC', type: 'contractor', role: 'Cleaning Service', rate: 45, email: 'info@brightshine.com', phone: '202-555-0602', taxId: '***-**-7733', startDate: '2024-01-10', status: 'active', stripeAccountId: null, stripeOnboardingComplete: false },
+  { id: 'staff3', name: 'Tony Russo', type: 'contractor', role: 'Handyman', rate: 55, email: 'tony.r@example.com', phone: '202-555-0603', taxId: '***-**-9156', startDate: '2024-06-01', status: 'active', stripeAccountId: null, stripeOnboardingComplete: false },
 ];
 
 const seedTimeEntries: TimeEntry[] = [
@@ -81,11 +87,11 @@ const seedTimeEntries: TimeEntry[] = [
 
 const seedPayRuns: PayRun[] = [
   // Carlos – Jan 2026: 32 hrs × $32 = $1024, 22% withholding = $225.28, net = $798.72
-  { id: 'pr1', staffId: 'staff1', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 32, grossPay: 1024, deductions: 225.28, withholdingPct: 22, netPay: 798.72, status: 'paid', paidDate: '2026-02-01', glEntryId: null },
+  { id: 'pr1', staffId: 'staff1', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 32, grossPay: 1024, deductions: 225.28, withholdingPct: 22, netPay: 798.72, status: 'paid', paidDate: '2026-02-01', glEntryId: null, paymentMethod: 'manual', stripeTransferId: null, withholdingGlEntryId: null },
   // Bright Shine – Jan 2026: 12 hrs × $45 = $540, 0% = $0, net = $540
-  { id: 'pr2', staffId: 'staff2', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 12, grossPay: 540, deductions: 0, withholdingPct: 0, netPay: 540, status: 'paid', paidDate: '2026-02-01', glEntryId: null },
+  { id: 'pr2', staffId: 'staff2', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 12, grossPay: 540, deductions: 0, withholdingPct: 0, netPay: 540, status: 'paid', paidDate: '2026-02-01', glEntryId: null, paymentMethod: 'manual', stripeTransferId: null, withholdingGlEntryId: null },
   // Tony – Jan 2026: 7 hrs × $55 = $385, 0% = $0, net = $385
-  { id: 'pr3', staffId: 'staff3', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 7, grossPay: 385, deductions: 0, withholdingPct: 0, netPay: 385, status: 'paid', paidDate: '2026-02-01', glEntryId: null },
+  { id: 'pr3', staffId: 'staff3', periodStart: '2026-01-01', periodEnd: '2026-01-31', hoursWorked: 7, grossPay: 385, deductions: 0, withholdingPct: 0, netPay: 385, status: 'paid', paidDate: '2026-02-01', glEntryId: null, paymentMethod: 'manual', stripeTransferId: null, withholdingGlEntryId: null },
 ];
 
 /* ── Store ──────────────────────────────────────────────────── */
@@ -99,6 +105,7 @@ interface PayrollState {
   // Staff CRUD
   addStaff: (s: Omit<StaffMember, 'id'>) => void;
   updateStaff: (id: string, u: Partial<StaffMember>) => void;
+  updateStaffStripe: (staffId: string, stripeAccountId: string, onboardingComplete: boolean) => void;
 
   // Time entries
   addTimeEntry: (e: Omit<TimeEntry, 'id'>) => void;
@@ -107,7 +114,7 @@ interface PayrollState {
 
   // Pay runs
   createPayRun: (staffId: string, periodStart: string, periodEnd: string) => PayRun;
-  processPayRun: (id: string) => void;
+  processPayRun: (id: string, paymentMethod: 'stripe' | 'manual') => Promise<void>;
 
   // 1099s
   generate1099: (staffId: string, year: number) => void;
@@ -129,6 +136,14 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
 
   updateStaff: (id, u) => {
     set(st => ({ staff: st.staff.map(s => s.id === id ? { ...s, ...u } : s) }));
+  },
+
+  updateStaffStripe: (staffId, stripeAccountId, onboardingComplete) => {
+    set(st => ({
+      staff: st.staff.map(s =>
+        s.id === staffId ? { ...s, stripeAccountId, stripeOnboardingComplete: onboardingComplete } : s
+      ),
+    }));
   },
 
   /* ── Time entries ──────────────────── */
@@ -173,35 +188,117 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       status: 'draft',
       paidDate: null,
       glEntryId: null,
+      paymentMethod: null,
+      stripeTransferId: null,
+      withholdingGlEntryId: null,
     };
     set(st => ({ payRuns: [...st.payRuns, pr] }));
     return pr;
   },
 
-  processPayRun: (id) => {
+  processPayRun: async (id, paymentMethod) => {
     const state = get();
     const pr = state.payRuns.find(p => p.id === id);
-    if (!pr || pr.status === 'paid') return;
+    if (!pr || pr.status === 'paid' || pr.status === 'processing') return;
 
     const member = state.staff.find(s => s.id === pr.staffId)!;
-    const debitAcct = member.type === 'employee' ? '5200' : '5210';
     const today = new Date().toISOString().slice(0, 10);
 
-    const glEntry = useFinancialStore.getState().glPost(
-      today,
-      `Payroll — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
-      debitAcct,
-      '1010',
-      pr.netPay,
-      'expense',
-      pr.id,
-    );
-
+    // Set status to processing immediately
     set(st => ({
       payRuns: st.payRuns.map(p =>
-        p.id === id ? { ...p, status: 'paid' as const, paidDate: today, glEntryId: glEntry.id } : p
+        p.id === id ? { ...p, status: 'processing' as const, paymentMethod } : p
       ),
     }));
+
+    const glPost = useFinancialStore.getState().glPost;
+    let glEntryId: string | null = null;
+    let withholdingGlEntryId: string | null = null;
+
+    if (pr.withholdingPct > 0) {
+      // Employee with withholding: 2 GL entries
+      // 1) Debit 5200 (Wages), Credit 2040 (Withholding Payable) for grossPay
+      const accrualEntry = glPost(
+        today,
+        `Payroll accrual — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
+        '5200',
+        '2040',
+        pr.grossPay,
+        'payroll',
+        pr.id,
+      );
+      withholdingGlEntryId = accrualEntry.id;
+
+      // 2) Debit 2040, Credit 1010 (Operating Cash) for netPay
+      const payEntry = glPost(
+        today,
+        `Payroll payment — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
+        '2040',
+        '1010',
+        pr.netPay,
+        'payroll',
+        pr.id,
+      );
+      glEntryId = payEntry.id;
+    } else {
+      // Contractor (0% withholding): 1 GL entry
+      // Debit 5210 (Contract Services), Credit 1010 for netPay
+      const entry = glPost(
+        today,
+        `Payroll — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
+        '5210',
+        '1010',
+        pr.netPay,
+        'payroll',
+        pr.id,
+      );
+      glEntryId = entry.id;
+    }
+
+    // Handle Stripe payment if selected and staff has connected account
+    if (paymentMethod === 'stripe' && member.stripeAccountId && member.stripeOnboardingComplete && supabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke('staff-payment', {
+          body: {
+            action: 'process_payment',
+            stripeAccountId: member.stripeAccountId,
+            amount: pr.netPay,
+            staffName: member.name,
+            payRunId: pr.id,
+            periodStart: pr.periodStart,
+            periodEnd: pr.periodEnd,
+          },
+        });
+
+        if (error || !data?.transferId) {
+          set(st => ({
+            payRuns: st.payRuns.map(p =>
+              p.id === id ? { ...p, status: 'failed' as const, glEntryId, withholdingGlEntryId } : p
+            ),
+          }));
+          return;
+        }
+
+        set(st => ({
+          payRuns: st.payRuns.map(p =>
+            p.id === id ? { ...p, status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId, stripeTransferId: data.transferId } : p
+          ),
+        }));
+      } catch {
+        set(st => ({
+          payRuns: st.payRuns.map(p =>
+            p.id === id ? { ...p, status: 'failed' as const, glEntryId, withholdingGlEntryId } : p
+          ),
+        }));
+      }
+    } else {
+      // Manual payment — mark paid after GL posting
+      set(st => ({
+        payRuns: st.payRuns.map(p =>
+          p.id === id ? { ...p, status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId } : p
+        ),
+      }));
+    }
   },
 
   /* ── 1099s ─────────────────────────── */

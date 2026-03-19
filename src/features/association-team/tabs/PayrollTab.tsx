@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import type { StaffMember, TimeEntry, PayRun } from '@/store/usePayrollStore';
+import { supabase } from '@/lib/supabase';
 
 /* ── Helpers ───────────────────────────────────────────────── */
 
@@ -12,12 +13,12 @@ const SUB_TABS = ['staff', 'time', 'pay', '1099s'] as const;
 type SubTab = typeof SUB_TABS[number];
 const SUB_TAB_LABELS: Record<SubTab, string> = { staff: 'Staff Directory', time: 'Time Tracking', pay: 'Pay History', '1099s': '1099s' };
 
-const EMPTY_STAFF: Omit<StaffMember, 'id'> = { name: '', type: 'employee', role: '', rate: 0, email: '', phone: '', taxId: '', startDate: '', status: 'active' };
+const EMPTY_STAFF: Omit<StaffMember, 'id'> = { name: '', type: 'employee', role: '', rate: 0, email: '', phone: '', taxId: '', startDate: '', status: 'active', stripeAccountId: null, stripeOnboardingComplete: false };
 
 /* ── Component ─────────────────────────────────────────────── */
 
 export default function PayrollTab() {
-  const { staff, timeEntries, payRuns, form1099s, addStaff, updateStaff, addTimeEntry, updateTimeEntry, deleteTimeEntry, createPayRun, processPayRun, generate1099, markSent } = usePayrollStore();
+  const { staff, timeEntries, payRuns, form1099s, addStaff, updateStaff, updateStaffStripe, addTimeEntry, updateTimeEntry, deleteTimeEntry, createPayRun, processPayRun, generate1099, markSent } = usePayrollStore();
 
   const [subTab, setSubTab] = useState<SubTab>('staff');
 
@@ -77,6 +78,78 @@ export default function PayrollTab() {
       createPayRun(payForm.staffId, payForm.periodStart, payForm.periodEnd);
     }
     setPayModal(false);
+  };
+
+  /* ── Process Payment modal ──────── */
+  const [processModal, setProcessModal] = useState<PayRun | null>(null);
+  const [processMethod, setProcessMethod] = useState<'stripe' | 'manual'>('manual');
+  const [processing, setProcessing] = useState(false);
+
+  const openProcessModal = (pr: PayRun) => {
+    const member = staff.find(s => s.id === pr.staffId);
+    setProcessMethod(member?.stripeAccountId && member.stripeOnboardingComplete ? 'stripe' : 'manual');
+    setProcessModal(pr);
+  };
+
+  const handleProcess = async () => {
+    if (!processModal) return;
+    setProcessing(true);
+    await processPayRun(processModal.id, processMethod);
+    setProcessing(false);
+    setProcessModal(null);
+  };
+
+  /* ── Pay Stub modal ─────────────── */
+  const [stubPayRun, setStubPayRun] = useState<PayRun | null>(null);
+  const stubMember = stubPayRun ? staff.find(s => s.id === stubPayRun.staffId) : null;
+  const stubTimeEntries = stubPayRun ? timeEntries.filter(e =>
+    e.staffId === stubPayRun.staffId && e.date >= stubPayRun.periodStart && e.date <= stubPayRun.periodEnd
+  ).sort((a, b) => a.date.localeCompare(b.date)) : [];
+
+  /* ── Stripe connect helpers ─────── */
+  const [stripeLoading, setStripeLoading] = useState<string | null>(null);
+
+  const handleConnectStripe = async (s: StaffMember) => {
+    if (!supabase) return;
+    setStripeLoading(s.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('staff-payment', {
+        body: { action: 'create_staff_account', staffName: s.name },
+      });
+      if (error || !data?.stripeAccountId) {
+        alert('Failed to create Stripe account');
+        setStripeLoading(null);
+        return;
+      }
+      updateStaffStripe(s.id, data.stripeAccountId, false);
+      if (data.onboardingUrl) window.open(data.onboardingUrl, '_blank');
+    } catch {
+      alert('Failed to connect Stripe');
+    }
+    setStripeLoading(null);
+  };
+
+  const handleCheckStripeStatus = async (s: StaffMember) => {
+    if (!supabase || !s.stripeAccountId) return;
+    setStripeLoading(s.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('staff-payment', {
+        body: { action: 'check_staff_status', stripeAccountId: s.stripeAccountId },
+      });
+      if (error) {
+        alert('Failed to check status');
+        setStripeLoading(null);
+        return;
+      }
+      if (data?.onboardingComplete) {
+        updateStaffStripe(s.id, s.stripeAccountId, true);
+      } else if (data?.onboardingUrl) {
+        window.open(data.onboardingUrl, '_blank');
+      }
+    } catch {
+      alert('Failed to check Stripe status');
+    }
+    setStripeLoading(null);
   };
 
   /* ── 1099 state ────────────────── */
@@ -148,6 +221,7 @@ export default function PayrollTab() {
                   <th className="px-4 py-3 font-medium">Role</th>
                   <th className="px-4 py-3 font-medium text-right">Rate</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Stripe</th>
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
@@ -170,6 +244,29 @@ export default function PayrollTab() {
                       }`}>
                         {s.status === 'active' ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.stripeAccountId && s.stripeOnboardingComplete ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          Connected
+                        </span>
+                      ) : s.stripeAccountId && !s.stripeOnboardingComplete ? (
+                        <button
+                          onClick={() => handleCheckStripeStatus(s)}
+                          disabled={stripeLoading === s.id}
+                          className="text-xs text-indigo-600 hover:text-indigo-800 underline disabled:opacity-50"
+                        >
+                          {stripeLoading === s.id ? 'Checking...' : 'Complete Setup'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleConnectStripe(s)}
+                          disabled={stripeLoading === s.id}
+                          className="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {stripeLoading === s.id ? 'Creating...' : 'Connect Stripe'}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => openEditStaff(s)} className="text-ink-400 hover:text-ink-700 text-sm">Edit</button>
@@ -274,20 +371,32 @@ export default function PayrollTab() {
                     <td className="px-4 py-3 text-right font-medium text-ink-900">{fmt$(pr.netPay)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        pr.status === 'paid' ? 'bg-sage-100 text-sage-700' : 'bg-amber-100 text-amber-700'
+                        pr.status === 'paid' ? 'bg-sage-100 text-sage-700' :
+                        pr.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                        pr.status === 'failed' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
                       }`}>
-                        {pr.status === 'paid' ? 'Paid' : 'Draft'}
+                        {pr.status === 'paid' ? 'Paid' : pr.status === 'processing' ? 'Processing' : pr.status === 'failed' ? 'Failed' : 'Draft'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right space-x-2">
                       {pr.status === 'draft' && (
-                        <button onClick={() => processPayRun(pr.id)}
+                        <button onClick={() => openProcessModal(pr)}
                           className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-medium hover:bg-emerald-700">
                           Process
                         </button>
                       )}
-                      {pr.status === 'paid' && pr.glEntryId && (
-                        <span className="text-xs text-ink-400">{pr.glEntryId}</span>
+                      {pr.status === 'failed' && (
+                        <button onClick={() => openProcessModal(pr)}
+                          className="px-3 py-1 bg-amber-600 text-white rounded-md text-xs font-medium hover:bg-amber-700">
+                          Retry
+                        </button>
+                      )}
+                      {pr.status === 'paid' && (
+                        <button onClick={() => setStubPayRun(pr)}
+                          className="px-3 py-1 border border-ink-200 text-ink-700 rounded-md text-xs font-medium hover:bg-ink-50">
+                          View Stub
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -516,6 +625,168 @@ export default function PayrollTab() {
                 </div>
               );
             })()}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Process Payment Modal ────────────────── */}
+      {processModal && (() => {
+        const member = staff.find(s => s.id === processModal.staffId);
+        const stripeReady = member?.stripeAccountId && member.stripeOnboardingComplete;
+        return (
+          <Modal title="Process Payment" subtitle={`${member?.name} — ${fmtDate(processModal.periodStart)} to ${fmtDate(processModal.periodEnd)}`} onClose={() => setProcessModal(null)}>
+            <div className="space-y-5">
+              {/* Summary */}
+              <div className="bg-ink-50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-ink-500">Gross Pay</span><span className="font-medium">{fmt$(processModal.grossPay)}</span></div>
+                <div className="flex justify-between"><span className="text-ink-500">Withholding ({processModal.withholdingPct}%)</span><span className="font-medium text-red-600">-{fmt$(processModal.deductions)}</span></div>
+                <div className="flex justify-between border-t border-ink-200 pt-2"><span className="text-ink-900 font-medium">Net Payment</span><span className="font-bold text-ink-900">{fmt$(processModal.netPay)}</span></div>
+              </div>
+
+              {/* Method selection */}
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-3">Payment Method</label>
+                <div className="space-y-2">
+                  <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${processMethod === 'stripe' ? 'border-indigo-300 bg-indigo-50' : 'border-ink-200 hover:bg-ink-50'} ${!stripeReady ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <input type="radio" name="payMethod" value="stripe" checked={processMethod === 'stripe'} onChange={() => setProcessMethod('stripe')} disabled={!stripeReady} className="text-indigo-600" />
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">Stripe Transfer</p>
+                      <p className="text-xs text-ink-500">{stripeReady ? 'Send directly to connected Stripe account' : 'Staff must connect Stripe first'}</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${processMethod === 'manual' ? 'border-indigo-300 bg-indigo-50' : 'border-ink-200 hover:bg-ink-50'}`}>
+                    <input type="radio" name="payMethod" value="manual" checked={processMethod === 'manual'} onChange={() => setProcessMethod('manual')} className="text-indigo-600" />
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">Manual / Offline</p>
+                      <p className="text-xs text-ink-500">Record payment processed outside the system (check, cash, etc.)</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setProcessModal(null)} className="px-4 py-2 text-ink-700 hover:text-ink-900 font-medium">Cancel</button>
+                <button onClick={handleProcess} disabled={processing}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50">
+                  {processing ? 'Processing...' : `Process ${fmt$(processModal.netPay)}`}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ── Pay Stub Modal ──────────────────────── */}
+      {stubPayRun && stubMember && (
+        <Modal title="Pay Stub" wide onClose={() => setStubPayRun(null)}
+          footer={
+            <div className="flex justify-between w-full">
+              <button onClick={() => setStubPayRun(null)} className="px-4 py-2 text-ink-700 hover:text-ink-900 font-medium">Close</button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-ink-900 text-white rounded-lg font-medium hover:bg-ink-800 no-print">Print</button>
+            </div>
+          }
+        >
+          <div className="print-pay-stub-root space-y-5">
+            {/* DEMO disclaimer */}
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 text-center no-print">
+              <p className="text-red-700 font-bold text-xs uppercase tracking-wider">DEMO — Not an official pay stub — For illustration purposes only</p>
+            </div>
+
+            {/* Header */}
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display text-lg font-bold text-ink-900">Maple Ridge Condominiums HOA</h3>
+                <p className="text-sm text-ink-500">Pay Stub</p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="text-ink-500">Pay Period</p>
+                <p className="font-medium text-ink-900">{fmtDate(stubPayRun.periodStart)} – {fmtDate(stubPayRun.periodEnd)}</p>
+                {stubPayRun.paidDate && <p className="text-ink-400 text-xs mt-1">Paid: {fmtDate(stubPayRun.paidDate)}</p>}
+              </div>
+            </div>
+
+            {/* Employee/Contractor info */}
+            <div className="grid grid-cols-2 gap-4 bg-ink-50 rounded-lg p-4 text-sm">
+              <div>
+                <p className="text-xs text-ink-400 uppercase tracking-wide mb-1">
+                  {stubMember.type === 'employee' ? 'Employee' : 'Contractor'}
+                </p>
+                <p className="font-medium text-ink-900">{stubMember.name}</p>
+                <p className="text-ink-500">{stubMember.role}</p>
+                <p className="text-ink-400 text-xs mt-1">TIN: {stubMember.taxId}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-ink-400 uppercase tracking-wide mb-1">Pay Run ID</p>
+                <p className="font-mono text-xs text-ink-600">{stubPayRun.id}</p>
+                {stubPayRun.paymentMethod && (
+                  <p className="text-xs text-ink-400 mt-2">Method: {stubPayRun.paymentMethod === 'stripe' ? 'Stripe Transfer' : 'Manual/Offline'}</p>
+                )}
+                {stubPayRun.stripeTransferId && (
+                  <p className="text-xs text-ink-400">Transfer: {stubPayRun.stripeTransferId}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Hours detail table */}
+            {stubTimeEntries.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-2">Hours Detail</h4>
+                <div className="border border-ink-100 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-ink-50 text-ink-500 text-xs">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-right font-medium">Hours</th>
+                        <th className="px-3 py-2 text-left font-medium">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-50">
+                      {stubTimeEntries.map(te => (
+                        <tr key={te.id}>
+                          <td className="px-3 py-2 text-ink-600">{fmtDate(te.date)}</td>
+                          <td className="px-3 py-2 text-right text-ink-600">{te.hours}</td>
+                          <td className="px-3 py-2 text-ink-600">{te.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-ink-50 font-medium">
+                      <tr>
+                        <td className="px-3 py-2 text-ink-900">Total</td>
+                        <td className="px-3 py-2 text-right text-ink-900">{stubPayRun.hoursWorked} hrs</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Earnings summary */}
+            <div>
+              <h4 className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-2">Earnings Summary</h4>
+              <div className="border border-ink-100 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-ink-500">Rate</span><span className="font-medium">{fmt$(stubMember.rate)}/hr</span></div>
+                <div className="flex justify-between"><span className="text-ink-500">Hours Worked</span><span className="font-medium">{stubPayRun.hoursWorked}</span></div>
+                <div className="flex justify-between"><span className="text-ink-500">Gross Pay</span><span className="font-medium">{fmt$(stubPayRun.grossPay)}</span></div>
+                {stubPayRun.withholdingPct > 0 && (
+                  <div className="flex justify-between"><span className="text-ink-500">Withholding ({stubPayRun.withholdingPct}%)</span><span className="font-medium text-red-600">-{fmt$(stubPayRun.deductions)}</span></div>
+                )}
+                <div className="flex justify-between border-t border-ink-200 pt-2">
+                  <span className="text-ink-900 font-bold">Net Pay</span>
+                  <span className="font-bold text-lg text-ink-900">{fmt$(stubPayRun.netPay)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* GL reference */}
+            {(stubPayRun.glEntryId || stubPayRun.withholdingGlEntryId) && (
+              <div className="text-xs text-ink-400 pt-2 border-t border-ink-100">
+                <p className="font-medium text-ink-500 mb-1">GL References</p>
+                {stubPayRun.withholdingGlEntryId && <p>Accrual entry: {stubPayRun.withholdingGlEntryId}</p>}
+                {stubPayRun.glEntryId && <p>Payment entry: {stubPayRun.glEntryId}</p>}
+              </div>
+            )}
           </div>
         </Modal>
       )}

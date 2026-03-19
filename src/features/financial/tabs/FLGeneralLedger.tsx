@@ -14,6 +14,7 @@ const SOURCE_COLORS: Record<string, string> = {
   fee: 'bg-yellow-100 text-yellow-700',
   transfer: 'bg-mist-100 text-ink-500',
   manual: 'bg-ink-100 text-ink-500',
+  payroll: 'bg-indigo-100 text-indigo-700',
 };
 
 const JOURNAL_PRESETS = [
@@ -157,9 +158,11 @@ export default function FLGeneralLedger() {
                 <td className="py-2">
                   <span
                     className={`pill px-1.5 py-0.5 rounded text-xs font-semibold ${SOURCE_COLORS[e.source] || 'bg-ink-100 text-ink-500'} ${(e.source !== 'manual' && e.source !== 'transfer') ? 'cursor-pointer hover:opacity-80' : ''}`}
+                    title={e.source === 'payroll' ? 'View in Payroll' : undefined}
                     onClick={() => {
                       if (e.source === 'case') navigate('/issues');
                       else if (e.source === 'expense' || (wo && wo.glEntryId)) setActiveTab('workorders');
+                      else if (e.source === 'payroll') navigate('/association-team?tab=payroll');
                       else if (e.source === 'payment' || e.source === 'fee' || e.source === 'assessment') { /* Unit ledger */ }
                     }}
                   >

@@ -81,4 +81,6 @@ export function resetStoresForRealTenant() {
   useAmenitiesStore.setState({ configs: [], reservations: [], notifications: [] });
 
   usePayrollStore.setState({ staff: [], timeEntries: [], payRuns: [], form1099s: [] });
+  // Note: stripeAccountId, stripeOnboardingComplete on staff, and paymentMethod,
+  // stripeTransferId, withholdingGlEntryId on payRuns are cleared when arrays empty.
 }

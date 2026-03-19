@@ -42,7 +42,7 @@ export interface GLEntry {
   debitAcct: string;
   creditAcct: string;
   amount: number;
-  source: 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee' | 'refund';
+  source: 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee' | 'refund' | 'payroll';
   sourceId: string | null;
   posted: string;
   status: 'posted' | 'void';

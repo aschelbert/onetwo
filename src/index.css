@@ -78,3 +78,19 @@
   background: #b8bfc8;
   border-radius: 8px;
 }
+
+@media print {
+  body > *:not(.print-pay-stub-root) {
+    display: none !important;
+  }
+  .print-pay-stub-root {
+    position: static !important;
+    background: white !important;
+  }
+  .print-pay-stub-root > div:first-child {
+    background: transparent !important;
+  }
+  .print-pay-stub-root .no-print {
+    display: none !important;
+  }
+}
