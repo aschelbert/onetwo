@@ -32,6 +32,8 @@
     { "source": "/admin/:path*", "destination": "/app.html" },
     { "source": "/portfolio/:path*", "destination": "/app.html" },
     { "source": "/portfolio", "destination": "/app.html" },
+    { "source": "/association-team", "destination": "/app.html" },
+    { "source": "/association-team/:path*", "destination": "/app.html" },
     { "source": "/demo", "destination": "/demo.html" }
   ]
 }
