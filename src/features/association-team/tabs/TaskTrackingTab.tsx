@@ -1,16 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import type { TaskItem, TaskStatus, TaskPriority, TaskCategory, LinkedItem } from '@/store/useTaskTrackingStore';
 
 /* ── Constants ─────────────────────────────────────────────── */
 
 const LANES: { key: TaskStatus; label: string; color: string; bg: string }[] = [
   { key: 'todo', label: 'To Do', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  { key: 'in_progress', label: 'In Progress', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
   { key: 'blocked', label: 'Blocked', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
+  { key: 'in_progress', label: 'In Progress', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
   { key: 'done', label: 'Done', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
 ];
 
@@ -33,8 +35,8 @@ const CATEGORY_LABELS: Record<TaskCategory, string> = {
 const LINKED_TYPE_LABELS: Record<LinkedItem['type'], string> = {
   meeting: 'Meeting',
   case: 'Case',
-  document: 'Document',
   property_log: 'Property Log',
+  request: 'Request',
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -60,15 +62,19 @@ export default function TaskTrackingTab() {
   const { tasks, addTask, updateTask, deleteTask, moveTask, addLinkedItem, removeLinkedItem } = useTaskTrackingStore();
   const { currentUser, buildingMembers } = useAuthStore();
   const { meetings } = useMeetingsStore();
+  const { cases, issues } = useIssuesStore();
+  const { logs: propertyLogs } = usePropertyLogStore();
 
   const [showLogs, setShowLogs] = useState(false);
   const [taskModal, setTaskModal] = useState<'add' | 'edit' | null>(null);
   const [taskForm, setTaskForm] = useState<EmptyForm>(emptyForm(currentUser.name, currentUser.id));
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [detailTask, setDetailTask] = useState<TaskItem | null>(null);
-  const [linkModal, setLinkModal] = useState<string | null>(null); // taskId to link
+  const [linkModal, setLinkModal] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ type: LinkedItem['type']; id: string; title: string }>({ type: 'meeting', id: '', title: '' });
-  const [moveMenu, setMoveMenu] = useState<string | null>(null); // taskId with open move menu
+  const [moveMenu, setMoveMenu] = useState<string | null>(null);
+  const [dragOverLane, setDragOverLane] = useState<TaskStatus | null>(null);
+  const dragTaskId = useRef<string | null>(null);
 
   /* ── Derived data ────────────────── */
 
@@ -77,7 +83,6 @@ export default function TaskTrackingTab() {
   const kanbanTasks = useMemo(() =>
     tasks.filter(t => {
       if (t.status !== 'done') return true;
-      // Done tasks older than 30 days go to logs
       if (!t.completedAt) return true;
       return now - new Date(t.completedAt).getTime() < THIRTY_DAYS_MS;
     }),
@@ -100,6 +105,22 @@ export default function TaskTrackingTab() {
     in_progress: byLane('in_progress').length,
     blocked: byLane('blocked').length,
     done: byLane('done').length,
+  };
+
+  /* ── Linkable artifact options ───── */
+
+  const meetingOptions = meetings.map(m => ({ id: m.id, title: `${m.title} (${fmtDate(m.date)})` }));
+  const caseOptions = cases.map(c => ({ id: c.id, title: c.title }));
+  const propertyLogOptions = propertyLogs.map(pl => ({ id: pl.id, title: `${pl.title} (${fmtDate(pl.date)})` }));
+  const requestOptions = issues.map(i => ({ id: i.id, title: `${i.title} — ${i.status}` }));
+
+  const optionsForType = (type: LinkedItem['type']) => {
+    switch (type) {
+      case 'meeting': return meetingOptions;
+      case 'case': return caseOptions;
+      case 'property_log': return propertyLogOptions;
+      case 'request': return requestOptions;
+    }
   };
 
   /* ── Handlers ────────────────────── */
@@ -136,11 +157,17 @@ export default function TaskTrackingTab() {
   const handleMove = (id: string, status: TaskStatus) => {
     moveTask(id, status);
     setMoveMenu(null);
-    // Refresh detail if open
     if (detailTask?.id === id) {
       const updated = useTaskTrackingStore.getState().tasks.find(t => t.id === id);
       if (updated) setDetailTask(updated);
     }
+  };
+
+  const refreshDetail = (taskId: string) => {
+    setTimeout(() => {
+      const updated = useTaskTrackingStore.getState().tasks.find(t => t.id === taskId);
+      if (updated) setDetailTask(updated);
+    }, 0);
   };
 
   const openLinkModal = (taskId: string) => {
@@ -149,35 +176,70 @@ export default function TaskTrackingTab() {
   };
 
   const saveLink = () => {
-    if (!linkModal || !linkForm.title.trim()) return;
-    addLinkedItem(linkModal, { id: linkForm.id || 'link-' + Date.now(), type: linkForm.type, title: linkForm.title });
+    if (!linkModal || !linkForm.id || !linkForm.title.trim()) return;
+    addLinkedItem(linkModal, { id: linkForm.id, type: linkForm.type, title: linkForm.title });
+    const tid = linkModal;
     setLinkModal(null);
-    // Refresh detail
-    if (detailTask?.id === linkModal) {
-      setTimeout(() => {
-        const updated = useTaskTrackingStore.getState().tasks.find(t => t.id === linkModal);
-        if (updated) setDetailTask(updated);
-      }, 0);
-    }
+    if (detailTask?.id === tid) refreshDetail(tid);
   };
 
   const handleUnlink = (taskId: string, linkedItemId: string) => {
     removeLinkedItem(taskId, linkedItemId);
-    if (detailTask?.id === taskId) {
-      setTimeout(() => {
-        const updated = useTaskTrackingStore.getState().tasks.find(t => t.id === taskId);
-        if (updated) setDetailTask(updated);
-      }, 0);
+    if (detailTask?.id === taskId) refreshDetail(taskId);
+  };
+
+  /* ── Drag & Drop handlers ────────── */
+
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    dragTaskId.current = taskId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId);
+    // Make the dragging card semi-transparent
+    if (e.currentTarget instanceof HTMLElement) {
+      requestAnimationFrame(() => {
+        (e.currentTarget as HTMLElement).style.opacity = '0.5';
+      });
     }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    dragTaskId.current = null;
+    setDragOverLane(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, laneKey: TaskStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverLane(laneKey);
+  };
+
+  const handleDragLeave = (e: React.DragEvent, laneKey: TaskStatus) => {
+    // Only clear if leaving the lane container (not entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !(e.currentTarget as HTMLElement).contains(relatedTarget)) {
+      if (dragOverLane === laneKey) setDragOverLane(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, laneKey: TaskStatus) => {
+    e.preventDefault();
+    setDragOverLane(null);
+    const taskId = dragTaskId.current || e.dataTransfer.getData('text/plain');
+    if (!taskId) return;
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.status !== laneKey) {
+      handleMove(taskId, laneKey);
+    }
+    dragTaskId.current = null;
   };
 
   /* ── Assignee options ────────────── */
   const assigneeOptions = buildingMembers
     .filter(m => m.status === 'active' && (m.role === 'BOARD_MEMBER' || m.role === 'PROPERTY_MANAGER'))
     .map(m => ({ id: m.id, name: m.name }));
-
-  /* ── Meeting options for linking ─── */
-  const meetingOptions = meetings.map(m => ({ id: m.id, title: m.title }));
 
   /* ── Render ──────────────────────── */
 
@@ -205,15 +267,23 @@ export default function TaskTrackingTab() {
       {!showLogs && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {LANES.map(lane => (
-            <div key={lane.key} className="space-y-3">
+            <div
+              key={lane.key}
+              className="space-y-3"
+              onDragOver={e => handleDragOver(e, lane.key)}
+              onDragLeave={e => handleDragLeave(e, lane.key)}
+              onDrop={e => handleDrop(e, lane.key)}
+            >
               {/* Lane header */}
               <div className={`flex items-center justify-between px-3 py-2 rounded-lg border ${lane.bg}`}>
                 <span className={`text-sm font-semibold ${lane.color}`}>{lane.label}</span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${lane.bg} ${lane.color}`}>{counts[lane.key]}</span>
               </div>
 
-              {/* Cards */}
-              <div className="space-y-2 min-h-[120px]">
+              {/* Drop zone */}
+              <div className={`space-y-2 min-h-[120px] rounded-lg transition-colors ${
+                dragOverLane === lane.key ? 'bg-ink-50 ring-2 ring-ink-300 ring-dashed' : ''
+              }`}>
                 {byLane(lane.key).map(task => (
                   <TaskCard
                     key={task.id}
@@ -223,10 +293,16 @@ export default function TaskTrackingTab() {
                     moveMenu={moveMenu}
                     setMoveMenu={setMoveMenu}
                     onMove={handleMove}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                   />
                 ))}
                 {byLane(lane.key).length === 0 && (
-                  <div className="text-center py-8 text-ink-300 text-sm">No tasks</div>
+                  <div className={`text-center py-8 text-sm ${
+                    dragOverLane === lane.key ? 'text-ink-500 font-medium' : 'text-ink-300'
+                  }`}>
+                    {dragOverLane === lane.key ? 'Drop here' : 'No tasks'}
+                  </div>
                 )}
               </div>
             </div>
@@ -345,7 +421,14 @@ export default function TaskTrackingTab() {
                   {detailTask.linkedItems.map(li => (
                     <div key={li.id} className="flex items-center justify-between bg-ink-50 rounded-lg px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-ink-400 uppercase">{LINKED_TYPE_LABELS[li.type]}</span>
+                        <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                          li.type === 'meeting' ? 'bg-blue-100 text-blue-600' :
+                          li.type === 'case' ? 'bg-purple-100 text-purple-600' :
+                          li.type === 'property_log' ? 'bg-amber-100 text-amber-600' :
+                          'bg-emerald-100 text-emerald-600'
+                        }`}>
+                          {LINKED_TYPE_LABELS[li.type]}
+                        </span>
                         <span className="text-ink-700">{li.title}</span>
                       </div>
                       <button onClick={() => handleUnlink(detailTask.id, li.id)} className="text-ink-300 hover:text-red-500 text-xs">Remove</button>
@@ -491,57 +574,38 @@ export default function TaskTrackingTab() {
               <label className="block text-sm font-medium text-ink-700 mb-1">Type</label>
               <select
                 value={linkForm.type}
-                onChange={e => setLinkForm(f => ({ ...f, type: e.target.value as LinkedItem['type'], id: '', title: '' }))}
+                onChange={e => setLinkForm({ type: e.target.value as LinkedItem['type'], id: '', title: '' })}
                 className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm bg-white"
               >
                 <option value="meeting">Meeting</option>
                 <option value="case">Case</option>
-                <option value="document">Document</option>
                 <option value="property_log">Property Log</option>
+                <option value="request">Request</option>
               </select>
             </div>
 
-            {/* For meetings, show a picker from existing meetings */}
-            {linkForm.type === 'meeting' && meetingOptions.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Select Meeting</label>
+            <div>
+              <label className="block text-sm font-medium text-ink-700 mb-1">
+                Select {LINKED_TYPE_LABELS[linkForm.type]}
+              </label>
+              {optionsForType(linkForm.type).length > 0 ? (
                 <select
                   value={linkForm.id}
                   onChange={e => {
-                    const mtg = meetingOptions.find(m => m.id === e.target.value);
-                    setLinkForm(f => ({ ...f, id: mtg?.id ?? '', title: mtg?.title ?? '' }));
+                    const opt = optionsForType(linkForm.type).find(o => o.id === e.target.value);
+                    setLinkForm(f => ({ ...f, id: opt?.id ?? '', title: opt?.title ?? '' }));
                   }}
                   className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm bg-white"
                 >
-                  <option value="">Select a meeting...</option>
-                  {meetingOptions.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                  <option value="">Select...</option>
+                  {optionsForType(linkForm.type).map(o => (
+                    <option key={o.id} value={o.id}>{o.title}</option>
+                  ))}
                 </select>
-              </div>
-            )}
-
-            {/* Manual entry for other types or when no options */}
-            {(linkForm.type !== 'meeting' || meetingOptions.length === 0) && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">Reference ID</label>
-                  <input
-                    value={linkForm.id}
-                    onChange={e => setLinkForm(f => ({ ...f, id: e.target.value }))}
-                    className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm"
-                    placeholder="e.g. case-123"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">Title / Description</label>
-                  <input
-                    value={linkForm.title}
-                    onChange={e => setLinkForm(f => ({ ...f, title: e.target.value }))}
-                    className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Name of the linked item"
-                  />
-                </div>
-              </>
-            )}
+              ) : (
+                <p className="text-sm text-ink-400 py-2">No {LINKED_TYPE_LABELS[linkForm.type].toLowerCase()}s found in this tenancy.</p>
+              )}
+            </div>
           </div>
         </Modal>
       )}
@@ -551,19 +615,26 @@ export default function TaskTrackingTab() {
 
 /* ── Task Card sub-component ───────────────────────────────── */
 
-function TaskCard({ task, onDetail, onEdit, moveMenu, setMoveMenu, onMove }: {
+function TaskCard({ task, onDetail, onEdit, moveMenu, setMoveMenu, onMove, onDragStart, onDragEnd }: {
   task: TaskItem;
   onDetail: () => void;
   onEdit: () => void;
   moveMenu: string | null;
   setMoveMenu: (id: string | null) => void;
   onMove: (id: string, status: TaskStatus) => void;
+  onDragStart: (e: React.DragEvent, taskId: string) => void;
+  onDragEnd: (e: React.DragEvent) => void;
 }) {
   const isOverdue = task.dueDate && task.status !== 'done' && new Date(task.dueDate + 'T23:59:59') < new Date();
   const isMenuOpen = moveMenu === task.id;
 
   return (
-    <div className="bg-white border border-ink-100 rounded-lg p-3 space-y-2 hover:shadow-sm transition-shadow">
+    <div
+      draggable
+      onDragStart={e => onDragStart(e, task.id)}
+      onDragEnd={onDragEnd}
+      className="bg-white border border-ink-100 rounded-lg p-3 space-y-2 hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
+    >
       {/* Title + priority */}
       <div className="flex items-start justify-between gap-2">
         <button onClick={onDetail} className="text-left text-sm font-medium text-ink-900 hover:text-blue-700 transition-colors leading-tight">

@@ -115,7 +115,7 @@ const seedTasks: TaskItem[] = [
     createdByName: 'Robert Mitchell',
     dueDate: '2026-01-31',
     completedAt: '2026-01-28T15:00:00Z',
-    linkedItems: [{ id: 'doc-ins-1', type: 'document', title: 'Insurance Policy 2026' }],
+    linkedItems: [{ id: 'ISS-1', type: 'request', title: 'Parking Garage Leak Report — SUBMITTED' }],
     notes: 'Policy renewed at 3.2% premium increase. Board approved.',
     createdAt: '2026-01-05T09:00:00Z',
     updatedAt: '2026-01-28T15:00:00Z',

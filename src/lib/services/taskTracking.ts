@@ -8,7 +8,7 @@ export type TaskCategory = 'maintenance' | 'administrative' | 'compliance' | 'co
 
 export interface LinkedItem {
   id: string;
-  type: 'meeting' | 'case' | 'document' | 'property_log';
+  type: 'meeting' | 'case' | 'property_log' | 'request';
   title: string;
 }
 
