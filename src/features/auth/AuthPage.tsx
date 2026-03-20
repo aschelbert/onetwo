@@ -7,13 +7,9 @@ import type { SubscriptionTier, BillingInterval } from '@/lib/tiers';
 
 const Logo = () => (
   <div className="text-center mb-8">
-    <svg className="w-14 h-14 mx-auto mb-4" viewBox="0 0 32 32" fill="none">
-      <rect width="32" height="32" rx="4" fill="#3D3D3D" />
-      <rect x="13.5" y="7" width="5" height="18" rx="1" fill="white" />
-      <rect x="7" y="13.5" width="18" height="5" rx="1" fill="white" />
-    </svg>
+    <img src="/onetwo-logo.jpg" alt="ONE two" className="w-14 h-14 mx-auto mb-4 rounded" />
     <h1 className="font-display text-2xl font-bold text-ink-900">
-      <span className="font-bold">ONE two</span> HOA
+      <span className="font-bold">ONE</span> two
     </h1>
     <p className="text-sm text-ink-400 mt-1">HOA compliance made simple</p>
   </div>
