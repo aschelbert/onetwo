@@ -96,12 +96,9 @@ function LoginForm() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <div className="flex items-center gap-2.5 mb-6">
-          <Image src="/onetwo-logo.jpg" alt="ONE two" width={32} height={32} className="w-8 h-8 rounded-lg object-cover" />
-          <div>
-            <span className="font-serif text-lg font-bold">ONE two</span>
-            <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider">Admin Console</span>
-          </div>
+        <div className="flex flex-col items-center mb-6">
+          <Image src="/onetwo-wordmark.jpg" alt="ONE two" width={200} height={80} className="h-20 w-auto object-contain" />
+          <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider mt-2">Admin Console</span>
         </div>
 
         {isSetup && (
