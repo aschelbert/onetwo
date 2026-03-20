@@ -463,13 +463,15 @@ export default function TaskTrackingTab() {
       {taskModal && (
         <Modal
           title={taskModal === 'add' ? 'New Task' : 'Edit Task'}
+          wide
           onClose={() => setTaskModal(null)}
           onSave={saveTask}
           saveLabel={taskModal === 'add' ? 'Create Task' : 'Save Changes'}
         >
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Title</label>
+              <p className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">Title</p>
               <input
                 value={taskForm.title}
                 onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
@@ -477,8 +479,10 @@ export default function TaskTrackingTab() {
                 placeholder="What needs to be done?"
               />
             </div>
+
+            {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Description</label>
+              <p className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">Description</p>
               <textarea
                 value={taskForm.description}
                 onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
@@ -487,9 +491,11 @@ export default function TaskTrackingTab() {
                 placeholder="Additional details..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            {/* Meta grid — matches detail view layout */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Status</label>
+                <p className="text-xs text-ink-400 mb-1">Status</p>
                 <select
                   value={taskForm.status}
                   onChange={e => setTaskForm(f => ({ ...f, status: e.target.value as TaskStatus }))}
@@ -499,7 +505,7 @@ export default function TaskTrackingTab() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Priority</label>
+                <p className="text-xs text-ink-400 mb-1">Priority</p>
                 <select
                   value={taskForm.priority}
                   onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value as TaskPriority }))}
@@ -511,10 +517,8 @@ export default function TaskTrackingTab() {
                   <option value="low">Low</option>
                 </select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Category</label>
+                <p className="text-xs text-ink-400 mb-1">Category</p>
                 <select
                   value={taskForm.category}
                   onChange={e => setTaskForm(f => ({ ...f, category: e.target.value as TaskCategory }))}
@@ -524,7 +528,7 @@ export default function TaskTrackingTab() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Due Date</label>
+                <p className="text-xs text-ink-400 mb-1">Due Date</p>
                 <input
                   type="date"
                   value={taskForm.dueDate ?? ''}
@@ -532,31 +536,39 @@ export default function TaskTrackingTab() {
                   className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
+              <div>
+                <p className="text-xs text-ink-400 mb-1">Assigned To</p>
+                <select
+                  value={taskForm.assignedTo ?? ''}
+                  onChange={e => {
+                    const member = assigneeOptions.find(m => m.id === e.target.value);
+                    setTaskForm(f => ({
+                      ...f,
+                      assignedTo: member?.id ?? null,
+                      assignedToName: member?.name ?? null,
+                    }));
+                  }}
+                  className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">Unassigned</option>
+                  {assigneeOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              {taskModal === 'edit' && (
+                <div>
+                  <p className="text-xs text-ink-400">Created By</p>
+                  <p className="font-medium text-ink-900 mt-1">{taskForm.createdByName}</p>
+                </div>
+              )}
             </div>
+
+            {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Assign To</label>
-              <select
-                value={taskForm.assignedTo ?? ''}
-                onChange={e => {
-                  const member = assigneeOptions.find(m => m.id === e.target.value);
-                  setTaskForm(f => ({
-                    ...f,
-                    assignedTo: member?.id ?? null,
-                    assignedToName: member?.name ?? null,
-                  }));
-                }}
-                className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Unassigned</option>
-                {assigneeOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Notes</label>
+              <p className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">Notes</p>
               <textarea
                 value={taskForm.notes}
                 onChange={e => setTaskForm(f => ({ ...f, notes: e.target.value }))}
-                className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-ink-200 rounded-lg px-3 py-2 text-sm bg-ink-50"
                 rows={2}
                 placeholder="Internal notes..."
               />
