@@ -91,8 +91,9 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
           {/* Logo */}
-          <div className="flex justify-center mb-6">
-            <img src="/onetwo-wordmark.jpg" alt="ONE two" className="h-20 object-contain" />
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <img src="/onetwo-wordmark-dark.jpg" alt="ONE two" className="h-20 object-contain rounded-lg" />
+            <img src="/onetwo-icon-1t.jpg" alt="ONE two icon" className="h-20 object-contain rounded-lg" />
           </div>
 
           {mode === 'request' ? (

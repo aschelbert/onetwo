@@ -97,7 +97,10 @@ function LoginForm() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
         <div className="flex flex-col items-center mb-6">
-          <Image src="/onetwo-wordmark.jpg" alt="ONE two" width={200} height={80} className="h-20 w-auto object-contain" />
+          <div className="flex items-center gap-4">
+            <Image src="/onetwo-wordmark-dark.jpg" alt="ONE two" width={160} height={80} className="h-20 w-auto object-contain rounded-lg" />
+            <Image src="/onetwo-icon-1t.jpg" alt="ONE two icon" width={80} height={80} className="h-20 w-auto object-contain rounded-lg" />
+          </div>
           <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider mt-2">Admin Console</span>
         </div>
 
