@@ -9,7 +9,7 @@ const APP_ROUTES = [
   '/login', '/reset-password', '/dashboard', '/financial', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
-  '/admin',
+  '/admin', '/portfolio',
 ]
 
 const STATIC_PAGES: Record<string, string> = {

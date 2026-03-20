@@ -86,7 +86,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   }}
                   className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-medium bg-white"
                 >
-                  {(Object.keys(ROLE_LABELS) as Role[]).filter(r => r !== 'PLATFORM_ADMIN').map((role) => (
+                  {(Object.keys(ROLE_LABELS) as Role[]).filter(r => r !== 'PLATFORM_ADMIN' && r !== 'PM_COMPANY').map((role) => (
                     <option key={role} value={role}>
                       {ROLE_LABELS[role]}
                     </option>

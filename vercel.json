@@ -30,6 +30,8 @@
     { "source": "/support", "destination": "/app.html" },
     { "source": "/subscription", "destination": "/app.html" },
     { "source": "/admin/:path*", "destination": "/app.html" },
+    { "source": "/portfolio/:path*", "destination": "/app.html" },
+    { "source": "/portfolio", "destination": "/app.html" },
     { "source": "/demo", "destination": "/demo.html" }
   ]
 }

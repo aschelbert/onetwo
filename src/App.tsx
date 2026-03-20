@@ -23,6 +23,9 @@ import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
+import PMProvider from '@/components/PMProvider';
+import PortfolioShell from '@/components/layout/PortfolioShell';
+import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
@@ -84,6 +87,31 @@ function AuthListener() {
             return;
           }
 
+          // Check management company user (PM)
+          const { data: mcUser } = await sb
+            .from('management_company_users')
+            .select('display_name')
+            .eq('user_id', session.user.id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (mcUser) {
+            const m = {
+              id: session.user.id,
+              name: mcUser.display_name || session.user.email?.split('@')[0] || 'PM User',
+              email: session.user.email || '',
+              phone: '',
+              role: 'PM_COMPANY' as Role,
+              unit: '',
+              status: 'active' as const,
+              joined: new Date().toISOString().split('T')[0],
+              boardTitle: null,
+            };
+            addMember(m);
+            login(m);
+            return;
+          }
+
           // Check tenant user
           const { data: tu } = await sb
             .from('tenant_users')
@@ -134,7 +162,9 @@ function LoginRoute() {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const host = window.location.hostname;
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
-    const target = currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+    const target = currentRole === 'PM_COMPANY'
+      ? '/portfolio'
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
     return <Navigate to={target} replace />;
   }
   return <AuthPage />;
@@ -145,10 +175,24 @@ function CatchAll() {
   if (isAuthenticated) {
     const host = window.location.hostname;
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
-    const target = currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+    const target = currentRole === 'PM_COMPANY'
+      ? '/portfolio'
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
     return <Navigate to={target} replace />;
   }
   return <Navigate to="/" replace />;
+}
+
+function RequirePM({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, currentRole } = useAuthStore();
+  const location = useLocation();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  if (currentRole !== 'PM_COMPANY') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
 }
 
 function AIAdvisorWrapper() {
@@ -176,6 +220,12 @@ export default function App() {
 
         {/* Admin console — own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><PlatformAdminPage /></TenantProvider></RequireAuth>} />
+
+        {/* Portfolio (PM) routes */}
+        <Route element={<RequirePM><PMProvider><PortfolioShell /></PMProvider></RequirePM>}>
+          <Route path="/portfolio" element={<PortfolioDashboardPage />} />
+          <Route path="/portfolio/dashboard" element={<PortfolioDashboardPage />} />
+        </Route>
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
