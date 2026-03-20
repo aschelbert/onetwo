@@ -1,5 +1,8 @@
 import { useTabParam } from '@/hooks/useTabParam';
 import { useAuthStore } from '@/store/useAuthStore';
+import { usePropertyLogStore } from '@/store/usePropertyLogStore';
+import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
+import { usePayrollStore } from '@/store/usePayrollStore';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
@@ -20,6 +23,18 @@ export default function AssociationTeamPage() {
   const { currentRole } = useAuthStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
+  const { logs } = usePropertyLogStore();
+  const { tasks } = useTaskTrackingStore();
+  const { staff } = usePayrollStore();
+
+  /* ── Header metrics ──────────────── */
+  const openLogs = logs.filter(l => l.status === 'open').length;
+  const highFindings = logs.flatMap(l => l.findings).filter(f => f.severity === 'high' || f.severity === 'medium').length;
+  const openActions = logs.flatMap(l => l.actionItems).filter(a => a.status === 'open').length;
+  const activeTasks = tasks.filter(t => t.status === 'in_progress').length;
+  const blockedTasks = tasks.filter(t => t.status === 'blocked').length;
+  const activeStaff = staff.filter(s => s.status === 'active').length;
+
   return (
     <div className="space-y-0">
       {/* Header */}
@@ -29,6 +44,22 @@ export default function AssociationTeamPage() {
             <h2 className="font-display text-2xl font-bold">Association Team</h2>
             <p className="text-accent-200 text-sm mt-1">Property operations, task management, and team oversight</p>
           </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+          {[
+            { val: openLogs, label: 'Open Logs', icon: '📋', tab: 'property-log' as Tab },
+            { val: highFindings, label: 'Findings', icon: '🔍', tab: 'property-log' as Tab },
+            { val: openActions, label: 'Action Items', icon: '⚡', tab: 'property-log' as Tab },
+            { val: activeTasks, label: 'In Progress', icon: '🔄', tab: 'task-tracking' as Tab },
+            { val: blockedTasks, label: 'Blocked', icon: '🚫', tab: 'task-tracking' as Tab },
+            { val: activeStaff, label: 'Active Staff', icon: '👥', tab: 'payroll' as Tab },
+          ].map(s => (
+            <div key={s.label} onClick={() => setTab(s.tab)} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
+              <span className="text-xl">{s.icon}</span>
+              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight">{s.label}</p>
+              <p className="text-sm font-bold text-white mt-1">{s.val}</p>
+            </div>
+          ))}
         </div>
       </div>
 
