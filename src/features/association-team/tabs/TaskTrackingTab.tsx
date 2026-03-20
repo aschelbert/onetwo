@@ -177,15 +177,27 @@ export default function TaskTrackingTab() {
 
   const saveLink = () => {
     if (!linkModal || !linkForm.id || !linkForm.title.trim()) return;
-    addLinkedItem(linkModal, { id: linkForm.id, type: linkForm.type, title: linkForm.title });
-    const tid = linkModal;
+    const newLink: LinkedItem = { id: linkForm.id, type: linkForm.type, title: linkForm.title };
+    if (linkModal === '__task_form__') {
+      // Adding link to unsaved task form (add or edit mode)
+      setTaskForm(f => ({
+        ...f,
+        linkedItems: f.linkedItems.some(li => li.id === newLink.id) ? f.linkedItems : [...f.linkedItems, newLink],
+      }));
+    } else {
+      addLinkedItem(linkModal, newLink);
+      if (detailTask?.id === linkModal) refreshDetail(linkModal);
+    }
     setLinkModal(null);
-    if (detailTask?.id === tid) refreshDetail(tid);
   };
 
   const handleUnlink = (taskId: string, linkedItemId: string) => {
-    removeLinkedItem(taskId, linkedItemId);
-    if (detailTask?.id === taskId) refreshDetail(taskId);
+    if (taskId === '__task_form__') {
+      setTaskForm(f => ({ ...f, linkedItems: f.linkedItems.filter(li => li.id !== linkedItemId) }));
+    } else {
+      removeLinkedItem(taskId, linkedItemId);
+      if (detailTask?.id === taskId) refreshDetail(taskId);
+    }
   };
 
   /* ── Drag & Drop handlers ────────── */
@@ -573,6 +585,38 @@ export default function TaskTrackingTab() {
                 rows={2}
                 placeholder="Internal notes..."
               />
+            </div>
+
+            {/* Linked items */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-ink-500 uppercase tracking-wide">Linked Items</p>
+                <button onClick={() => openLinkModal('__task_form__')} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                  + Link Item
+                </button>
+              </div>
+              {taskForm.linkedItems.length > 0 ? (
+                <div className="space-y-1">
+                  {taskForm.linkedItems.map(li => (
+                    <div key={li.id} className="flex items-center justify-between bg-ink-50 rounded-lg px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                          li.type === 'meeting' ? 'bg-blue-100 text-blue-600' :
+                          li.type === 'case' ? 'bg-purple-100 text-purple-600' :
+                          li.type === 'property_log' ? 'bg-amber-100 text-amber-600' :
+                          'bg-emerald-100 text-emerald-600'
+                        }`}>
+                          {LINKED_TYPE_LABELS[li.type]}
+                        </span>
+                        <span className="text-ink-700">{li.title}</span>
+                      </div>
+                      <button onClick={() => handleUnlink('__task_form__', li.id)} className="text-ink-300 hover:text-red-500 text-xs">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-ink-400">No linked items</p>
+              )}
             </div>
           </div>
         </Modal>
