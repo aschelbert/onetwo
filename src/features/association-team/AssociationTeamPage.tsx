@@ -1,6 +1,7 @@
 import { useTabParam } from '@/hooks/useTabParam';
 import { useAuthStore } from '@/store/useAuthStore';
 import PropertyLogPage from '@/features/property-log/PropertyLogPage';
+import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
 import PayrollTab from '@/features/association-team/tabs/PayrollTab';
 
@@ -54,16 +55,7 @@ export default function AssociationTeamPage() {
       <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
         {tab === 'property-log' && <PropertyLogPage />}
 
-        {tab === 'task-tracking' && (
-          <div className="text-center py-12">
-            <p className="text-4xl mb-4">&#x1F4CB;</p>
-            <h3 className="font-display text-xl font-bold text-ink-900 mb-2">Task Tracking</h3>
-            <p className="text-sm text-ink-500 mb-1">Track and manage association tasks, action items, and follow-ups</p>
-            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-mist-50 border border-mist-200 text-ink-600 rounded-lg text-sm font-medium">
-              Coming Soon
-            </div>
-          </div>
-        )}
+        {tab === 'task-tracking' && <TaskTrackingTab />}
 
         {tab === 'pm-scorecard' && <PMScorecardTab />}
 
