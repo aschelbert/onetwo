@@ -99,13 +99,6 @@ export default function PropertyLogPage() {
     return true;
   }).sort((a, b) => b.date.localeCompare(a.date));
 
-  // Stats
-  const openCount = logs.filter(l => l.status === 'open').length;
-  const pendingActions = logs.reduce((sum, l) => sum + l.actionItems.filter(a => a.status === 'open').length, 0);
-  const lastWalkthrough = logs
-    .filter(l => l.type === 'walkthrough')
-    .sort((a, b) => b.date.localeCompare(a.date))[0]?.date || 'None';
-
   // Modal handlers
   const openAdd = () => {
     setForm({ ...emptyForm(), conductedBy: currentUser.name });
@@ -217,86 +210,56 @@ export default function PropertyLogPage() {
   };
 
   return (
-    <div className="space-y-0">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Property Log</h2>
-            <p className="text-accent-200 text-sm mt-1">Inspections, walkthroughs & property condition tracking</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-white">{logs.length}</p>
-            <p className="text-[11px] text-accent-100 mt-0.5">Total Logs</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-white">{openCount}</p>
-            <p className="text-[11px] text-accent-100 mt-0.5">Open Items</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-white">{pendingActions}</p>
-            <p className="text-[11px] text-accent-100 mt-0.5">Action Items Pending</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center">
-            <p className="text-sm font-bold text-white">{lastWalkthrough !== 'None' ? formatDate(lastWalkthrough) : 'None'}</p>
-            <p className="text-[11px] text-accent-100 mt-0.5">Last Walkthrough</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* Filter Bar */}
-      <div className="bg-white border-x border-b border-ink-100 px-6 py-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-ink-500">Type</label>
-              <select
-                value={typeFilter}
-                onChange={e => setTypeFilter(e.target.value as TypeFilter)}
-                className="px-3 py-1.5 border border-ink-200 rounded-lg text-sm text-ink-700 bg-white"
-              >
-                <option value="all">All Types</option>
-                <option value="walkthrough">Walkthrough</option>
-                <option value="inspection">Inspection</option>
-                <option value="incident">Incident</option>
-                <option value="maintenance_check">Maintenance Check</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-ink-500">Status</label>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-                className="px-3 py-1.5 border border-ink-200 rounded-lg text-sm text-ink-700 bg-white"
-              >
-                <option value="all">All Statuses</option>
-                <option value="open">Open</option>
-                <option value="resolved">Resolved</option>
-                <option value="monitoring">Monitoring</option>
-              </select>
-            </div>
-            {(typeFilter !== 'all' || statusFilter !== 'all') && (
-              <button
-                onClick={() => { setTypeFilter('all'); setStatusFilter('all'); }}
-                className="text-xs text-accent-600 hover:text-accent-800 font-medium"
-              >
-                Clear filters
-              </button>
-            )}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-ink-500">Type</label>
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value as TypeFilter)}
+              className="px-3 py-1.5 border border-ink-200 rounded-lg text-sm text-ink-700 bg-white"
+            >
+              <option value="all">All Types</option>
+              <option value="walkthrough">Walkthrough</option>
+              <option value="inspection">Inspection</option>
+              <option value="incident">Incident</option>
+              <option value="maintenance_check">Maintenance Check</option>
+            </select>
           </div>
-          <button
-            onClick={openAdd}
-            className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 transition-colors"
-          >
-            + New Log
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-ink-500">Status</label>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+              className="px-3 py-1.5 border border-ink-200 rounded-lg text-sm text-ink-700 bg-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+              <option value="monitoring">Monitoring</option>
+            </select>
+          </div>
+          {(typeFilter !== 'all' || statusFilter !== 'all') && (
+            <button
+              onClick={() => { setTypeFilter('all'); setStatusFilter('all'); }}
+              className="text-xs text-accent-600 hover:text-accent-800 font-medium"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
+        <button
+          onClick={openAdd}
+          className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 transition-colors"
+        >
+          + New Log
+        </button>
       </div>
 
       {/* Log List */}
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div>
         {filtered.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-ink-400 text-sm">No log entries found.</p>
