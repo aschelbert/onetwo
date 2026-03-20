@@ -69,6 +69,21 @@ export default function AuthPage() {
           p_member_type: demoMemberType,
           p_subscription_interest: demoSubscriptionInterest,
         });
+
+        // Fire-and-forget: notify alyssa@getonetwo.com
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+          body: JSON.stringify({
+            type: 'demo',
+            name: `${demoFirstName.trim()} ${demoLastName.trim()}`,
+            email: demoEmail.trim(),
+            condo_name: demoCondoName.trim(),
+            unit_count: demoUnitCount ? parseInt(demoUnitCount) : null,
+            member_type: demoMemberType,
+            subscription_interest: demoSubscriptionInterest,
+          }),
+        }).catch(() => { /* non-critical */ });
       }
     } catch (err) {
       console.warn('Demo lead submission failed (non-blocking):', err);

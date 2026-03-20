@@ -2238,6 +2238,13 @@
                 body: JSON.stringify({ name: data.name, email: data.email, community_name: community_name, spot_number: spot })
             }).catch(function() { /* non-critical */ });
 
+            // Fire-and-forget: notify alyssa@getonetwo.com
+            fetch(SB_URL + '/functions/v1/notify-signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON },
+                body: JSON.stringify({ type: 'waitlist', name: data.name, email: data.email, community_name: community_name, unit_count: unit_count, board_role: board_role, spot_number: spot })
+            }).catch(function() { /* non-critical */ });
+
         } catch (err) {
             errEl.textContent = 'Something went wrong. Please try again.';
             errEl.className = 'wl-error visible';
