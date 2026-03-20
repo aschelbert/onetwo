@@ -289,6 +289,7 @@ export default function TaskTrackingTab() {
                     key={task.id}
                     task={task}
                     onDetail={() => setDetailTask(task)}
+                    onEdit={() => openEdit(task)}
                     moveMenu={moveMenu}
                     setMoveMenu={setMoveMenu}
                     onMove={handleMove}
@@ -626,9 +627,10 @@ export default function TaskTrackingTab() {
 
 /* ── Task Card sub-component ───────────────────────────────── */
 
-function TaskCard({ task, onDetail, moveMenu, setMoveMenu, onMove, onDragStart, onDragEnd }: {
+function TaskCard({ task, onDetail, onEdit, moveMenu, setMoveMenu, onMove, onDragStart, onDragEnd }: {
   task: TaskItem;
   onDetail: () => void;
+  onEdit: () => void;
   moveMenu: string | null;
   setMoveMenu: (id: string | null) => void;
   onMove: (id: string, status: TaskStatus) => void;
@@ -701,7 +703,7 @@ function TaskCard({ task, onDetail, moveMenu, setMoveMenu, onMove, onDragStart, 
                 </button>
               ))}
               <div className="border-t border-ink-100 mt-1 pt-1">
-                <button onClick={() => { setMoveMenu(null); onDetail(); }} className="w-full text-left px-3 py-1.5 text-xs text-ink-500 hover:bg-ink-50">Edit</button>
+                <button onClick={() => { setMoveMenu(null); onEdit(); }} className="w-full text-left px-3 py-1.5 text-xs text-ink-500 hover:bg-ink-50">Edit</button>
               </div>
             </div>
           )}
