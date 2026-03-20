@@ -1,4 +1,5 @@
 'use client'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Package, Grid3X3, Monitor, Users, UserCog, Shield, Building2, MessageCircle, Lightbulb, CreditCard, ClipboardCheck, ClipboardList, TrendingUp, X } from 'lucide-react'
@@ -53,7 +54,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         'md:translate-x-0'
       )}>
         <div className="px-4 py-5 border-b border-white/[0.08] flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-[#c42030] rounded-lg flex items-center justify-center text-white text-xs font-bold font-serif">1|2</div>
+          <Image src="/onetwo-logo.jpg" alt="ONE two" width={28} height={28} className="w-7 h-7 rounded-lg object-cover" />
           <div className="flex-1">
             <span className="font-serif text-[1.05rem] font-bold tracking-tight">ONE two</span>
             <small className="block text-[0.65rem] text-gray-500 font-normal uppercase tracking-wider mt-px">Admin Console</small>

@@ -1,5 +1,6 @@
 'use client'
 import { useTenant } from '@/lib/tenant-context'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -26,7 +27,10 @@ export function TenantSidebar() {
   return (
     <aside className="w-56 bg-white border-r border-stone-200 flex flex-col">
       <div className="p-4 border-b border-stone-200">
-        <div className="font-serif text-sm font-bold text-[#c42030]">ONE two</div>
+        <div className="flex items-center gap-2">
+          <Image src="/onetwo-logo.jpg" alt="ONE two" width={28} height={28} className="w-7 h-7 rounded-lg object-cover" />
+          <div className="font-serif text-sm font-bold text-[#c42030]">ONE two</div>
+        </div>
         <div className="text-xs text-stone-500 mt-1 truncate">{tenancy.name}</div>
       </div>
       <nav className="flex-1 p-2 space-y-1">

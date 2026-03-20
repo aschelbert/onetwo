@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
@@ -96,7 +97,7 @@ function LoginForm() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
         <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-8 h-8 bg-[#c42030] rounded-lg flex items-center justify-center text-white text-sm font-bold font-serif">1|2</div>
+          <Image src="/onetwo-logo.jpg" alt="ONE two" width={32} height={32} className="w-8 h-8 rounded-lg object-cover" />
           <div>
             <span className="font-serif text-lg font-bold">ONE two</span>
             <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider">Admin Console</span>
