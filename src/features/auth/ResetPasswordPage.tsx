@@ -92,11 +92,7 @@ export default function ResetPasswordPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <svg className="w-12 h-12" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="4" fill="#3D3D3D" />
-              <rect x="13.5" y="7" width="5" height="18" rx="1" fill="white" />
-              <rect x="7" y="13.5" width="18" height="5" rx="1" fill="white" />
-            </svg>
+            <img src="/onetwo-logo.jpg" alt="ONE two" className="w-12 h-12 rounded object-cover" />
           </div>
 
           {mode === 'request' ? (

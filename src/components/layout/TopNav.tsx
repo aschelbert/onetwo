@@ -32,11 +32,7 @@ export default function TopNav() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <svg className="w-9 h-9" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="4" fill="#3D3D3D" />
-              <rect x="13.5" y="7" width="5" height="18" rx="1" fill="white" />
-              <rect x="7" y="13.5" width="18" height="5" rx="1" fill="white" />
-            </svg>
+            <img src="/onetwo-logo.jpg" alt="ONE two" className="w-9 h-9 rounded object-cover" />
             <div>
               <h1 className="font-display text-base font-bold text-ink-900 leading-tight">
                 {tenant.name} {tenant.isDemo ? '' : 'HOA'}
