@@ -9,12 +9,12 @@ import TheUnitsTab from './tabs/TheUnitsTab';
 import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
 import VendorsTab from './tabs/VendorsTab';
-import PMScorecardTab from './tabs/PMScorecardTab';
+
 import MailingSettingsTab from './tabs/MailingSettingsTab';
 import FeeScheduleTab from './tabs/FeeScheduleTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors','fees','scorecard','mailing'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', scorecard:'PM Scorecard', mailing:'Mailing' };
+const TABS = ['details','contacts','units','legal','insurance','vendors','fees','mailing'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', mailing:'Mailing' };
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
@@ -30,7 +30,7 @@ export default function BuildingPage() {
   const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const [tab, setTab] = useTabParam<typeof TABS[number]>('tab', 'details', [...TABS]);
-  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'scorecard' && t !== 'mailing');
+  const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'mailing');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');
   const [form, setForm] = useState<Record<string, string>>({});
@@ -166,9 +166,6 @@ export default function BuildingPage() {
 
           {/* FEE SCHEDULE */}
           {tab === 'fees' && <FeeScheduleTab />}
-
-          {/* PM SCORECARD */}
-          {tab === 'scorecard' && isBoard && <PMScorecardTab />}
 
           {/* MAILING */}
           {tab === 'mailing' && isBoard && <MailingSettingsTab />}
