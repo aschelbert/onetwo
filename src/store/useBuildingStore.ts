@@ -218,6 +218,10 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (data.insurance) updates.insurance = data.insurance;
     if (data.vendors) updates.vendors = data.vendors;
     if (data.maintenanceSchedules) updates.maintenanceSchedules = data.maintenanceSchedules;
+    if (data.profile) {
+      const current = useBuildingStore.getState().details;
+      updates.details = { ...current, ...data.profile };
+    }
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -228,7 +232,6 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   updateDetails: (det) => {
     set(s => ({ details: { ...s.details, ...det } }));
     if (isBackendEnabled) {
-      const { getActiveTenantId } = require('@/lib/supabase');
       const tenantId = getActiveTenantId();
       if (tenantId) buildingSvc.upsertBuildingProfile(tenantId, det);
     }
