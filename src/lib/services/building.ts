@@ -2,6 +2,7 @@ import { supabase, logDbError } from '@/lib/supabase';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
   LegalDocument, InsurancePolicy, Vendor, MaintenanceSchedule,
+  BuildingDetails,
 } from '@/store/useBuildingStore';
 
 // ── Board Members ──
@@ -346,10 +347,50 @@ export async function deleteMaintenanceSchedule(id: string): Promise<boolean> {
   return true;
 }
 
+// ── Building Profile (property details, building team, amenities) ──
+
+export async function fetchBuildingProfile(tenantId: string): Promise<Omit<BuildingDetails, 'totalUnits'> | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('building_profiles')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (error) { logDbError('fetchBuildingProfile error:', error); return null; }
+  if (!data) return null;
+  return {
+    yearBuilt: data.year_built, floors: data.floors, type: data.type,
+    sqft: data.sqft, lotSize: data.lot_size, parking: data.parking,
+    architect: data.architect, contractor: data.contractor,
+    amenities: data.amenities || [],
+    entityType: data.entity_type as 'incorporated' | 'unincorporated',
+    fiscalYearEnd: data.fiscal_year_end,
+  };
+}
+
+export async function upsertBuildingProfile(tenantId: string, d: Partial<BuildingDetails>): Promise<boolean> {
+  if (!supabase) return false;
+  const row: Record<string, unknown> = { tenant_id: tenantId, updated_at: new Date().toISOString() };
+  if (d.yearBuilt !== undefined) row.year_built = d.yearBuilt;
+  if (d.floors !== undefined) row.floors = d.floors;
+  if (d.type !== undefined) row.type = d.type;
+  if (d.sqft !== undefined) row.sqft = d.sqft;
+  if (d.lotSize !== undefined) row.lot_size = d.lotSize;
+  if (d.parking !== undefined) row.parking = d.parking;
+  if (d.architect !== undefined) row.architect = d.architect;
+  if (d.contractor !== undefined) row.contractor = d.contractor;
+  if (d.amenities !== undefined) row.amenities = d.amenities;
+  if (d.entityType !== undefined) row.entity_type = d.entityType;
+  if (d.fiscalYearEnd !== undefined) row.fiscal_year_end = d.fiscalYearEnd;
+  const { error } = await supabase.from('building_profiles').upsert(row, { onConflict: 'tenant_id' });
+  if (error) { logDbError('upsertBuildingProfile error:', error); return false; }
+  return true;
+}
+
 // ── Bulk fetch for loadFromDb ──
 
 export async function fetchAllBuildingData(tenantId: string) {
-  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules] = await Promise.all([
+  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile] = await Promise.all([
     fetchBoardMembers(tenantId),
     fetchManagementInfo(tenantId),
     fetchLegalCounsel(tenantId),
@@ -357,6 +398,7 @@ export async function fetchAllBuildingData(tenantId: string) {
     fetchInsurancePolicies(tenantId),
     fetchVendors(tenantId),
     fetchMaintenanceSchedules(tenantId),
+    fetchBuildingProfile(tenantId),
   ]);
-  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules };
+  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile };
 }

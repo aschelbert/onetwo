@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as buildingSvc from '@/lib/services/building';
 
 // ─── Types ─────────────────────────────────────
@@ -225,7 +225,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
 
   updateName: (name) => set({ name }),
   updateAddress: (addr) => set(s => ({ address: { ...s.address, ...addr } })),
-  updateDetails: (det) => set(s => ({ details: { ...s.details, ...det } })),
+  updateDetails: (det) => {
+    set(s => ({ details: { ...s.details, ...det } }));
+    if (isBackendEnabled) {
+      const { getActiveTenantId } = require('@/lib/supabase');
+      const tenantId = getActiveTenantId();
+      if (tenantId) buildingSvc.upsertBuildingProfile(tenantId, det);
+    }
+  },
 
   updateManagement: (mgmt, tenantId?) => {
     set(s => ({ management: { ...s.management, ...mgmt } }));
