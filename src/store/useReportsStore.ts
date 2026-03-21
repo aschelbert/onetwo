@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type ReportType =
   | 'board_packet'
@@ -26,8 +27,14 @@ interface ReportsState {
   deleteReport: (id: string) => void;
 }
 
-export const useReportsStore = create<ReportsState>((set) => ({
+export const useReportsStore = create<ReportsState>()(persist((set) => ({
   reports: [],
   addReport: (r) => set((s) => ({ reports: [r, ...s.reports] })),
   deleteReport: (id) => set((s) => ({ reports: s.reports.filter((r) => r.id !== id) })),
+}), {
+  name: 'onetwo-wizard-reports',
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+  }),
 }));
