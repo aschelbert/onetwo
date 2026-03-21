@@ -14,12 +14,104 @@ function formatPeriodHeader(period: { start: string; end: string } | undefined, 
 }
 
 export default function FinancialStatementRenderer({ type, snapshot }: Props) {
-  if (type === 'balance_sheet' && snapshot.data) return <BalanceSheet data={snapshot.data} period={snapshot.period} />;
-  if (type === 'income_statement' && snapshot.data) return <IncomeStatement data={snapshot.data} period={snapshot.period} />;
-  if (type === 'budget_vs_actual' && snapshot.rows) return <BudgetVsActual rows={snapshot.rows} period={snapshot.period} />;
+  if (type === 'balance_sheet'   && snapshot.data) return <BalanceSheet   data={snapshot.data} period={snapshot.period} meta={snapshot.meta} />;
+  if (type === 'income_statement' && snapshot.data) return <IncomeStatement data={snapshot.data} period={snapshot.period} meta={snapshot.meta} />;
+  if (type === 'budget_vs_actual' && snapshot.rows) return <BudgetVsActual  rows={snapshot.rows} period={snapshot.period} meta={snapshot.meta} />;
   if (type === 'form_1120h' && snapshot.data) return <Form1120H data={snapshot.data} period={snapshot.period} />;
   if (type === 'local_tax_forms' && snapshot.data) return <LocalTaxForms data={snapshot.data} period={snapshot.period} />;
   return <p className="text-sm text-ink-400">No data available for this financial statement.</p>;
+}
+
+function FinancialHealthDashboard({ meta }: { meta: any }) {
+  if (!meta) return null;
+
+  const {
+    collectionRate, monthlyCollected, monthlyExpected,
+    operatingCash, reservePct, reserveFunding, reserveRequired,
+  } = meta;
+
+  const reserveKnown = reserveRequired > 0;
+
+  const reserveColor  = !reserveKnown ? 'text-ink-400'
+    : reservePct >= 80 ? 'text-sage-700'
+    : reservePct >= 50 ? 'text-yellow-700'
+    : 'text-red-600';
+
+  const reserveBarColor = !reserveKnown ? 'bg-ink-200'
+    : reservePct >= 80 ? 'bg-sage-500'
+    : reservePct >= 50 ? 'bg-yellow-400'
+    : 'bg-red-400';
+
+  const reserveLabel = !reserveKnown ? 'No reserve study on file'
+    : reservePct >= 80 ? 'Well-funded'
+    : reservePct >= 50 ? 'Partially funded'
+    : 'Underfunded — action needed';
+
+  const collectionColor = collectionRate >= 95 ? 'text-sage-700'
+    : collectionRate >= 85 ? 'text-yellow-700'
+    : 'text-red-600';
+
+  const collectionLabel = collectionRate >= 95 ? 'On target'
+    : collectionRate >= 85 ? 'Below target'
+    : 'Needs follow-up';
+
+  return (
+    <div className="mx-5 mb-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+      {/* Reserve Health */}
+      <div className="bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
+        <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mb-2">
+          Reserve Fund Health
+        </p>
+        <p className={`text-2xl font-bold font-mono ${reserveColor}`}>
+          {reserveKnown ? `${reservePct}%` : '—'}
+        </p>
+        {reserveKnown && (
+          <>
+            <div className="mt-2 w-full h-1.5 bg-ink-100 rounded-full overflow-hidden">
+              <div
+                className={`h-1.5 rounded-full ${reserveBarColor}`}
+                style={{ width: `${Math.min(reservePct, 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-ink-400 mt-1.5 tabular-nums">
+              {fmt(reserveFunding)} funded of {fmt(reserveRequired)} required
+            </p>
+          </>
+        )}
+        <p className={`text-[10px] font-semibold mt-1 ${reserveColor}`}>{reserveLabel}</p>
+      </div>
+
+      {/* Collection Rate */}
+      <div className="bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
+        <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mb-2">
+          Assessment Collection Rate
+        </p>
+        <p className={`text-2xl font-bold font-mono ${collectionColor}`}>
+          {collectionRate}%
+        </p>
+        <p className="text-[10px] text-ink-400 mt-2 tabular-nums">
+          {fmt(monthlyCollected)} collected of {fmt(monthlyExpected)} expected
+        </p>
+        <p className={`text-[10px] font-semibold mt-1 ${collectionColor}`}>{collectionLabel}</p>
+      </div>
+
+      {/* Operating Cash */}
+      <div className="bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
+        <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold mb-2">
+          Operating Cash Balance
+        </p>
+        <p className="text-2xl font-bold font-mono text-ink-900">
+          {fmt(operatingCash)}
+        </p>
+        <p className="text-[10px] text-ink-400 mt-2">Current operating account balance</p>
+        <p className="text-[10px] font-semibold mt-1 text-ink-400">
+          {operatingCash > 0 ? 'Positive balance' : operatingCash === 0 ? 'No balance recorded' : 'Negative — review required'}
+        </p>
+      </div>
+
+    </div>
+  );
 }
 
 function ExecSummary({ lines }: { lines: string[] }) {
@@ -52,7 +144,7 @@ function ReserveHealthBar({ current, total }: { current: number; total: number }
   );
 }
 
-function BalanceSheet({ data, period }: { data: any; period?: { start: string; end: string } }) {
+function BalanceSheet({ data, period, meta }: { data: any; period?: { start: string; end: string }; meta?: any }) {
   const periodText = formatPeriodHeader(period, 'as-of');
   const totalAssets      = data.assets?.total ?? 0;
   const reserveFund      = data.assets?.reserves ?? 0;
@@ -69,6 +161,9 @@ function BalanceSheet({ data, period }: { data: any; period?: { start: string; e
       <div className="px-5 py-3 border-b border-sage-200">
         <h3 className="font-display text-base font-bold text-ink-900">Balance Sheet{periodText ? ` — ${periodText}` : ''}</h3>
         <p className="text-xs text-ink-400">Snapshot at time of generation</p>
+      </div>
+      <div className="pt-5">
+        <FinancialHealthDashboard meta={meta} />
       </div>
       <ExecSummary lines={summaryLines} />
       {totalAssets > 0 && (
@@ -107,7 +202,7 @@ function BalanceSheet({ data, period }: { data: any; period?: { start: string; e
   );
 }
 
-function IncomeStatement({ data, period }: { data: any; period?: { start: string; end: string } }) {
+function IncomeStatement({ data, period, meta }: { data: any; period?: { start: string; end: string }; meta?: any }) {
   const periodText = formatPeriodHeader(period, 'range');
   const surplus    = (data.netIncome ?? 0) >= 0;
   const pctOfInc   = data.totalIncome > 0
@@ -124,6 +219,9 @@ function IncomeStatement({ data, period }: { data: any; period?: { start: string
     <div className="bg-mist-50 border border-mist-200 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-mist-200">
         <h3 className="font-display text-base font-bold text-ink-900">Income Statement (P&L){periodText ? ` — ${periodText}` : ''}</h3>
+      </div>
+      <div className="pt-5">
+        <FinancialHealthDashboard meta={meta} />
       </div>
       <ExecSummary lines={isLines} />
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
@@ -153,11 +251,14 @@ function IncomeStatement({ data, period }: { data: any; period?: { start: string
   );
 }
 
-function BudgetVsActual({ rows, period }: { rows: any[]; period?: { start: string; end: string } }) {
+function BudgetVsActual({ rows, period, meta }: { rows: any[]; period?: { start: string; end: string }; meta?: any }) {
   const periodText = formatPeriodHeader(period, 'range');
   return (
     <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-ink-100"><h3 className="font-display text-base font-bold text-ink-900">Budget vs Actual{periodText ? ` — ${periodText}` : ''}</h3></div>
+      <div className="pt-5">
+        <FinancialHealthDashboard meta={meta} />
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

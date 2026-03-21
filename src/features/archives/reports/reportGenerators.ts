@@ -106,6 +106,29 @@ function buildFinancialSnapshot(type: ReportType, periodStart?: string, periodEn
     };
   }
 
+  // ── Executive health meta (balance_sheet / income_statement / budget_vs_actual) ──
+  if (['balance_sheet', 'income_statement', 'budget_vs_actual'].includes(type)) {
+    try {
+      const metrics = fin.getIncomeMetrics();
+      const bs = fin.getBalanceSheet();
+      const reserveItems: any[] = (fin as any).reserveItems || [];
+      const totalReserveRequired = reserveItems.reduce((s: number, i: any) => s + (i.estimatedCost || 0), 0);
+      const totalReserveFunding  = reserveItems.reduce((s: number, i: any) => s + (i.currentFunding  || 0), 0);
+      snapshot.meta = {
+        collectionRate:   metrics.collectionRate,
+        monthlyCollected: metrics.monthlyCollected,
+        monthlyExpected:  metrics.monthlyExpected,
+        operatingCash:    bs.assets?.operating ?? 0,
+        reserveBalance:   bs.assets?.reserves  ?? 0,
+        reserveFunding:   totalReserveFunding,
+        reserveRequired:  totalReserveRequired,
+        reservePct: totalReserveRequired > 0
+          ? Math.round((totalReserveFunding / totalReserveRequired) * 100)
+          : null,
+      };
+    } catch (_) { /* store not ready — meta omitted */ }
+  }
+
   return snapshot;
 }
 
