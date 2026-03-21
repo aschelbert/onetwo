@@ -73,6 +73,8 @@ const DEFAULT_CHANNELS = [
   { slug: 'board-only', name: '🔒 Board Only', channel_type: 'group', restricted_to_role: 'board_member', description: 'Private board member discussions' },
 ];
 
+const MAX_CHANNELS = 50;
+
 // ─── Component ──────────────────────────────────────────────────
 export default function CommunicationsTab() {
   const tenantId = getActiveTenantId();
@@ -88,6 +90,11 @@ export default function CommunicationsTab() {
   const [tenantUserId, setTenantUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelDesc, setNewChannelDesc] = useState('');
+  const [newChannelRestricted, setNewChannelRestricted] = useState(false);
+  const [creatingChannel, setCreatingChannel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -282,6 +289,35 @@ export default function CommunicationsTab() {
     }
   };
 
+  // ─── Create channel ─────────────────────────────────────────
+  const handleCreateChannel = async () => {
+    const name = newChannelName.trim();
+    if (!name || !supabase || !tenantId) return;
+    if (channels.length >= MAX_CHANNELS) return;
+    setCreatingChannel(true);
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const { data, error } = await supabase.from('team_channels').insert({
+      tenant_id: tenantId,
+      slug: slug || `ch-${Date.now()}`,
+      name: `# ${name}`,
+      description: newChannelDesc.trim(),
+      channel_type: 'group',
+      restricted_to_role: newChannelRestricted ? 'board_member' : null,
+    }).select().single();
+
+    if (!error && data) {
+      setChannels(prev => [...prev, data as unknown as TeamChannel]);
+      setActiveChannelId(data.id);
+    }
+
+    setNewChannelName('');
+    setNewChannelDesc('');
+    setNewChannelRestricted(false);
+    setShowNewChannel(false);
+    setCreatingChannel(false);
+  };
+
   // ─── Access denied state ──────────────────────────────────────
   if (accessDenied) {
     return (
@@ -308,10 +344,60 @@ export default function CommunicationsTab() {
     <div className="flex border border-ink-100 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 360px)', minHeight: 420 }}>
       {/* Left Rail */}
       <div className="w-[240px] flex-shrink-0 border-r border-ink-100 flex flex-col bg-white">
-        <div className="px-4 py-3 border-b border-ink-100">
+        <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Channels</span>
+          {channels.length < MAX_CHANNELS && (
+            <button
+              onClick={() => setShowNewChannel(true)}
+              className="w-5 h-5 flex items-center justify-center rounded text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition-colors text-lg leading-none"
+              title="New channel"
+            >
+              +
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto py-1">
+          {/* New channel form */}
+          {showNewChannel && (
+            <div className="px-3 py-2 border-b border-ink-100 space-y-2">
+              <input
+                autoFocus
+                value={newChannelName}
+                onChange={e => setNewChannelName(e.target.value)}
+                placeholder="Channel name"
+                maxLength={40}
+                className="w-full text-sm border border-ink-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-600"
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateChannel(); if (e.key === 'Escape') setShowNewChannel(false); }}
+              />
+              <input
+                value={newChannelDesc}
+                onChange={e => setNewChannelDesc(e.target.value)}
+                placeholder="Description (optional)"
+                maxLength={100}
+                className="w-full text-xs border border-ink-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-600"
+              />
+              <label className="flex items-center gap-1.5 text-[11px] text-ink-500 cursor-pointer">
+                <input type="checkbox" checked={newChannelRestricted} onChange={e => setNewChannelRestricted(e.target.checked)} className="rounded" />
+                Board members only
+              </label>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleCreateChannel}
+                  disabled={!newChannelName.trim() || creatingChannel}
+                  className="flex-1 text-xs font-medium py-1.5 rounded bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {creatingChannel ? 'Creating...' : 'Create'}
+                </button>
+                <button
+                  onClick={() => { setShowNewChannel(false); setNewChannelName(''); setNewChannelDesc(''); setNewChannelRestricted(false); }}
+                  className="text-xs font-medium py-1.5 px-3 rounded text-ink-500 hover:bg-ink-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="text-[10px] text-ink-300">{channels.length} / {MAX_CHANNELS} channels</p>
+            </div>
+          )}
           {channels.map(ch => {
             const isActive = ch.id === activeChannelId;
             const unread = unreadCounts[ch.id] || 0;
