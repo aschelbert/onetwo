@@ -74,6 +74,13 @@ export interface PMScorecardEntry {
   updated_at: string
 }
 
+export interface CategoryScore {
+  score: number
+  notes: string
+}
+
+export type CategoryScores = Partial<Record<ScorecardCategory, CategoryScore>>
+
 export interface PMScorecardReview {
   id: string
   tenant_id: string
@@ -82,6 +89,7 @@ export interface PMScorecardReview {
   summary: string
   strengths: string[]
   improvements: string[]
+  category_scores: CategoryScores
   reviewed_by: string
   created_at: string
   updated_at: string

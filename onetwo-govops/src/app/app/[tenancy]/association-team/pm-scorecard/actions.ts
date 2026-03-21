@@ -62,6 +62,7 @@ export async function createScorecardReview(
     summary: string
     strengths: string[]
     improvements: string[]
+    category_scores: Record<string, { score: number; notes: string }>
     reviewed_by: string
   }
 ) {
@@ -78,6 +79,7 @@ export async function createScorecardReview(
       summary: data.summary,
       strengths: data.strengths,
       improvements: data.improvements,
+      category_scores: data.category_scores,
       reviewed_by: data.reviewed_by,
     })
     .select()
