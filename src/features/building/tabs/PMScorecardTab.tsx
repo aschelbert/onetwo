@@ -254,10 +254,10 @@ export default function PMScorecardTab() {
         </div>
       </div>
 
-      {/* ── Reviews Section ─────────────────────────── */}
+      {/* ── Performance Trend ────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Reviews</h4>
+          <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Performance Trend</h4>
           <button
             onClick={openReviewModal}
             className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium"
@@ -265,103 +265,6 @@ export default function PMScorecardTab() {
             + Write Review
           </button>
         </div>
-
-        {periodReviews.length === 0 ? (
-          <div className="bg-ink-50 rounded-xl p-8 text-center border border-ink-100">
-            <p className="text-ink-400 text-sm">No reviews for {selectedPeriod} yet.</p>
-            <button onClick={openReviewModal} className="mt-2 text-sm text-accent-600 font-medium hover:text-accent-700">
-              Write the first review
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {periodReviews.map(review => (
-              <div key={review.id} className="bg-white rounded-xl border border-ink-100 p-5 hover:shadow-sm transition-all">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <StarRating score={review.overallRating} size="sm" />
-                      <span className="text-sm font-bold text-ink-900">{review.overallRating}/5</span>
-                    </div>
-                    <p className="text-sm text-ink-700 mt-2">{review.summary}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => openViewReview(review.id)}
-                      className="text-xs text-accent-600 font-medium hover:text-accent-700"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => { if (confirm('Delete this review?')) store.deleteReview(review.id); }}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                {/* Category ratings inline */}
-                {review.categoryRatings && Object.keys(review.categoryRatings).length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {CATEGORIES.map(cat => {
-                      const r = review.categoryRatings?.[cat.key];
-                      if (!r || r.score === 0) return null;
-                      const colors = scoreColorClasses(r.score);
-                      return (
-                        <span key={cat.key} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${colors.bg} ${colors.text} ${colors.border} border`}>
-                          {cat.icon} {cat.label}: {'\u2605'.repeat(r.score)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  {review.strengths.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-sage-700 uppercase tracking-wider mb-1">Strengths</p>
-                      <ul className="space-y-0.5">
-                        {review.strengths.slice(0, 3).map((s, i) => (
-                          <li key={i} className="text-xs text-ink-600 flex items-start gap-1.5">
-                            <span className="text-sage-500 shrink-0 mt-px">{'\u2713'}</span>
-                            <span>{s}</span>
-                          </li>
-                        ))}
-                        {review.strengths.length > 3 && (
-                          <li className="text-[10px] text-ink-400">+{review.strengths.length - 3} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                  {review.improvements.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wider mb-1">Improvements</p>
-                      <ul className="space-y-0.5">
-                        {review.improvements.slice(0, 3).map((s, i) => (
-                          <li key={i} className="text-xs text-ink-600 flex items-start gap-1.5">
-                            <span className="text-yellow-500 shrink-0 mt-px">{'\u25CB'}</span>
-                            <span>{s}</span>
-                          </li>
-                        ))}
-                        {review.improvements.length > 3 && (
-                          <li className="text-[10px] text-ink-400">+{review.improvements.length - 3} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-[10px] text-ink-400 mt-3">Reviewed by {review.reviewedBy}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Historical Trend ────────────────────────── */}
-      <div>
-        <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Performance Trend</h4>
         <div className="bg-white rounded-xl border border-ink-100 p-5">
           {/* TTM Overall */}
           {ttmScore !== null && (
@@ -464,6 +367,103 @@ export default function PMScorecardTab() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Reviews Section ─────────────────────────── */}
+      <div>
+        <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Reviews</h4>
+
+        {periodReviews.length === 0 ? (
+          <div className="bg-ink-50 rounded-xl p-8 text-center border border-ink-100">
+            <p className="text-ink-400 text-sm">No reviews for {selectedPeriod} yet.</p>
+            <button onClick={openReviewModal} className="mt-2 text-sm text-accent-600 font-medium hover:text-accent-700">
+              Write the first review
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {periodReviews.map(review => (
+              <div key={review.id} className="bg-white rounded-xl border border-ink-100 p-5 hover:shadow-sm transition-all">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <StarRating score={review.overallRating} size="sm" />
+                      <span className="text-sm font-bold text-ink-900">{review.overallRating}/5</span>
+                    </div>
+                    <p className="text-sm text-ink-700 mt-2">{review.summary}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => openViewReview(review.id)}
+                      className="text-xs text-accent-600 font-medium hover:text-accent-700"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => { if (confirm('Delete this review?')) store.deleteReview(review.id); }}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category ratings inline */}
+                {review.categoryRatings && Object.keys(review.categoryRatings).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {CATEGORIES.map(cat => {
+                      const r = review.categoryRatings?.[cat.key];
+                      if (!r || r.score === 0) return null;
+                      const colors = scoreColorClasses(r.score);
+                      return (
+                        <span key={cat.key} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${colors.bg} ${colors.text} ${colors.border} border`}>
+                          {cat.icon} {cat.label}: {'\u2605'.repeat(r.score)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  {review.strengths.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-sage-700 uppercase tracking-wider mb-1">Strengths</p>
+                      <ul className="space-y-0.5">
+                        {review.strengths.slice(0, 3).map((s, i) => (
+                          <li key={i} className="text-xs text-ink-600 flex items-start gap-1.5">
+                            <span className="text-sage-500 shrink-0 mt-px">{'\u2713'}</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                        {review.strengths.length > 3 && (
+                          <li className="text-[10px] text-ink-400">+{review.strengths.length - 3} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  {review.improvements.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wider mb-1">Improvements</p>
+                      <ul className="space-y-0.5">
+                        {review.improvements.slice(0, 3).map((s, i) => (
+                          <li key={i} className="text-xs text-ink-600 flex items-start gap-1.5">
+                            <span className="text-yellow-500 shrink-0 mt-px">{'\u25CB'}</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                        {review.improvements.length > 3 && (
+                          <li className="text-[10px] text-ink-400">+{review.improvements.length - 3} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-ink-400 mt-3">Reviewed by {review.reviewedBy}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Write Review Modal (includes category ratings) ── */}
