@@ -421,10 +421,6 @@ export default function CommunicationsTab() {
             );
           })}
         </div>
-        <div className="border-t border-ink-100 px-4 py-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Direct Messages</span>
-          <p className="text-[11px] text-ink-300 mt-1">Coming soon</p>
-        </div>
       </div>
 
       {/* Right Panel */}
