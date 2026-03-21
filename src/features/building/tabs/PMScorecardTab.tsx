@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useScorecardStore } from '@/store/useScorecardStore';
-import type { ScorecardEntry } from '@/store/useScorecardStore';
+import type { ScorecardReview } from '@/store/useScorecardStore';
+import type { CategoryRatings, Category } from '@/lib/services/scorecard';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import Modal from '@/components/ui/Modal';
 
 // ─── Constants ────────────────────────────────────────
-
-type Category = ScorecardEntry['category'];
 
 const CATEGORIES: { key: Category; label: string; icon: string; description: string }[] = [
   { key: 'responsiveness', label: 'Responsiveness', icon: '⚡', description: 'Response time to requests and emergencies' },
@@ -61,11 +60,28 @@ function ClickableStars({ value, onChange, size = 'md' }: { value: number; onCha
   );
 }
 
-// ─── Modal Types ──────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────
 
-type ModalType = null | 'scoreEntry' | 'writeReview' | 'viewReview';
+function deriveOverall(ratings: CategoryRatings): number {
+  const values = Object.values(ratings).filter(Boolean).map(r => r!.score);
+  if (values.length === 0) return 0;
+  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
+}
+
+function getCategoryAvgsFromReviews(reviews: ScorecardReview[]): Record<Category, number> {
+  const avgs: Record<Category, number> = { responsiveness: 0, financial: 0, maintenance: 0, communication: 0, compliance: 0 };
+  for (const cat of CATEGORIES) {
+    const scores = reviews
+      .map(r => r.categoryRatings?.[cat.key]?.score)
+      .filter((s): s is number => s !== undefined);
+    avgs[cat.key] = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
+  }
+  return avgs;
+}
 
 // ─── Component ────────────────────────────────────────
+
+type ModalType = null | 'writeReview' | 'viewReview';
 
 export default function PMScorecardTab() {
   const store = useScorecardStore();
@@ -74,49 +90,27 @@ export default function PMScorecardTab() {
 
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0]);
   const [modal, setModal] = useState<ModalType>(null);
-  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [viewReviewId, setViewReviewId] = useState<string | null>(null);
 
-  // Score entry form state
-  const [entryScore, setEntryScore] = useState(0);
-  const [entryNotes, setEntryNotes] = useState('');
-
-  // Review form state
-  const [reviewRating, setReviewRating] = useState(0);
+  // Review form state (includes category ratings)
   const [reviewSummary, setReviewSummary] = useState('');
   const [reviewStrengths, setReviewStrengths] = useState<string[]>(['']);
   const [reviewImprovements, setReviewImprovements] = useState<string[]>(['']);
+  const [reviewCategoryRatings, setReviewCategoryRatings] = useState<CategoryRatings>(
+    Object.fromEntries(CATEGORIES.map(c => [c.key, { score: 0, notes: '' }]))
+  );
 
   // ─── Derived Data ───────────────────────────────────
-
-  const periodEntries = useMemo(
-    () => store.entries.filter(e => e.period === selectedPeriod),
-    [store.entries, selectedPeriod],
-  );
 
   const periodReviews = useMemo(
     () => store.reviews.filter(r => r.period === selectedPeriod),
     [store.reviews, selectedPeriod],
   );
 
-  const categoryScores = useMemo(() => {
-    const map: Record<Category, ScorecardEntry[]> = {
-      responsiveness: [], financial: [], maintenance: [], communication: [], compliance: [],
-    };
-    for (const entry of periodEntries) {
-      map[entry.category].push(entry);
-    }
-    return map;
-  }, [periodEntries]);
-
-  const categoryAverages = useMemo(() => {
-    const avgs: Record<Category, number> = { responsiveness: 0, financial: 0, maintenance: 0, communication: 0, compliance: 0 };
-    for (const cat of CATEGORIES) {
-      const entries = categoryScores[cat.key];
-      avgs[cat.key] = entries.length > 0 ? entries.reduce((s, e) => s + e.score, 0) / entries.length : 0;
-    }
-    return avgs;
-  }, [categoryScores]);
+  const categoryAverages = useMemo(
+    () => getCategoryAvgsFromReviews(periodReviews),
+    [periodReviews],
+  );
 
   const overallScore = useMemo(() => {
     const scored = CATEGORIES.filter(c => categoryAverages[c.key] > 0);
@@ -124,65 +118,39 @@ export default function PMScorecardTab() {
     return scored.reduce((s, c) => s + categoryAverages[c.key], 0) / scored.length;
   }, [categoryAverages]);
 
-  // Historical data for trend view
+  // Historical trend data
   const trendData = useMemo(() => {
     return PERIODS.map(period => {
-      const entries = store.entries.filter(e => e.period === period);
-      const catAvgs: Record<Category, number> = { responsiveness: 0, financial: 0, maintenance: 0, communication: 0, compliance: 0 };
-      for (const cat of CATEGORIES) {
-        const catEntries = entries.filter(e => e.category === cat.key);
-        catAvgs[cat.key] = catEntries.length > 0 ? catEntries.reduce((s, e) => s + e.score, 0) / catEntries.length : 0;
-      }
+      const reviews = store.reviews.filter(r => r.period === period);
+      const catAvgs = getCategoryAvgsFromReviews(reviews);
       const scored = CATEGORIES.filter(c => catAvgs[c.key] > 0);
       const overall = scored.length > 0 ? scored.reduce((s, c) => s + catAvgs[c.key], 0) / scored.length : 0;
-      return { period, categories: catAvgs, overall, hasData: entries.length > 0 };
+      return { period, categories: catAvgs, overall, hasData: reviews.length > 0 };
     });
-  }, [store.entries]);
+  }, [store.reviews]);
 
   // ─── Handlers ───────────────────────────────────────
 
-  const openScoreModal = (category: Category) => {
-    const existing = periodEntries.find(e => e.category === category && e.scoredBy === currentUser.name);
-    setActiveCategory(category);
-    setEntryScore(existing ? existing.score : 0);
-    setEntryNotes(existing ? existing.notes : '');
-    setModal('scoreEntry');
-  };
-
-  const saveScore = () => {
-    if (!activeCategory || entryScore === 0) return;
-    // Remove existing entry from this user for this category/period
-    const existing = periodEntries.find(e => e.category === activeCategory && e.scoredBy === currentUser.name);
-    if (existing) store.deleteEntry(existing.id);
-    store.addEntry({
-      period: selectedPeriod,
-      category: activeCategory,
-      score: entryScore,
-      notes: entryNotes,
-      scoredBy: currentUser.name,
-    });
-    setModal(null);
-    setActiveCategory(null);
-    setEntryScore(0);
-    setEntryNotes('');
-  };
-
   const openReviewModal = () => {
-    setReviewRating(0);
     setReviewSummary('');
     setReviewStrengths(['']);
     setReviewImprovements(['']);
+    setReviewCategoryRatings(
+      Object.fromEntries(CATEGORIES.map(c => [c.key, { score: 0, notes: '' }]))
+    );
     setModal('writeReview');
   };
 
   const saveReview = () => {
-    if (reviewRating === 0 || !reviewSummary.trim()) return;
+    const overall = deriveOverall(reviewCategoryRatings);
+    if (overall === 0 || !reviewSummary.trim()) return;
     store.addReview({
       period: selectedPeriod,
-      overallRating: reviewRating,
+      overallRating: overall,
       summary: reviewSummary,
       strengths: reviewStrengths.filter(s => s.trim()),
       improvements: reviewImprovements.filter(s => s.trim()),
+      categoryRatings: reviewCategoryRatings,
       reviewedBy: currentUser.name,
     });
     setModal(null);
@@ -209,9 +177,23 @@ export default function PMScorecardTab() {
   const addImprovement = () => setReviewImprovements(prev => [...prev, '']);
   const removeImprovement = (idx: number) => setReviewImprovements(prev => prev.filter((_, i) => i !== idx));
 
+  const updateCategoryScore = (cat: Category, score: number) => {
+    setReviewCategoryRatings(prev => ({
+      ...prev,
+      [cat]: { ...prev[cat], score, notes: prev[cat]?.notes ?? '' },
+    }));
+  };
+
+  const updateCategoryNotes = (cat: Category, notes: string) => {
+    setReviewCategoryRatings(prev => ({
+      ...prev,
+      [cat]: { score: prev[cat]?.score ?? 0, notes },
+    }));
+  };
+
   // ─── Render ─────────────────────────────────────────
 
-  const activeCatMeta = activeCategory ? CATEGORIES.find(c => c.key === activeCategory) : null;
+  const formOverall = deriveOverall(reviewCategoryRatings);
 
   return (
     <div className="space-y-6">
@@ -244,7 +226,7 @@ export default function PMScorecardTab() {
             {overallScore > 0 ? (
               <StarRating score={overallScore} size="lg" />
             ) : (
-              <span className="text-accent-300 text-sm">No scores yet for this period</span>
+              <span className="text-accent-300 text-sm">No reviews yet for this period</span>
             )}
           </div>
         </div>
@@ -264,73 +246,7 @@ export default function PMScorecardTab() {
         </div>
       </div>
 
-      {/* ── Category Scores Grid ────────────────────── */}
-      <div>
-        <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Category Scores</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {CATEGORIES.map(cat => {
-            const entries = categoryScores[cat.key];
-            const avg = categoryAverages[cat.key];
-            const colors = avg > 0 ? scoreColorClasses(Math.round(avg)) : { bg: 'bg-ink-50', text: 'text-ink-500', border: 'border-ink-100', fill: 'text-ink-300' };
-
-            return (
-              <div key={cat.key} className={`rounded-xl border p-4 transition-all ${colors.border} ${colors.bg}`}>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{cat.icon}</span>
-                    <div>
-                      <h5 className="text-sm font-bold text-ink-900">{cat.label}</h5>
-                      <p className="text-[11px] text-ink-500">{cat.description}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                    {avg > 0 ? (
-                      <StarRating score={avg} size="md" />
-                    ) : (
-                      <span className="text-xs text-ink-400">Not yet rated</span>
-                    )}
-                    {avg > 0 && (
-                      <p className={`text-xs font-semibold mt-0.5 ${colors.text}`}>{avg.toFixed(1)} / 5.0</p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => openScoreModal(cat.key)}
-                    className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800 transition-colors"
-                  >
-                    Rate
-                  </button>
-                </div>
-
-                {entries.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-ink-100 space-y-2">
-                    {entries.map(entry => (
-                      <div key={entry.id} className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-ink-600 leading-snug">{entry.notes}</p>
-                          <p className="text-[10px] text-ink-400 mt-0.5">
-                            {entry.scoredBy} -- {'\u2605'.repeat(entry.score)}{'\u2606'.repeat(5 - entry.score)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => { if (confirm('Remove this score?')) store.deleteEntry(entry.id); }}
-                          className="text-[10px] text-red-400 hover:text-red-600 shrink-0"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Quarterly Reviews Section ───────────────── */}
+      {/* ── Reviews Section ─────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Quarterly Reviews</h4>
@@ -376,6 +292,22 @@ export default function PMScorecardTab() {
                     </button>
                   </div>
                 </div>
+
+                {/* Category ratings inline */}
+                {review.categoryRatings && Object.keys(review.categoryRatings).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {CATEGORIES.map(cat => {
+                      const r = review.categoryRatings?.[cat.key];
+                      if (!r || r.score === 0) return null;
+                      const colors = scoreColorClasses(r.score);
+                      return (
+                        <span key={cat.key} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${colors.bg} ${colors.text} ${colors.border} border`}>
+                          {cat.icon} {cat.label}: {'\u2605'.repeat(r.score)}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   {review.strengths.length > 0 && (
@@ -509,69 +441,7 @@ export default function PMScorecardTab() {
         </div>
       </div>
 
-      {/* ── Score Entry Modal ───────────────────────── */}
-      {modal === 'scoreEntry' && activeCatMeta && (
-        <Modal
-          title={`Rate: ${activeCatMeta.label}`}
-          subtitle={activeCatMeta.description}
-          onClose={() => { setModal(null); setActiveCategory(null); }}
-          onSave={saveScore}
-          saveLabel="Submit Score"
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Period</label>
-              <input
-                type="text"
-                value={selectedPeriod}
-                disabled
-                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-ink-50 text-ink-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Category</label>
-              <input
-                type="text"
-                value={activeCatMeta.label}
-                disabled
-                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-ink-50 text-ink-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-2">Score *</label>
-              <div className="flex items-center gap-3">
-                <ClickableStars value={entryScore} onChange={setEntryScore} size="lg" />
-                {entryScore > 0 && (
-                  <span className={`text-sm font-bold ${scoreColorClasses(entryScore).text}`}>
-                    {entryScore}/5
-                  </span>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Notes</label>
-              <textarea
-                value={entryNotes}
-                onChange={e => setEntryNotes(e.target.value)}
-                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm resize-none"
-                rows={3}
-                placeholder="Add context or observations about this rating..."
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Scored By</label>
-              <input
-                type="text"
-                value={currentUser.name}
-                disabled
-                className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm bg-ink-50 text-ink-500"
-              />
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Write Review Modal ─────────────────────── */}
+      {/* ── Write Review Modal (includes category ratings) ── */}
       {modal === 'writeReview' && (
         <Modal
           title="Write Quarterly Review"
@@ -582,17 +452,56 @@ export default function PMScorecardTab() {
           wide
         >
           <div className="space-y-5">
+            {/* Category Ratings */}
             <div>
-              <label className="block text-xs font-medium text-ink-700 mb-2">Overall Rating *</label>
-              <div className="flex items-center gap-3">
-                <ClickableStars value={reviewRating} onChange={setReviewRating} size="lg" />
-                {reviewRating > 0 && (
-                  <span className={`text-sm font-bold ${scoreColorClasses(reviewRating).text}`}>
-                    {reviewRating}/5
-                  </span>
-                )}
+              <label className="block text-xs font-bold text-ink-800 uppercase tracking-wider mb-3">Category Ratings *</label>
+              <div className="bg-ink-50 rounded-xl border border-ink-100 p-4 space-y-4">
+                {CATEGORIES.map(cat => {
+                  const rating = reviewCategoryRatings[cat.key];
+                  return (
+                    <div key={cat.key} className="border-b border-ink-100 pb-3 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">{cat.icon}</span>
+                        <span className="text-sm font-bold text-ink-900">{cat.label}</span>
+                      </div>
+                      <p className="text-[11px] text-ink-500 mb-2">{cat.description}</p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <ClickableStars value={rating?.score ?? 0} onChange={v => updateCategoryScore(cat.key, v)} size="md" />
+                        {(rating?.score ?? 0) > 0 && (
+                          <span className={`text-xs font-bold ${scoreColorClasses(rating!.score).text}`}>
+                            {rating!.score}/5
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={rating?.notes ?? ''}
+                        onChange={e => updateCategoryNotes(cat.key, e.target.value)}
+                        className="w-full px-3 py-1.5 border border-ink-200 rounded-lg text-sm"
+                        placeholder={`Notes for ${cat.label.toLowerCase()}...`}
+                      />
+                    </div>
+                  );
+                })}
+                {/* Derived overall */}
+                <div className="pt-3 border-t border-ink-200 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink-500 uppercase">Overall Rating (avg)</span>
+                  <div className="flex items-center gap-2">
+                    {formOverall > 0 ? (
+                      <>
+                        <StarRating score={formOverall} size="sm" />
+                        <span className={`text-sm font-bold ${scoreColorClasses(Math.round(formOverall)).text}`}>
+                          {formOverall}/5
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-ink-400">Rate categories above</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
+
             <div>
               <label className="block text-xs font-medium text-ink-700 mb-1">Summary *</label>
               <textarea
@@ -680,6 +589,35 @@ export default function PMScorecardTab() {
                 {viewedReview.overallRating}/5
               </span>
             </div>
+
+            {/* Category ratings breakdown */}
+            {viewedReview.categoryRatings && Object.keys(viewedReview.categoryRatings).length > 0 && (
+              <div className="bg-ink-50 rounded-xl border border-ink-100 p-4">
+                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-3">Category Ratings</p>
+                <div className="space-y-2">
+                  {CATEGORIES.map(cat => {
+                    const r = viewedReview.categoryRatings?.[cat.key];
+                    if (!r || r.score === 0) return null;
+                    const colors = scoreColorClasses(r.score);
+                    return (
+                      <div key={cat.key} className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base">{cat.icon}</span>
+                          <div>
+                            <span className="text-sm font-semibold text-ink-900">{cat.label}</span>
+                            {r.notes && <p className="text-xs text-ink-500 mt-0.5">{r.notes}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <StarRating score={r.score} size="sm" />
+                          <span className={`text-xs font-bold ${colors.text}`}>{r.score}/5</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-1">Summary</p>

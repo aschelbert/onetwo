@@ -11,6 +11,10 @@ export interface ScorecardEntry {
   scoredBy: string;
 }
 
+export type Category = ScorecardEntry['category'];
+
+export type CategoryRatings = Partial<Record<Category, { score: number; notes: string }>>;
+
 export interface ScorecardReview {
   id: string;
   period: string;
@@ -18,6 +22,7 @@ export interface ScorecardReview {
   summary: string;
   strengths: string[];
   improvements: string[];
+  categoryRatings: CategoryRatings;
   reviewedBy: string;
 }
 
@@ -54,6 +59,7 @@ function rowToReview(r: Record<string, unknown>): ScorecardReview {
     summary: r.summary as string,
     strengths: (r.strengths || []) as string[],
     improvements: (r.improvements || []) as string[],
+    categoryRatings: (r.category_scores || {}) as CategoryRatings,
     reviewedBy: r.reviewed_by as string,
   };
 }
@@ -65,6 +71,7 @@ function reviewToRow(rv: Partial<ScorecardReview>): Record<string, unknown> {
   if (rv.summary !== undefined) row.summary = rv.summary;
   if (rv.strengths !== undefined) row.strengths = rv.strengths;
   if (rv.improvements !== undefined) row.improvements = rv.improvements;
+  if (rv.categoryRatings !== undefined) row.category_scores = rv.categoryRatings;
   if (rv.reviewedBy !== undefined) row.reviewed_by = rv.reviewedBy;
   return row;
 }

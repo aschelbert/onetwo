@@ -17,14 +17,25 @@ interface ScorecardState {
 }
 
 export const useScorecardStore = create<ScorecardState>()(persist((set) => ({
-  entries: [
-    { id: 'se1', period: '2026-Q1', category: 'responsiveness', score: 4, notes: 'Generally responsive. One delayed response on Unit 301 pipe issue.', scoredBy: 'Robert Mitchell' },
-    { id: 'se2', period: '2026-Q1', category: 'financial', score: 5, notes: 'Monthly reports delivered on time. Budget tracking accurate.', scoredBy: 'David Chen' },
-    { id: 'se3', period: '2026-Q1', category: 'maintenance', score: 3, notes: 'Elevator maintenance vendor coordination needs improvement.', scoredBy: 'Jennifer Adams' },
-    { id: 'se4', period: '2026-Q1', category: 'communication', score: 4, notes: 'Good communication with residents. Board updates regular.', scoredBy: 'Maria Rodriguez' },
-    { id: 'se5', period: '2026-Q1', category: 'compliance', score: 4, notes: 'Filings on track. Proactive on regulatory changes.', scoredBy: 'Robert Mitchell' },
+  entries: [],
+  reviews: [
+    {
+      id: 'sr-seed',
+      period: '2026-Q1',
+      overallRating: 4,
+      summary: 'Solid quarter overall. Strong financial reporting and compliance work. Maintenance vendor coordination is the main area needing attention.',
+      strengths: ['Monthly reports delivered on time', 'Proactive on regulatory changes', 'Good communication with residents'],
+      improvements: ['Elevator maintenance vendor coordination', 'Faster response on Unit 301 pipe issue'],
+      categoryRatings: {
+        responsiveness: { score: 4, notes: 'Generally responsive. One delayed response on Unit 301 pipe issue.' },
+        financial: { score: 5, notes: 'Monthly reports delivered on time. Budget tracking accurate.' },
+        maintenance: { score: 3, notes: 'Elevator maintenance vendor coordination needs improvement.' },
+        communication: { score: 4, notes: 'Good communication with residents. Board updates regular.' },
+        compliance: { score: 4, notes: 'Filings on track. Proactive on regulatory changes.' },
+      },
+      reviewedBy: 'Robert Mitchell',
+    },
   ],
-  reviews: [],
 
   loadFromDb: async (tenantId: string) => {
     const [entries, reviews] = await Promise.all([
