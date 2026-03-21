@@ -86,6 +86,15 @@ export function buildBoardPacketSnapshot(
       collectionRate: metrics.collectionRate, totalUnits: metrics.totalUnits,
       budgetCategories: variance.length, overBudget: variance.filter(v => v.pct > 100).length,
       underBudget: variance.filter(v => v.pct <= 100).length,
+      netIncome: (() => {
+        try {
+          const ytdStart = `${new Date().getFullYear()}-01-01`;
+          const ytdEnd = new Date().toISOString().split('T')[0];
+          const pnl = fin.getIncomeStatement(ytdStart, ytdEnd);
+          return pnl.netIncome;
+        } catch (_) { return 0; }
+      })(),
+      topVariances: [...variance].sort((a: any, b: any) => b.pct - a.pct).slice(0, 5),
     };
   }
   if (enabledIds.has('compliance')) {
@@ -632,26 +641,134 @@ function MetricBox({ label, value, sub }: { label: string; value: string; sub?: 
   );
 }
 
-function FinancialSection({ data }: { data: any }) {
+function KPICard({
+  label, value, sub, status,
+}: {
+  label: string; value: string; sub?: string;
+  status?: 'good' | 'bad' | 'caution' | 'neutral';
+}) {
+  const valueColor =
+    status === 'good'    ? 'text-sage-700'   :
+    status === 'bad'     ? 'text-red-600'    :
+    status === 'caution' ? 'text-yellow-700' :
+    'text-ink-900';
   return (
-    <div className="space-y-3">
+    <div className="bg-white border border-ink-100 rounded-xl p-4 shadow-sm">
+      <p className="text-[10px] text-ink-400 uppercase tracking-wider font-semibold">{label}</p>
+      <p className={`text-xl font-bold mt-1 font-mono ${valueColor}`}>{value}</p>
+      {sub && <p className="text-[10px] text-ink-400 mt-1.5 leading-snug">{sub}</p>}
+    </div>
+  );
+}
+
+function generateFinancialNarrative(data: any): string {
+  const rate = data.collectionRate ?? 0;
+  const net  = data.netIncome ?? 0;
+  const parts: string[] = [];
+
+  if (rate >= 95)       parts.push(`collection rate is strong at ${rate}%`);
+  else if (rate >= 85)  parts.push(`collection rate is ${rate}% — follow-up recommended`);
+  else                  parts.push(`collection rate is below target at ${rate}%`);
+
+  if (net > 0)       parts.push(`operating with a ${fmt(net)} surplus YTD`);
+  else if (net < 0)  parts.push(`running a ${fmt(Math.abs(net))} deficit YTD`);
+
+  if (data.overBudget > 0)
+    parts.push(`${data.overBudget} budget categor${data.overBudget === 1 ? 'y' : 'ies'} over budget`);
+  else
+    parts.push('all budget categories on track');
+
+  return parts
+    .map((p, i) => (i === 0 ? p.charAt(0).toUpperCase() + p.slice(1) : p))
+    .join(', ') + '.';
+}
+
+function FinancialSection({ data }: { data: any }) {
+  const rate = data.collectionRate ?? 0;
+  const net  = data.netIncome ?? 0;
+
+  const healthStatus =
+    rate >= 95 && data.overBudget === 0 ? 'healthy' :
+    rate >= 85 && data.overBudget <= 2  ? 'caution'  : 'attention';
+
+  const health = {
+    healthy:   { bg: 'bg-sage-50',   border: 'border-sage-200',   dot: 'bg-sage-500',   label: 'Finances On Track'       },
+    caution:   { bg: 'bg-yellow-50', border: 'border-yellow-200', dot: 'bg-yellow-500', label: 'Review Recommended'       },
+    attention: { bg: 'bg-red-50',    border: 'border-red-100',    dot: 'bg-red-500',    label: 'Needs Board Attention'    },
+  }[healthStatus];
+
+  const narrative = generateFinancialNarrative(data);
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── Status banner ── */}
+      <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border ${health.bg} ${health.border}`}>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${health.dot}`} />
+        <span className="text-sm font-semibold text-ink-800">{health.label}</span>
+        <span className="text-xs text-ink-500 hidden sm:block">— {narrative}</span>
+      </div>
+
+      {/* ── Hero KPIs ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KPICard
+          label="Operating Cash"
+          value={fmt(data.operatingCash)}
+          sub="Current operating balance"
+          status="neutral"
+        />
+        <KPICard
+          label="Reserve Fund"
+          value={fmt(data.reserveFund)}
+          sub="Reserve account balance"
+          status="neutral"
+        />
+        <KPICard
+          label="Collection Rate"
+          value={`${rate}%`}
+          sub={`${fmt(data.monthlyCollected)} of ${fmt(data.monthlyExpected)} collected`}
+          status={rate >= 95 ? 'good' : rate >= 85 ? 'caution' : 'bad'}
+        />
+        <KPICard
+          label="Net Income YTD"
+          value={fmt(net)}
+          sub={net >= 0 ? 'Operating surplus' : 'Operating deficit'}
+          status={net >= 0 ? 'good' : 'bad'}
+        />
+      </div>
+
+      {/* ── Budget health ── */}
+      {data.overBudget > 0 ? (
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
+          <p className="text-xs font-bold text-red-700 uppercase tracking-wide">
+            {data.overBudget} of {data.budgetCategories} budget categories over budget
+          </p>
+          {data.topVariances
+            ?.filter((v: any) => v.pct > 100)
+            .map((v: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs text-red-600 py-0.5 border-t border-red-100 first:border-0 pt-1.5">
+                <span className="font-medium">{v.name}</span>
+                <span className="text-red-400 tabular-nums">
+                  {fmt(v.actual)} spent · {v.pct}% of {fmt(v.budgeted)} budget
+                </span>
+              </div>
+            ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-xs text-sage-700 bg-sage-50 border border-sage-100 rounded-xl px-4 py-2.5">
+          <span className="w-2 h-2 rounded-full bg-sage-500 shrink-0" />
+          All {data.budgetCategories} budget categories are on or under budget
+        </div>
+      )}
+
+      {/* ── Secondary metrics ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricBox label="Operating Cash" value={fmt(data.operatingCash)} />
-        <MetricBox label="Reserve Fund" value={fmt(data.reserveFund)} />
-        <MetricBox label="Total Assets" value={fmt(data.totalAssets)} />
-        <MetricBox label="Total Equity" value={fmt(data.totalEquity)} />
+        <MetricBox label="Total Assets"   value={fmt(data.totalAssets)} />
+        <MetricBox label="Total Equity"   value={fmt(data.totalEquity)} />
+        <MetricBox label="Total Units"    value={String(data.totalUnits)} />
+        <MetricBox label="Total Liabilities" value={fmt(data.totalLiabilities)} />
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricBox label="Monthly Expected" value={fmt(data.monthlyExpected)} />
-        <MetricBox label="Monthly Collected" value={fmt(data.monthlyCollected)} />
-        <MetricBox label="Collection Rate" value={`${data.collectionRate}%`} />
-        <MetricBox label="Total Units" value={String(data.totalUnits)} />
-      </div>
-      <div className="flex items-center gap-3 text-xs text-ink-400">
-        <span>{data.budgetCategories} budget categories</span>
-        <span>{data.overBudget} over budget</span>
-        <span>{data.underBudget} under/at budget</span>
-      </div>
+
     </div>
   );
 }

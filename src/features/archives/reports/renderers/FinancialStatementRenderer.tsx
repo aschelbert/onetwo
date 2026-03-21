@@ -22,14 +22,58 @@ export default function FinancialStatementRenderer({ type, snapshot }: Props) {
   return <p className="text-sm text-ink-400">No data available for this financial statement.</p>;
 }
 
+function ExecSummary({ lines }: { lines: string[] }) {
+  return (
+    <div className="mx-5 mb-4 bg-mist-50 border border-mist-200 rounded-lg px-4 py-3 space-y-1.5">
+      {lines.map((line, i) => (
+        <p key={i} className="text-xs text-ink-600 leading-relaxed">{line}</p>
+      ))}
+    </div>
+  );
+}
+
+function ReserveHealthBar({ current, total }: { current: number; total: number }) {
+  const pct = total > 0 ? Math.min(Math.round((current / total) * 100), 100) : 0;
+  const color = pct >= 80 ? 'bg-sage-500' : pct >= 50 ? 'bg-yellow-400' : 'bg-red-400';
+  const label = pct >= 80 ? 'Well-funded' : pct >= 50 ? 'Partially funded' : 'Underfunded';
+  return (
+    <div className="mx-5 mb-4">
+      <div className="flex items-center justify-between text-[10px] text-ink-400 mb-1.5">
+        <span className="uppercase tracking-wide font-semibold">Reserve Fund Health</span>
+        <span className="font-mono tabular-nums">{fmt(current)} of {fmt(total)} — {pct}% funded</span>
+      </div>
+      <div className="w-full h-2 bg-ink-100 rounded-full overflow-hidden">
+        <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className={`text-[10px] mt-1 font-semibold ${
+        pct >= 80 ? 'text-sage-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-600'
+      }`}>{label}</p>
+    </div>
+  );
+}
+
 function BalanceSheet({ data, period }: { data: any; period?: { start: string; end: string } }) {
   const periodText = formatPeriodHeader(period, 'as-of');
+  const totalAssets      = data.assets?.total ?? 0;
+  const reserveFund      = data.assets?.reserves ?? 0;
+  const totalLiabilities = data.liabilities?.total ?? 0;
+  const netEquity        = totalAssets - totalLiabilities;
+  const summaryLines = [
+    `Total assets of ${fmt(totalAssets)} are offset by liabilities of ${fmt(totalLiabilities)}, resulting in net equity of ${fmt(netEquity)}.`,
+    reserveFund > 0
+      ? `The reserve fund holds ${fmt(reserveFund)}, representing ${totalAssets > 0 ? Math.round((reserveFund / totalAssets) * 100) : 0}% of total assets.`
+      : 'No reserve fund balance is currently recorded.',
+  ];
   return (
     <div className="bg-sage-50 border border-sage-200 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-sage-200">
         <h3 className="font-display text-base font-bold text-ink-900">Balance Sheet{periodText ? ` — ${periodText}` : ''}</h3>
         <p className="text-xs text-ink-400">Snapshot at time of generation</p>
       </div>
+      <ExecSummary lines={summaryLines} />
+      {totalAssets > 0 && (
+        <ReserveHealthBar current={reserveFund} total={totalAssets} />
+      )}
       <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
         <div>
           <h4 className="text-xs font-bold text-sage-600 uppercase tracking-wide mb-3">Assets</h4>
@@ -65,11 +109,23 @@ function BalanceSheet({ data, period }: { data: any; period?: { start: string; e
 
 function IncomeStatement({ data, period }: { data: any; period?: { start: string; end: string } }) {
   const periodText = formatPeriodHeader(period, 'range');
+  const surplus    = (data.netIncome ?? 0) >= 0;
+  const pctOfInc   = data.totalIncome > 0
+    ? Math.round((Math.abs(data.netIncome ?? 0) / data.totalIncome) * 100)
+    : 0;
+  const expenseRatio = data.totalIncome > 0
+    ? Math.round((data.totalExpenses / data.totalIncome) * 100)
+    : 0;
+  const isLines = [
+    `Net ${surplus ? 'income' : 'loss'} for the period is ${fmt(data.netIncome ?? 0)}, a ${pctOfInc}% ${surplus ? 'surplus' : 'deficit'} relative to total income of ${fmt(data.totalIncome)}.`,
+    `Total expenses of ${fmt(data.totalExpenses)} represent ${expenseRatio}% of income — ${expenseRatio <= 95 ? 'within an acceptable range' : 'exceeding income for the period'}.`,
+  ];
   return (
     <div className="bg-mist-50 border border-mist-200 rounded-xl overflow-hidden">
       <div className="px-5 py-3 border-b border-mist-200">
         <h3 className="font-display text-base font-bold text-ink-900">Income Statement (P&L){periodText ? ` — ${periodText}` : ''}</h3>
       </div>
+      <ExecSummary lines={isLines} />
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
         <div>
           <h4 className="text-xs font-bold text-sage-600 uppercase tracking-wide mb-3">Income</h4>
@@ -124,6 +180,29 @@ function BudgetVsActual({ rows, period }: { rows: any[]; period?: { start: strin
           </tbody>
         </table>
       </div>
+    {(() => {
+      const overBudget = rows.filter((r: any) => r.pct > 100);
+      const worst = [...rows].sort((a: any, b: any) => b.pct - a.pct)[0];
+      if (overBudget.length === 0) {
+        return (
+          <div className="flex items-center gap-2 mx-5 mb-4 mt-1 text-xs text-sage-700 bg-sage-50 border border-sage-100 rounded-lg px-3 py-2">
+            <span className="w-2 h-2 rounded-full bg-sage-500 shrink-0" />
+            All {rows.length} budget line{rows.length !== 1 ? 's' : ''} are on or under budget.
+          </div>
+        );
+      }
+      return (
+        <div className="mx-5 mb-4 mt-1 bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+          <span className="font-semibold">{overBudget.length} of {rows.length} categories over budget.</span>
+          {worst && (
+            <span className="text-red-500 ml-1">
+              Largest overage: <span className="font-medium">{worst.name}</span> at {worst.pct}% of budget
+              ({fmt(worst.actual)} vs. {fmt(worst.budgeted)} budgeted).
+            </span>
+          )}
+        </div>
+      );
+    })()}
     </div>
   );
 }
