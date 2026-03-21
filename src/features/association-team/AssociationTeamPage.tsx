@@ -16,7 +16,7 @@ const TAB_LABELS: Record<Tab, string> = {
   'property-log': 'Property Log',
   'task-tracking': 'Task Tracking',
   'pm-scorecard': 'PM Scorecard',
-  'communications': 'Communications',
+  'communications': 'Intercom',
   'payroll': 'Payroll & 1099s',
 };
 
