@@ -121,3 +121,33 @@ export interface UnitInvoice {
   stripeRefundId?: string | null;
 }
 
+export interface UnitDocument {
+  id: string;
+  unitNumber: string;
+  uploadedBy: string | null;
+  uploadedByName: string | null;
+  filename: string;
+  storagePath: string;
+  docType: string;
+  visibleToOwner: boolean;
+  createdAt: string;
+}
+
+export interface MoveEvent {
+  id: string;
+  unitNumber: string;
+  moveType: 'in' | 'out';
+  scheduledDate: string;
+  timeWindow: string | null;
+  elevatorSlot: string | null;
+  depositAmount: number;
+  depositStatus: 'pending' | 'collected' | 'refunded' | 'forfeited';
+  accessStatus: 'pending' | 'issued' | 'revoked';
+  insuranceConfirmed: boolean;
+  inspectionStatus: 'pending' | 'scheduled' | 'passed' | 'failed';
+  residentName: string | null;
+  moverName: string | null;
+  caseId: string | null;
+  notes: string | null;
+  createdAt: string;
+}

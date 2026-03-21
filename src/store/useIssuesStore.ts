@@ -1832,6 +1832,27 @@ export const CATS: Category[] = [
           'DC':'DC does not have a specific condo move deposit statute — authority derives from bylaws and rules. Ensure move deposit and fee amounts are authorized in governing documents. DC small claims limit is $10,000 for damage recovery.',
           '_':'Move deposits must be authorized by governing docs. Inspect before and after. Refund or itemize promptly.'
         }
+      },
+      { id:'scheduled-move', title:'Scheduled Move-In/Move-Out', desc:'Coordinate move logistics, deposits, access, and inspections',
+        tags:['Move coordination','Elevator reservation','Deposit collection','Access management'],
+        pre:[
+          {s:'Schedule elevator reservation and confirm move date/time window with resident',t:'Upon request',d:'Rules & Regulations',detail:'Reserve the freight elevator or designated move elevator for the requested time slot. Confirm permitted move hours per building rules. Notify building staff and other residents if required.',ph:'receive',ck:['Reserve elevator for requested time','Confirm permitted move hours','Notify building staff']},
+          {s:'Collect move deposit per governing documents and issue receipt',t:'Before move date',d:'Bylaws & Rules',detail:'Deposit amount must be authorized by governing docs. Collect payment and issue a receipt. Record deposit in financial system.',ph:'receive',ck:['Verify deposit amount per governing docs','Collect payment','Issue receipt']},
+          {s:'Confirm mover insurance certificate (COI) naming association as additional insured',t:'Before move date',d:'Rules & Regulations',detail:'Require certificate of insurance from moving company. Verify association is named as additional insured. Verify coverage meets minimum requirements.',ph:'process',ck:['Request COI from moving company','Verify association named as additional insured','Confirm coverage meets minimums']},
+          {s:'Issue or revoke building access credentials (keys, fobs, parking) as appropriate for move type',t:'Move day',d:'Rules & Regulations',detail:'Move-in: issue keys, fobs, mailbox keys, parking credentials. Move-out: collect and deactivate all credentials. Update access control system.',ph:'process',ck:['Issue or collect keys/fobs','Update mailbox access','Update parking credentials','Update access control system']},
+          {s:'Complete pre/post-move inspection of common areas; document conditions with dated photos',t:'Within 24 hours of move',d:'Rules: Move policy',detail:'Inspect hallways, elevators, lobby, and loading areas before and after the move. Take dated photographs. Compare conditions and note any damage.',ph:'deliver',ck:['Pre-move inspection with photos','Post-move inspection with photos','Compare conditions','Note any damage']},
+          {s:'Record move event, refund or retain deposit based on inspection, and close',t:'Within 30 days',d:'Rules & Regulations',detail:'If no damage: refund deposit with written clearance. If damage found: send itemized deduction notice with photos and repair estimates. Record the completed move event in the system.',ph:'deliver',ck:['Complete inspection review','Process deposit refund or deduction','Send written confirmation to resident','Record move event']}
+        ],
+        self:[
+          {s:'Handle deposit disputes by providing pre/post inspection photos and itemized deductions',t:'Within 10 business days of dispute',d:'Rules & Regulations',desc:'Document-driven response to resident disputes over deposit deductions.',detail:'Respond in writing with: (1) Pre-move inspection photos, (2) Post-move inspection photos, (3) Side-by-side comparison, (4) Repair invoices or estimates for each deduction, (5) Reference to governing document provisions.',w:'Required when resident disputes deposit deductions',ph:'deliver'}
+        ],
+        legal:[
+          {s:'Attorney advises on deposit retention and collection procedures when damage exceeds deposit',t:'When dispute arises',d:'DC Superior Court Small Claims',desc:'Attorney ensures proper procedures for deposit disputes and damage collection.',detail:'Attorney assists with: (1) Reviewing deposit retention authority in governing documents, (2) Drafting demand letter for balance owed, (3) Filing small claims action if needed.',w:'Damage exceeds deposit or formal dispute arises',ph:'deliver'}
+        ],
+        notes:{
+          'DC':'DC does not have a specific condo move deposit statute — authority derives from bylaws and rules. Ensure move deposit and fee amounts are authorized in governing documents.',
+          '_':'Schedule elevator, collect deposit, confirm insurance, manage access, inspect, and close. Document everything.'
+        }
       }
     ]
   }
@@ -2060,6 +2081,11 @@ export const SITUATION_PHASES: Record<string, { id: string; label: string }[]> =
     { id: 'receive', label: 'Receive' },
     { id: 'process', label: 'Process' },
     { id: 'deliver', label: 'Deliver' },
+  ],
+  'scheduled-move': [
+    { id: 'receive', label: 'Schedule & Collect' },
+    { id: 'process', label: 'Verify & Access' },
+    { id: 'deliver', label: 'Inspect & Close' },
   ],
 };
 

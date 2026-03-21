@@ -483,6 +483,12 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
   const [source, setSource] = useState(prefill?.source || '');
   const [daciSuggested, setDaciSuggested] = useState(false);
 
+  // Scheduled move fields
+  const [moveType, setMoveType] = useState<'in' | 'out'>('in');
+  const [moveDate, setMoveDate] = useState('');
+  const [moveTimeWindow, setMoveTimeWindow] = useState('');
+  const [moveResidentName, setMoveResidentName] = useState('');
+
   // Custom situation state
   const [isCustom, setIsCustom] = useState(false);
   const [customSitName, setCustomSitName] = useState('');
@@ -522,18 +528,44 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
     }
   };
 
+  const finStore = useFinancialStore();
+
   const handleCreate = () => {
-    if (!title.trim()) return;
+    // Auto-populate title for scheduled moves if empty
+    const finalTitle = title.trim() || (sitId === 'scheduled-move' ? `Unit ${unit || '___'} — Move-${moveType === 'in' ? 'In' : 'Out'} ${moveDate}` : '');
+    if (!finalTitle) return;
+
     if (isCustom) {
       const filteredSteps = customSteps.filter(cs => cs.s.trim());
       if (!customSitName.trim() || filteredSteps.length === 0) return;
       const customSitId = `custom-${Date.now()}`;
       const fullNotes = customSitDesc.trim() ? `[Custom: ${customSitDesc.trim()}]\n${notes}` : notes;
-      const id = createCase({ catId: catId || 'general', sitId: customSitId, approach: 'pre', title, unit, owner, priority, notes: fullNotes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined, customSteps: filteredSteps.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })) });
+      const id = createCase({ catId: catId || 'general', sitId: customSitId, approach: 'pre', title: finalTitle, unit, owner, priority, notes: fullNotes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined, customSteps: filteredSteps.map(cs => ({ s: cs.s, ...(cs.t && { t: cs.t }), ...(cs.detail && { detail: cs.detail }) })) });
       onDone(id);
     } else {
       if (!catId || !sitId) return;
-      const id = createCase({ catId, sitId, approach, title, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
+      const id = createCase({ catId, sitId, approach, title: finalTitle, unit, owner, priority, notes, assignedTo: assignedTo || undefined, assignedRole: assignedRole || undefined, dueDate: dueDate || undefined, source: source || prefill?.source || undefined, sourceId: prefill?.sourceId || undefined });
+
+      // Create linked move_events record for scheduled-move cases
+      if (sitId === 'scheduled-move' && moveDate) {
+        finStore.addMoveEvent({
+          unitNumber: unit || '',
+          moveType,
+          scheduledDate: moveDate,
+          timeWindow: moveTimeWindow || null,
+          elevatorSlot: null,
+          depositAmount: 0,
+          depositStatus: 'pending',
+          accessStatus: 'pending',
+          insuranceConfirmed: false,
+          inspectionStatus: 'pending',
+          residentName: moveResidentName || owner || null,
+          moverName: null,
+          caseId: id,
+          notes: notes || null,
+        });
+      }
+
       onDone(id);
     }
   };
@@ -706,6 +738,42 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
               ))}
             </div>
           </div>
+          {/* Scheduled Move fields */}
+          {sitId === 'scheduled-move' && (
+            <div className="border-t border-ink-100 pt-4 mt-2 space-y-3">
+              <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-2">Move Details</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Move Type</label>
+                  <select value={moveType} onChange={e => { setMoveType(e.target.value as 'in' | 'out'); if (!title) setTitle(`Unit ${unit || '___'} — Move-${e.target.value === 'in' ? 'In' : 'Out'}`); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                    <option value="in">Move-In</option>
+                    <option value="out">Move-Out</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Scheduled Date *</label>
+                  <input type="date" value={moveDate} onChange={e => setMoveDate(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Time Window</label>
+                  <select value={moveTimeWindow} onChange={e => setMoveTimeWindow(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                    <option value="">Select...</option>
+                    <option value="8am-12pm">8:00 AM - 12:00 PM</option>
+                    <option value="12pm-4pm">12:00 PM - 4:00 PM</option>
+                    <option value="4pm-8pm">4:00 PM - 8:00 PM</option>
+                    <option value="full-day">Full Day</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Resident / Mover Name</label>
+                  <input value={moveResidentName} onChange={e => setMoveResidentName(e.target.value)} placeholder="Name of resident or moving company" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Assignment fields */}
           <div className="border-t border-ink-100 pt-4 mt-2">
             <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider mb-3">Assignment</p>

@@ -25,6 +25,7 @@ export const SIT_TEMPLATE_MAP: Record<string, string[]> = {
   'insurance-claims':      ['notice', 'general'],
   'neighbor-conflicts':    ['violation', 'notice'],
   'damage-responsibility': ['notice'],
+  'scheduled-move': ['notice', 'general'],
 };
 
 export function getSuggestedTemplateCategories(catId: string, sitId: string): string[] {

@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
+import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice } from '@/lib/financial-logic';
-import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
+import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 
@@ -29,6 +30,8 @@ interface FinancialState {
   annualReserveContribution: number;
   workOrders: WorkOrder[];
   unitInvoices: UnitInvoice[];
+  unitDocuments: UnitDocument[];
+  moveEvents: MoveEvent[];
 
   // UI state
   activeTab: string;
@@ -127,6 +130,16 @@ interface FinancialState {
 
   // Refund
   refundUnitInvoice: (invoiceId: string, reason: string) => void;
+
+  // Unit Documents
+  fetchUnitDocuments: (tenantId: string) => Promise<void>;
+  uploadDocument: (unitNumber: string, file: File, docType: string, visibleToOwner: boolean, uploadedBy: string | null, uploadedByName: string | null) => Promise<void>;
+  deleteDocument: (id: string, storagePath: string) => Promise<void>;
+
+  // Move Events
+  fetchMoveEvents: (tenantId: string) => Promise<void>;
+  addMoveEvent: (event: Omit<MoveEvent, 'id' | 'createdAt'>) => Promise<MoveEvent | null>;
+  updateMoveEvent: (id: string, updates: Partial<MoveEvent>) => Promise<void>;
 }
 
 // ── Sync helpers ──
@@ -182,6 +195,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   annualReserveContribution: 12000,
   workOrders: [...seedWorkOrders],
   unitInvoices: [],
+  unitDocuments: [],
+  moveEvents: [],
 
   activeTab: 'dashboard',
   glFilter: { account: '', source: '', search: '' },
@@ -210,6 +225,13 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     }
     if (data.workOrders) updates.workOrders = data.workOrders;
     if (data.unitInvoices) updates.unitInvoices = data.unitInvoices;
+    // Fetch unit documents and move events
+    const [unitDocs, moveEvts] = await Promise.all([
+      unitMgrSvc.fetchUnitDocuments(tenantId),
+      unitMgrSvc.fetchMoveEvents(tenantId),
+    ]);
+    if (unitDocs) updates.unitDocuments = unitDocs;
+    if (moveEvts) updates.moveEvents = moveEvts;
     if (data.settings) {
       updates.hoaDueDay = data.settings.hoaDueDay;
       updates.annualReserveContribution = data.settings.annualReserveContribution;
@@ -807,6 +829,44 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     syncSettings();
   },
 
+  // Unit Documents
+  fetchUnitDocuments: async (tenantId) => {
+    const docs = await unitMgrSvc.fetchUnitDocuments(tenantId);
+    if (docs) set({ unitDocuments: docs });
+  },
+  uploadDocument: async (unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName) => {
+    const tenantId = get().tenantId;
+    if (!tenantId) return;
+    const doc = await unitMgrSvc.uploadUnitDocument(tenantId, unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName);
+    if (doc) set(s => ({ unitDocuments: [doc, ...s.unitDocuments] }));
+  },
+  deleteDocument: async (id, storagePath) => {
+    const ok = await unitMgrSvc.deleteUnitDocument(id, storagePath);
+    if (ok) set(s => ({ unitDocuments: s.unitDocuments.filter(d => d.id !== id) }));
+  },
+
+  // Move Events
+  fetchMoveEvents: async (tenantId) => {
+    const events = await unitMgrSvc.fetchMoveEvents(tenantId);
+    if (events) set({ moveEvents: events });
+  },
+  addMoveEvent: async (event) => {
+    const tenantId = get().tenantId;
+    if (!tenantId) {
+      // Offline: create a local-only event
+      const local: MoveEvent = { ...event, id: 'mv-' + Date.now(), createdAt: new Date().toISOString() };
+      set(s => ({ moveEvents: [local, ...s.moveEvents] }));
+      return local;
+    }
+    const created = await unitMgrSvc.createMoveEvent(tenantId, event);
+    if (created) set(s => ({ moveEvents: [created, ...s.moveEvents] }));
+    return created;
+  },
+  updateMoveEvent: async (id, updates) => {
+    const ok = await unitMgrSvc.updateMoveEvent(id, updates);
+    if (ok) set(s => ({ moveEvents: s.moveEvents.map(e => e.id === id ? { ...e, ...updates } : e) }));
+  },
+
   // Unit Invoices
   createUnitInvoice: (unitNum, type, amount, description, caseId?) => {
     const today = new Date().toISOString().split('T')[0];
@@ -868,6 +928,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     annualReserveContribution: state.annualReserveContribution,
     workOrders: state.workOrders,
     unitInvoices: state.unitInvoices,
+    unitDocuments: state.unitDocuments,
+    moveEvents: state.moveEvents,
     stripeConnectId: state.stripeConnectId,
     stripeOnboardingComplete: state.stripeOnboardingComplete,
     autoBillingEnabled: state.autoBillingEnabled,
