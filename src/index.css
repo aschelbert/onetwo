@@ -116,25 +116,43 @@
     display: none !important;
   }
 
-  /* Report print mode — activated by adding .printing-report to body */
-  body.printing-report *:not(.print-report-active):not(.print-report-active *) {
+  /* Report print mode — activated by printReport() helper.
+     Hides sibling branches at each level while keeping the ancestor
+     chain and report content fully intact (preserves flex/grid etc). */
+
+  /* Hide direct children of body that aren't on the ancestor path */
+  body.printing-report > *:not(.print-report-ancestor) {
     display: none !important;
   }
 
-  body.printing-report .print-report-active {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
+  /* At each ancestor level, hide siblings that aren't the next
+     ancestor or the active report element */
+  body.printing-report .print-report-ancestor > *:not(.print-report-ancestor):not(.print-report-active) {
+    display: none !important;
+  }
+
+  /* Strip visual chrome from ancestor wrappers so they're
+     transparent pass-through containers */
+  body.printing-report .print-report-ancestor {
     padding: 0 !important;
     margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* The report element itself */
+  body.printing-report .print-report-active {
+    width: 100% !important;
+    max-width: 100% !important;
     background: white !important;
   }
 
-  body.printing-report .print-report-active * {
-    display: revert !important;
-  }
-
+  /* Hide no-print elements inside the report */
   body.printing-report .print-report-active .no-print {
     display: none !important;
   }
