@@ -9,12 +9,13 @@ import TheUnitsTab from './tabs/TheUnitsTab';
 import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
 import VendorsTab from './tabs/VendorsTab';
+import MaintenanceScheduleTab from './tabs/MaintenanceScheduleTab';
 
 import MailingSettingsTab from './tabs/MailingSettingsTab';
 import FeeScheduleTab from './tabs/FeeScheduleTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors','fees','mailing'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', mailing:'Mailing' };
+const TABS = ['details','contacts','units','legal','insurance','vendors','fees','maintenance','mailing'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', maintenance:'Maintenance', mailing:'Mailing' };
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
@@ -22,7 +23,7 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: { la
   );
 }
 
-type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor';
+type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint';
 
 export default function BuildingPage() {
   const store = useBuildingStore();
@@ -167,6 +168,16 @@ export default function BuildingPage() {
           {/* FEE SCHEDULE */}
           {tab === 'fees' && <FeeScheduleTab />}
 
+          {/* MAINTENANCE */}
+          {tab === 'maintenance' && (
+            <MaintenanceScheduleTab
+              store={store}
+              isBoard={isBoard}
+              openAdd={() => { resetForm(); setModal('addMaint'); }}
+              openEdit={(id, data) => openEdit('editMaint', id, data)}
+            />
+          )}
+
           {/* MAILING */}
           {tab === 'mailing' && isBoard && <MailingSettingsTab />}
         </div>
@@ -187,6 +198,8 @@ export default function BuildingPage() {
       {(modal === 'addIns' || modal === 'editIns') && (<Modal title={modal === 'addIns' ? 'Add Insurance Policy' : 'Edit Policy'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('type') || !f('carrier')) { alert('Type and carrier required'); return; } const data = { type: f('type'), carrier: f('carrier'), coverage: f('coverage'), premium: f('premium'), expires: f('expires'), policyNum: f('policyNum') }; if (modal === 'addIns') store.addInsurance(data); else store.updateInsurance(editId, data); setModal(null); resetForm(); }}><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><Field label="Policy Type *" value={f('type')} onChange={v => sf('type', v)} placeholder="General Liability" /><Field label="Policy #" value={f('policyNum')} onChange={v => sf('policyNum', v)} /></div><div className="grid grid-cols-2 gap-3"><Field label="Carrier *" value={f('carrier')} onChange={v => sf('carrier', v)} /><Field label="Coverage" value={f('coverage')} onChange={v => sf('coverage', v)} /></div><div className="grid grid-cols-2 gap-3"><Field label="Premium" value={f('premium')} onChange={v => sf('premium', v)} placeholder="$8,500/yr" /><Field label="Expires" value={f('expires')} onChange={v => sf('expires', v)} type="date" /></div>{modal === 'editIns' && (() => { const pol = store.insurance.find(p => p.id === editId); if (!pol) return null; return (<div className="border-t pt-3"><label className="block text-xs font-medium text-ink-700 mb-2">Policy Documents</label>{pol.attachments.length > 0 && (<div className="space-y-1.5 mb-2">{pol.attachments.map((att, i) => (<div key={i} className="flex items-center justify-between py-1.5 px-3 bg-mist-50 border border-mist-100 rounded-lg"><div className="flex items-center gap-2"><span className="text-accent-500 text-sm">📎</span><span className="text-xs font-medium text-ink-700">{att.name}</span><span className="text-[10px] text-ink-400">{att.size} · {att.uploadedAt}</span></div><button type="button" onClick={() => store.removeInsuranceAttachment(editId, i)} className="text-[10px] text-red-400 hover:text-red-600">Remove</button></div>))}</div>)}<button type="button" onClick={() => { const name = prompt('File name (e.g., GL_Policy_2026.pdf):'); if (name) { const size = prompt('File size (e.g., 2.1 MB):') || '1.0 MB'; store.addInsuranceAttachment(editId, { name, size, type: 'application/pdf' }); } }} className="w-full py-2 border-2 border-dashed border-ink-200 rounded-lg text-xs text-ink-500 hover:border-accent-300 hover:text-accent-600">+ Attach Policy Document</button></div>); })()}</div></Modal>)}
 
       {(modal === 'addVendor' || modal === 'editVendor') && (<Modal title={modal === 'addVendor' ? 'Add Vendor' : 'Edit Vendor'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('name') || !f('service')) { alert('Name and service required'); return; } if (modal === 'addVendor') store.addVendor({ name: f('name'), service: f('service'), contact: f('contact'), phone: f('phone'), email: f('email'), contract: f('contract'), status: 'active' }); else store.updateVendor(editId, { name: f('name'), service: f('service'), contact: f('contact'), phone: f('phone'), email: f('email'), contract: f('contract') }); setModal(null); resetForm(); }}><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><Field label="Company Name *" value={f('name')} onChange={v => sf('name', v)} /><Field label="Service *" value={f('service')} onChange={v => sf('service', v)} placeholder="Plumbing" /></div><div className="grid grid-cols-2 gap-3"><Field label="Contact Person" value={f('contact')} onChange={v => sf('contact', v)} /><Field label="Phone" value={f('phone')} onChange={v => sf('phone', v)} /></div><div className="grid grid-cols-2 gap-3"><Field label="Email" value={f('email')} onChange={v => sf('email', v)} type="email" /><Field label="Contract" value={f('contract')} onChange={v => sf('contract', v)} placeholder="On-call" /></div></div></Modal>)}
+
+      {(modal === 'addMaint' || modal === 'editMaint') && (<Modal title={modal === 'addMaint' ? 'Add Maintenance Task' : 'Edit Maintenance Task'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('task') || !f('category')) { alert('Task name and category required'); return; } const data = { task: f('task'), category: f('category'), frequency: f('frequency') || 'quarterly', vendor: f('vendor'), lastCompleted: f('lastCompleted'), nextDue: f('nextDue'), estimatedCost: f('estimatedCost'), notes: f('notes'), status: (f('status') || 'on-track') as 'on-track' | 'due-soon' | 'overdue' | 'completed' }; if (modal === 'addMaint') store.addMaintenanceSchedule(data); else store.updateMaintenanceSchedule(editId, data); setModal(null); resetForm(); }}><div className="space-y-3"><Field label="Task Name *" value={f('task')} onChange={v => sf('task', v)} placeholder="HVAC Filter Replacement" /><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category *</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['HVAC','Elevator','Fire Safety','Plumbing','Electrical','General'].map(c => <option key={c}>{c}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Frequency</label><select value={f('frequency') || 'quarterly'} onChange={e => sf('frequency', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semi-annual">Semi-Annual</option><option value="annual">Annual</option></select></div></div><Field label="Vendor" value={f('vendor')} onChange={v => sf('vendor', v)} placeholder="Assigned vendor name" /><div className="grid grid-cols-2 gap-3"><Field label="Last Completed" value={f('lastCompleted')} onChange={v => sf('lastCompleted', v)} type="date" /><Field label="Next Due" value={f('nextDue')} onChange={v => sf('nextDue', v)} type="date" /></div><div className="grid grid-cols-2 gap-3"><Field label="Estimated Cost" value={f('estimatedCost')} onChange={v => sf('estimatedCost', v)} placeholder="$450" /><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status') || 'on-track'} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="on-track">On Track</option><option value="due-soon">Due Soon</option><option value="overdue">Overdue</option><option value="completed">Completed</option></select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} placeholder="Additional details..." /></div></div></Modal>)}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { supabase, logDbError } from '@/lib/supabase';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
-  LegalDocument, InsurancePolicy, Vendor,
+  LegalDocument, InsurancePolicy, Vendor, MaintenanceSchedule,
 } from '@/store/useBuildingStore';
 
 // ── Board Members ──
@@ -286,16 +286,77 @@ export async function deleteVendor(id: string): Promise<boolean> {
   return true;
 }
 
+// ── Maintenance Schedules ──
+
+export async function fetchMaintenanceSchedules(tenantId: string): Promise<MaintenanceSchedule[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('maintenance_schedules')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (error) { logDbError('fetchMaintenanceSchedules error:', error); return null; }
+  return (data || []).map(r => ({
+    id: r.id, task: r.task, category: r.category, frequency: r.frequency,
+    vendor: r.vendor || '', lastCompleted: r.last_completed || '', nextDue: r.next_due || '',
+    estimatedCost: r.estimated_cost || '', notes: r.notes || '',
+    status: r.status as MaintenanceSchedule['status'],
+  }));
+}
+
+export async function createMaintenanceSchedule(tenantId: string, m: Omit<MaintenanceSchedule, 'id'>): Promise<MaintenanceSchedule | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('maintenance_schedules')
+    .insert({
+      tenant_id: tenantId, task: m.task, category: m.category, frequency: m.frequency,
+      vendor: m.vendor, last_completed: m.lastCompleted || null, next_due: m.nextDue || null,
+      estimated_cost: m.estimatedCost, notes: m.notes, status: m.status,
+    })
+    .select()
+    .single();
+  if (error) { logDbError('createMaintenanceSchedule error:', error); return null; }
+  return {
+    id: data.id, task: data.task, category: data.category, frequency: data.frequency,
+    vendor: data.vendor || '', lastCompleted: data.last_completed || '', nextDue: data.next_due || '',
+    estimatedCost: data.estimated_cost || '', notes: data.notes || '', status: data.status,
+  };
+}
+
+export async function updateMaintenanceSchedule(id: string, m: Partial<MaintenanceSchedule>): Promise<boolean> {
+  if (!supabase) return false;
+  const row: Record<string, unknown> = {};
+  if (m.task !== undefined) row.task = m.task;
+  if (m.category !== undefined) row.category = m.category;
+  if (m.frequency !== undefined) row.frequency = m.frequency;
+  if (m.vendor !== undefined) row.vendor = m.vendor;
+  if (m.lastCompleted !== undefined) row.last_completed = m.lastCompleted || null;
+  if (m.nextDue !== undefined) row.next_due = m.nextDue || null;
+  if (m.estimatedCost !== undefined) row.estimated_cost = m.estimatedCost;
+  if (m.notes !== undefined) row.notes = m.notes;
+  if (m.status !== undefined) row.status = m.status;
+  const { error } = await supabase.from('maintenance_schedules').update(row).eq('id', id);
+  if (error) { logDbError('updateMaintenanceSchedule error:', error); return false; }
+  return true;
+}
+
+export async function deleteMaintenanceSchedule(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('maintenance_schedules').delete().eq('id', id);
+  if (error) { logDbError('deleteMaintenanceSchedule error:', error); return false; }
+  return true;
+}
+
 // ── Bulk fetch for loadFromDb ──
 
 export async function fetchAllBuildingData(tenantId: string) {
-  const [board, management, counsel, docs, insurance, vendors] = await Promise.all([
+  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules] = await Promise.all([
     fetchBoardMembers(tenantId),
     fetchManagementInfo(tenantId),
     fetchLegalCounsel(tenantId),
     fetchLegalDocuments(tenantId),
     fetchInsurancePolicies(tenantId),
     fetchVendors(tenantId),
+    fetchMaintenanceSchedules(tenantId),
   ]);
-  return { board, management, counsel, docs, insurance, vendors };
+  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules };
 }

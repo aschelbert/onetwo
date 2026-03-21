@@ -25,6 +25,7 @@ export interface InsurancePolicy {
 }
 export interface Vendor {
   id: string; name: string; service: string; contact: string; phone: string; email: string; contract: string; status: 'active' | 'inactive';
+  w9OnFile?: boolean;
 }
 export interface BuildingAddress {
   street: string; city: string; state: string; zip: string;
@@ -34,6 +35,19 @@ export interface BuildingDetails {
   parking: string; architect: string; contractor: string; amenities: string[];
   entityType: 'incorporated' | 'unincorporated';
   fiscalYearEnd: string; // MM-DD format, e.g. '12-31'
+}
+
+export interface MaintenanceSchedule {
+  id: string;
+  task: string;
+  category: string;
+  frequency: string;
+  vendor: string;
+  lastCompleted: string;
+  nextDue: string;
+  estimatedCost: string;
+  notes: string;
+  status: 'on-track' | 'due-soon' | 'overdue' | 'completed';
 }
 
 export interface BylawsConfig {
@@ -53,6 +67,7 @@ interface BuildingState {
   legalDocuments: LegalDocument[];
   insurance: InsurancePolicy[];
   vendors: Vendor[];
+  maintenanceSchedules: MaintenanceSchedule[];
   bylawsConfig: BylawsConfig;
   updateBylawsConfig: (config: Partial<BylawsConfig>) => void;
 
@@ -89,6 +104,11 @@ interface BuildingState {
   updateVendor: (id: string, v: Partial<Vendor>) => void;
   removeVendor: (id: string) => void;
   toggleVendorStatus: (id: string) => void;
+  toggleVendorW9: (id: string) => void;
+
+  addMaintenanceSchedule: (m: Omit<MaintenanceSchedule, 'id'>, tenantId?: string) => void;
+  updateMaintenanceSchedule: (id: string, m: Partial<MaintenanceSchedule>) => void;
+  removeMaintenanceSchedule: (id: string) => void;
 }
 
 // Sync helpers
@@ -116,6 +136,11 @@ function syncVendor(id: string) {
   if (!isBackendEnabled) return;
   const v = useBuildingStore.getState().vendors.find(x => x.id === id);
   if (v) buildingSvc.updateVendor(id, v);
+}
+function syncMaintenanceSchedule(id: string) {
+  if (!isBackendEnabled) return;
+  const m = useBuildingStore.getState().maintenanceSchedules.find(x => x.id === id);
+  if (m) buildingSvc.updateMaintenanceSchedule(id, m);
 }
 
 export const useBuildingStore = create<BuildingState>()(persist((set) => ({
@@ -172,6 +197,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     { id: 'v4', name: 'Metro Elevator Co', service: 'Elevator', contact: 'James Metro', phone: '202-555-4004', email: 'james@metroelevator.com', contract: 'Annual inspection, $950/yr', status: 'active' },
     { id: 'v5', name: 'Quick Fix Plumbing', service: 'Plumbing', contact: 'Pete Quick', phone: '202-555-4005', email: 'pete@quickfix.com', contract: 'On-call', status: 'active' },
   ],
+  maintenanceSchedules: [
+    { id: 'ms1', task: 'HVAC Filter Replacement', category: 'HVAC', frequency: 'quarterly', vendor: 'Cool Air Services', lastCompleted: '2026-01-15', nextDue: '2026-04-15', estimatedCost: '$450', notes: 'Replace all common area HVAC filters', status: 'on-track' },
+    { id: 'ms2', task: 'Elevator Inspection', category: 'Elevator', frequency: 'semi-annual', vendor: 'Metro Elevator Co', lastCompleted: '2025-12-01', nextDue: '2026-06-01', estimatedCost: '$950', notes: 'State-mandated safety inspection for both elevators', status: 'on-track' },
+    { id: 'ms3', task: 'Fire Alarm System Test', category: 'Fire Safety', frequency: 'annual', vendor: '', lastCompleted: '2025-06-15', nextDue: '2026-06-15', estimatedCost: '$1,200', notes: 'Full fire alarm and sprinkler system test per NFPA 72', status: 'on-track' },
+    { id: 'ms4', task: 'Backflow Preventer Test', category: 'Plumbing', frequency: 'annual', vendor: 'Quick Fix Plumbing', lastCompleted: '2025-03-10', nextDue: '2026-03-10', estimatedCost: '$350', notes: 'Annual backflow prevention device testing — DC Water requirement', status: 'overdue' },
+    { id: 'ms5', task: 'Roof Inspection', category: 'General', frequency: 'semi-annual', vendor: 'Apex Roofing', lastCompleted: '2025-10-01', nextDue: '2026-04-01', estimatedCost: '$600', notes: 'Visual inspection of membrane, flashing, and drainage', status: 'due-soon' },
+    { id: 'ms6', task: 'Emergency Generator Test', category: 'Electrical', frequency: 'monthly', vendor: '', lastCompleted: '2026-03-01', nextDue: '2026-04-01', estimatedCost: '$200', notes: 'Monthly load test of backup generator', status: 'on-track' },
+  ],
   bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51 },
 
   // ─── DB Hydration ─────────────────────────────
@@ -184,6 +217,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (data.docs) updates.legalDocuments = data.docs;
     if (data.insurance) updates.insurance = data.insurance;
     if (data.vendors) updates.vendors = data.vendors;
+    if (data.maintenanceSchedules) updates.maintenanceSchedules = data.maintenanceSchedules;
     if (Object.keys(updates).length > 0) set(updates);
   },
 
@@ -317,6 +351,29 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) }));
     syncVendor(id);
   },
+  toggleVendorW9: (id) => {
+    set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, w9OnFile: !x.w9OnFile } : x) }));
+    syncVendor(id);
+  },
+
+  addMaintenanceSchedule: (m, tenantId?) => {
+    const id = 'ms' + Date.now();
+    set(s => ({ maintenanceSchedules: [...s.maintenanceSchedules, { id, ...m }] }));
+    if (isBackendEnabled && tenantId) {
+      buildingSvc.createMaintenanceSchedule(tenantId, m).then(dbRow => {
+        if (dbRow) set(s => ({ maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateMaintenanceSchedule: (id, m) => {
+    set(s => ({ maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, ...m } : x) }));
+    syncMaintenanceSchedule(id);
+  },
+  removeMaintenanceSchedule: (id) => {
+    set(s => ({ maintenanceSchedules: s.maintenanceSchedules.filter(x => x.id !== id) }));
+    if (isBackendEnabled) buildingSvc.deleteMaintenanceSchedule(id);
+  },
+
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
@@ -330,6 +387,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     legalDocuments: state.legalDocuments,
     insurance: state.insurance,
     vendors: state.vendors,
+    maintenanceSchedules: state.maintenanceSchedules,
     bylawsConfig: state.bylawsConfig,
   }),
   merge: (persisted: any, current: any) => ({
