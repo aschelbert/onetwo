@@ -1,7 +1,7 @@
 import { useBuildingStore } from '@/store/useBuildingStore';
 import type { MaintenanceSchedule } from '@/store/useBuildingStore';
 
-const CATEGORIES = ['HVAC', 'Elevator', 'Fire Safety', 'Plumbing', 'Electrical', 'General'] as const;
+const BASE_CATEGORIES = ['HVAC', 'Elevator', 'Fire Safety', 'Plumbing', 'Electrical', 'General'];
 const FREQUENCIES = ['monthly', 'quarterly', 'semi-annual', 'annual'] as const;
 
 const FREQ_LABELS: Record<string, string> = {
@@ -19,6 +19,7 @@ const CAT_COLORS: Record<string, string> = {
   Electrical: 'bg-yellow-100 text-yellow-700',
   General: 'bg-ink-100 text-ink-600',
 };
+const AMENITY_COLOR = 'bg-accent-100 text-accent-700';
 
 const STATUS_CONFIG: Record<MaintenanceSchedule['status'], { label: string; color: string; dot: string }> = {
   'on-track': { label: 'On Track', color: 'bg-sage-100 text-sage-700', dot: 'bg-sage-500' },
@@ -36,6 +37,8 @@ interface Props {
 
 export default function MaintenanceScheduleTab({ store, isBoard, openAdd, openEdit }: Props) {
   const schedules = store.maintenanceSchedules;
+  const amenityCategories = store.details.amenities.filter(a => !BASE_CATEGORIES.some(b => b.toLowerCase() === a.toLowerCase()));
+  const allCategories = [...BASE_CATEGORIES, ...amenityCategories];
 
   // Compliance scoring
   const total = schedules.length;
@@ -109,7 +112,7 @@ export default function MaintenanceScheduleTab({ store, isBoard, openAdd, openEd
 
           {schedules.map(m => {
             const st = STATUS_CONFIG[m.status];
-            const catColor = CAT_COLORS[m.category] || CAT_COLORS.General;
+            const catColor = CAT_COLORS[m.category] || AMENITY_COLOR;
             return (
               <div key={m.id} className={`rounded-xl border p-4 transition-all ${m.status === 'overdue' ? 'border-red-200 bg-red-50 bg-opacity-40' : m.status === 'due-soon' ? 'border-yellow-200 bg-yellow-50 bg-opacity-40' : 'border-ink-100 bg-white hover:shadow-sm'}`}>
                 <div className="flex items-start justify-between gap-3">
