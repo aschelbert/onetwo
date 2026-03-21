@@ -4,6 +4,7 @@ import type { ScorecardReview } from '@/store/useScorecardStore';
 import type { CategoryRatings, Category } from '@/lib/services/scorecard';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { getActiveTenantId } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 
 // ─── Constants ────────────────────────────────────────
@@ -160,7 +161,7 @@ export default function PMScorecardTab() {
       improvements: reviewImprovements.filter(s => s.trim()),
       categoryRatings: reviewCategoryRatings,
       reviewedBy: currentUser.name,
-    });
+    }, getActiveTenantId() ?? undefined);
     setModal(null);
   };
 

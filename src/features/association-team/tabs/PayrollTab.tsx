@@ -4,7 +4,7 @@ import { usePayrollStore } from '@/store/usePayrollStore';
 import type { StaffMember, TimeEntry, PayRun } from '@/store/usePayrollStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { supabase } from '@/lib/supabase';
+import { supabase, getActiveTenantId } from '@/lib/supabase';
 
 /* ── Helpers ───────────────────────────────────────────────── */
 
@@ -39,7 +39,7 @@ export default function PayrollTab() {
     setStaffForm(rest); setEditStaffId(id); setStaffModal('edit');
   };
   const saveStaff = () => {
-    if (staffModal === 'add') addStaff(staffForm);
+    if (staffModal === 'add') addStaff(staffForm, getActiveTenantId() ?? undefined);
     else if (editStaffId) updateStaff(editStaffId, staffForm);
     setStaffModal(null);
   };
@@ -58,7 +58,7 @@ export default function PayrollTab() {
   };
   const saveTime = () => {
     if (editTimeId) updateTimeEntry(editTimeId, timeForm);
-    else addTimeEntry(timeForm);
+    else addTimeEntry(timeForm, getActiveTenantId() ?? undefined);
     setTimeModal(false);
   };
 
@@ -81,7 +81,7 @@ export default function PayrollTab() {
   const openRunPayroll = () => { setPayForm({ staffId: staff[0]?.id ?? '', periodStart: '', periodEnd: '' }); setPayModal(true); };
   const runPayroll = () => {
     if (payForm.staffId && payForm.periodStart && payForm.periodEnd) {
-      createPayRun(payForm.staffId, payForm.periodStart, payForm.periodEnd);
+      createPayRun(payForm.staffId, payForm.periodStart, payForm.periodEnd, getActiveTenantId() ?? undefined);
     }
     setPayModal(false);
   };
@@ -508,7 +508,7 @@ export default function PayrollTab() {
                     <span className="font-medium text-ink-900">YTD: {fmt$(ytd)}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => generate1099(c.id, year1099)}
+                    <button onClick={() => generate1099(c.id, year1099, getActiveTenantId() ?? undefined)}
                       className="px-3 py-1.5 bg-ink-900 text-white rounded-md text-xs font-medium hover:bg-ink-800">
                       {f ? 'Regenerate 1099' : 'Generate 1099'}
                     </button>

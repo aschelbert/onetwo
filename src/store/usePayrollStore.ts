@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useFinancialStore } from './useFinancialStore';
-import { supabase } from '@/lib/supabase';
+import { supabase, isBackendEnabled } from '@/lib/supabase';
+import * as payrollSvc from '@/lib/services/payroll';
 
 /* ── Types ─────────────────────────────────────────────────── */
 
@@ -102,22 +103,25 @@ interface PayrollState {
   payRuns: PayRun[];
   form1099s: Form1099[];
 
+  // Hydration
+  loadFromDb: (tenantId: string) => Promise<void>;
+
   // Staff CRUD
-  addStaff: (s: Omit<StaffMember, 'id'>) => void;
+  addStaff: (s: Omit<StaffMember, 'id'>, tenantId?: string) => void;
   updateStaff: (id: string, u: Partial<StaffMember>) => void;
   updateStaffStripe: (staffId: string, stripeAccountId: string, onboardingComplete: boolean) => void;
 
   // Time entries
-  addTimeEntry: (e: Omit<TimeEntry, 'id'>) => void;
+  addTimeEntry: (e: Omit<TimeEntry, 'id'>, tenantId?: string) => void;
   updateTimeEntry: (id: string, u: Partial<TimeEntry>) => void;
   deleteTimeEntry: (id: string) => void;
 
   // Pay runs
-  createPayRun: (staffId: string, periodStart: string, periodEnd: string) => PayRun;
+  createPayRun: (staffId: string, periodStart: string, periodEnd: string, tenantId?: string) => PayRun;
   processPayRun: (id: string, paymentMethod: 'stripe' | 'manual') => Promise<void>;
 
   // 1099s
-  generate1099: (staffId: string, year: number) => void;
+  generate1099: (staffId: string, year: number, tenantId?: string) => void;
   markSent: (id: string) => void;
 }
 
@@ -127,15 +131,38 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   payRuns: seedPayRuns,
   form1099s: [],
 
+  /* ── Hydration ──────────────────────── */
+
+  loadFromDb: async (tenantId: string) => {
+    const [staff, timeEntries, payRuns, form1099s] = await Promise.all([
+      payrollSvc.fetchStaff(tenantId),
+      payrollSvc.fetchTimeEntries(tenantId),
+      payrollSvc.fetchPayRuns(tenantId),
+      payrollSvc.fetchForm1099s(tenantId),
+    ]);
+    const updates: Partial<PayrollState> = {};
+    if (staff) updates.staff = staff;
+    if (timeEntries) updates.timeEntries = timeEntries;
+    if (payRuns) updates.payRuns = payRuns;
+    if (form1099s) updates.form1099s = form1099s;
+    if (Object.keys(updates).length > 0) set(updates);
+  },
+
   /* ── Staff ─────────────────────────── */
 
-  addStaff: (s) => {
+  addStaff: (s, tenantId?) => {
     const id = 'staff' + Date.now();
     set(st => ({ staff: [...st.staff, { id, ...s }] }));
+    if (isBackendEnabled && tenantId) {
+      payrollSvc.createStaff(tenantId, s).then(dbRow => {
+        if (dbRow) set(st => ({ staff: st.staff.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
   },
 
   updateStaff: (id, u) => {
     set(st => ({ staff: st.staff.map(s => s.id === id ? { ...s, ...u } : s) }));
+    if (isBackendEnabled) payrollSvc.updateStaff(id, u);
   },
 
   updateStaffStripe: (staffId, stripeAccountId, onboardingComplete) => {
@@ -144,26 +171,35 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
         s.id === staffId ? { ...s, stripeAccountId, stripeOnboardingComplete: onboardingComplete } : s
       ),
     }));
+    if (isBackendEnabled) payrollSvc.updateStaff(staffId, { stripeAccountId, stripeOnboardingComplete: onboardingComplete });
   },
 
   /* ── Time entries ──────────────────── */
 
-  addTimeEntry: (e) => {
+  addTimeEntry: (e, tenantId?) => {
     const id = 'te' + Date.now();
     set(st => ({ timeEntries: [...st.timeEntries, { id, ...e }] }));
+    if (isBackendEnabled && tenantId) {
+      // staffId in the entry is the local id; for DB we need to pass it through
+      payrollSvc.createTimeEntry(tenantId, e.staffId, { date: e.date, hours: e.hours, description: e.description }).then(dbRow => {
+        if (dbRow) set(st => ({ timeEntries: st.timeEntries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
   },
 
   updateTimeEntry: (id, u) => {
     set(st => ({ timeEntries: st.timeEntries.map(e => e.id === id ? { ...e, ...u } : e) }));
+    if (isBackendEnabled) payrollSvc.updateTimeEntry(id, u);
   },
 
   deleteTimeEntry: (id) => {
     set(st => ({ timeEntries: st.timeEntries.filter(e => e.id !== id) }));
+    if (isBackendEnabled) payrollSvc.deleteTimeEntry(id);
   },
 
   /* ── Pay runs ──────────────────────── */
 
-  createPayRun: (staffId, periodStart, periodEnd) => {
+  createPayRun: (staffId, periodStart, periodEnd, tenantId?) => {
     const state = get();
     const member = state.staff.find(s => s.id === staffId)!;
     const entries = state.timeEntries.filter(e =>
@@ -175,8 +211,9 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
     const deductions = Math.round(grossPay * withholdingPct / 100 * 100) / 100;
     const netPay = Math.round((grossPay - deductions) * 100) / 100;
 
+    const localId = 'pr' + Date.now();
     const pr: PayRun = {
-      id: 'pr' + Date.now(),
+      id: localId,
       staffId,
       periodStart,
       periodEnd,
@@ -193,6 +230,14 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       withholdingGlEntryId: null,
     };
     set(st => ({ payRuns: [...st.payRuns, pr] }));
+
+    if (isBackendEnabled && tenantId) {
+      const { id: _id, ...rest } = pr;
+      payrollSvc.createPayRun(tenantId, rest).then(dbRow => {
+        if (dbRow) set(st => ({ payRuns: st.payRuns.map(p => p.id === localId ? { ...p, id: dbRow.id } : p) }));
+      });
+    }
+
     return pr;
   },
 
@@ -210,6 +255,7 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
         p.id === id ? { ...p, status: 'processing' as const, paymentMethod } : p
       ),
     }));
+    if (isBackendEnabled) payrollSvc.updatePayRun(id, { status: 'processing', paymentMethod });
 
     const finState = useFinancialStore.getState();
     const glPost = finState.glPost;
@@ -292,39 +338,39 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
         });
 
         if (error || !data?.transferId) {
+          const failUpdates = { status: 'failed' as const, glEntryId, withholdingGlEntryId };
           set(st => ({
-            payRuns: st.payRuns.map(p =>
-              p.id === id ? { ...p, status: 'failed' as const, glEntryId, withholdingGlEntryId } : p
-            ),
+            payRuns: st.payRuns.map(p => p.id === id ? { ...p, ...failUpdates } : p),
           }));
+          if (isBackendEnabled) payrollSvc.updatePayRun(id, failUpdates);
           return;
         }
 
+        const successUpdates = { status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId, stripeTransferId: data.transferId };
         set(st => ({
-          payRuns: st.payRuns.map(p =>
-            p.id === id ? { ...p, status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId, stripeTransferId: data.transferId } : p
-          ),
+          payRuns: st.payRuns.map(p => p.id === id ? { ...p, ...successUpdates } : p),
         }));
+        if (isBackendEnabled) payrollSvc.updatePayRun(id, successUpdates);
       } catch {
+        const failUpdates = { status: 'failed' as const, glEntryId, withholdingGlEntryId };
         set(st => ({
-          payRuns: st.payRuns.map(p =>
-            p.id === id ? { ...p, status: 'failed' as const, glEntryId, withholdingGlEntryId } : p
-          ),
+          payRuns: st.payRuns.map(p => p.id === id ? { ...p, ...failUpdates } : p),
         }));
+        if (isBackendEnabled) payrollSvc.updatePayRun(id, failUpdates);
       }
     } else {
       // Manual payment — mark paid after GL posting
+      const paidUpdates = { status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId };
       set(st => ({
-        payRuns: st.payRuns.map(p =>
-          p.id === id ? { ...p, status: 'paid' as const, paidDate: today, glEntryId, withholdingGlEntryId } : p
-        ),
+        payRuns: st.payRuns.map(p => p.id === id ? { ...p, ...paidUpdates } : p),
       }));
+      if (isBackendEnabled) payrollSvc.updatePayRun(id, paidUpdates);
     }
   },
 
   /* ── 1099s ─────────────────────────── */
 
-  generate1099: (staffId, year) => {
+  generate1099: (staffId, year, tenantId?) => {
     const state = get();
     const paidRuns = state.payRuns.filter(
       pr => pr.staffId === staffId && pr.status === 'paid' &&
@@ -335,35 +381,43 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
 
     const existing = state.form1099s.find(f => f.staffId === staffId && f.year === year);
     if (existing) {
+      const updates = { totalCompensation, status: 'generated' as const, generatedDate: today };
       set(st => ({
         form1099s: st.form1099s.map(f =>
-          f.id === existing.id
-            ? { ...f, totalCompensation, status: 'generated' as const, generatedDate: today }
-            : f
+          f.id === existing.id ? { ...f, ...updates } : f
         ),
       }));
+      if (isBackendEnabled) payrollSvc.updateForm1099(existing.id, updates);
     } else {
-      set(st => ({
-        form1099s: [...st.form1099s, {
-          id: '1099-' + Date.now(),
-          staffId,
-          year,
-          totalCompensation,
-          status: 'generated',
-          generatedDate: today,
-          sentDate: null,
-        }],
-      }));
+      const localId = '1099-' + Date.now();
+      const newForm: Form1099 = {
+        id: localId,
+        staffId,
+        year,
+        totalCompensation,
+        status: 'generated',
+        generatedDate: today,
+        sentDate: null,
+      };
+      set(st => ({ form1099s: [...st.form1099s, newForm] }));
+      if (isBackendEnabled && tenantId) {
+        const { id: _id, ...rest } = newForm;
+        payrollSvc.createForm1099(tenantId, rest).then(dbRow => {
+          if (dbRow) set(st => ({ form1099s: st.form1099s.map(f => f.id === localId ? { ...f, id: dbRow.id } : f) }));
+        });
+      }
     }
   },
 
   markSent: (id) => {
     const today = new Date().toISOString().slice(0, 10);
+    const updates = { status: 'sent' as const, sentDate: today };
     set(st => ({
       form1099s: st.form1099s.map(f =>
-        f.id === id ? { ...f, status: 'sent' as const, sentDate: today } : f
+        f.id === id ? { ...f, ...updates } : f
       ),
     }));
+    if (isBackendEnabled) payrollSvc.updateForm1099(id, updates);
   },
 }), {
   name: 'onetwo-payroll',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { usePropertyLogStore, type PropertyLogEntry } from '@/store/usePropertyLogStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getActiveTenantId } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 
 type ModalMode = null | 'add' | 'edit';
@@ -149,7 +150,7 @@ export default function PropertyLogPage() {
         findings: cleanFindings,
         actionItems: cleanActions,
         notes: form.notes,
-      });
+      }, getActiveTenantId() ?? undefined);
       // addLog prepends; grab the newly created log's ID
       logId = usePropertyLogStore.getState().logs[0].id;
     }
@@ -171,7 +172,7 @@ export default function PropertyLogPage() {
           completedAt: action.status === 'done' ? new Date().toISOString() : null,
           linkedItems: [{ type: 'property_log' as const, id: logId, title: form.title }],
           notes: '',
-        });
+        }, getActiveTenantId() ?? undefined);
         // addTask prepends; grab the generated task ID
         const taskId = useTaskTrackingStore.getState().tasks[0].id;
         return { ...action, taskId };

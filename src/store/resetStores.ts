@@ -16,6 +16,7 @@ import { useScorecardStore } from './useScorecardStore';
 import { useCommunicationsStore } from './useCommunicationsStore';
 import { useAmenitiesStore } from './useAmenitiesStore';
 import { usePayrollStore } from './usePayrollStore';
+import { useTaskTrackingStore } from './useTaskTrackingStore';
 
 export function resetStoresForRealTenant() {
   useBuildingStore.setState({
@@ -81,6 +82,8 @@ export function resetStoresForRealTenant() {
   useAmenitiesStore.setState({ configs: [], reservations: [], notifications: [] });
 
   usePayrollStore.setState({ staff: [], timeEntries: [], payRuns: [], form1099s: [] });
+
+  useTaskTrackingStore.setState({ tasks: [] });
   // Note: stripeAccountId, stripeOnboardingComplete on staff, and paymentMethod,
   // stripeTransferId, withholdingGlEntryId on payRuns are cleared when arrays empty.
 }

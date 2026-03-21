@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { getActiveTenantId } from '@/lib/supabase';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
@@ -141,7 +142,7 @@ export default function TaskTrackingTab() {
   const saveTask = () => {
     if (!taskForm.title.trim()) return;
     if (taskModal === 'add') {
-      addTask(taskForm);
+      addTask(taskForm, getActiveTenantId() ?? undefined);
     } else if (editTaskId) {
       const { createdBy, createdByName, ...updates } = taskForm;
       updateTask(editTaskId, updates);
