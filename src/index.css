@@ -116,12 +116,13 @@
     display: none !important;
   }
 
-  /* Report print mode */
-  body:has(.print-report-root) > *:not(.print-report-root):not(.print-report-header) {
+  /* Report print mode — activated by adding .printing-report to body */
+  body.printing-report *:not(.print-report-active):not(.print-report-active *) {
     display: none !important;
   }
 
-  .print-report-root {
+  body.printing-report .print-report-active {
+    display: block !important;
     position: static !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -130,32 +131,12 @@
     background: white !important;
   }
 
-  .print-report-header {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    padding-bottom: 16px;
-    margin-bottom: 16px;
-    border-bottom: 2px solid #1a1f25;
+  body.printing-report .print-report-active * {
+    display: revert !important;
   }
 
-  /* Page numbers */
-  .print-report-root {
-    counter-reset: page-num;
-  }
-
-  .print-report-root::after {
-    content: '';
-    display: block;
-    page-break-after: avoid;
-  }
-
-  @page {
-    @bottom-center {
-      content: counter(page);
-      font-size: 10px;
-      color: #6b7280;
-    }
+  body.printing-report .print-report-active .no-print {
+    display: none !important;
   }
 
   /* General print cleanup */

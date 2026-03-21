@@ -6,6 +6,7 @@ import CaseReportRenderer from './renderers/CaseReportRenderer';
 import FinancialStatementRenderer from './renderers/FinancialStatementRenderer';
 import BoardReportRenderer from './renderers/BoardReportRenderer';
 import SalesPackageRenderer from './renderers/SalesPackageRenderer';
+import { printReport } from '@/lib/printReport';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Unknown';
@@ -133,13 +134,13 @@ export default function ReportList() {
                   <div className="border-t border-ink-100 px-4 pb-5 pt-4">
                     <div className="flex justify-end mb-3 no-print">
                       <button
-                        onClick={e => { e.stopPropagation(); window.print(); }}
+                        onClick={e => { e.stopPropagation(); printReport(document.querySelector(`[data-report-print="${report.id}"]`) as HTMLElement); }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800 transition-colors"
                       >
                         Export PDF
                       </button>
                     </div>
-                    <div className="print-report-root">
+                    <div className="print-report-root" data-report-print={report.id}>
                       <ReportRenderer report={report} />
                     </div>
                   </div>

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { fmt } from '@/lib/formatters';
+import { printReport } from '@/lib/printReport';
 
 type ReportTab = 'balanceSheet' | 'incomeStatement' | 'budgetVariance' | 'form1120h' | 'localTax';
 
@@ -56,6 +57,7 @@ export default function FLReports() {
   const bv = getBudgetVariance();
 
   const [tab, setTab] = useState<ReportTab>('balanceSheet');
+  const printRef = useRef<HTMLDivElement>(null);
 
   const state = building.address.state;
   const entityType = building.details.entityType || 'incorporated';
@@ -79,7 +81,7 @@ export default function FLReports() {
   ];
 
   return (
-    <div className="space-y-6 print-report-root">
+    <div className="space-y-6 print-report-root" ref={printRef}>
       {/* Report selector + Export PDF */}
       <div className="flex items-center gap-3">
         <div className="flex gap-1 bg-mist-50 rounded-lg p-1 flex-wrap flex-1">
@@ -88,7 +90,7 @@ export default function FLReports() {
           ))}
         </div>
         <button
-          onClick={() => window.print()}
+          onClick={() => printReport(printRef.current)}
           className="no-print px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800 transition-colors shrink-0"
         >
           Export PDF

@@ -1,12 +1,30 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useArchiveStore, type ArchiveSnapshot } from '@/store/useArchiveStore';
 import { useReportsStore, type GeneratedReport, type ReportType } from '@/store/useReportsStore';
+import { useReportStore } from '@/store/useReportStore';
+import type { ReportType as FullReportType, ReportCategory } from '@/lib/services/reports';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
+import { generateReportSnapshot } from '@/features/archives/reports/reportGenerators';
+import CaseReportRenderer from '@/features/archives/reports/renderers/CaseReportRenderer';
+import FinancialStatementRenderer from '@/features/archives/reports/renderers/FinancialStatementRenderer';
+import BoardReportRenderer from '@/features/archives/reports/renderers/BoardReportRenderer';
+import SalesPackageRenderer from '@/features/archives/reports/renderers/SalesPackageRenderer';
+import { printReport } from '@/lib/printReport';
+
+// Map wizard report types → generator types + categories
+const GENERATOR_MAP: Record<ReportType, { generatorType: FullReportType; category: ReportCategory }> = {
+  board_packet:        { generatorType: 'board_packet',            category: 'board_governance' },
+  financial_statement: { generatorType: 'financial_snapshot',      category: 'board_governance' },
+  delinquency:         { generatorType: 'collections_delinquency', category: 'case_analysis' },
+  compliance_summary:  { generatorType: 'compliance_report',       category: 'board_governance' },
+  meeting_minutes:     { generatorType: 'board_packet',            category: 'board_governance' },
+  annual_report:       { generatorType: 'board_packet',            category: 'board_governance' },
+};
 
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -268,6 +286,7 @@ export default function ArchivesPage() {
   // Stores
   const archiveStore = useArchiveStore();
   const reportsStore = useReportsStore();
+  const reportStore = useReportStore();
   const { currentRole, currentUser } = useAuthStore();
   const comp = useComplianceStore();
   const mtg = useMeetingsStore();
@@ -296,6 +315,7 @@ export default function ArchivesPage() {
   const [reportSections, setReportSections] = useState<Set<string>>(new Set(REPORT_SECTIONS.board_packet.map(s => s.id)));
   const [typeFilter, setTypeFilter] = useState<ReportType | 'all'>('all');
   const [reportDone, setReportDone] = useState<GeneratedReport | null>(null);
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
 
   const openReportPanel = () => {
     setReportType('board_packet');
@@ -329,6 +349,15 @@ export default function ArchivesPage() {
 
   const handleGenerateReport = () => {
     const meta = REPORT_META[reportType];
+    const mapping = GENERATOR_MAP[reportType];
+    const snapshot = generateReportSnapshot(mapping.generatorType, {
+      periodStart: reportFrom,
+      periodEnd: reportTo,
+    });
+    const today = new Date().toISOString();
+    const userName = currentUser?.name || 'Board Member';
+
+    // Save to legacy store (for local display list)
     const report: GeneratedReport = {
       id: 'rpt_' + Date.now(),
       name: `${meta.label} — ${reportPeriodLabel}`,
@@ -337,10 +366,24 @@ export default function ArchivesPage() {
       periodEnd: reportTo,
       periodLabel: reportPeriodLabel,
       sections: [...reportSections],
-      generatedAt: new Date().toISOString(),
-      generatedBy: currentUser?.name || 'Board Member',
+      generatedAt: today,
+      generatedBy: userName,
     };
     reportsStore.addReport(report);
+
+    // Save to canonical report store (with snapshot for rendering)
+    useReportStore.getState().addReport({
+      configId: '',
+      name: `${meta.label} — ${reportPeriodLabel}`,
+      type: mapping.generatorType,
+      category: mapping.category,
+      generatedAt: today,
+      generatedBy: userName,
+      snapshot,
+      periodStart: reportFrom,
+      periodEnd: reportTo,
+    });
+
     setReportDone(report);
     setReportStep(4);
   };
@@ -519,33 +562,69 @@ export default function ArchivesPage() {
               <div className="grid gap-3">
                 {filteredReports.map(r => {
                   const meta = REPORT_META[r.type];
+                  const isExpanded = expandedReportId === r.id;
+                  // Find matching canonical report (with snapshot) by name
+                  const canonical = reportStore.reports.find(cr => cr.name === r.name && cr.generatedAt === r.generatedAt);
                   return (
-                    <div key={r.id} className="border border-ink-100 rounded-xl p-4 hover:border-accent-200 hover:shadow-sm transition-all flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 ${meta.bgClass}`}>
-                        {meta.icon}
+                    <div key={r.id} className={`border rounded-xl transition-all ${isExpanded ? 'border-ink-200 shadow-sm' : 'border-ink-100 hover:border-accent-200 hover:shadow-sm'}`}>
+                      <div
+                        className="p-4 flex items-center gap-4 cursor-pointer"
+                        onClick={() => setExpandedReportId(isExpanded ? null : r.id)}
+                      >
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 ${meta.bgClass}`}>
+                          {meta.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-ink-900 truncate">{r.name}</p>
+                          <p className="text-xs text-ink-500 mt-0.5">
+                            Generated {new Date(r.generatedAt).toLocaleDateString()} · by {r.generatedBy} · {r.sections.length} sections
+                          </p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-1 rounded-lg font-semibold whitespace-nowrap flex-shrink-0 ${meta.badgeClass}`}>
+                          {fmtDate(r.periodStart)} – {fmtDate(r.periodEnd)}
+                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {isBoard && (
+                            <button
+                              onClick={e => { e.stopPropagation(); if (confirm('Delete this report?')) { reportsStore.deleteReport(r.id); if (canonical) reportStore.deleteReport(canonical.id); if (isExpanded) setExpandedReportId(null); } }}
+                              className="text-xs text-red-400 hover:text-red-600 px-1"
+                            >
+                              ×
+                            </button>
+                          )}
+                          <svg className={`w-4 h-4 text-ink-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-ink-900 truncate">{r.name}</p>
-                        <p className="text-xs text-ink-500 mt-0.5">
-                          Generated {new Date(r.generatedAt).toLocaleDateString()} · by {r.generatedBy} · {r.sections.length} sections
-                        </p>
-                      </div>
-                      <span className={`text-[10px] px-2 py-1 rounded-lg font-semibold whitespace-nowrap flex-shrink-0 ${meta.badgeClass}`}>
-                        {fmtDate(r.periodStart)} – {fmtDate(r.periodEnd)}
-                      </span>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => window.print()} className="text-xs px-3 py-1.5 border border-ink-200 rounded-lg hover:bg-mist-50 text-ink-700 font-medium transition-colors">
-                          Export PDF
-                        </button>
-                        {isBoard && (
-                          <button
-                            onClick={() => { if (confirm('Delete this report?')) reportsStore.deleteReport(r.id); }}
-                            className="text-xs text-red-400 hover:text-red-600 px-1"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
+                      {isExpanded && (
+                        <div className="border-t border-ink-100 px-4 pb-5 pt-4">
+                          <div className="flex justify-end mb-3 no-print">
+                            <button
+                              onClick={() => printReport(document.querySelector(`[data-report-print="${r.id}"]`) as HTMLElement)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800 transition-colors"
+                            >
+                              Export PDF
+                            </button>
+                          </div>
+                          <div className="print-report-root" data-report-print={r.id}>
+                            {canonical?.snapshot ? (
+                              (() => {
+                                const cat = canonical.category;
+                                if (cat === 'case_analysis') return <CaseReportRenderer type={canonical.type} snapshot={canonical.snapshot} />;
+                                if (cat === 'financial_statements') return <FinancialStatementRenderer type={canonical.type} snapshot={canonical.snapshot} />;
+                                if (cat === 'board_governance') return <BoardReportRenderer type={canonical.type} snapshot={canonical.snapshot} />;
+                                if (cat === 'sales_package') return <SalesPackageRenderer type={canonical.type} snapshot={canonical.snapshot} />;
+                                return <p className="text-sm text-ink-400">Unknown report category.</p>;
+                              })()
+                            ) : (
+                              <div className="text-center py-8 text-ink-400">
+                                <p className="text-sm">Report data unavailable. Try regenerating this report.</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
