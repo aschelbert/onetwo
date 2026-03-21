@@ -129,6 +129,14 @@ export default function PMScorecardTab() {
     });
   }, [store.reviews]);
 
+  // TTM (trailing twelve months = last 4 quarters) overall score
+  const ttmScore = useMemo(() => {
+    const withData = trendData.filter(r => r.hasData).slice(0, 4);
+    if (withData.length === 0) return null;
+    const avg = withData.reduce((s, r) => s + r.overall, 0) / withData.length;
+    return Math.round(avg * 10) / 10;
+  }, [trendData]);
+
   // ─── Handlers ───────────────────────────────────────
 
   const openReviewModal = () => {
@@ -249,7 +257,7 @@ export default function PMScorecardTab() {
       {/* ── Reviews Section ─────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Quarterly Reviews</h4>
+          <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Reviews</h4>
           <button
             onClick={openReviewModal}
             className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium"
@@ -355,6 +363,23 @@ export default function PMScorecardTab() {
       <div>
         <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Performance Trend</h4>
         <div className="bg-white rounded-xl border border-ink-100 p-5">
+          {/* TTM Overall */}
+          {ttmScore !== null && (
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-ink-100">
+              <div>
+                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wider">TTM Overall Score</p>
+                <p className="text-[10px] text-ink-400 mt-0.5">Trailing 12-month average</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StarRating score={ttmScore} size="md" />
+                <span className={`text-2xl font-bold ${scoreColorClasses(Math.round(ttmScore)).text}`}>
+                  {ttmScore.toFixed(1)}
+                </span>
+                <span className="text-sm text-ink-400">/5</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             {/* Header row */}
             <div className="flex items-center gap-2">
@@ -444,7 +469,7 @@ export default function PMScorecardTab() {
       {/* ── Write Review Modal (includes category ratings) ── */}
       {modal === 'writeReview' && (
         <Modal
-          title="Write Quarterly Review"
+          title="Write Review"
           subtitle={`${management.company || 'PM Company'} -- ${selectedPeriod}`}
           onClose={() => setModal(null)}
           onSave={saveReview}
@@ -577,7 +602,7 @@ export default function PMScorecardTab() {
       {/* ── View Review Modal ──────────────────────── */}
       {modal === 'viewReview' && viewedReview && (
         <Modal
-          title="Quarterly Review"
+          title="Review"
           subtitle={`${management.company || 'PM Company'} -- ${viewedReview.period}`}
           onClose={() => { setModal(null); setViewReviewId(null); }}
           wide
