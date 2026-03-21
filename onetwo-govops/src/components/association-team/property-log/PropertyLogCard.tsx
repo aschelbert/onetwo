@@ -52,6 +52,15 @@ export function PropertyLogCard({ log, tenancySlug }: { log: PropertyLog; tenanc
                 {log.conducted_by && <span>by {log.conducted_by}</span>}
                 {log.location && <span>{log.location}</span>}
               </div>
+              {log.insurance_claim_case_id && (
+                <Link
+                  href={`/app/${tenancySlug}/boardroom/cases/${log.insurance_claim_case_id}/steps/1`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full text-[0.72rem] font-semibold bg-amber-50 text-amber-800 border border-amber-200 no-underline hover:bg-amber-100 transition-colors"
+                >
+                  ⚖️ Insurance Claim →
+                </Link>
+              )}
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
               <Badge variant={STATUS_VARIANT[log.status]}>{STATUS_LABEL[log.status]}</Badge>

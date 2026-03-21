@@ -15,6 +15,12 @@ const LOG_TYPES = [
   { value: 'maintenance_observation', label: 'Maintenance Observation' },
 ]
 
+const CLAIM_OPTIONS: { value: 'yes' | 'no' | 'unknown'; label: string }[] = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+  { value: 'unknown', label: 'Unknown' },
+]
+
 export function PropertyLogForm({
   open,
   onClose,
@@ -32,14 +38,22 @@ export function PropertyLogForm({
     date: new Date().toISOString().split('T')[0],
     conducted_by: '',
     location: '',
+    insurance_claim_needed: 'unknown' as 'yes' | 'no' | 'unknown',
   })
 
   const handleSubmit = () => {
     if (!form.title.trim()) return
     startTransition(async () => {
-      const log = await createPropertyLog(tenancySlug, form)
+      const log = await createPropertyLog(tenancySlug, {
+        type: form.type,
+        title: form.title,
+        date: form.date,
+        conducted_by: form.conducted_by,
+        location: form.location,
+        insurance_claim_needed: form.type === 'incident' ? form.insurance_claim_needed : 'unknown',
+      })
       onClose()
-      setForm({ type: 'walkthrough', title: '', date: new Date().toISOString().split('T')[0], conducted_by: '', location: '' })
+      setForm({ type: 'walkthrough', title: '', date: new Date().toISOString().split('T')[0], conducted_by: '', location: '', insurance_claim_needed: 'unknown' })
       router.push(`/app/${tenancySlug}/association-team/property-log/${log.id}`)
     })
   }
@@ -59,12 +73,34 @@ export function PropertyLogForm({
       }
     >
       <FormGroup label="Type">
-        <Select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+        <Select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value, insurance_claim_needed: 'unknown' }))}>
           {LOG_TYPES.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </Select>
       </FormGroup>
+
+      {form.type === 'incident' && (
+        <FormGroup label="Insurance claim needed?">
+          <div className="flex gap-1">
+            {CLAIM_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, insurance_claim_needed: opt.value }))}
+                className={`flex-1 px-3 py-2 text-[0.82rem] font-medium rounded-lg border transition-all cursor-pointer ${
+                  form.insurance_claim_needed === opt.value
+                    ? 'bg-[#1a1f25] text-white border-[#1a1f25]'
+                    : 'bg-white text-[#45505a] border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </FormGroup>
+      )}
+
       <FormGroup label="Title">
         <Input
           value={form.title}

@@ -277,6 +277,17 @@ export function PropertyLogDetail({
               />
             </FormGroup>
           </div>
+
+          {log.insurance_claim_case_id && (
+            <div className="mt-4">
+              <Link
+                href={`/app/${tenancySlug}/boardroom/cases/${log.insurance_claim_case_id}/steps/1`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.78rem] font-semibold bg-amber-50 text-amber-800 border border-amber-200 no-underline hover:bg-amber-100 transition-colors"
+              >
+                ⚖️ Insurance Claim →
+              </Link>
+            </div>
+          )}
         </CardBody>
       </Card>
 

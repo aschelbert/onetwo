@@ -2,7 +2,8 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { resolveTenantId } from '@/lib/resolve-tenant'
 import { redirect } from 'next/navigation'
 import { PMScorecardDashboard } from '@/components/association-team/pm-scorecard/PMScorecardDashboard'
-import type { PMScorecardEntry, PMScorecardReview } from '@/types/association-team'
+import { computeScorecardData } from './actions'
+import type { PMScorecardReview } from '@/types/association-team'
 
 export default async function PMScorecardPage({
   params,
@@ -19,12 +20,9 @@ export default async function PMScorecardPage({
   if (!tenantId) redirect('/unauthorized')
 
   const db = supabase as any
-  const [{ data: entries }, { data: reviews }] = await Promise.all([
-    db
-      .from('pm_scorecard_entries')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false }),
+
+  const [scorecardData, { data: reviews }] = await Promise.all([
+    computeScorecardData(tenancySlug),
     db
       .from('pm_scorecard_reviews')
       .select('*')
@@ -34,7 +32,7 @@ export default async function PMScorecardPage({
 
   return (
     <PMScorecardDashboard
-      entries={(entries as unknown as PMScorecardEntry[]) || []}
+      scorecardData={scorecardData}
       reviews={(reviews as unknown as PMScorecardReview[]) || []}
       tenancySlug={tenancySlug}
     />

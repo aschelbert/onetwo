@@ -9,6 +9,14 @@ import type { PropertyLogFinding, PropertyLogActionItem } from '@/types/associat
 // We cast to `any` at the `.from()` boundary to bypass type checks.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+const INSURANCE_CLAIM_STEPS = [
+  { step_text: 'Document incident details and gather photo evidence', sort_order: 0 },
+  { step_text: 'Notify insurer within required reporting window', sort_order: 1 },
+  { step_text: 'Coordinate adjuster site access', sort_order: 2 },
+  { step_text: 'Track claim status and board updates', sort_order: 3 },
+  { step_text: 'Close claim and record outcome in Fiscal Lens GL', sort_order: 4 },
+]
+
 export async function createPropertyLog(
   tenancySlug: string,
   data: {
@@ -17,11 +25,14 @@ export async function createPropertyLog(
     date: string
     conducted_by: string
     location: string
+    insurance_claim_needed?: string
   }
 ) {
   const supabase = await createServerSupabase()
   const tenantId = await resolveTenantId(supabase, tenancySlug)
   if (!tenantId) throw new Error('Tenant not found')
+
+  const claimNeeded = data.insurance_claim_needed || 'unknown'
 
   const { data: log, error } = await (supabase as any)
     .from('property_logs')
@@ -36,13 +47,95 @@ export async function createPropertyLog(
       findings: [],
       action_items: [],
       notes: '',
+      insurance_claim_needed: claimNeeded,
     })
     .select()
     .single()
 
   if (error) throw new Error(error.message)
+
+  // If insurance claim needed, create a case automatically
+  if (claimNeeded === 'yes') {
+    await createInsuranceClaimCase(supabase, tenantId, tenancySlug, log)
+  }
+
   revalidatePath(`/app/${tenancySlug}/association-team/property-log`)
   return log
+}
+
+async function createInsuranceClaimCase(
+  supabase: any,
+  tenantId: string,
+  tenancySlug: string,
+  log: any
+) {
+  const caseId = crypto.randomUUID()
+  const localId = `c-ins-${Date.now()}`
+  const title = `Insurance Claim — ${log.title} — ${log.date}`
+
+  const { error: caseError } = await supabase
+    .from('cases')
+    .insert({
+      id: caseId,
+      tenant_id: tenantId,
+      local_id: localId,
+      cat_id: 'legal',
+      sit_id: 'insurance-claims',
+      title,
+      unit: '',
+      owner: '',
+      approach: 'pre',
+      status: 'open',
+      priority: 'high',
+      created_date: new Date().toISOString().split('T')[0],
+      notes: `Auto-created from property log incident: ${log.title}`,
+      board_votes: null,
+      linked_wos: [],
+      source: 'property_log',
+      source_id: log.id,
+    })
+
+  if (caseError) {
+    console.error('Failed to create insurance claim case:', caseError.message)
+    return
+  }
+
+  // Create pre-populated case steps
+  const stepRows = INSURANCE_CLAIM_STEPS.map((s, i) => ({
+    id: crypto.randomUUID(),
+    tenant_id: tenantId,
+    case_id: caseId,
+    local_id: `s${i}`,
+    step_text: s.step_text,
+    timing: null,
+    doc_ref: null,
+    detail: null,
+    warning: null,
+    done: false,
+    done_date: null,
+    user_notes: '',
+    sort_order: s.sort_order,
+  }))
+
+  const { error: stepsError } = await supabase
+    .from('case_steps')
+    .insert(stepRows)
+
+  if (stepsError) {
+    console.error('Failed to create case steps:', stepsError.message)
+  }
+
+  // Write case id back to property log
+  const { error: updateError } = await supabase
+    .from('property_logs')
+    .update({ insurance_claim_case_id: caseId })
+    .eq('id', log.id)
+
+  if (updateError) {
+    console.error('Failed to link case to property log:', updateError.message)
+  }
+
+  revalidatePath(`/app/${tenancySlug}/association-team/property-log`)
 }
 
 export async function updatePropertyLog(
