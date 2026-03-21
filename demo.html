@@ -117,9 +117,10 @@
             overflow: hidden;
             box-shadow: 0 4px 24px rgba(15,26,46,0.06);
         }
-        .calendar-card .calendly-inline-widget {
+        .calendar-card iframe {
             width: 100%;
             height: 700px;
+            border: none;
         }
 
         /* FOOTER */
@@ -145,7 +146,7 @@
         @media (max-width: 768px) {
             .demo-header h1 { font-size: 1.8rem; }
             .demo-page { padding: 7rem 1rem 3rem; }
-            .calendar-card .calendly-inline-widget { height: 550px; }
+            .calendar-card iframe { height: 550px; }
             .nav-links a:not(.btn) { display: none; }
         }
     </style>
@@ -171,10 +172,21 @@
         <p>See how ONE two simplifies HOA governance, compliance, and accounting. Pick a time that works for you.</p>
     </div>
     <div class="calendar-card">
-        <!-- Calendly inline widget begin -->
-        <div class="calendly-inline-widget" data-url="https://calendly.com/alyssa-getonetwo/30min?primary_color=d62839" style="min-width:320px;height:700px;"></div>
-        <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
-        <!-- Calendly inline widget end -->
+        <!-- Cal inline embed code begins -->
+        <div style="width:100%;height:100%;overflow:scroll" id="my-cal-inline-30min"></div>
+        <script type="text/javascript">
+          (function (C, A, L) { let p = function (a, ar) { a.q.push(ar); }; let d = C.document; C.Cal = C.Cal || function () { let cal = C.Cal; let ar = arguments; if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; } if (ar[0] === L) { const api = function () { p(api, arguments); }; const namespace = ar[1]; api.q = api.q || []; if(typeof namespace === "string"){cal.ns[namespace] = cal.ns[namespace] || api;p(cal.ns[namespace], ar);p(cal, ["initNamespace", namespace]);} else p(cal, ar); return;} p(cal, ar); }; })(window, "https://app.cal.com/embed/embed.js", "init");
+          Cal("init", "30min", {origin:"https://app.cal.com"});
+
+          Cal.ns["30min"]("inline", {
+            elementOrSelector:"#my-cal-inline-30min",
+            config: {"layout":"month_view","useSlotsViewOnSmallScreen":"true"},
+            calLink: "alyssaschelbert/30min",
+          });
+
+          Cal.ns["30min"]("ui", {"hideEventTypeDetails":false,"layout":"month_view"});
+        </script>
+        <!-- Cal inline embed code ends -->
     </div>
 </main>
 
