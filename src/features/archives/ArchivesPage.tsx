@@ -534,8 +534,8 @@ export default function ArchivesPage() {
                         {fmtDate(r.periodStart)} – {fmtDate(r.periodEnd)}
                       </span>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button className="text-xs px-3 py-1.5 border border-ink-200 rounded-lg hover:bg-mist-50 text-ink-700 font-medium transition-colors">
-                          ⬇ Download
+                        <button onClick={() => window.print()} className="text-xs px-3 py-1.5 border border-ink-200 rounded-lg hover:bg-mist-50 text-ink-700 font-medium transition-colors">
+                          Export PDF
                         </button>
                         {isBoard && (
                           <button
@@ -737,6 +737,12 @@ export default function ArchivesPage() {
                   This report will be generated from live data as of today. The period covered is {fmtDate(reportFrom)} – {fmtDate(reportTo)}.
                 </p>
               </div>
+              <button
+                onClick={() => window.print()}
+                className="mt-3 w-full py-2 border border-ink-200 rounded-lg text-sm font-medium text-ink-700 hover:bg-mist-50 transition-colors"
+              >
+                Export PDF (Preview)
+              </button>
             </div>
           )}
 
@@ -777,7 +783,7 @@ export default function ArchivesPage() {
           {reportStep === 4 && (
             <>
               <button onClick={() => setShowReportPanel(false)} className="flex-1 py-2.5 border border-ink-200 rounded-lg text-sm font-medium text-ink-700 hover:bg-mist-50 transition-colors">Close</button>
-              <button className="flex-[2] py-2.5 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800 transition-colors">⬇ Download PDF</button>
+              <button onClick={() => window.print()} className="flex-[2] py-2.5 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800 transition-colors">Export PDF</button>
             </>
           )}
         </div>

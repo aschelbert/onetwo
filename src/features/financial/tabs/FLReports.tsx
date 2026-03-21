@@ -79,12 +79,20 @@ export default function FLReports() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Report selector */}
-      <div className="flex gap-1 bg-mist-50 rounded-lg p-1 flex-wrap">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>{t.label}</button>
-        ))}
+    <div className="space-y-6 print-report-root">
+      {/* Report selector + Export PDF */}
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1 bg-mist-50 rounded-lg p-1 flex-wrap flex-1">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>{t.label}</button>
+          ))}
+        </div>
+        <button
+          onClick={() => window.print()}
+          className="no-print px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-semibold hover:bg-ink-800 transition-colors shrink-0"
+        >
+          Export PDF
+        </button>
       </div>
 
       {/* Balance Sheet */}

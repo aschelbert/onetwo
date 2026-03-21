@@ -131,7 +131,17 @@ export default function ReportList() {
                 </div>
                 {isExpanded && (
                   <div className="border-t border-ink-100 px-4 pb-5 pt-4">
-                    <ReportRenderer report={report} />
+                    <div className="flex justify-end mb-3 no-print">
+                      <button
+                        onClick={e => { e.stopPropagation(); window.print(); }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800 transition-colors"
+                      >
+                        Export PDF
+                      </button>
+                    </div>
+                    <div className="print-report-root">
+                      <ReportRenderer report={report} />
+                    </div>
                   </div>
                 )}
               </div>

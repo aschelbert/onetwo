@@ -211,43 +211,64 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       ),
     }));
 
-    const glPost = useFinancialStore.getState().glPost;
+    const finState = useFinancialStore.getState();
+    const glPost = finState.glPost;
+    const coa = finState.chartOfAccounts;
+
+    // Dynamic account lookup from chart_of_accounts
+    const findAcct = (pred: (a: { num: string; name: string; type: string; sub: string }) => boolean, fallback: string) => {
+      const found = coa.find(a => a.sub !== 'header' && pred(a));
+      return found?.num ?? fallback;
+    };
+
+    const payrollExpenseAcct = member.type === 'employee'
+      ? findAcct(a => a.type === 'expense' && /payroll|wages|salar/i.test(a.name), '5200')
+      : findAcct(a => a.type === 'expense' && /contract/i.test(a.name), '5210');
+
+    const cashAcct = findAcct(
+      a => a.num === '1010' || (a.type === 'asset' && /operating|cash/i.test(a.name)),
+      '1010',
+    );
+
+    const withholdingAcct = findAcct(
+      a => a.type === 'liability' && /withholding|accrued/i.test(a.name),
+      '2040',
+    );
+
+    const period = `${pr.periodStart} to ${pr.periodEnd}`;
     let glEntryId: string | null = null;
     let withholdingGlEntryId: string | null = null;
 
     if (pr.withholdingPct > 0) {
       // Employee with withholding: 2 GL entries
-      // 1) Debit 5200 (Wages), Credit 2040 (Withholding Payable) for grossPay
       const accrualEntry = glPost(
         today,
-        `Payroll accrual — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
-        '5200',
-        '2040',
+        `Payroll — ${member.name} — ${period}`,
+        payrollExpenseAcct,
+        withholdingAcct,
         pr.grossPay,
         'payroll',
         pr.id,
       );
       withholdingGlEntryId = accrualEntry.id;
 
-      // 2) Debit 2040, Credit 1010 (Operating Cash) for netPay
       const payEntry = glPost(
         today,
-        `Payroll payment — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
-        '2040',
-        '1010',
+        `Payroll — ${member.name} — ${period}`,
+        withholdingAcct,
+        cashAcct,
         pr.netPay,
         'payroll',
         pr.id,
       );
       glEntryId = payEntry.id;
     } else {
-      // Contractor (0% withholding): 1 GL entry
-      // Debit 5210 (Contract Services), Credit 1010 for netPay
+      // Contractor: 1 GL entry
       const entry = glPost(
         today,
-        `Payroll — ${member.name} (${pr.periodStart} to ${pr.periodEnd})`,
-        '5210',
-        '1010',
+        `Payroll — ${member.name} — ${period}`,
+        payrollExpenseAcct,
+        cashAcct,
         pr.netPay,
         'payroll',
         pr.id,

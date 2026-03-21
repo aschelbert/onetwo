@@ -37,6 +37,8 @@ export interface PropertyLog {
   findings: PropertyLogFinding[]
   action_items: PropertyLogActionItem[]
   notes: string
+  insurance_claim_needed: 'yes' | 'no' | 'unknown'
+  insurance_claim_case_id: string | null
   created_at: string
   updated_at: string
 }
@@ -89,6 +91,30 @@ export function getScoreBand(score: number): { label: string; color: string; bg:
   if (score >= 80) return { label: 'Strong', color: '#047857', bg: '#ecfdf5' }
   if (score >= 50) return { label: 'Moderate', color: '#a16207', bg: '#fef9c3' }
   return { label: 'Needs Improvement', color: '#d12626', bg: '#fef2f2' }
+}
+
+// ─── PM Scorecard v2 — Computed Metrics ─────────────────────────
+
+export interface ScorecardMetric {
+  label: string
+  value: number | null       // 0–100 normalized score (null = no data)
+  display: string            // human-readable value, e.g. "4.2 / 5", "87%"
+  trend: 'up' | 'down' | 'flat' | null
+  source: string             // e.g. "from Board Reviews"
+}
+
+export interface ScorecardData {
+  pmPerformance: {
+    boardReviewRating: ScorecardMetric
+    speedOfCommunication: ScorecardMetric
+    taskCompletionRate: ScorecardMetric
+    propertyLogCompletion: ScorecardMetric
+    aggregateScore: number | null
+  }
+  buildingHealth: {
+    financialHealth: ScorecardMetric
+    complianceHealth: ScorecardMetric
+  }
 }
 
 // ─── Task Tracking ──────────────────────────────────────────────
@@ -147,4 +173,31 @@ export const STATUS_CONFIG: Record<TaskStatus, { label: string; variant: string 
   in_progress: { label: 'In Progress', variant: 'amber' },
   done: { label: 'Done', variant: 'green' },
   canceled: { label: 'Canceled', variant: 'gray' },
+}
+
+// ─── Team Communications ────────────────────────────────────────
+
+export interface TeamChannel {
+  id: string
+  tenant_id: string
+  slug: string
+  name: string
+  description: string
+  channel_type: 'group' | 'direct'
+  restricted_to_role: string | null
+  created_at: string
+}
+
+export interface TeamMessage {
+  id: string
+  tenant_id: string
+  channel_id: string
+  sender_id: string
+  sender_name: string
+  sender_role: string
+  body: string
+  attachment_url: string | null
+  attachment_name: string | null
+  read_by: string[]
+  created_at: string
 }

@@ -80,7 +80,29 @@
 }
 
 @media print {
-  body > *:not(.print-pay-stub-root) {
+  @page {
+    size: letter;
+    margin: 0.75in;
+  }
+
+  /* Hide non-content elements */
+  nav,
+  aside,
+  [data-sidebar],
+  [data-nav],
+  .no-print,
+  button:not(.print-keep),
+  [role="tablist"],
+  .setup-banner,
+  [data-setup-banner],
+  .pill,
+  [data-floating],
+  [data-drawer] {
+    display: none !important;
+  }
+
+  /* Pay stub print (existing) */
+  body:has(.print-pay-stub-root) > *:not(.print-pay-stub-root) {
     display: none !important;
   }
   .print-pay-stub-root {
@@ -92,5 +114,70 @@
   }
   .print-pay-stub-root .no-print {
     display: none !important;
+  }
+
+  /* Report print mode */
+  body:has(.print-report-root) > *:not(.print-report-root):not(.print-report-header) {
+    display: none !important;
+  }
+
+  .print-report-root {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+
+  .print-report-header {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #1a1f25;
+  }
+
+  /* Page numbers */
+  .print-report-root {
+    counter-reset: page-num;
+  }
+
+  .print-report-root::after {
+    content: '';
+    display: block;
+    page-break-after: avoid;
+  }
+
+  @page {
+    @bottom-center {
+      content: counter(page);
+      font-size: 10px;
+      color: #6b7280;
+    }
+  }
+
+  /* General print cleanup */
+  body {
+    background: white !important;
+    color: #1a1f25 !important;
+    font-size: 11pt !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  h2, h3, h4 {
+    page-break-after: avoid;
   }
 }

@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import type { StaffMember, TimeEntry, PayRun } from '@/store/usePayrollStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { supabase } from '@/lib/supabase';
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -9,9 +11,9 @@ import { supabase } from '@/lib/supabase';
 const fmt$ = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const fmtDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-const SUB_TABS = ['staff', 'time', 'pay', '1099s'] as const;
+const SUB_TABS = ['staff', 'time', 'pay', '1099s', '1099prep'] as const;
 type SubTab = typeof SUB_TABS[number];
-const SUB_TAB_LABELS: Record<SubTab, string> = { staff: 'Staff Directory', time: 'Time Tracking', pay: 'Pay History', '1099s': '1099s' };
+const SUB_TAB_LABELS: Record<SubTab, string> = { staff: 'Staff Directory', time: 'Time Tracking', pay: 'Pay History', '1099s': '1099s', '1099prep': '1099 Prep' };
 
 const EMPTY_STAFF: Omit<StaffMember, 'id'> = { name: '', type: 'employee', role: '', rate: 0, email: '', phone: '', taxId: '', startDate: '', status: 'active', stripeAccountId: null, stripeOnboardingComplete: false };
 
@@ -19,6 +21,10 @@ const EMPTY_STAFF: Omit<StaffMember, 'id'> = { name: '', type: 'employee', role:
 
 export default function PayrollTab() {
   const { staff, timeEntries, payRuns, form1099s, addStaff, updateStaff, updateStaffStripe, addTimeEntry, updateTimeEntry, deleteTimeEntry, createPayRun, processPayRun, generate1099, markSent } = usePayrollStore();
+  const workOrders = useFinancialStore(s => s.workOrders);
+  const glEntries = useFinancialStore(s => s.generalLedger);
+  const vendors = useBuildingStore(s => s.vendors);
+  const toggleVendorW9 = useBuildingStore(s => s.toggleVendorW9);
 
   const [subTab, setSubTab] = useState<SubTab>('staff');
 
@@ -171,6 +177,39 @@ export default function PayrollTab() {
   const contractorCount = staff.filter(s => s.type === 'contractor' && s.status === 'active').length;
 
   const staffName = (id: string) => staff.find(s => s.id === id)?.name ?? 'Unknown';
+
+  // Helper to find GL entry local_id from glEntryId
+  const glLocalId = (glId: string | null) => {
+    if (!glId) return null;
+    return glEntries.find(e => e.id === glId)?.id ?? glId;
+  };
+
+  /* ── 1099 Prep data ─────────── */
+  const [prepYear, setPrepYear] = useState(new Date().getFullYear());
+  const vendorPayments = useMemo(() => {
+    const paidWOs = workOrders.filter(wo =>
+      wo.status === 'paid' && wo.paidDate && wo.paidDate.startsWith(String(prepYear))
+    );
+    const byVendor: Record<string, { vendor: string; total: number; acctNum: string; woCount: number }> = {};
+    for (const wo of paidWOs) {
+      if (!byVendor[wo.vendor]) {
+        byVendor[wo.vendor] = { vendor: wo.vendor, total: 0, acctNum: wo.acctNum, woCount: 0 };
+      }
+      byVendor[wo.vendor].total += wo.amount;
+      byVendor[wo.vendor].woCount++;
+    }
+    return Object.values(byVendor).map(vp => {
+      const vendorRecord = vendors.find(v => v.name === vp.vendor);
+      const w9 = vendorRecord?.w9OnFile ?? false;
+      const required = vp.total >= 600;
+      return {
+        ...vp,
+        vendorId: vendorRecord?.id,
+        w9OnFile: w9,
+        thresholdStatus: required && !w9 ? 'W-9 Missing' as const : required ? 'Required' as const : 'Below threshold' as const,
+      };
+    }).sort((a, b) => b.total - a.total);
+  }, [workOrders, vendors, prepYear]);
 
   return (
     <div className="space-y-4">
@@ -357,6 +396,7 @@ export default function PayrollTab() {
                   <th className="px-4 py-3 font-medium text-right">Deductions</th>
                   <th className="px-4 py-3 font-medium text-right">Net</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">GL</th>
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
@@ -378,6 +418,22 @@ export default function PayrollTab() {
                       }`}>
                         {pr.status === 'paid' ? 'Paid' : pr.status === 'processing' ? 'Processing' : pr.status === 'failed' ? 'Failed' : 'Draft'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {pr.glEntryId ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 cursor-pointer hover:bg-emerald-100 transition-colors"
+                          title={`GL Entry: ${glLocalId(pr.glEntryId)}`}
+                          onClick={() => {
+                            useFinancialStore.getState().setActiveTab('gl');
+                            useFinancialStore.getState().setGlFilter({ search: glLocalId(pr.glEntryId) || '' });
+                          }}
+                        >
+                          GL Posted · {glLocalId(pr.glEntryId)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-ink-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       {pr.status === 'draft' && (
@@ -402,7 +458,7 @@ export default function PayrollTab() {
                   </tr>
                 ))}
                 {payRuns.length === 0 && (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-400">No pay runs yet</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-400">No pay runs yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -478,6 +534,106 @@ export default function PayrollTab() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════ 1099 PREP ═══════════ */}
+      {subTab === '1099prep' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-ink-900">1099 Prep Worksheet</h3>
+              <p className="text-xs text-ink-500 mt-0.5">Vendor payments from work orders — review W-9 status and 1099 thresholds</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-ink-700">Tax Year</label>
+              <select value={prepYear} onChange={e => setPrepYear(Number(e.target.value))}
+                className="border border-ink-200 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value={2026}>2026</option>
+                <option value={2025}>2025</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-ink-50 rounded-lg p-4">
+              <p className="text-xs font-medium text-ink-500 uppercase tracking-wide">Total Vendors Paid</p>
+              <p className="text-2xl font-bold text-ink-900 mt-1">{vendorPayments.length}</p>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-4">
+              <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">1099 Required</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">{vendorPayments.filter(v => v.thresholdStatus === 'Required' || v.thresholdStatus === 'W-9 Missing').length}</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-4">
+              <p className="text-xs font-medium text-red-600 uppercase tracking-wide">W-9 Missing</p>
+              <p className="text-2xl font-bold text-red-700 mt-1">{vendorPayments.filter(v => v.thresholdStatus === 'W-9 Missing').length}</p>
+            </div>
+          </div>
+
+          {/* Vendor table */}
+          <div className="overflow-x-auto border border-ink-100 rounded-lg">
+            <table className="w-full text-sm">
+              <thead className="bg-ink-50 text-ink-500 text-left text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Vendor</th>
+                  <th className="px-4 py-3 font-medium text-right">Total Paid YTD</th>
+                  <th className="px-4 py-3 font-medium">Primary GL Acct</th>
+                  <th className="px-4 py-3 font-medium">W-9 on File</th>
+                  <th className="px-4 py-3 font-medium">1099 Status</th>
+                  <th className="px-4 py-3 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {vendorPayments.map(vp => (
+                  <tr key={vp.vendor} className="hover:bg-ink-50/50">
+                    <td className="px-4 py-3 font-medium text-ink-900">{vp.vendor}</td>
+                    <td className="px-4 py-3 text-right font-medium text-ink-900">{fmt$(vp.total)}</td>
+                    <td className="px-4 py-3 text-ink-600 font-mono text-xs">{vp.acctNum}</td>
+                    <td className="px-4 py-3">
+                      {vp.w9OnFile ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sage-100 text-sage-700">Yes</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">No</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        vp.thresholdStatus === 'Required' ? 'bg-amber-100 text-amber-700' :
+                        vp.thresholdStatus === 'W-9 Missing' ? 'bg-red-100 text-red-700' :
+                        'bg-ink-100 text-ink-500'
+                      }`}>
+                        {vp.thresholdStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {vp.vendorId && (
+                        <button
+                          onClick={() => toggleVendorW9(vp.vendorId!)}
+                          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                            vp.w9OnFile
+                              ? 'border border-ink-200 text-ink-600 hover:bg-ink-50'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          }`}
+                        >
+                          {vp.w9OnFile ? 'Unmark W-9' : 'Mark W-9 on File'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {vendorPayments.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-400">No vendor payments found for {prepYear}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+            <p className="text-xs text-blue-700 leading-relaxed">
+              Vendors receiving $600 or more in a calendar year require a 1099-NEC. Ensure W-9 forms are collected before year-end filing.
+            </p>
           </div>
         </div>
       )}
