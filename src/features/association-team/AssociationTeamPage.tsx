@@ -7,14 +7,16 @@ import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
 import PayrollTab from '@/features/association-team/tabs/PayrollTab';
+import CommunicationsTab from '@/features/association-team/tabs/CommunicationsTab';
 
-const TABS = ['property-log', 'task-tracking', 'pm-scorecard', 'payroll'] as const;
+const TABS = ['property-log', 'task-tracking', 'pm-scorecard', 'communications', 'payroll'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_LABELS: Record<Tab, string> = {
   'property-log': 'Property Log',
   'task-tracking': 'Task Tracking',
   'pm-scorecard': 'PM Scorecard',
+  'communications': 'Communications',
   'payroll': 'Payroll & 1099s',
 };
 
@@ -89,6 +91,8 @@ export default function AssociationTeamPage() {
         {tab === 'task-tracking' && <TaskTrackingTab />}
 
         {tab === 'pm-scorecard' && <PMScorecardTab />}
+
+        {tab === 'communications' && <CommunicationsTab />}
 
         {tab === 'payroll' && <PayrollTab />}
       </div>
