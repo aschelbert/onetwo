@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePropertyLogStore, type PropertyLogEntry } from '@/store/usePropertyLogStore';
+import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import Modal from '@/components/ui/Modal';
 
@@ -52,6 +53,7 @@ interface ActionItem {
   assignedTo: string;
   dueDate: string;
   status: string;
+  taskId?: string;
 }
 
 interface LogForm {
@@ -83,6 +85,7 @@ const emptyForm = (): LogForm => ({
 
 export default function PropertyLogPage() {
   const { logs, addLog, updateLog, deleteLog } = usePropertyLogStore();
+  const { addTask, moveTask } = useTaskTrackingStore();
   const { currentUser } = useAuthStore();
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
@@ -131,23 +134,68 @@ export default function PropertyLogPage() {
     const cleanFindings = form.findings.filter(f => f.area.trim() !== '');
     const cleanActions = form.actionItems.filter(a => a.description.trim() !== '');
 
-    const payload = {
-      title: form.title,
-      type: form.type,
-      date: form.date,
-      conductedBy: form.conductedBy,
-      location: form.location,
-      status: form.status,
-      findings: cleanFindings,
-      actionItems: cleanActions,
-      notes: form.notes,
-    };
-
+    // Determine log ID — for edits we already have it; for adds we save first then read it
+    let logId: string;
     if (modal === 'edit' && editId) {
-      updateLog(editId, payload);
+      logId = editId;
     } else {
-      addLog(payload);
+      addLog({
+        title: form.title,
+        type: form.type,
+        date: form.date,
+        conductedBy: form.conductedBy,
+        location: form.location,
+        status: form.status,
+        findings: cleanFindings,
+        actionItems: cleanActions,
+        notes: form.notes,
+      });
+      // addLog prepends; grab the newly created log's ID
+      logId = usePropertyLogStore.getState().logs[0].id;
     }
+
+    // Create kanban tasks for action items that don't already have one
+    const enrichedActions = cleanActions.map(action => {
+      if (action.description.trim() && !action.taskId) {
+        addTask({
+          title: action.description,
+          description: '',
+          status: action.status === 'done' ? 'done' : 'todo',
+          priority: 'medium',
+          category: 'maintenance',
+          assignedTo: null,
+          assignedToName: action.assignedTo || null,
+          createdBy: currentUser.id,
+          createdByName: currentUser.name,
+          dueDate: action.dueDate || null,
+          completedAt: action.status === 'done' ? new Date().toISOString() : null,
+          linkedItems: [{ type: 'property_log' as const, id: logId, title: form.title }],
+          notes: '',
+        });
+        // addTask prepends; grab the generated task ID
+        const taskId = useTaskTrackingStore.getState().tasks[0].id;
+        return { ...action, taskId };
+      }
+      return action;
+    });
+
+    // Update the log with enriched action items (taskIds populated)
+    if (modal === 'edit' && editId) {
+      updateLog(editId, {
+        title: form.title,
+        type: form.type,
+        date: form.date,
+        conductedBy: form.conductedBy,
+        location: form.location,
+        status: form.status,
+        findings: cleanFindings,
+        actionItems: enrichedActions,
+        notes: form.notes,
+      });
+    } else {
+      updateLog(logId, { actionItems: enrichedActions });
+    }
+
     setModal(null);
   };
 
@@ -185,16 +233,23 @@ export default function PropertyLogPage() {
     setForm({ ...form, actionItems: form.actionItems.filter((_, i) => i !== index) });
   };
 
-  // Toggle action item status inline
+  // Toggle action item status inline and sync to kanban
   const toggleActionStatus = (logId: string, actionIndex: number) => {
     const log = logs.find(l => l.id === logId);
     if (!log) return;
     const updatedActions = [...log.actionItems];
+    const newStatus = updatedActions[actionIndex].status === 'done' ? 'open' : 'done';
     updatedActions[actionIndex] = {
       ...updatedActions[actionIndex],
-      status: updatedActions[actionIndex].status === 'done' ? 'open' : 'done',
+      status: newStatus,
     };
     updateLog(logId, { actionItems: updatedActions });
+
+    // Sync status to linked kanban task
+    const taskId = updatedActions[actionIndex].taskId;
+    if (taskId) {
+      moveTask(taskId, newStatus === 'done' ? 'done' : 'todo');
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -396,7 +451,18 @@ export default function PropertyLogPage() {
                                         </button>
                                       </td>
                                       <td className={`py-2.5 px-3 font-medium ${isDone ? 'text-ink-400 line-through' : 'text-ink-900'}`}>
-                                        {action.description}
+                                        <span className="flex items-center gap-1.5">
+                                          {action.description}
+                                          {action.taskId && (
+                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-50 text-accent-600 text-[10px] font-medium whitespace-nowrap">
+                                              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                              </svg>
+                                              Task
+                                            </span>
+                                          )}
+                                        </span>
                                       </td>
                                       <td className="py-2.5 px-3 text-ink-600">{action.assignedTo}</td>
                                       <td className={`py-2.5 px-3 ${isOverdue ? 'text-red-600 font-medium' : 'text-ink-600'}`}>

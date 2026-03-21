@@ -9,7 +9,7 @@ export interface PropertyLogEntry {
   location: string;
   status: 'open' | 'resolved' | 'monitoring';
   findings: Array<{ area: string; condition: string; notes: string; severity: string }>;
-  actionItems: Array<{ description: string; assignedTo: string; dueDate: string; status: string }>;
+  actionItems: Array<{ description: string; assignedTo: string; dueDate: string; status: string; taskId?: string }>;
   notes: string;
 }
 
