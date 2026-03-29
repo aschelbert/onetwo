@@ -9,9 +9,9 @@ const MODULE_NAV = [
   { module: 'Board Room', icon: '⚖️', href: 'board-room' },
   { module: 'The Building', icon: '🏢', href: 'the-building' },
   { module: 'Fiscal Lens', icon: '💰', href: 'fiscal-lens' },
-  { module: 'The Archives', icon: '📁', href: 'the-archives' },
   { module: 'Community Room', icon: '👥', href: 'community-room' },
   { module: 'Association Team', icon: '🔧', href: 'association-team' },
+  { module: 'The Archives', icon: '📁', href: 'the-archives' },
   { module: 'Account Management', icon: '👤', href: 'account-mgmt' },
 ]
 
