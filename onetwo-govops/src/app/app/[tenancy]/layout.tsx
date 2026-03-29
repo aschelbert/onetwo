@@ -79,7 +79,7 @@ export default async function TenantLayout({
     return (
       <TenantProvider value={contextValue}>
         <SetupContextPillProvider>
-          <div className="flex flex-col h-screen bg-stone-50">
+          <div className="flex flex-col h-screen bg-bg-page">
             <TopNav />
             <main className="flex-1 overflow-y-auto p-6">
               {children}
@@ -124,7 +124,7 @@ export default async function TenantLayout({
   return (
     <TenantProvider value={contextValue}>
       <SetupContextPillProvider>
-        <div className="flex flex-col h-screen bg-stone-50">
+        <div className="flex flex-col h-screen bg-bg-page">
           <TopNav />
           <main className="flex-1 overflow-y-auto p-6">
             {children}

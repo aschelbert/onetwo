@@ -33,9 +33,26 @@ export default {
           400: '#dde0d8', 500: '#c8cdc2',
         },
         navy: {
+          DEFAULT: '#0D1B2E',
           50: '#f0f4f8', 100: '#d9e2ec', 200: '#bcccdc', 300: '#9fb3c8',
           400: '#829ab1', 500: '#627d98', 600: '#486581', 700: '#334e68',
           800: '#243b53', 900: '#0D1B2E', 950: '#091525',
+        },
+        'brand-red': '#D62839',
+        'brand-cyan': '#A5F3FC',
+        'brand-teal': {
+          DEFAULT: '#155E75',
+          light: '#f4fbf9',
+          border: '#b8ddd4',
+        },
+        'bg-page': '#e4e6eb',
+        warn: {
+          bg: '#fff8f8',
+          border: '#f0c4c8',
+        },
+        'status-ok': {
+          bg: '#f4fbf9',
+          border: '#b8ddd4',
         },
       },
       keyframes: {

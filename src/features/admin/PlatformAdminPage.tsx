@@ -186,7 +186,7 @@ export default function PlatformAdminPage() {
     <div className="flex min-h-screen bg-ink-50">
 
       {/* ═══════════════════════ SIDEBAR ═══════════════════════ */}
-      <aside className="fixed top-0 left-0 bottom-0 w-60 bg-ink-900 text-white flex flex-col z-50 overflow-y-auto">
+      <aside className="fixed top-0 left-0 bottom-0 w-60 bg-navy text-white flex flex-col z-50 overflow-y-auto">
         {/* Logo */}
         <div className="px-4 py-5 border-b border-white/[0.08] flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#c42030] flex items-center justify-center shrink-0">

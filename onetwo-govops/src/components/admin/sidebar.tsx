@@ -47,7 +47,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       )}
 
       <aside className={cn(
-        'w-60 bg-gray-900 text-white flex flex-col fixed top-0 left-0 bottom-0 z-50 overflow-y-auto transition-transform duration-200 ease-in-out',
+        'w-60 bg-navy text-white flex flex-col fixed top-0 left-0 bottom-0 z-50 overflow-y-auto transition-transform duration-200 ease-in-out',
         // Mobile: slide in/out
         open ? 'translate-x-0' : '-translate-x-full',
         // Desktop: always visible

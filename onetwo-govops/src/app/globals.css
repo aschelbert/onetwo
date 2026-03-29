@@ -11,11 +11,22 @@
   --color-ink-500: #6b7280;
   --color-ink-800: #1a1a1a;
   --color-stripe: #635bff;
+  --color-navy: #0D1B2E;
+  --color-brand-red: #D62839;
+  --color-brand-cyan: #A5F3FC;
+  --color-brand-teal: #155E75;
+  --color-brand-teal-light: #f4fbf9;
+  --color-brand-teal-border: #b8ddd4;
+  --color-bg-page: #e4e6eb;
+  --color-warn-bg: #fff8f8;
+  --color-warn-border: #f0c4c8;
+  --color-status-ok-bg: #f4fbf9;
+  --color-status-ok-border: #b8ddd4;
   --font-serif: 'Georgia', 'Times New Roman', serif;
 }
 
 body {
-  background: #f9fafb;
+  background: #e4e6eb;
   color: #111827;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
