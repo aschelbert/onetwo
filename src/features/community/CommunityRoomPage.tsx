@@ -132,26 +132,24 @@ export default function CommunityRoomPage() {
     <div className="space-y-0">
       {/* Header */}
       <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold">🏠 Community Room</h2>
-          </div>
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
+          <div><h2 className="font-display text-2xl font-bold">🏠 Community Room</h2></div>
         </div>
-        <div className={`grid grid-cols-2 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mt-5`}>
+        <div className={`grid grid-cols-3 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
           {[
-            { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', icon: '📌', tab: 'announcements' as TabId },
-            { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', icon: '📬', tab: 'requests' as TabId },
-            { val: upcoming.length, label: 'Upcoming Meetings', icon: '📅', tab: 'meetings' as TabId },
-            { val: openElections, label: 'Open Votes', icon: '🗳', tab: 'votes' as TabId },
+            { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', sub: 'Active', tab: 'announcements' as TabId },
+            { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', sub: 'Pending', tab: 'requests' as TabId },
+            { val: upcoming.length, label: 'Upcoming Meetings', sub: 'Scheduled', tab: 'meetings' as TabId },
+            { val: openElections, label: 'Open Votes', sub: openElections > 0 ? 'Active' : 'None active', tab: 'votes' as TabId },
             ...(isManagementSuite ? [
-              { val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', icon: '🏢', tab: 'amenities' as TabId },
-              ...(isBoard ? [{ val: amenityPending, label: 'Pending Approvals', icon: '⏳', tab: 'amenities' as TabId }] : []),
+              { val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', sub: 'Booked', tab: 'amenities' as TabId },
+              ...(isBoard ? [{ val: amenityPending, label: 'Pending Approvals', sub: amenityPending > 0 ? 'Needs attention' : 'All clear', tab: 'amenities' as TabId }] : []),
             ] : []),
           ].map(s => (
-            <div key={s.label} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab(s.tab)}>
-              <span className="text-xl">{s.icon}</span>
-              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight">{s.label}</p>
-              <p className="text-sm font-bold text-white mt-1">{s.val}</p>
+            <div key={s.label} onClick={() => setTab(s.tab)} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
+              <p className="text-xl font-bold text-white">{s.val}</p>
+              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight truncate">{s.sub}</p>
+              <p className="text-[10px] text-accent-200 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>

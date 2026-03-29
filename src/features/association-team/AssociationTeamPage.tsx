@@ -41,24 +41,22 @@ export default function AssociationTeamPage() {
     <div className="space-y-0">
       {/* Header */}
       <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Association Team</h2>
-          </div>
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
+          <div><h2 className="font-display text-2xl font-bold">Association Team</h2></div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
-            { val: openLogs, label: 'Open Logs', icon: '📋', tab: 'property-log' as Tab },
-            { val: highFindings, label: 'Findings', icon: '🔍', tab: 'property-log' as Tab },
-            { val: openActions, label: 'Action Items', icon: '⚡', tab: 'property-log' as Tab },
-            { val: activeTasks, label: 'In Progress', icon: '🔄', tab: 'task-tracking' as Tab },
-            { val: blockedTasks, label: 'Blocked', icon: '🚫', tab: 'task-tracking' as Tab },
-            { val: activeStaff, label: 'Active Staff', icon: '👥', tab: 'payroll' as Tab },
+            { val: openLogs, label: 'Open Logs', sub: 'Active', tab: 'property-log' as Tab },
+            { val: highFindings, label: 'Findings', sub: highFindings > 0 ? 'Needs review' : 'Clear', tab: 'property-log' as Tab },
+            { val: openActions, label: 'Action Items', sub: 'Pending', tab: 'property-log' as Tab },
+            { val: activeTasks, label: 'In Progress', sub: 'Tasks', tab: 'task-tracking' as Tab },
+            { val: blockedTasks, label: 'Blocked', sub: blockedTasks > 0 ? 'Needs attention' : 'None', tab: 'task-tracking' as Tab },
+            { val: activeStaff, label: 'Active Staff', sub: 'Team members', tab: 'payroll' as Tab },
           ].map(s => (
-            <div key={s.label} onClick={() => setTab(s.tab)} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
-              <span className="text-xl">{s.icon}</span>
-              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight">{s.label}</p>
-              <p className="text-sm font-bold text-white mt-1">{s.val}</p>
+            <div key={s.label} onClick={() => setTab(s.tab)} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
+              <p className="text-xl font-bold text-white">{s.val}</p>
+              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight truncate">{s.sub}</p>
+              <p className="text-[10px] text-accent-200 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>

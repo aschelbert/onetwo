@@ -59,36 +59,24 @@ export default function FinancialPage() {
     <div className="space-y-0">
       {/* Header — dark gradient matching dashboard */}
       <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold">💰 Fiscal Lens</h2>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-white">{healthScore}%</div>
-            <div className="text-accent-200 text-xs">Financial Health</div>
-          </div>
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
+          <div><h2 className="font-display text-2xl font-bold">💰 Fiscal Lens</h2></div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
-            <p className="text-[11px] text-accent-100 leading-tight">Operating Cash</p>
-            <p className="text-sm font-bold text-white mt-1">{fmt(bs.assets.operating)}</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('ledger')}>
-            <p className="text-[11px] text-accent-100 leading-tight">Collection Rate</p>
-            <p className={`text-sm font-bold mt-1 ${metrics.collectionRate >= 90 ? 'text-green-300' : metrics.collectionRate >= 75 ? 'text-yellow-300' : 'text-red-300'}`}>{metrics.collectionRate}%</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('budget')}>
-            <p className="text-[11px] text-accent-100 leading-tight">Budget Used</p>
-            <p className={`text-sm font-bold mt-1 ${budgetPct <= 75 ? 'text-green-300' : budgetPct <= 100 ? 'text-yellow-300' : 'text-red-300'}`}>{budgetPct}%</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('reserves')}>
-            <p className="text-[11px] text-accent-100 leading-tight">Reserve Funded</p>
-            <p className={`text-sm font-bold mt-1 ${reservePct >= 70 ? 'text-green-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300'}`}>{reservePct}%</p>
-          </div>
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setActiveTab('dashboard')}>
-            <p className="text-[11px] text-accent-100 leading-tight">Receivables</p>
-            <p className={`text-sm font-bold mt-1 ${bs.assets.totalReceivable === 0 ? 'text-green-300' : 'text-red-300'}`}>{fmt(bs.assets.totalReceivable)}</p>
-          </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {[
+            { label: 'Financial Health', value: `${healthScore}%`, sub: hc === 'sage' ? 'Healthy' : hc === 'yellow' ? 'Fair' : 'At Risk', color: healthScore >= 80 ? 'text-emerald-300' : healthScore >= 60 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('dashboard') },
+            { label: 'Operating Cash', value: fmt(bs.assets.operating), sub: 'Current balance', color: 'text-white', onClick: () => setActiveTab('dashboard') },
+            { label: 'Collection Rate', value: `${metrics.collectionRate}%`, sub: fmt(metrics.monthlyExpected) + '/mo', color: metrics.collectionRate >= 90 ? 'text-emerald-300' : metrics.collectionRate >= 75 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('ledger') },
+            { label: 'Budget Used', value: `${budgetPct}%`, sub: 'YTD spend', color: budgetPct <= 75 ? 'text-emerald-300' : budgetPct <= 100 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('budget') },
+            { label: 'Reserve Funded', value: `${reservePct}%`, sub: fmt(bs.assets.reserve), color: reservePct >= 70 ? 'text-emerald-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('reserves') },
+            { label: 'Receivables', value: fmt(bs.assets.totalReceivable), sub: bs.assets.totalReceivable === 0 ? 'None' : 'Outstanding', color: bs.assets.totalReceivable === 0 ? 'text-emerald-300' : 'text-red-300', onClick: () => setActiveTab('dashboard') },
+          ].map(m => (
+            <div key={m.label} onClick={m.onClick} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
+              <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
+              <p className="text-[11px] text-accent-100 mt-0.5 leading-tight truncate">{m.sub}</p>
+              <p className="text-[10px] text-accent-200 mt-0.5">{m.label}</p>
+            </div>
+          ))}
         </div>
       </div>
 
