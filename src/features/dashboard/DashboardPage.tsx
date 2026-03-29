@@ -12,6 +12,7 @@ import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
 import { FiduciaryAlerts } from './FiduciaryAlerts';
 import { useTenantContext } from '@/components/TenantProvider';
+import PageHeader from '@/components/shared/PageHeader';
 
 export default function DashboardPage() {
   const { currentUser, currentRole } = useAuthStore();
@@ -142,25 +143,14 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-5">
-        {/* Header with grade badges */}
-        <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Welcome back, {currentUser.name.split(' ')[0]}</h1>
-              <p className="text-accent-200 text-sm mt-1">{building.name} · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-center bg-white bg-opacity-10 rounded-lg px-4 py-2">
-                <p className="text-[10px] text-accent-200">Building</p>
-                <p className={`text-lg font-bold ${buildingHealth >= 80 ? 'text-green-300' : buildingHealth >= 60 ? 'text-yellow-300' : 'text-red-300'}`}>{buildingGrade}</p>
-              </div>
-              <div className="text-center bg-white bg-opacity-10 rounded-lg px-4 py-2">
-                <p className="text-[10px] text-accent-200">Compliance</p>
-                <p className={`text-lg font-bold ${complianceScore >= 75 ? 'text-green-300' : complianceScore >= 60 ? 'text-yellow-300' : 'text-red-300'}`}>{complianceGrade}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          title={`Welcome back, ${currentUser.name.split(' ')[0]}`}
+          subtitle={`${building.name} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`}
+          grades={[
+            { value: buildingGrade, label: 'Building', color: buildingHealth >= 80 ? 'text-green-300' : buildingHealth >= 60 ? 'text-yellow-300' : 'text-red-300' },
+            { value: complianceGrade, label: 'Compliance', color: complianceScore >= 75 ? 'text-green-300' : complianceScore >= 60 ? 'text-yellow-300' : 'text-red-300' },
+          ]}
+        />
 
         {/* Attention Pills */}
         {attentionItems.length > 0 && (
@@ -344,18 +334,11 @@ export default function DashboardPage() {
 
     return (
       <div className="space-y-5">
-        {/* Header — Operations Overview */}
-        <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Welcome back, {currentUser.name.split(' ')[0]}</h1>
-              <p className="text-accent-200 text-sm mt-1">{building.name} · Operations Overview</p>
-            </div>
-            <div className="text-right">
-              <p className="text-accent-200 text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          title={`Welcome back, ${currentUser.name.split(' ')[0]}`}
+          subtitle={`${building.name} · Operations Overview`}
+          action={<p className="text-white/60 text-xs">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>}
+        />
 
         {/* Attention Pills */}
         {attentionItems.length > 0 && (
@@ -523,20 +506,11 @@ export default function DashboardPage() {
   // ─── RESIDENT DASHBOARD ───
   return (
     <div className="space-y-5">
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Welcome back, {currentUser.name.split(' ')[0]}</h1>
-            <p className="text-accent-200 text-sm mt-1">{building.name} · Unit {currentUser.unitNumber}</p>
-          </div>
-          {myUnit && (
-            <div className={`text-center rounded-lg px-5 py-2.5 ${myTotalBalance > 0 ? 'bg-red-500 bg-opacity-30' : 'bg-green-500 bg-opacity-20'}`}>
-              <p className="text-[10px] text-accent-200">Account</p>
-              <p className="text-lg font-bold">{myTotalBalance > 0 ? fmt(myTotalBalance) : '✓ Current'}</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={`Welcome back, ${currentUser.name.split(' ')[0]}`}
+        subtitle={`${building.name} · Unit ${currentUser.unitNumber}`}
+        grades={myUnit ? [{ value: myTotalBalance > 0 ? fmt(myTotalBalance) : '✓ Current', label: 'Account', color: myTotalBalance > 0 ? 'text-red-300' : 'text-green-300' }] : undefined}
+      />
 
       {myTotalBalance > 0 && (
         <div onClick={() => navigate('/my-unit')} className="bg-red-50 border border-red-200 rounded-xl p-4 cursor-pointer hover:shadow-sm transition-all flex items-center justify-between">
