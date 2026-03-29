@@ -2,6 +2,7 @@ import { createServerSupabase } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { TenantProvider } from '@/lib/tenant-context'
 import { TopNav } from '@/components/tenant/top-nav'
+import { BottomNav } from '@/components/tenant/bottom-nav'
 import { SetupContextPillProvider } from '@/components/onboarding/context-pill/SetupContextPillProvider'
 import { SetupContextPill } from '@/components/onboarding/context-pill/SetupContextPill'
 
@@ -81,9 +82,10 @@ export default async function TenantLayout({
         <SetupContextPillProvider>
           <div className="flex flex-col h-screen bg-bg-page">
             <TopNav />
-            <main className="flex-1 overflow-y-auto p-6">
+            <main className="flex-1 overflow-y-auto p-6 pb-[76px] sm:pb-6">
               {children}
             </main>
+            <BottomNav />
           </div>
           <SetupContextPill />
         </SetupContextPillProvider>
@@ -126,9 +128,10 @@ export default async function TenantLayout({
       <SetupContextPillProvider>
         <div className="flex flex-col h-screen bg-bg-page">
           <TopNav />
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-6 pb-[76px] sm:pb-6">
             {children}
           </main>
+          <BottomNav />
         </div>
         <SetupContextPill />
       </SetupContextPillProvider>
