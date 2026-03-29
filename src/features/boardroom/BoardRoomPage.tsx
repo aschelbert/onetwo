@@ -344,9 +344,9 @@ export default function BoardRoomPage() {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), rgb(165, 243, 252))' }}>
         <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
-          <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2><p className="text-accent-200 text-sm mt-1">Governance calendar, meetings, votes & communications · {isDC ? 'District of Columbia' : jurisdiction} jurisdiction</p></div>
+          <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2></div>
         </div>
         {(() => {
           const openCases = issues.cases.filter(c => c.status === 'open').length;

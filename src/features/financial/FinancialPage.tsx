@@ -58,11 +58,10 @@ export default function FinancialPage() {
   return (
     <div className="space-y-0">
       {/* Header — dark gradient matching dashboard */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), rgb(165, 243, 252))' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">💰 Fiscal Lens</h2>
-            <p className="text-accent-200 text-sm mt-1">Double-entry general ledger, chart of accounts, budgets, reserves & reports</p>
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{healthScore}%</div>

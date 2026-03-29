@@ -131,11 +131,10 @@ export default function CommunityRoomPage() {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), rgb(165, 243, 252))' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">🏠 Community Room</h2>
-            <p className="text-accent-200 text-sm mt-1">Announcements, requests, meetings & vote results</p>
           </div>
         </div>
         <div className={`grid grid-cols-2 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 mt-5`}>

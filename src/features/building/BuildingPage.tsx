@@ -64,11 +64,10 @@ export default function BuildingPage() {
   return (
     <div className="space-y-0">
       {/* Building header — dark gradient, rounded-t only */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), rgb(165, 243, 252))' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">🏢 {store.name}</h2>
-            <p className="text-accent-200 text-sm mt-1">{store.address.street}, {store.address.city}, {store.address.state} {store.address.zip}</p>
           </div>
           <div className="text-center">
             <div className="text-4xl font-bold text-white">{hGrade}</div>
@@ -136,6 +135,7 @@ export default function BuildingPage() {
           {tab === 'details' && (<div className="space-y-6">
             <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
               <div className="flex items-center justify-between mb-4"><h3 className="font-display text-xl font-bold text-ink-900">Property Details</h3><div className="flex gap-2"><button onClick={() => { setForm({ street: store.address.street, city: store.address.city, state: store.address.state, zip: store.address.zip }); setModal('editAddress'); }} className="text-sm text-accent-600 font-medium">Edit Address</button><button onClick={() => { setForm({ yearBuilt: store.details.yearBuilt, totalUnits: String(store.details.totalUnits), floors: String(store.details.floors), type: store.details.type, sqft: store.details.sqft, lotSize: store.details.lotSize, parking: store.details.parking, architect: store.details.architect, contractor: store.details.contractor, amenities: store.details.amenities.join(', '), entityType: store.details.entityType, fiscalYearEnd: store.details.fiscalYearEnd || '12-31' }); setModal('editDetails'); }} className="text-sm text-accent-600 font-medium">Edit Details</button></div></div>
+              <div className="bg-white rounded-lg p-3 mb-3"><p className="text-xs text-ink-500 mb-1">Address</p><p className="text-sm font-bold text-ink-900">{store.address.street}, {store.address.city}, {store.address.state} {store.address.zip}</p></div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{([['Year Built', store.details.yearBuilt], ['Units', store.details.totalUnits], ['Floors', store.details.floors], ['Type', store.details.type], ['Sq Footage', store.details.sqft], ['Lot Size', store.details.lotSize], ['Parking', store.details.parking], ['Entity', store.details.entityType === 'incorporated' ? 'Incorporated' : 'Unincorporated'], ['Fiscal Year End', (() => { const fye = store.details.fiscalYearEnd || '12-31'; const [m, d] = fye.split('-'); const dt = new Date(2000, parseInt(m) - 1, parseInt(d)); return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); })()]] as [string, string|number][]).map(([label, val]) => (<div key={label} className="bg-white rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">{label}</p><p className="text-sm font-bold text-ink-900">{val}</p></div>))}</div>
             </div>
             <div><p className="text-sm font-bold text-ink-900 mb-2">Building Team</p><p className="text-sm text-ink-500"><strong>Architect:</strong> {store.details.architect}</p><p className="text-sm text-ink-500"><strong>Contractor:</strong> {store.details.contractor}</p></div>

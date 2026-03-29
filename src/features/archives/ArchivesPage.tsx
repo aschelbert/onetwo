@@ -474,16 +474,11 @@ export default function ArchivesPage() {
   return (
     <div className="space-y-0">
       {/* ── Gradient header ── */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), rgb(165, 243, 252))' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             {backLabel}
             <h2 className="font-display text-2xl font-bold">📦 Archives</h2>
-            <p className="text-accent-200 text-sm mt-1">
-              {selected
-                ? `${selected.label} · Created ${new Date(selected.createdAt).toLocaleDateString()} by ${selected.createdBy}`
-                : 'Reports and governance snapshots for your community'}
-            </p>
           </div>
           {/* Three-dot menu with create actions */}
           {!selectedArchiveId && isBoard && (

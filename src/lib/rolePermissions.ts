@@ -18,9 +18,9 @@ const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
   { featureId: 'building',         nav: { id: 'contacts',     label: 'The Building',   path: '/building',      icon: 'contacts' } },
   { featureId: 'fiscalLens',       nav: { id: 'financial',    label: 'Fiscal Lens',    path: '/financial',     icon: 'financial' } },
   { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
-  { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
   { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
   { featureId: 'userManagement',   nav: { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' } },
+  { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
 ];
 
 // Role name in auth store → roleId used in permissions
@@ -70,8 +70,8 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
-    { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
     { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
+    { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   RESIDENT: [
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
@@ -90,7 +90,7 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
-    { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
     { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
+    { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
 };
