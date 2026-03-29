@@ -3,6 +3,7 @@
 import { useTenant } from '@/lib/tenant-context'
 import { PageHeader } from '@/components/PageHeader'
 import { AlertBar } from '@/components/AlertBar'
+import { KpiCard } from '@/components/KpiCard'
 
 export default function BoardDashboard() {
   const { user, tenancy } = useTenant()
@@ -32,7 +33,14 @@ export default function BoardDashboard() {
         onLinkClick={() => {}}
       />
 
-      <div className="flex items-center justify-center py-20">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Collection Rate" value="--%" sub="Monthly expected" variant="ok" />
+        <KpiCard label="Reserve Funding" value="--%" sub="Funded" variant="warn" />
+        <KpiCard label="Compliance Score" value="--%" sub="Grade pending" variant="warn" />
+        <KpiCard label="Open Cases" value="--" sub="Urgent/high" variant="default" />
+      </div>
+
+      <div className="flex items-center justify-center py-12">
         <p className="text-sm text-[#929da8]">Dashboard modules are coming soon.</p>
       </div>
     </div>
