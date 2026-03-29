@@ -50,7 +50,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
   }
 
   return (
-    <div className="p-5 md:px-7 md:py-6" style={{ maxWidth: 860 }}>
+    <div className="p-5 md:px-7 md:py-6">
       <div className="space-y-5">
         {/* Jurisdiction guidance — only on step 0 */}
         {stNote && stepIndex === 0 && (
