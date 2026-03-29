@@ -60,9 +60,17 @@ export default function TopNav() {
   return (
     <nav className="bg-navy sticky top-0 z-50" style={{ height: 58 }}>
       <div className="h-full px-4 sm:px-6 flex items-center justify-between">
-        {/* Left: Logo */}
-        <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => goTo('/dashboard')}>
-          <img src="/onetwo-logo-mark.jpg" alt="ONE two" className="w-8 h-8 rounded object-cover" />
+        {/* Left: Logo + hamburger (mobile) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="cursor-pointer" onClick={() => goTo('/dashboard')}>
+            <img src="/onetwo-logo-mark.jpg" alt="ONE two" className="w-8 h-8 rounded object-cover" />
+          </div>
+          <button
+            className="min-[1080px]:hidden text-white/70 hover:text-white p-1.5"
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Center (>=1080px): Horizontal nav links */}
@@ -87,14 +95,6 @@ export default function TopNav() {
             );
           })}
         </div>
-
-        {/* Center (<1080px): Hamburger */}
-        <button
-          className="min-[1080px]:hidden text-white/70 hover:text-white p-1.5"
-          onClick={() => setMobileOpen(!mobileOpen)}
-        >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
 
         {/* Right side */}
         <div className="flex items-center gap-3 shrink-0">
