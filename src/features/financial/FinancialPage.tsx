@@ -68,7 +68,7 @@ export default function FinancialPage() {
             { label: 'Operating Cash', value: fmt(bs.assets.operating), sub: 'Current balance', color: 'text-white', onClick: () => setActiveTab('dashboard') },
             { label: 'Collection Rate', value: `${metrics.collectionRate}%`, sub: fmt(metrics.monthlyExpected) + '/mo', color: metrics.collectionRate >= 90 ? 'text-emerald-300' : metrics.collectionRate >= 75 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('ledger') },
             { label: 'Budget Used', value: `${budgetPct}%`, sub: 'YTD spend', color: budgetPct <= 75 ? 'text-emerald-300' : budgetPct <= 100 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('budget') },
-            { label: 'Reserve Funded', value: `${reservePct}%`, sub: fmt(bs.assets.reserve), color: reservePct >= 70 ? 'text-emerald-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('reserves') },
+            { label: 'Reserve Funded', value: `${reservePct}%`, sub: fmt(bs.assets.reserves), color: reservePct >= 70 ? 'text-emerald-300' : reservePct >= 40 ? 'text-yellow-300' : 'text-red-300', onClick: () => setActiveTab('reserves') },
             { label: 'Receivables', value: fmt(bs.assets.totalReceivable), sub: bs.assets.totalReceivable === 0 ? 'None' : 'Outstanding', color: bs.assets.totalReceivable === 0 ? 'text-emerald-300' : 'text-red-300', onClick: () => setActiveTab('dashboard') },
           ].map(m => (
             <div key={m.label} onClick={m.onClick} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg px-3 py-2.5 text-center cursor-pointer hover:bg-opacity-20 transition-colors">
