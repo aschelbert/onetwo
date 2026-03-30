@@ -1,5 +1,5 @@
-import { createClient } from './supabase/client'
-import type { CaseThread, CaseMessage, ThreadType } from '../types/caseChat'
+import { createClient } from '@/lib/supabase/client'
+import type { CaseThread, CaseMessage, ThreadType } from '@/types/caseChat'
 
 function getSupabase() {
   return createClient()
