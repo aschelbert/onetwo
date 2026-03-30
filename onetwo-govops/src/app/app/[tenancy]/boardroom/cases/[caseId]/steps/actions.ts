@@ -22,6 +22,28 @@ export async function getCaseById(caseId: string) {
   return data as { id: string; tenant_id: string; local_id: string; cat_id: string; sit_id: string; title: string; unit: string; status: string; approach: string }
 }
 
+// ─── Load step definition from case_steps ───────────────────────────────────
+
+export async function getCaseStepDef(caseId: string, sortOrder: number) {
+  const supabase = await createServerSupabase()
+  const { data, error } = await (supabase as any)
+    .from('case_steps')
+    .select('step_text, timing, doc_ref, detail, warning, done')
+    .eq('case_id', caseId)
+    .eq('sort_order', sortOrder)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data as {
+    step_text: string
+    timing: string | null
+    doc_ref: string | null
+    detail: string | null
+    warning: string | null
+    done: boolean
+  } | null
+}
+
 // ─── Load step response ──────────────────────────────────────────────────────
 
 export async function getStepResponse(caseId: string, stepNumber: number) {
