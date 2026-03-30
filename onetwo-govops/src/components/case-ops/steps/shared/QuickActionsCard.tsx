@@ -11,6 +11,7 @@ interface QuickAction {
 
 interface QuickActionsCardProps {
   actions: QuickAction[]
+  extraAction?: React.ReactNode
 }
 
 const variantStyles: Record<QuickAction['variant'], string> = {
@@ -19,7 +20,7 @@ const variantStyles: Record<QuickAction['variant'], string> = {
   ghost: 'flex items-center gap-1.5 px-3 py-2 bg-transparent text-[#6e7b8a] border-[1.5px] border-[#e6e8eb] rounded-lg text-[12px] font-medium',
 }
 
-export function QuickActionsCard({ actions }: QuickActionsCardProps) {
+export function QuickActionsCard({ actions, extraAction }: QuickActionsCardProps) {
   return (
     <div className="bg-white border-[1.5px] border-[#e6e8eb] rounded-[10px] overflow-hidden mb-4">
       {/* Header */}
@@ -44,6 +45,7 @@ export function QuickActionsCard({ actions }: QuickActionsCardProps) {
             </Tag>
           )
         })}
+        {extraAction}
       </div>
     </div>
   )

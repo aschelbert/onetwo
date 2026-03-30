@@ -1,4 +1,4 @@
-import { getStepResponse } from '../actions'
+import { getStepResponse, getCaseById } from '../actions'
 import { Step2ReserveStudy } from '@/components/case-ops/steps/Step2ReserveStudy'
 import type { Step2Data } from '@/types/case-steps'
 
@@ -10,7 +10,10 @@ export default async function StepPage({
   const { caseId, stepNumber: stepNumberStr } = await params
   const stepNum = parseInt(stepNumberStr, 10)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = await getStepResponse(caseId, stepNum) as any
+  const [response, caseData] = await Promise.all([
+    getStepResponse(caseId, stepNum) as any,
+    getCaseById(caseId),
+  ])
 
   if (stepNum === 2) {
     return (
@@ -19,6 +22,10 @@ export default async function StepPage({
         initialData={(response?.step_data as Partial<Step2Data>) ?? {}}
         confirmedSections={(response?.confirmed_sections as string[]) ?? []}
         isComplete={response?.is_complete ?? false}
+        caseTitle={caseData.title}
+        caseLocalId={caseData.local_id}
+        caseStatus={caseData.status}
+        stepNumber={stepNum}
       />
     )
   }

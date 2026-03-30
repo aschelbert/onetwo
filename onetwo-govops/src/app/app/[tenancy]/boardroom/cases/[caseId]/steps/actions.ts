@@ -8,6 +8,20 @@ import type { Step2Data, Step2SectionId } from '@/types/case-steps'
 // yet in the auto-generated Supabase types. Use `any` casts until types are
 // regenerated.
 
+// ─── Load case metadata ─────────────────────────────────────────────────────
+
+export async function getCaseById(caseId: string) {
+  const supabase = await createServerSupabase()
+  const { data, error } = await (supabase as any)
+    .from('cases')
+    .select('id, local_id, title, status, approach')
+    .eq('id', caseId)
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as { id: string; local_id: string; title: string; status: string; approach: string }
+}
+
 // ─── Load step response ──────────────────────────────────────────────────────
 
 export async function getStepResponse(caseId: string, stepNumber: number) {
