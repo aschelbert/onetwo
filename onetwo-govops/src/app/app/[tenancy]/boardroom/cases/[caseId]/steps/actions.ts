@@ -14,12 +14,12 @@ export async function getCaseById(caseId: string) {
   const supabase = await createServerSupabase()
   const { data, error } = await (supabase as any)
     .from('cases')
-    .select('id, local_id, title, status, approach')
+    .select('id, tenant_id, local_id, cat_id, sit_id, title, unit, status, approach')
     .eq('id', caseId)
     .single()
 
   if (error) throw new Error(error.message)
-  return data as { id: string; local_id: string; title: string; status: string; approach: string }
+  return data as { id: string; tenant_id: string; local_id: string; cat_id: string; sit_id: string; title: string; unit: string; status: string; approach: string }
 }
 
 // ─── Load step response ──────────────────────────────────────────────────────
