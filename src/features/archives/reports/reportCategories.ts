@@ -49,6 +49,7 @@ export const REPORT_TYPES: ReportTypeMeta[] = [
   { type: 'monthly_summary', category: 'board_governance', label: 'Monthly Summary', description: 'High-level monthly operations summary' },
   { type: 'compliance_report', category: 'board_governance', label: 'Compliance Report', description: 'Compliance status and filing overview' },
   { type: 'financial_snapshot', category: 'board_governance', label: 'Financial Snapshot', description: 'Quick financial health overview' },
+  { type: 'executive_summary', category: 'board_governance', label: 'Executive Summary', description: 'High-level narrative overview of financial position, budget variances, reserves, and board action items' },
 
   // Sales Package
   { type: 'resale_certificate', category: 'sales_package', label: 'Resale / Estoppel Certificate', description: 'Unit-specific disclosure for resale or refinance', requiresUnit: true },

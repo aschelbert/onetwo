@@ -340,6 +340,117 @@ function buildOperationsSnapshot(type: ReportType, periodStart?: string, periodE
   return snapshot;
 }
 
+function buildExecutiveSummarySnapshot(periodStart?: string, periodEnd?: string): Record<string, any> {
+  const fin = useFinancialStore.getState();
+  const building = useBuildingStore.getState();
+  const issues = useIssuesStore.getState();
+  const start = periodStart || `${new Date().getFullYear()}-01-01`;
+  const end = periodEnd || new Date().toISOString().split('T')[0];
+
+  // Balance sheet
+  const bs = fin.getBalanceSheet();
+  const operatingBalance = bs.assets.operating;
+
+  // Income statement for the period
+  const pnl = fin.getIncomeStatement(start, end);
+
+  // Budget variance
+  const budgetVariance = fin.getBudgetVariance();
+  const overBudgetCategories = budgetVariance
+    .filter((b: any) => b.pct > 100)
+    .sort((a: any, b: any) => (a.actual - a.budgeted) - (b.actual - b.budgeted))
+    .map((b: any) => ({ name: b.name, budgeted: b.budgeted, actual: b.actual, variance: b.variance, pct: b.pct }));
+  const totalBudgeted = budgetVariance.reduce((s: number, b: any) => s + b.budgeted, 0);
+  const totalActual = budgetVariance.reduce((s: number, b: any) => s + b.actual, 0);
+
+  // Collections & delinquency
+  const metrics = fin.getIncomeMetrics();
+  const aging = fin.getDelinquencyAging();
+
+  // Reserve fund
+  const reserveItems = fin.getReserveFundingStatus();
+  const totalReserveFunding = reserveItems.reduce((s: number, i: any) => s + i.currentFunding, 0);
+  const totalReserveRequired = reserveItems.reduce((s: number, i: any) => s + i.estimatedCost, 0);
+  const reservePct = totalReserveRequired > 0 ? Math.round((totalReserveFunding / totalReserveRequired) * 100) : 100;
+  const recommendedAnnual = Math.round(fin.calculateRecommendedAnnualReserve());
+  const currentAnnual = fin.annualReserveContribution;
+  const reserveGap = recommendedAnnual - currentAnnual;
+
+  // Project months to gap event: if underfunded and contribution gap exists
+  const monthlyContribution = currentAnnual / 12;
+  const unfundedItems = reserveItems.filter((i: any) => i.yearsRemaining > 0 && i.yearsRemaining <= 3);
+  const nearTermCapex = unfundedItems.reduce((s: number, i: any) => s + i.gap, 0);
+  const monthsToGap = nearTermCapex > 0 && monthlyContribution > 0
+    ? Math.round(totalReserveFunding / (nearTermCapex / 36)) // rough projection
+    : null;
+
+  // Insurance
+  const now = new Date();
+  const policies = building.insurance.map(p => {
+    const premium = parseFloat(p.premium.replace(/[^0-9.]/g, '')) || 0;
+    return { type: p.type, carrier: p.carrier, premium, expires: p.expires, active: new Date(p.expires) > now };
+  });
+  const totalPremium = policies.reduce((s, p) => s + p.premium, 0);
+  const expiredPolicies = policies.filter(p => !p.active);
+
+  // Open issues
+  const allIssues = issues.issues;
+  const openIssues = allIssues.filter(i => i.status === 'SUBMITTED' || i.status === 'IN_PROGRESS');
+  const urgentIssues = openIssues.filter(i => i.priority === 'URGENT' || i.priority === 'HIGH');
+
+  // Vendor contracts
+  const vendorStore = useVendorTrackerStore.getState();
+  const in90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const expiringContracts = vendorStore.contracts.filter(c => {
+    const d = new Date(c.endDate);
+    return d > now && d <= in90;
+  });
+
+  // Per-unit increase to close reserve gap (if applicable)
+  const unitCount = fin.units.length;
+  const monthlyIncreasePerUnit = reserveGap > 0 && unitCount > 0
+    ? Math.ceil(reserveGap / unitCount / 12)
+    : 0;
+  const monthsToClose = monthlyIncreasePerUnit > 0 && reserveGap > 0
+    ? Math.ceil((totalReserveRequired - totalReserveFunding) / ((currentAnnual + reserveGap) / 12))
+    : null;
+
+  return {
+    reportType: 'executive_summary',
+    period: { start, end },
+    buildingName: building.name,
+    operatingBalance,
+    pnl: { totalIncome: pnl.totalIncome, totalExpenses: pnl.totalExpenses, netIncome: pnl.netIncome },
+    budget: { totalBudgeted, totalActual, overBudgetCategories, totalCategories: budgetVariance.length },
+    collections: {
+      collectionRate: metrics.collectionRate,
+      monthlyExpected: metrics.monthlyExpected,
+      monthlyCollected: metrics.monthlyCollected,
+      totalOutstanding: aging.totalOutstanding,
+      delinquentUnits: metrics.delinquentUnits,
+      totalUnits: metrics.totalUnits,
+    },
+    reserves: {
+      totalFunding: totalReserveFunding,
+      totalRequired: totalReserveRequired,
+      pctFunded: reservePct,
+      currentAnnual,
+      recommendedAnnual,
+      gap: reserveGap,
+      monthsToGap,
+      items: reserveItems.map((i: any) => ({ name: i.name, pct: i.pct, gap: i.gap, yearsRemaining: i.yearsRemaining })),
+    },
+    insurance: { totalPremium, policyCount: policies.length, expiredCount: expiredPolicies.length, policies },
+    issues: { openCount: openIssues.length, urgentCount: urgentIssues.length },
+    vendors: { expiringContracts: expiringContracts.length },
+    recommendations: {
+      monthlyIncreasePerUnit,
+      monthsToClose,
+      unitCount,
+    },
+  };
+}
+
 // ── Main generator function ──
 
 interface GenerateOpts {
@@ -357,6 +468,10 @@ export function generateReportSnapshot(type: ReportType, opts?: GenerateOpts): R
   // Financial Statements
   if (['balance_sheet', 'income_statement', 'budget_vs_actual', 'form_1120h', 'local_tax_forms'].includes(type)) {
     return buildFinancialSnapshot(type, periodStart, periodEnd);
+  }
+  // Executive Summary
+  if (type === 'executive_summary') {
+    return buildExecutiveSummarySnapshot(periodStart, periodEnd);
   }
   // Board & Governance
   if (['board_packet', 'monthly_summary', 'compliance_report', 'financial_snapshot'].includes(type)) {

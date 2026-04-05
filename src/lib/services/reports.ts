@@ -6,7 +6,7 @@ export type ReportCategory = 'case_analysis' | 'financial_statements' | 'board_g
 
 export type ReportType =
   // Board & Governance
-  | 'board_packet' | 'monthly_summary' | 'compliance_report' | 'financial_snapshot'
+  | 'board_packet' | 'monthly_summary' | 'compliance_report' | 'financial_snapshot' | 'executive_summary'
   // Case Analysis
   | 'reconciliation' | 'budget_variance' | 'collections_delinquency' | 'reserve_balances' | 'year_end_projections'
   // Financial Statements

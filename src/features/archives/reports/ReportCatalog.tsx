@@ -11,7 +11,7 @@ interface Props {
   onGenerated: () => void; // switch to History view after generating
 }
 
-type PeriodPreset = 'current_month' | 'current_quarter' | 'ytd' | 'full_year' | 'prev_year' | 'custom';
+type PeriodPreset = 'current_month' | 'last_month' | 'q1' | 'q2' | 'q3' | 'q4' | 'current_quarter' | 'ytd' | 'full_year' | 'prev_year' | 'custom';
 
 // Compute the current fiscal year start/end from the FY end date (MM-DD).
 // If FY ends 12-31 → FY 2026 = Jan 1 2026 – Dec 31 2026
@@ -53,6 +53,22 @@ function getPresetDates(preset: PeriodPreset, fyEnd: string): { start: string; e
     case 'current_month': {
       const start = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
       return { start, end: today, label: `${now.toLocaleString('en-US', { month: 'short' })} ${now.getFullYear()}` };
+    }
+    case 'last_month': {
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const start = `${lm.getFullYear()}-${pad(lm.getMonth() + 1)}-01`;
+      const end = `${lmEnd.getFullYear()}-${pad(lmEnd.getMonth() + 1)}-${pad(lmEnd.getDate())}`;
+      return { start, end, label: `${lm.toLocaleString('en-US', { month: 'short' })} ${lm.getFullYear()}` };
+    }
+    case 'q1': case 'q2': case 'q3': case 'q4': {
+      const qIdx = parseInt(preset[1]) - 1;
+      const yr = now.getFullYear();
+      const qStart = `${yr}-${pad(qIdx * 3 + 1)}-01`;
+      const qEndMonth = qIdx * 3 + 3;
+      const qEndDay = new Date(yr, qEndMonth, 0).getDate();
+      const qEnd = `${yr}-${pad(qEndMonth)}-${pad(qEndDay)}`;
+      return { start: qStart, end: qEnd, label: `Q${qIdx + 1} ${yr}` };
     }
     case 'current_quarter': {
       const q = Math.floor(now.getMonth() / 3);
@@ -105,8 +121,13 @@ export default function ReportCatalog({ onGenerated }: Props) {
   const currentFY = getCurrentFiscalYear(fiscalYearEnd);
 
   const presetOptions: { value: PeriodPreset; label: string }[] = useMemo(() => [
-    { value: 'current_month', label: 'Current Month' },
+    { value: 'current_month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
     { value: 'current_quarter', label: 'Current Quarter' },
+    { value: 'q1', label: 'Q1' },
+    { value: 'q2', label: 'Q2' },
+    { value: 'q3', label: 'Q3' },
+    { value: 'q4', label: 'Q4' },
     { value: 'ytd', label: isCalendarFY ? 'Year-to-Date' : 'FY-to-Date' },
     { value: 'full_year', label: isCalendarFY ? `Full Year ${currentFY}` : `FY ${currentFY}` },
     { value: 'prev_year', label: isCalendarFY ? `Full Year ${currentFY - 1}` : `FY ${currentFY - 1}` },

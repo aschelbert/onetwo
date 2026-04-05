@@ -6,6 +6,7 @@ import CaseReportRenderer from './renderers/CaseReportRenderer';
 import FinancialStatementRenderer from './renderers/FinancialStatementRenderer';
 import BoardReportRenderer from './renderers/BoardReportRenderer';
 import SalesPackageRenderer from './renderers/SalesPackageRenderer';
+import ExecutiveSummaryRenderer from './renderers/ExecutiveSummaryRenderer';
 import { printReport } from '@/lib/printReport';
 
 function formatDate(dateStr: string): string {
@@ -15,6 +16,7 @@ function formatDate(dateStr: string): string {
 }
 
 function ReportRenderer({ report }: { report: GeneratedReport }) {
+  if (report.type === 'executive_summary') return <ExecutiveSummaryRenderer snapshot={report.snapshot} />;
   const cat = report.category;
   if (cat === 'case_analysis') return <CaseReportRenderer type={report.type} snapshot={report.snapshot} />;
   if (cat === 'financial_statements') return <FinancialStatementRenderer type={report.type} snapshot={report.snapshot} />;
