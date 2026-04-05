@@ -131,7 +131,7 @@ export default function BuildingPage() {
           </div>)}
 
           {/* THE UNITS (combined units + payments) */}
-          {tab === 'units' && isBoard && <TheUnitsTab />}
+          {tab === 'units' && isBoard && <TheUnitsTab variant="building" />}
           {tab === 'details' && (<div className="space-y-6">
             <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
               <div className="flex items-center justify-between mb-4"><h3 className="font-display text-xl font-bold text-ink-900">Property Details</h3><div className="flex gap-2"><button onClick={() => { setForm({ street: store.address.street, city: store.address.city, state: store.address.state, zip: store.address.zip }); setModal('editAddress'); }} className="text-sm text-accent-600 font-medium">Edit Address</button><button onClick={() => { setForm({ yearBuilt: store.details.yearBuilt, totalUnits: String(store.details.totalUnits), floors: String(store.details.floors), type: store.details.type, sqft: store.details.sqft, lotSize: store.details.lotSize, parking: store.details.parking, architect: store.details.architect, contractor: store.details.contractor, amenities: store.details.amenities.join(', '), entityType: store.details.entityType, fiscalYearEnd: store.details.fiscalYearEnd || '12-31' }); setModal('editDetails'); }} className="text-sm text-accent-600 font-medium">Edit Details</button></div></div>

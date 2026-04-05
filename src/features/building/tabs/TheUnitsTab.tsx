@@ -66,7 +66,8 @@ function ActionMenu({ unitNum, onEdit, onPay, onFee, onSpecial }: {
   );
 }
 
-export default function TheUnitsTab() {
+export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'building' | 'fiscal' } = {}) {
+  const isBuildingView = variant === 'building';
   const store = useFinancialStore();
   const building = useBuildingStore();
   const { currentRole } = useAuthStore();
@@ -350,7 +351,7 @@ export default function TheUnitsTab() {
     <div className="space-y-5">
 
       {/* Stripe Connect Bar */}
-      <div className={`rounded-xl border-2 px-5 py-4 flex items-center justify-between flex-wrap gap-3 ${stripeReady ? 'bg-sage-50 border-sage-200' : store.stripeConnectId ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'}`}>
+      {!isBuildingView && <div className={`rounded-xl border-2 px-5 py-4 flex items-center justify-between flex-wrap gap-3 ${stripeReady ? 'bg-sage-50 border-sage-200' : store.stripeConnectId ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-200'}`}>
         <div className="flex items-center gap-3">
           <svg className="w-6 h-6 text-indigo-600 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
           <div>
@@ -367,10 +368,10 @@ export default function TheUnitsTab() {
           {stripeReady && <button onClick={() => window.open('https://dashboard.stripe.com', '_blank')} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">Dashboard ↗</button>}
           <button onClick={() => setModal('stripe')} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">Details</button>
         </div>
-      </div>
+      </div>}
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+      {!isBuildingView && <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
         {[
           { val: String(totalUnits), label: 'Total Units', color: 'text-ink-900' },
           { val: String(currentUnits), label: 'Current', color: 'text-sage-600' },
@@ -384,15 +385,15 @@ export default function TheUnitsTab() {
             <p className="text-[11px] text-ink-400">{s.label}</p>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Action Bar */}
       {isBoard && (
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Due Day</button>
-          <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>
-          <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>
-          {stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
+          {!isBuildingView && <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>}
+          {!isBuildingView && <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>}
+          {!isBuildingView && stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
           <div className="flex-1" />
           <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
         </div>
@@ -401,14 +402,14 @@ export default function TheUnitsTab() {
       {/* Search + Filter */}
       <div className="flex flex-wrap gap-3 items-center">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search units, owners, email..." className="flex-1 min-w-[200px] px-3 py-2 border border-ink-200 rounded-lg text-sm" />
-        <div className="flex gap-1.5">
+        {!isBuildingView && <div className="flex gap-1.5">
           {(['all','current','behind','delinquent','for_sale'] as AccountFilter[]).map(fv => (
             <button key={fv} onClick={() => setFilter(fv)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filter === fv ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-500 hover:border-ink-300'}`}>
               {fv === 'all' ? 'All' : fv === 'behind' ? 'Behind' : fv === 'for_sale' ? 'For Sale' : fv.charAt(0).toUpperCase() + fv.slice(1)}
               {fv !== 'all' && filterCounts[fv] > 0 && <span className="ml-1 text-[10px] opacity-70">{filterCounts[fv]}</span>}
             </button>
           ))}
-        </div>
+        </div>}
         <select value={sort} onChange={e => setSort(e.target.value as SortKey)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
           <option value="number">Sort: Unit #</option>
           <option value="owner">Sort: Owner</option>
@@ -425,10 +426,12 @@ export default function TheUnitsTab() {
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Unit</th>
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Owner</th>
               <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Monthly</th>
-              <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Balance</th>
-              <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Fees / SA</th>
-              <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Account Status</th>
-              <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Last Payment</th>
+              {!isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Balance</th>}
+              {!isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Fees / SA</th>}
+              {!isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Account Status</th>}
+              {!isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Last Payment</th>}
+              {isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Voting %</th>}
+              {isBuildingView && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider">Parking</th>}
               {isBoard && <th className="py-3 px-3 text-xs font-semibold text-ink-500 uppercase tracking-wider text-right">Actions</th>}
             </tr>
           </thead>
@@ -439,20 +442,22 @@ export default function TheUnitsTab() {
               const unitUnpaidSA = u.specialAssessments.filter(a => !a.paid).length;
               const lastPay = u.payments.length > 0 ? [...u.payments].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
               return (
-                <tr key={u.number} className={`border-b border-ink-50 hover:bg-mist-50 transition-colors ${acct.sortOrder >= 3 && acct.sortOrder <= 3 ? 'bg-red-50 bg-opacity-30' : acct.sortOrder >= 1 && acct.sortOrder <= 2 ? 'bg-yellow-50 bg-opacity-20' : ''}`}>
+                <tr key={u.number} className={`border-b border-ink-50 hover:bg-mist-50 transition-colors ${!isBuildingView && acct.sortOrder >= 3 && acct.sortOrder <= 3 ? 'bg-red-50 bg-opacity-30' : !isBuildingView && acct.sortOrder >= 1 && acct.sortOrder <= 2 ? 'bg-yellow-50 bg-opacity-20' : ''}`}>
                   <td className="py-3 px-3"><button onClick={() => openDetail(u.number)} className="font-bold text-accent-600 hover:text-accent-700">{u.number}</button></td>
                   <td className="py-3 px-3"><div><p className="font-medium text-ink-900">{u.owner}</p><p className="text-xs text-ink-400">{u.email}</p></div></td>
                   <td className="py-3 px-3 font-medium text-ink-900">{fmt(u.monthlyFee)}</td>
-                  <td className="py-3 px-3"><span className={`font-bold ${u.balance > 0 ? 'text-red-600' : 'text-sage-600'}`}>{fmt(u.balance)}</span></td>
-                  <td className="py-3 px-3">
+                  {!isBuildingView && <td className="py-3 px-3"><span className={`font-bold ${u.balance > 0 ? 'text-red-600' : 'text-sage-600'}`}>{fmt(u.balance)}</span></td>}
+                  {!isBuildingView && <td className="py-3 px-3">
                     <div className="flex gap-1">
                       {activeFees > 0 && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-semibold">{activeFees} fee{activeFees > 1 ? 's' : ''}</span>}
                       {unitUnpaidSA > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">{unitUnpaidSA} SA</span>}
                       {activeFees === 0 && unitUnpaidSA === 0 && <span className="text-ink-300">—</span>}
                     </div>
-                  </td>
-                  <td className="py-3 px-3"><span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${acct.color}`}>{acct.label}</span></td>
-                  <td className="py-3 px-3 text-xs text-ink-400">{lastPay ? `${lastPay.date} · ${lastPay.method}` : '—'}</td>
+                  </td>}
+                  {!isBuildingView && <td className="py-3 px-3"><span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${acct.color}`}>{acct.label}</span></td>}
+                  {!isBuildingView && <td className="py-3 px-3 text-xs text-ink-400">{lastPay ? `${lastPay.date} · ${lastPay.method}` : '—'}</td>}
+                  {isBuildingView && <td className="py-3 px-3 text-sm text-ink-700">{u.votingPct}%</td>}
+                  {isBuildingView && <td className="py-3 px-3 text-sm text-ink-700">{u.parking || '—'}</td>}
                   {isBoard && (
                     <td className="py-3 px-3 text-right">
                       <ActionMenu unitNum={u.number} onEdit={() => openEdit(u.number)} onPay={() => openPay(u.number)} onFee={() => openFee(u.number)} onSpecial={() => openSpecial(u.number)} />
