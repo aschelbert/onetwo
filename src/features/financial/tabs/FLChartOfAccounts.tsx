@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import Modal from '@/components/ui/Modal';
+import GLMappingConfig from './GLMappingConfig';
 
 const TYPE_COLORS: Record<string, string> = {
   asset: 'bg-sage-100 text-sage-700',
@@ -68,6 +69,7 @@ export default function FLChartOfAccounts() {
 
   return (
     <div className="space-y-4">
+      <GLMappingConfig />
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-ink-400">{chartOfAccounts.length} accounts · Standard HOA numbering</p>

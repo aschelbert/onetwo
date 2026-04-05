@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
-import { getGLAccountsForInvoice } from '@/lib/financial-logic';
+import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } from '@/lib/financial-logic';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
@@ -32,6 +32,10 @@ interface FinancialState {
   unitInvoices: UnitInvoice[];
   unitDocuments: UnitDocument[];
   moveEvents: MoveEvent[];
+
+  // GL account mapping
+  glAccountMapping: GLAccountMapping;
+  setGlAccountMapping: (partial: Partial<GLAccountMapping>) => void;
 
   // UI state
   activeTab: string;
@@ -197,6 +201,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   unitInvoices: [],
   unitDocuments: [],
   moveEvents: [],
+  glAccountMapping: { ...DEFAULT_GL_MAPPING },
+
+  setGlAccountMapping: (partial) => {
+    set(s => ({ glAccountMapping: { ...s.glAccountMapping, ...partial } }));
+    syncSettings();
+  },
 
   activeTab: 'dashboard',
   glFilter: { account: '', source: '', search: '' },
@@ -625,7 +635,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const wo = get().workOrders.find((w) => w.id === id);
     if (!wo || wo.status !== 'invoiced') return;
     const paidDate = new Date().toISOString().split('T')[0];
-    const entry = get().glPost(paidDate, `${wo.title} — ${wo.vendor}${wo.caseId ? ' (' + wo.caseId + ')' : ''}`, wo.acctNum, '1010', wo.amount, wo.caseId ? 'case' : 'expense', wo.caseId || wo.invoiceNum);
+    const m = get().glAccountMapping;
+    const entry = get().glPost(paidDate, `${wo.title} — ${wo.vendor}${wo.caseId ? ' (' + wo.caseId + ')' : ''}`, wo.acctNum, m.bankAccount, wo.amount, wo.caseId ? 'case' : 'expense', wo.caseId || wo.invoiceNum);
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
         w.id === id ? { ...w, status: 'paid' as const, paidDate, glEntryId: entry.id } : w
@@ -686,7 +697,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   recordUnitPayment: (unitNum, amount, method) => {
     const today = new Date().toISOString().split('T')[0];
-    get().glPost(today, `Payment received - Unit ${unitNum}`, '1010', '1110', amount, 'payment', unitNum);
+    const m = get().glAccountMapping;
+    get().glPost(today, `Payment received - Unit ${unitNum}`, m.bankAccount, m.assessmentsReceivable, amount, 'payment', unitNum);
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
@@ -709,7 +721,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   imposeLateFee: (unitNum, amount, reason) => {
     const today = new Date().toISOString().split('T')[0];
-    get().glPost(today, `Late fee assessed - Unit ${unitNum}`, '1130', '4030', amount, 'fee', unitNum);
+    const m = get().glAccountMapping;
+    get().glPost(today, `Late fee assessed - Unit ${unitNum}`, m.lateFeeReceivable, m.lateFeeRevenue, amount, 'fee', unitNum);
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
@@ -736,7 +749,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   addSpecialAssessment: (unitNum, amount, reason) => {
     const today = new Date().toISOString().split('T')[0];
     const id = 'sa-' + Date.now();
-    get().glPost(today, `Special assessment - Unit ${unitNum}: ${reason}`, '1120', '4020', amount, 'assessment', unitNum);
+    const m = get().glAccountMapping;
+    get().glPost(today, `Special assessment - Unit ${unitNum}: ${reason}`, m.specialAssessmentsReceivable, m.specialAssessmentRevenue, amount, 'assessment', unitNum);
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
@@ -752,7 +766,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const unit = get().units.find(u => u.number === unitNum);
     const sa = unit?.specialAssessments.find(a => a.id === assessmentId);
     if (!sa || sa.paid) return;
-    get().glPost(today, `Special assessment payment - Unit ${unitNum}`, '1010', '1120', sa.amount, 'payment', unitNum);
+    const m = get().glAccountMapping;
+    get().glPost(today, `Special assessment payment - Unit ${unitNum}`, m.bankAccount, m.specialAssessmentsReceivable, sa.amount, 'payment', unitNum);
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
@@ -793,9 +808,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const inv = get().unitInvoices.find(i => i.id === invoiceId);
     if (!inv || inv.status !== 'paid') return;
 
-    // Post reversal GL entry: debit AR, credit 1010 (cash)
-    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? '1130' : inv.type === 'special_assessment' ? '1120' : '1110';
-    const glEntry = get().glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}`, arAcct, '1010', inv.amount, 'refund', inv.unitNumber);
+    // Post reversal GL entry: debit AR, credit bank (cash)
+    const m = get().glAccountMapping;
+    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? m.lateFeeReceivable : inv.type === 'special_assessment' ? m.specialAssessmentsReceivable : m.assessmentsReceivable;
+    const glEntry = get().glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}`, arAcct, m.bankAccount, inv.amount, 'refund', inv.unitNumber);
 
     // Update invoice in state
     set(s => ({
@@ -876,7 +892,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const id = 'INV-U' + Date.now().toString(36).toUpperCase();
-    const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type);
+    const m = get().glAccountMapping;
+    const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type, m);
     const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
     const invoice: UnitInvoice = {
       id, unitNumber: unitNum, type, description, amount,
@@ -898,7 +915,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const today = new Date().toISOString().split('T')[0];
     const inv = get().unitInvoices.find(i => i.id === invoiceId);
     if (!inv || inv.status === 'paid') return;
-    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, '1010', inv.type === 'fee' || inv.type === 'amenity_fee' ? '1130' : '1120', inv.amount, 'payment', inv.unitNumber);
+    const m = get().glAccountMapping;
+    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? m.lateFeeReceivable : inv.type === 'special_assessment' ? m.specialAssessmentsReceivable : m.assessmentsReceivable;
+    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, m.bankAccount, arAcct, inv.amount, 'payment', inv.unitNumber);
     set(s => ({
       unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
         ...i, status: 'paid' as const, paidDate: today, paidAmount: inv.amount,
@@ -940,6 +959,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lateFeeEnabled: state.lateFeeEnabled,
     lateFeeAmount: state.lateFeeAmount,
     lateFeeGraceDays: state.lateFeeGraceDays,
+    glAccountMapping: state.glAccountMapping,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

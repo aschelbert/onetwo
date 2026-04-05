@@ -1,18 +1,44 @@
 import type { ChartOfAccountsEntry, GLEntry, Unit } from '@/types/financial';
 
+// ─── GL Account Mapping ─────────────────────────────
+export type GLAccountMapping = {
+  bankAccount: string;
+  assessmentsReceivable: string;
+  specialAssessmentsReceivable: string;
+  lateFeeReceivable: string;
+  regularAssessmentRevenue: string;
+  specialAssessmentRevenue: string;
+  lateFeeRevenue: string;
+  amenityRevenue: string;
+};
+
+export const DEFAULT_GL_MAPPING: GLAccountMapping = {
+  bankAccount: '1010',
+  assessmentsReceivable: '1110',
+  specialAssessmentsReceivable: '1120',
+  lateFeeReceivable: '1130',
+  regularAssessmentRevenue: '4010',
+  specialAssessmentRevenue: '4020',
+  lateFeeRevenue: '4030',
+  amenityRevenue: '4060',
+};
+
 /**
  * Returns the GL accounts (AR + revenue) for a given unit invoice type.
  */
-export function getGLAccountsForInvoice(type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly'): { arAcct: string; revenueAcct: string } {
+export function getGLAccountsForInvoice(
+  type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly',
+  mapping: GLAccountMapping = DEFAULT_GL_MAPPING,
+): { arAcct: string; revenueAcct: string } {
   switch (type) {
     case 'fee':
-      return { arAcct: '1130', revenueAcct: '4030' };
+      return { arAcct: mapping.lateFeeReceivable, revenueAcct: mapping.lateFeeRevenue };
     case 'amenity_fee':
-      return { arAcct: '1130', revenueAcct: '4060' };
+      return { arAcct: mapping.lateFeeReceivable, revenueAcct: mapping.amenityRevenue };
     case 'special_assessment':
-      return { arAcct: '1120', revenueAcct: '4020' };
+      return { arAcct: mapping.specialAssessmentsReceivable, revenueAcct: mapping.specialAssessmentRevenue };
     case 'monthly':
-      return { arAcct: '1110', revenueAcct: '4010' };
+      return { arAcct: mapping.assessmentsReceivable, revenueAcct: mapping.regularAssessmentRevenue };
   }
 }
 
