@@ -45,6 +45,7 @@ export default function FLGeneralLedger() {
   const [xferForm, setXferForm] = useState({ date: today, from: '1010', to: '1020', amount: '', memo: '' });
 
   // Derived lists
+  const expenseHeaders = chartOfAccounts.filter(a => a.type === 'expense' && a.sub === 'header');
   const expenseAccts = chartOfAccounts.filter(a => a.type === 'expense' && a.sub !== 'header');
   const bankAccts = chartOfAccounts.filter(a => a.sub === 'bank');
   const allAccts = chartOfAccounts.filter(a => a.sub !== 'header');
@@ -219,13 +220,20 @@ export default function FLGeneralLedger() {
               <label className="block text-sm font-medium text-ink-700 mb-1">Category *</label>
               <select value={expForm.category} onChange={e => setExpForm({ ...expForm, category: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
                 <option value="">Select expense category...</option>
-                {expenseAccts.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}
+                {expenseHeaders.map(h => (
+                  <optgroup key={h.num} label={h.name}>
+                    {expenseAccts.filter(a => a.parent === h.num).map(a => (
+                      <option key={a.num} value={a.num}>{a.num} · {a.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
+              <p className="text-xs text-ink-300 mt-1">From <button type="button" onClick={() => { setShowExpense(false); setActiveTab('coa'); }} className="text-accent-600 hover:text-accent-700 underline">Chart of Accounts</button></p>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-1">Pay From *</label>
               <select value={expForm.payFrom} onChange={e => setExpForm({ ...expForm, payFrom: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                {bankAccts.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}
+                {bankAccts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}
               </select>
             </div>
             <div>
@@ -265,13 +273,13 @@ export default function FLGeneralLedger() {
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-1">From Account *</label>
               <select value={xferForm.from} onChange={e => setXferForm({ ...xferForm, from: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                {bankAccts.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}
+                {bankAccts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700 mb-1">To Account *</label>
               <select value={xferForm.to} onChange={e => setXferForm({ ...xferForm, to: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                {bankAccts.filter(a => a.num !== xferForm.from).map(a => <option key={a.num} value={a.num}>{a.name}</option>)}
+                {bankAccts.filter(a => a.num !== xferForm.from).map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}
               </select>
             </div>
             <div>
