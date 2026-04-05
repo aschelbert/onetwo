@@ -13,7 +13,7 @@ import TheUnitsTab from '../building/tabs/TheUnitsTab';
 
 const TABS = [
   { id: 'dashboard', label: 'Overview' },
-  { id: 'units', label: 'The Units' },
+  { id: 'units', label: 'Unit Ledger' },
   { id: 'coa', label: 'Chart of Accounts' },
   { id: 'ledger', label: 'General Ledger' },
   { id: 'workorders', label: 'WO & Invoices' },
