@@ -9,20 +9,23 @@ import FLBudget from './tabs/FLBudget';
 import FLReserves from './tabs/FLReserves';
 import FLReports from './tabs/FLReports';
 import FLApprovals from './tabs/FLApprovals';
+import TheUnitsTab from '../building/tabs/TheUnitsTab';
 
 const TABS = [
   { id: 'dashboard', label: 'Overview' },
+  { id: 'units', label: 'The Units' },
   { id: 'coa', label: 'Chart of Accounts' },
   { id: 'ledger', label: 'General Ledger' },
   { id: 'workorders', label: 'WO & Invoices' },
   { id: 'budget', label: 'Budget' },
   { id: 'reserves', label: 'Reserves' },
   { id: 'approvals', label: 'Spending Decisions' },
-  { id: 'reports', label: 'Reports' },
+  { id: 'reports', label: 'Statements & Tax Forms' },
 ];
 
 const TAB_COMPONENTS: Record<string, () => any> = {
   dashboard: FLDashboard,
+  units: TheUnitsTab,
   coa: FLChartOfAccounts,
   ledger: FLGeneralLedger,
   workorders: FLWorkOrders,
