@@ -289,14 +289,18 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       });
     };
 
+    // Use only original seed units for demo GL data — never generate
+    // entries for dynamically added units.
+    const demoUnits = seedUnits;
+
     // 1. Assessment billings
-    state.units.forEach((u) => {
+    demoUnits.forEach((u) => {
       post('2026-01-01', `Assessment - Unit ${u.number} (Jan)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
       post('2026-02-01', `Assessment - Unit ${u.number} (Feb)`, '1110', '4010', u.monthlyFee, 'assessment', u.number);
     });
 
     // 2. Payments received
-    state.units.forEach((u) => {
+    demoUnits.forEach((u) => {
       post('2026-01-15', `Payment received - Unit ${u.number} (Jan)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
       if (u.balance === 0) {
         post('2026-02-10', `Payment received - Unit ${u.number} (Feb)`, '1010', '1110', u.monthlyFee, 'payment', u.number);
@@ -304,14 +308,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     });
 
     // 3. Late fees
-    state.units.forEach((u) => {
+    demoUnits.forEach((u) => {
       if (u.balance > 0 && u.balance > u.monthlyFee) {
         post('2026-02-05', `Late fee - Unit ${u.number}`, '1130', '4030', 25, 'fee', u.number);
       }
     });
 
     // 4. Operating expenses from budget categories
-    state.budgetCategories.forEach((cat) => {
+    seedBudgetCategories.forEach((cat) => {
       const glAcct = state.chartOfAccounts.find((a) => a.budgetCat === cat.id);
       const acctNum = glAcct ? glAcct.num : '5070';
       cat.expenses.forEach((exp) => {
@@ -320,15 +324,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     });
 
     // 5. Reserve fund balances
-    state.reserveItems.forEach((item) => {
+    seedReserveItems.forEach((item) => {
       if (item.currentFunding > 0) {
         post('2025-12-31', `Reserve balance - ${item.name}`, '1020', '3020', item.currentFunding, 'transfer', item.id);
       }
     });
 
     // 6. Opening operating balance
-    const totalExpenses = state.budgetCategories.reduce((s, c) => s + c.expenses.reduce((s2, e) => s2 + e.amount, 0), 0);
-    const totalCollected = state.units.reduce((s, u) => s + u.monthlyFee * 2, 0);
+    const totalExpenses = seedBudgetCategories.reduce((s, c) => s + c.expenses.reduce((s2, e) => s2 + e.amount, 0), 0);
+    const totalCollected = demoUnits.reduce((s, u) => s + u.monthlyFee * 2, 0);
     const openingBalance = totalCollected - totalExpenses + 15000;
     post('2025-12-31', 'Opening operating fund balance', '1010', '3010', openingBalance, 'manual', null);
 
