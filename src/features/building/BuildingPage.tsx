@@ -74,7 +74,7 @@ export default function BuildingPage() {
             <div className="text-accent-200 text-xs">Health {overallHealth}%</div>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
           {[
             { label: 'Legal & Bylaws', score: legalScore, detail: `${currentDocs}/${totalDocs}`, tab: 'legal' as typeof TABS[number] },
             { label: 'Insurance', score: insScore, detail: `${activePolicies}/${totalPolicies}`, tab: 'insurance' as typeof TABS[number] },
@@ -92,6 +92,11 @@ export default function BuildingPage() {
               <p className="text-[10px] text-accent-300">{m.detail}</p>
             </div>
           ))}
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab('units')}>
+            <p className="text-[11px] text-accent-100 leading-tight">Monthly Due Day</p>
+            <p className="text-sm font-bold mt-1 text-white">{finStore.hoaDueDay}{finStore.hoaDueDay === 1 ? 'st' : finStore.hoaDueDay === 2 ? 'nd' : finStore.hoaDueDay === 3 ? 'rd' : 'th'}</p>
+            <p className="text-[10px] text-accent-300">of each month</p>
+          </div>
         </div>
       </div>
 

@@ -177,7 +177,7 @@ export default function PaymentsManager() {
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-4 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-50">⚙ Assessment Due Day</button>
+        <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-4 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-50">⚙ Manage Monthly Due Day</button>
         <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-4 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-50">📝 Edit Unit Monthly Fee</button>
         <button onClick={() => { resetForm(); setSelectedUnits(occupied.map(u => u.number)); setModal('bulkAssessment'); }} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">📋 Bulk Special Assessment</button>
         {stripeReady && (

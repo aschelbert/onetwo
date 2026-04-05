@@ -371,7 +371,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       </div>}
 
       {/* KPIs */}
-      {!isBuildingView && <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+      {!isBuildingView && <div className="grid grid-cols-3 sm:grid-cols-7 gap-3">
         {[
           { val: String(totalUnits), label: 'Total Units', color: 'text-ink-900' },
           { val: String(currentUnits), label: 'Current', color: 'text-sage-600' },
@@ -379,6 +379,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
           { val: String(delinquentCount), label: 'Delinquent', color: delinquentCount > 0 ? 'text-red-600' : 'text-sage-600' },
           { val: fmt(totalAR + totalSAAR), label: 'Total Receivable', color: totalAR > 0 ? 'text-red-600' : 'text-sage-600' },
           { val: fmt(monthlyRevenue), label: 'Monthly Revenue', color: 'text-ink-900' },
+          { val: `${store.hoaDueDay}${store.hoaDueDay === 1 ? 'st' : store.hoaDueDay === 2 ? 'nd' : store.hoaDueDay === 3 ? 'rd' : 'th'}`, label: 'Monthly Due Day', color: 'text-accent-600' },
         ].map(s => (
           <div key={s.label} className="bg-mist-50 rounded-lg p-3 border border-mist-100">
             <p className={`text-lg font-bold ${s.color}`}>{s.val}</p>
@@ -390,7 +391,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       {/* Action Bar */}
       {isBoard && (
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Due Day</button>
+          <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Manage Monthly Due Day</button>
           {!isBuildingView && <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>}
           {!isBuildingView && <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>}
           {!isBuildingView && stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
