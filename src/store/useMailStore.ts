@@ -198,4 +198,5 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
   },
 }), {
   name: 'onetwo-mail',
+  version: 2,
 }));

@@ -3243,6 +3243,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 }), {
   name: 'onetwo-issues',
+  version: 2,
   partialize: (state: IssuesState) => ({
     issues: state.issues,
     cases: state.cases,

@@ -247,4 +247,10 @@ export const useCommunicationsStore = create<CommunicationsState>()(persist((set
   },
 }), {
   name: 'communications-store',
+  version: 2,
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+    communications: persisted?.communications?.length ? persisted.communications : current.communications,
+  }),
 }));

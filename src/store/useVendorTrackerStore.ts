@@ -105,8 +105,12 @@ export const useVendorTrackerStore = create<VendorTrackerState>()(persist((set) 
   },
 }), {
   name: 'onetwo-vendor-tracker',
+  version: 2,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
+    bids: persisted?.bids?.length ? persisted.bids : current.bids,
+    reviews: persisted?.reviews?.length ? persisted.reviews : current.reviews,
+    contracts: persisted?.contracts?.length ? persisted.contracts : current.contracts,
   }),
 }));

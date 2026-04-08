@@ -939,6 +939,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 }), {
   name: 'onetwo-financial',
+  version: 2,
   partialize: (state) => ({
     budgetCategories: state.budgetCategories,
     reserveItems: state.reserveItems,
@@ -964,5 +965,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
+    budgetCategories: persisted?.budgetCategories?.length ? persisted.budgetCategories : current.budgetCategories,
+    reserveItems: persisted?.reserveItems?.length ? persisted.reserveItems : current.reserveItems,
+    chartOfAccounts: persisted?.chartOfAccounts?.length ? persisted.chartOfAccounts : current.chartOfAccounts,
+    units: persisted?.units?.length ? persisted.units : current.units,
+    workOrders: persisted?.workOrders?.length ? persisted.workOrders : current.workOrders,
   }),
 }));

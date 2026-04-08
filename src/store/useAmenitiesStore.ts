@@ -593,4 +593,13 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
       ),
     }));
   },
-}), { name: 'onetwo-amenities' }));
+}), {
+  name: 'onetwo-amenities',
+  version: 2,
+  merge: (persisted: any, current: any) => ({
+    ...current,
+    ...(persisted || {}),
+    configs: persisted?.configs?.length ? persisted.configs : current.configs,
+    reservations: persisted?.reservations?.length ? persisted.reservations : current.reservations,
+  }),
+}));

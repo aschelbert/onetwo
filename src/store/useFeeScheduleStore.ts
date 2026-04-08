@@ -267,8 +267,10 @@ export const useFeeScheduleStore = create<FeeScheduleState>()(persist((set, get)
   },
 }), {
   name: 'onetwo-fee-schedule',
+  version: 2,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
+    fees: persisted?.fees?.length ? persisted.fees : current.fees,
   }),
 }));

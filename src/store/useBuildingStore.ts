@@ -387,6 +387,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
+  version: 2,
   partialize: (state) => ({
     name: state.name,
     address: state.address,
@@ -403,5 +404,10 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
+    board: persisted?.board?.length ? persisted.board : current.board,
+    legalDocuments: persisted?.legalDocuments?.length ? persisted.legalDocuments : current.legalDocuments,
+    insurance: persisted?.insurance?.length ? persisted.insurance : current.insurance,
+    vendors: persisted?.vendors?.length ? persisted.vendors : current.vendors,
+    maintenanceSchedules: persisted?.maintenanceSchedules?.length ? persisted.maintenanceSchedules : current.maintenanceSchedules,
   }),
 }));

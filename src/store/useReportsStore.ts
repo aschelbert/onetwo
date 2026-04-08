@@ -33,6 +33,7 @@ export const useReportsStore = create<ReportsState>()(persist((set) => ({
   deleteReport: (id) => set((s) => ({ reports: s.reports.filter((r) => r.id !== id) })),
 }), {
   name: 'onetwo-wizard-reports',
+  version: 2,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

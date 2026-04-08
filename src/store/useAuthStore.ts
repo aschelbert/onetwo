@@ -181,6 +181,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   },
 }), {
   name: 'onetwo-auth',
+  version: 2,
   partialize: (state) => ({
     isAuthenticated: state.isAuthenticated,
     currentUser: state.currentUser,

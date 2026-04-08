@@ -65,11 +65,11 @@ function syncFiling(id: string) {
 
 export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   completions: {
-    g1: true, g2: true, g3: true, g4: true, g5: true, g6: true, g7: true, g8: true, g9: true,
-    f1: true, f2: true, f3: true, f4: true, f5: true, f6: true, f7: true,
-    i1: true, i2: true, i3: true, i4: true, i5: true, i6: true,
-    m1: true, m2: true, m3: true, m4: true, m5: true, m6: true,
-    r1: true, r2: true, r3: true, r4: true, r5: true,
+    g1: true, g2: true, g3: true, g4: true, g5: true, g6: true, g7: false, g8: true, g9: true,
+    f1: true, f2: true, f3: false, f4: true, f5: true, f6: true, f7: true,
+    i1: true, i2: true, i3: true, i4: true, i5: false, i6: true,
+    m1: true, m2: true, m3: true, m4: false, m5: true, m6: false,
+    r1: true, r2: true, r3: false, r4: true, r5: true,
     o1: true, o2: true, o3: true, o4: true,
     e1: true, e2: true, e3: true,
     l1: true, l2: true,
@@ -215,9 +215,13 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   },
 }), {
   name: 'onetwo-compliance',
+  version: 2,
   merge: (persisted: any, current: any) => ({
     ...current,
-    ...persisted,
-    announcements: persisted?.announcements || current.announcements || [],
+    ...(persisted || {}),
+    announcements: persisted?.announcements?.length ? persisted.announcements : current.announcements || [],
+    filings: persisted?.filings?.length ? persisted.filings : current.filings || [],
+    communications: persisted?.communications?.length ? persisted.communications : current.communications || [],
+    completions: persisted?.completions && Object.keys(persisted.completions).length > 0 ? persisted.completions : current.completions,
   }),
 }));
