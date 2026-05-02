@@ -57,10 +57,6 @@ export default async function StepPage({
         initialData={(response?.step_data as Partial<Step2Data>) ?? {}}
         confirmedSections={(response?.confirmed_sections as string[]) ?? []}
         isComplete={response?.is_complete ?? false}
-        caseTitle={caseData.title}
-        caseLocalId={caseData.local_id}
-        caseStatus={caseData.status}
-        stepNumber={stepNum}
       />
     )
   }

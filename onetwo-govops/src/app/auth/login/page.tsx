@@ -15,7 +15,8 @@ function LoginForm() {
   const [setupDone, setSetupDone] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
-  const redirect = searchParams.get('redirect') || '/admin/dashboard'
+  const isAdmin = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')
+  const redirect = searchParams.get('redirect') || (isAdmin ? '/admin/dashboard' : '/')
 
   // Check if this is a fresh install (no admin users yet)
   useEffect(() => {
@@ -101,7 +102,7 @@ function LoginForm() {
             <Image src="/onetwo-wordmark-dark.jpg" alt="ONE two" width={160} height={80} className="h-20 w-auto object-contain rounded-lg" />
             <Image src="/onetwo-icon-1t.jpg" alt="ONE two icon" width={80} height={80} className="h-20 w-auto object-contain rounded-lg" />
           </div>
-          <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider mt-2">Admin Console</span>
+          {isAdmin && <span className="block text-[0.65rem] text-gray-500 uppercase tracking-wider mt-2">Admin Console</span>}
         </div>
 
         {isSetup && (

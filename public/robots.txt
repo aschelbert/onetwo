@@ -44,3 +44,5 @@ Disallow: /
 # Allow all other crawlers (search engines, etc.)
 User-agent: *
 Allow: /
+
+Sitemap: https://getonetwo.com/sitemap.xml

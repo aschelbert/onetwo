@@ -3,10 +3,6 @@
 import { useState, useCallback, useTransition } from 'react'
 import { upsertStep2Data, toggleSectionConfirmed, markStep2Complete } from '@/app/app/[tenancy]/boardroom/cases/[caseId]/steps/actions'
 import type { Step2Data, Step2SectionId } from '@/types/case-steps'
-import { useTenant } from '@/lib/tenant-context'
-import { useCaseChat } from '@/hooks/useCaseChat'
-import { CaseChatPanel } from '../CaseChatPanel'
-import { CaseChatToggleButton } from '../CaseChatToggleButton'
 
 // Sub-sections
 import { Section1StudyValidity } from './step2/Section1StudyValidity'
@@ -22,18 +18,9 @@ interface Props {
   initialData: Partial<Step2Data>
   confirmedSections: string[]
   isComplete: boolean
-  caseTitle: string
-  caseLocalId: string
-  caseStatus: string
-  stepNumber: number
 }
 
-export function Step2ReserveStudy({ caseId, initialData, confirmedSections: initialConfirmed, isComplete: initialComplete, caseTitle, caseLocalId, caseStatus, stepNumber }: Props) {
-  const { user } = useTenant()
-  const chat = useCaseChat(caseId)
-  const totalUnread = chat.unreadCounts.internal + chat.unreadCounts.owner
-  const canSeeInternal = ['BOARD_MEMBER', 'PROPERTY_MANAGER', 'STAFF'].includes(user.role_id?.toUpperCase() ?? '')
-
+export function Step2ReserveStudy({ caseId, initialData, confirmedSections: initialConfirmed, isComplete: initialComplete }: Props) {
   const [data, setData] = useState<Partial<Step2Data>>(initialData)
   const [confirmed, setConfirmed] = useState<string[]>(initialConfirmed)
   const [isComplete, setIsComplete] = useState(initialComplete)
@@ -65,15 +52,10 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
     try {
       await markStep2Complete(caseId)
       setIsComplete(true)
-      // System event: step marked complete
-      chat.send(`Step ${stepNumber} complete — Review Reserve Study`, {
-        msgType: 'event',
-        eventMeta: { event: 'step_complete', step_id: caseId, step_label: 'Review Reserve Study', step_number: stepNumber },
-      })
     } catch (e) {
       alert((e as Error).message)
     }
-  }, [caseId, chat, stepNumber])
+  }, [caseId])
 
   const toggleSection = (id: Step2SectionId) =>
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -82,7 +64,6 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
     .every((s) => confirmed.includes(s))
 
   return (
-    <>
       <div className="px-7 py-[18px] pb-8">
         {/* Mark Complete */}
         <MarkCompleteCard
@@ -100,20 +81,13 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
           guidance="Before any budget number is set, the board must understand the reserve picture. Work through all four sections. This step cannot be marked complete until each section is confirmed — and the outputs here feed directly into the owner notice (Step 7) and assessment rationale (Step 8)."
         />
 
-        {/* Quick Actions — Chat toggle added here */}
+        {/* Quick Actions */}
         <QuickActionsCard
           actions={[
             { label: 'Review Reserve Study', variant: 'primary', icon: '\u{1F4CA}', href: '#' },
             { label: 'Open Reserves', variant: 'secondary', icon: '\u{1F3E6}', href: '/fiscal-lens/reserves', hint: '\u2192 Fiscal Lens \u2192 Reserves' },
             { label: 'Upload Document', variant: 'ghost', icon: '\u{1F4CE}', onClick: () => { /* TODO */ } },
           ]}
-          extraAction={
-            <CaseChatToggleButton
-              isOpen={chat.isOpen}
-              totalUnread={totalUnread}
-              onClick={() => chat.isOpen ? chat.closeChat() : chat.openChat()}
-            />
-          }
         />
 
         {/* Section progress label */}
@@ -163,17 +137,5 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
           ↓ Click step 3 in the sidebar to continue
         </div>
       </div>
-
-      {/* Chat panel — fixed position, outside the scroll container */}
-      <CaseChatPanel
-        caseId={caseId}
-        caseTitle={caseTitle}
-        caseLocalId={caseLocalId}
-        caseStatus={caseStatus}
-        activeStep={`Step ${stepNumber} active`}
-        canSeeInternal={canSeeInternal}
-        chat={chat}
-      />
-    </>
   )
 }
