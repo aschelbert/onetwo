@@ -389,8 +389,10 @@ export async function upsertBuildingProfile(tenantId: string, d: Partial<Buildin
 
 // ── Bulk fetch for loadFromDb ──
 
+import * as assetsSvc from '@/lib/services/assets';
+
 export async function fetchAllBuildingData(tenantId: string) {
-  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile] = await Promise.all([
+  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets] = await Promise.all([
     fetchBoardMembers(tenantId),
     fetchManagementInfo(tenantId),
     fetchLegalCounsel(tenantId),
@@ -399,6 +401,7 @@ export async function fetchAllBuildingData(tenantId: string) {
     fetchVendors(tenantId),
     fetchMaintenanceSchedules(tenantId),
     fetchBuildingProfile(tenantId),
+    assetsSvc.fetchAssets(tenantId),
   ]);
-  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile };
+  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets };
 }

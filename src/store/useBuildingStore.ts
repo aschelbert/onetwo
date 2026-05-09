@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as buildingSvc from '@/lib/services/building';
+import * as assetsSvc from '@/lib/services/assets';
 
 // ─── Types ─────────────────────────────────────
 
@@ -50,6 +51,57 @@ export interface MaintenanceSchedule {
   status: 'on-track' | 'due-soon' | 'overdue' | 'completed';
 }
 
+export type AssetCategory = 'Mechanical' | 'Amenity' | 'Safety' | 'Technology' | 'Common Area' | 'Landscaping';
+export type AssetCondition = 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Critical';
+
+export interface ConditionAssessment {
+  date: string;
+  condition: AssetCondition;
+  assessedBy: string;
+  notes: string;
+}
+
+export interface AssetWarranty {
+  id: string;
+  description: string;
+  type: string;
+  vendorId: string;
+  vendorName: string;
+  expires: string;
+  documentRef: string;
+}
+
+export interface BuildingAsset {
+  id: string;
+  name: string;
+  category: AssetCategory;
+  location: string;
+  condition: AssetCondition;
+  installedDate: string;
+  originalCost: number;
+  usefulLifeYears: number;
+  remainingLifeYears: number;
+  replacementCostToday: number;
+  inflationRate: number;
+  criticality: string;
+  annualMaintenanceCost: number;
+  annualOperatingCost: number;
+  parentAssetId: string | null;
+  reserveItemId: string;
+  maintenanceScheduleIds: string[];
+  workOrderIds: string[];
+  vendorIds: string[];
+  insurancePolicyIds: string[];
+  amenityConfigId: string;
+  glAccountNum: string;
+  budgetCategoryId: string;
+  spendingApprovalIds: string[];
+  conditionHistory: ConditionAssessment[];
+  warranties: AssetWarranty[];
+  notes: string;
+  insuredValue: number;
+}
+
 export interface BylawsConfig {
   assessmentCapPct: number;
   ownerVoteThreshold: number;
@@ -68,6 +120,7 @@ interface BuildingState {
   insurance: InsurancePolicy[];
   vendors: Vendor[];
   maintenanceSchedules: MaintenanceSchedule[];
+  assets: BuildingAsset[];
   bylawsConfig: BylawsConfig;
   updateBylawsConfig: (config: Partial<BylawsConfig>) => void;
 
@@ -109,6 +162,13 @@ interface BuildingState {
   addMaintenanceSchedule: (m: Omit<MaintenanceSchedule, 'id'>, tenantId?: string) => void;
   updateMaintenanceSchedule: (id: string, m: Partial<MaintenanceSchedule>) => void;
   removeMaintenanceSchedule: (id: string) => void;
+
+  addAsset: (a: Omit<BuildingAsset, 'id'>, tenantId?: string) => void;
+  updateAsset: (id: string, a: Partial<BuildingAsset>) => void;
+  removeAsset: (id: string) => void;
+  addConditionAssessment: (assetId: string, assessment: ConditionAssessment) => void;
+  addWarranty: (assetId: string, warranty: Omit<AssetWarranty, 'id'>) => void;
+  removeWarranty: (assetId: string, warrantyId: string) => void;
 }
 
 // Sync helpers
@@ -141,6 +201,11 @@ function syncMaintenanceSchedule(id: string) {
   if (!isBackendEnabled) return;
   const m = useBuildingStore.getState().maintenanceSchedules.find(x => x.id === id);
   if (m) buildingSvc.updateMaintenanceSchedule(id, m);
+}
+function syncAsset(id: string) {
+  if (!isBackendEnabled) return;
+  const a = useBuildingStore.getState().assets.find(x => x.id === id);
+  if (a) assetsSvc.updateAsset(id, a);
 }
 
 export const useBuildingStore = create<BuildingState>()(persist((set) => ({
@@ -205,6 +270,176 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     { id: 'ms5', task: 'Roof Inspection', category: 'General', frequency: 'semi-annual', vendor: 'Apex Roofing', lastCompleted: '2025-10-01', nextDue: '2026-04-01', estimatedCost: '$600', notes: 'Visual inspection of membrane, flashing, and drainage', status: 'due-soon' },
     { id: 'ms6', task: 'Emergency Generator Test', category: 'Electrical', frequency: 'monthly', vendor: '', lastCompleted: '2026-03-01', nextDue: '2026-04-01', estimatedCost: '$200', notes: 'Monthly load test of backup generator', status: 'on-track' },
   ],
+  assets: [
+    {
+      id: 'ast1', name: 'Pool & Deck Area', category: 'Amenity', location: 'Ground Floor - South', condition: 'Good',
+      installedDate: '2010-06-15', originalCost: 120000, usefulLifeYears: 25, remainingLifeYears: 8,
+      replacementCostToday: 185000, inflationRate: 3, criticality: 'Medium',
+      annualMaintenanceCost: 8400, annualOperatingCost: 1200, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: ['ms1'], workOrderIds: [],
+      vendorIds: ['v1'], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-01-10', condition: 'Good', assessedBy: 'Diane Carter', notes: 'Deck boards solid, pool liner in good shape' },
+        { date: '2025-01-15', condition: 'Good', assessedBy: 'Diane Carter', notes: 'Post-season inspection, all good' },
+        { date: '2024-01-12', condition: 'Fair', assessedBy: 'Mark Green', notes: 'Some deck boards showing wear' },
+      ],
+      warranties: [
+        { id: 'w1', description: 'Pool liner warranty', type: 'Manufacturer', vendorId: 'v1', vendorName: 'Green Thumb Landscaping', expires: '2030-06-15', documentRef: '' },
+      ],
+      notes: 'Heated pool, 40x20ft, max capacity 30. Deck resurfaced 2022.', insuredValue: 185000,
+    },
+    {
+      id: 'ast2', name: 'Pool Pump', category: 'Mechanical', location: 'Pool Equipment Room', condition: 'Fair',
+      installedDate: '2018-04-01', originalCost: 3200, usefulLifeYears: 8, remainingLifeYears: 3,
+      replacementCostToday: 4200, inflationRate: 3, criticality: 'High',
+      annualMaintenanceCost: 600, annualOperatingCost: 200, parentAssetId: 'ast1',
+      reserveItemId: '', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: ['v5'], insurancePolicyIds: [], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-02-01', condition: 'Fair', assessedBy: 'Pete Quick', notes: 'Bearings showing wear, monitor closely' },
+      ],
+      warranties: [], notes: 'Pentair SuperFlo 1.5HP', insuredValue: 0,
+    },
+    {
+      id: 'ast3', name: 'Pool Heater', category: 'Mechanical', location: 'Pool Equipment Room', condition: 'Good',
+      installedDate: '2020-03-15', originalCost: 6500, usefulLifeYears: 12, remainingLifeYears: 6,
+      replacementCostToday: 8500, inflationRate: 3, criticality: 'Medium',
+      annualMaintenanceCost: 400, annualOperatingCost: 200, parentAssetId: 'ast1',
+      reserveItemId: '', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: ['v2'], insurancePolicyIds: [], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-01-10', condition: 'Good', assessedBy: 'Tom Frost', notes: 'Operating efficiently' },
+      ],
+      warranties: [
+        { id: 'w2', description: 'Heat exchanger warranty', type: 'Manufacturer', vendorId: 'v2', vendorName: 'Cool Air Services', expires: '2028-03-15', documentRef: '' },
+      ],
+      notes: 'Hayward H400FDN natural gas', insuredValue: 0,
+    },
+    {
+      id: 'ast4', name: 'Elevator #1', category: 'Mechanical', location: 'Main Lobby', condition: 'Good',
+      installedDate: '2005-01-15', originalCost: 180000, usefulLifeYears: 25, remainingLifeYears: 12,
+      replacementCostToday: 320000, inflationRate: 3, criticality: 'Critical',
+      annualMaintenanceCost: 6000, annualOperatingCost: 1200, parentAssetId: null,
+      reserveItemId: 'res3', maintenanceScheduleIds: ['ms2'], workOrderIds: [],
+      vendorIds: ['v4'], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: ['sa3'],
+      conditionHistory: [
+        { date: '2026-01-15', condition: 'Good', assessedBy: 'James Metro', notes: 'Annual inspection passed' },
+        { date: '2025-06-01', condition: 'Good', assessedBy: 'James Metro', notes: 'Semi-annual check OK' },
+      ],
+      warranties: [], notes: 'Otis Gen2 — serves floors 1-8. State inspection due Sep 2026.', insuredValue: 320000,
+    },
+    {
+      id: 'ast5', name: 'Elevator #2', category: 'Mechanical', location: 'Service Lobby', condition: 'Fair',
+      installedDate: '2005-01-15', originalCost: 180000, usefulLifeYears: 25, remainingLifeYears: 12,
+      replacementCostToday: 320000, inflationRate: 3, criticality: 'Critical',
+      annualMaintenanceCost: 6000, annualOperatingCost: 1200, parentAssetId: null,
+      reserveItemId: 'res3', maintenanceScheduleIds: ['ms2'], workOrderIds: [],
+      vendorIds: ['v4'], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-01-15', condition: 'Fair', assessedBy: 'James Metro', notes: 'Door operator showing wear, plan replacement' },
+      ],
+      warranties: [], notes: 'Otis Gen2 — serves floors 1-8, freight-capable.', insuredValue: 320000,
+    },
+    {
+      id: 'ast6', name: 'Community Room', category: 'Amenity', location: 'Floor 1 - West Wing', condition: 'Good',
+      installedDate: '1998-01-01', originalCost: 50000, usefulLifeYears: 30, remainingLifeYears: 15,
+      replacementCostToday: 75000, inflationRate: 3, criticality: 'Low',
+      annualMaintenanceCost: 2400, annualOperatingCost: 600, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: ['ins2'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2025-12-01', condition: 'Good', assessedBy: 'Diane Carter', notes: 'Furniture and AV in good shape. Carpet replaced 2024.' },
+      ],
+      warranties: [], notes: 'Seats 60, AV system, kitchenette. Reservable for private events.', insuredValue: 75000,
+    },
+    {
+      id: 'ast7', name: 'HVAC Central', category: 'Mechanical', location: 'Mechanical Room - Basement', condition: 'Fair',
+      installedDate: '2007-08-01', originalCost: 145000, usefulLifeYears: 20, remainingLifeYears: 5,
+      replacementCostToday: 210000, inflationRate: 3, criticality: 'Critical',
+      annualMaintenanceCost: 8500, annualOperatingCost: 3200, parentAssetId: null,
+      reserveItemId: 'res2', maintenanceScheduleIds: ['ms1'], workOrderIds: [],
+      vendorIds: ['v2'], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-02-15', condition: 'Fair', assessedBy: 'Tom Frost', notes: 'Compressor efficiency declining, plan replacement in 3-5 years' },
+        { date: '2025-08-01', condition: 'Fair', assessedBy: 'Tom Frost', notes: 'Filters replaced, refrigerant topped off' },
+        { date: '2024-02-10', condition: 'Good', assessedBy: 'Tom Frost', notes: 'System running well' },
+      ],
+      warranties: [], notes: 'Trane XR17 system, 50-ton capacity. Serves common areas.', insuredValue: 210000,
+    },
+    {
+      id: 'ast8', name: 'Fire Suppression System', category: 'Safety', location: 'Building-wide', condition: 'Good',
+      installedDate: '1998-01-01', originalCost: 95000, usefulLifeYears: 30, remainingLifeYears: 18,
+      replacementCostToday: 140000, inflationRate: 3, criticality: 'Critical',
+      annualMaintenanceCost: 3600, annualOperatingCost: 0, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: ['ms3'], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2025-06-15', condition: 'Good', assessedBy: 'DC Fire Marshall', notes: 'Annual NFPA 72 test passed' },
+      ],
+      warranties: [], notes: 'Sprinkler + fire alarm system. NFPA 72 compliant.', insuredValue: 140000,
+    },
+    {
+      id: 'ast9', name: 'Lobby / Foyer', category: 'Common Area', location: 'Floor 1 - Main Entrance', condition: 'Excellent',
+      installedDate: '1998-01-01', originalCost: 35000, usefulLifeYears: 20, remainingLifeYears: 14,
+      replacementCostToday: 55000, inflationRate: 3, criticality: 'Low',
+      annualMaintenanceCost: 1800, annualOperatingCost: 600, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: ['ins2'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2025-11-01', condition: 'Excellent', assessedBy: 'Diane Carter', notes: 'Renovated 2024 — new furniture, lighting, flooring' },
+      ],
+      warranties: [], notes: 'Renovated 2024. Package room adjacent.', insuredValue: 55000,
+    },
+    {
+      id: 'ast10', name: 'Fitness Center', category: 'Amenity', location: 'Floor 1 - East Wing', condition: 'Good',
+      installedDate: '2015-03-01', originalCost: 45000, usefulLifeYears: 15, remainingLifeYears: 7,
+      replacementCostToday: 65000, inflationRate: 3, criticality: 'Low',
+      annualMaintenanceCost: 3600, annualOperatingCost: 1200, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: ['ins2'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2025-12-01', condition: 'Good', assessedBy: 'Diane Carter', notes: 'Equipment functional, treadmill belt replaced' },
+      ],
+      warranties: [], notes: 'Cardio + free weights. 8 machines total.', insuredValue: 65000,
+    },
+    {
+      id: 'ast11', name: 'Parking Gate System', category: 'Technology', location: 'Garage Entrance', condition: 'Poor',
+      installedDate: '2012-09-01', originalCost: 12000, usefulLifeYears: 12, remainingLifeYears: 1,
+      replacementCostToday: 18000, inflationRate: 3, criticality: 'High',
+      annualMaintenanceCost: 2400, annualOperatingCost: 600, parentAssetId: null,
+      reserveItemId: 'res4', maintenanceScheduleIds: [], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: [], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat1', spendingApprovalIds: ['sa1'],
+      conditionHistory: [
+        { date: '2026-01-20', condition: 'Poor', assessedBy: 'Diane Carter', notes: 'Gate arm sticking, motor struggling. Replace soon.' },
+        { date: '2025-06-01', condition: 'Fair', assessedBy: 'Diane Carter', notes: 'Intermittent issues with remote sensors' },
+      ],
+      warranties: [], notes: 'RFID + remote access. 65 spaces.', insuredValue: 0,
+    },
+    {
+      id: 'ast12', name: 'Landscaping', category: 'Landscaping', location: 'Exterior Grounds', condition: 'Good',
+      installedDate: '1998-01-01', originalCost: 25000, usefulLifeYears: 10, remainingLifeYears: 4,
+      replacementCostToday: 35000, inflationRate: 3, criticality: 'Low',
+      annualMaintenanceCost: 7800, annualOperatingCost: 0, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: ['ms5'], workOrderIds: [],
+      vendorIds: ['v1'], insurancePolicyIds: [], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: 'cat3', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-03-01', condition: 'Good', assessedBy: 'Mark Green', notes: 'Spring prep complete, irrigation tested' },
+      ],
+      warranties: [], notes: 'Includes irrigation system, seasonal plantings, tree maintenance.', insuredValue: 0,
+    },
+  ],
   bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51 },
 
   // ─── DB Hydration ─────────────────────────────
@@ -218,6 +453,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (data.insurance) updates.insurance = data.insurance;
     if (data.vendors) updates.vendors = data.vendors;
     if (data.maintenanceSchedules) updates.maintenanceSchedules = data.maintenanceSchedules;
+    if (data.assets) updates.assets = data.assets;
     if (data.profile) {
       const current = useBuildingStore.getState().details;
       updates.details = { ...current, ...data.profile };
@@ -384,10 +620,47 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (isBackendEnabled) buildingSvc.deleteMaintenanceSchedule(id);
   },
 
+  addAsset: (a, tenantId?) => {
+    const id = 'ast' + Date.now();
+    set(s => ({ assets: [...s.assets, { id, ...a }] }));
+    if (isBackendEnabled && tenantId) {
+      assetsSvc.createAsset(tenantId, a).then(dbRow => {
+        if (dbRow) set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      });
+    }
+  },
+  updateAsset: (id, a) => {
+    set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, ...a } : x) }));
+    syncAsset(id);
+  },
+  removeAsset: (id) => {
+    set(s => ({ assets: s.assets.filter(x => x.id !== id) }));
+    if (isBackendEnabled) assetsSvc.deleteAsset(id);
+  },
+  addConditionAssessment: (assetId, assessment) => {
+    set(s => ({
+      assets: s.assets.map(x => x.id === assetId ? { ...x, conditionHistory: [assessment, ...x.conditionHistory], condition: assessment.condition } : x),
+    }));
+    syncAsset(assetId);
+  },
+  addWarranty: (assetId, warranty) => {
+    const wId = 'w' + Date.now();
+    set(s => ({
+      assets: s.assets.map(x => x.id === assetId ? { ...x, warranties: [...x.warranties, { id: wId, ...warranty }] } : x),
+    }));
+    syncAsset(assetId);
+  },
+  removeWarranty: (assetId, warrantyId) => {
+    set(s => ({
+      assets: s.assets.map(x => x.id === assetId ? { ...x, warranties: x.warranties.filter(w => w.id !== warrantyId) } : x),
+    }));
+    syncAsset(assetId);
+  },
+
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
-  version: 2,
+  version: 3,
   partialize: (state) => ({
     name: state.name,
     address: state.address,
@@ -399,6 +672,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     insurance: state.insurance,
     vendors: state.vendors,
     maintenanceSchedules: state.maintenanceSchedules,
+    assets: state.assets,
     bylawsConfig: state.bylawsConfig,
   }),
   merge: (persisted: any, current: any) => ({
@@ -409,5 +683,6 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     insurance: persisted?.insurance?.length ? persisted.insurance : current.insurance,
     vendors: persisted?.vendors?.length ? persisted.vendors : current.vendors,
     maintenanceSchedules: persisted?.maintenanceSchedules?.length ? persisted.maintenanceSchedules : current.maintenanceSchedules,
+    assets: persisted?.assets?.length ? persisted.assets : current.assets,
   }),
 }));

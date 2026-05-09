@@ -36,6 +36,7 @@ export function resetStoresForRealTenant() {
     legalDocuments: [],
     insurance: [],
     vendors: [],
+    assets: [],
   });
 
   useFinancialStore.setState({
