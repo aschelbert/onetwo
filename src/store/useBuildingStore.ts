@@ -169,6 +169,9 @@ interface BuildingState {
   addConditionAssessment: (assetId: string, assessment: ConditionAssessment) => void;
   addWarranty: (assetId: string, warranty: Omit<AssetWarranty, 'id'>) => void;
   removeWarranty: (assetId: string, warrantyId: string) => void;
+
+  linkScheduleToAsset: (assetId: string, scheduleId: string) => void;
+  unlinkScheduleFromAsset: (assetId: string, scheduleId: string) => void;
 }
 
 // Sync helpers
@@ -439,6 +442,32 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
       ],
       warranties: [], notes: 'Includes irrigation system, seasonal plantings, tree maintenance.', insuredValue: 0,
     },
+    {
+      id: 'ast13', name: 'Building Plumbing System', category: 'Mechanical', location: 'Building-wide', condition: 'Fair',
+      installedDate: '1998-01-01', originalCost: 85000, usefulLifeYears: 30, remainingLifeYears: 10,
+      replacementCostToday: 120000, inflationRate: 3, criticality: 'High',
+      annualMaintenanceCost: 4200, annualOperatingCost: 800, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: ['ms4'], workOrderIds: [],
+      vendorIds: ['v5'], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: '', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-01-20', condition: 'Fair', assessedBy: 'Pete Quick', notes: 'Backflow preventer overdue for testing. Some galvanized sections need attention.' },
+      ],
+      warranties: [], notes: 'Original building plumbing. Backflow preventer testing required annually by DC Water.', insuredValue: 120000,
+    },
+    {
+      id: 'ast14', name: 'Emergency Generator', category: 'Mechanical', location: 'Basement - Mechanical Room', condition: 'Good',
+      installedDate: '2010-05-01', originalCost: 45000, usefulLifeYears: 20, remainingLifeYears: 8,
+      replacementCostToday: 65000, inflationRate: 3, criticality: 'Critical',
+      annualMaintenanceCost: 2400, annualOperatingCost: 600, parentAssetId: null,
+      reserveItemId: '', maintenanceScheduleIds: ['ms6'], workOrderIds: [],
+      vendorIds: [], insurancePolicyIds: ['ins3'], amenityConfigId: '',
+      glAccountNum: '', budgetCategoryId: '', spendingApprovalIds: [],
+      conditionHistory: [
+        { date: '2026-03-01', condition: 'Good', assessedBy: 'Diane Carter', notes: 'Monthly load test passed. Generator running well.' },
+      ],
+      warranties: [], notes: 'Generac 100kW natural gas backup generator. Monthly load testing required.', insuredValue: 65000,
+    },
   ],
   bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51 },
 
@@ -657,10 +686,23 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     syncAsset(assetId);
   },
 
+  linkScheduleToAsset: (assetId, scheduleId) => {
+    set(s => ({
+      assets: s.assets.map(x => x.id === assetId ? { ...x, maintenanceScheduleIds: [...new Set([...x.maintenanceScheduleIds, scheduleId])] } : x),
+    }));
+    syncAsset(assetId);
+  },
+  unlinkScheduleFromAsset: (assetId, scheduleId) => {
+    set(s => ({
+      assets: s.assets.map(x => x.id === assetId ? { ...x, maintenanceScheduleIds: x.maintenanceScheduleIds.filter(id => id !== scheduleId) } : x),
+    }));
+    syncAsset(assetId);
+  },
+
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
-  version: 3,
+  version: 4,
   partialize: (state) => ({
     name: state.name,
     address: state.address,

@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import type { BuildingAsset, AssetCategory, AssetCondition } from '@/store/useBuildingStore';
+import type { BuildingAsset, AssetCategory, AssetCondition, MaintenanceSchedule } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
+import VendorsTab from './VendorsTab';
 
 // ── Helpers ──────────────────────────────────────
 
@@ -20,6 +21,31 @@ const CAT_COLORS: Record<AssetCategory, string> = {
   Technology: 'bg-cyan-50 text-cyan-700',
   'Common Area': 'bg-ink-100 text-ink-600',
   Landscaping: 'bg-sage-100 text-sage-700',
+};
+
+// Maintenance category colors (lifted from MaintenanceScheduleTab)
+const CAT_COLORS_MAINT: Record<string, string> = {
+  HVAC: 'bg-blue-100 text-blue-700',
+  Elevator: 'bg-purple-100 text-purple-700',
+  'Fire Safety': 'bg-red-100 text-red-700',
+  Plumbing: 'bg-cyan-100 text-cyan-700',
+  Electrical: 'bg-yellow-100 text-yellow-700',
+  General: 'bg-ink-100 text-ink-600',
+};
+const AMENITY_MAINT_COLOR = 'bg-accent-100 text-accent-700';
+
+const STATUS_CONFIG: Record<MaintenanceSchedule['status'], { label: string; color: string; dot: string }> = {
+  'on-track': { label: 'On Track', color: 'bg-sage-100 text-sage-700', dot: 'bg-sage-500' },
+  'due-soon': { label: 'Due Soon', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+  overdue: { label: 'Overdue', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+  completed: { label: 'Completed', color: 'bg-mist-100 text-mist-700', dot: 'bg-mist-500' },
+};
+
+const FREQ_LABELS: Record<string, string> = {
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  'semi-annual': 'Semi-Annual',
+  annual: 'Annual',
 };
 
 const CONDITION_DOT: Record<AssetCondition, string> = {
@@ -53,16 +79,19 @@ interface Props {
   isBoard: boolean;
   openAdd: () => void;
   openEdit: (id: string, data: Record<string, string>) => void;
+  openAddMaint: (assetId: string) => void;
+  openEditMaint: (id: string, data: Record<string, string>) => void;
+  navigateToTab?: (tab: string) => void;
 }
 
-export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) {
+export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMaint, openEditMaint, navigateToTab }: Props) {
   const assets = store.assets;
   const finStore = useFinancialStore();
   const spendingStore = useSpendingStore();
   const amenitiesStore = useAmenitiesStore();
 
   // ── Local state ──
-  const [subView, setSubView] = useState<'registry' | 'capital'>('registry');
+  const [subView, setSubView] = useState<'registry' | 'calendar' | 'capital' | 'vendors'>('registry');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<AssetCategory | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -127,28 +156,6 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
       return cfg?.reservable;
     });
   }, [assets, amenitiesStore.configs]);
-
-  // ── Connected module tiles (global counts) ──
-  const connectedModuleCounts = useMemo(() => {
-    const msIds = new Set(assets.flatMap(a => a.maintenanceScheduleIds));
-    const woIds = new Set(assets.flatMap(a => a.workOrderIds));
-    const vIds = new Set(assets.flatMap(a => a.vendorIds));
-    const insIds = new Set(assets.flatMap(a => a.insurancePolicyIds));
-    const resIds = new Set(assets.map(a => a.reserveItemId).filter(Boolean));
-    const amIds = new Set(assets.map(a => a.amenityConfigId).filter(Boolean));
-    const saIds = new Set(assets.flatMap(a => a.spendingApprovalIds));
-    const bcIds = new Set(assets.map(a => a.budgetCategoryId).filter(Boolean));
-    return {
-      maintenance: msIds.size,
-      workOrders: woIds.size,
-      vendors: vIds.size,
-      insurance: insIds.size,
-      reserves: resIds.size,
-      amenities: amIds.size,
-      approvals: saIds.size,
-      budgets: bcIds.size,
-    };
-  }, [assets]);
 
   // ═══════════════════════════════════════════════
   // ASSET DETAIL VIEW
@@ -232,7 +239,7 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
             <div className="bg-white rounded-lg p-3 border border-ink-100">
               <p className="text-xs text-ink-400">Annual Cost</p>
               <p className="text-lg font-bold text-ink-900">{fmt(totalAnnualCost(selectedAsset))}</p>
-              <p className="text-[11px] text-ink-400 mt-0.5">maint + ops</p>
+              <p className="text-[11px] text-ink-400 mt-0.5">maint + est. ops</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-ink-100">
               <p className="text-xs text-ink-400">Criticality</p>
@@ -282,6 +289,7 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
                   <div className="flex justify-between"><span className="text-ink-500">Insured Value</span><span className="font-medium text-ink-800">{fmt(selectedAsset.insuredValue)}</span></div>
                 )}
               </div>
+              <p className="text-[11px] text-ink-400 mt-3 italic">Operating costs are estimates. Actual costs are tracked through vendor invoices.</p>
             </div>
 
             {/* Sub-components */}
@@ -312,21 +320,71 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
 
             {/* Maintenance Schedules */}
             <div className="bg-white border border-ink-100 rounded-xl p-4">
-              <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Maintenance Schedules ({mod.ms.length})</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Maintenance Schedules ({mod.ms.length})</h4>
+                {isBoard && (
+                  <button onClick={() => openAddMaint(selectedAsset.id)} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-xs font-medium">+ Add Task</button>
+                )}
+              </div>
               {mod.ms.length === 0 && <p className="text-xs text-ink-400 italic">No linked maintenance schedules.</p>}
-              {mod.ms.map(m => (
-                <div key={m.id} className="border border-ink-100 rounded-lg p-3 mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-ink-900">{m.task}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${m.status === 'overdue' ? 'bg-red-100 text-red-700' : m.status === 'due-soon' ? 'bg-yellow-100 text-yellow-700' : 'bg-sage-100 text-sage-700'}`}>{m.status}</span>
+              {mod.ms.map(m => {
+                const st = STATUS_CONFIG[m.status];
+                const catColor = CAT_COLORS_MAINT[m.category] || AMENITY_MAINT_COLOR;
+                return (
+                  <div key={m.id} className={`rounded-xl border p-4 mb-2 transition-all ${m.status === 'overdue' ? 'border-red-200 bg-red-50 bg-opacity-40' : m.status === 'due-soon' ? 'border-yellow-200 bg-yellow-50 bg-opacity-40' : 'border-ink-100 bg-white hover:shadow-sm'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-ink-900">{m.task}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${catColor}`}>{m.category}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${st.color}`}>
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full ${st.dot} mr-1`} />
+                            {st.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-ink-500 flex-wrap">
+                          <span>Frequency: <strong className="text-ink-700">{FREQ_LABELS[m.frequency] || m.frequency}</strong></span>
+                          {m.vendor && <span>Vendor: <strong className="text-ink-700">{m.vendor}</strong></span>}
+                          <span>Est. Cost: <strong className="text-ink-700">{m.estimatedCost}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-4 mt-1.5 text-xs">
+                          <span className="text-ink-400">Last completed: <strong className={m.lastCompleted ? 'text-ink-700' : 'text-ink-300'}>{m.lastCompleted || 'Never'}</strong></span>
+                          <span className={`${m.status === 'overdue' ? 'text-red-600 font-semibold' : m.status === 'due-soon' ? 'text-yellow-600 font-semibold' : 'text-ink-400'}`}>
+                            Next due: <strong>{m.nextDue || 'TBD'}</strong>
+                          </span>
+                        </div>
+                        {m.notes && <p className="text-xs text-ink-400 mt-1.5">{m.notes}</p>}
+                      </div>
+                      {isBoard && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => openEditMaint(m.id, {
+                              task: m.task, category: m.category, frequency: m.frequency,
+                              vendor: m.vendor, lastCompleted: m.lastCompleted, nextDue: m.nextDue,
+                              estimatedCost: m.estimatedCost, notes: m.notes, status: m.status,
+                            })}
+                            className="text-xs text-accent-600 font-medium hover:text-accent-700"
+                          >Edit</button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Remove "${m.task}"?`)) {
+                                store.unlinkScheduleFromAsset(selectedAsset.id, m.id);
+                                store.removeMaintenanceSchedule(m.id);
+                              }
+                            }}
+                            className="text-xs text-red-400 hover:text-red-600"
+                          >Remove</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-4 mt-1 text-xs text-ink-500">
-                    <span>Frequency: <strong className="text-ink-700">{m.frequency}</strong></span>
-                    <span>Next: <strong className="text-ink-700">{m.nextDue || 'TBD'}</strong></span>
-                    <span>Cost: <strong className="text-ink-700">{m.estimatedCost}</strong></span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
+              {isBoard && (
+                <button onClick={() => openAddMaint(selectedAsset.id)} className="w-full py-3 border-2 border-dashed border-ink-200 rounded-xl text-sm text-ink-500 hover:border-accent-300 hover:text-accent-600 transition-colors font-medium mt-2">
+                  + Add Maintenance Task
+                </button>
+              )}
             </div>
 
             {/* Work Orders */}
@@ -399,30 +457,146 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
               })}
             </div>
 
+            {/* Linked Vendors */}
+            <div className="bg-white border border-ink-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Linked Vendors ({mod.vendors.length})</h4>
+                {isBoard && (() => {
+                  const unlinkedVendors = store.vendors.filter(v => v.status === 'active' && !selectedAsset.vendorIds.includes(v.id));
+                  if (unlinkedVendors.length === 0) return null;
+                  return (
+                    <div className="relative">
+                      <select
+                        value=""
+                        onChange={e => {
+                          if (e.target.value) {
+                            store.updateAsset(selectedAsset.id, { vendorIds: [...selectedAsset.vendorIds, e.target.value] });
+                          }
+                        }}
+                        className="text-xs px-2 py-1.5 border border-ink-200 rounded-lg bg-white text-ink-700 cursor-pointer"
+                      >
+                        <option value="">+ Link Vendor</option>
+                        {unlinkedVendors.map(v => <option key={v.id} value={v.id}>{v.name} — {v.service}</option>)}
+                      </select>
+                    </div>
+                  );
+                })()}
+              </div>
+              {mod.vendors.length === 0 && <p className="text-xs text-ink-400 italic">No vendors linked to this asset.</p>}
+              {mod.vendors.map(v => (
+                <div key={v.id} className="flex items-center justify-between bg-cyan-50 rounded-lg px-3 py-2 border border-cyan-100 mb-1.5">
+                  <div>
+                    <span className="text-sm font-medium text-ink-900">{v.name}</span>
+                    <div className="flex gap-3 text-xs text-ink-500 mt-0.5">
+                      <span>{v.service}</span>
+                      <span>{v.phone}</span>
+                      {v.email && <span>{v.email}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => navigateToTab?.('vendors')} className="text-[10px] text-accent-600 hover:text-accent-700 font-medium">View</button>
+                    {isBoard && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Unlink ${v.name} from this asset?`))
+                            store.updateAsset(selectedAsset.id, { vendorIds: selectedAsset.vendorIds.filter(id => id !== v.id) });
+                        }}
+                        className="text-[10px] text-red-400 hover:text-red-600"
+                      >Unlink</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Linked Insurance */}
+            <div className="bg-white border border-ink-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Insurance Coverage ({mod.insurance.length})</h4>
+                {isBoard && (() => {
+                  const unlinkedPolicies = store.insurance.filter(p => !selectedAsset.insurancePolicyIds.includes(p.id));
+                  if (unlinkedPolicies.length === 0) return null;
+                  return (
+                    <div className="relative">
+                      <select
+                        value=""
+                        onChange={e => {
+                          if (e.target.value) {
+                            store.updateAsset(selectedAsset.id, { insurancePolicyIds: [...selectedAsset.insurancePolicyIds, e.target.value] });
+                          }
+                        }}
+                        className="text-xs px-2 py-1.5 border border-ink-200 rounded-lg bg-white text-ink-700 cursor-pointer"
+                      >
+                        <option value="">+ Link Policy</option>
+                        {unlinkedPolicies.map(p => <option key={p.id} value={p.id}>{p.type} — {p.carrier}</option>)}
+                      </select>
+                    </div>
+                  );
+                })()}
+              </div>
+              {mod.insurance.length === 0 && <p className="text-xs text-ink-400 italic">No insurance policies linked to this asset.</p>}
+              {mod.insurance.map(p => {
+                const expired = new Date(p.expires) < new Date();
+                return (
+                  <div key={p.id} className={`flex items-center justify-between rounded-lg px-3 py-2 border mb-1.5 ${expired ? 'bg-red-50 border-red-200' : 'bg-red-50 bg-opacity-40 border-red-100'}`}>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-ink-900">{p.type}</span>
+                        {expired && <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-red-100 text-red-700">Expired</span>}
+                      </div>
+                      <div className="flex gap-3 text-xs text-ink-500 mt-0.5">
+                        <span>{p.carrier}</span>
+                        <span>{p.coverage}</span>
+                        <span>Expires: {p.expires}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => navigateToTab?.('insurance')} className="text-[10px] text-accent-600 hover:text-accent-700 font-medium">View</button>
+                      {isBoard && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Unlink ${p.type} policy from this asset?`))
+                              store.updateAsset(selectedAsset.id, { insurancePolicyIds: selectedAsset.insurancePolicyIds.filter(id => id !== p.id) });
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-600"
+                        >Unlink</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             {/* Financial & Module Links */}
             <div className="bg-white border border-ink-100 rounded-xl p-4">
               <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Financial & Module Links</h4>
               <div className="space-y-2 text-sm">
                 {mod.reserve && (
-                  <div className="bg-sage-50 rounded-lg p-3 border border-sage-100">
-                    <p className="text-xs text-ink-400">Reserve Item</p>
+                  <button onClick={() => navigateToTab?.('units')} className="w-full text-left bg-sage-50 rounded-lg p-3 border border-sage-100 hover:shadow-sm transition-all cursor-pointer group">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-ink-400">Reserve Item</p>
+                      <span className="text-[10px] text-accent-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Go to Reserves &rarr;</span>
+                    </div>
                     <p className="font-bold text-ink-900">{mod.reserve.name}</p>
                     <div className="flex gap-3 text-xs text-ink-500 mt-1">
                       <span>Funded: <strong className="text-sage-700">{fmt(mod.reserve.currentFunding)}</strong></span>
                       <span>Needed: <strong className="text-ink-700">{fmt(mod.reserve.estimatedCost)}</strong></span>
                       <span>{mod.reserve.estimatedCost > 0 ? Math.round((mod.reserve.currentFunding / mod.reserve.estimatedCost) * 100) : 100}% funded</span>
                     </div>
-                  </div>
+                  </button>
                 )}
                 {mod.budget && (
-                  <div className="bg-mist-50 rounded-lg p-3 border border-mist-100">
-                    <p className="text-xs text-ink-400">Budget Category</p>
+                  <button onClick={() => navigateToTab?.('units')} className="w-full text-left bg-mist-50 rounded-lg p-3 border border-mist-100 hover:shadow-sm transition-all cursor-pointer group">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-ink-400">Budget Category</p>
+                      <span className="text-[10px] text-accent-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Go to Budget &rarr;</span>
+                    </div>
                     <p className="font-bold text-ink-900">{mod.budget.name}</p>
                     <div className="flex gap-3 text-xs text-ink-500 mt-1">
                       <span>Budgeted: <strong className="text-ink-700">{fmt(mod.budget.budgeted)}</strong></span>
                       <span>Spent: <strong className="text-ink-700">{fmt(mod.budget.expenses.reduce((s, e) => s + e.amount, 0))}</strong></span>
                     </div>
-                  </div>
+                  </button>
                 )}
                 {mod.amenity && (
                   <div className="bg-mist-50 rounded-lg p-3 border border-mist-100">
@@ -439,28 +613,6 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
                   <div className="flex justify-between px-1">
                     <span className="text-ink-500">GL Account</span>
                     <span className="font-mono text-ink-700">{selectedAsset.glAccountNum}</span>
-                  </div>
-                )}
-                {mod.vendors.length > 0 && (
-                  <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-100">
-                    <p className="text-xs text-ink-400 mb-1">Linked Vendors</p>
-                    {mod.vendors.map(v => (
-                      <div key={v.id} className="flex items-center justify-between text-xs py-0.5">
-                        <span className="font-medium text-ink-900">{v.name}</span>
-                        <span className="text-ink-500">{v.service} &middot; {v.phone}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {mod.insurance.length > 0 && (
-                  <div className="bg-red-50 rounded-lg p-3 border border-red-100">
-                    <p className="text-xs text-ink-400 mb-1">Insurance Coverage</p>
-                    {mod.insurance.map(p => (
-                      <div key={p.id} className="flex items-center justify-between text-xs py-0.5">
-                        <span className="font-medium text-ink-900">{p.type}</span>
-                        <span className="text-ink-500">{p.carrier} &middot; {p.coverage}</span>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
@@ -508,10 +660,23 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${subView === 'registry' ? 'bg-ink-900 text-white' : 'bg-ink-200 text-ink-600'}`}>{totalAssets}</span>
         </button>
         <button
+          onClick={() => setSubView('calendar')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${subView === 'calendar' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}
+        >
+          Maintenance Calendar
+        </button>
+        <button
           onClick={() => setSubView('capital')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${subView === 'capital' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}
         >
           Capital Planning
+        </button>
+        <button
+          onClick={() => setSubView('vendors')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${subView === 'vendors' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}
+        >
+          Vendors
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${subView === 'vendors' ? 'bg-ink-900 text-white' : 'bg-ink-200 text-ink-600'}`}>{store.vendors.filter(v => v.status === 'active').length}</span>
         </button>
       </div>
 
@@ -567,27 +732,71 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
             </div>
           </div>
 
-          {/* Connected Modules hub */}
-          <div>
-            <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Connected Modules</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { label: 'Maintenance', count: connectedModuleCounts.maintenance, color: 'bg-purple-50 border-purple-100' },
-                { label: 'Work Orders', count: connectedModuleCounts.workOrders, color: 'bg-yellow-50 border-yellow-100' },
-                { label: 'Vendors', count: connectedModuleCounts.vendors, color: 'bg-cyan-50 border-cyan-100' },
-                { label: 'Insurance', count: connectedModuleCounts.insurance, color: 'bg-red-50 border-red-100' },
-                { label: 'Reserve Items', count: connectedModuleCounts.reserves, color: 'bg-sage-50 border-sage-100' },
-                { label: 'Amenity Configs', count: connectedModuleCounts.amenities, color: 'bg-mist-50 border-mist-100' },
-                { label: 'Approvals', count: connectedModuleCounts.approvals, color: 'bg-accent-50 border-accent-100' },
-                { label: 'Budget Categories', count: connectedModuleCounts.budgets, color: 'bg-ink-50 border-ink-100' },
-              ].map(tile => (
-                <div key={tile.label} className={`rounded-lg p-3 border ${tile.color}`}>
-                  <p className="text-xs text-ink-500">{tile.label}</p>
-                  <p className="text-lg font-bold text-ink-900">{tile.count}</p>
+          {/* Maintenance Health Dashboard */}
+          {(() => {
+            const schedules = store.maintenanceSchedules;
+            const total = schedules.length;
+            const onTrack = schedules.filter(s => s.status === 'on-track' || s.status === 'completed').length;
+            const overdue = schedules.filter(s => s.status === 'overdue').length;
+            const dueSoon = schedules.filter(s => s.status === 'due-soon').length;
+            const score = total > 0 ? Math.round((onTrack / total) * 100) : 100;
+            const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+            const gc = score >= 80 ? 'sage' : score >= 60 ? 'yellow' : 'red';
+            const totalCost = schedules.reduce((s, m) => {
+              const num = parseFloat(m.estimatedCost.replace(/[^0-9.]/g, ''));
+              return s + (isNaN(num) ? 0 : num);
+            }, 0);
+            // Unlinked schedules warning
+            const allLinkedIds = new Set(assets.flatMap(a => a.maintenanceScheduleIds));
+            const unlinkedSchedules = schedules.filter(s => !allLinkedIds.has(s.id));
+
+            return (
+              <div className={`bg-gradient-to-br ${gc === 'sage' ? 'from-sage-50 to-sage-100 border-sage-200' : gc === 'yellow' ? 'from-yellow-50 to-yellow-100 border-yellow-200' : 'from-red-50 to-red-100 border-red-200'} border-2 rounded-xl p-5`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-display text-xl font-bold text-ink-900">Maintenance Health</h3>
+                    <p className="text-sm text-ink-500 mt-0.5">Preventive maintenance compliance score</p>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-4xl font-bold ${gc === 'sage' ? 'text-sage-600' : gc === 'yellow' ? 'text-yellow-600' : 'text-red-600'}`}>{grade}</div>
+                    <p className={`text-sm font-bold ${gc === 'sage' ? 'text-sage-600' : gc === 'yellow' ? 'text-yellow-600' : 'text-red-600'}`}>{score}%</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-lg p-3 border border-ink-100">
+                    <p className="text-xs text-ink-400">Total Tasks</p>
+                    <p className="text-lg font-bold text-ink-900">{total}</p>
+                    <p className="text-[11px] text-ink-400 mt-1">scheduled items</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-ink-100">
+                    <p className="text-xs text-ink-400">On Track</p>
+                    <p className="text-lg font-bold text-sage-600">{onTrack}<span className="text-sm font-normal text-ink-400">/{total}</span></p>
+                    <div className="mt-1.5 h-2 bg-ink-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${gc === 'sage' ? 'bg-sage-500' : gc === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} rounded-full`} style={{ width: `${score}%` }} />
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-ink-100">
+                    <p className="text-xs text-ink-400">Overdue</p>
+                    <p className={`text-lg font-bold ${overdue > 0 ? 'text-red-600' : 'text-sage-600'}`}>{overdue}</p>
+                    <p className="text-[11px] text-ink-400 mt-1">{dueSoon > 0 ? `${dueSoon} due soon` : 'none upcoming'}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-ink-100">
+                    <p className="text-xs text-ink-400">Est. Annual Cost</p>
+                    <p className="text-lg font-bold text-ink-900">${totalCost.toLocaleString()}</p>
+                    <p className="text-[11px] text-ink-400 mt-1">per cycle total</p>
+                  </div>
+                </div>
+                {unlinkedSchedules.length > 0 && (
+                  <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-yellow-700">⚠ {unlinkedSchedules.length} Unlinked Schedule{unlinkedSchedules.length > 1 ? 's' : ''}</p>
+                    <p className="text-[11px] text-yellow-600 mt-0.5">
+                      {unlinkedSchedules.map(s => s.task).join(', ')} — not associated with any asset
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Category filter tabs + search + Add button */}
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -753,6 +962,12 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit }: Props) 
           )}
         </div>
       )}
+
+      {/* ═══════ MAINTENANCE CALENDAR VIEW ═══════ */}
+      {subView === 'calendar' && <MaintenanceCalendarView store={store} />}
+
+      {/* ═══════ VENDORS VIEW ═══════ */}
+      {subView === 'vendors' && <VendorsTab />}
 
       {/* ═══════ CAPITAL PLANNING VIEW ═══════ */}
       {subView === 'capital' && <CapitalPlanningView assets={assets} finStore={finStore} spendingStore={spendingStore} />}
@@ -1137,6 +1352,275 @@ function CapitalPlanningView({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// Maintenance Calendar sub-view
+// ═══════════════════════════════════════════════════
+
+function MaintenanceCalendarView({
+  store,
+}: {
+  store: ReturnType<typeof useBuildingStore.getState>;
+}) {
+  const [viewMode, setViewMode] = useState<'12-month' | 'monthly-list' | 'timeline'>('12-month');
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Project all maintenance events for the selected year
+  const calendarEvents = useMemo(() => {
+    const events: { date: Date; month: number; task: string; assetName: string; category: string; status: string; frequency: string; vendor: string; cost: string; scheduleId: string; isOverdue: boolean }[] = [];
+
+    const freqMonths: Record<string, number> = { monthly: 1, quarterly: 3, 'semi-annual': 6, annual: 12 };
+
+    store.maintenanceSchedules.forEach(schedule => {
+      // Find owning asset
+      const owningAsset = store.assets.find(a => a.maintenanceScheduleIds.includes(schedule.id));
+      const assetName = owningAsset?.name || 'Unlinked';
+
+      const nextDueDate = new Date(schedule.nextDue);
+      if (isNaN(nextDueDate.getTime())) return;
+
+      const intervalMonths = freqMonths[schedule.frequency] || 12;
+
+      // Project occurrences forward and backward from nextDue to cover selected year
+      const yearStart = new Date(selectedYear, 0, 1);
+      const yearEnd = new Date(selectedYear, 11, 31);
+
+      // Go backward from nextDue
+      const occurrences: Date[] = [];
+      let d = new Date(nextDueDate);
+      // Go backward until before yearStart
+      while (d >= yearStart) {
+        if (d <= yearEnd) occurrences.push(new Date(d));
+        d = new Date(d);
+        d.setMonth(d.getMonth() - intervalMonths);
+      }
+      // Go forward from nextDue
+      d = new Date(nextDueDate);
+      d.setMonth(d.getMonth() + intervalMonths);
+      while (d <= yearEnd) {
+        if (d >= yearStart) occurrences.push(new Date(d));
+        d = new Date(d);
+        d.setMonth(d.getMonth() + intervalMonths);
+      }
+
+      occurrences.forEach(occ => {
+        const isOverdue = occ < new Date() && schedule.status !== 'completed';
+        events.push({
+          date: occ,
+          month: occ.getMonth(),
+          task: schedule.task,
+          assetName,
+          category: schedule.category,
+          status: isOverdue ? 'overdue' : schedule.status,
+          frequency: schedule.frequency,
+          vendor: schedule.vendor,
+          cost: schedule.estimatedCost,
+          scheduleId: schedule.id,
+          isOverdue,
+        });
+      });
+    });
+
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
+    return events;
+  }, [store.maintenanceSchedules, store.assets, selectedYear]);
+
+  // Group by month
+  const eventsByMonth = useMemo(() => {
+    const grouped: Record<number, typeof calendarEvents> = {};
+    for (let m = 0; m < 12; m++) grouped[m] = [];
+    calendarEvents.forEach(e => grouped[e.month].push(e));
+    return grouped;
+  }, [calendarEvents]);
+
+  // KPIs
+  const totalEvents = calendarEvents.length;
+  const totalCost = useMemo(() => calendarEvents.reduce((s, e) => {
+    const num = parseFloat(e.cost.replace(/[^0-9.]/g, ''));
+    return s + (isNaN(num) ? 0 : num);
+  }, 0), [calendarEvents]);
+  const overdueCount = calendarEvents.filter(e => e.isOverdue).length;
+  const now = new Date();
+  const thirtyDaysOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const upcomingCount = calendarEvents.filter(e => e.date >= now && e.date <= thirtyDaysOut).length;
+
+  // Unique schedules for timeline view
+  const uniqueSchedules = useMemo(() => {
+    const map = new Map<string, { scheduleId: string; task: string; assetName: string; frequency: string; category: string }>();
+    calendarEvents.forEach(e => {
+      if (!map.has(e.scheduleId)) {
+        map.set(e.scheduleId, { scheduleId: e.scheduleId, task: e.task, assetName: e.assetName, frequency: e.frequency, category: e.category });
+      }
+    });
+    return Array.from(map.values());
+  }, [calendarEvents]);
+
+  return (
+    <div className="space-y-5">
+      {/* Year selector + view mode toggle */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSelectedYear(y => y - 1)} className="px-2 py-1 bg-ink-100 rounded hover:bg-ink-200 text-sm font-medium text-ink-700">&larr;</button>
+          <span className="text-lg font-bold text-ink-900 min-w-[4rem] text-center">{selectedYear}</span>
+          <button onClick={() => setSelectedYear(y => y + 1)} className="px-2 py-1 bg-ink-100 rounded hover:bg-ink-200 text-sm font-medium text-ink-700">&rarr;</button>
+        </div>
+        <div className="flex items-center gap-1 bg-mist-50 rounded-lg p-1">
+          {([['12-month', '12-Month Grid'], ['monthly-list', 'Monthly List'], ['timeline', 'Timeline']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setViewMode(key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === key ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg p-3 border border-ink-100">
+          <p className="text-xs text-ink-400">Total Events This Year</p>
+          <p className="text-lg font-bold text-ink-900">{totalEvents}</p>
+        </div>
+        <div className="bg-white rounded-lg p-3 border border-ink-100">
+          <p className="text-xs text-ink-400">Est. Total Cost</p>
+          <p className="text-lg font-bold text-ink-900">${totalCost.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-lg p-3 border border-ink-100">
+          <p className="text-xs text-ink-400">Overdue Tasks</p>
+          <p className={`text-lg font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-sage-600'}`}>{overdueCount}</p>
+        </div>
+        <div className="bg-white rounded-lg p-3 border border-ink-100">
+          <p className="text-xs text-ink-400">Upcoming (30 days)</p>
+          <p className="text-lg font-bold text-ink-900">{upcomingCount}</p>
+        </div>
+      </div>
+
+      {/* ── 12-Month Grid ── */}
+      {viewMode === '12-month' && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          {MONTH_NAMES.map((name, i) => {
+            const monthEvents = eventsByMonth[i];
+            const hasOverdue = monthEvents.some(e => e.isOverdue);
+            return (
+              <div key={i} className={`rounded-xl border p-3 ${hasOverdue ? 'border-red-200 bg-red-50 bg-opacity-40' : 'border-ink-100 bg-white'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-ink-800">{name}</span>
+                  {monthEvents.length > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${hasOverdue ? 'bg-red-100 text-red-700' : 'bg-ink-100 text-ink-600'}`}>{monthEvents.length}</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {monthEvents.map((e, j) => {
+                    const catColor = CAT_COLORS_MAINT[e.category] || AMENITY_MAINT_COLOR;
+                    const statusCfg = STATUS_CONFIG[e.status as keyof typeof STATUS_CONFIG];
+                    const dotColor = statusCfg?.dot || (e.isOverdue ? 'bg-red-500' : 'bg-ink-300');
+                    return (
+                      <span key={j} className={`w-2.5 h-2.5 rounded-full ${dotColor}`} title={`${e.task} (${e.assetName})`} />
+                    );
+                  })}
+                </div>
+                {monthEvents.length === 0 && <p className="text-[10px] text-ink-300 italic">No events</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Monthly List ── */}
+      {viewMode === 'monthly-list' && (
+        <div className="space-y-4">
+          {MONTH_NAMES.map((name, i) => {
+            const monthEvents = eventsByMonth[i];
+            return (
+              <div key={i}>
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-sm font-bold text-ink-800">{name}</h4>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-ink-100 text-ink-600">{monthEvents.length}</span>
+                </div>
+                {monthEvents.length === 0 && <p className="text-xs text-ink-300 italic ml-1">No scheduled events</p>}
+                {monthEvents.map((e, j) => {
+                  const catColor = CAT_COLORS_MAINT[e.category] || AMENITY_MAINT_COLOR;
+                  const statusCfg = STATUS_CONFIG[e.status as keyof typeof STATUS_CONFIG];
+                  const statusColor = statusCfg?.color || 'bg-ink-100 text-ink-600';
+                  const statusLabel = statusCfg?.label || e.status;
+                  return (
+                    <div key={j} className={`flex items-center justify-between rounded-lg border px-3 py-2 mb-1.5 ${e.isOverdue ? 'border-red-200 bg-red-50 bg-opacity-40' : 'border-ink-100 bg-white'}`}>
+                      <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                        <span className="text-xs text-ink-400 font-mono w-20 shrink-0">{e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        <span className="text-sm font-medium text-ink-900 truncate">{e.task}</span>
+                        <span className="text-xs text-ink-500 truncate">{e.assetName}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${catColor}`}>{e.category}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${statusColor}`}>{statusLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-ink-500 shrink-0 ml-2">
+                        <span>{FREQ_LABELS[e.frequency] || e.frequency}</span>
+                        {e.vendor && <span>{e.vendor}</span>}
+                        <span className="font-medium text-ink-700">{e.cost}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Timeline / Gantt ── */}
+      {viewMode === 'timeline' && (
+        <div className="bg-white border border-ink-100 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-ink-100 bg-ink-50">
+                  <th className="text-left py-2 px-3 text-xs font-bold text-ink-600 uppercase tracking-wider min-w-[200px] sticky left-0 bg-ink-50 z-10">Task</th>
+                  {MONTH_NAMES.map((name, i) => (
+                    <th key={i} className="text-center py-2 px-1 text-[10px] font-bold text-ink-500 uppercase w-16">{name.slice(0, 3)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {uniqueSchedules.length === 0 && (
+                  <tr><td colSpan={13} className="text-center py-6 text-ink-400 text-sm">No maintenance schedules to display.</td></tr>
+                )}
+                {uniqueSchedules.map(sched => {
+                  const catColor = CAT_COLORS_MAINT[sched.category] || AMENITY_MAINT_COLOR;
+                  // Which months have an occurrence?
+                  const monthHits = new Set<number>();
+                  const monthOverdue = new Set<number>();
+                  calendarEvents.filter(e => e.scheduleId === sched.scheduleId).forEach(e => {
+                    monthHits.add(e.month);
+                    if (e.isOverdue) monthOverdue.add(e.month);
+                  });
+                  return (
+                    <tr key={sched.scheduleId} className="border-b border-ink-50 hover:bg-mist-50">
+                      <td className="py-2 px-3 sticky left-0 bg-white z-10">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-medium text-ink-900 truncate max-w-[120px]">{sched.task}</span>
+                          <span className="text-[10px] text-ink-400 truncate max-w-[80px]">{sched.assetName}</span>
+                          <span className={`text-[9px] px-1 py-0.5 rounded font-semibold ${catColor}`}>{FREQ_LABELS[sched.frequency] || sched.frequency}</span>
+                        </div>
+                      </td>
+                      {Array.from({ length: 12 }, (_, m) => (
+                        <td key={m} className="text-center py-2 px-1">
+                          {monthHits.has(m) && (
+                            <span className={`inline-block w-3 h-3 rounded-full ${monthOverdue.has(m) ? 'bg-red-500' : catColor.split(' ')[0].replace('text-', 'bg-').replace('100', '500')}`} />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

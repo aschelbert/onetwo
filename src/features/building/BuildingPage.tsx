@@ -9,14 +9,13 @@ import TheUnitsTab from './tabs/TheUnitsTab';
 import LegalBylawsTab from './tabs/LegalBylawsTab';
 import InsuranceTab from './tabs/InsuranceTab';
 import VendorsTab from './tabs/VendorsTab';
-import MaintenanceScheduleTab from './tabs/MaintenanceScheduleTab';
 import AssetsTab from './tabs/AssetsTab';
 
 import MailingSettingsTab from './tabs/MailingSettingsTab';
 import FeeScheduleTab from './tabs/FeeScheduleTab';
 
-const TABS = ['details','contacts','units','legal','insurance','vendors','fees','maintenance','mailing','assets'] as const;
-const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', maintenance:'Maintenance', mailing:'Mailing', assets:'Assets' };
+const TABS = ['details','contacts','units','fees','assets','legal','insurance','mailing'] as const;
+const TAB_LABELS: Record<string, string> = { details:'Building Details', contacts:'Contacts', units:'The Units', legal:'Legal & Bylaws', insurance:'Insurance', vendors:'Vendors', fees:'Fee Schedule', mailing:'Mailing', assets:'Assets' };
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
@@ -24,7 +23,7 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: { la
   );
 }
 
-type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint' | 'addAsset' | 'editAsset';
+type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint' | 'addAsset' | 'editAsset' | 'autoMaintVendor';
 
 export default function BuildingPage() {
   const store = useBuildingStore();
@@ -38,6 +37,9 @@ export default function BuildingPage() {
   const [form, setForm] = useState<Record<string, string>>({});
   const f = (key: string) => form[key] || '';
   const sf = (key: string, val: string) => setForm(p => ({ ...p, [key]: val }));
+  const [maintAssetId, setMaintAssetId] = useState<string | null>(null);
+  const [pendingAutoMaintAssetId, setPendingAutoMaintAssetId] = useState<string | null>(null);
+  const [autoMaintVendor, setAutoMaintVendor] = useState('');
   const resetForm = () => setForm({});
   const openEdit = (type: ModalState, id: string, data: Record<string, string>) => { setEditId(id); setForm(data); setModal(type); };
 
@@ -168,21 +170,8 @@ export default function BuildingPage() {
             />
           )}
 
-          {/* VENDORS */}
-          {tab === 'vendors' && <VendorsTab />}
-
           {/* FEE SCHEDULE */}
           {tab === 'fees' && <FeeScheduleTab />}
-
-          {/* MAINTENANCE */}
-          {tab === 'maintenance' && (
-            <MaintenanceScheduleTab
-              store={store}
-              isBoard={isBoard}
-              openAdd={() => { resetForm(); setModal('addMaint'); }}
-              openEdit={(id, data) => openEdit('editMaint', id, data)}
-            />
-          )}
 
           {/* MAILING */}
           {tab === 'mailing' && isBoard && <MailingSettingsTab />}
@@ -194,6 +183,9 @@ export default function BuildingPage() {
               isBoard={isBoard}
               openAdd={() => { resetForm(); setModal('addAsset'); }}
               openEdit={(id, data) => openEdit('editAsset', id, data)}
+              openAddMaint={(assetId) => { resetForm(); setMaintAssetId(assetId); setModal('addMaint'); }}
+              openEditMaint={(id, data) => openEdit('editMaint', id, data)}
+              navigateToTab={setTab}
             />
           )}
         </div>
@@ -215,9 +207,71 @@ export default function BuildingPage() {
 
       {(modal === 'addVendor' || modal === 'editVendor') && (<Modal title={modal === 'addVendor' ? 'Add Vendor' : 'Edit Vendor'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('name') || !f('service')) { alert('Name and service required'); return; } if (modal === 'addVendor') store.addVendor({ name: f('name'), service: f('service'), contact: f('contact'), phone: f('phone'), email: f('email'), contract: f('contract'), status: 'active' }); else store.updateVendor(editId, { name: f('name'), service: f('service'), contact: f('contact'), phone: f('phone'), email: f('email'), contract: f('contract') }); setModal(null); resetForm(); }}><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><Field label="Company Name *" value={f('name')} onChange={v => sf('name', v)} /><Field label="Service *" value={f('service')} onChange={v => sf('service', v)} placeholder="Plumbing" /></div><div className="grid grid-cols-2 gap-3"><Field label="Contact Person" value={f('contact')} onChange={v => sf('contact', v)} /><Field label="Phone" value={f('phone')} onChange={v => sf('phone', v)} /></div><div className="grid grid-cols-2 gap-3"><Field label="Email" value={f('email')} onChange={v => sf('email', v)} type="email" /><Field label="Contract" value={f('contract')} onChange={v => sf('contract', v)} placeholder="On-call" /></div></div></Modal>)}
 
-      {(modal === 'addMaint' || modal === 'editMaint') && (<Modal title={modal === 'addMaint' ? 'Add Maintenance Task' : 'Edit Maintenance Task'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('task') || !f('category')) { alert('Task name and category required'); return; } const data = { task: f('task'), category: f('category'), frequency: f('frequency') || 'quarterly', vendor: f('vendor'), lastCompleted: f('lastCompleted'), nextDue: f('nextDue'), estimatedCost: f('estimatedCost'), notes: f('notes'), status: (f('status') || 'on-track') as 'on-track' | 'due-soon' | 'overdue' | 'completed' }; if (modal === 'addMaint') store.addMaintenanceSchedule(data); else store.updateMaintenanceSchedule(editId, data); setModal(null); resetForm(); }}><div className="space-y-3"><Field label="Task Name *" value={f('task')} onChange={v => sf('task', v)} placeholder="HVAC Filter Replacement" /><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category *</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['HVAC','Elevator','Fire Safety','Plumbing','Electrical','General'].map(c => <option key={c}>{c}</option>)}{store.details.amenities.filter(a => !['HVAC','Elevator','Fire Safety','Plumbing','Electrical','General'].some(b => b.toLowerCase() === a.toLowerCase())).map(a => <option key={a}>{a}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Frequency</label><select value={f('frequency') || 'quarterly'} onChange={e => sf('frequency', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semi-annual">Semi-Annual</option><option value="annual">Annual</option></select></div></div><Field label="Vendor" value={f('vendor')} onChange={v => sf('vendor', v)} placeholder="Assigned vendor name" /><div className="grid grid-cols-2 gap-3"><Field label="Last Completed" value={f('lastCompleted')} onChange={v => sf('lastCompleted', v)} type="date" /><Field label="Next Due" value={f('nextDue')} onChange={v => sf('nextDue', v)} type="date" /></div><div className="grid grid-cols-2 gap-3"><Field label="Estimated Cost" value={f('estimatedCost')} onChange={v => sf('estimatedCost', v)} placeholder="$450" /><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status') || 'on-track'} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="on-track">On Track</option><option value="due-soon">Due Soon</option><option value="overdue">Overdue</option><option value="completed">Completed</option></select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} placeholder="Additional details..." /></div></div></Modal>)}
+      {(modal === 'addMaint' || modal === 'editMaint') && (<Modal title={modal === 'addMaint' ? 'Add Maintenance Task' : 'Edit Maintenance Task'} onClose={() => { setModal(null); resetForm(); setMaintAssetId(null); }} onSave={() => { if (!f('task') || !f('category')) { alert('Task name and category required'); return; } const data = { task: f('task'), category: f('category'), frequency: f('frequency') || 'quarterly', vendor: f('vendor'), lastCompleted: f('lastCompleted'), nextDue: f('nextDue'), estimatedCost: f('estimatedCost'), notes: f('notes'), status: (f('status') || 'on-track') as 'on-track' | 'due-soon' | 'overdue' | 'completed' }; if (modal === 'addMaint') { store.addMaintenanceSchedule(data); if (maintAssetId) { const newMs = useBuildingStore.getState().maintenanceSchedules; const newMsId = newMs[newMs.length - 1]?.id; if (newMsId) store.linkScheduleToAsset(maintAssetId, newMsId); } } else { store.updateMaintenanceSchedule(editId, data); } setModal(null); resetForm(); setMaintAssetId(null); }}><div className="space-y-3"><Field label="Task Name *" value={f('task')} onChange={v => sf('task', v)} placeholder="HVAC Filter Replacement" /><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category *</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['HVAC','Elevator','Fire Safety','Plumbing','Electrical','General'].map(c => <option key={c}>{c}</option>)}{store.details.amenities.filter(a => !['HVAC','Elevator','Fire Safety','Plumbing','Electrical','General'].some(b => b.toLowerCase() === a.toLowerCase())).map(a => <option key={a}>{a}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Frequency</label><select value={f('frequency') || 'quarterly'} onChange={e => sf('frequency', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semi-annual">Semi-Annual</option><option value="annual">Annual</option></select></div></div><Field label="Vendor" value={f('vendor')} onChange={v => sf('vendor', v)} placeholder="Assigned vendor name" /><div className="grid grid-cols-2 gap-3"><Field label="Last Completed" value={f('lastCompleted')} onChange={v => sf('lastCompleted', v)} type="date" /><Field label="Next Due" value={f('nextDue')} onChange={v => sf('nextDue', v)} type="date" /></div><div className="grid grid-cols-2 gap-3"><Field label="Estimated Cost" value={f('estimatedCost')} onChange={v => sf('estimatedCost', v)} placeholder="$450" /><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status') || 'on-track'} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="on-track">On Track</option><option value="due-soon">Due Soon</option><option value="overdue">Overdue</option><option value="completed">Completed</option></select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} placeholder="Additional details..." /></div></div></Modal>)}
 
-      {(modal === 'addAsset' || modal === 'editAsset') && (<Modal title={modal === 'addAsset' ? 'Add Building Asset' : 'Edit Asset'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('name') || !f('category')) { alert('Name and category required'); return; } const data = { name: f('name'), category: f('category') as import('@/store/useBuildingStore').AssetCategory, location: f('location'), condition: (f('condition') || 'Good') as import('@/store/useBuildingStore').AssetCondition, installedDate: f('installedDate'), originalCost: parseFloat(f('originalCost')) || 0, usefulLifeYears: parseInt(f('usefulLifeYears')) || 20, remainingLifeYears: parseInt(f('remainingLifeYears')) || 20, replacementCostToday: parseFloat(f('replacementCostToday')) || 0, inflationRate: parseFloat(f('inflationRate')) || 3, criticality: f('criticality') || 'Medium', annualMaintenanceCost: parseFloat(f('annualMaintenanceCost')) || 0, annualOperatingCost: parseFloat(f('annualOperatingCost')) || 0, parentAssetId: f('parentAssetId') || null, reserveItemId: f('reserveItemId') || '', maintenanceScheduleIds: [], workOrderIds: [], vendorIds: [], insurancePolicyIds: [], amenityConfigId: '', glAccountNum: '', budgetCategoryId: '', spendingApprovalIds: [], conditionHistory: [], warranties: [], notes: f('notes'), insuredValue: parseFloat(f('insuredValue')) || 0 }; if (modal === 'addAsset') store.addAsset(data); else store.updateAsset(editId, data); setModal(null); resetForm(); }}><div className="space-y-3"><Field label="Asset Name *" value={f('name')} onChange={v => sf('name', v)} placeholder="Pool & Deck Area" /><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category *</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['Mechanical','Amenity','Safety','Technology','Common Area','Landscaping'].map(c => <option key={c}>{c}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Condition</label><select value={f('condition') || 'Good'} onChange={e => sf('condition', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="Excellent">Excellent</option><option value="Good">Good</option><option value="Fair">Fair</option><option value="Poor">Poor</option><option value="Critical">Critical</option></select></div></div><Field label="Location" value={f('location')} onChange={v => sf('location', v)} placeholder="Floor 1 - East Wing" /><div className="grid grid-cols-2 gap-3"><Field label="Installed Date" value={f('installedDate')} onChange={v => sf('installedDate', v)} type="date" /><Field label="Original Cost ($)" value={f('originalCost')} onChange={v => sf('originalCost', v)} type="number" /></div><div className="grid grid-cols-3 gap-3"><Field label="Useful Life (yrs)" value={f('usefulLifeYears')} onChange={v => sf('usefulLifeYears', v)} type="number" /><Field label="Remaining Life (yrs)" value={f('remainingLifeYears')} onChange={v => sf('remainingLifeYears', v)} type="number" /><Field label="Replacement Cost ($)" value={f('replacementCostToday')} onChange={v => sf('replacementCostToday', v)} type="number" /></div><div className="grid grid-cols-3 gap-3"><Field label="Inflation Rate (%)" value={f('inflationRate') || '3'} onChange={v => sf('inflationRate', v)} type="number" /><div><label className="block text-xs font-medium text-ink-700 mb-1">Criticality</label><select value={f('criticality') || 'Medium'} onChange={e => sf('criticality', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option><option value="Critical">Critical</option></select></div><Field label="Insured Value ($)" value={f('insuredValue')} onChange={v => sf('insuredValue', v)} type="number" /></div><div className="grid grid-cols-2 gap-3"><Field label="Annual Maint. Cost ($)" value={f('annualMaintenanceCost')} onChange={v => sf('annualMaintenanceCost', v)} type="number" /><Field label="Annual Operating Cost ($)" value={f('annualOperatingCost')} onChange={v => sf('annualOperatingCost', v)} type="number" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Parent Asset</label><select value={f('parentAssetId')} onChange={e => sf('parentAssetId', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">None (top-level asset)</option>{store.assets.filter(a => !a.parentAssetId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} placeholder="Additional details..." /></div></div></Modal>)}
+      {(modal === 'addAsset' || modal === 'editAsset') && (<Modal title={modal === 'addAsset' ? 'Add Building Asset' : 'Edit Asset'} wide onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('name') || !f('category')) { alert('Name and category required'); return; } const data = { name: f('name'), category: f('category') as import('@/store/useBuildingStore').AssetCategory, location: f('location'), condition: (f('condition') || 'Good') as import('@/store/useBuildingStore').AssetCondition, installedDate: f('installedDate'), originalCost: parseFloat(f('originalCost')) || 0, usefulLifeYears: parseInt(f('usefulLifeYears')) || 20, remainingLifeYears: parseInt(f('remainingLifeYears')) || 20, replacementCostToday: parseFloat(f('replacementCostToday')) || 0, inflationRate: parseFloat(f('inflationRate')) || 3, criticality: f('criticality') || 'Medium', annualMaintenanceCost: parseFloat(f('annualMaintenanceCost')) || 0, annualOperatingCost: parseFloat(f('annualOperatingCost')) || 0, parentAssetId: f('parentAssetId') || null, reserveItemId: f('reserveItemId') || '', maintenanceScheduleIds: [], workOrderIds: [], vendorIds: [], insurancePolicyIds: [], amenityConfigId: '', glAccountNum: '', budgetCategoryId: '', spendingApprovalIds: [], conditionHistory: [], warranties: [], notes: f('notes'), insuredValue: parseFloat(f('insuredValue')) || 0 }; if (modal === 'addAsset') { store.addAsset(data); const maintCost = parseFloat(f('annualMaintenanceCost')) || 0; if (maintCost > 0) { const newAssets = useBuildingStore.getState().assets; const newAssetId = newAssets[newAssets.length - 1]?.id; if (newAssetId) { setPendingAutoMaintAssetId(newAssetId); setAutoMaintVendor(''); setModal('autoMaintVendor'); resetForm(); return; } } } else { store.updateAsset(editId, data); } setModal(null); resetForm(); }}><div className="space-y-3"><div className="border-b border-ink-100 pb-1"><h4 className="text-sm font-bold text-ink-800">Asset Identification</h4><p className="text-xs text-ink-400 mt-0.5">What is this asset and where is it?</p></div><Field label="Asset Name *" value={f('name')} onChange={v => sf('name', v)} placeholder="Pool & Deck Area" /><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category *</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['Mechanical','Amenity','Safety','Technology','Common Area','Landscaping'].map(c => <option key={c}>{c}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Condition</label><select value={f('condition') || 'Good'} onChange={e => sf('condition', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="Excellent">Excellent</option><option value="Good">Good</option><option value="Fair">Fair</option><option value="Poor">Poor</option><option value="Critical">Critical</option></select></div></div><Field label="Location" value={f('location')} onChange={v => sf('location', v)} placeholder="Floor 1 - East Wing" /><div className="border-b border-ink-100 pb-1 mt-5"><h4 className="text-sm font-bold text-ink-800">Lifecycle & Valuation</h4><p className="text-xs text-ink-400 mt-0.5">When was it installed and what's the replacement plan?</p></div><div className="grid grid-cols-2 gap-3"><Field label="Installed Date" value={f('installedDate')} onChange={v => sf('installedDate', v)} type="date" /><Field label="Original Cost ($)" value={f('originalCost')} onChange={v => sf('originalCost', v)} type="number" /></div><div className="grid grid-cols-3 gap-3"><Field label="Useful Life (yrs)" value={f('usefulLifeYears')} onChange={v => sf('usefulLifeYears', v)} type="number" /><Field label="Remaining Life (yrs)" value={f('remainingLifeYears')} onChange={v => sf('remainingLifeYears', v)} type="number" /><Field label="Replacement Cost ($)" value={f('replacementCostToday')} onChange={v => sf('replacementCostToday', v)} type="number" /></div><Field label="Inflation Rate (%)" value={f('inflationRate') || '3'} onChange={v => sf('inflationRate', v)} type="number" /><div className="border-b border-ink-100 pb-1 mt-5"><h4 className="text-sm font-bold text-ink-800">Financial</h4><p className="text-xs text-ink-400 mt-0.5">Maintenance Budget sets the annual cost ceiling for scheduled tasks. Est. Operating Cost is your projection — actuals are tracked through vendor invoices.</p></div><div className="grid grid-cols-3 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Criticality</label><select value={f('criticality') || 'Medium'} onChange={e => sf('criticality', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option><option value="Critical">Critical</option></select></div><Field label="Insured Value ($)" value={f('insuredValue')} onChange={v => sf('insuredValue', v)} type="number" /></div><div className="grid grid-cols-2 gap-3"><Field label="Annual Maintenance Budget ($)" value={f('annualMaintenanceCost')} onChange={v => sf('annualMaintenanceCost', v)} type="number" /><Field label="Est. Annual Operating Cost ($)" value={f('annualOperatingCost')} onChange={v => sf('annualOperatingCost', v)} type="number" /></div><div className="border-b border-ink-100 pb-1 mt-5"><h4 className="text-sm font-bold text-ink-800">Relationships</h4><p className="text-xs text-ink-400 mt-0.5">How does this asset connect to others?</p></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Parent Asset</label><select value={f('parentAssetId')} onChange={e => sf('parentAssetId', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">None (top-level asset)</option>{store.assets.filter(a => !a.parentAssetId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} placeholder="Additional details..." /></div></div></Modal>)}
+
+      {/* Auto-Maintenance Vendor Prompt */}
+      {modal === 'autoMaintVendor' && pendingAutoMaintAssetId && (() => {
+        const asset = store.assets.find(a => a.id === pendingAutoMaintAssetId);
+        if (!asset) return null;
+        const activeVendors = store.vendors.filter(v => v.status === 'active');
+        const costFmt = '$' + asset.annualMaintenanceCost.toLocaleString();
+        return (
+          <Modal
+            title="Create Maintenance Schedule"
+            subtitle={`This asset has a maintenance budget of ${costFmt}/year. Create an annual schedule?`}
+            onClose={() => { setModal(null); setPendingAutoMaintAssetId(null); setAutoMaintVendor(''); }}
+            footer={
+              <>
+                <button onClick={() => { setModal(null); setPendingAutoMaintAssetId(null); setAutoMaintVendor(''); }} className="px-4 py-2 text-ink-700 hover:text-ink-900 font-medium">Skip</button>
+                <button onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                  const vendorName = autoMaintVendor ? activeVendors.find(v => v.id === autoMaintVendor)?.name || '' : '';
+                  store.addMaintenanceSchedule({
+                    task: `Annual Maintenance — ${asset.name}`,
+                    category: 'General',
+                    frequency: 'annual',
+                    vendor: vendorName,
+                    lastCompleted: '',
+                    nextDue: nextYear,
+                    estimatedCost: costFmt,
+                    notes: `Auto-created annual maintenance schedule for ${asset.name}`,
+                    status: 'on-track',
+                  });
+                  const newMs = useBuildingStore.getState().maintenanceSchedules;
+                  const newMsId = newMs[newMs.length - 1]?.id;
+                  if (newMsId) store.linkScheduleToAsset(pendingAutoMaintAssetId, newMsId);
+                  if (autoMaintVendor) {
+                    const currentVendorIds = new Set(asset.vendorIds);
+                    if (!currentVendorIds.has(autoMaintVendor)) {
+                      store.updateAsset(pendingAutoMaintAssetId, { vendorIds: [...asset.vendorIds, autoMaintVendor] });
+                    }
+                  }
+                  setModal(null);
+                  setPendingAutoMaintAssetId(null);
+                  setAutoMaintVendor('');
+                }} className="px-6 py-2 bg-ink-900 text-white rounded-lg font-medium hover:bg-ink-800">Create Schedule</button>
+              </>
+            }
+          >
+            <div className="space-y-3">
+              <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
+                <p className="text-sm text-ink-700"><strong>{asset.name}</strong></p>
+                <p className="text-xs text-ink-500 mt-1">Annual maintenance budget: <strong className="text-ink-700">{costFmt}</strong></p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-700 mb-1">Assign Vendor (optional)</label>
+                <select value={autoMaintVendor} onChange={e => setAutoMaintVendor(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                  <option value="">No vendor</option>
+                  {activeVendors.map(v => <option key={v.id} value={v.id}>{v.name} — {v.service}</option>)}
+                </select>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
