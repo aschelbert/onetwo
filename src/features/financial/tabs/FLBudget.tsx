@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
@@ -23,6 +24,15 @@ export default function FLBudget() {
   const allocPct = ob.operatingBudget > 0 ? Math.round((ob.totalAllocated / ob.operatingBudget) * 100) : 0;
   const spentPct = ob.operatingBudget > 0 ? Math.round((totalActual / ob.operatingBudget) * 100) : 0;
   const viewCat = viewCatId ? budgetCategories.find(c => c.id === viewCatId) : null;
+
+  // ── Asset Cost Reality Check ──
+  const { assets } = useBuildingStore();
+  const totalAssetMaint = useMemo(() => assets.reduce((s, a) => s + a.annualMaintenanceCost, 0), [assets]);
+  const totalAssetOps = useMemo(() => assets.reduce((s, a) => s + a.annualOperatingCost, 0), [assets]);
+  const totalAssetCosts = totalAssetMaint + totalAssetOps;
+  const assetPctOfBudget = ob.operatingBudget > 0 ? Math.round((totalAssetCosts / ob.operatingBudget) * 100) : 0;
+  const maintBudgetCat = useMemo(() => bv.find(b => b.name.toLowerCase().includes('maintenance')), [bv]);
+  const maintShortfall = maintBudgetCat ? totalAssetMaint - maintBudgetCat.budgeted : 0;
 
   const handleAddCategory = () => {
     const budgeted = parseFloat(catForm.budgeted);
@@ -104,6 +114,45 @@ export default function FLBudget() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Asset Cost Reality Check */}
+      <div className="bg-white border-2 border-ink-200 rounded-xl p-5">
+        <h3 className="font-display text-lg font-bold text-ink-900 mb-4">Asset Cost Reality Check</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+          <div className="bg-mist-50 border border-mist-200 rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wider">Annual Maintenance</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{fmt(totalAssetMaint)}</p>
+            <p className="text-[10px] text-ink-400 mt-1">all assets combined</p>
+          </div>
+          <div className="bg-mist-50 border border-mist-200 rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wider">Annual Operating</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{fmt(totalAssetOps)}</p>
+            <p className="text-[10px] text-ink-400 mt-1">all assets combined</p>
+          </div>
+          <div className="bg-sage-50 border border-sage-200 rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-sage-600 uppercase tracking-wider">Total Asset Costs</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{fmt(totalAssetCosts)}</p>
+            <p className="text-[10px] text-ink-400 mt-1">maintenance + operating</p>
+          </div>
+          <div className={`rounded-xl p-4 border ${assetPctOfBudget > 80 ? 'bg-accent-50 border-accent-200' : 'bg-sage-50 border-sage-200'}`}>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider ${assetPctOfBudget > 80 ? 'text-accent-600' : 'text-sage-600'}`}>vs Operating Budget</p>
+            <p className={`text-xl font-bold mt-1 ${assetPctOfBudget > 80 ? 'text-accent-700' : 'text-ink-900'}`}>{assetPctOfBudget}%</p>
+            <p className="text-[10px] text-ink-400 mt-1">of {fmt(ob.operatingBudget)} budget</p>
+          </div>
+        </div>
+
+        {maintShortfall > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 mb-4">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <p className="text-sm font-semibold text-red-800">Maintenance budget shortfall: {fmt(maintShortfall)}</p>
+              <p className="text-xs text-red-600 mt-0.5">Asset maintenance costs ({fmt(totalAssetMaint)}) exceed the "{maintBudgetCat?.name}" budget ({fmt(maintBudgetCat?.budgeted || 0)})</p>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs text-ink-400">Reserve contribution ({fmt(ob.reserveContribution)}) + total asset lifecycle costs ({fmt(totalAssetCosts)}) = {fmt(ob.reserveContribution + totalAssetCosts)}/yr</p>
       </div>
 
       {/* Category Header + Add */}
