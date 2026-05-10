@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
@@ -16,6 +17,22 @@ export default function FLReserves() {
   const recommendedAnnual = calculateRecommendedAnnualReserve();
   const nonContingency = status.filter(i => !i.isContingency);
   const urgent = nonContingency.filter(i => i.yearsRemaining < 3).sort((a, b) => a.yearsRemaining - b.yearsRemaining);
+
+  // ── Asset Coverage Analysis ──
+  const { assets, updateAsset } = useBuildingStore();
+  const linkedAssets = useMemo(() => assets.filter(a => a.reserveItemId), [assets]);
+  const unlinkedAssets = useMemo(() => assets.filter(a => !a.reserveItemId && a.replacementCostToday > 0), [assets]);
+  const totalAssetReplacementCost = useMemo(() => assets.reduce((s, a) => s + a.replacementCostToday, 0), [assets]);
+  const unlinkedReplacementTotal = useMemo(() => unlinkedAssets.reduce((s, a) => s + a.replacementCostToday, 0), [unlinkedAssets]);
+
+  // Per-reserve-item: compare estimatedCost vs sum of linked asset replacementCostToday
+  const reserveVsAssetDeltas = useMemo(() => {
+    return nonContingency.map(ri => {
+      const linked = assets.filter(a => a.reserveItemId === ri.id);
+      const assetCostSum = linked.reduce((s, a) => s + a.replacementCostToday, 0);
+      return { ...ri, linkedCount: linked.length, assetCostSum, delta: ri.estimatedCost - assetCostSum };
+    });
+  }, [nonContingency, assets]);
 
   return (
     <div className="space-y-6">
@@ -39,6 +56,107 @@ export default function FLReserves() {
         <h3 className="font-display text-lg font-bold text-ink-900 mb-2">Recommended Annual Contribution</h3>
         <p className="text-3xl font-bold text-ink-900">{fmt(recommendedAnnual)}</p>
         <p className="text-sm text-ink-400 mt-1">{fmt(recommendedAnnual / 12)}/month · Based on remaining useful life and funding gaps</p>
+      </div>
+
+      {/* Asset Coverage Analysis */}
+      <div className="bg-white border-2 border-ink-200 rounded-xl p-5">
+        <h3 className="font-display text-lg font-bold text-ink-900 mb-4">Asset Coverage Analysis</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+          <div className="bg-sage-50 border border-sage-200 rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-sage-600 uppercase tracking-wider">Assets with Reserve Link</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{linkedAssets.length} <span className="text-sm font-normal text-ink-400">of {assets.length}</span></p>
+          </div>
+          <div className={`rounded-xl p-4 border ${unlinkedAssets.length > 0 ? 'bg-accent-50 border-accent-200' : 'bg-sage-50 border-sage-200'}`}>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider ${unlinkedAssets.length > 0 ? 'text-accent-600' : 'text-sage-600'}`}>Assets without Reserve</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{unlinkedAssets.length}</p>
+            {unlinkedAssets.length > 0 && <p className="text-[10px] text-ink-400 mt-1">{fmt(unlinkedReplacementTotal)} replacement value unprotected</p>}
+          </div>
+          <div className="bg-mist-50 border border-mist-200 rounded-xl p-4">
+            <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wider">Asset Replacement vs Reserve</p>
+            <p className="text-xl font-bold text-ink-900 mt-1">{fmt(totalAssetReplacementCost)}</p>
+            <p className="text-[10px] text-ink-400 mt-1">vs {fmt(totalNeeded)} reserve needed</p>
+          </div>
+        </div>
+
+        {/* Unreserved Assets List */}
+        {unlinkedAssets.length > 0 && (
+          <div className="mb-5">
+            <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Unreserved Assets</h4>
+            <div className="space-y-2">
+              {unlinkedAssets.map(a => (
+                <div key={a.id} className="flex items-center justify-between bg-accent-50 rounded-lg p-3 border border-accent-100 gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink-900 text-sm">{a.name}</p>
+                    <p className="text-xs text-ink-400">{a.category} · {a.remainingLifeYears} yr remaining</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value=""
+                      onChange={e => {
+                        if (e.target.value) {
+                          updateAsset(a.id, { reserveItemId: e.target.value });
+                        }
+                      }}
+                      className="text-xs px-2 py-1.5 border border-ink-200 rounded-lg bg-white text-ink-700 cursor-pointer max-w-[160px]"
+                    >
+                      <option value="">Link to...</option>
+                      {nonContingency.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const newItem = {
+                          name: a.name,
+                          estimatedCost: a.replacementCostToday,
+                          currentFunding: 0,
+                          usefulLife: a.usefulLifeYears,
+                          lastReplaced: a.installedDate,
+                          yearsRemaining: a.remainingLifeYears,
+                          isContingency: false,
+                        };
+                        addReserveItem(newItem);
+                        const items = useFinancialStore.getState().reserveItems;
+                        const created = items[items.length - 1];
+                        if (created) {
+                          updateAsset(a.id, { reserveItemId: created.id });
+                        }
+                      }}
+                      className="px-2.5 py-1.5 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-xs font-medium whitespace-nowrap"
+                    >Create Reserve</button>
+                    <div className="text-right">
+                      <p className="font-bold text-accent-700 text-sm">{fmt(a.replacementCostToday)}</p>
+                      <p className="text-[10px] text-ink-400">replacement cost</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Per-Reserve-Item Comparison */}
+        {reserveVsAssetDeltas.length > 0 && (
+          <div>
+            <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Reserve vs Asset Cost Comparison</h4>
+            <div className="space-y-2">
+              {reserveVsAssetDeltas.map(ri => (
+                <div key={ri.id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-ink-100">
+                  <div>
+                    <p className="font-semibold text-ink-900 text-sm">{ri.name}</p>
+                    <p className="text-xs text-ink-400">{ri.linkedCount} linked asset{ri.linkedCount !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-ink-400">Reserve: {fmt(ri.estimatedCost)} · Assets: {fmt(ri.assetCostSum)}</p>
+                    <p className={`font-bold text-sm ${ri.delta > 0 ? 'text-yellow-600' : ri.delta < 0 ? 'text-accent-600' : 'text-sage-600'}`}>
+                      {ri.delta > 0 ? `+${fmt(ri.delta)} over` : ri.delta < 0 ? `${fmt(Math.abs(ri.delta))} under` : 'Matched'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Urgent items */}

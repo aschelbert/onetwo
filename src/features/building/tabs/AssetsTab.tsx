@@ -120,20 +120,13 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
   const totalAssets = assets.length;
   const totalReplacementCost = useMemo(() => assets.reduce((s, a) => s + a.replacementCostToday, 0), [assets]);
   const totalAnnualMaint = useMemo(() => assets.reduce((s, a) => s + a.annualMaintenanceCost, 0), [assets]);
+  const reserveStatus = useMemo(() => finStore.getReserveFundingStatus(), [finStore]);
   const reserveFundedPct = useMemo(() => {
-    const linkedReserveAssets = assets.filter(a => a.reserveItemId);
-    if (linkedReserveAssets.length === 0) return 0;
-    let totalFunding = 0;
-    let totalEstimated = 0;
-    linkedReserveAssets.forEach(a => {
-      const ri = finStore.reserveItems.find(r => r.id === a.reserveItemId);
-      if (ri) {
-        totalFunding += ri.currentFunding;
-        totalEstimated += ri.estimatedCost;
-      }
-    });
-    return totalEstimated > 0 ? Math.round((totalFunding / totalEstimated) * 100) : 0;
-  }, [assets, finStore.reserveItems]);
+    const totalFunding = reserveStatus.reduce((s: number, i: any) => s + i.currentFunding, 0);
+    const totalNeeded = reserveStatus.reduce((s: number, i: any) => s + i.estimatedCost, 0);
+    return totalNeeded > 0 ? Math.round((totalFunding / totalNeeded) * 100) : 0;
+  }, [reserveStatus]);
+  const assetsWithoutReserve = useMemo(() => assets.filter(a => !a.reserveItemId), [assets]);
 
   // ── Cross-module resolution helpers ──
   const resolveModuleCounts = (asset: BuildingAsset) => {
@@ -212,6 +205,7 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                     annualOperatingCost: String(selectedAsset.annualOperatingCost),
                     notes: selectedAsset.notes,
                     insuredValue: String(selectedAsset.insuredValue),
+                    reserveItemId: selectedAsset.reserveItemId || '',
                   })}
                   className="text-xs text-accent-600 font-medium hover:text-accent-700"
                 >Edit</button>
@@ -269,6 +263,78 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Reserve Item Link */}
+        <div className="bg-white border border-ink-100 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider">Reserve Item</h4>
+          </div>
+          {mod.reserve ? (
+            <div className="bg-sage-50 rounded-lg px-4 py-3 border border-sage-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-ink-900">{mod.reserve.name}</p>
+                  <div className="flex gap-4 text-xs text-ink-500 mt-1">
+                    <span>Est. Cost: <strong className="text-ink-700">{fmt(mod.reserve.estimatedCost)}</strong></span>
+                    <span>Funded: <strong className="text-sage-700">{fmt(mod.reserve.currentFunding)}</strong></span>
+                    <span className="font-semibold">{mod.reserve.estimatedCost > 0 ? Math.round((mod.reserve.currentFunding / mod.reserve.estimatedCost) * 100) : 100}%</span>
+                  </div>
+                </div>
+                {isBoard && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Unlink reserve item "${mod.reserve!.name}" from this asset?`))
+                        store.updateAsset(selectedAsset.id, { reserveItemId: '' });
+                    }}
+                    className="text-xs text-red-400 hover:text-red-600 font-medium"
+                  >Unlink</button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-ink-400 italic">No reserve item linked to this asset.</p>
+              {isBoard && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value=""
+                    onChange={e => {
+                      if (e.target.value) {
+                        store.updateAsset(selectedAsset.id, { reserveItemId: e.target.value });
+                      }
+                    }}
+                    className="text-xs px-2 py-1.5 border border-ink-200 rounded-lg bg-white text-ink-700 cursor-pointer flex-1"
+                  >
+                    <option value="">+ Link to Reserve Item</option>
+                    {finStore.reserveItems.filter(r => !r.isContingency).map(r => (
+                      <option key={r.id} value={r.id}>{r.name} — {fmt(r.estimatedCost)}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      const newItem = {
+                        name: selectedAsset.name,
+                        estimatedCost: selectedAsset.replacementCostToday,
+                        currentFunding: 0,
+                        usefulLife: selectedAsset.usefulLifeYears,
+                        lastReplaced: selectedAsset.installedDate,
+                        yearsRemaining: selectedAsset.remainingLifeYears,
+                        isContingency: false,
+                      };
+                      finStore.addReserveItem(newItem);
+                      const items = useFinancialStore.getState().reserveItems;
+                      const created = items[items.length - 1];
+                      if (created) {
+                        store.updateAsset(selectedAsset.id, { reserveItemId: created.id });
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-xs font-medium whitespace-nowrap"
+                  >Create &amp; Link</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Two-column layout */}
@@ -729,6 +795,9 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
               <div className="mt-1.5 h-2 bg-ink-100 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${reserveFundedPct >= 80 ? 'bg-sage-500' : reserveFundedPct >= 50 ? 'bg-yellow-500' : 'bg-accent-500'}`} style={{ width: `${Math.min(reserveFundedPct, 100)}%` }} />
               </div>
+              {assetsWithoutReserve.length > 0 && (
+                <p className="text-[10px] text-accent-500 mt-1">{assetsWithoutReserve.length} assets unlinked</p>
+              )}
             </div>
           </div>
 
