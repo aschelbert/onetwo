@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import * as Sentry from '@sentry/react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -210,22 +209,6 @@ function ActiveCaseWidgetWrapper() {
 }
 
 
-// Test component — remove after verifying Sentry integration
-function ErrorButton() {
-  return (
-    <button
-      onClick={() => {
-        Sentry.logger.info('User triggered test error', {
-          action: 'test_error_button_click',
-        });
-        throw new Error('This is your first error!');
-      }}
-    >
-      Break the world
-    </button>
-  );
-}
-
 export default function App() {
   return (
     <ErrorBoundary fallbackLevel="app">
@@ -274,7 +257,6 @@ export default function App() {
       {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
       <ActiveCaseWidgetWrapper />
-      <ErrorButton />
     </BrowserRouter>
     </HydrationGate>
     </ErrorBoundary>

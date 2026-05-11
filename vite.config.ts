@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import path from 'path'
 import fs from 'fs'
 
@@ -34,13 +35,25 @@ function multiPagePlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), multiPagePlugin()],
+  plugins: [
+    react(),
+    multiPagePlugin(),
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   build: {
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
