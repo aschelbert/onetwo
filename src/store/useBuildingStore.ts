@@ -505,16 +505,18 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
 
   updateManagement: (mgmt, tenantId?) => {
     set(s => ({ management: { ...s.management, ...mgmt } }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.upsertManagementInfo(tenantId, { ...useBuildingStore.getState().management });
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.upsertManagementInfo(tid, { ...useBuildingStore.getState().management });
     }
   },
 
   addBoardMember: (m, tenantId?) => {
     const id = generateLocalId('bm');
     set(s => ({ board: [...s.board, { id, ...m }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createBoardMember(tenantId, m).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createBoardMember(tid, m).then(dbRow => {
         if (dbRow) set(s => ({ board: s.board.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createBoardMember failed:', err);
@@ -534,8 +536,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addLegalCounsel: (c, tenantId?) => {
     const id = generateLocalId('lc');
     set(s => ({ legalCounsel: [...s.legalCounsel, { id, ...c }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createLegalCounsel(tenantId, c).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createLegalCounsel(tid, c).then(dbRow => {
         if (dbRow) set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createLegalCounsel failed:', err);
@@ -555,8 +558,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addLegalDocument: (d, tenantId?) => {
     const id = generateLocalId('ld');
     set(s => ({ legalDocuments: [...s.legalDocuments, { id, ...d, attachments: [] }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createLegalDocument(tenantId, d).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createLegalDocument(tid, d).then(dbRow => {
         if (dbRow) set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createLegalDocument failed:', err);
@@ -588,8 +592,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addInsurance: (p, tenantId?) => {
     const id = generateLocalId('ins');
     set(s => ({ insurance: [...s.insurance, { id, ...p, attachments: [] }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createInsurancePolicy(tenantId, p).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createInsurancePolicy(tid, p).then(dbRow => {
         if (dbRow) set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createInsurancePolicy failed:', err);
@@ -621,8 +626,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addVendor: (v, tenantId?) => {
     const id = generateLocalId('v');
     set(s => ({ vendors: [...s.vendors, { id, ...v }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createVendor(tenantId, v).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createVendor(tid, v).then(dbRow => {
         if (dbRow) set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createVendor failed:', err);
@@ -650,8 +656,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addMaintenanceSchedule: (m, tenantId?) => {
     const id = generateLocalId('ms');
     set(s => ({ maintenanceSchedules: [...s.maintenanceSchedules, { id, ...m }] }));
-    if (isBackendEnabled && tenantId) {
-      buildingSvc.createMaintenanceSchedule(tenantId, m).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.createMaintenanceSchedule(tid, m).then(dbRow => {
         if (dbRow) set(s => ({ maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createMaintenanceSchedule failed:', err);
@@ -671,8 +678,9 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   addAsset: (a, tenantId?) => {
     const id = generateLocalId('ast');
     set(s => ({ assets: [...s.assets, { id, ...a }] }));
-    if (isBackendEnabled && tenantId) {
-      assetsSvc.createAsset(tenantId, a).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      assetsSvc.createAsset(tid, a).then(dbRow => {
         if (dbRow) set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createAsset failed:', err);
