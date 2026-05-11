@@ -9,7 +9,7 @@ const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
 };
 
 async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown) {

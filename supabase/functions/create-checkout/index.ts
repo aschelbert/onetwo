@@ -35,7 +35,7 @@ async function getTrialDays(): Promise<number> {
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
 };
 
 Deno.serve(async (req) => {

@@ -12,7 +12,7 @@ Sentry.init({
     Sentry.replayIntegration(),
   ],
   tracesSampleRate: 1.0,
-  tracePropagationTargets: ["localhost", /^https:\/\/.*\.getonetwo\.com/, /^https:\/\/.*\.supabase\.co/],
+  tracePropagationTargets: [/^\//, /^https:\/\/.*\.getonetwo\.com/, /^https:\/\/.*\.supabase\.co/],
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   enableLogs: true,
