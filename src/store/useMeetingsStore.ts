@@ -99,7 +99,7 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
   revokeMinutesApproval: (meetingId, name) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovals: (x.minutesApprovals || []).filter(a => a.name !== name) } : x) })); syncMeeting(meetingId); },
 }), {
   name: 'onetwo-meetings',
-  version: 2,
+  version: 3,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

@@ -88,7 +88,7 @@ export const useScorecardStore = create<ScorecardState>()(persist((set) => ({
   },
 }), {
   name: 'onetwo-scorecard',
-  version: 2,
+  version: 3,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

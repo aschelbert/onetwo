@@ -88,7 +88,7 @@ export const useReportStore = create<ReportState>()(persist((set) => ({
   },
 }), {
   name: 'onetwo-reports',
-  version: 2,
+  version: 3,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

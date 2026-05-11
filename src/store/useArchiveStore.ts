@@ -175,7 +175,7 @@ export const useArchiveStore = create<ArchiveState>()(persist((set) => ({
   },
 }), {
   name: 'onetwo-archives',
-  version: 2,
+  version: 3,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

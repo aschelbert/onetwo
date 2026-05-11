@@ -238,7 +238,7 @@ export const useTaskTrackingStore = create<TaskTrackingState>()(persist((set) =>
   },
 }), {
   name: 'onetwo-task-tracking',
-  version: 2,
+  version: 3,
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
