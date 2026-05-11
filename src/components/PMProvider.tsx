@@ -51,7 +51,7 @@ export default function PMProvider({ children }: { children: React.ReactNode }) 
         // 1. Load the user's management company membership
         const { data: mcUser } = await sb
           .from('management_company_users')
-          .select('id, company_id, user_id, role, status, display_name, created_at')
+          .select('id, management_company_id, user_id, role, status, name, created_at')
           .eq('user_id', currentUser.id)
           .eq('status', 'active')
           .maybeSingle();
@@ -66,7 +66,7 @@ export default function PMProvider({ children }: { children: React.ReactNode }) 
         const { data: mc } = await sb
           .from('management_companies')
           .select('id, name, contact_email, contact_phone, address, created_at')
-          .eq('id', mcUser.company_id)
+          .eq('id', mcUser.management_company_id)
           .maybeSingle();
 
         if (mc) setCompany(mc);
@@ -75,7 +75,7 @@ export default function PMProvider({ children }: { children: React.ReactNode }) 
         const { data: mcts } = await sb
           .from('management_company_tenants')
           .select('id, company_id, tenant_id, assigned_at, tenants:tenant_id(id, name, address, total_units)')
-          .eq('company_id', mcUser.company_id);
+          .eq('company_id', mcUser.management_company_id);
 
         if (mcts) {
           const bldgs: PMPortfolioBuilding[] = mcts

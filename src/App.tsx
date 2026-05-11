@@ -91,7 +91,7 @@ function AuthListener() {
           // Check management company user (PM)
           const { data: mcUser } = await sb
             .from('management_company_users')
-            .select('display_name')
+            .select('name')
             .eq('user_id', session.user.id)
             .eq('status', 'active')
             .maybeSingle();
@@ -99,7 +99,7 @@ function AuthListener() {
           if (mcUser) {
             const m = {
               id: session.user.id,
-              name: mcUser.display_name || session.user.email?.split('@')[0] || 'PM User',
+              name: mcUser.name || session.user.email?.split('@')[0] || 'PM User',
               email: session.user.email || '',
               phone: '',
               role: 'PM_COMPANY' as Role,
