@@ -119,6 +119,7 @@ export const useVendorTrackerStore = create<VendorTrackerState>()(persist((set) 
 }), {
   name: 'onetwo-vendor-tracker',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

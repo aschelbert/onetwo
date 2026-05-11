@@ -439,6 +439,7 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
 }), {
   name: 'onetwo-payroll',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

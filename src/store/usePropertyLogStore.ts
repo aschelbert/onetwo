@@ -63,6 +63,7 @@ export const usePropertyLogStore = create<PropertyLogState>()(persist((set) => (
 }), {
   name: 'onetwo-property-log',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

@@ -102,6 +102,7 @@ export const useSpendingStore = create<SpendingState>()(persist((set) => ({
 }), {
   name: 'onetwo-spending',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

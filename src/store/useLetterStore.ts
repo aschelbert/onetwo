@@ -146,6 +146,7 @@ export const useLetterStore = create<LetterState>()(persist((set) => ({
 }), {
   name: 'onetwo-letters',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => {
     if (!persisted) return current;
     // Seed template IDs from code — always include these

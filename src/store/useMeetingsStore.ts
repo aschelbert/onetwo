@@ -100,6 +100,7 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
 }), {
   name: 'onetwo-meetings',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),

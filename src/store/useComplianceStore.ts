@@ -235,6 +235,7 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
 }), {
   name: 'onetwo-compliance',
   version: 3,
+  migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
     ...(persisted || {}),
