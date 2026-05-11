@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { useSyncStatusStore } from '@/store/useSyncStatusStore';
 
 /**
@@ -20,8 +21,8 @@ export async function syncWrite<T>(
     const msg = err instanceof Error ? err.message : String(err);
     sync.markError(msg);
     console.error(`[syncWrite] ${opts.label} failed:`, err);
+    Sentry.captureException(err, { tags: { syncWrite: opts.label } });
     opts.rollback?.();
-    // Future: Sentry (P1-3), toast notification
     return null;
   }
 }

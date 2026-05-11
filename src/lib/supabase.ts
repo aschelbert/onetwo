@@ -3,6 +3,7 @@
 // Env vars are set in .env.local and injected by Vite.
 
 import { createClient } from '@supabase/supabase-js';
+import * as Sentry from '@sentry/react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -38,6 +39,7 @@ export function logDbError(label: string, error: unknown): void {
   console.error(label, error);
   _recentErrors.push({ label, error, ts: Date.now() });
   if (_recentErrors.length > MAX_RECENT_ERRORS) _recentErrors.shift();
+  Sentry.captureException(error, { tags: { dbError: label } });
 }
 
 /** Return the last N logged DB errors (for sync status UI). */
