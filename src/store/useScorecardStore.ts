@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as scorecardSvc from '@/lib/services/scorecard';
 import type { ScorecardEntry, ScorecardReview } from '@/lib/services/scorecard';
 import { generateLocalId } from '@/lib/generateId';
@@ -52,8 +52,9 @@ export const useScorecardStore = create<ScorecardState>()(persist((set) => ({
   addEntry: (entry, tenantId?) => {
     const id = generateLocalId('se');
     set(s => ({ entries: [{ id, ...entry }, ...s.entries] }));
-    if (isBackendEnabled && tenantId) {
-      scorecardSvc.createEntry(tenantId, entry).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      scorecardSvc.createEntry(tid, entry).then(dbRow => {
         if (dbRow) set(s => ({ entries: s.entries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createEntry failed:', err);
@@ -70,8 +71,9 @@ export const useScorecardStore = create<ScorecardState>()(persist((set) => ({
   addReview: (review, tenantId?) => {
     const id = generateLocalId('sr');
     set(s => ({ reviews: [{ id, ...review }, ...s.reviews] }));
-    if (isBackendEnabled && tenantId) {
-      scorecardSvc.createReview(tenantId, review).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      scorecardSvc.createReview(tid, review).then(dbRow => {
         if (dbRow) set(s => ({ reviews: s.reviews.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createReview failed:', err);

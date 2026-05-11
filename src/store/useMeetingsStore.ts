@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as meetingsSvc from '@/lib/services/meetings';
 import { generateLocalId } from '@/lib/generateId';
 
@@ -73,8 +73,9 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
     const id = generateLocalId('mtg');
     const meeting: Meeting = { id, title: m.title, type: m.type, status: m.status, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda, notes: m.notes, votes: [], minutes: '', attendees: m.attendees || { board: [], owners: [], guests: [] }, linkedCaseIds: [], linkedVoteIds: [], documents: [], minutesApprovals: [] };
     set(s => ({ meetings: [...s.meetings, meeting] }));
-    if (isBackendEnabled && tenantId) {
-      meetingsSvc.createMeeting(tenantId, meeting).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      meetingsSvc.createMeeting(tid, meeting).then(dbRow => {
         if (dbRow) set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createMeeting failed:', err);

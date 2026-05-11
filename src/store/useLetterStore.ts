@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as letterSvc from '@/lib/services/letterEngine';
 import type { LetterTemplate, GeneratedLetter } from '@/lib/services/letterEngine';
 import { generateLocalId } from '@/lib/generateId';
@@ -99,8 +99,9 @@ export const useLetterStore = create<LetterState>()(persist((set) => ({
   addTemplate: (t, tenantId?) => {
     const id = generateLocalId('lt');
     set(s => ({ templates: [{ id, ...t }, ...s.templates] }));
-    if (isBackendEnabled && tenantId) {
-      letterSvc.createTemplate(tenantId, t).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      letterSvc.createTemplate(tid, t).then(dbRow => {
         if (dbRow) set(s => ({ templates: s.templates.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createTemplate failed:', err);
@@ -122,8 +123,9 @@ export const useLetterStore = create<LetterState>()(persist((set) => ({
   addLetter: (l, tenantId?) => {
     const id = generateLocalId('gl');
     set(s => ({ letters: [{ id, ...l }, ...s.letters] }));
-    if (isBackendEnabled && tenantId) {
-      letterSvc.createLetter(tenantId, l).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      letterSvc.createLetter(tid, l).then(dbRow => {
         if (dbRow) set(s => ({ letters: s.letters.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createLetter failed:', err);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as archivesSvc from '@/lib/services/archives';
 
 export interface ArchiveSnapshot {
@@ -158,8 +158,9 @@ export const useArchiveStore = create<ArchiveState>()(persist((set) => ({
 
   addArchive: (a, tenantId?) => {
     set(s => ({ archives: [a, ...s.archives] }));
-    if (isBackendEnabled && tenantId) {
-      archivesSvc.createArchive(tenantId, a).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      archivesSvc.createArchive(tid, a).then(dbRow => {
         if (dbRow) set(s => ({ archives: s.archives.map(x => x.id === a.id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createArchive failed:', err);

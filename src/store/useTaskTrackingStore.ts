@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as taskSvc from '@/lib/services/taskTracking';
 import type { TaskItem, TaskStatus, LinkedItem } from '@/lib/services/taskTracking';
 import { generateLocalId } from '@/lib/generateId';
@@ -167,8 +167,9 @@ export const useTaskTrackingStore = create<TaskTrackingState>()(persist((set) =>
     const now = new Date().toISOString();
     const newTask: TaskItem = { id, ...task, createdAt: now, updatedAt: now };
     set(s => ({ tasks: [newTask, ...s.tasks] }));
-    if (isBackendEnabled && tenantId) {
-      taskSvc.createTask(tenantId, task).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      taskSvc.createTask(tid, task).then(dbRow => {
         if (dbRow) set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, id: dbRow.id } : t) }));
       }).catch(err => {
         console.error('[syncWrite] createTask failed:', err);

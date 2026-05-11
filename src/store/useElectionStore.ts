@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as electionsSvc from '@/lib/services/elections';
 import { generateLocalId } from '@/lib/generateId';
 
@@ -328,8 +328,9 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
       comments: [], resolution: null, linkedCaseId: null,
     };
     set(s => ({ elections: [election, ...s.elections] }));
-    if (isBackendEnabled && tenantId) {
-      electionsSvc.createElection(tenantId, election).then(dbId => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      electionsSvc.createElection(tid, election).then(dbId => {
         if (dbId) set(s => ({ elections: s.elections.map(x => x.id === id ? { ...x, id: dbId } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createElection failed:', err);

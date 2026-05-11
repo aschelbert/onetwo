@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as logSvc from '@/lib/services/propertyLog';
 import type { PropertyLogEntry } from '@/lib/services/propertyLog';
 import { generateLocalId } from '@/lib/generateId';
@@ -40,8 +40,9 @@ export const usePropertyLogStore = create<PropertyLogState>()(persist((set) => (
   addLog: (log, tenantId?) => {
     const id = generateLocalId('pl');
     set(s => ({ logs: [{ id, ...log }, ...s.logs] }));
-    if (isBackendEnabled && tenantId) {
-      logSvc.createLog(tenantId, log).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      logSvc.createLog(tid, log).then(dbRow => {
         if (dbRow) set(s => ({ logs: s.logs.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createLog failed:', err);

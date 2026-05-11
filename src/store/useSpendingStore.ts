@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as spendingSvc from '@/lib/services/spending';
 import type { SpendingApproval } from '@/lib/services/spending';
 import { generateLocalId } from '@/lib/generateId';
@@ -61,8 +61,9 @@ export const useSpendingStore = create<SpendingState>()(persist((set) => ({
   addApproval: (a, tenantId?) => {
     const id = generateLocalId('sa');
     set(s => ({ approvals: [{ id, ...a }, ...s.approvals] }));
-    if (isBackendEnabled && tenantId) {
-      spendingSvc.createApproval(tenantId, a).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      spendingSvc.createApproval(tid, a).then(dbRow => {
         if (dbRow) set(s => ({ approvals: s.approvals.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createApproval failed:', err);

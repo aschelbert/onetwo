@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as announcementsSvc from '@/lib/services/announcements';
 import * as communicationsSvc from '@/lib/services/communications';
 import * as complianceSvc from '@/lib/services/compliance';
@@ -126,15 +126,17 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
 
   toggleItem: (id, tenantId?) => {
     set(s => ({ completions: { ...s.completions, [id]: !s.completions[id] } }));
-    if (isBackendEnabled && tenantId) {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
       const val = useComplianceStore.getState().completions[id];
-      complianceSvc.upsertCompletion(tenantId, id, val);
+      complianceSvc.upsertCompletion(tid, id, val);
     }
   },
   setCompletion: (id, val, tenantId?) => {
     set(s => ({ completions: { ...s.completions, [id]: val } }));
-    if (isBackendEnabled && tenantId) {
-      complianceSvc.upsertCompletion(tenantId, id, val);
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      complianceSvc.upsertCompletion(tid, id, val);
     }
   },
 
@@ -142,16 +144,18 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     set(s => ({
       itemAttachments: { ...s.itemAttachments, [itemId]: [...(s.itemAttachments[itemId] || []), att] }
     }));
-    if (isBackendEnabled && tenantId) {
-      complianceSvc.createItemAttachment(tenantId, itemId, att);
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      complianceSvc.createItemAttachment(tid, itemId, att);
     }
   },
   removeItemAttachment: (itemId, attName, tenantId?) => {
     set(s => ({
       itemAttachments: { ...s.itemAttachments, [itemId]: (s.itemAttachments[itemId] || []).filter(a => a.name !== attName) }
     }));
-    if (isBackendEnabled && tenantId) {
-      complianceSvc.deleteItemAttachment(tenantId, itemId, attName);
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      complianceSvc.deleteItemAttachment(tid, itemId, attName);
     }
   },
 
@@ -159,8 +163,9 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     const id = generateLocalId('rf');
     const filing: RegulatoryFiling = { id, status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f };
     set(s => ({ filings: [...s.filings, filing] }));
-    if (isBackendEnabled && tenantId) {
-      complianceSvc.createFiling(tenantId, filing).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      complianceSvc.createFiling(tid, filing).then(dbRow => {
         if (dbRow) set(s => ({ filings: s.filings.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createFiling failed:', err);
@@ -188,8 +193,9 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   addCommunication: (c, tenantId?) => {
     const id = generateLocalId('oc');
     set(s => ({ communications: [{ id, ...c }, ...s.communications] }));
-    if (isBackendEnabled && tenantId) {
-      communicationsSvc.createCommunication(tenantId, c).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      communicationsSvc.createCommunication(tid, c).then(dbRow => {
         if (dbRow) set(s => ({ communications: s.communications.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createCommunication failed:', err);
@@ -205,8 +211,9 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   addAnnouncement: (a, tenantId?) => {
     const id = generateLocalId('ann');
     set(s => ({ announcements: [{ id, ...a }, ...(s.announcements || [])] }));
-    if (isBackendEnabled && tenantId) {
-      announcementsSvc.createAnnouncement(tenantId, a).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      announcementsSvc.createAnnouncement(tid, a).then(dbRow => {
         if (dbRow) set(s => ({ announcements: (s.announcements || []).map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createAnnouncement failed:', err);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { isBackendEnabled } from '@/lib/supabase';
+import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as reportsSvc from '@/lib/services/reports';
 import type { ReportConfig, GeneratedReport, ReportCategory, ReportType } from '@/lib/services/reports';
 import { generateLocalId } from '@/lib/generateId';
@@ -47,8 +47,9 @@ export const useReportStore = create<ReportState>()(persist((set) => ({
   addConfig: (config, tenantId?) => {
     const id = generateLocalId('rc');
     set(s => ({ configs: [{ id, ...config }, ...s.configs] }));
-    if (isBackendEnabled && tenantId) {
-      reportsSvc.createConfig(tenantId, config).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      reportsSvc.createConfig(tid, config).then(dbRow => {
         if (dbRow) set(s => ({ configs: s.configs.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createConfig failed:', err);
@@ -70,8 +71,9 @@ export const useReportStore = create<ReportState>()(persist((set) => ({
   addReport: (report, tenantId?) => {
     const id = generateLocalId('rpt');
     set(s => ({ reports: [{ id, ...report }, ...s.reports] }));
-    if (isBackendEnabled && tenantId) {
-      reportsSvc.createReport(tenantId, report).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      reportsSvc.createReport(tid, report).then(dbRow => {
         if (dbRow) set(s => ({ reports: s.reports.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createReport failed:', err);

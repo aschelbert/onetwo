@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useFinancialStore } from './useFinancialStore';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as payrollSvc from '@/lib/services/payroll';
 import { generateLocalId } from '@/lib/generateId';
 
@@ -154,8 +154,9 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   addStaff: (s, tenantId?) => {
     const id = generateLocalId('staff');
     set(st => ({ staff: [...st.staff, { id, ...s }] }));
-    if (isBackendEnabled && tenantId) {
-      payrollSvc.createStaff(tenantId, s).then(dbRow => {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      payrollSvc.createStaff(tid, s).then(dbRow => {
         if (dbRow) set(st => ({ staff: st.staff.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createStaff failed:', err);
@@ -183,9 +184,10 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   addTimeEntry: (e, tenantId?) => {
     const id = generateLocalId('te');
     set(st => ({ timeEntries: [...st.timeEntries, { id, ...e }] }));
-    if (isBackendEnabled && tenantId) {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
       // staffId in the entry is the local id; for DB we need to pass it through
-      payrollSvc.createTimeEntry(tenantId, e.staffId, { date: e.date, hours: e.hours, description: e.description }).then(dbRow => {
+      payrollSvc.createTimeEntry(tid, e.staffId, { date: e.date, hours: e.hours, description: e.description }).then(dbRow => {
         if (dbRow) set(st => ({ timeEntries: st.timeEntries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createTimeEntry failed:', err);
@@ -238,9 +240,10 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
     };
     set(st => ({ payRuns: [...st.payRuns, pr] }));
 
-    if (isBackendEnabled && tenantId) {
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
       const { id: _id, ...rest } = pr;
-      payrollSvc.createPayRun(tenantId, rest).then(dbRow => {
+      payrollSvc.createPayRun(tid, rest).then(dbRow => {
         if (dbRow) set(st => ({ payRuns: st.payRuns.map(p => p.id === localId ? { ...p, id: dbRow.id } : p) }));
       }).catch(err => {
         console.error('[syncWrite] createPayRun failed:', err);
@@ -410,9 +413,10 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
         sentDate: null,
       };
       set(st => ({ form1099s: [...st.form1099s, newForm] }));
-      if (isBackendEnabled && tenantId) {
+      const tid = tenantId || getActiveTenantId();
+      if (isBackendEnabled && tid) {
         const { id: _id, ...rest } = newForm;
-        payrollSvc.createForm1099(tenantId, rest).then(dbRow => {
+        payrollSvc.createForm1099(tid, rest).then(dbRow => {
           if (dbRow) set(st => ({ form1099s: st.form1099s.map(f => f.id === localId ? { ...f, id: dbRow.id } : f) }));
         }).catch(err => {
           console.error('[syncWrite] createForm1099 failed:', err);
