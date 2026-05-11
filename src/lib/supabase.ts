@@ -27,9 +27,21 @@ let _activeTenantId: string | null = null;
 export function setActiveTenantId(id: string | null) { _activeTenantId = id; }
 export function getActiveTenantId(): string | null { return _activeTenantId; }
 
+/** Recent errors ring buffer for sync status indicator (P1-2). */
+interface DbError { label: string; error: unknown; ts: number }
+const _recentErrors: DbError[] = [];
+const MAX_RECENT_ERRORS = 20;
+
 /** Log a Supabase error, suppressing "table not found" (PGRST205) noise. */
 export function logDbError(label: string, error: unknown): void {
   if (error && typeof error === 'object' && (error as any).code === 'PGRST205') return;
   console.error(label, error);
+  _recentErrors.push({ label, error, ts: Date.now() });
+  if (_recentErrors.length > MAX_RECENT_ERRORS) _recentErrors.shift();
+}
+
+/** Return the last N logged DB errors (for sync status UI). */
+export function getRecentDbErrors(): readonly DbError[] {
+  return _recentErrors;
 }
 

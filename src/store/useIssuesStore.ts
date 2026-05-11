@@ -5,6 +5,7 @@ import * as issuesSvc from '@/lib/services/issues';
 import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
 import { ANNUAL_BUDGET_FINANCIALS } from '@/features/issues/components/shell/budgetData';
+import { generateLocalId } from '@/lib/generateId';
 
 // ─── Situation Templates ───────────────────────────────────
 export interface StepAction {
@@ -2518,6 +2519,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled && tid) {
       issuesSvc.createIssue(tid, issue, localId).then(dbId => {
         if (dbId) set(s => ({ issues: s.issues.map(i => i.id === localId ? { ...i, id: dbId } : i) }));
+      }).catch(err => {
+        console.error('[syncWrite] createIssue failed:', err);
+        set(s => ({ issues: s.issues.filter(x => x.id !== localId) }));
       });
     }
   },
@@ -2568,7 +2572,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   addIssueComment: (issueId, author, text) => {
-    const localId = 'cmt-' + Date.now();
+    const localId = generateLocalId('cmt-');
     const date = new Date().toISOString().split('T')[0];
     set(s => ({
       issues: s.issues.map(i => i.id === issueId ? {
@@ -2627,7 +2631,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
       status: 'open', created: today,
       steps, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
-      conflictChecks: [], decisionTrail: [{ id: 'te' + Date.now(), type: 'case_created', date: today, actor: 'Board', summary: `Case created: ${data.title}` }],
+      conflictChecks: [], decisionTrail: [{ id: generateLocalId('te'), type: 'case_created', date: today, actor: 'Board', summary: `Case created: ${data.title}` }],
       ...(data.assignedTo && { assignedTo: data.assignedTo }),
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
@@ -2657,7 +2661,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
           doneDate: !wasDone ? today : null
         };
         if (!wasDone) {
-          const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'step_completed', date: today, actor: 'Board', summary: `Step completed: ${steps[stepIdx].s}` };
+          const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor: 'Board', summary: `Step completed: ${steps[stepIdx].s}` };
           return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
         }
         return { ...c, steps };
@@ -2677,7 +2681,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         if (c.id !== caseId || !c.steps) return c;
         const steps = [...c.steps];
         steps[stepIdx] = { ...steps[stepIdx], userNotes: note };
-        const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'note_added', date: today, actor: 'Board', summary: `Note added to step: ${steps[stepIdx].s}` };
+        const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'note_added', date: today, actor: 'Board', summary: `Note added to step: ${steps[stepIdx].s}` };
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
@@ -2752,7 +2756,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         step.doneDate = allDone ? today : null;
         steps[stepIdx] = step;
         if (!allDone) return { ...c, steps };
-        const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'step_completed' as const, date: today, actor: 'Board', summary: `Step completed: ${step.s}` };
+        const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed' as const, date: today, actor: 'Board', summary: `Step completed: ${step.s}` };
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
@@ -2778,7 +2782,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   attachCheckDocument: (caseId, stepIdx, checkId, attachment) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: today, actor: 'Board', summary: `Check document attached: ${attachment.name} (${attachment.source})` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'document_attached', date: today, actor: 'Board', summary: `Check document attached: ${attachment.name} (${attachment.source})` };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps) return c;
@@ -2799,7 +2803,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   putOnHold: (caseId, reason) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_held', date: today, actor: 'Board', summary: `Case put on hold: ${reason}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_held', date: today, actor: 'Board', summary: `Case put on hold: ${reason}` };
     set(s => ({
       cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'on-hold' as const, holdReason: reason, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
@@ -2808,7 +2812,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   resumeCase: (caseId) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_resumed', date: today, actor: 'Board', summary: 'Case resumed from hold' };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_resumed', date: today, actor: 'Board', summary: 'Case resumed from hold' };
     set(s => ({
       cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'open' as const, holdReason: undefined, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
@@ -2817,7 +2821,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   closeCaseWithReason: (caseId, reason, notes) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'case_closed', date: today, actor: 'Board', summary: `Case closed: ${reason}`, details: notes };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_closed', date: today, actor: 'Board', summary: `Case closed: ${reason}`, details: notes };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
@@ -2868,7 +2872,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
           }));
         }
         const newApproach = { approach, addedDate: today, steps };
-        const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
+        const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
         return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
@@ -2957,7 +2961,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     const boardVotes = { motion, date, votes };
     const approves = votes.filter(v => v.vote === 'approve').length;
     const denies = votes.filter(v => v.vote === 'deny').length;
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'board_vote', date, actor: 'Board', summary: `Board vote: ${approves} approve, ${denies} deny — "${motion}"` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'board_vote', date, actor: 'Board', summary: `Board vote: ${approves} approve, ${denies} deny — "${motion}"` };
     set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, boardVotes, decisionTrail: [...(c.decisionTrail || []), trail] } : c) }));
     if (isBackendEnabled) casesSvc.updateCase(caseId, { boardVotes });
   },
@@ -2968,14 +2972,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   },
 
   addDocument: (caseId, doc) => {
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Document attached: ${doc.name}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Document attached: ${doc.name}` };
     set(s => ({
       cases: s.cases.map(c => c.id === caseId ? { ...c, attachments: [...c.attachments, doc], decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
   },
 
   addStepDocument: (caseId, stepIdx, doc) => {
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Step document attached: ${doc.name}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'document_attached', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Step document attached: ${doc.name}` };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps) return c;
@@ -2998,7 +3002,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   addComm: (caseId, comm) => set(s => {
     const id = `cm${s.nextCommNum}`;
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'communication_sent', date: comm.date || new Date().toISOString().split('T')[0], actor: comm.sentBy || 'Board', summary: `Communication sent: ${comm.subject}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'communication_sent', date: comm.date || new Date().toISOString().split('T')[0], actor: comm.sentBy || 'Board', summary: `Communication sent: ${comm.subject}` };
     return {
       cases: s.cases.map(c => c.id === caseId ? { ...c, comms: [...c.comms, { ...comm, id }], decisionTrail: [...(c.decisionTrail || []), trail] } : c),
       nextCommNum: s.nextCommNum + 1
@@ -3015,7 +3019,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   })),
 
   linkWO: (caseId, woId) => {
-    const trail: DecisionTrailEntry = { id: 'te' + Date.now(), type: 'work_order_linked', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Work order linked: ${woId}`, linkedEntityType: 'work_order', linkedEntityId: woId };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'work_order_linked', date: new Date().toISOString().split('T')[0], actor: 'Board', summary: `Work order linked: ${woId}`, linkedEntityType: 'work_order', linkedEntityId: woId };
     set(s => ({ cases: s.cases.map(c => c.id === caseId ? { ...c, linkedWOs: [...c.linkedWOs, woId], decisionTrail: [...(c.decisionTrail || []), trail] } : c) }));
     if (isBackendEnabled) {
       const c = get().cases.find(x => x.id === caseId);
@@ -3096,7 +3100,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         const steps = [...c.steps];
         steps[stepIdx] = { ...steps[stepIdx], spendingDecision: decision };
         const trail: DecisionTrailEntry = {
-          id: 'te' + Date.now(), type: 'spending_decision', date: today,
+          id: generateLocalId('te'), type: 'spending_decision', date: today,
           actor: decision.recordedBy, summary: `Spending decision: $${decision.amount.toLocaleString()} from ${decision.fundingSource}`,
           details: decision.rationale,
         };
@@ -3119,7 +3123,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   addBid: (caseId, stepIdx, bid) => {
     const today = new Date().toISOString().split('T')[0];
-    const bidId = 'bid' + Date.now();
+    const bidId = generateLocalId('bid');
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps) return c;
@@ -3128,7 +3132,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         if (!bc) return c;
         steps[stepIdx] = { ...steps[stepIdx], bidCollection: { ...bc, bids: [...bc.bids, { ...bid, id: bidId }] } };
         const trail: DecisionTrailEntry = {
-          id: 'te' + Date.now(), type: 'bid_uploaded', date: today,
+          id: generateLocalId('te'), type: 'bid_uploaded', date: today,
           actor: 'Board', summary: `Bid received from ${bid.vendorName}: $${bid.amount.toLocaleString()}`,
           linkedEntityType: 'bid', linkedEntityId: bidId,
         };
@@ -3161,7 +3165,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         const selectedBid = bc.bids.find(b => b.id === bidId);
         steps[stepIdx] = { ...steps[stepIdx], bidCollection: { ...bc, selectedBidId: bidId, selectionRationale: rationale, completedDate: today } };
         const trail: DecisionTrailEntry = {
-          id: 'te' + Date.now(), type: 'bid_selected', date: today,
+          id: generateLocalId('te'), type: 'bid_selected', date: today,
           actor: 'Board', summary: `Bid selected: ${selectedBid?.vendorName || 'Unknown'} ($${selectedBid?.amount.toLocaleString() || '0'})`,
           details: rationale, linkedEntityType: 'bid', linkedEntityId: bidId,
         };
@@ -3172,14 +3176,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   // ─── Fiduciary: Conflict Checks ─────────────────────────
   addConflictCheck: (caseId, check) => {
-    const checkId = 'cc' + Date.now();
+    const checkId = generateLocalId('cc');
     const today = new Date().toISOString().split('T')[0];
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
         const newCheck = { ...check, id: checkId };
         const trail: DecisionTrailEntry = {
-          id: 'te' + Date.now(), type: 'conflict_check', date: today,
+          id: generateLocalId('te'), type: 'conflict_check', date: today,
           actor: 'Board', summary: 'Conflict of interest check initiated',
           linkedEntityType: 'conflict_check', linkedEntityId: checkId,
         };
@@ -3212,7 +3216,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
-        return { ...c, decisionTrail: [...(c.decisionTrail || []), { ...entry, id: 'te' + Date.now() }] };
+        return { ...c, decisionTrail: [...(c.decisionTrail || []), { ...entry, id: generateLocalId('te') }] };
       })
     }));
   },

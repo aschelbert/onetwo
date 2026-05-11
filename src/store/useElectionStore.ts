@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as electionsSvc from '@/lib/services/elections';
+import { generateLocalId } from '@/lib/generateId';
 
 // ─── Types ───
 
@@ -166,7 +167,7 @@ interface ElectionState {
   } | null;
 }
 
-const tlId = () => 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+const tlId = () => generateLocalId('tl_');
 
 // Helper: sync election updates to DB
 function syncElection(id: string, updates: Partial<Election>) {
@@ -319,7 +320,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
   },
 
   addElection: (e, tenantId?) => {
-    const id = 'elec_' + Date.now();
+    const id = generateLocalId('elec_');
     const now = new Date().toISOString();
     const election: Election = {
       ...e, id, createdAt: now, ballots: [],
@@ -330,6 +331,9 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
     if (isBackendEnabled && tenantId) {
       electionsSvc.createElection(tenantId, election).then(dbId => {
         if (dbId) set(s => ({ elections: s.elections.map(x => x.id === id ? { ...x, id: dbId } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createElection failed:', err);
+        set(s => ({ elections: s.elections.filter(x => x.id !== id) }));
       });
     }
   },
@@ -385,7 +389,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
 
   addBallotItem: (electionId, item) => set(s => ({
     elections: s.elections.map(e => e.id === electionId
-      ? { ...e, ballotItems: [...e.ballotItems, { ...item, id: 'bi_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), attachments: [] }] }
+      ? { ...e, ballotItems: [...e.ballotItems, { ...item, id: generateLocalId('bi_'), attachments: [] }] }
       : e),
   })),
 
@@ -404,7 +408,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
   addBallotAttachment: (electionId, itemId, att) => set(s => ({
     elections: s.elections.map(e => e.id === electionId ? {
       ...e,
-      ballotItems: e.ballotItems.map(i => i.id === itemId ? { ...i, attachments: [...i.attachments, { ...att, id: 'att_' + Date.now() }] } : i),
+      ballotItems: e.ballotItems.map(i => i.id === itemId ? { ...i, attachments: [...i.attachments, { ...att, id: generateLocalId('att_') }] } : i),
       timeline: [...e.timeline, { id: tlId(), type: 'document_added' as const, description: `Document "${att.name}" attached to "${e.ballotItems.find(x => x.id === itemId)?.title || ''}"`, date: new Date().toISOString(), actor: att.uploadedBy }],
     } : e),
   })),
@@ -417,7 +421,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
 
   recordBallot: (electionId, ballot, actor) => {
     const now = new Date().toISOString();
-    const newBallot = { ...ballot, id: 'bal_' + Date.now(), recordedAt: now };
+    const newBallot = { ...ballot, id: generateLocalId('bal_'), recordedAt: now };
     const desc = ballot.isProxy
       ? `Proxy vote recorded: Unit ${ballot.unitNumber} (by ${ballot.proxyVoterName || actor})`
       : `Ballot recorded: Unit ${ballot.unitNumber} via ${ballot.method}`;
@@ -446,7 +450,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
 
   addComment: (electionId, comment) => {
     const now = new Date().toISOString();
-    const newComment = { ...comment, id: 'vc_' + Date.now(), createdAt: now };
+    const newComment = { ...comment, id: generateLocalId('vc_'), createdAt: now };
     const tlEvent = { id: tlId(), type: 'comment' as const, description: `Comment by Unit ${comment.unitNumber}`, date: now, actor: comment.owner };
     set(s => ({
       elections: s.elections.map(e => e.id === electionId ? {
@@ -489,7 +493,7 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
   },
 
   setResolution: (electionId, resolution) => {
-    const full = { ...resolution, id: 'res_' + Date.now() };
+    const full = { ...resolution, id: generateLocalId('res_') };
     set(s => ({
       elections: s.elections.map(e => e.id === electionId
         ? { ...e, resolution: full }

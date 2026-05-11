@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { useFinancialStore } from './useFinancialStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as payrollSvc from '@/lib/services/payroll';
+import { generateLocalId } from '@/lib/generateId';
 
 /* ── Types ─────────────────────────────────────────────────── */
 
@@ -151,11 +152,14 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   /* ── Staff ─────────────────────────── */
 
   addStaff: (s, tenantId?) => {
-    const id = 'staff' + Date.now();
+    const id = generateLocalId('staff');
     set(st => ({ staff: [...st.staff, { id, ...s }] }));
     if (isBackendEnabled && tenantId) {
       payrollSvc.createStaff(tenantId, s).then(dbRow => {
         if (dbRow) set(st => ({ staff: st.staff.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createStaff failed:', err);
+        set(st => ({ staff: st.staff.filter(x => x.id !== id) }));
       });
     }
   },
@@ -177,12 +181,15 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   /* ── Time entries ──────────────────── */
 
   addTimeEntry: (e, tenantId?) => {
-    const id = 'te' + Date.now();
+    const id = generateLocalId('te');
     set(st => ({ timeEntries: [...st.timeEntries, { id, ...e }] }));
     if (isBackendEnabled && tenantId) {
       // staffId in the entry is the local id; for DB we need to pass it through
       payrollSvc.createTimeEntry(tenantId, e.staffId, { date: e.date, hours: e.hours, description: e.description }).then(dbRow => {
         if (dbRow) set(st => ({ timeEntries: st.timeEntries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createTimeEntry failed:', err);
+        set(st => ({ timeEntries: st.timeEntries.filter(x => x.id !== id) }));
       });
     }
   },
@@ -211,7 +218,7 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
     const deductions = Math.round(grossPay * withholdingPct / 100 * 100) / 100;
     const netPay = Math.round((grossPay - deductions) * 100) / 100;
 
-    const localId = 'pr' + Date.now();
+    const localId = generateLocalId('pr');
     const pr: PayRun = {
       id: localId,
       staffId,
@@ -235,6 +242,9 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       const { id: _id, ...rest } = pr;
       payrollSvc.createPayRun(tenantId, rest).then(dbRow => {
         if (dbRow) set(st => ({ payRuns: st.payRuns.map(p => p.id === localId ? { ...p, id: dbRow.id } : p) }));
+      }).catch(err => {
+        console.error('[syncWrite] createPayRun failed:', err);
+        set(st => ({ payRuns: st.payRuns.filter(x => x.id !== localId) }));
       });
     }
 
@@ -389,7 +399,7 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       }));
       if (isBackendEnabled) payrollSvc.updateForm1099(existing.id, updates);
     } else {
-      const localId = '1099-' + Date.now();
+      const localId = generateLocalId('1099-');
       const newForm: Form1099 = {
         id: localId,
         staffId,
@@ -404,6 +414,9 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
         const { id: _id, ...rest } = newForm;
         payrollSvc.createForm1099(tenantId, rest).then(dbRow => {
           if (dbRow) set(st => ({ form1099s: st.form1099s.map(f => f.id === localId ? { ...f, id: dbRow.id } : f) }));
+        }).catch(err => {
+          console.error('[syncWrite] createForm1099 failed:', err);
+          set(st => ({ form1099s: st.form1099s.filter(x => x.id !== localId) }));
         });
       }
     }

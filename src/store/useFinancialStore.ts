@@ -7,6 +7,7 @@ import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } fr
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { generateLocalId } from '@/lib/generateId';
 
 // ─── GL Filter state ─────────────────────────────────
 interface GLFilter {
@@ -153,13 +154,13 @@ function syncUnit(unitNum: string) {
   const s = useFinancialStore.getState();
   if (!s.tenantId) return;
   const u = s.units.find(x => x.number === unitNum);
-  if (u) financialSvc.upsertUnit(s.tenantId, u);
+  if (u) financialSvc.upsertUnit(s.tenantId, u).catch(err => console.error('[syncWrite] upsertUnit failed:', err));
 }
 
 function syncBudgetCategory(id: string) {
   if (!isBackendEnabled) return;
   const cat = useFinancialStore.getState().budgetCategories.find(x => x.id === id);
-  if (cat) financialSvc.updateBudgetCategory(id, cat);
+  if (cat) financialSvc.updateBudgetCategory(id, cat).catch(err => console.error('[syncWrite] updateBudgetCategory failed:', err));
 }
 
 function syncWorkOrder(localId: string) {
@@ -167,7 +168,7 @@ function syncWorkOrder(localId: string) {
   const s = useFinancialStore.getState();
   if (!s.tenantId) return;
   const wo = s.workOrders.find(x => x.id === localId);
-  if (wo) financialSvc.updateWorkOrderByLocalId(s.tenantId, localId, wo);
+  if (wo) financialSvc.updateWorkOrderByLocalId(s.tenantId, localId, wo).catch(err => console.error('[syncWrite] updateWorkOrder failed:', err));
 }
 
 function syncSettings() {
@@ -183,7 +184,7 @@ function syncSettings() {
     lateFeeEnabled: s.lateFeeEnabled,
     lateFeeAmount: s.lateFeeAmount,
     lateFeeGraceDays: s.lateFeeGraceDays,
-  });
+  }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
 
 export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
@@ -503,12 +504,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   // ─── Mutations ─────────────────────────────────────
   addBudgetCategory: (name, budgeted) => {
-    const id = 'cat' + Date.now();
+    const id = generateLocalId('cat');
     const cat: BudgetCategory = { id, name, budgeted, expenses: [] };
     set((s) => ({ budgetCategories: [...s.budgetCategories, cat] }));
     if (isBackendEnabled && get().tenantId) {
       financialSvc.createBudgetCategory(get().tenantId!, cat).then(dbRow => {
         if (dbRow) set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createBudgetCategory failed:', err);
+        set(s => ({ budgetCategories: s.budgetCategories.filter(x => x.id !== id) }));
       });
     }
   },
@@ -547,7 +551,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set((s) => ({
       budgetCategories: s.budgetCategories.map((c) =>
         c.id === categoryId
-          ? { ...c, expenses: [...c.expenses, { id: 'exp' + Date.now(), ...expense }].sort((a, b) => b.date.localeCompare(a.date)) }
+          ? { ...c, expenses: [...c.expenses, { id: generateLocalId('exp'), ...expense }].sort((a, b) => b.date.localeCompare(a.date)) }
           : c
       ),
     }));
@@ -564,12 +568,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   addReserveItem: (item) => {
-    const id = 'res' + Date.now();
+    const id = generateLocalId('res');
     const newItem: ReserveItem = { id, ...item };
     set((s) => ({ reserveItems: [...s.reserveItems, newItem] }));
     if (isBackendEnabled && get().tenantId) {
       financialSvc.createReserveItem(get().tenantId!, newItem).then(dbRow => {
         if (dbRow) set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createReserveItem failed:', err);
+        set(s => ({ reserveItems: s.reserveItems.filter(x => x.id !== id) }));
       });
     }
   },
@@ -748,7 +755,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   addSpecialAssessment: (unitNum, amount, reason) => {
     const today = new Date().toISOString().split('T')[0];
-    const id = 'sa-' + Date.now();
+    const id = generateLocalId('sa-');
     const m = get().glAccountMapping;
     get().glPost(today, `Special assessment - Unit ${unitNum}: ${reason}`, m.specialAssessmentsReceivable, m.specialAssessmentRevenue, amount, 'assessment', unitNum);
     set(s => ({
@@ -874,7 +881,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const tenantId = get().tenantId;
     if (!tenantId) {
       // Offline: create a local-only event
-      const local: MoveEvent = { ...event, id: 'mv-' + Date.now(), createdAt: new Date().toISOString() };
+      const local: MoveEvent = { ...event, id: generateLocalId('mv-'), createdAt: new Date().toISOString() };
       set(s => ({ moveEvents: [local, ...s.moveEvents] }));
       return local;
     }
@@ -891,7 +898,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   createUnitInvoice: (unitNum, type, amount, description, caseId?) => {
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const id = 'INV-U' + Date.now().toString(36).toUpperCase();
+    const id = generateLocalId('INV-U');
     const m = get().glAccountMapping;
     const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type, m);
     const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
@@ -906,6 +913,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (isBackendEnabled && get().tenantId) {
       financialSvc.createUnitInvoice(get().tenantId!, invoice).then(dbRow => {
         if (dbRow) set(s => ({ unitInvoices: s.unitInvoices.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createUnitInvoice failed:', err);
+        set(s => ({ unitInvoices: s.unitInvoices.filter(x => x.id !== id) }));
       });
     }
     return invoice;

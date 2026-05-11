@@ -161,6 +161,9 @@ export const useArchiveStore = create<ArchiveState>()(persist((set) => ({
     if (isBackendEnabled && tenantId) {
       archivesSvc.createArchive(tenantId, a).then(dbRow => {
         if (dbRow) set(s => ({ archives: s.archives.map(x => x.id === a.id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createArchive failed:', err);
+        set(s => ({ archives: s.archives.filter(x => x.id !== a.id) }));
       });
     }
   },

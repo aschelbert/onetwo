@@ -11,6 +11,7 @@ import type { MailDeliveryMethod } from '@/types/mail';
 import { PRICING, calculateMailingCost } from '@/types/mail';
 import { useComplianceStore } from './useComplianceStore';
 import { useIssuesStore } from './useIssuesStore';
+import { generateLocalId } from '@/lib/generateId';
 
 interface CommunicationsState {
   communications: Communication[];
@@ -163,7 +164,7 @@ export const useCommunicationsStore = create<CommunicationsState>()(persist((set
   },
 
   sendCommunication: (params) => {
-    const id = 'comm_' + Date.now();
+    const id = generateLocalId('comm_');
     const now = new Date().toISOString().split('T')[0];
 
     // Calculate mail cost

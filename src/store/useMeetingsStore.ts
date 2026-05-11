@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as meetingsSvc from '@/lib/services/meetings';
+import { generateLocalId } from '@/lib/generateId';
 
 export interface MeetingDocument {
   id: string; name: string; size: string; type: string; uploadedAt: string; uploadedBy: string;
@@ -69,12 +70,15 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
   },
 
   addMeeting: (m, tenantId?) => {
-    const id = 'mtg' + Date.now();
+    const id = generateLocalId('mtg');
     const meeting: Meeting = { id, title: m.title, type: m.type, status: m.status, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda, notes: m.notes, votes: [], minutes: '', attendees: m.attendees || { board: [], owners: [], guests: [] }, linkedCaseIds: [], linkedVoteIds: [], documents: [], minutesApprovals: [] };
     set(s => ({ meetings: [...s.meetings, meeting] }));
     if (isBackendEnabled && tenantId) {
       meetingsSvc.createMeeting(tenantId, meeting).then(dbRow => {
         if (dbRow) set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createMeeting failed:', err);
+        set(s => ({ meetings: s.meetings.filter(x => x.id !== id) }));
       });
     }
   },
@@ -82,13 +86,13 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
   deleteMeeting: (id) => { set(s => ({ meetings: s.meetings.filter(x => x.id !== id) })); if (isBackendEnabled) meetingsSvc.deleteMeeting(id); },
   updateAttendees: (id, attendees) => { set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, attendees } : x) })); syncMeeting(id); },
   updateMinutes: (id, minutes) => { set(s => ({ meetings: s.meetings.map(x => x.id === id ? { ...x, minutes, minutesApprovals: [] } : x) })); syncMeeting(id); },
-  addVote: (meetingId, vote) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, votes: [...x.votes, { id: 'v' + Date.now(), ...vote }] } : x) })); syncMeeting(meetingId); },
+  addVote: (meetingId, vote) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, votes: [...x.votes, { id: generateLocalId('v'), ...vote }] } : x) })); syncMeeting(meetingId); },
   deleteVote: (meetingId, voteId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, votes: x.votes.filter(v => v.id !== voteId) } : x) })); syncMeeting(meetingId); },
   linkCase: (meetingId, caseId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, linkedCaseIds: [...new Set([...x.linkedCaseIds, caseId])] } : x) })); syncMeeting(meetingId); },
   unlinkCase: (meetingId, caseId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, linkedCaseIds: x.linkedCaseIds.filter(c => c !== caseId) } : x) })); syncMeeting(meetingId); },
   linkVote: (meetingId, voteId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, linkedVoteIds: [...new Set([...(x.linkedVoteIds || []), voteId])] } : x) })); syncMeeting(meetingId); },
   unlinkVote: (meetingId, voteId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, linkedVoteIds: (x.linkedVoteIds || []).filter(v => v !== voteId) } : x) })); syncMeeting(meetingId); },
-  addDocument: (meetingId, doc) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, documents: [...(x.documents || []), { id: 'doc_' + Date.now(), ...doc }] } : x) })); syncMeeting(meetingId); },
+  addDocument: (meetingId, doc) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, documents: [...(x.documents || []), { id: generateLocalId('doc_'), ...doc }] } : x) })); syncMeeting(meetingId); },
   removeDocument: (meetingId, docId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, documents: (x.documents || []).filter(d => d.id !== docId) } : x) })); syncMeeting(meetingId); },
   approveMinutes: (meetingId, approval) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovals: [...(x.minutesApprovals || []).filter(a => a.name !== approval.name), approval] } : x) })); syncMeeting(meetingId); },
   revokeMinutesApproval: (meetingId, name) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovals: (x.minutesApprovals || []).filter(a => a.name !== name) } : x) })); syncMeeting(meetingId); },

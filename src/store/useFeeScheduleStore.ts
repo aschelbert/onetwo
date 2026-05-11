@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { generateLocalId } from '@/lib/generateId';
 
 // ─── Types ──────────────────────────────────────
 export interface FeeScheduleItem {
@@ -240,7 +241,7 @@ export const useFeeScheduleStore = create<FeeScheduleState>()(persist((set, get)
   getFeeByName: (name) => get().fees.find(f => f.name === name),
 
   addFee: (fee) => {
-    const id = 'fee-' + Date.now();
+    const id = generateLocalId('fee-');
     set(s => ({
       fees: [...s.fees, { ...fee, id, isDefault: false }],
     }));

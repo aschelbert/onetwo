@@ -141,10 +141,22 @@ ${getContext()}`;
     setLoading(false);
   };
 
-  const renderMarkdown = (text: string) => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br>');
+  /** Render bold + newlines safely via React elements (no HTML injection). */
+  const renderMarkdown = (text: string): React.ReactNode => {
+    // Split on newlines first, then handle bold within each line
+    return text.split('\n').map((line, lineIdx, lines) => {
+      // Split on **bold** markers
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      const rendered = parts.map((part, i) =>
+        i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+      );
+      return (
+        <span key={lineIdx}>
+          {rendered}
+          {lineIdx < lines.length - 1 && <br />}
+        </span>
+      );
+    });
   };
 
   return (
@@ -181,7 +193,7 @@ ${getContext()}`;
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`${m.role === 'user' ? 'bg-accent-600 text-white' : 'bg-ink-50 text-ink-800 border border-ink-100'} rounded-2xl ${m.role === 'user' ? 'rounded-br-md' : 'rounded-bl-md'} px-4 py-2.5 max-w-[85%] text-sm leading-relaxed`}>
-                  <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+                  <div>{renderMarkdown(m.content)}</div>
                   {m.role === 'assistant' && i > 0 && (
                     <div className="mt-2 pt-2 border-t border-ink-100 text-[10px] text-ink-400 italic">
                       ⚖ General guidance based on governing documents and applicable codes. Not legal advice — consult a licensed attorney.

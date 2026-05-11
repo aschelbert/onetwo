@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { sendInvoiceToStripe } from '@/lib/services/invoicing';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { generateLocalId } from '@/lib/generateId';
 
 export interface AmenityConfig {
   id: string;
@@ -387,7 +388,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
     const reservation: Reservation = {
       ...r,
-      id: 'res' + Date.now(),
+      id: generateLocalId('res'),
       status: needsApproval ? 'pending_approval' : 'active',
       createdAt: new Date().toISOString(),
       fee,
@@ -436,7 +437,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
   },
 
   sendNotification: (n) => {
-    const notification: AmenityNotification = { ...n, id: 'notif' + Date.now(), readBy: [] };
+    const notification: AmenityNotification = { ...n, id: generateLocalId('notif'), readBy: [] };
     set(s => ({ notifications: [notification, ...s.notifications] }));
   },
 
@@ -520,7 +521,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
   // v2: Recurring reservations
   addRecurringReservation: (base, pattern) => {
-    const groupId = 'rgrp' + Date.now();
+    const groupId = generateLocalId('rgrp');
     const dates = generateRecurringDates(base.date, pattern);
     const created: Reservation[] = [];
 
@@ -534,7 +535,7 @@ export const useAmenitiesStore = create<AmenitiesState>()(persist((set, get) => 
 
       const reservation: Reservation = {
         ...base,
-        id: 'res' + Date.now() + Math.random().toString(36).slice(2, 6),
+        id: generateLocalId('res'),
         date,
         status: needsApproval ? 'pending_approval' : 'active',
         createdAt: new Date().toISOString(),

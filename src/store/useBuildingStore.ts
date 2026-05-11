@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as buildingSvc from '@/lib/services/building';
 import * as assetsSvc from '@/lib/services/assets';
+import { generateLocalId } from '@/lib/generateId';
 
 // ─── Types ─────────────────────────────────────
 
@@ -178,37 +179,37 @@ interface BuildingState {
 function syncBoardMember(id: string) {
   if (!isBackendEnabled) return;
   const m = useBuildingStore.getState().board.find(x => x.id === id);
-  if (m) buildingSvc.updateBoardMember(id, m);
+  if (m) buildingSvc.updateBoardMember(id, m).catch(err => console.error('[syncWrite] updateBoardMember failed:', err));
 }
 function syncLegalCounsel(id: string) {
   if (!isBackendEnabled) return;
   const c = useBuildingStore.getState().legalCounsel.find(x => x.id === id);
-  if (c) buildingSvc.updateLegalCounsel(id, c);
+  if (c) buildingSvc.updateLegalCounsel(id, c).catch(err => console.error('[syncWrite] updateLegalCounsel failed:', err));
 }
 function syncLegalDocument(id: string) {
   if (!isBackendEnabled) return;
   const d = useBuildingStore.getState().legalDocuments.find(x => x.id === id);
-  if (d) buildingSvc.updateLegalDocument(id, d);
+  if (d) buildingSvc.updateLegalDocument(id, d).catch(err => console.error('[syncWrite] updateLegalDocument failed:', err));
 }
 function syncInsurance(id: string) {
   if (!isBackendEnabled) return;
   const p = useBuildingStore.getState().insurance.find(x => x.id === id);
-  if (p) buildingSvc.updateInsurancePolicy(id, p);
+  if (p) buildingSvc.updateInsurancePolicy(id, p).catch(err => console.error('[syncWrite] updateInsurancePolicy failed:', err));
 }
 function syncVendor(id: string) {
   if (!isBackendEnabled) return;
   const v = useBuildingStore.getState().vendors.find(x => x.id === id);
-  if (v) buildingSvc.updateVendor(id, v);
+  if (v) buildingSvc.updateVendor(id, v).catch(err => console.error('[syncWrite] updateVendor failed:', err));
 }
 function syncMaintenanceSchedule(id: string) {
   if (!isBackendEnabled) return;
   const m = useBuildingStore.getState().maintenanceSchedules.find(x => x.id === id);
-  if (m) buildingSvc.updateMaintenanceSchedule(id, m);
+  if (m) buildingSvc.updateMaintenanceSchedule(id, m).catch(err => console.error('[syncWrite] updateMaintenanceSchedule failed:', err));
 }
 function syncAsset(id: string) {
   if (!isBackendEnabled) return;
   const a = useBuildingStore.getState().assets.find(x => x.id === id);
-  if (a) assetsSvc.updateAsset(id, a);
+  if (a) assetsSvc.updateAsset(id, a).catch(err => console.error('[syncWrite] updateAsset failed:', err));
 }
 
 export const useBuildingStore = create<BuildingState>()(persist((set) => ({
@@ -510,11 +511,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addBoardMember: (m, tenantId?) => {
-    const id = 'bm' + Date.now();
+    const id = generateLocalId('bm');
     set(s => ({ board: [...s.board, { id, ...m }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createBoardMember(tenantId, m).then(dbRow => {
         if (dbRow) set(s => ({ board: s.board.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createBoardMember failed:', err);
+        set(s => ({ board: s.board.filter(x => x.id !== id) }));
       });
     }
   },
@@ -528,11 +532,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addLegalCounsel: (c, tenantId?) => {
-    const id = 'lc' + Date.now();
+    const id = generateLocalId('lc');
     set(s => ({ legalCounsel: [...s.legalCounsel, { id, ...c }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createLegalCounsel(tenantId, c).then(dbRow => {
         if (dbRow) set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createLegalCounsel failed:', err);
+        set(s => ({ legalCounsel: s.legalCounsel.filter(x => x.id !== id) }));
       });
     }
   },
@@ -546,11 +553,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addLegalDocument: (d, tenantId?) => {
-    const id = 'ld' + Date.now();
+    const id = generateLocalId('ld');
     set(s => ({ legalDocuments: [...s.legalDocuments, { id, ...d, attachments: [] }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createLegalDocument(tenantId, d).then(dbRow => {
         if (dbRow) set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createLegalDocument failed:', err);
+        set(s => ({ legalDocuments: s.legalDocuments.filter(x => x.id !== id) }));
       });
     }
   },
@@ -576,11 +586,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addInsurance: (p, tenantId?) => {
-    const id = 'ins' + Date.now();
+    const id = generateLocalId('ins');
     set(s => ({ insurance: [...s.insurance, { id, ...p, attachments: [] }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createInsurancePolicy(tenantId, p).then(dbRow => {
         if (dbRow) set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createInsurancePolicy failed:', err);
+        set(s => ({ insurance: s.insurance.filter(x => x.id !== id) }));
       });
     }
   },
@@ -606,11 +619,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addVendor: (v, tenantId?) => {
-    const id = 'v' + Date.now();
+    const id = generateLocalId('v');
     set(s => ({ vendors: [...s.vendors, { id, ...v }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createVendor(tenantId, v).then(dbRow => {
         if (dbRow) set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createVendor failed:', err);
+        set(s => ({ vendors: s.vendors.filter(x => x.id !== id) }));
       });
     }
   },
@@ -632,11 +648,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addMaintenanceSchedule: (m, tenantId?) => {
-    const id = 'ms' + Date.now();
+    const id = generateLocalId('ms');
     set(s => ({ maintenanceSchedules: [...s.maintenanceSchedules, { id, ...m }] }));
     if (isBackendEnabled && tenantId) {
       buildingSvc.createMaintenanceSchedule(tenantId, m).then(dbRow => {
         if (dbRow) set(s => ({ maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createMaintenanceSchedule failed:', err);
+        set(s => ({ maintenanceSchedules: s.maintenanceSchedules.filter(x => x.id !== id) }));
       });
     }
   },
@@ -650,11 +669,14 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   addAsset: (a, tenantId?) => {
-    const id = 'ast' + Date.now();
+    const id = generateLocalId('ast');
     set(s => ({ assets: [...s.assets, { id, ...a }] }));
     if (isBackendEnabled && tenantId) {
       assetsSvc.createAsset(tenantId, a).then(dbRow => {
         if (dbRow) set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createAsset failed:', err);
+        set(s => ({ assets: s.assets.filter(x => x.id !== id) }));
       });
     }
   },
@@ -673,7 +695,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     syncAsset(assetId);
   },
   addWarranty: (assetId, warranty) => {
-    const wId = 'w' + Date.now();
+    const wId = generateLocalId('w');
     set(s => ({
       assets: s.assets.map(x => x.id === assetId ? { ...x, warranties: [...x.warranties, { id: wId, ...warranty }] } : x),
     }));

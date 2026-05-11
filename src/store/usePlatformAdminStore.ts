@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as platformSvc from '@/lib/services/platform';
+import { generateLocalId } from '@/lib/generateId';
 
 // ── Types ──────────────────────────────────────────
 
@@ -818,7 +819,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
         subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
         features,
       } : t),
-      auditLog: [{ id: `aud-${Date.now()}`, timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
+      auditLog: [{ id: generateLocalId('aud-'), timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
     }));
     if (isBackendEnabled) platformSvc.syncTenantFeatures(id, features);
   },
@@ -838,17 +839,20 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   })),
 
   addAuditEntry: (entry) => set(s => ({
-    auditLog: [{ ...entry, id: `aud-${Date.now()}`, timestamp: new Date().toISOString() }, ...s.auditLog],
+    auditLog: [{ ...entry, id: generateLocalId('aud-'), timestamp: new Date().toISOString() }, ...s.auditLog],
   })),
 
   // Support tickets
   addTicket: (ticket) => {
-    const id = `tkt-${Date.now()}`;
+    const id = generateLocalId('tkt-');
     const now = new Date().toISOString();
     set(s => ({ supportTickets: [{ ...ticket, id, createdAt: now, updatedAt: now, notes: [] }, ...s.supportTickets] }));
     if (isBackendEnabled) {
       platformSvc.createTicket(ticket).then(dbRow => {
         if (dbRow) set(s => ({ supportTickets: s.supportTickets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createTicket failed:', err);
+        set(s => ({ supportTickets: s.supportTickets.filter(x => x.id !== id) }));
       });
     }
   },
@@ -865,11 +869,14 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   },
   // Announcements
   addAnnouncement: (a) => {
-    const id = `ann-${Date.now()}`;
+    const id = generateLocalId('ann-');
     set(s => ({ announcements: [{ ...a, id, createdAt: new Date().toISOString().split('T')[0], sentAt: null }, ...s.announcements] }));
     if (isBackendEnabled) {
       platformSvc.createPlatformAnnouncement(a).then(dbRow => {
         if (dbRow) set(s => ({ announcements: s.announcements.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createPlatformAnnouncement failed:', err);
+        set(s => ({ announcements: s.announcements.filter(x => x.id !== id) }));
       });
     }
   },
@@ -889,12 +896,15 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     if (isBackendEnabled) platformSvc.updateTemplate(id, { ...updates, lastEdited });
   },
   addTemplate: (t) => {
-    const id = `tmpl-${Date.now()}`;
+    const id = generateLocalId('tmpl-');
     const lastEdited = new Date().toISOString().split('T')[0];
     set(s => ({ emailTemplates: [...s.emailTemplates, { ...t, id, lastEdited }] }));
     if (isBackendEnabled) {
       platformSvc.createTemplate(t).then(dbRow => {
         if (dbRow) set(s => ({ emailTemplates: s.emailTemplates.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createTemplate failed:', err);
+        set(s => ({ emailTemplates: s.emailTemplates.filter(x => x.id !== id) }));
       });
     }
   },
@@ -934,12 +944,15 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
 
   // ─── Finance ──────────────────────────────────────
   addGLEntry: (entry) => {
-    const id = `PGL${Date.now()}`;
+    const id = generateLocalId('PGL');
     const now = new Date().toISOString();
     set(s => ({ glEntries: [{ ...entry, id, postedAt: now, postedBy: 'admin' }, ...s.glEntries] }));
     if (isBackendEnabled) {
       platformSvc.createPlatformGLEntry(entry).then(dbRow => {
         if (dbRow) set(s => ({ glEntries: s.glEntries.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createPlatformGLEntry failed:', err);
+        set(s => ({ glEntries: s.glEntries.filter(x => x.id !== id) }));
       });
     }
   },
@@ -954,7 +967,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
 
   // ─── Spending Approvals ──────────────────────────
   addPlatformApproval: (approval) => {
-    const id = `pa-${Date.now()}`;
+    const id = generateLocalId('pa-');
     set(s => ({ platformApprovals: [{ ...approval, id, status: 'pending' as const, votes: [], createdAt: new Date().toISOString().split('T')[0] }, ...s.platformApprovals] }));
   },
   castPlatformVote: (approvalId, voter, vote) => {

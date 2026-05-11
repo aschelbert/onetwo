@@ -4,6 +4,7 @@ import { isBackendEnabled } from '@/lib/supabase';
 import * as announcementsSvc from '@/lib/services/announcements';
 import * as communicationsSvc from '@/lib/services/communications';
 import * as complianceSvc from '@/lib/services/compliance';
+import { generateLocalId } from '@/lib/generateId';
 
 export interface FilingAttachment {
   name: string; size: string; uploadedAt: string;
@@ -60,7 +61,9 @@ interface ComplianceState {
 function syncFiling(id: string) {
   if (!isBackendEnabled) return;
   const f = useComplianceStore.getState().filings.find(x => x.id === id);
-  if (f) complianceSvc.updateFiling(id, f);
+  if (f) complianceSvc.updateFiling(id, f).catch(err => {
+    console.error('[syncWrite] syncFiling failed:', err);
+  });
 }
 
 export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
@@ -153,12 +156,15 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   },
 
   addFiling: (f, tenantId?) => {
-    const id = 'rf' + Date.now();
+    const id = generateLocalId('rf');
     const filing: RegulatoryFiling = { id, status: 'pending', filedDate: null, confirmationNum: '', attachments: [], ...f };
     set(s => ({ filings: [...s.filings, filing] }));
     if (isBackendEnabled && tenantId) {
       complianceSvc.createFiling(tenantId, filing).then(dbRow => {
         if (dbRow) set(s => ({ filings: s.filings.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createFiling failed:', err);
+        set(s => ({ filings: s.filings.filter(x => x.id !== id) }));
       });
     }
   },
@@ -180,11 +186,14 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   },
 
   addCommunication: (c, tenantId?) => {
-    const id = 'oc' + Date.now();
+    const id = generateLocalId('oc');
     set(s => ({ communications: [{ id, ...c }, ...s.communications] }));
     if (isBackendEnabled && tenantId) {
       communicationsSvc.createCommunication(tenantId, c).then(dbRow => {
         if (dbRow) set(s => ({ communications: s.communications.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createCommunication failed:', err);
+        set(s => ({ communications: s.communications.filter(x => x.id !== id) }));
       });
     }
   },
@@ -194,11 +203,14 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
   },
 
   addAnnouncement: (a, tenantId?) => {
-    const id = 'ann' + Date.now();
+    const id = generateLocalId('ann');
     set(s => ({ announcements: [{ id, ...a }, ...(s.announcements || [])] }));
     if (isBackendEnabled && tenantId) {
       announcementsSvc.createAnnouncement(tenantId, a).then(dbRow => {
         if (dbRow) set(s => ({ announcements: (s.announcements || []).map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createAnnouncement failed:', err);
+        set(s => ({ announcements: s.announcements.filter(x => x.id !== id) }));
       });
     }
   },

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
@@ -209,6 +210,7 @@ function ActiveCaseWidgetWrapper() {
 
 export default function App() {
   return (
+    <ErrorBoundary fallbackLevel="app">
     <HydrationGate>
     <BrowserRouter>
       <AuthListener />
@@ -219,33 +221,33 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Admin console — own layout (sidebar nav), outside AppShell */}
-        <Route path="/admin/console" element={<RequireAuth><TenantProvider><PlatformAdminPage /></TenantProvider></RequireAuth>} />
+        <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />
 
         {/* Portfolio (PM) routes */}
         <Route element={<RequirePM><PMProvider><PortfolioShell /></PMProvider></RequirePM>}>
-          <Route path="/portfolio" element={<PortfolioDashboardPage />} />
-          <Route path="/portfolio/dashboard" element={<PortfolioDashboardPage />} />
+          <Route path="/portfolio" element={<ErrorBoundary fallbackLevel="page"><PortfolioDashboardPage /></ErrorBoundary>} />
+          <Route path="/portfolio/dashboard" element={<ErrorBoundary fallbackLevel="page"><PortfolioDashboardPage /></ErrorBoundary>} />
         </Route>
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/financial" element={<FinancialPage />} />
-          <Route path="/issues" element={<IssuesPage />} />
-          <Route path="/building" element={<BuildingPage />} />
+          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
+          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
+          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
+          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/archives" element={<ArchivesPage />} />
+          <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />
           <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/boardroom" element={<BoardRoomPage />} />
+          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/association-team" element={<AssociationTeamPage />} />
+          <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamPage /></ErrorBoundary>} />
           <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
-          <Route path="/community" element={<CommunityRoomPage />} />
-          <Route path="/my-unit" element={<MyUnitPage />} />
-          <Route path="/account" element={<AccountSettingsPage />} />
-          <Route path="/support" element={<HelpSupportPage />} />
-          <Route path="/subscription" element={<SubscriptionPage />} />
-          <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
+          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
+          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
+          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
+          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
+          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
         </Route>
 
         {/* Catch-all */}
@@ -256,5 +258,6 @@ export default function App() {
       <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
+    </ErrorBoundary>
   );
 }

@@ -17,6 +17,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import SyncIndicator from '@/components/shared/SyncIndicator';
 
 export default function TopNav() {
   const { currentUser, currentRole, switchRole, isAdminPreview, signOut } = useAuthStore();
@@ -98,6 +99,7 @@ export default function TopNav() {
 
         {/* Right side */}
         <div className="flex items-center gap-3 shrink-0">
+          <SyncIndicator />
           {/* Tenant name + role (hidden on small) */}
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium text-white leading-tight">{tenant.name}</p>

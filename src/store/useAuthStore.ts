@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Role, AuthStep, BuildingMember, BuildingInvite } from '@/types/auth';
+import { generateLocalId } from '@/lib/generateId';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -158,7 +159,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   inviteMember: (email, role, unit) => {
     const code = get().generateInviteCode(role);
     const invite: BuildingInvite = {
-      id: `inv-${Date.now()}`,
+      id: generateLocalId('inv-'),
       email,
       role,
       unit: unit || '',

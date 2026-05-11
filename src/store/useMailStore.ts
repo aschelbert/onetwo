@@ -10,6 +10,7 @@ import type {
 import { calculateMailingCost } from '@/types/mail';
 import { useIssuesStore } from './useIssuesStore';
 import { supabase } from '@/lib/supabase';
+import { generateLocalId } from '@/lib/generateId';
 
 interface MailState {
   mailingSettings: MailingSettings;
@@ -98,7 +99,7 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
     const settings = get().mailingSettings;
     const cost = calculateMailingCost(params.deliveryMethod, params.pageCount, params.includeReturnEnvelope);
     const now = new Date().toISOString();
-    const id = 'mr_' + Date.now();
+    const id = generateLocalId('mr_');
 
     const record: MailRecord = {
       id,
@@ -181,7 +182,7 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       await new Promise(res => setTimeout(res, 400));
       advanceStatus('submitted', 'Submitted to LetterStream for processing (demo)', {
         sentAt: new Date().toISOString(),
-        letterstreamJobId: 'ls_sim_' + Date.now(),
+        letterstreamJobId: generateLocalId('ls_sim_'),
       });
     }
 

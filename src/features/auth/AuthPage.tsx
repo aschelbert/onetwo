@@ -276,14 +276,14 @@ export default function AuthPage() {
           // Restore session from pre-checkout save if session was lost during Stripe redirect
           if (!user && isProvisioned) {
             try {
-              const saved = localStorage.getItem('onetwo_checkout_tokens');
+              const saved = sessionStorage.getItem('onetwo_checkout_tokens');
               if (saved) {
                 const { access_token, refresh_token } = JSON.parse(saved);
                 const { data, error } = await supabase!.auth.setSession({ access_token, refresh_token });
                 if (!error && data.user) {
                   user = data.user;
                 }
-                localStorage.removeItem('onetwo_checkout_tokens');
+                sessionStorage.removeItem('onetwo_checkout_tokens');
               }
             } catch { /* ignore parse errors */ }
           }
@@ -304,7 +304,7 @@ export default function AuthPage() {
 
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
-                  localStorage.removeItem('onetwo_checkout_tokens');
+                  sessionStorage.removeItem('onetwo_checkout_tokens');
                   await loginWithTenantUser(user, tu);
                   clearTimeout(timeout);
                   setSessionChecking(false);
@@ -495,12 +495,16 @@ export default function AuthPage() {
       setLoginLoading(false);
     }
 
-    // Fall back to demo store
+    // Fall back to demo store (only when demo mode is enabled)
+    const isDemoEnabled = import.meta.env.VITE_DEMO_ENABLED === 'true';
+    if (!isDemoEnabled) {
+      alert('No account found with that email.');
+      return;
+    }
     const member = buildingMembers.find(
       (m) => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active'
     );
     if (!member) { alert('No account found with that email.'); return; }
-    if (member.role === 'PLATFORM_ADMIN' && password !== 'SuperCooperis9') { alert('Invalid password.'); return; }
     login(member);
   };
 
@@ -719,8 +723,8 @@ export default function AuthPage() {
 
       // Redirect to Stripe Checkout
       if (data.url) {
-        // Save session tokens so we can restore after Stripe redirect
-        localStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+        // Save session tokens so we can restore after Stripe redirect (sessionStorage = tab-scoped, cleared on close)
+        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
           access_token: session.access_token,
           refresh_token: session.refresh_token,
         }));

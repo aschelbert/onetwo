@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as vendorSvc from '@/lib/services/vendorTracker';
 import type { VendorBid, VendorReview, VendorContract } from '@/lib/services/vendorTracker';
+import { generateLocalId } from '@/lib/generateId';
 
 export type { VendorBid, VendorReview, VendorContract } from '@/lib/services/vendorTracker';
 
@@ -50,11 +51,14 @@ export const useVendorTrackerStore = create<VendorTrackerState>()(persist((set) 
   },
 
   addBid: (bid, tenantId?) => {
-    const id = 'vb' + Date.now();
+    const id = generateLocalId('vb');
     set(s => ({ bids: [{ id, ...bid }, ...s.bids] }));
     if (isBackendEnabled && tenantId) {
       vendorSvc.createBid(tenantId, bid).then(dbRow => {
         if (dbRow) set(s => ({ bids: s.bids.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createBid failed:', err);
+        set(s => ({ bids: s.bids.filter(x => x.id !== id) }));
       });
     }
   },
@@ -70,11 +74,14 @@ export const useVendorTrackerStore = create<VendorTrackerState>()(persist((set) 
   },
 
   addReview: (review, tenantId?) => {
-    const id = 'vr' + Date.now();
+    const id = generateLocalId('vr');
     set(s => ({ reviews: [{ id, ...review }, ...s.reviews] }));
     if (isBackendEnabled && tenantId) {
       vendorSvc.createReview(tenantId, review).then(dbRow => {
         if (dbRow) set(s => ({ reviews: s.reviews.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createReview failed:', err);
+        set(s => ({ reviews: s.reviews.filter(x => x.id !== id) }));
       });
     }
   },
@@ -85,11 +92,14 @@ export const useVendorTrackerStore = create<VendorTrackerState>()(persist((set) 
   },
 
   addContract: (contract, tenantId?) => {
-    const id = 'vc' + Date.now();
+    const id = generateLocalId('vc');
     set(s => ({ contracts: [{ id, ...contract }, ...s.contracts] }));
     if (isBackendEnabled && tenantId) {
       vendorSvc.createContract(tenantId, contract).then(dbRow => {
         if (dbRow) set(s => ({ contracts: s.contracts.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createContract failed:', err);
+        set(s => ({ contracts: s.contracts.filter(x => x.id !== id) }));
       });
     }
   },
