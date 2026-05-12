@@ -206,6 +206,7 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                     notes: selectedAsset.notes,
                     insuredValue: String(selectedAsset.insuredValue),
                     reserveItemId: selectedAsset.reserveItemId || '',
+                    budgetCategoryId: selectedAsset.budgetCategoryId || '',
                   })}
                   className="text-xs text-accent-600 font-medium hover:text-accent-700"
                 >Edit</button>
