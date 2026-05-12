@@ -8,6 +8,7 @@ import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, 
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { generateLocalId } from '@/lib/generateId';
+import { useBuildingStore } from '@/store/useBuildingStore';
 
 // ─── GL Filter state ─────────────────────────────────
 interface GLFilter {
@@ -509,7 +510,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set((s) => ({ budgetCategories: [...s.budgetCategories, cat] }));
     if (isBackendEnabled && get().tenantId) {
       financialSvc.createBudgetCategory(get().tenantId!, cat).then(dbRow => {
-        if (dbRow) set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (dbRow) {
+          set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+          // Update any building assets referencing the old local ID
+          const bStore = useBuildingStore.getState();
+          bStore.assets.filter(a => a.budgetCategoryId === id).forEach(a => {
+            bStore.updateAsset(a.id, { budgetCategoryId: dbRow.id });
+          });
+        }
       }).catch(err => {
         console.error('[syncWrite] createBudgetCategory failed:', err);
         set(s => ({ budgetCategories: s.budgetCategories.filter(x => x.id !== id) }));
@@ -573,7 +581,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set((s) => ({ reserveItems: [...s.reserveItems, newItem] }));
     if (isBackendEnabled && get().tenantId) {
       financialSvc.createReserveItem(get().tenantId!, newItem).then(dbRow => {
-        if (dbRow) set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (dbRow) {
+          set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+          // Update any building assets referencing the old local ID
+          const bStore = useBuildingStore.getState();
+          bStore.assets.filter(a => a.reserveItemId === id).forEach(a => {
+            bStore.updateAsset(a.id, { reserveItemId: dbRow.id });
+          });
+        }
       }).catch(err => {
         console.error('[syncWrite] createReserveItem failed:', err);
         set(s => ({ reserveItems: s.reserveItems.filter(x => x.id !== id) }));
