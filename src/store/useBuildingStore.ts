@@ -659,7 +659,20 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createMaintenanceSchedule(tid, m).then(dbRow => {
-        if (dbRow) set(s => ({ maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (dbRow) {
+          set(s => ({
+            maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x),
+            assets: s.assets.map(a =>
+              a.maintenanceScheduleIds.includes(id)
+                ? { ...a, maintenanceScheduleIds: a.maintenanceScheduleIds.map(sid => sid === id ? dbRow.id : sid) }
+                : a
+            ),
+          }));
+          // Re-sync any assets whose schedule reference was just corrected
+          useBuildingStore.getState().assets
+            .filter(a => a.maintenanceScheduleIds.includes(dbRow.id))
+            .forEach(a => syncAsset(a.id));
+        }
       }).catch(err => {
         console.error('[syncWrite] createMaintenanceSchedule failed:', err);
         set(s => ({ maintenanceSchedules: s.maintenanceSchedules.filter(x => x.id !== id) }));
