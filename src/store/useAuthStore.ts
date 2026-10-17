@@ -64,7 +64,7 @@ const seedInvites: BuildingInvite[] = [
 
 export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   isAuthenticated: false,
-  authStep: 'welcome',
+  authStep: 'login',
   authJoinRole: 'RESIDENT',
   currentUser: defaultUser,
   currentRole: 'BOARD_MEMBER',
@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     });
     set({
       isAuthenticated: false,
-      authStep: 'welcome',
+      authStep: 'login',
       currentUser: defaultUser,
       currentRole: 'BOARD_MEMBER',
       isAdminPreview: false,

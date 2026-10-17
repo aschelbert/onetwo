@@ -6,6 +6,9 @@ export const DEFAULT_TRIAL_DAYS = 30;
 export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
 export type BillingInterval = 'monthly' | 'annual';
 
+export const DEFAULT_SIGNUP_TIER: SubscriptionTier = 'community_plus';
+export const DEFAULT_BILLING_INTERVAL: BillingInterval = 'monthly';
+
 export interface TierConfig {
   id: SubscriptionTier;
   name: string;

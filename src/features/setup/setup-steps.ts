@@ -42,9 +42,39 @@ export interface CompletionContext {
   insuranceCount: number;
   vendorCount: number;
   allRequiredComplete?: boolean;
+  // Profile completion (deferred from simplified signup)
+  hasPhone: boolean;
+  hasBoardTitle: boolean;
+  hasFullAddress: boolean;
 }
 
 export const SETUP_STEPS: StepConfig[] = [
+  {
+    stepNumber: 0,
+    title: 'Complete Your Profile',
+    description: 'Finish setting up your account with a few details deferred from signup.',
+    required: false,
+    subTasks: [
+      {
+        id: 'profile_board_title',
+        label: 'Set your board title',
+        navigateTo: '/account',
+        checkComplete: (ctx) => ctx.hasBoardTitle,
+      },
+      {
+        id: 'profile_phone',
+        label: 'Add your phone number',
+        navigateTo: '/account',
+        checkComplete: (ctx) => ctx.hasPhone,
+      },
+      {
+        id: 'profile_address',
+        label: 'Complete building address (city, state, zip)',
+        navigateTo: '/building',
+        checkComplete: (ctx) => ctx.hasFullAddress,
+      },
+    ],
+  },
   {
     stepNumber: 1,
     title: 'Building Profile',
