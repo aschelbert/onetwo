@@ -79,9 +79,12 @@ async function syncToAdminConsole(tenantId: string, meta: Record<string, string>
   }
   try {
     const tierToSubscriptionId: Record<string, string> = {
-      compliance_pro: "compliance-pro",
-      community_plus: "community-plus",
-      management_suite: "management-suite",
+      essentials: "essentials",
+      board: "board",
+      estate: "estate",
+      compliance_pro: "essentials",
+      community_plus: "board",
+      management_suite: "estate",
     };
     const address = [meta.address_street, meta.address_city, meta.address_state, meta.address_zip]
       .filter(Boolean).join(", ") || null;
@@ -389,25 +392,33 @@ Deno.serve(async (req) => {
           active: "active", trialing: "trialing", past_due: "past_due",
         };
 
-        // Price ID → tier lookup
+        // Price ID -> tier lookup
+        // TODO: replace placeholder price IDs with actual Stripe price IDs
         const PRICE_TO_TIER: Record<string, string> = {
-          "price_1T3qQD2eQBbijDsqxvNiEs8U": "compliance_pro",
-          "price_1T3qQD2eQBbijDsqbcwCMX7v": "compliance_pro",
-          "price_1T36YO2eQBbijDsqkULOdtRi": "community_plus",
-          "price_1T3qQg2eQBbijDsqHaOVBbtA": "community_plus",
-          "price_1T3qRQ2eQBbijDsq7PP4vlxh": "management_suite",
-          "price_1T3qSR2eQBbijDsqzVEUuZD4": "management_suite",
+          "price_essentials_monthly": "essentials",
+          "price_essentials_annual": "essentials",
+          "price_board_monthly": "board",
+          "price_board_annual": "board",
+          "price_estate_monthly": "estate",
+          "price_estate_annual": "estate",
+          // Legacy prices map to new tiers
+          "price_1T3qQD2eQBbijDsqxvNiEs8U": "essentials",
+          "price_1T3qQD2eQBbijDsqbcwCMX7v": "essentials",
+          "price_1T36YO2eQBbijDsqkULOdtRi": "board",
+          "price_1T3qQg2eQBbijDsqHaOVBbtA": "board",
+          "price_1T3qRQ2eQBbijDsq7PP4vlxh": "estate",
+          "price_1T3qSR2eQBbijDsqzVEUuZD4": "estate",
         };
         const TIER_MONTHLY_RATES: Record<string, number> = {
-          compliance_pro: 179, community_plus: 279, management_suite: 399,
+          essentials: 79, board: 199, estate: 399,
         };
         const TIER_SUBSCRIPTION_SLUGS: Record<string, string> = {
-          compliance_pro: "compliance-pro", community_plus: "community-plus", management_suite: "management-suite",
+          essentials: "essentials", board: "board", estate: "estate",
         };
         const TIER_FEATURES: Record<string, Record<string, boolean>> = {
-          compliance_pro: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: false, community_portal: false, vendor_management: true, reserve_study_tools: false },
-          community_plus: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: false },
-          management_suite: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: true },
+          essentials: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: false, reserve_study_tools: false },
+          board: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: false },
+          estate: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: true },
         };
 
         // Build update payload

@@ -36,7 +36,7 @@ export async function updatePlatformSettings(trialDays: number): Promise<boolean
 
 // ── Tenants ──
 
-const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+const TIER_PRICES: Record<string, number> = { essentials: 79, board: 199, estate: 399, compliance_pro: 179, community_plus: 279, management_suite: 399 };
 
 export async function fetchTenants(): Promise<Tenant[] | null> {
   if (!supabase) return null;
@@ -101,8 +101,8 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
   return (tenantRows || []).map((r): Tenant => {
     const id = r.id as string;
     const sub = subMap.get(id);
-    const tier = ((sub?.tier as string) || 'compliance_pro') as SubscriptionTier;
-    const validTier = (tier in TIER_FEATURES) ? tier : 'compliance_pro' as SubscriptionTier;
+    const tier = ((sub?.tier as string) || 'essentials') as SubscriptionTier;
+    const validTier = (tier in TIER_FEATURES) ? tier : 'essentials' as SubscriptionTier;
     const addr = typeof r.address === 'string' ? JSON.parse(r.address) : (r.address || {});
     const subStatus = (sub?.status as string) || 'trialing';
     // Map DB subscription status to app status

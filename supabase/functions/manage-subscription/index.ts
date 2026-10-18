@@ -14,54 +14,77 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
 };
 
-// Tier feature defaults — mirrors the SQL tier_feature_defaults function
+// Tier feature defaults -- mirrors the SQL tier_feature_defaults function
 const TIER_FEATURES: Record<string, Record<string, boolean>> = {
+  essentials: {
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: false, reserve_study_tools: false,
+  },
+  board: {
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: true, reserve_study_tools: false,
+  },
+  estate: {
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: true, reserve_study_tools: true,
+  },
+  // Legacy tiers map to new feature sets
   compliance_pro: {
-    dashboard: true, boardroom: true, financial: true, building: true,
-    issues: true, property_log: true, archives: true,
-    community: false, voting: false, assessments: false,
-    pm_tools: false, work_orders: false, distributions: false,
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: false, reserve_study_tools: false,
   },
   community_plus: {
-    dashboard: true, boardroom: true, financial: true, building: true,
-    issues: true, property_log: true, archives: true,
-    community: true, voting: true, assessments: true,
-    pm_tools: false, work_orders: false, distributions: false,
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: true, reserve_study_tools: false,
   },
   management_suite: {
-    dashboard: true, boardroom: true, financial: true, building: true,
-    issues: true, property_log: true, archives: true,
-    community: true, voting: true, assessments: true,
-    pm_tools: true, work_orders: true, distributions: true,
+    fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true,
+    document_vault: true, payment_processing: true, votes_resolutions: true,
+    community_portal: true, vendor_management: true, reserve_study_tools: true,
   },
 };
 
-// Price ID → tier mapping
+// Price ID -> tier mapping
+// TODO: replace placeholder price IDs with actual Stripe price IDs
 const PRICE_TO_TIER: Record<string, string> = {
-  "price_1T3qQD2eQBbijDsqxvNiEs8U": "compliance_pro",
-  "price_1T3qQD2eQBbijDsqbcwCMX7v": "compliance_pro",
-  "price_1T36YO2eQBbijDsqkULOdtRi": "community_plus",
-  "price_1T3qQg2eQBbijDsqHaOVBbtA": "community_plus",
-  "price_1T3qRQ2eQBbijDsq7PP4vlxh": "management_suite",
-  "price_1T3qSR2eQBbijDsqzVEUuZD4": "management_suite",
+  // New tier prices
+  "price_essentials_monthly": "essentials",
+  "price_essentials_annual": "essentials",
+  "price_board_monthly": "board",
+  "price_board_annual": "board",
+  "price_estate_monthly": "estate",
+  "price_estate_annual": "estate",
+  // Legacy prices map to new tiers
+  "price_1T3qQD2eQBbijDsqxvNiEs8U": "essentials",
+  "price_1T3qQD2eQBbijDsqbcwCMX7v": "essentials",
+  "price_1T36YO2eQBbijDsqkULOdtRi": "board",
+  "price_1T3qQg2eQBbijDsqHaOVBbtA": "board",
+  "price_1T3qRQ2eQBbijDsq7PP4vlxh": "estate",
+  "price_1T3qSR2eQBbijDsqzVEUuZD4": "estate",
 };
 
+// TODO: replace placeholder price IDs with actual Stripe price IDs
 const TIER_PRICES: Record<string, { monthly: string; annual: string }> = {
-  compliance_pro: { monthly: "price_1T3qQD2eQBbijDsqxvNiEs8U", annual: "price_1T3qQD2eQBbijDsqbcwCMX7v" },
-  community_plus: { monthly: "price_1T36YO2eQBbijDsqkULOdtRi", annual: "price_1T3qQg2eQBbijDsqHaOVBbtA" },
-  management_suite: { monthly: "price_1T3qRQ2eQBbijDsq7PP4vlxh", annual: "price_1T3qSR2eQBbijDsqzVEUuZD4" },
+  essentials: { monthly: "price_essentials_monthly", annual: "price_essentials_annual" },
+  board: { monthly: "price_board_monthly", annual: "price_board_annual" },
+  estate: { monthly: "price_estate_monthly", annual: "price_estate_annual" },
 };
 
 const TIER_MONTHLY_RATES: Record<string, number> = {
-  compliance_pro: 179,
-  community_plus: 279,
-  management_suite: 399,
+  essentials: 79,
+  board: 199,
+  estate: 399,
 };
 
 const TIER_SUBSCRIPTION_SLUGS: Record<string, string> = {
-  compliance_pro: "compliance-pro",
-  community_plus: "community-plus",
-  management_suite: "management-suite",
+  essentials: "essentials",
+  board: "board",
+  estate: "estate",
 };
 
 // Supabase REST helper (service role bypasses RLS)
