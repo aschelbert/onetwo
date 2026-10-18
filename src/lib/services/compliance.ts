@@ -75,23 +75,33 @@ export async function deleteFiling(id: string): Promise<boolean> {
 
 // ── Compliance Completions (composite PK: tenant_id + item_id) ──
 
-export async function fetchCompletions(tenantId: string): Promise<Record<string, boolean> | null> {
+export async function fetchCompletions(tenantId: string): Promise<{ completions: Record<string, boolean>; stepCompletions: Record<string, boolean[]> } | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('compliance_completions')
-    .select('item_id, completed')
+    .select('item_id, completed, steps')
     .eq('tenant_id', tenantId);
   if (error) { logDbError('fetchCompletions error:', error); return null; }
-  const result: Record<string, boolean> = {};
-  (data || []).forEach(r => { result[r.item_id] = r.completed; });
-  return result;
+  const completions: Record<string, boolean> = {};
+  const stepCompletions: Record<string, boolean[]> = {};
+  (data || []).forEach(r => {
+    completions[r.item_id] = r.completed;
+    if (r.steps && Array.isArray(r.steps) && r.steps.length > 0) {
+      stepCompletions[r.item_id] = r.steps as boolean[];
+    }
+  });
+  return { completions, stepCompletions };
 }
 
-export async function upsertCompletion(tenantId: string, itemId: string, completed: boolean): Promise<boolean> {
+export async function upsertCompletion(tenantId: string, itemId: string, completed: boolean, steps?: boolean[]): Promise<boolean> {
   if (!supabase) return false;
-  const { error } = await supabase.from('compliance_completions').upsert({
+  const row: Record<string, unknown> = {
     tenant_id: tenantId, item_id: itemId, completed,
-  }, { onConflict: 'tenant_id,item_id' });
+  };
+  if (steps !== undefined) row.steps = steps;
+  const { error } = await supabase.from('compliance_completions').upsert(
+    row, { onConflict: 'tenant_id,item_id' }
+  );
   if (error) { logDbError('upsertCompletion error:', error); return false; }
   return true;
 }

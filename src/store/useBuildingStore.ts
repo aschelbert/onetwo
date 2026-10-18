@@ -9,6 +9,7 @@ import { generateLocalId } from '@/lib/generateId';
 
 export interface BoardMember {
   id: string; name: string; role: string; email: string; phone: string; term: string;
+  roleKey?: import('@/types/auth').BoardRoleKey;
 }
 export interface ManagementInfo {
   company: string; contact: string; title: string; email: string; phone: string;
@@ -224,11 +225,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     fiscalYearEnd: '12-31',
   },
   board: [
-    { id: 'bm1', name: 'Robert Mitchell', role: 'President', email: 'robert@example.com', phone: '202-555-0401', term: 'Jan 2025 – Dec 2026' },
-    { id: 'bm2', name: 'Jennifer Adams', role: 'Vice President', email: 'jennifer@example.com', phone: '202-555-0202', term: 'Jan 2025 – Dec 2026' },
-    { id: 'bm3', name: 'David Chen', role: 'Treasurer', email: 'david@example.com', phone: '202-555-0102', term: 'Jan 2025 – Dec 2026' },
-    { id: 'bm4', name: 'Maria Rodriguez', role: 'Secretary', email: 'maria@example.com', phone: '202-555-0303', term: 'Jan 2024 – Dec 2025' },
-    { id: 'bm5', name: 'Thomas Baker', role: 'Member at Large', email: 'thomas@example.com', phone: '202-555-0404', term: 'Jan 2024 – Dec 2025' },
+    { id: 'bm1', name: 'Robert Mitchell', role: 'President', email: 'robert@example.com', phone: '202-555-0401', term: 'Jan 2025 – Dec 2026', roleKey: 'president' as const },
+    { id: 'bm2', name: 'Jennifer Adams', role: 'Vice President', email: 'jennifer@example.com', phone: '202-555-0202', term: 'Jan 2025 – Dec 2026', roleKey: 'vice_president' as const },
+    { id: 'bm3', name: 'David Chen', role: 'Treasurer', email: 'david@example.com', phone: '202-555-0102', term: 'Jan 2025 – Dec 2026', roleKey: 'treasurer' as const },
+    { id: 'bm4', name: 'Maria Rodriguez', role: 'Secretary', email: 'maria@example.com', phone: '202-555-0303', term: 'Jan 2024 – Dec 2025', roleKey: 'secretary' as const },
+    { id: 'bm5', name: 'Thomas Baker', role: 'Member at Large', email: 'thomas@example.com', phone: '202-555-0404', term: 'Jan 2024 – Dec 2025', roleKey: 'member_at_large' as const },
   ],
   management: {
     company: 'Premier Property Management', contact: 'Diane Carter', title: 'Property Manager',
