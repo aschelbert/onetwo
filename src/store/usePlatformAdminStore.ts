@@ -46,6 +46,12 @@ export interface Tenant {
     communityPortal: boolean;
     vendorManagement: boolean;
     reserveStudyTools: boolean;
+    v2Home: boolean;
+    v2Drawers: boolean;
+    v2BoardRoom: boolean;
+    v2FiscalLens: boolean;
+    v2Cases: boolean;
+    v2Building: boolean;
   };
   onboardingChecklist: {
     accountCreated: boolean;
@@ -66,32 +72,38 @@ export const TIER_FEATURES: Record<string, Record<keyof Tenant['features'], bool
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   board: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   estate: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   // Legacy mappings -- point to the nearest new tier
   compliance_pro: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   community_plus: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   management_suite: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
 };
 
