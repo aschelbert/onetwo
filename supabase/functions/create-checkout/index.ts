@@ -1,7 +1,12 @@
 // supabase/functions/create-checkout/index.ts
 // Zero dependencies — uses raw fetch to Stripe API and Supabase Auth API
 
+// TODO: replace with actual Stripe price IDs once created in Stripe dashboard
 const TIER_PRICES: Record<string, string> = {
+  essentials: Deno.env.get("STRIPE_PRICE_ESSENTIALS") || "",
+  board: Deno.env.get("STRIPE_PRICE_BOARD") || "",
+  estate: Deno.env.get("STRIPE_PRICE_ESTATE") || "",
+  // Legacy env vars kept for backward compat during migration
   compliance_pro: Deno.env.get("STRIPE_PRICE_COMPLIANCE_PRO") || "",
   community_plus: Deno.env.get("STRIPE_PRICE_COMMUNITY_PLUS") || "",
   management_suite: Deno.env.get("STRIPE_PRICE_MANAGEMENT_SUITE") || "",

@@ -45,7 +45,7 @@ export default function StripeTab() {
 
   const totalCollected = stripePayments.filter(p => p.status === 'succeeded').reduce((s, p) => s + p.amount, 0);
   const failedPayments = stripePayments.filter(p => p.status === 'failed').length;
-  const syncedProducts = 3; // All 3 subscription tiers are synced in seed data
+  const syncedProducts = 3; // All 3 active tiers (Essentials, Board, Estate) synced
 
   return (
     <div className="space-y-6">
@@ -90,9 +90,9 @@ export default function StripeTab() {
               <h4 className="font-bold text-ink-900 mb-4">Product ↔ Stripe Mapping</h4>
               <div className="space-y-3">
                 {[
-                  { name: 'Compliance Pro', price: '$179/mo', color: 'bg-accent-100', productId: 'prod_U1uEALGv7cxbG8', status: 'synced' },
-                  { name: 'Community Plus', price: '$279/mo', color: 'bg-ink-100', productId: 'prod_U18qLUrk51rvcH', status: 'synced' },
-                  { name: 'Management Suite', price: '$399/mo', color: 'bg-sage-100', productId: 'prod_U1uF4LzxGLbojg', status: 'synced' },
+                  { name: 'Essentials', price: '$79/mo', color: 'bg-accent-100', productId: 'prod_essentials', status: 'synced' },
+                  { name: 'Board', price: '$199/mo', color: 'bg-ink-100', productId: 'prod_board', status: 'synced' },
+                  { name: 'Estate', price: '$399/mo', color: 'bg-sage-100', productId: 'prod_estate', status: 'synced' },
                 ].map(p => (
                   <div key={p.name} className="flex items-center justify-between py-2 border-b border-ink-50 last:border-0">
                     <div className="flex items-center gap-3">

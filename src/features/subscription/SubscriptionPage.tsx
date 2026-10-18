@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
-import { TIERS, getTierById, getTierDisplayName } from '@/lib/tiers';
-import type { SubscriptionTier } from '@/lib/tiers';
+import { TIERS, getTierById, getTierDisplayName, describeTier, isActiveTier } from '@/lib/tiers';
+import type { SubscriptionTier, ActiveTier } from '@/lib/tiers';
 import { Shield, AlertTriangle, Check, X, CreditCard, RotateCcw } from 'lucide-react';
 
 interface SubscriptionData {
@@ -52,7 +52,7 @@ export default function SubscriptionPage() {
   const [sub, setSub] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
+  const [selectedTier, setSelectedTier] = useState<ActiveTier | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelConfirmText, setCancelConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +280,7 @@ export default function SubscriptionPage() {
             {TIERS.map(tier => {
               const isCurrent = tier.id === sub.tier;
               const isSelected = tier.id === selectedTier;
+              const featureLines = describeTier(tier.id);
               return (
                 <button
                   key={tier.id}
@@ -293,16 +294,25 @@ export default function SubscriptionPage() {
                         : 'border-ink-200 hover:border-ink-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="font-bold text-ink-900">
                         {tier.name}
                         {isCurrent && <span className="ml-2 text-xs font-normal text-accent-600">Current Plan</span>}
                       </p>
-                      <p className="text-xs text-ink-400 mt-0.5">{tier.features[0]}</p>
                     </div>
                     <p className="text-lg font-bold text-accent-600">${tier.monthly}<span className="text-xs font-normal text-ink-400">/mo</span></p>
                   </div>
+                  {isSelected && featureLines.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {featureLines.slice(0, 6).map((line, i) => (
+                        <li key={i} className="text-xs text-ink-500 flex items-start gap-1.5">
+                          <Check className="w-3 h-3 text-sage-500 mt-0.5 flex-shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </button>
               );
             })}

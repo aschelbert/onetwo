@@ -30,7 +30,7 @@ const REQ_CATS = [
 
 export default function CommunityRoomPage() {
   const tenant = useTenantContext();
-  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  const isManagementSuite = tenant.tier === 'estate' || tenant.tier === 'management_suite' || tenant.isDemo;
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);

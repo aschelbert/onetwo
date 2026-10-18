@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS, DEFAULT_TRIAL_DAYS, DEFAULT_SIGNUP_TIER, DEFAULT_BILLING_INTERVAL } from '@/lib/tiers';
+import { TIERS, DEFAULT_TRIAL_DAYS, DEFAULT_BILLING_INTERVAL, describeTier, recommendTier } from '@/lib/tiers';
+import type { ActiveTier, BuildingAmenity } from '@/lib/tiers';
+import { Check } from 'lucide-react';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -35,6 +37,9 @@ export default function AuthPage() {
   const [bldgSubdomain, setBldgSubdomain] = useState('');
   const [subdomainStatus, setSubdomainStatus] = useState<'idle'|'checking'|'available'|'taken'>('idle');
   const [bldgStreet, setBldgStreet] = useState('');
+  const [bldgUnits, setBldgUnits] = useState<number | ''>('');
+  const [bldgAmenities, setBldgAmenities] = useState<BuildingAmenity[]>([]);
+  const [selectedTier, setSelectedTier] = useState<ActiveTier>('essentials');
 
   // ── UI state ──
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -613,7 +618,7 @@ export default function AuthPage() {
         return;
       }
 
-      const tier = TIERS.find(t => t.id === DEFAULT_SIGNUP_TIER)!;
+      const tier = TIERS.find(t => t.id === selectedTier)!;
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
@@ -625,13 +630,13 @@ export default function AuthPage() {
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
-            tier: DEFAULT_SIGNUP_TIER,
+            tier: selectedTier,
             priceId: tier.stripePriceMonthly,
             billingInterval: DEFAULT_BILLING_INTERVAL,
             buildingName: bldgName,
             subdomain: bldgSubdomain,
             address: { street: bldgStreet, city: '', state: '', zip: '' },
-            totalUnits: 0,
+            totalUnits: typeof bldgUnits === 'number' ? bldgUnits : 0,
             yearBuilt: '',
             contactName: `${firstName} ${lastName}`.trim(),
             contactPhone: '',
@@ -809,7 +814,25 @@ export default function AuthPage() {
         )}
 
         {/* ══════ SCREEN 2: NAME YOUR BUILDING (new subscribers only) ══════ */}
-        {authStep === 'building' && (
+        {authStep === 'building' && (() => {
+          const unitVal = typeof bldgUnits === 'number' ? bldgUnits : 0;
+          const recommended = recommendTier(unitVal, bldgAmenities);
+          const amenityOptions: { id: BuildingAmenity; label: string }[] = [
+            { id: 'elevator', label: 'Elevator' },
+            { id: 'pool', label: 'Pool' },
+            { id: 'gym', label: 'Gym' },
+            { id: 'sport_court', label: 'Tennis / Sport Court' },
+            { id: 'parking_garage', label: 'Parking Garage' },
+            { id: 'roof_deck', label: 'Roof Deck' },
+          ];
+          const toggleAmenity = (a: BuildingAmenity) => {
+            setBldgAmenities(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
+          };
+          // Auto-update selected tier when recommendation changes
+          if (selectedTier !== recommended && !(['board', 'estate'].includes(selectedTier) && recommended === 'essentials')) {
+            // Only auto-select when user hasn't manually chosen a higher tier
+          }
+          return (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Name Your Building</h2>
@@ -825,6 +848,85 @@ export default function AuthPage() {
                 <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)}
                   className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="123 Main St" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">How many units?</label>
+                <input type="number" min={1} value={bldgUnits} onChange={e => {
+                  const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                  setBldgUnits(v);
+                  if (typeof v === 'number') {
+                    setSelectedTier(recommendTier(v, bldgAmenities));
+                  }
+                }}
+                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="e.g., 12" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Which of these does your building have?</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {amenityOptions.map(a => (
+                    <button key={a.id} type="button"
+                      onClick={() => {
+                        const next = bldgAmenities.includes(a.id) ? bldgAmenities.filter(x => x !== a.id) : [...bldgAmenities, a.id];
+                        setBldgAmenities(next);
+                        const uv = typeof bldgUnits === 'number' ? bldgUnits : 0;
+                        setSelectedTier(recommendTier(uv, next));
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        bldgAmenities.includes(a.id)
+                          ? 'bg-accent-50 border-accent-400 text-accent-700'
+                          : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
+                      }`}>
+                      {a.label}
+                    </button>
+                  ))}
+                  <button type="button"
+                    onClick={() => { setBldgAmenities([]); setSelectedTier(recommendTier(typeof bldgUnits === 'number' ? bldgUnits : 0, [])); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      bldgAmenities.length === 0
+                        ? 'bg-ink-100 border-ink-300 text-ink-700'
+                        : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
+                    }`}>
+                    None
+                  </button>
+                </div>
+              </div>
+
+              {/* Plan recommendation */}
+              <div>
+                <label className="block text-sm font-medium text-ink-700 mb-2">Recommended plan</label>
+                <div className="space-y-2">
+                  {TIERS.map(tier => {
+                    const isRec = tier.id === recommended;
+                    const isSel = tier.id === selectedTier;
+                    const features = describeTier(tier.id).slice(0, 4);
+                    return (
+                      <button key={tier.id} type="button"
+                        onClick={() => setSelectedTier(tier.id)}
+                        className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+                          isSel ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                        }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-ink-900 text-sm">{tier.name}</p>
+                            {isRec && <span className="text-[10px] bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded font-semibold">Recommended</span>}
+                          </div>
+                          <p className="text-sm font-bold text-accent-600">${tier.monthly}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+                        </div>
+                        {isSel && features.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {features.map((f, i) => (
+                              <li key={i} className="text-xs text-ink-500 flex items-start gap-1.5">
+                                <Check className="w-3 h-3 text-sage-500 mt-0.5 flex-shrink-0" />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-ink-700 mb-1">First Name</label>
@@ -845,7 +947,8 @@ export default function AuthPage() {
               <a onClick={() => setAuthStep('signup')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back</a>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ══════ SCREEN 3: YOU'RE IN (Confirmation + soft payment ask) ══════ */}
         {authStep === 'confirm' && (

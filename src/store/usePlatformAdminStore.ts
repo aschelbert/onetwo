@@ -5,7 +5,7 @@ import { generateLocalId } from '@/lib/generateId';
 
 // ── Types ──────────────────────────────────────────
 
-export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
+export type SubscriptionTier = 'essentials' | 'board' | 'estate' | 'pm_addon' | 'compliance_pro' | 'community_plus' | 'management_suite';
 export type SubscriptionStatus = 'active' | 'trial' | 'past_due' | 'cancelled' | 'suspended';
 export type BuildingStatus = 'active' | 'onboarding' | 'suspended' | 'archived';
 
@@ -64,19 +64,39 @@ export interface Tenant {
   };
 }
 
-// Feature matrix per tier — determines defaults when creating/changing tiers
-// Tiers match Stripe products: Compliance Pro ($179), Community Plus ($279), Management Suite ($399)
-export const TIER_FEATURES: Record<SubscriptionTier, Record<keyof Tenant['features'], boolean>> = {
+// Feature matrix per tier -- determines defaults when creating/changing tiers
+// Active tiers: Essentials ($79), Board ($199), Estate ($399)
+// Legacy tier ids kept for backward compat; they map to new tiers at read time.
+export const TIER_FEATURES: Record<string, Record<keyof Tenant['features'], boolean>> = {
+  essentials: {
+    fiscalLens: true, caseOps: true, complianceRunbook: true,
+    aiAdvisor: true, documentVault: true, paymentProcessing: true,
+    votesResolutions: true, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
+  },
+  board: {
+    fiscalLens: true, caseOps: true, complianceRunbook: true,
+    aiAdvisor: true, documentVault: true, paymentProcessing: true,
+    votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: false,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
+  },
+  estate: {
+    fiscalLens: true, caseOps: true, complianceRunbook: true,
+    aiAdvisor: true, documentVault: true, paymentProcessing: true,
+    votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
+    v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
+  },
+  // Legacy mappings -- point to the nearest new tier
   compliance_pro: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
-    aiAdvisor: false, documentVault: false, paymentProcessing: false,
-    votesResolutions: false, communityPortal: false, vendorManagement: false, reserveStudyTools: false,
+    aiAdvisor: true, documentVault: true, paymentProcessing: true,
+    votesResolutions: true, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
     v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   community_plus: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
-    votesResolutions: false, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
+    votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: false,
     v2Home: false, v2Drawers: false, v2BoardRoom: false, v2FiscalLens: false, v2Cases: false, v2Building: false,
   },
   management_suite: {
@@ -219,10 +239,10 @@ export interface PlatformSpendingApproval {
 
 // Role definitions for RBAC
 export const TENANT_ROLES = [
-  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'staff', name: 'Staff', description: 'Building staff such as concierge, maintenance, and building managers', icon: '🔧', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['management_suite'] as SubscriptionTier[] },
+  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['essentials', 'board', 'estate'] as SubscriptionTier[] },
+  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['essentials', 'board', 'estate'] as SubscriptionTier[] },
+  { id: 'staff', name: 'Staff', description: 'Building staff such as concierge, maintenance, and building managers', icon: '🔧', tiers: ['board', 'estate'] as SubscriptionTier[] },
+  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['estate'] as SubscriptionTier[] },
 ] as const;
 
 export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
@@ -340,7 +360,7 @@ export interface Announcement {
   id: string;
   title: string;
   message: string;
-  audience: 'all' | 'compliance_pro' | 'community_plus' | 'management_suite' | string;
+  audience: 'all' | 'essentials' | 'board' | 'estate' | 'compliance_pro' | 'community_plus' | 'management_suite' | string;
   status: 'draft' | 'sent';
   createdBy: string;
   createdAt: string;
@@ -825,7 +845,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     set(s => ({
       tenants: s.tenants.map(t => t.id === id ? {
         ...t,
-        subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
+        subscription: { ...t.subscription, tier, monthlyRate: ({ essentials: 79, board: 199, estate: 399, compliance_pro: 179, community_plus: 279, management_suite: 399 } as Record<string, number>)[tier] || t.subscription.monthlyRate },
         features,
       } : t),
       auditLog: [{ id: generateLocalId('aud-'), timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
@@ -947,7 +967,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
         return { ...p, actions: newActions, updatedAt: new Date().toISOString(), updatedBy: 'admin' };
       }),
     }));
-    const allFeatures = [...CORE_FEATURES, ...Object.keys(TIER_FEATURES.compliance_pro)];
+    const allFeatures = [...CORE_FEATURES, ...Object.keys(TIER_FEATURES.essentials)];
     if (isBackendEnabled) platformSvc.bulkUpdatePermissions(roleId, mode, allFeatures);
   },
 
