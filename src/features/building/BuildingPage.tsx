@@ -185,7 +185,7 @@ export default function BuildingPage() {
               openEdit={(id, data) => openEdit('editAsset', id, data)}
               openAddMaint={(assetId) => { resetForm(); setMaintAssetId(assetId); setModal('addMaint'); }}
               openEditMaint={(id, data) => openEdit('editMaint', id, data)}
-              navigateToTab={setTab}
+              navigateToTab={(tab: string) => setTab(tab as typeof TABS[number])}
             />
           )}
         </div>
