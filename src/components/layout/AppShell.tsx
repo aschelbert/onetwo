@@ -3,6 +3,7 @@ import TopNav from './TopNav';
 import BottomNav from './BottomNav';
 import OnboardingSetupWidget from '@/components/OnboardingSetupWidget';
 import { useTenantContext } from '@/components/TenantProvider';
+import UndoToastHost from '@/components/ui/UndoToast';
 
 export default function AppShell() {
   const tenant = useTenantContext();
@@ -22,6 +23,7 @@ export default function AppShell() {
         </div>
       </main>
       <BottomNav />
+      <UndoToastHost />
     </div>
   );
 }
