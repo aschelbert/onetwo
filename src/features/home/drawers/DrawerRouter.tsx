@@ -1,34 +1,41 @@
 /**
- * DrawerRouter maps drawer IDs to their corresponding components.
- * This is the single entry point for all drawers opened from the v2 home page.
- *
- * Usage:
- *   <DrawerRouter drawerId="close_month" open={true} onClose={fn} props={{ period: '2026-10' }} />
+ * DrawerRouter — Maps drawer IDs from the Home page to their corresponding
+ * drawer components. Used when v2 feature flags are enabled.
  */
 
+import RunbookDrawer from '@/features/compliance/RunbookDrawer';
 import CloseMonthDrawer from '@/features/financial/CloseMonthDrawer';
 
-export type DrawerId = 'close_month';
+export type DrawerId = 'runbook' | 'close_month';
 
 interface DrawerRouterProps {
   drawerId: DrawerId | null;
   open: boolean;
   onClose: () => void;
-  props?: Record<string, unknown>;
+  context?: Record<string, string>;
 }
 
-export default function DrawerRouter({ drawerId, open, onClose, props = {} }: DrawerRouterProps) {
+export default function DrawerRouter({ drawerId, open, onClose, context = {} }: DrawerRouterProps) {
   if (!drawerId || !open) return null;
 
   switch (drawerId) {
+    case 'runbook':
+      return (
+        <RunbookDrawer
+          itemId={context.itemId || ''}
+          onClose={onClose}
+        />
+      );
+
     case 'close_month':
       return (
         <CloseMonthDrawer
           open={open}
           onClose={onClose}
-          period={(props.period as string) || new Date().toISOString().slice(0, 7)}
+          period={context.period || new Date().toISOString().slice(0, 7)}
         />
       );
+
     default:
       return null;
   }
