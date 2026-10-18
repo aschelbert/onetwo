@@ -15,6 +15,8 @@ import { computeBoardHealth } from '@/lib/boardHealth';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import CommunicationsTab from './tabs/CommunicationsTab';
+import OutboxTab from './tabs/OutboxTab';
+import RolesCalendarTab from './tabs/RolesCalendarTab';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
 import { useTenantContext } from '@/components/TenantProvider';
@@ -30,7 +32,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops' | 'before' | 'meeting_day' | 'after' | 'outbox' | 'cases' | 'roles';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument' | 'addAnnouncement';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -72,12 +74,15 @@ export default function BoardRoomPage() {
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const tenant = useTenantContext();
   const v2Drawers = !!tenant.features?.v2Drawers;
+  const v2BoardRoom = !!tenant.features?.v2BoardRoom;
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const [tab, setTab] = useTabParam<TabId>('tab', 'duties', ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops']);
+  const v2ValidTabs: TabId[] = ['before', 'meeting_day', 'after', 'outbox', 'cases', 'roles'];
+  const v1ValidTabs: TabId[] = ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops'];
+  const [tab, setTab] = useTabParam<TabId>('tab', v2BoardRoom ? 'before' : 'duties', v2BoardRoom ? v2ValidTabs : v1ValidTabs);
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
   const [targetId, setTargetId] = useState('');
@@ -365,14 +370,25 @@ export default function BoardRoomPage() {
   };
 
   // ─── Tab definitions ───
-  const TABS: { id: TabId; label: string; badge?: number }[] = [
+  const pendingCommsCount = comp.communications.filter(c => c.status === 'pending').length;
+  const openCasesCount = issues.cases.filter(c => c.status === 'open').length;
+  const V1_TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'duties', label: 'Duties & Roles' },
     { id: 'runbook', label: 'Governance Calendar', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => i.scope === 'governance' && !isItemComplete(i.id, i.howTo.length)).length) || undefined },
-    { id: 'dailyops', label: 'Daily Operations', badge: issues.cases.filter(c => c.status === 'open').length || undefined },
+    { id: 'dailyops', label: 'Daily Operations', badge: openCasesCount || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
-    { id: 'communications', label: 'Communications', badge: comp.communications.filter(c => c.status === 'pending').length || undefined },
+    { id: 'communications', label: 'Communications', badge: pendingCommsCount || undefined },
   ];
+  const V2_TABS: { id: TabId; label: string; badge?: number }[] = [
+    { id: 'before', label: 'Before the Meeting' },
+    { id: 'meeting_day', label: 'Meeting Day' },
+    { id: 'after', label: 'After' },
+    { id: 'outbox', label: 'Outbox', badge: pendingCommsCount || undefined },
+    { id: 'cases', label: 'Cases', badge: openCasesCount || undefined },
+    { id: 'roles', label: 'Roles' },
+  ];
+  const TABS = v2BoardRoom ? V2_TABS : V1_TABS;
 
   return (
     <div className="space-y-0">
@@ -1048,6 +1064,50 @@ export default function BoardRoomPage() {
 
         {/* ═══ DAILY OPERATIONS TAB ═══ */}
         {tab === 'dailyops' && <IssuesPage embedded />}
+
+        {/* ═══ V2 TABS ═══ */}
+        {/* Before / Meeting Day / After — render existing Meetings tab content */}
+        {tab === 'before' && (() => {
+          return (<div className="space-y-6">
+            <div><h3 className="font-display text-lg font-bold text-ink-900">Before the Meeting</h3><p className="text-xs text-ink-400 mt-1">Prepare agendas, notices, and materials for upcoming meetings.</p></div>
+            {upcoming.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Upcoming</p><div className="space-y-3">{upcoming.map(m => renderMeeting(m, true))}</div></div>)}
+            {upcoming.length === 0 && <p className="text-center text-ink-400 py-8">No upcoming meetings. Schedule one to get started.</p>}
+            {isBoard && <div className="flex justify-center"><button onClick={openAddMeeting} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Schedule Meeting</button></div>}
+          </div>);
+        })()}
+
+        {tab === 'meeting_day' && (() => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const todayMeetings = meetings.filter(m => m.date === todayStr && m.status !== 'CANCELLED');
+          const nearFuture = upcoming.filter(m => {
+            const d = new Date(m.date + 'T00:00:00');
+            const diff = (d.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+            return diff >= 0 && diff <= 7;
+          });
+          return (<div className="space-y-6">
+            <div><h3 className="font-display text-lg font-bold text-ink-900">Meeting Day</h3><p className="text-xs text-ink-400 mt-1">Run your meeting with agendas, attendance, and real-time notes.</p></div>
+            {todayMeetings.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Today</p><div className="space-y-3">{todayMeetings.map(m => renderMeeting(m, true))}</div></div>)
+            : nearFuture.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">This Week</p><div className="space-y-3">{nearFuture.map(m => renderMeeting(m, true))}</div></div>)
+            : <p className="text-center text-ink-400 py-8">No meetings scheduled for today or this week.</p>}
+          </div>);
+        })()}
+
+        {tab === 'after' && (() => {
+          return (<div className="space-y-6">
+            <div><h3 className="font-display text-lg font-bold text-ink-900">After the Meeting</h3><p className="text-xs text-ink-400 mt-1">Approve minutes, follow up on action items, and distribute records.</p></div>
+            {past.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Completed Meetings</p><div className="space-y-3">{past.map(m => renderMeeting(m, false))}</div></div>)}
+            {past.length === 0 && <p className="text-center text-ink-400 py-8">No completed meetings yet.</p>}
+          </div>);
+        })()}
+
+        {/* Outbox tab */}
+        {tab === 'outbox' && <OutboxTab />}
+
+        {/* Cases tab — renders existing Daily Operations content */}
+        {tab === 'cases' && <IssuesPage embedded />}
+
+        {/* Roles tab — combined Role Charters + Calendar */}
+        {tab === 'roles' && <RolesCalendarTab />}
 
       </div>
 

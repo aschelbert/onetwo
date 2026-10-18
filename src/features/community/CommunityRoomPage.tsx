@@ -10,6 +10,8 @@ import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AmenitiesTab from '@/features/community/AmenitiesTab';
+import RoleCharter from '@/features/boardroom/components/RoleCharter';
+import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
 
 type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities';
 
@@ -31,6 +33,8 @@ const REQ_CATS = [
 export default function CommunityRoomPage() {
   const tenant = useTenantContext();
   const isManagementSuite = tenant.tier === 'estate' || tenant.tier === 'management_suite' || tenant.isDemo;
+  const v2BoardRoom = !!tenant.features?.v2BoardRoom;
+  const [whoDoesWhatRole, setWhoDoesWhatRole] = useState<BoardRoleKey>('president');
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
@@ -363,6 +367,32 @@ export default function CommunityRoomPage() {
         {tab === 'amenities' && isManagementSuite && <AmenitiesTab />}
 
       </div>
+
+      {/* ═══ WHO DOES WHAT (v2BoardRoom) ═══ */}
+      {v2BoardRoom && (
+        <div className="bg-white rounded-xl border border-ink-100 p-6 mt-4">
+          <div className="mb-4">
+            <h3 className="font-display text-lg font-bold text-ink-900">Who does what</h3>
+            <p className="text-xs text-ink-400 mt-0.5">Board member responsibilities and task assignments</p>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap mb-4">
+            {(['president', 'vice_president', 'treasurer', 'secretary', 'member_at_large'] as BoardRoleKey[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setWhoDoesWhatRole(r)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  whoDoesWhatRole === r
+                    ? 'bg-navy text-white'
+                    : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
+                }`}
+              >
+                {BOARD_ROLE_LABELS[r]}
+              </button>
+            ))}
+          </div>
+          <RoleCharter roleKey={whoDoesWhatRole} readOnly />
+        </div>
+      )}
     </div>
   );
 }

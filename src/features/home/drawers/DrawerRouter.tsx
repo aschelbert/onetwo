@@ -5,8 +5,9 @@
 
 import RunbookDrawer from '@/features/compliance/RunbookDrawer';
 import CloseMonthDrawer from '@/features/financial/CloseMonthDrawer';
+import ComposeDrawer from '@/features/boardroom/components/ComposeDrawer';
 
-export type DrawerId = 'runbook' | 'close_month';
+export type DrawerId = 'runbook' | 'close_month' | 'compose';
 
 interface DrawerRouterProps {
   drawerId: DrawerId | null;
@@ -33,6 +34,15 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
           open={open}
           onClose={onClose}
           period={context.period || new Date().toISOString().slice(0, 7)}
+        />
+      );
+
+    case 'compose':
+      return (
+        <ComposeDrawer
+          open={open}
+          onClose={onClose}
+          prefillRecipient={context.recipient}
         />
       );
 
