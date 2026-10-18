@@ -93,4 +93,8 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
+  PM_COMPANY: [
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
+    { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
+  ],
 };
