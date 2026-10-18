@@ -93,12 +93,22 @@ export async function fetchCompletions(tenantId: string): Promise<{ completions:
   return { completions, stepCompletions };
 }
 
-export async function upsertCompletion(tenantId: string, itemId: string, completed: boolean, steps?: boolean[]): Promise<boolean> {
+export type ProofKind = 'attachment' | 'communication' | 'filing' | 'case' | 'meeting' | 'reason';
+export interface CompletionProof { kind: ProofKind; ref: string }
+
+export async function upsertCompletion(
+  tenantId: string,
+  itemId: string,
+  completed: boolean,
+  steps?: boolean[],
+  proof?: CompletionProof,
+): Promise<boolean> {
   if (!supabase) return false;
   const row: Record<string, unknown> = {
     tenant_id: tenantId, item_id: itemId, completed,
   };
   if (steps !== undefined) row.steps = steps;
+  if (proof !== undefined) row.proof = proof;
   const { error } = await supabase.from('compliance_completions').upsert(
     row, { onConflict: 'tenant_id,item_id' }
   );
