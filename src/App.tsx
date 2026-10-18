@@ -28,6 +28,7 @@ import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
+import UiKitPage from '@/features/dev/UiKitPage';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -250,6 +251,11 @@ export default function App() {
           <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
           <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
         </Route>
+
+        {/* Dev-only UI kit route */}
+        {import.meta.env.DEV && (
+          <Route path="/dev/ui-kit" element={<UiKitPage />} />
+        )}
 
         {/* Catch-all */}
         <Route path="*" element={<CatchAll />} />
