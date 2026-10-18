@@ -17,6 +17,11 @@ import IssuesPage from '@/features/issues/IssuesPage';
 import CommunicationsTab from './tabs/CommunicationsTab';
 import Modal from '@/components/ui/Modal';
 import FileUpload from '@/components/ui/FileUpload';
+import { useTenantContext } from '@/components/TenantProvider';
+import RunbookDrawer from '@/features/compliance/RunbookDrawer';
+import RoleChip from '@/components/ui/RoleChip';
+import ProofBadge from '@/components/ui/ProofBadge';
+import { ChevronRight } from 'lucide-react';
 
 const ROLE_COLORS: Record<string, string> = { President:'accent', 'Vice President':'mist', Treasurer:'sage', Secretary:'yellow', 'Member at Large':'purple' };
 const DUTY_LABELS: Record<string, string> = { care:'Duty of Care', loyalty:'Duty of Loyalty', obedience:'Duty of Obedience' };
@@ -65,6 +70,9 @@ export default function BoardRoomPage() {
   const letterStore = useLetterStore();
   const navigate = useNavigate();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
+  const tenant = useTenantContext();
+  const v2Drawers = !!tenant.features?.v2Drawers;
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
@@ -501,8 +509,120 @@ export default function BoardRoomPage() {
           </div>);
         })()}
 
-        {/* ═══ RUNBOOK TAB (with filings integrated) ═══ */}
-        {tab === 'runbook' && (() => {
+        {/* ═══ RUNBOOK TAB — v2Drawers compact list ═══ */}
+        {tab === 'runbook' && v2Drawers && (() => {
+          const allItems = catScores.flatMap(c => c.items).filter(i => i.scope === 'governance');
+          const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
+
+          // Group by due date or category (reuse runbookSort)
+          const getDueStatus = (due: string) => {
+            if (!due || due === 'Ongoing' || due === 'Per meeting' || due === 'Per transfer' || due === 'Per request' || due === 'Quarterly' || due === 'As needed' || due === 'Monthly' || due === 'Annual') return 'ongoing';
+            const d = Date.parse(due);
+            if (isNaN(d)) return 'ongoing';
+            const now = Date.now();
+            if (d < now) return 'overdue';
+            const sevenDays = 7 * 24 * 60 * 60 * 1000;
+            if (d - now < sevenDays) return 'soon';
+            return 'later';
+          };
+
+          const sorted = [...allItems].sort((a, b) => {
+            const aDone = isItemComplete(a.id, a.howTo.length);
+            const bDone = isItemComplete(b.id, b.howTo.length);
+            if (aDone !== bDone) return aDone ? 1 : -1;
+            const aT = Date.parse(a.due) || 99999999999999;
+            const bT = Date.parse(b.due) || 99999999999999;
+            return aT - bT;
+          });
+
+          const STATUS_DOT: Record<string, string> = {
+            complete: 'bg-sage-500',
+            overdue: 'bg-red-500',
+            soon: 'bg-amber-500',
+            later: 'bg-ink-300',
+            ongoing: 'bg-ink-200',
+          };
+
+          const DUE_PILL: Record<string, string> = {
+            overdue: 'bg-red-100 text-red-700',
+            soon: 'bg-amber-100 text-amber-700',
+            later: 'bg-ink-100 text-ink-600',
+            ongoing: 'bg-ink-50 text-ink-400',
+          };
+
+          return (
+            <div className="space-y-4">
+              {/* Summary bar */}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-ink-500">
+                  {completedCount}/{allItems.length} complete
+                </p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <button onClick={() => setRoleFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === 'all' ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>All Roles</button>
+                  {allRoles.map(r => (<button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${roleFilter === r ? 'bg-accent-600 text-white' : 'bg-ink-50 text-ink-600 hover:bg-ink-100'}`}>{r}</button>))}
+                </div>
+              </div>
+
+              {/* Compact rows */}
+              <div className="border border-ink-100 rounded-xl overflow-hidden divide-y divide-ink-50">
+                {sorted.map((item) => {
+                  const done = isItemComplete(item.id, item.howTo.length);
+                  const dueStatus = done ? 'complete' : getDueStatus(item.due);
+                  const itemAtts = comp.itemAttachments[item.id] || [];
+                  const hasProof = itemAtts.length > 0;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setDrawerItemId(item.id)}
+                      className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-mist-50 transition-colors ${done ? 'bg-sage-50 bg-opacity-30' : ''}`}
+                    >
+                      {/* Status dot */}
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS_DOT[dueStatus]}`} />
+
+                      {/* Task name */}
+                      <span className={`flex-1 text-sm truncate ${done ? 'text-ink-400 line-through' : 'text-ink-800'}`}>
+                        {item.task}
+                      </span>
+
+                      {/* Role chip */}
+                      <RoleChip label={item.role} />
+
+                      {/* Due pill */}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${DUE_PILL[dueStatus] || DUE_PILL.later}`}>
+                        {item.due}
+                      </span>
+
+                      {/* Proof badge */}
+                      {hasProof && <ProofBadge label={`${itemAtts.length}`} />}
+
+                      {/* Chevron */}
+                      <ChevronRight size={16} className="text-ink-300 shrink-0" />
+                    </button>
+                  );
+                })}
+                {sorted.length === 0 && (
+                  <p className="p-6 text-center text-sm text-ink-400">No items for this filter</p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Runbook Drawer (v2) */}
+        {v2Drawers && drawerItemId && (
+          <RunbookDrawer
+            itemId={drawerItemId}
+            onClose={() => setDrawerItemId(null)}
+            onEditLegacy={(id) => {
+              setDrawerItemId(null);
+              setExpandedRunbook(id);
+            }}
+          />
+        )}
+
+        {/* ═══ RUNBOOK TAB (legacy — with filings integrated) ═══ */}
+        {tab === 'runbook' && !v2Drawers && (() => {
           const allItems = catScores.flatMap(c => c.items).filter(i => i.scope === 'governance');
           const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
           const inProgressCount = allItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length;
