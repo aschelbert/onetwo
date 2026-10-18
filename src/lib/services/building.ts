@@ -1,4 +1,5 @@
 import { supabase, logDbError } from '@/lib/supabase';
+import { toBoardRoleKey } from '@/types/auth';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
   LegalDocument, InsurancePolicy, Vendor, MaintenanceSchedule,
@@ -16,28 +17,31 @@ export async function fetchBoardMembers(tenantId: string): Promise<BoardMember[]
   if (error) { logDbError('fetchBoardMembers error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, name: r.name, role: r.role, email: r.email, phone: r.phone, term: r.term,
+    roleKey: r.role_key ?? toBoardRoleKey(r.role),
   }));
 }
 
 export async function createBoardMember(tenantId: string, m: Omit<BoardMember, 'id'>): Promise<BoardMember | null> {
   if (!supabase) return null;
+  const roleKey = m.roleKey ?? toBoardRoleKey(m.role);
   const { data, error } = await supabase
     .from('board_members')
-    .insert({ tenant_id: tenantId, name: m.name, role: m.role, email: m.email, phone: m.phone, term: m.term })
+    .insert({ tenant_id: tenantId, name: m.name, role: m.role, email: m.email, phone: m.phone, term: m.term, role_key: roleKey })
     .select()
     .single();
   if (error) { logDbError('createBoardMember error:', error); return null; }
-  return { id: data.id, name: data.name, role: data.role, email: data.email, phone: data.phone, term: data.term };
+  return { id: data.id, name: data.name, role: data.role, email: data.email, phone: data.phone, term: data.term, roleKey: data.role_key ?? toBoardRoleKey(data.role) };
 }
 
 export async function updateBoardMember(id: string, m: Partial<BoardMember>): Promise<boolean> {
   if (!supabase) return false;
   const row: Record<string, unknown> = {};
   if (m.name !== undefined) row.name = m.name;
-  if (m.role !== undefined) row.role = m.role;
+  if (m.role !== undefined) { row.role = m.role; row.role_key = m.roleKey ?? toBoardRoleKey(m.role); }
   if (m.email !== undefined) row.email = m.email;
   if (m.phone !== undefined) row.phone = m.phone;
   if (m.term !== undefined) row.term = m.term;
+  if (m.roleKey !== undefined) row.role_key = m.roleKey;
   const { error } = await supabase.from('board_members').update(row).eq('id', id);
   if (error) { logDbError('updateBoardMember error:', error); return false; }
   return true;

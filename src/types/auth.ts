@@ -1,5 +1,25 @@
 export type Role = 'BOARD_MEMBER' | 'RESIDENT' | 'PROPERTY_MANAGER' | 'STAFF' | 'PLATFORM_ADMIN' | 'PM_COMPANY';
 
+export type BoardRoleKey = 'president' | 'vice_president' | 'treasurer' | 'secretary' | 'member_at_large';
+
+export const BOARD_ROLE_LABELS: Record<BoardRoleKey, string> = {
+  president: 'President',
+  vice_president: 'Vice President',
+  treasurer: 'Treasurer',
+  secretary: 'Secretary',
+  member_at_large: 'Member at Large',
+};
+
+export function toBoardRoleKey(role: string | null | undefined): BoardRoleKey {
+  if (!role) return 'member_at_large';
+  const lower = role.toLowerCase();
+  if (lower.includes('vice') && lower.includes('pres')) return 'vice_president';
+  if (lower.includes('pres')) return 'president';
+  if (lower.includes('treas')) return 'treasurer';
+  if (lower.includes('sec')) return 'secretary';
+  return 'member_at_large';
+}
+
 export interface User {
   id: string;
   name: string;
@@ -24,6 +44,7 @@ export interface BuildingMember {
   status: 'active' | 'inactive';
   joined: string;
   boardTitle: string | null;
+  roleKey?: BoardRoleKey;
 }
 
 export interface BuildingInvite {

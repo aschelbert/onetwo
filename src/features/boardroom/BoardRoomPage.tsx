@@ -9,7 +9,9 @@ import { useElectionStore } from '@/store/useElectionStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { supabase } from '@/lib/supabase';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
+import { computeBoardHealth } from '@/lib/boardHealth';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import CommunicationsTab from './tabs/CommunicationsTab';
@@ -56,6 +58,7 @@ export default function BoardRoomPage() {
   const comp = useComplianceStore();
   const mtg = useMeetingsStore();
   const { board, address, legalDocuments, insurance, management } = useBuildingStore();
+  const fin = useFinancialStore();
   const issues = useIssuesStore();
   const elections = useElectionStore();
   const { currentRole, currentUser, buildingMembers } = useAuthStore();
@@ -79,7 +82,8 @@ export default function BoardRoomPage() {
   const [minText, setMinText] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedRunbook, setExpandedRunbook] = useState<string | null>(null);
-  const [workflowSteps, setWorkflowSteps] = useState<Record<string, boolean[]>>({});
+  // Step completions from the compliance store (persisted)
+  const workflowSteps = comp.stepCompletions;
   const [pendingFile, setPendingFile] = useState<{ name: string; size: string; type: string } | null>(null);
   const [linkCaseId, setLinkCaseId] = useState('');
   const [newCaseForm, setNewCaseForm] = useState({ catId: 'governance', sitId: 'board-meetings', title: '', priority: 'medium' as string });
@@ -88,17 +92,38 @@ export default function BoardRoomPage() {
   const [runbookItemForMeeting, setRunbookItemForMeeting] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  // Completion = all workflow steps checked
-  const isItemComplete = (itemId: string, howToLength: number): boolean => {
-    const steps = workflowSteps[itemId];
-    if (!steps || steps.length === 0) return false;
-    return steps.length >= howToLength && steps.every(Boolean);
+  // Completion from the compliance store
+  const isItemComplete = (itemId: string, _howToLength: number): boolean => {
+    return !!comp.completions[itemId];
   };
 
   // Compliance scores (driven by workflow completion)
   const catScores = categories.map(c => { const filtered = roleFilter === 'all' ? c.items : c.items.filter(i => i.role === roleFilter); const passed = filtered.filter(i => isItemComplete(i.id, i.howTo.length)).length; const pct = filtered.length > 0 ? Math.round((passed / filtered.length) * 100) : 100; return { ...c, items: filtered, passed, total: filtered.length, pct }; });
-  const totalWeight = catScores.reduce((s, c) => s + c.weight, 0);
-  const healthIndex = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
+
+  // Board Health score (single source of truth)
+  const finMetrics = fin.getIncomeMetrics();
+  const reserveItems = fin.reserveItems;
+  const totalReserveFunded = reserveItems.reduce((s, i) => s + i.currentFunding, 0);
+  const totalReserveNeeded = reserveItems.reduce((s, i) => s + i.estimatedCost, 0);
+  const brReservePct = totalReserveNeeded > 0 ? Math.round((totalReserveFunded / totalReserveNeeded) * 100) : 0;
+  const totalDocs = legalDocuments.length;
+  const currentDocs = legalDocuments.filter(d => d.status === 'current').length;
+  const documentsCurrentPct = totalDocs > 0 ? Math.round((currentDocs / totalDocs) * 100) : 0;
+  const allItems = categories.flatMap(c => c.items);
+  const attachedCount = Object.keys(comp.itemAttachments).filter(k => (comp.itemAttachments[k]?.length ?? 0) > 0).length;
+  const proofCoverage = allItems.length > 0 ? attachedCount / allItems.length : 0;
+  const healthResult = computeBoardHealth({
+    runbookItems: allItems.map(i => ({ id: i.id, due: i.due, critical: i.critical, scope: i.scope })),
+    completions: comp.completions,
+    filings: comp.filings.map(f => ({ status: f.status, dueDate: f.dueDate, filedDate: f.filedDate })),
+    collectionRate: finMetrics.collectionRate,
+    reservePctFunded: brReservePct,
+    monthsClosedOnTime: 0,
+    meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: null, minutesApprovedAt: null, quorumMet: undefined })),
+    proofCoverage,
+    documentsCurrentPct,
+  });
+  const healthIndex = healthResult.score;
   const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
   const allRoles: string[] = [...new Set(categories.flatMap(c => c.items.map(i => i.role)))];
 
@@ -200,7 +225,7 @@ export default function BoardRoomPage() {
     if (runbookItemForMeeting && modal === 'addMeeting') {
       const item = categories.flatMap(c => c.items).find(i => i.id === runbookItemForMeeting);
       if (item) {
-        setWorkflowSteps(prev => ({ ...prev, [runbookItemForMeeting!]: item.howTo.map(() => true) }));
+        comp.completeAllSteps(runbookItemForMeeting!, item.howTo.length);
       }
       setRunbookItemForMeeting(null);
     }
@@ -669,7 +694,7 @@ export default function BoardRoomPage() {
                     };
                     const toggleStep = (si: number) => {
                       const ns = [...steps]; ns[si] = !ns[si];
-                      setWorkflowSteps({ ...workflowSteps, [item.id]: ns });
+                      comp.setStepCompletions(item.id, ns);
                       // If this step made all steps done, prompt for communication
                       if (ns.every(Boolean) && !allDone) promptComm(item.task);
                     };
@@ -688,8 +713,8 @@ export default function BoardRoomPage() {
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span>
                           </div>
                           <div className="flex gap-2">
-                            {!allDone && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) }); if (!allDone) promptComm(item.task); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
-                            {completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
+                            {!allDone && <button onClick={() => { comp.completeAllSteps(item.id, item.howTo.length); if (!allDone) promptComm(item.task); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
+                            {completedSteps > 0 && <button onClick={() => comp.setStepCompletions(item.id, item.howTo.map(() => false))} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
                           </div>
                         </div>
                         <div className="divide-y divide-ink-50">
@@ -835,7 +860,7 @@ export default function BoardRoomPage() {
                     const steps = workflowSteps[item.id] || item.howTo.map(() => false);
                     const completedSteps = steps.filter(Boolean).length;
                     const allStepsDone = completedSteps === item.howTo.length;
-                    const toggleStep = (si: number) => { const ns = [...steps]; ns[si] = !ns[si]; setWorkflowSteps({ ...workflowSteps, [item.id]: ns }); };
+                    const toggleStep = (si: number) => { const ns = [...steps]; ns[si] = !ns[si]; comp.setStepCompletions(item.id, ns); };
                     return (<div className="px-4 pb-4 ml-10 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">⚠ Why This Matters</p><p className="text-xs text-amber-900 leading-relaxed">{item.whyItMatters}</p></div>
@@ -844,7 +869,7 @@ export default function BoardRoomPage() {
                       <div className={`border rounded-xl overflow-hidden ${allStepsDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
                         <div className="p-3 border-b border-ink-100 flex items-center justify-between">
                           <div className="flex items-center gap-2"><p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allStepsDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span></div>
-                          <div className="flex gap-2">{!allStepsDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
+                          <div className="flex gap-2">{!allStepsDone && <button onClick={() => comp.completeAllSteps(item.id, item.howTo.length)} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => comp.setStepCompletions(item.id, item.howTo.map(() => false))} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
                         </div>
                         <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
                         {allStepsDone && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2"><svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span></div>)}
@@ -861,7 +886,9 @@ export default function BoardRoomPage() {
         {tab === 'meetings' && (() => {
           const bylawRef = hasBylaws ? 'Bylaws Art. IV-V' : 'Governing Documents';
           const meetingsThisYear = meetings.filter(m => m.date.startsWith('2026')).length;
-          const meetingsRequired = 6; // bi-monthly per bylaws
+          // TODO: read from buildingSettings.meetingCadence via tenant context
+          const cadenceMap: Record<string, number> = { monthly: 12, bimonthly: 6, quarterly: 4 };
+          const meetingsRequired = cadenceMap['bimonthly'] ?? 6;
           const cadencePct = Math.min(100, Math.round((meetingsThisYear / meetingsRequired) * 100));
           const minutesPending = past.filter(m => !m.minutesApprovals || m.minutesApprovals.length === 0).length;
           return (<div className="space-y-6">

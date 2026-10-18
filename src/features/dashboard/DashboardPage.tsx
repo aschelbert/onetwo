@@ -7,10 +7,13 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
+import { computeBoardHealth } from '@/lib/boardHealth';
 import { computeFiduciaryAlerts } from '@/lib/fiduciaryAlerts';
 import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
 import { FiduciaryAlerts } from './FiduciaryAlerts';
+import { useSpendingStore } from '@/store/useSpendingStore';
+import { useElectionStore } from '@/store/useElectionStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import PageHeader from '@/components/shared/PageHeader';
 
@@ -22,6 +25,8 @@ export default function DashboardPage() {
   const comp = useComplianceStore();
   const building = useBuildingStore();
   const issues = useIssuesStore();
+  const spending = useSpendingStore();
+  const elections = useElectionStore();
   const archives = useArchiveStore();
   const navigate = useNavigate();
 
@@ -35,7 +40,7 @@ export default function DashboardPage() {
   const totalReserveNeeded = reserveItems.reduce((s, i) => s + i.estimatedCost, 0);
   const reservePct = totalReserveNeeded > 0 ? Math.round((totalReserveFunded / totalReserveNeeded) * 100) : 0;
 
-  // Compliance
+  // Compliance & Board Health (single source of truth)
   const refreshResult = refreshComplianceRequirements({
     state: building.address.state,
     legalDocuments: building.legalDocuments.map(d => ({ name: d.name, status: d.status })),
@@ -43,22 +48,28 @@ export default function DashboardPage() {
     boardCount: building.board.length,
     hasManagement: !!building.management.company,
   });
-  const totalItems = refreshResult.categories.reduce((s, c) => s + c.items.length, 0);
-  const completedItems = Object.values(comp.completions).filter(Boolean).length;
-  const complianceScore = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-  const complianceGrade = complianceScore >= 90 ? 'A' : complianceScore >= 75 ? 'B' : complianceScore >= 60 ? 'C' : 'D';
-
-  // Building health
+  const allRunbookItems = refreshResult.categories.flatMap(c => c.items);
   const totalDocs = building.legalDocuments.length;
   const currentDocs = building.legalDocuments.filter(d => d.status === 'current').length;
-  const docsWithFiles = building.legalDocuments.filter(d => d.attachments && d.attachments.length > 0).length;
-  const legalScore = totalDocs > 0 ? Math.round(((currentDocs / totalDocs) * 60) + ((docsWithFiles / totalDocs) * 40)) : 0;
-  const totalPolicies = building.insurance.length;
-  const activePolicies = building.insurance.filter(p => new Date(p.expires) > new Date()).length;
-  const policiesWithDocs = building.insurance.filter(p => p.attachments && p.attachments.length > 0).length;
-  const insScore = totalPolicies > 0 ? Math.round(((activePolicies / totalPolicies) * 70) + ((policiesWithDocs / totalPolicies) * 30)) : 0;
-  const govScore = Math.round(([building.board.length >= 3, !!building.management.company, building.legalCounsel.length > 0, building.vendors.filter(v => v.status === 'active').length >= 3].filter(Boolean).length / 4) * 100);
-  const buildingHealth = Math.round(legalScore * 0.35 + insScore * 0.35 + govScore * 0.30);
+  const documentsCurrentPct = totalDocs > 0 ? Math.round((currentDocs / totalDocs) * 100) : 0;
+  const attachedCount = Object.keys(comp.itemAttachments).filter(k => (comp.itemAttachments[k]?.length ?? 0) > 0).length;
+  const proofCoverage = allRunbookItems.length > 0 ? attachedCount / allRunbookItems.length : 0;
+  const healthResult = computeBoardHealth({
+    runbookItems: allRunbookItems.map(i => ({ id: i.id, due: i.due, critical: i.critical, scope: i.scope })),
+    completions: comp.completions,
+    filings: comp.filings.map(f => ({ status: f.status, dueDate: f.dueDate, filedDate: f.filedDate })),
+    collectionRate: metrics.collectionRate,
+    reservePctFunded: reservePct,
+    monthsClosedOnTime: 0,
+    meetings: meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: null, minutesApprovedAt: null, quorumMet: undefined })),
+    proofCoverage,
+    documentsCurrentPct,
+  });
+  const totalItems = allRunbookItems.length;
+  const completedItems = Object.values(comp.completions).filter(Boolean).length;
+  const complianceScore = healthResult.compliance;
+  const complianceGrade = complianceScore >= 90 ? 'A' : complianceScore >= 75 ? 'B' : complianceScore >= 60 ? 'C' : 'D';
+  const buildingHealth = healthResult.score;
   const buildingGrade = buildingHealth >= 90 ? 'A' : buildingHealth >= 80 ? 'B' : buildingHealth >= 70 ? 'C' : buildingHealth >= 60 ? 'D' : 'F';
 
   // Meetings
@@ -89,14 +100,22 @@ export default function DashboardPage() {
   const recentComms = comp.communications.slice(0, 5);
 
   // Fiduciary alerts
+  // TODO handoff 08: count elections with status open and no conflict check record
+  const _openElections = elections.elections.filter(e => e.status === 'open');
+  const boardVotesWithoutConflictChecks = 0; // conflict check field does not exist yet
+  // TODO: read from buildingSettings once TenantProvider loads settings
+  const bylawsSpendingLimit = 5000;
+  const pendingSpendingAboveLimit = spending.approvals.filter(
+    a => a.status === 'pending' && a.amount > bylawsSpendingLimit
+  ).length;
   const fiduciaryAlerts = isBoard ? computeFiduciaryAlerts({
     insurance: building.insurance.map(p => ({ type: p.type, expires: p.expires })),
     reservePctFunded: reservePct,
     openCases: issues.cases.filter(c => c.status === 'open'),
     delinquentUnits: aging.days60.concat(aging.days90plus).map(u => ({ number: u.unit || '', balance: u.balance || 0, daysPastDue: 60 })),
-    boardVotesWithoutConflictChecks: 0,
-    bylawsSpendingLimit: 5000,
-    pendingSpendingAboveLimit: 0,
+    boardVotesWithoutConflictChecks,
+    bylawsSpendingLimit,
+    pendingSpendingAboveLimit,
   }) : [];
   const budgetAlerts = isBoard ? getBudgetAlerts(fin.getBudgetVariance()) : [];
 

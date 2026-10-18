@@ -122,6 +122,12 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
       communityPortal: feat.community_portal as boolean,
       vendorManagement: feat.vendor_management as boolean,
       reserveStudyTools: feat.reserve_study_tools as boolean,
+      v2Home: (feat.v2_home ?? false) as boolean,
+      v2Drawers: (feat.v2_drawers ?? false) as boolean,
+      v2BoardRoom: (feat.v2_board_room ?? false) as boolean,
+      v2FiscalLens: (feat.v2_fiscal_lens ?? false) as boolean,
+      v2Cases: (feat.v2_cases ?? false) as boolean,
+      v2Building: (feat.v2_building ?? false) as boolean,
     } : { ...TIER_FEATURES[validTier] };
 
     // Per-tenant onboarding from DB
@@ -400,6 +406,12 @@ export async function syncTenantFeatures(tenantId: string, features: Tenant['fea
     community_portal: features.communityPortal,
     vendor_management: features.vendorManagement,
     reserve_study_tools: features.reserveStudyTools,
+    v2_home: features.v2Home,
+    v2_drawers: features.v2Drawers,
+    v2_board_room: features.v2BoardRoom,
+    v2_fiscal_lens: features.v2FiscalLens,
+    v2_cases: features.v2Cases,
+    v2_building: features.v2Building,
   };
   const { error } = await supabase
     .from('tenant_features')
