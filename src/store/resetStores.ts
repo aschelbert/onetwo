@@ -46,6 +46,7 @@ export function resetStoresForRealTenant() {
     generalLedger: [],
     workOrders: [],
     unitInvoices: [],
+    periodCloses: [],
     hoaDueDay: 15,
     annualReserveContribution: 0,
   });

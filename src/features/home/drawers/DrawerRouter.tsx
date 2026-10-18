@@ -1,22 +1,22 @@
 /**
  * DrawerRouter — Maps drawer IDs from the Home page to their corresponding
- * drawer components. Used when `features.v2Drawers` is enabled.
+ * drawer components. Used when v2 feature flags are enabled.
  */
 
-import React from 'react';
 import RunbookDrawer from '@/features/compliance/RunbookDrawer';
+import CloseMonthDrawer from '@/features/financial/CloseMonthDrawer';
 
-export type DrawerId = 'runbook' | null;
+export type DrawerId = 'runbook' | 'close_month';
 
 interface DrawerRouterProps {
-  drawerId: DrawerId;
-  /** Opaque context passed to the drawer — typically contains an itemId */
-  context: Record<string, string>;
+  drawerId: DrawerId | null;
+  open: boolean;
   onClose: () => void;
+  context?: Record<string, string>;
 }
 
-export default function DrawerRouter({ drawerId, context, onClose }: DrawerRouterProps) {
-  if (!drawerId) return null;
+export default function DrawerRouter({ drawerId, open, onClose, context = {} }: DrawerRouterProps) {
+  if (!drawerId || !open) return null;
 
   switch (drawerId) {
     case 'runbook':
@@ -24,6 +24,15 @@ export default function DrawerRouter({ drawerId, context, onClose }: DrawerRoute
         <RunbookDrawer
           itemId={context.itemId || ''}
           onClose={onClose}
+        />
+      );
+
+    case 'close_month':
+      return (
+        <CloseMonthDrawer
+          open={open}
+          onClose={onClose}
+          period={context.period || new Date().toISOString().slice(0, 7)}
         />
       );
 
