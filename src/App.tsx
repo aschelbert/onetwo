@@ -7,6 +7,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
+import HomePage from '@/features/home/HomePage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import BuildingPage from '@/features/building/BuildingPage';
@@ -23,7 +24,7 @@ import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
-import TenantProvider from '@/components/TenantProvider';
+import TenantProvider, { useTenantContext } from '@/components/TenantProvider';
 import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
@@ -197,6 +198,23 @@ function RequirePM({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * HomeOrDashboard — renders the new HomePage for board members and property
+ * managers when tenant.features.v2Home is enabled; otherwise falls back to
+ * the existing DashboardPage.
+ */
+function HomeOrDashboard() {
+  const { currentRole } = useAuthStore();
+  const tenant = useTenantContext();
+  const isV2 = tenant.features.v2Home;
+  const isBoardOrPM = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
+
+  if (isV2 && isBoardOrPM) {
+    return <HomePage />;
+  }
+  return <DashboardPage />;
+}
+
 function AIAdvisorWrapper() {
   const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) return null;
@@ -233,7 +251,7 @@ export default function App() {
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
-          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
+          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeOrDashboard /></ErrorBoundary>} />
           <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
           <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
