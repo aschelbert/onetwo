@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import type { InsurancePolicy } from '@/store/useBuildingStore';
+import { useTenantContext } from '@/components/TenantProvider';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 
 /** Required and recommended insurance policies for condominiums.
  *  Based on DC Code, Fannie Mae/Freddie Mac requirements, and industry best practices. */
@@ -53,6 +56,8 @@ interface Props {
 }
 
 export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Props) {
+  const tenant = useTenantContext();
+  const [caseDrawerPolicy, setCaseDrawerPolicy] = useState<string | null>(null);
   const policies = store.insurance;
   const state = store.address.state;
 
@@ -157,6 +162,7 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
                         {expSoon && !exp && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-yellow-100 text-yellow-700">Expiring Soon</span>}
                         {!exp && !expSoon && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-sage-100 text-sage-700">✓ Active</span>}
                         <span className="text-[11px] text-ink-400">{pol.carrier} · {pol.coverage} · Exp {pol.expires}{pol.attachments && pol.attachments.length > 0 ? ` · 📎 ${pol.attachments.length} file${pol.attachments.length > 1 ? 's' : ''}` : ' · ⚠ No doc attached'}</span>
+                        {tenant.features.v2Cases && <button onClick={() => setCaseDrawerPolicy(pol.id)} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Open a case</button>}
                         <button onClick={() => openEdit(pol.id, { type: pol.type, carrier: pol.carrier, coverage: pol.coverage, premium: pol.premium, expires: pol.expires, policyNum: pol.policyNum })} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Edit</button>
                         <button onClick={() => { if (confirm('Remove?')) store.removeInsurance(pol.id); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
                       </div>
@@ -246,6 +252,15 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
       <button onClick={openAdd} className="w-full py-3 border-2 border-dashed border-ink-200 rounded-xl text-sm text-ink-500 hover:border-accent-300 hover:text-accent-600 transition-colors font-medium">
         + Add Additional Policy
       </button>
+
+      {/* v2Cases: Open a case drawer for insurance */}
+      {tenant.features.v2Cases && caseDrawerPolicy && (
+        <OpenCaseDrawer
+          open={true}
+          onClose={() => setCaseDrawerPolicy(null)}
+          prefill={{ insurancePolicyId: caseDrawerPolicy, source: 'insurance', sourceId: caseDrawerPolicy }}
+        />
+      )}
     </div>
   );
 }

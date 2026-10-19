@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import type { StepAction } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -26,11 +26,13 @@ import { StepContent } from './components/shell/StepContent';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
 import { DACI_MATRIX } from '@/data/daciMatrix';
+import { useTenantContext } from '@/components/TenantProvider';
 import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
+  const tenant = useTenantContext();
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useTabParam<string>('view', 'tabs');
@@ -38,6 +40,11 @@ export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
+
+  // When v2Cases is enabled and not embedded, redirect /issues to /boardroom?tab=cases
+  if (tenant.features.v2Cases && !embedded) {
+    return <Navigate to="/boardroom?tab=cases" replace />;
+  }
 
   if (view === 'new') return <WizardView onDone={(id) => { setWizardPrefill(undefined); setView(`case:${id}`); }} onBack={() => { setWizardPrefill(undefined); setView('tabs'); }} prefill={wizardPrefill} />;
   if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;

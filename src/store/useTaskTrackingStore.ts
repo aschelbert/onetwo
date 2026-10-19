@@ -4,6 +4,7 @@ import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as taskSvc from '@/lib/services/taskTracking';
 import type { TaskItem, TaskStatus, LinkedItem } from '@/lib/services/taskTracking';
 import { generateLocalId } from '@/lib/generateId';
+import { useIssuesStore } from '@/store/useIssuesStore';
 
 export type { TaskItem, TaskStatus, TaskPriority, TaskCategory, LinkedItem } from '@/lib/services/taskTracking';
 
@@ -152,6 +153,11 @@ interface TaskTrackingState {
   moveTask: (id: string, newStatus: TaskStatus) => void;
   addLinkedItem: (taskId: string, item: LinkedItem) => void;
   removeLinkedItem: (taskId: string, linkedItemId: string) => void;
+  /**
+   * migrateToCases — Converts open tasks into cases via the issues store.
+   * Returns the number of tasks migrated.
+   */
+  migrateToCases: () => number;
 }
 
 export const useTaskTrackingStore = create<TaskTrackingState>()(persist((set) => ({
@@ -235,6 +241,56 @@ export const useTaskTrackingStore = create<TaskTrackingState>()(persist((set) =>
       const task = useTaskTrackingStore.getState().tasks.find(t => t.id === taskId);
       if (task) taskSvc.updateTask(taskId, { linkedItems: task.linkedItems });
     }
+  },
+
+  migrateToCases: () => {
+    const issuesStore = useIssuesStore.getState();
+    const state = useTaskTrackingStore.getState();
+
+    // Only migrate open tasks (todo, in_progress, blocked)
+    const openTasks = state.tasks.filter(
+      t => t.status === 'todo' || t.status === 'in_progress' || t.status === 'blocked',
+    );
+
+    // Category-to-CATS mapping for best-effort situation assignment
+    const CAT_MAP: Record<string, { catId: string; sitId: string }> = {
+      maintenance: { catId: 'maintenance', sitId: 'common-area-repairs' },
+      compliance: { catId: 'governance', sitId: 'board-meetings' },
+      financial: { catId: 'financial', sitId: 'annual-budgeting' },
+      governance: { catId: 'governance', sitId: 'board-meetings' },
+      communication: { catId: 'governance', sitId: 'board-meetings' },
+    };
+
+    let migrated = 0;
+    for (const task of openTasks) {
+      const mapping = CAT_MAP[task.category] || { catId: 'governance', sitId: 'board-meetings' };
+      const priority = task.priority === 'high' || task.priority === 'urgent' ? task.priority : 'medium';
+      issuesStore.openCaseFromDrawer({
+        catId: mapping.catId,
+        sitId: mapping.sitId,
+        approach: 'pre' as const,
+        title: task.title,
+        reporter: task.createdByName || 'Board',
+        assignedTo: task.assignedToName || undefined,
+        priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+        source: 'task_migration',
+        sourceId: task.id,
+      });
+      migrated++;
+    }
+
+    // Mark migrated tasks as done
+    const now = new Date().toISOString();
+    set(s => ({
+      tasks: s.tasks.map(t => {
+        if (openTasks.some(ot => ot.id === t.id)) {
+          return { ...t, status: 'done' as TaskStatus, completedAt: now, updatedAt: now, notes: `${t.notes ? t.notes + '\n' : ''}Migrated to Cases.` };
+        }
+        return t;
+      }),
+    }));
+
+    return migrated;
   },
 }), {
   name: 'onetwo-task-tracking',

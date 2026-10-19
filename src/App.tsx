@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -10,6 +10,7 @@ import DashboardPage from '@/features/dashboard/DashboardPage';
 import HomePage from '@/features/home/HomePage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
+import CasePageRoute from '@/features/issues/CasePage';
 import BuildingPage from '@/features/building/BuildingPage';
 import ArchivesPage from '@/features/archives/ArchivesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
@@ -227,6 +228,12 @@ function ActiveCaseWidgetWrapper() {
   return <ActiveCaseWidget />;
 }
 
+/** Wrapper to extract `id` param from route and pass to CasePage */
+function CasePageRouteWrapper() {
+  const { id } = useParams<{ id: string }>();
+  return <CasePageRoute caseId={id || ''} />;
+}
+
 
 export default function App() {
   return (
@@ -254,6 +261,7 @@ export default function App() {
           <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeOrDashboard /></ErrorBoundary>} />
           <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
           <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
+          <Route path="/cases/:id" element={<ErrorBoundary fallbackLevel="page"><CasePageRouteWrapper /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />

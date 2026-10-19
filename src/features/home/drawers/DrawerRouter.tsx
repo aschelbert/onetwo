@@ -3,8 +3,7 @@
  * drawer components. Used when v2 feature flags are enabled.
  *
  * IDs that still map to LegacyActionDrawer (placeholder) until their full
- * drawers land in later handoffs: case_new, vote, request,
- * collections_offer, capital_offer.
+ * drawers land in later handoffs: collections_offer, capital_offer.
  */
 
 import DrawerShell from '@/components/ui/DrawerShell';
@@ -20,6 +19,8 @@ import VoteDrawer from '@/features/elections/VoteDrawer';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import CaseStepDrawer from '@/features/issues/components/CaseStepDrawer';
 import ManualJournalDrawer from '@/features/financial/drawers/ManualJournalDrawer';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
+import RequestDrawer from '@/features/issues/RequestDrawer';
 
 export type DrawerId =
   | 'runbook'
@@ -39,8 +40,6 @@ export type DrawerId =
   | 'case_step';
 
 const LEGACY_LABELS: Record<string, string> = {
-  case_new: 'New Case',
-  request: 'Owner Request',
   collections_offer: 'Collections',
   capital_offer: 'Capital Project',
 };
@@ -205,7 +204,23 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
       );
 
     case 'case_new':
+      return (
+        <OpenCaseDrawer
+          open={open}
+          onClose={onClose}
+          prefill={context.text ? { text: context.text, unit: context.unit, source: context.source, sourceId: context.sourceId } : undefined}
+        />
+      );
+
     case 'request':
+      return (
+        <RequestDrawer
+          open={open}
+          onClose={onClose}
+          requestId={context.requestId}
+        />
+      );
+
     case 'collections_offer':
     case 'capital_offer':
       return (

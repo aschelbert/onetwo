@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import { useMeetingsStore, type AgendaItem, type AgendaOutcome, type AgendaTally, type MeetingAttendance } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { generateMinutes } from '@/features/meetings/minutesGenerator';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import type { BuildingSettings } from '@/lib/buildingSettings';
 
 interface MeetingDayTabProps {
@@ -37,7 +39,9 @@ function formatTimeDisplay(time: string): string {
 export default function MeetingDayTab({ settings, isBoard }: MeetingDayTabProps) {
   const mtg = useMeetingsStore();
   const { board } = useBuildingStore();
+  const tenant = useTenantContext();
   const [currentItemIdx, setCurrentItemIdx] = useState(0);
+  const [caseDrawerMeeting, setCaseDrawerMeeting] = useState<string | null>(null);
   const [localNotes, setLocalNotes] = useState<Record<string, string>>({});
   const [localMotion, setLocalMotion] = useState<Record<string, string>>({});
   const [localMovedBy, setLocalMovedBy] = useState<Record<string, string>>({});
@@ -261,15 +265,25 @@ export default function MeetingDayTab({ settings, isBoard }: MeetingDayTabProps)
                 {meeting.date} at {formatTimeDisplay(meeting.time)} -- {meeting.location}
               </p>
             </div>
-            {!isStarted && !isCompleted && isBoard && (
-              <button
-                onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-800 transition-colors"
-              >
-                <Play size={16} />
-                Start Meeting
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isBoard && tenant.features.v2Cases && (
+                <button
+                  onClick={() => setCaseDrawerMeeting(meeting.id)}
+                  className="px-4 py-2.5 border border-accent-200 text-accent-600 rounded-lg text-sm font-medium hover:bg-accent-50 transition-colors"
+                >
+                  Open a case
+                </button>
+              )}
+              {!isStarted && !isCompleted && isBoard && (
+                <button
+                  onClick={handleStartMeeting}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-800 transition-colors"
+                >
+                  <Play size={16} />
+                  Start Meeting
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -601,6 +615,15 @@ export default function MeetingDayTab({ settings, isBoard }: MeetingDayTabProps)
             </div>
           )}
         </div>
+      )}
+
+      {/* v2Cases: Open a case drawer from a meeting */}
+      {tenant.features.v2Cases && caseDrawerMeeting && (
+        <OpenCaseDrawer
+          open={true}
+          onClose={() => setCaseDrawerMeeting(null)}
+          prefill={{ meetingId: caseDrawerMeeting, source: 'meeting', sourceId: caseDrawerMeeting }}
+        />
       )}
     </div>
   );

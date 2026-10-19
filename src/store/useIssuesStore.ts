@@ -2482,6 +2482,24 @@ interface IssuesState {
 
   // Step engine: milestone case linking
   createCaseForMilestone: (milestoneId: string, catId: string, situationId: string, approach: CaseApproach, title: string, tenantId?: string) => string;
+
+  // v2 Cases: open a case from the drawer
+  openCaseFromDrawer: (input: {
+    catId: string;
+    sitId: string;
+    approach: CaseApproach;
+    title: string;
+    unit?: string;
+    reporter?: string;
+    assignedTo?: string;
+    assignedRole?: string;
+    priority?: CasePriority;
+    source?: string;
+    sourceId?: string;
+  }) => string;
+
+  // v2 Cases: attach a case to a milestone
+  attachToMilestone: (caseId: string, milestoneId: string) => void;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -3274,6 +3292,34 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     }));
 
     return caseId;
+  },
+
+  // ─── v2 Cases: open a case from the drawer ────────
+  openCaseFromDrawer: (input) => {
+    const s = get();
+    return s.createCase({
+      catId: input.catId,
+      sitId: input.sitId,
+      approach: input.approach,
+      title: input.title,
+      unit: input.unit || '',
+      owner: input.reporter || 'Board',
+      priority: input.priority || 'medium',
+      notes: '',
+      assignedTo: input.assignedTo,
+      assignedRole: input.assignedRole,
+      source: input.source,
+      sourceId: input.sourceId,
+    });
+  },
+
+  // ─── v2 Cases: attach a case to a milestone ────────
+  attachToMilestone: (caseId, milestoneId) => {
+    set(st => ({
+      cases: st.cases.map(c =>
+        c.id === caseId ? { ...c, linkedMilestoneId: milestoneId } : c,
+      ),
+    }));
   },
 }), {
   name: 'onetwo-issues',

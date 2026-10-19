@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useIssuesStore, CATS } from '@/store/useIssuesStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTenantContext } from '@/components/TenantProvider';
 import type { CaseApproach, CasePriority } from '@/types/issues';
 
 type PillState = 'idle' | 'picker' | 'active' | 'minimized';
@@ -35,6 +36,7 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 export default function ActiveCaseWidget() {
+  const tenant = useTenantContext();
   const ctx = useIssuesStore(s => s.activeCaseContext);
   const cases = useIssuesStore(s => s.cases);
   const store = useIssuesStore();
@@ -48,6 +50,10 @@ export default function ActiveCaseWidget() {
   const [searchQuery, setSearchQuery] = useState('');
   const [createSearchQuery, setCreateSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
+
+  // When v2Cases is enabled, the widget is not rendered — cases are managed
+  // via the CasesTab in Board Room and CasePage depth view.
+  if (tenant.features.v2Cases) return null;
 
   // New case wizard (single-step: pick situation then fill details)
   const [wizSitKey, setWizSitKey] = useState<string | null>(null); // "catId:sitId"
