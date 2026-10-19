@@ -175,7 +175,7 @@ export default function TopNav() {
                     <Users className="w-4 h-4 text-ink-400" /> User Management
                   </button>
                 )}
-                {currentRole === 'BOARD_MEMBER' && !tenant.isDemo && (
+                {currentRole === 'BOARD_MEMBER' && (
                   <button onClick={() => goTo('/subscription')} className="w-full text-left px-4 py-2.5 text-sm text-ink-700 hover:bg-mist-50 flex items-center gap-3">
                     <CreditCard className="w-4 h-4 text-ink-400" /> Subscription
                   </button>

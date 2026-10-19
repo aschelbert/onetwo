@@ -5,6 +5,7 @@ import type { Role } from '@/types/auth';
 import { TIERS, DEFAULT_TRIAL_DAYS, DEFAULT_BILLING_INTERVAL, describeTier, recommendTier } from '@/lib/tiers';
 import type { ActiveTier, BuildingAmenity } from '@/lib/tiers';
 import { Check } from 'lucide-react';
+import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -17,7 +18,7 @@ const Logo = () => (
 );
 
 export default function AuthPage() {
-  const { authStep, setAuthStep, setAuthJoinRole, login, skipToDemo, buildingMembers, buildingInvites, addMember } = useAuthStore();
+  const { authStep, setAuthStep, setAuthJoinRole, login, skipToDemo, buildingMembers, buildingInvites, addMember, demoExitSource } = useAuthStore();
 
   // ── Core form state ──
   const [email, setEmail] = useState('');
@@ -49,6 +50,7 @@ export default function AuthPage() {
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
   const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
+  const [showLeadModal, setShowLeadModal] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -95,6 +97,7 @@ export default function AuthPage() {
 
     // ?demo=1 → skip directly to demo (no lead form)
     if (params.get('demo') === '1') {
+      setSessionChecking(false);
       skipToDemo();
       return;
     }
@@ -102,6 +105,10 @@ export default function AuthPage() {
     // ?create=1 → show signup screen
     if (params.get('create') === '1') {
       setAuthStep('signup');
+      // If coming from demo, show lead-capture modal (once per browser)
+      if (params.get('from') === 'demo' && !wasAlreadyShown()) {
+        setShowLeadModal(true);
+      }
       setSessionChecking(false);
       return;
     }
@@ -650,6 +657,11 @@ export default function AuthPage() {
       if (data.error) { console.error(data.error); setCheckoutLoading(false); return; }
 
       if (data.url) {
+        // Link demo lead if this signup came from the demo
+        const fromDemo = new URLSearchParams(window.location.search).get('from') === 'demo';
+        if (fromDemo && supabase) {
+          supabase.rpc('link_demo_lead', { p_email: email.trim().toLowerCase() }).then(() => {}, () => {});
+        }
         sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
           access_token: session.access_token,
           refresh_token: session.refresh_token,
@@ -1032,6 +1044,16 @@ export default function AuthPage() {
         )}
 
       </div>
+
+      {/* Demo lead-capture modal — shown once when arriving from demo */}
+      {showLeadModal && (
+        <DemoLeadModal
+          onClose={(capturedEmail) => {
+            setShowLeadModal(false);
+            if (capturedEmail) setEmail(capturedEmail);
+          }}
+        />
+      )}
     </div>
   );
 }
