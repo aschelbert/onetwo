@@ -24,6 +24,8 @@ import RunbookDrawer from '@/features/compliance/RunbookDrawer';
 import RoleChip from '@/components/ui/RoleChip';
 import ProofBadge from '@/components/ui/ProofBadge';
 import BeforeTab from './tabs/BeforeTab';
+import MeetingDayTab from './tabs/MeetingDayTab';
+import AfterTab from './tabs/AfterTab';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import { ChevronRight } from 'lucide-react';
 
@@ -134,7 +136,7 @@ export default function BoardRoomPage() {
     collectionRate: finMetrics.collectionRate,
     reservePctFunded: brReservePct,
     monthsClosedOnTime: 0,
-    meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: m.noticeSentAt ?? null, minutesApprovedAt: null, quorumMet: undefined })),
+    meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: m.noticeSentAt ?? null, minutesApprovedAt: m.minutesApprovedAt ?? null, quorumMet: m.quorumMet })),
     proofCoverage,
     documentsCurrentPct,
   });
@@ -1082,29 +1084,37 @@ export default function BoardRoomPage() {
               })()
         )}
 
-        {tab === 'meeting_day' && (() => {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const todayMeetings = meetings.filter(m => m.date === todayStr && m.status !== 'CANCELLED');
-          const nearFuture = upcoming.filter(m => {
-            const d = new Date(m.date + 'T00:00:00');
-            const diff = (d.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
-            return diff >= 0 && diff <= 7;
-          });
-          return (<div className="space-y-6">
-            <div><h3 className="font-display text-lg font-bold text-ink-900">Meeting Day</h3><p className="text-xs text-ink-400 mt-1">Run your meeting with agendas, attendance, and real-time notes.</p></div>
-            {todayMeetings.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Today</p><div className="space-y-3">{todayMeetings.map(m => renderMeeting(m, true))}</div></div>)
-            : nearFuture.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">This Week</p><div className="space-y-3">{nearFuture.map(m => renderMeeting(m, true))}</div></div>)
-            : <p className="text-center text-ink-400 py-8">No meetings scheduled for today or this week.</p>}
-          </div>);
-        })()}
+        {tab === 'meeting_day' && (
+          v2BoardRoom
+            ? <MeetingDayTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
+            : (() => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const todayMeetings = meetings.filter(m => m.date === todayStr && m.status !== 'CANCELLED');
+                const nearFuture = upcoming.filter(m => {
+                  const d = new Date(m.date + 'T00:00:00');
+                  const diff = (d.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+                  return diff >= 0 && diff <= 7;
+                });
+                return (<div className="space-y-6">
+                  <div><h3 className="font-display text-lg font-bold text-ink-900">Meeting Day</h3><p className="text-xs text-ink-400 mt-1">Run your meeting with agendas, attendance, and real-time notes.</p></div>
+                  {todayMeetings.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Today</p><div className="space-y-3">{todayMeetings.map(m => renderMeeting(m, true))}</div></div>)
+                  : nearFuture.length > 0 ? (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">This Week</p><div className="space-y-3">{nearFuture.map(m => renderMeeting(m, true))}</div></div>)
+                  : <p className="text-center text-ink-400 py-8">No meetings scheduled for today or this week.</p>}
+                </div>);
+              })()
+        )}
 
-        {tab === 'after' && (() => {
-          return (<div className="space-y-6">
-            <div><h3 className="font-display text-lg font-bold text-ink-900">After the Meeting</h3><p className="text-xs text-ink-400 mt-1">Approve minutes, follow up on action items, and distribute records.</p></div>
-            {past.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Completed Meetings</p><div className="space-y-3">{past.map(m => renderMeeting(m, false))}</div></div>)}
-            {past.length === 0 && <p className="text-center text-ink-400 py-8">No completed meetings yet.</p>}
-          </div>);
-        })()}
+        {tab === 'after' && (
+          v2BoardRoom
+            ? <AfterTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
+            : (() => {
+                return (<div className="space-y-6">
+                  <div><h3 className="font-display text-lg font-bold text-ink-900">After the Meeting</h3><p className="text-xs text-ink-400 mt-1">Approve minutes, follow up on action items, and distribute records.</p></div>
+                  {past.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Completed Meetings</p><div className="space-y-3">{past.map(m => renderMeeting(m, false))}</div></div>)}
+                  {past.length === 0 && <p className="text-center text-ink-400 py-8">No completed meetings yet.</p>}
+                </div>);
+              })()
+        )}
 
         {/* Outbox tab */}
         {tab === 'outbox' && <OutboxTab />}

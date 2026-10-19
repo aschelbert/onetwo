@@ -19,6 +19,12 @@ export interface MinutesApproval {
 
 export type AgendaSourceType = 'manual' | 'standing' | 'runbook' | 'case' | 'approval' | 'vote' | 'season';
 
+export type AgendaOutcome = 'passed' | 'failed' | 'tabled' | 'noted' | 'discussed';
+
+export interface AgendaTally {
+  [memberName: string]: 'yes' | 'no' | 'abstain';
+}
+
 export interface AgendaItem {
   id: string;
   position: number;
@@ -27,6 +33,25 @@ export interface AgendaItem {
   sourceId: string | null;
   requiresVote: boolean;
   locked: boolean;
+  motionText?: string;
+  movedBy?: string;
+  secondedBy?: string;
+  tally?: AgendaTally;
+  outcome?: AgendaOutcome;
+  notes?: string;
+  conflictsDeclared?: string[];
+  completedAt?: string | null;
+}
+
+export interface MeetingAttendance {
+  name: string;
+  present: boolean;
+  byVideo: boolean;
+}
+
+export interface MinutesDoc {
+  html: string;
+  text: string;
 }
 
 export interface Meeting {
@@ -43,6 +68,14 @@ export interface Meeting {
   reminderScheduledFor?: string | null;
   packetReady?: boolean;
   conflictCheckStatus?: unknown[];
+  calledToOrderAt?: string | null;
+  adjournedAt?: string | null;
+  quorumMet?: boolean;
+  minutesGeneratedAt?: string | null;
+  minutesApprovedAt?: string | null;
+  minutesDoc?: MinutesDoc | null;
+  boardAttendance?: MeetingAttendance[];
+  ownersPresent?: number;
 }
 
 interface MeetingsState {
@@ -66,6 +99,14 @@ interface MeetingsState {
   addMeetingWithAgenda: (m: Omit<Meeting, 'id' | 'votes' | 'minutes' | 'attendees' | 'linkedCaseIds' | 'linkedVoteIds' | 'documents' | 'minutesApprovals'> & { attendees?: Meeting['attendees'] }, items: Omit<AgendaItem, 'id'>[], tenantId?: string) => string;
   updateAgendaItems: (meetingId: string, items: AgendaItem[]) => void;
   setNoticeSent: (meetingId: string, at: string) => void;
+  callToOrder: (meetingId: string) => void;
+  adjourn: (meetingId: string) => void;
+  recordAgendaItem: (meetingId: string, itemId: string, updates: Partial<AgendaItem>) => void;
+  setMinutesDoc: (meetingId: string, doc: MinutesDoc) => void;
+  setMinutesApprovedAt: (meetingId: string, at: string) => void;
+  setBoardAttendance: (meetingId: string, attendance: MeetingAttendance[]) => void;
+  setOwnersPresent: (meetingId: string, count: number) => void;
+  setQuorumMet: (meetingId: string, met: boolean) => void;
 }
 
 // Helper: sync full meeting to DB after local mutation
@@ -159,9 +200,93 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
     set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, noticeSentAt: at } : x) }));
     syncMeeting(meetingId);
   },
+
+  callToOrder: (meetingId) => {
+    const now = new Date().toISOString();
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, calledToOrderAt: now, status: 'IN_PROGRESS' } : x) }));
+    syncMeeting(meetingId);
+  },
+
+  adjourn: (meetingId) => {
+    const now = new Date().toISOString();
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, adjournedAt: now, status: 'COMPLETED' } : x) }));
+    syncMeeting(meetingId);
+  },
+
+  recordAgendaItem: (meetingId, itemId, updates) => {
+    set(s => ({
+      meetings: s.meetings.map(x => {
+        if (x.id !== meetingId) return x;
+        const agendaItems = (x.agendaItems || []).map(ai =>
+          ai.id === itemId ? { ...ai, ...updates } : ai
+        );
+        // Also derive the legacy votes array from any vote items
+        const newVotes: MeetingVote[] = [];
+        for (const ai of agendaItems) {
+          if (ai.requiresVote && ai.tally && ai.outcome) {
+            const results = Object.entries(ai.tally).map(([name, vote]) => ({
+              name,
+              vote: vote === 'yes' ? 'approve' : vote === 'no' ? 'deny' : 'abstain',
+            }));
+            const tally = {
+              approve: results.filter(r => r.vote === 'approve').length,
+              deny: results.filter(r => r.vote === 'deny').length,
+              abstain: results.filter(r => r.vote === 'abstain').length,
+            };
+            newVotes.push({
+              id: ai.id,
+              motion: ai.motionText || ai.title,
+              type: 'board',
+              status: ai.outcome === 'passed' ? 'passed' : 'failed',
+              date: x.date,
+              results,
+              tally,
+            });
+          }
+        }
+        return { ...x, agendaItems, votes: newVotes.length > 0 ? newVotes : x.votes };
+      }),
+    }));
+    syncMeeting(meetingId);
+  },
+
+  setMinutesDoc: (meetingId, doc) => {
+    const now = new Date().toISOString();
+    set(s => ({
+      meetings: s.meetings.map(x => x.id === meetingId
+        ? { ...x, minutesDoc: doc, minutesGeneratedAt: now, minutes: doc.text }
+        : x),
+    }));
+    syncMeeting(meetingId);
+  },
+
+  setMinutesApprovedAt: (meetingId, at) => {
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovedAt: at } : x) }));
+    syncMeeting(meetingId);
+  },
+
+  setBoardAttendance: (meetingId, attendance) => {
+    const presentNames = attendance.filter(a => a.present).map(a => a.name);
+    set(s => ({
+      meetings: s.meetings.map(x => x.id === meetingId
+        ? { ...x, boardAttendance: attendance, attendees: { ...x.attendees, board: presentNames } }
+        : x),
+    }));
+    syncMeeting(meetingId);
+  },
+
+  setOwnersPresent: (meetingId, count) => {
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, ownersPresent: count } : x) }));
+    syncMeeting(meetingId);
+  },
+
+  setQuorumMet: (meetingId, met) => {
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, quorumMet: met } : x) }));
+    syncMeeting(meetingId);
+  },
 }), {
   name: 'onetwo-meetings',
-  version: 4,
+  version: 5,
   migrate: () => ({}),
   merge: (persisted: any, current: any) => ({
     ...current,
@@ -174,6 +299,14 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
           reminderScheduledFor: m.reminderScheduledFor ?? null,
           packetReady: m.packetReady ?? false,
           conflictCheckStatus: m.conflictCheckStatus ?? [],
+          calledToOrderAt: m.calledToOrderAt ?? null,
+          adjournedAt: m.adjournedAt ?? null,
+          quorumMet: m.quorumMet ?? undefined,
+          minutesGeneratedAt: m.minutesGeneratedAt ?? null,
+          minutesApprovedAt: m.minutesApprovedAt ?? null,
+          minutesDoc: m.minutesDoc ?? null,
+          boardAttendance: m.boardAttendance ?? [],
+          ownersPresent: m.ownersPresent ?? 0,
         }))
       : current.meetings,
   }),

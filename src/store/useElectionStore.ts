@@ -141,6 +141,16 @@ interface ElectionState {
   openElection: (id: string, actor: string) => void;
   closeElection: (id: string, actor: string) => void;
   certifyElection: (id: string, certifiedBy: string) => void;
+  createFromDrawer: (data: {
+    title: string;
+    type: ElectionType;
+    description: string;
+    closeDate: string | null;
+    ballotItems: Omit<BallotItem, 'id' | 'attachments'>[];
+    createdBy: string;
+    quorumRequired: number;
+  }, tenantId?: string) => void;
+  certifyWithTally: (id: string, certifiedBy: string, units: Array<{ number: string; votingPct: number; status: string }>) => void;
   addBallotItem: (electionId: string, item: Omit<BallotItem, 'id' | 'attachments'>) => void;
   updateBallotItem: (electionId: string, itemId: string, updates: Partial<BallotItem>) => void;
   removeBallotItem: (electionId: string, itemId: string) => void;
@@ -514,6 +524,96 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
     }));
     syncElection(electionId, { linkedCaseId: caseId });
     if (isBackendEnabled) electionsSvc.addTimelineEvent('', electionId, tlEvent);
+  },
+
+  createFromDrawer: (data, tenantId?) => {
+    const id = generateLocalId('elec_');
+    const now = new Date().toISOString();
+    const ballotItems: BallotItem[] = data.ballotItems.map(bi => ({
+      ...bi,
+      id: generateLocalId('bi_'),
+      attachments: [],
+    }));
+    const election: Election = {
+      id,
+      title: data.title,
+      type: data.type,
+      status: 'draft',
+      description: data.description,
+      createdAt: now,
+      createdBy: data.createdBy,
+      openedAt: null,
+      closedAt: null,
+      certifiedAt: null,
+      certifiedBy: null,
+      scheduledCloseDate: data.closeDate,
+      noticeDate: now.split('T')[0],
+      quorumRequired: data.quorumRequired,
+      ballotItems,
+      ballots: [],
+      legalRef: '',
+      notes: '',
+      complianceChecks: [],
+      timeline: [{ id: generateLocalId('tl_'), type: 'created', description: `Vote created: ${data.title}`, date: now, actor: data.createdBy }],
+      comments: [],
+      resolution: null,
+      linkedCaseId: null,
+      linkedMeetingId: null,
+    };
+    set(s => ({ elections: [election, ...s.elections] }));
+    const tid = tenantId || getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      electionsSvc.createElection(tid, election).then(dbId => {
+        if (dbId) set(s => ({ elections: s.elections.map(x => x.id === id ? { ...x, id: dbId } : x) }));
+      }).catch(err => {
+        console.error('[syncWrite] createFromDrawer failed:', err);
+        set(s => ({ elections: s.elections.filter(x => x.id !== id) }));
+      });
+    }
+  },
+
+  certifyWithTally: (id, certifiedBy, units) => {
+    const now = new Date().toISOString();
+    const election = get().elections.find(e => e.id === id);
+    if (!election) return;
+
+    // Compute results
+    const results = get().getResults(id, units);
+    if (!results) return;
+
+    // Generate resolution text from results
+    const resolutionLines = results.itemResults.map(ir => {
+      if (ir.type === 'yes_no') {
+        return `${ir.title}: ${ir.passed ? 'APPROVED' : 'NOT APPROVED'} (${ir.approveCount} approve, ${ir.denyCount} deny, ${ir.abstainCount} abstain). Quorum ${ir.quorumMet ? 'met' : 'not met'}.`;
+      }
+      if (ir.candidateResults && ir.candidateResults.length > 0) {
+        const winners = ir.candidateResults.slice(0, election.ballotItems.find(bi => bi.id === ir.ballotItemId)?.maxSelections || 1);
+        return `${ir.title}: Elected: ${winners.map(c => c.name).join(', ')}.`;
+      }
+      return `${ir.title}: ${ir.passed ? 'Passed' : 'Failed'}.`;
+    });
+
+    const resolutionText = `RESOLVED:\n${resolutionLines.join('\n')}\n\nCertified by ${certifiedBy} on ${now.split('T')[0]}.`;
+
+    const tlEvent = { id: generateLocalId('tl_'), type: 'certified' as const, description: `Results certified by ${certifiedBy}`, date: now, actor: certifiedBy };
+
+    set(s => ({
+      elections: s.elections.map(e => e.id === id ? {
+        ...e,
+        status: 'certified' as ElectionStatus,
+        certifiedAt: now,
+        certifiedBy,
+        timeline: [...e.timeline, tlEvent],
+        resolution: {
+          id: generateLocalId('res_'),
+          text: resolutionText,
+          effectiveDate: now.split('T')[0],
+          recordedBy: certifiedBy,
+        },
+      } : e),
+    }));
+    syncElection(id, { status: 'certified', certifiedAt: now, certifiedBy });
+    if (isBackendEnabled) electionsSvc.addTimelineEvent('', id, tlEvent);
   },
 
   getResults: (electionId, units) => {
