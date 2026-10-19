@@ -16,6 +16,8 @@ import type { BuildingSettings } from '@/lib/buildingSettings';
 import type { ComplianceItem } from '@/lib/complianceRefresh';
 import type { RegulatoryFiling } from '@/store/useComplianceStore';
 import { ALL_MILESTONES, type MilestoneDef, type SeasonId } from '@/data/milestones';
+import { getMilestoneCaseMapping } from '@/data/milestoneCases';
+import type { CaseTrackerCase } from '@/types/issues';
 
 // ── Public Types ────────────────────────────────────────────────────────────
 
@@ -195,8 +197,11 @@ export function buildSeasons(args: {
   tenantStatus: 'onboarding' | 'active' | string;
   setupProgress?: { completed: number; total: number };
   today?: Date;
+  /** Cases for milestone step progress — when a milestone has a linked CATS case,
+   *  the milestone's progress reads from the case's steps. */
+  cases?: CaseTrackerCase[];
 }): SeasonState[] {
-  const { items, completions, filings, settings, tenantStatus, setupProgress, today: todayArg } = args;
+  const { items, completions, filings, settings, tenantStatus, setupProgress, today: todayArg, cases: casesList } = args;
   const today = todayArg ?? new Date();
   const todayStr = today.toISOString().split('T')[0];
   const currentYear = today.getFullYear();
@@ -235,7 +240,7 @@ export function buildSeasons(args: {
       .sort((a, b) => a.order - b.order);
 
     const milestoneStates: MilestoneState[] = seasonMilestones.map(m =>
-      hydrateMilestone(m, itemMap, completions, filingsByCategory, window, todayStr, today)
+      hydrateMilestone(m, itemMap, completions, filingsByCategory, window, todayStr, today, casesList)
     );
 
     const totalCount = milestoneStates.reduce((sum, ms) => sum + ms.totalCount, 0);
@@ -313,7 +318,56 @@ function hydrateMilestone(
   window: SeasonWindow,
   todayStr: string,
   _today: Date,
+  cases?: CaseTrackerCase[],
 ): MilestoneState {
+  // Check if this milestone has a linked CATS case
+  const mapping = getMilestoneCaseMapping(m.id);
+  const linkedCase = mapping && cases
+    ? cases.find(c => c.linkedMilestoneId === m.id && c.status !== 'closed')
+    : undefined;
+
+  // If a linked case exists, use its steps for progress tracking
+  if (linkedCase && linkedCase.steps && linkedCase.steps.length > 0) {
+    const caseSteps = linkedCase.steps;
+    const caseTotalCount = caseSteps.length;
+    const caseCompletedCount = caseSteps.filter(s => s.done).length;
+    const isComplete = caseTotalCount > 0 && caseCompletedCount === caseTotalCount;
+    const isCurrent = window.startDate <= todayStr && todayStr <= window.endDate;
+
+    // Check for overdue by looking at case due date
+    const hasOverdue = linkedCase.dueDate ? linkedCase.dueDate < todayStr : false;
+
+    let status: MilestoneState['status'];
+    if (isComplete) {
+      status = 'complete';
+    } else if (hasOverdue) {
+      status = 'overdue';
+    } else if (isCurrent) {
+      status = 'active';
+    } else {
+      status = 'upcoming';
+    }
+
+    const dueDate = linkedCase.dueDate ?? computeDueDate(m, m.itemIds.filter(id => itemMap.has(id)), [], itemMap, window);
+
+    return {
+      id: m.id,
+      seasonId: m.seasonId,
+      title: m.title,
+      itemIds: m.itemIds,
+      filingCategories: m.filingCategories,
+      flowId: m.flowId,
+      order: m.order,
+      dueRule: m.dueRule,
+      fixedMonthDay: m.fixedMonthDay,
+      status,
+      completedCount: caseCompletedCount,
+      totalCount: caseTotalCount,
+      dueDate,
+      ownerRole: m.ownerRole,
+    };
+  }
+
   // Collect trackable items: runbook items that exist in the data
   const trackableItemIds = m.itemIds.filter(id => itemMap.has(id));
 

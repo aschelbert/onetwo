@@ -4,7 +4,7 @@
  *
  * IDs that still map to LegacyActionDrawer (placeholder) until their full
  * drawers land in later handoffs: case_new, vote, request,
- * collections_offer, case_step.
+ * collections_offer, capital_offer.
  */
 
 import DrawerShell from '@/components/ui/DrawerShell';
@@ -17,6 +17,7 @@ import PayBillDrawer from '@/features/financial/drawers/PayBillDrawer';
 import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
 import MeetingDrawer from '@/features/meetings/MeetingDrawer';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
+import CaseStepDrawer from '@/features/issues/components/CaseStepDrawer';
 
 export type DrawerId =
   | 'runbook'
@@ -31,6 +32,7 @@ export type DrawerId =
   | 'vote'
   | 'request'
   | 'collections_offer'
+  | 'capital_offer'
   | 'case_step';
 
 const LEGACY_LABELS: Record<string, string> = {
@@ -38,7 +40,7 @@ const LEGACY_LABELS: Record<string, string> = {
   vote: 'Board Vote',
   request: 'Owner Request',
   collections_offer: 'Collections',
-  case_step: 'Case Step',
+  capital_offer: 'Capital Project',
 };
 
 interface DrawerRouterProps {
@@ -159,6 +161,16 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
         />
       );
 
+    case 'case_step':
+      return (
+        <CaseStepDrawer
+          open={open}
+          onClose={onClose}
+          caseId={context.caseId || ''}
+          stepIndex={parseInt(context.stepIndex || '0', 10)}
+        />
+      );
+
     case 'meeting':
       return (
         <MeetingDrawer
@@ -178,7 +190,7 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
     case 'vote':
     case 'request':
     case 'collections_offer':
-    case 'case_step':
+    case 'capital_offer':
       return (
         <LegacyActionDrawer
           drawerId={drawerId}

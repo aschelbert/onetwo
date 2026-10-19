@@ -10,6 +10,7 @@ import type { BuildingSettings } from '@/lib/buildingSettings';
 import type { ComplianceItem } from '@/lib/complianceRefresh';
 import type { RegulatoryFiling } from '@/store/useComplianceStore';
 import type { SeasonState } from '@/lib/seasons';
+import type { Step } from '@/types/steps';
 
 // ── Public Types ────────────────────────────────────────────────────────────
 
@@ -51,6 +52,12 @@ export interface QueueInputs {
       ownerRole?: BoardRoleKey;
     };
   }>;
+  /**
+   * Optional: unified Step[] for cases. When provided, these are used
+   * instead of the ad hoc cases[].nextStep shape for generating
+   * case_step queue items. Falls back to the legacy shape if omitted.
+   */
+  caseSteps?: Step[];
   requests: Array<{
     id: string;
     title: string;
@@ -248,37 +255,80 @@ export function buildQueue(i: QueueInputs): QueueResult {
   }
 
   // ── 3. Case steps ──
-  for (const c of i.cases) {
-    if (!c.nextStep) continue;
-    if (c.status === 'closed' || c.status === 'resolved') continue;
+  // When unified caseSteps are provided, use them; otherwise fall back to legacy
+  if (i.caseSteps && i.caseSteps.length > 0) {
+    // Group by containerId and pick the first open step per case
+    const seen = new Set<string>();
+    for (const step of i.caseSteps) {
+      if (step.status === 'done' || step.status === 'skipped') continue;
+      if (seen.has(step.containerId)) continue;
+      seen.add(step.containerId);
 
-    const stepRole = c.nextStep.ownerRole ?? 'president';
-    const rs = roleState(stepRole, 'president', i.me.roleKey);
-    const tone = c.nextStep.dueDate ? dueTone(c.nextStep.dueDate, todayStr) : 'normal';
-    const isOverdue = c.nextStep.dueDate ? c.nextStep.dueDate < todayStr : false;
-    const priority = isOverdue ? PRIORITY_OVERDUE
-      : priorityCasePriority(c.priority) <= 1 ? PRIORITY_CRITICAL_SOON
-      : PRIORITY_DUE_SOON;
+      const caseInfo = i.cases.find(c => c.id === step.containerId);
+      if (caseInfo && (caseInfo.status === 'closed' || caseInfo.status === 'resolved')) continue;
 
-    queue.push({
-      id: `case-${c.id}`,
-      source: 'case_step',
-      sourceId: c.id,
-      title: c.nextStep.title,
-      why: `Step ${c.nextStep.index + 1}/${c.nextStep.total} of "${c.title}"`,
-      roleKey: stepRole,
-      roleState: rs,
-      containerLine: c.title,
-      dueDate: c.nextStep.dueDate,
-      dueTone: tone,
-      priority,
-      primaryAction: {
-        label: 'Open step',
-        drawer: 'case_step',
-        params: { caseId: c.id, stepIndex: String(c.nextStep.index) },
-      },
-      secondaryActions: [],
-    });
+      const stepRole = step.ownerRole ?? 'president';
+      const rs = roleState(stepRole, 'president', i.me.roleKey);
+      const tone = step.dueDate ? dueTone(step.dueDate, todayStr) : 'normal';
+      const isOverdue = step.dueDate ? step.dueDate < todayStr : false;
+      const casePriority = caseInfo ? priorityCasePriority(caseInfo.priority) : 4;
+      const priority = isOverdue ? PRIORITY_OVERDUE
+        : casePriority <= 1 ? PRIORITY_CRITICAL_SOON
+        : PRIORITY_DUE_SOON;
+
+      queue.push({
+        id: `case-${step.containerId}`,
+        source: 'case_step',
+        sourceId: step.containerId,
+        title: step.title,
+        why: `Step ${step.index + 1}/${step.total} of "${caseInfo?.title ?? step.containerId}"`,
+        roleKey: stepRole,
+        roleState: rs,
+        containerLine: caseInfo?.title ?? step.containerId,
+        dueDate: step.dueDate,
+        dueTone: tone,
+        priority,
+        primaryAction: {
+          label: 'Open step',
+          drawer: step.drawer.id,
+          params: step.drawer.params,
+        },
+        secondaryActions: [],
+      });
+    }
+  } else {
+    for (const c of i.cases) {
+      if (!c.nextStep) continue;
+      if (c.status === 'closed' || c.status === 'resolved') continue;
+
+      const stepRole = c.nextStep.ownerRole ?? 'president';
+      const rs = roleState(stepRole, 'president', i.me.roleKey);
+      const tone = c.nextStep.dueDate ? dueTone(c.nextStep.dueDate, todayStr) : 'normal';
+      const isOverdue = c.nextStep.dueDate ? c.nextStep.dueDate < todayStr : false;
+      const priority = isOverdue ? PRIORITY_OVERDUE
+        : priorityCasePriority(c.priority) <= 1 ? PRIORITY_CRITICAL_SOON
+        : PRIORITY_DUE_SOON;
+
+      queue.push({
+        id: `case-${c.id}`,
+        source: 'case_step',
+        sourceId: c.id,
+        title: c.nextStep.title,
+        why: `Step ${c.nextStep.index + 1}/${c.nextStep.total} of "${c.title}"`,
+        roleKey: stepRole,
+        roleState: rs,
+        containerLine: c.title,
+        dueDate: c.nextStep.dueDate,
+        dueTone: tone,
+        priority,
+        primaryAction: {
+          label: 'Open step',
+          drawer: 'case_step',
+          params: { caseId: c.id, stepIndex: String(c.nextStep.index) },
+        },
+        secondaryActions: [],
+      });
+    }
   }
 
   // ── 4. Votes ──
