@@ -15,11 +15,76 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey
+const _rawSupabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export const isBackendEnabled = !!supabase;
+export const isBackendEnabled = !!_rawSupabase;
+
+// ── Demo mutation guard ─────────────────────────────────────────
+// When running in a demo session (seed data, no real tenant),
+// intercept .from() mutations and functions.invoke so nothing hits the DB.
+// Reads (.select()) pass through unchanged.
+
+let _demoGuardLogged = false;
+const NOOP_RESULT = { data: null, error: null };
+
+function _isDemoSession(): boolean {
+  // Inline check to avoid circular import with demoGuard.ts (which imports getActiveTenantId)
+  if (_activeTenantId) return false;
+  try {
+    const raw = localStorage.getItem('onetwo-auth');
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const uid: string | undefined = parsed?.state?.currentUser?.id;
+    if (!uid) return false;
+    return uid === 'user1' || uid.startsWith('user-');
+  } catch { return false; }
+}
+
+const MUTATION_METHODS = new Set(['insert', 'update', 'upsert', 'delete']);
+
+function wrapFrom(original: typeof _rawSupabase extends null ? never : NonNullable<typeof _rawSupabase>['from']) {
+  return function proxyFrom(...args: Parameters<typeof original>) {
+    const builder = original.apply(_rawSupabase, args);
+    if (!_isDemoSession()) return builder;
+
+    if (!_demoGuardLogged) {
+      console.debug('[demo-guard] Mutations blocked for demo session');
+      _demoGuardLogged = true;
+    }
+
+    return new Proxy(builder, {
+      get(target, prop, receiver) {
+        if (typeof prop === 'string' && MUTATION_METHODS.has(prop)) {
+          return () => Promise.resolve(NOOP_RESULT);
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  };
+}
+
+function wrapFunctionsInvoke(original: Function) {
+  return function proxyInvoke(...args: any[]) {
+    if (_isDemoSession()) {
+      if (!_demoGuardLogged) {
+        console.debug('[demo-guard] Mutations blocked for demo session');
+        _demoGuardLogged = true;
+      }
+      return Promise.resolve(NOOP_RESULT);
+    }
+    return original.apply(_rawSupabase!.functions, args);
+  };
+}
+
+// Apply guards if the client exists
+if (_rawSupabase) {
+  (_rawSupabase as any).from = wrapFrom(_rawSupabase.from.bind(_rawSupabase));
+  (_rawSupabase as any).functions.invoke = wrapFunctionsInvoke(_rawSupabase.functions.invoke.bind(_rawSupabase.functions));
+}
+
+export const supabase = _rawSupabase;
 
 // ── Active tenant ID ──────────────────────────────────────────────
 // Set once by TenantProvider after tenant is resolved.

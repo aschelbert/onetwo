@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
@@ -43,6 +44,97 @@ function StatusBadge({ status, cancelPending }: { status: string; cancelPending:
     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${colors[status] || 'bg-ink-100 text-ink-600'}`}>
       {labels[status] || status}
     </span>
+  );
+}
+
+// ── Demo pricing preview ── TODO 17: replace with real tier prices
+const DEMO_PRICING = {
+  plan: { name: 'Facilities', price: 278 },
+  addOns: [
+    { name: 'On Call', price: 499, enabled: true },
+    { name: 'PM Seat', price: 79, enabled: false },
+  ],
+  setup: { name: 'Setup Fee', price: 599, oneTime: true },
+};
+
+function DemoSubscriptionPreview() {
+  const { leaveDemo } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleCTA = () => {
+    leaveDemo('subscription');
+    navigate('/login?create=1&from=demo');
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-6 space-y-6">
+      <h1 className="font-display text-2xl font-bold text-ink-900">Subscription</h1>
+
+      <div className="bg-brand-teal-light border border-brand-teal/30 rounded-lg p-3 text-sm text-brand-teal">
+        This is how your subscription page will look. Sunny Acres is a sample building.
+      </div>
+
+      {/* Current plan */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg font-bold text-ink-900">Current Plan</h2>
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sage-100 text-sage-800">Active</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-ink-400 text-xs mb-0.5">Plan</p>
+            <p className="font-semibold text-ink-900">{DEMO_PRICING.plan.name}</p>
+          </div>
+          <div>
+            <p className="text-ink-400 text-xs mb-0.5">Price</p>
+            <p className="font-semibold text-ink-900">${DEMO_PRICING.plan.price}/mo</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Add-ons */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <h2 className="font-display text-lg font-bold text-ink-900 mb-4">Add-ons</h2>
+        <div className="space-y-3">
+          {DEMO_PRICING.addOns.map((addon) => (
+            <div key={addon.name} className="flex items-center justify-between p-3 rounded-lg border border-ink-200">
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${addon.enabled ? 'bg-sage-500' : 'bg-ink-200'}`} />
+                <span className="text-sm font-medium text-ink-900">{addon.name}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-ink-500">${addon.price}/mo</span>
+                <button
+                  onClick={handleCTA}
+                  className="px-3 py-1 text-xs font-semibold rounded-lg border border-accent-300 text-accent-600 hover:bg-accent-50"
+                >
+                  {addon.enabled ? 'Manage' : 'Add'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Setup fee */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink-900">{DEMO_PRICING.setup.name}</h2>
+            <p className="text-xs text-ink-400">One-time</p>
+          </div>
+          <span className="text-lg font-bold text-accent-600">${DEMO_PRICING.setup.price}</span>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <button
+        onClick={handleCTA}
+        className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700"
+      >
+        Start Your Own Building
+      </button>
+    </div>
   );
 }
 
@@ -158,15 +250,7 @@ export default function SubscriptionPage() {
   }
 
   if (tenant.isDemo) {
-    return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-8 text-center">
-          <CreditCard className="w-10 h-10 text-ink-300 mx-auto mb-3" />
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">Subscription Management</h2>
-          <p className="text-sm text-ink-500">Subscription management is not available in demo mode.</p>
-        </div>
-      </div>
-    );
+    return <DemoSubscriptionPreview />;
   }
 
   if (loading) {
