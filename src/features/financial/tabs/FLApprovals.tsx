@@ -4,9 +4,11 @@ import type { SpendingApproval } from '@/store/useSpendingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
 import Modal from '@/components/ui/Modal';
+import SpendingDrawer from '../drawers/SpendingDrawer';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'denied';
 
@@ -50,9 +52,12 @@ export default function FLApprovals() {
   const { currentUser, currentRole } = useAuthStore();
   const { board } = useBuildingStore();
   const financialStore = useFinancialStore();
+  const tenant = useTenantContext();
+  const isV2 = tenant.features.v2FiscalLens ?? false;
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSpendingDrawer, setShowSpendingDrawer] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -168,7 +173,7 @@ export default function FLApprovals() {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => isV2 ? setShowSpendingDrawer(true) : setShowAddModal(true)}
           className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium"
         >
           + New Spending Request
@@ -573,6 +578,14 @@ export default function FLApprovals() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* v2: SpendingDrawer replaces the modal form */}
+      {isV2 && (
+        <SpendingDrawer
+          open={showSpendingDrawer}
+          onClose={() => setShowSpendingDrawer(false)}
+        />
       )}
     </div>
   );

@@ -14,6 +14,8 @@ import FLReserves from './tabs/FLReserves';
 import FLReports from './tabs/FLReports';
 import FLApprovals from './tabs/FLApprovals';
 import FLThisMonth from './tabs/FLThisMonth';
+import FLMoneyIn from './tabs/FLMoneyIn';
+import FLMoneyOut from './tabs/FLMoneyOut';
 import TheUnitsTab from '../building/tabs/TheUnitsTab';
 import GLMappingConfig from './tabs/GLMappingConfig';
 
@@ -131,11 +133,9 @@ export default function FinancialPage() {
       case 'this_month':
         return <FLThisMonth />;
       case 'money_in':
-        // Renders existing Unit Ledger content until handoff 12
-        return <TheUnitsTab />;
+        return <FLMoneyIn />;
       case 'money_out':
-        // Renders existing WO & Invoices content until handoff 12
-        return <FLWorkOrders />;
+        return <FLMoneyOut />;
       case 'plan':
         // Renders Budget and Reserves stacked until handoff 12
         return (
