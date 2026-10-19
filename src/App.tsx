@@ -53,10 +53,12 @@ function AuthListener() {
     const sb = supabase; // narrow for TS inside async callback
 
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      const { isAuthenticated, login, signOut, addMember } = useAuthStore.getState();
+      const { isAuthenticated, currentUser, login, signOut, addMember } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
-        if (isAuthenticated) signOut();
+        // Don't sign out demo users — they have no real Supabase session
+        const isDemoUser = currentUser.id === 'user1' || currentUser.id.startsWith('user-');
+        if (isAuthenticated && !isDemoUser) signOut();
         return;
       }
 
