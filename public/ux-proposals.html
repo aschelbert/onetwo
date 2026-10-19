@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OneTwo UX Proposals</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --navy: #1e293b;
+    --ink-900: #0f172a;
+    --ink-700: #334155;
+    --ink-500: #64748b;
+    --ink-400: #94a3b8;
+    --ink-200: #e2e8f0;
+    --ink-100: #f1f5f9;
+    --ink-50: #f8fafc;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --sage: #16a34a;
+    --sage-light: #f0fdf4;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #f1f5f9; color: var(--ink-900); }
+
+  /* Proposal navigation */
+  .proposal-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--navy); padding: 0 24px; height: 56px;
+    display: flex; align-items: center; gap: 32px;
+  }
+  .proposal-nav h1 { color: white; font-size: 15px; font-weight: 700; white-space: nowrap; }
+  .proposal-tabs { display: flex; gap: 4px; }
+  .proposal-tab {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: rgba(255,255,255,0.6); cursor: pointer; border: none; background: none;
+    transition: all 0.2s;
+  }
+  .proposal-tab:hover { color: white; background: rgba(255,255,255,0.1); }
+  .proposal-tab.active { color: white; background: rgba(255,255,255,0.15); }
+
+  .proposals { padding-top: 56px; }
+  .proposal { display: none; padding: 32px; max-width: 1200px; margin: 0 auto; }
+  .proposal.active { display: block; }
+  .proposal h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+  .proposal .subtitle { font-size: 14px; color: var(--ink-500); margin-bottom: 32px; line-height: 1.5; }
+
+  /* Comparison layout */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
+  .comparison-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+  .comparison-label.current { color: var(--ink-400); }
+  .comparison-label.proposed { color: var(--accent); }
+
+  /* Phone frame */
+  .phone {
+    width: 375px; margin: 0 auto; border-radius: 40px; overflow: hidden;
+    border: 8px solid #1e1e1e; background: white;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.15);
+  }
+  .phone-screen { height: 720px; overflow-y: auto; position: relative; }
+  .phone-screen::-webkit-scrollbar { display: none; }
+
+  /* Desktop frame */
+  .desktop {
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--ink-200);
+    background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+
+  /* App chrome */
+  .app-topnav {
+    background: var(--navy); height: 48px; display: flex; align-items: center;
+    padding: 0 16px; gap: 24px;
+  }
+  .app-topnav .logo { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); }
+  .app-topnav .nav-items { display: flex; gap: 4px; }
+  .app-topnav .nav-item {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.2s;
+  }
+  .app-topnav .nav-item:hover { color: white; background: rgba(255,255,255,0.08); }
+  .app-topnav .nav-item.active { color: white; background: rgba(255,255,255,0.12); }
+  .app-topnav .avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #475569;
+    margin-left: auto; font-size: 11px; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;
+  }
+
+  .app-bottomnav {
+    height: 56px; background: white; border-top: 1px solid var(--ink-200);
+    display: flex; align-items: center; justify-content: space-around;
+    position: sticky; bottom: 0;
+  }
+  .app-bottomnav .bnav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 10px; font-weight: 600; color: var(--ink-400); cursor: pointer;
+  }
+  .app-bottomnav .bnav-item.active { color: var(--accent); }
+  .app-bottomnav .bnav-item svg { width: 20px; height: 20px; }
+
+  /* Page content */
+  .page { padding: 16px; background: var(--ink-50); min-height: 600px; }
+
+  /* Cards */
+  .card { background: white; border-radius: 12px; border: 1px solid var(--ink-200); padding: 16px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 700; color: var(--ink-700); margin-bottom: 8px; }
+
+  /* Alert banner */
+  .alert-banner {
+    background: var(--red-light); border: 1px solid #fecaca; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .alert-banner .alert-icon { font-size: 16px; }
+  .alert-banner .alert-text { font-size: 12px; color: #991b1b; font-weight: 500; flex: 1; }
+  .alert-banner .alert-arrow { color: #dc2626; font-size: 14px; }
+
+  /* Action items */
+  .action-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s;
+  }
+  .action-item:hover { transform: translateX(2px); }
+  .action-item.urgent { background: var(--red-light); border: 1px solid #fecaca; }
+  .action-item.warning { background: var(--amber-light); border: 1px solid #fde68a; }
+  .action-item.info { background: var(--accent-light); border: 1px solid #bfdbfe; }
+  .action-item .ai-icon { font-size: 16px; flex-shrink: 0; }
+  .action-item .ai-content { flex: 1; min-width: 0; }
+  .action-item .ai-title { font-size: 12px; font-weight: 600; color: var(--ink-900); }
+  .action-item .ai-sub { font-size: 10px; color: var(--ink-500); margin-top: 1px; }
+  .action-item .ai-arrow { color: var(--ink-400); font-size: 12px; }
+
+  /* Stats strip */
+  .stats-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat-box { text-align: center; padding: 10px 8px; border-radius: 8px; background: white; border: 1px solid var(--ink-200); }
+  .stat-value { font-size: 18px; font-weight: 800; }
+  .stat-value.good { color: var(--sage); }
+  .stat-value.warn { color: var(--amber); }
+  .stat-value.bad { color: var(--red); }
+  .stat-label { font-size: 9px; font-weight: 600; color: var(--ink-400); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+  /* Section header */
+  .section-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-400); margin-bottom: 8px; margin-top: 16px; }
+
+  /* Activity items */
+  .activity-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ink-100); }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-item .act-icon { font-size: 14px; }
+  .activity-item .act-text { font-size: 11px; color: var(--ink-700); flex: 1; }
+  .activity-item .act-date { font-size: 10px; color: var(--ink-400); }
+
+  /* Case categories */
+  .case-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .case-group {
+    border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.15s;
+    border: 2px solid var(--ink-200); background: white;
+  }
+  .case-group:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(37,99,235,0.1); }
+  .case-group .cg-icon { font-size: 24px; margin-bottom: 6px; }
+  .case-group .cg-title { font-size: 13px; font-weight: 700; color: var(--ink-900); }
+  .case-group .cg-desc { font-size: 10px; color: var(--ink-500); margin-top: 2px; line-height: 1.4; }
+
+  /* Old case categories */
+  .case-cats-old { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+  .case-cat-old {
+    border-radius: 8px; padding: 8px 4px; text-align: center; cursor: pointer;
+    border: 2px solid var(--ink-200); background: white; transition: all 0.15s;
+  }
+  .case-cat-old:hover { border-color: var(--accent); }
+  .case-cat-old .cco-icon { font-size: 18px; }
+  .case-cat-old .cco-label { font-size: 8px; font-weight: 600; color: var(--ink-700); margin-top: 2px; }
+
+  /* Next step banner */
+  .next-step-banner {
+    background: linear-gradient(135deg, #eff6ff, #f0f9ff); border: 1px solid #bfdbfe;
+    border-radius: 12px; padding: 16px; margin-bottom: 16px;
+  }
+  .next-step-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--accent); letter-spacing: 0.05em; }
+  .next-step-title { font-size: 14px; font-weight: 700; color: var(--ink-900); margin-top: 4px; }
+  .next-step-meta { font-size: 11px; color: var(--ink-500); margin-top: 4px; }
+  .next-step-btn {
+    margin-top: 10px; padding: 8px 20px; background: var(--accent); color: white;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+
+  /* Building tabs */
+  .building-tabs { display: flex; gap: 2px; padding: 8px 16px; background: white; border-bottom: 1px solid var(--ink-200); overflow-x: auto; }
+  .building-tab {
+    padding: 6px 12px; font-size: 11px; font-weight: 600; color: var(--ink-400);
+    border-radius: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s;
+  }
+  .building-tab:hover { color: var(--ink-700); background: var(--ink-50); }
+  .building-tab.active { color: var(--accent); background: var(--accent-light); }
+
+  /* Terminology table */
+  .term-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .term-table th { text-align: left; padding: 10px 16px; background: var(--ink-50); color: var(--ink-500); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .term-table td { padding: 10px 16px; border-bottom: 1px solid var(--ink-100); }
+  .term-table .old { color: var(--ink-400); text-decoration: line-through; }
+  .term-table .new { color: var(--accent); font-weight: 600; }
+  .term-table .why { color: var(--ink-500); font-size: 12px; }
+
+  /* Full-width section */
+  .full-section { margin-bottom: 40px; }
+  .full-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+
+  /* Greeting */
+  .greeting { margin-bottom: 4px; }
+  .greeting-name { font-size: 16px; font-weight: 700; color: var(--ink-900); }
+  .greeting-building { font-size: 11px; color: var(--ink-400); margin-top: 2px; }
+
+  /* Notes */
+  .design-note {
+    background: #fefce8; border: 1px solid #fef08a; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 16px; font-size: 12px; color: #854d0e; line-height: 1.5;
+  }
+  .design-note strong { font-weight: 700; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .comparison { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="proposal-nav">
+  <h1>UX Proposals</h1>
+  <div class="proposal-tabs">
+    <button class="proposal-tab active" onclick="show('nav')">Navigation</button>
+    <button class="proposal-tab" onclick="show('today')">Today View</button>
+    <button class="proposal-tab" onclick="show('cases')">Cases</button>
+    <button class="proposal-tab" onclick="show('building')">Building</button>
+    <button class="proposal-tab" onclick="show('terms')">Terminology</button>
+  </div>
+</nav>
+
+<div class="proposals">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PROPOSAL 1: NAVIGATION                          -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="nav" class="proposal active">
+  <h2>Navigation: 6 items &rarr; 4 items</h2>
+  <p class="subtitle">A volunteer board president has 10 minutes at night. Every tap counts. The current 6-item nav with mobile overflow means the two most important things &mdash; Cases and financial data &mdash; compete for attention with governance and archives. The proposal: 4 items that map to what board members actually do.</p>
+
+  <div class="design-note">
+    <strong>Why this matters:</strong> Cases is OneTwo's core differentiator &mdash; no other HOA tool has jurisdictional step-by-step resolution workflows. But Cases is currently buried inside Board Room. Promoting it to primary nav makes the product's value immediately visible.
+  </div>
+
+  <div class="comparison">
+    <div>
+      <div class="comparison-label current">Current &mdash; Desktop (6 nav items)</div>
+      <div class="desktop">
+        <div class="app-topnav">
+          <div class="logo"></div>
+          <div class="nav-items">
+            <div class="nav-item active">Dashboard</div>
+            <div class="nav-item">The Building</div>
+            <div class="nav-item">Fiscal Lens</div>
+            <div class="nav-item">Board Room</div>
+            <div class="nav-item">Assoc Team</div>
+            <div class="nav-item">The Archives</div>
+          </div>
+          <div class="avatar">SP</div>
+        </div>
+        <div class="page" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+          <div style="text-align: center; color: var(--ink-400);">
+            <div style="font-size: 13px; font-weight: 600;">6 top-level items</div>
+            <div style="font-size: 11px; margin-top: 4px;">Cases buried inside Board Room &rarr; Votes tab</div>
+            <div style="font-size: 11px;">Mobile: 4 tabs + "More" overflow</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="comparison-label proposed">Proposed &mdash; Desktop (4 nav items)</div>
+      <div class="desktop">
+        <div class="app-topnav">
+          <div class="logo"></div>
+          <div class="nav-items">
+            <div class="nav-item active">Today</div>
+            <div class="nav-item">Money</div>
+            <div class="nav-item">Cases</div>
+            <div class="nav-item">Building</div>
+          </div>
+          <div class="avatar">SP</div>
+        </div>
+        <div class="page" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+          <div style="text-align: center; color: var(--ink-400);">
+            <div style="font-size: 13px; font-weight: 600;">4 items &mdash; everything fits on mobile</div>
+            <div style="font-size: 11px; margin-top: 4px;">Cases promoted to top-level (core differentiator)</div>
+            <div style="font-size: 11px;">No "More" overflow on mobile</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="comparison">
+    <div>
+      <div class="comparison-label current">Current &mdash; Mobile bottom nav</div>
+      <div class="phone" style="height: auto;">
+        <div class="app-bottomnav">
+          <div class="bnav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Board</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Fiscal</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Community</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="comparison-label proposed">Proposed &mdash; Mobile bottom nav</div>
+      <div class="phone" style="height: auto;">
+        <div class="app-bottomnav">
+          <div class="bnav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Today</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Money</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Cases</div>
+          <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Building</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="full-section">
+    <h3>What merges where</h3>
+    <table class="term-table">
+      <tr><th>Current Page</th><th>Proposed Home</th><th>Rationale</th></tr>
+      <tr><td>Dashboard</td><td class="new">Today</td><td class="why">Action items only. Charts and financial detail move to Money.</td></tr>
+      <tr><td>Fiscal Lens</td><td class="new">Money</td><td class="why">Full financial suite: GL, budget, reserves, Who Owes (unit ledger), dashboard.</td></tr>
+      <tr><td>Issues (inside Board Room)</td><td class="new">Cases (top-level)</td><td class="why">The product's differentiator. 40+ jurisdictional workflows shouldn't be 3 taps deep.</td></tr>
+      <tr><td>The Building</td><td class="new">Building &rarr; Overview tab</td><td class="why">Property details, contacts, units, insurance, vendors, fees, assets.</td></tr>
+      <tr><td>Board Room</td><td class="new">Building &rarr; Governance tab</td><td class="why">Meetings, runbook, compliance duties, votes, communications.</td></tr>
+      <tr><td>Association Team</td><td class="new">Building &rarr; People tab</td><td class="why">Board members, management company, legal counsel, staff.</td></tr>
+      <tr><td>The Archives</td><td class="new">Building &rarr; Documents tab</td><td class="why">All stored documents, minutes, reports, generated archives.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PROPOSAL 2: TODAY VIEW                          -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="today" class="proposal">
+  <h2>Today View: Action-items first</h2>
+  <p class="subtitle">The current Dashboard shows 4 KPI cards, attention pills, fiduciary alerts, delinquency aging, budget alerts, meetings, and activity &mdash; all at once. For a board president with 10 minutes, the question is: "What do I need to do right now?" Everything else is noise. The proposed Today view answers that question in the first scroll.</p>
+
+  <div class="design-note">
+    <strong>Design principle:</strong> Only show an alert banner if something is <em>critically wrong</em> (insurance expired, fiduciary duty at risk). Action items are tappable &mdash; each one takes you to the exact screen to resolve it. The 3-stat strip gives a pulse check without taking up card space. Financial detail (aging, budget variance, charts) moves to Money.
+  </div>
+
+  <div class="comparison">
+    <div>
+      <div class="comparison-label current">Current Dashboard (Board Member)</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="app-topnav">
+            <div class="logo"></div>
+            <div class="nav-items"><div class="nav-item active" style="font-size:10px">Dashboard</div></div>
+            <div class="avatar">SP</div>
+          </div>
+          <div class="page">
+            <div style="background:var(--navy);margin:-16px -16px 12px;padding:16px;border-radius:0 0 12px 12px;">
+              <div style="color:white;font-size:14px;font-weight:700;">Welcome back, Sarah</div>
+              <div style="color:rgba(255,255,255,0.5);font-size:10px;">Sunny Acres &middot; Tuesday, October 17, 2026</div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;text-align:center;"><div style="color:#86efac;font-size:16px;font-weight:800;">B</div><div style="color:rgba(255,255,255,0.5);font-size:8px;">Building</div></div>
+                <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;text-align:center;"><div style="color:#fde047;font-size:16px;font-weight:800;">C</div><div style="color:rgba(255,255,255,0.5);font-size:8px;">Compliance</div></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;">
+              <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:6px 10px;white-space:nowrap;font-size:10px;color:#991b1b;font-weight:600;">📅 2 Overdue</div>
+              <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:6px 10px;white-space:nowrap;font-size:10px;color:#991b1b;font-weight:600;">🚨 1 Urgent</div>
+              <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;white-space:nowrap;font-size:10px;color:#92400e;font-weight:600;">📥 3 Requests</div>
+              <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;white-space:nowrap;font-size:10px;color:#92400e;font-weight:600;">🛡 1 Insurance</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+              <div class="card" style="padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--sage);">94%</div><div style="font-size:9px;color:var(--ink-400);">Collection Rate</div></div>
+              <div class="card" style="padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--amber);">45%</div><div style="font-size:9px;color:var(--ink-400);">Reserve Funding</div></div>
+              <div class="card" style="padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--amber);">68%</div><div style="font-size:9px;color:var(--ink-400);">Compliance</div></div>
+              <div class="card" style="padding:10px;text-align:center;"><div style="font-size:18px;font-weight:800;color:var(--red);">4</div><div style="font-size:9px;color:var(--ink-400);">Open Cases</div></div>
+            </div>
+            <div class="card">
+              <div class="card-title">⚡ Fiduciary Alerts</div>
+              <div style="font-size:10px;color:var(--ink-500);line-height:1.6;">
+                <div style="padding:4px 0;border-bottom:1px solid var(--ink-100);">⚠️ D&O insurance expires in 30 days</div>
+                <div style="padding:4px 0;border-bottom:1px solid var(--ink-100);">⚠️ Reserve fund below 50% threshold</div>
+                <div style="padding:4px 0;">⚠️ Unit 402 delinquent 92 days</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">⚡ Your Action Items</div>
+              <div style="font-size:10px;color:var(--ink-500);line-height:1.8;">
+                📅 Annual Report overdue<br>🚨 Noise complaint<br>🏛 Board meeting in 5 days
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">💰 Delinquency Aging</div>
+              <div style="font-size:10px;color:var(--ink-500);line-height:1.8;">
+                0-30 days: 2 units<br>30-60 days: 1 unit<br>60-90 days: 0 units<br>90+ days: 1 unit<br><strong>Total: $4,200</strong>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">📊 Budget Alerts</div>
+              <div style="font-size:10px;color:var(--ink-500);">Landscaping: 112% of budget (critical)</div>
+            </div>
+            <div class="card">
+              <div class="card-title">📅 Upcoming Meetings</div>
+              <div style="font-size:10px;color:var(--ink-500);line-height:1.8;">Oct 22 &middot; Board Meeting<br>Nov 5 &middot; Annual Meeting</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Recent Activity</div>
+              <div style="font-size:10px;color:var(--ink-500);line-height:1.8;">Budget review completed<br>Notice sent to Unit 204<br>Insurance renewal filed</div>
+            </div>
+          </div>
+          <div class="app-bottomnav">
+            <div class="bnav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span style="font-size:9px">Dash</span></div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg><span style="font-size:9px">Board</span></div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/></svg><span style="font-size:9px">Fiscal</span></div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span style="font-size:9px">Comm</span></div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span style="font-size:9px">More</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="comparison-label proposed">Proposed Today View</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="app-topnav">
+            <div class="logo"></div>
+            <div class="nav-items"><div class="nav-item active" style="font-size:10px">Today</div></div>
+            <div class="avatar">SP</div>
+          </div>
+          <div class="page">
+            <div class="greeting">
+              <div class="greeting-name">Good evening, Sarah</div>
+              <div class="greeting-building">Sunny Acres &middot; Tue, Oct 17</div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="alert-banner">
+              <div class="alert-icon">🛡</div>
+              <div class="alert-text">D&O insurance expires in 30 days &mdash; board members are personally exposed</div>
+              <div class="alert-arrow">&rarr;</div>
+            </div>
+
+            <div class="section-header">Your action items</div>
+
+            <div class="action-item urgent">
+              <div class="ai-icon">📅</div>
+              <div class="ai-content">
+                <div class="ai-title">File Annual Report with DCRA</div>
+                <div class="ai-sub">Overdue since Oct 1 &middot; $80 fee &middot; Your role: Treasurer</div>
+              </div>
+              <div class="ai-arrow">&rarr;</div>
+            </div>
+
+            <div class="action-item urgent">
+              <div class="ai-icon">🚨</div>
+              <div class="ai-content">
+                <div class="ai-title">Unit 403 noise complaint &mdash; Step 2</div>
+                <div class="ai-sub">Next: Send notice to owner &middot; Open 3 days</div>
+              </div>
+              <div class="ai-arrow">&rarr;</div>
+            </div>
+
+            <div class="action-item warning">
+              <div class="ai-icon">💰</div>
+              <div class="ai-content">
+                <div class="ai-title">Unit 402 delinquent &mdash; 92 days</div>
+                <div class="ai-sub">$2,800 owed &middot; Next: Send formal demand letter</div>
+              </div>
+              <div class="ai-arrow">&rarr;</div>
+            </div>
+
+            <div class="action-item info">
+              <div class="ai-icon">🏛</div>
+              <div class="ai-content">
+                <div class="ai-title">Board meeting in 5 days</div>
+                <div class="ai-sub">Thu Oct 22 &middot; 7:00 PM &middot; Community Room</div>
+              </div>
+              <div class="ai-arrow">&rarr;</div>
+            </div>
+
+            <div class="action-item warning">
+              <div class="ai-icon">📋</div>
+              <div class="ai-content">
+                <div class="ai-title">Reserve study due for update</div>
+                <div class="ai-sub">Last completed 2023 &middot; Required every 3 years</div>
+              </div>
+              <div class="ai-arrow">&rarr;</div>
+            </div>
+
+            <div style="height:8px;"></div>
+            <div class="stats-strip">
+              <div class="stat-box"><div class="stat-value good">94%</div><div class="stat-label">Collection</div></div>
+              <div class="stat-box"><div class="stat-value warn">45%</div><div class="stat-label">Reserves</div></div>
+              <div class="stat-box"><div class="stat-value good">B</div><div class="stat-label">Compliance</div></div>
+            </div>
+
+            <div class="section-header">Recent activity</div>
+            <div class="card" style="padding:8px 12px;">
+              <div class="activity-item"><div class="act-icon">📦</div><div class="act-text">Budget review completed</div><div class="act-date">Oct 15</div></div>
+              <div class="activity-item"><div class="act-icon">✉️</div><div class="act-text">Violation notice sent to Unit 502</div><div class="act-date">Oct 14</div></div>
+              <div class="activity-item"><div class="act-icon">✅</div><div class="act-text">Insurance renewal filed</div><div class="act-date">Oct 12</div></div>
+              <div class="activity-item"><div class="act-icon">🗓</div><div class="act-text">Q3 board meeting completed</div><div class="act-date">Oct 8</div></div>
+            </div>
+          </div>
+          <div class="app-bottomnav">
+            <div class="bnav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Today</div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Money</div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Cases</div>
+            <div class="bnav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Building</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PROPOSAL 3: CASES                               -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="cases" class="proposal">
+  <h2>Case Creation: 10 categories &rarr; 4 groups</h2>
+  <p class="subtitle">The current case creation wizard shows 10 category tiles + a custom option, then situation picker, then approach selection (pre-legal vs legal vs self-represented). For a board member creating their first case, it's overwhelming. The proposal groups categories into 4 intuitive buckets, defaults to step-by-step resolution (the pre-legal path), and shows a contextual "next step" banner on each case instead of the full step list.</p>
+
+  <div class="design-note">
+    <strong>Key insight:</strong> The approach selection (pre-legal vs legal vs self-represented) is a power feature that confuses new users. 90%+ of cases should start as pre-legal. The proposal removes the choice &mdash; every case starts as step-by-step resolution. A banner says "If this escalates, you can add Legal Counsel path anytime." Power users still get the full workflow; new users don't need to understand the distinction.
+  </div>
+
+  <div class="comparison">
+    <div>
+      <div class="comparison-label current">Current &mdash; 10 category tiles</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="app-topnav"><div class="logo"></div><div class="avatar">SP</div></div>
+          <div class="page">
+            <div style="font-size:10px;color:var(--ink-400);cursor:pointer;margin-bottom:8px;">&larr; Back</div>
+            <div style="font-size:18px;font-weight:800;margin-bottom:4px;">New Case</div>
+            <div style="display:flex;gap:4px;margin-bottom:12px;">
+              <div style="height:3px;flex:1;border-radius:2px;background:var(--accent);"></div>
+              <div style="height:3px;flex:1;border-radius:2px;background:var(--ink-100);"></div>
+              <div style="height:3px;flex:1;border-radius:2px;background:var(--ink-100);"></div>
+            </div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:10px;">1. What's the situation?</div>
+            <div class="case-cats-old">
+              <div class="case-cat-old"><div class="cco-icon">💰</div><div class="cco-label">Fiscal</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🔧</div><div class="cco-label">Maint</div></div>
+              <div class="case-cat-old" style="border-color:var(--accent);background:var(--accent-light);"><div class="cco-icon">⚖️</div><div class="cco-label">Rules</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🏛️</div><div class="cco-label">Legal</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🗳️</div><div class="cco-label">Govern</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🤝</div><div class="cco-label">Disputes</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🏊</div><div class="cco-label">Cmty Ops</div></div>
+              <div class="case-cat-old"><div class="cco-icon">📐</div><div class="cco-label">Strategy</div></div>
+              <div class="case-cat-old"><div class="cco-icon">🚨</div><div class="cco-label">Crisis</div></div>
+              <div class="case-cat-old"><div class="cco-icon">📁</div><div class="cco-label">Admin</div></div>
+            </div>
+            <div class="case-cat-old" style="border-style:dashed;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;margin-bottom:12px;">
+              <span style="font-size:14px;">+</span><span class="cco-label" style="font-size:10px;">Custom Situation</span>
+            </div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink-600);margin-bottom:6px;">Select situation type:</div>
+            <div class="card" style="padding:10px;border:2px solid var(--accent);"><div style="font-size:12px;font-weight:700;">Covenant Violations</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Pet policy, noise, parking, unauthorized modifications</div><div style="display:flex;gap:4px;margin-top:4px;"><span style="font-size:8px;background:var(--ink-50);padding:2px 6px;border-radius:3px;color:var(--ink-400);">hearing</span><span style="font-size:8px;background:var(--ink-50);padding:2px 6px;border-radius:3px;color:var(--ink-400);">fine</span></div></div>
+            <div class="card" style="padding:10px;"><div style="font-size:12px;font-weight:700;">Fine Hearings</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Formal hearing process for violations</div></div>
+            <div class="card" style="padding:10px;"><div style="font-size:12px;font-weight:700;">Architectural Review</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Modification requests, ARC approvals</div></div>
+            <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--ink-600);margin-bottom:6px;">Then choose approach:</div>
+            <div style="display:flex;gap:4px;">
+              <div style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--accent);background:var(--accent-light);text-align:center;font-size:10px;font-weight:600;color:var(--accent);">Pre-Legal</div>
+              <div style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--ink-200);text-align:center;font-size:10px;font-weight:600;color:var(--ink-500);">Self-Rep</div>
+              <div style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--ink-200);text-align:center;font-size:10px;font-weight:600;color:var(--ink-500);">Legal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="comparison-label proposed">Proposed &mdash; 4 intuitive groups</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="app-topnav"><div class="logo"></div><div class="avatar">SP</div></div>
+          <div class="page">
+            <div style="font-size:10px;color:var(--ink-400);cursor:pointer;margin-bottom:8px;">&larr; Back to Cases</div>
+            <div style="font-size:18px;font-weight:800;margin-bottom:4px;">New Case</div>
+            <div style="font-size:13px;color:var(--ink-500);margin-bottom:16px;">What kind of issue is this?</div>
+
+            <div class="case-groups">
+              <div class="case-group">
+                <div class="cg-icon">💰</div>
+                <div class="cg-title">Money</div>
+                <div class="cg-desc">Assessments, delinquencies, budgets, special assessments, reserves</div>
+              </div>
+              <div class="case-group" style="border-color:var(--accent);box-shadow:0 2px 12px rgba(37,99,235,0.1);">
+                <div class="cg-icon">🏢</div>
+                <div class="cg-title">Building</div>
+                <div class="cg-desc">Repairs, maintenance, amenities, emergencies, vendors</div>
+              </div>
+              <div class="case-group">
+                <div class="cg-icon">👥</div>
+                <div class="cg-title">People</div>
+                <div class="cg-desc">Violations, disputes, noise, parking, rule enforcement</div>
+              </div>
+              <div class="case-group">
+                <div class="cg-icon">📋</div>
+                <div class="cg-title">Board</div>
+                <div class="cg-desc">Governance, legal, elections, bylaws, compliance, crisis</div>
+              </div>
+            </div>
+
+            <div style="font-size:12px;font-weight:600;color:var(--ink-600);margin-bottom:6px;">Select situation:</div>
+            <div class="card" style="padding:10px;"><div style="font-size:12px;font-weight:700;">Common Area Repairs</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Lobby, hallway, garage, exterior repairs</div></div>
+            <div class="card" style="padding:10px;border:2px solid var(--accent);background:var(--accent-light);"><div style="font-size:12px;font-weight:700;">Emergency Situations</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Water leak, fire damage, structural concern</div></div>
+            <div class="card" style="padding:10px;"><div style="font-size:12px;font-weight:700;">Vendor Management</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Contract issues, disputes, rebidding</div></div>
+            <div class="card" style="padding:10px;"><div style="font-size:12px;font-weight:700;">Preventative Maintenance</div><div style="font-size:10px;color:var(--ink-400);margin-top:2px;">Scheduled inspections, seasonal prep</div></div>
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:10px;color:#166534;line-height:1.5;">
+              <strong>Step-by-step resolution</strong> &mdash; We'll guide you through each step. If this escalates, you can add Legal Counsel path anytime.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="full-section">
+    <h3>Case detail: contextual next action</h3>
+    <p class="subtitle" style="margin-bottom:16px;">Instead of showing the full 10-step workflow list, show the user exactly what they need to do next &mdash; one action, one button.</p>
+    <div style="max-width:500px;">
+      <div class="next-step-banner">
+        <div class="next-step-label">Next step</div>
+        <div class="next-step-title">Send formal demand letter via certified mail</div>
+        <div class="next-step-meta">Step 4 of 10 &middot; Delinquent Accounts &middot; Unit 402<br>Timeline: 60 days past due &middot; DC Code &sect; 42-1903.13(a)</div>
+        <button class="next-step-btn">Send Demand Letter</button>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink-700);">Resolution Progress</div>
+          <div style="flex:1;height:4px;background:var(--ink-100);border-radius:2px;"><div style="width:30%;height:100%;background:var(--accent);border-radius:2px;"></div></div>
+          <div style="font-size:10px;color:var(--ink-400);">3/10</div>
+        </div>
+        <div style="font-size:10px;color:var(--ink-500);line-height:1.6;">
+          <div style="color:var(--sage);">✓ Verified delinquency ($2,800 + $150 late fees)</div>
+          <div style="color:var(--sage);">✓ Sent first late notice (Oct 5)</div>
+          <div style="color:var(--sage);">✓ Applied late fee, sent second notice certified (Oct 20)</div>
+          <div style="color:var(--accent);font-weight:600;">→ Send formal demand letter</div>
+          <div style="color:var(--ink-300);">○ Offer payment plan</div>
+          <div style="color:var(--ink-300);">○ Board resolution to record lien</div>
+          <div style="color:var(--ink-300);font-size:9px;margin-top:2px;">... 4 more steps</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PROPOSAL 4: BUILDING (merged)                   -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="building" class="proposal">
+  <h2>Building: 4 pages merged into tabs</h2>
+  <p class="subtitle">The Building, Board Room, Association Team, and The Archives are currently 4 separate top-level pages. The proposal merges them into a single "Building" page with tabs: Overview, People, Governance, Documents, Units, and Comms. This reduces cognitive load &mdash; everything about your building is in one place.</p>
+
+  <div class="design-note">
+    <strong>Rationale:</strong> Board members don't think "I need the Board Room" &mdash; they think "I need to check on my building's meeting schedule." The Building tab becomes the single source of truth for everything about the property: who runs it, how it's governed, what documents exist, what units are there, and how to communicate with owners.
+  </div>
+
+  <div class="comparison">
+    <div>
+      <div class="comparison-label current">Current &mdash; 4 separate pages</div>
+      <div class="desktop">
+        <div class="app-topnav">
+          <div class="logo"></div>
+          <div class="nav-items">
+            <div class="nav-item">Dashboard</div>
+            <div class="nav-item active">The Building</div>
+            <div class="nav-item">Fiscal Lens</div>
+            <div class="nav-item">Board Room</div>
+            <div class="nav-item">Assoc Team</div>
+            <div class="nav-item">Archives</div>
+          </div>
+          <div class="avatar">SP</div>
+        </div>
+        <div class="building-tabs">
+          <div class="building-tab active">Details</div>
+          <div class="building-tab">Contacts</div>
+          <div class="building-tab">Units</div>
+          <div class="building-tab">Legal</div>
+          <div class="building-tab">Insurance</div>
+          <div class="building-tab">Vendors</div>
+          <div class="building-tab">Fees</div>
+          <div class="building-tab">Mailing</div>
+          <div class="building-tab" style="color:var(--accent);">Assets ✨</div>
+        </div>
+        <div class="page" style="height:200px;display:flex;align-items:center;justify-content:center;">
+          <div style="text-align:center;color:var(--ink-400);font-size:12px;line-height:1.8;">
+            <strong>The Building</strong> has 9 tabs<br>
+            <strong>Board Room</strong> has 6 tabs (Duties, Runbook, Meetings, Votes, Comms, Daily Ops)<br>
+            <strong>Association Team</strong> is a separate page<br>
+            <strong>The Archives</strong> is a separate page<br><br>
+            Total: 4 nav items, 17+ tabs across them
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="comparison-label proposed">Proposed &mdash; Single Building page</div>
+      <div class="desktop">
+        <div class="app-topnav">
+          <div class="logo"></div>
+          <div class="nav-items">
+            <div class="nav-item">Today</div>
+            <div class="nav-item">Money</div>
+            <div class="nav-item">Cases</div>
+            <div class="nav-item active">Building</div>
+          </div>
+          <div class="avatar">SP</div>
+        </div>
+        <div class="building-tabs">
+          <div class="building-tab active">Overview</div>
+          <div class="building-tab">People</div>
+          <div class="building-tab">Governance</div>
+          <div class="building-tab">Documents</div>
+          <div class="building-tab">Units</div>
+          <div class="building-tab">Comms</div>
+        </div>
+        <div class="page" style="height:200px;display:flex;align-items:center;justify-content:center;">
+          <div style="text-align:center;color:var(--ink-400);font-size:12px;line-height:1.8;">
+            <strong>Overview</strong> = Building details, address, insurance, vendors, fees, assets<br>
+            <strong>People</strong> = Board, management co, counsel, staff (was Assoc Team)<br>
+            <strong>Governance</strong> = Duties, runbook, meetings, votes (was Board Room)<br>
+            <strong>Documents</strong> = Legal docs, bylaws, archives, generated reports<br>
+            <strong>Units</strong> = Unit roster, fees, move tracking<br>
+            <strong>Comms</strong> = Owner communications log, notice templates<br><br>
+            1 nav item, 6 tabs. Same data, clearer mental model.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- PROPOSAL 5: TERMINOLOGY                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<div id="terms" class="proposal">
+  <h2>Terminology Simplification</h2>
+  <p class="subtitle">OneTwo uses professional HOA terminology throughout the app. While this signals expertise to industry insiders, it creates friction for volunteer board members who manage their building's compliance alongside a day job. The proposal: use plain language in the UI, keep the legal precision in the step content and legal citations where it matters.</p>
+
+  <div class="design-note">
+    <strong>Principle:</strong> The <em>navigation</em> should use language a first-time board president understands. The <em>content inside cases and compliance items</em> keeps full legal terminology and DC Code citations &mdash; that's where precision matters and where OneTwo's expertise shows.
+  </div>
+
+  <div class="full-section">
+    <table class="term-table">
+      <tr><th style="width:25%">Current Term</th><th style="width:25%">Proposed Term</th><th>Why</th></tr>
+      <tr><td class="old">Dashboard</td><td class="new">Today</td><td class="why">"What do I need to do today?" is the question. Dashboard is generic.</td></tr>
+      <tr><td class="old">Fiscal Lens</td><td class="new">Money</td><td class="why">Everyone knows what money means. "Fiscal Lens" requires explanation.</td></tr>
+      <tr><td class="old">Board Room</td><td class="new">Governance (tab inside Building)</td><td class="why">Board Room sounds like a physical space. Governance says what it actually is.</td></tr>
+      <tr><td class="old">The Building</td><td class="new">Building</td><td class="why">Drop "The" &mdash; shorter, same meaning.</td></tr>
+      <tr><td class="old">Association Team</td><td class="new">People (tab inside Building)</td><td class="why">Simpler. "Team" implies employment; many board members are volunteers.</td></tr>
+      <tr><td class="old">The Archives</td><td class="new">Documents (tab inside Building)</td><td class="why">"Archives" sounds like storage. "Documents" sounds like something you use.</td></tr>
+      <tr><td class="old">Unit Ledger</td><td class="new">Who Owes</td><td class="why">The board president's actual question. "Ledger" is accounting jargon.</td></tr>
+      <tr><td class="old">Compliance Runbook</td><td class="new">Governance Checklist</td><td class="why">"Runbook" is ops/engineering jargon. "Checklist" is universally understood.</td></tr>
+      <tr><td class="old">Fiduciary Alerts</td><td class="new">Board Alerts</td><td class="why">99% of board members don't know what "fiduciary" means. The alert content explains the duty.</td></tr>
+      <tr><td class="old">Pre-Legal Escalation</td><td class="new">Step-by-Step Resolution</td><td class="why">"Pre-Legal" is intimidating. "Step-by-Step" describes the experience.</td></tr>
+      <tr><td class="old">DACI Matrix</td><td class="new">(hidden from UI)</td><td class="why">Auto-assign from DACI internally, but don't show the acronym to users. "Suggested assignee" is enough.</td></tr>
+    </table>
+  </div>
+
+  <div class="design-note" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">
+    <strong>What stays the same:</strong> Legal citations in case steps (DC Code &sect; 42-1903.13), compliance item descriptions, fiduciary duty explanations within alert details, all exported reports and documents. The precision lives in the content. The simplification is in the navigation and labels.
+  </div>
+</div>
+
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.proposal').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.proposal-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

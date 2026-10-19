@@ -7,7 +7,9 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { getInitials, fmt } from '@/lib/formatters';
 import { Building2 } from 'lucide-react';
-import type { Role } from '@/types/auth';
+import type { Role, BoardRoleKey } from '@/types/auth';
+import { BOARD_ROLE_LABELS } from '@/types/auth';
+import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import TheUnitsTab from './tabs/TheUnitsTab';
 import UnitsManager from './tabs/UnitsManager';
@@ -48,7 +50,7 @@ type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 
 
 export default function BuildingPage() {
   const store = useBuildingStore();
-  const { currentRole, buildingMembers, buildingInvites, inviteMember, revokeInvite } = useAuthStore();
+  const { currentRole, buildingMembers, buildingInvites, revokeInvite } = useAuthStore();
   const finStore = useFinancialStore();
   const tenant = useTenantContext();
   const { run: runUndoable } = useUndoableAction();
@@ -74,7 +76,8 @@ export default function BuildingPage() {
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('address');
 
   // Invite form
-  const [inviteForm, setInviteForm] = useState({ email: '', role: 'resident', unit: '' });
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'resident', unit: '', roleKey: '' });
+  const [inviteSending, setInviteSending] = useState(false);
 
   // ─── Building Compliance Health ───
   const totalDocs = store.legalDocuments.length;
@@ -429,22 +432,58 @@ export default function BuildingPage() {
 
       {/* Invite Modal */}
       {modal === 'invite' && (
-        <Modal title="Invite User" onClose={() => setModal(null)} onSave={() => {
-          if (!inviteForm.email) return;
-          inviteMember(inviteForm.email, inviteForm.role as Role, inviteForm.unit || undefined);
-          setModal(null);
+        <Modal title="Invite User" onClose={() => setModal(null)} onSave={async () => {
+          if (!inviteForm.email || inviteSending) return;
+          setInviteSending(true);
+          try {
+            if (supabase) {
+              const { data: { session } } = await supabase.auth.getSession();
+              await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/send-invite`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session?.access_token}`,
+                  },
+                  body: JSON.stringify({
+                    email: inviteForm.email,
+                    role: inviteForm.role,
+                    unit: inviteForm.unit || undefined,
+                    roleKey: inviteForm.role === 'board_member' && inviteForm.roleKey ? inviteForm.roleKey : undefined,
+                    senderName: store.board.find(m => m.email === useAuthStore.getState().currentUser.email)?.name || useAuthStore.getState().currentUser.name,
+                  }),
+                },
+              );
+            }
+            setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' });
+            setModal(null);
+          } finally {
+            setInviteSending(false);
+          }
         }}>
           <div className="space-y-3">
             <Field label="Email *" value={inviteForm.email} onChange={v => setInviteForm(p => ({ ...p, email: v }))} type="email" placeholder="user@example.com" />
             <div>
               <label className="block text-xs font-medium text-ink-700 mb-1">Role *</label>
-              <select value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+              <select value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value, roleKey: '' }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
                 <option value="resident">Resident</option>
                 <option value="board_member">Board Member</option>
                 <option value="property_manager">Property Manager</option>
                 <option value="staff">Staff</option>
               </select>
             </div>
+            {inviteForm.role === 'board_member' && (
+              <div>
+                <label className="block text-xs font-medium text-ink-700 mb-1">Board Seat</label>
+                <select value={inviteForm.roleKey} onChange={e => setInviteForm(p => ({ ...p, roleKey: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                  <option value="">Let them pick</option>
+                  {(Object.entries(BOARD_ROLE_LABELS) as [BoardRoleKey, string][]).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <Field label="Unit (optional)" value={inviteForm.unit} onChange={v => setInviteForm(p => ({ ...p, unit: v }))} placeholder="101" />
           </div>
         </Modal>

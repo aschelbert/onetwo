@@ -80,15 +80,16 @@ Deno.serve(async (req) => {
     }
     const user = await userRes.json();
 
-    // Get user's tenant membership (must be board_member)
+    // Get user's tenant membership — must be board_member or account owner (can_setup)
     const tuRes = await fetch(
-      `${SB_URL}/rest/v1/tenant_users?user_id=eq.${user.id}&select=tenant_id,role`,
+      `${SB_URL}/rest/v1/tenant_users?user_id=eq.${user.id}&select=tenant_id,role,is_account_owner`,
       { headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Accept": "application/json" } }
     );
     const tuList = await tuRes.json();
     const tu = tuList?.[0];
-    if (!tu || tu.role !== "board_member") {
-      return new Response(JSON.stringify({ error: "Only board members can send invitations" }), {
+    const isSetupUser = tu && (tu.is_account_owner || tu.role === "board_member" || tu.role === "BOARD_MEMBER");
+    if (!tu || !isSetupUser) {
+      return new Response(JSON.stringify({ error: "Only board members or account owners can send invitations" }), {
         status: 403, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
@@ -108,8 +109,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
 
     // Normalize to array for bulk support
-    const invitees: Array<{ email: string; role: string; unit?: string }> =
-      Array.isArray(body.invitees) ? body.invitees : [{ email: body.email, role: body.role, unit: body.unit }];
+    const invitees: Array<{ email: string; role: string; unit?: string; roleKey?: string }> =
+      Array.isArray(body.invitees) ? body.invitees : [{ email: body.email, role: body.role, unit: body.unit, roleKey: body.roleKey }];
 
     if (!invitees.length || !invitees[0].email) {
       return new Response(JSON.stringify({ error: "At least one email is required" }), {
@@ -125,6 +126,7 @@ Deno.serve(async (req) => {
       const email = inv.email.trim().toLowerCase();
       const role = inv.role || "resident";
       const unit = inv.unit || null;
+      const roleKey = inv.roleKey || null;
 
       // If resending, reuse the existing code
       if (resendCode && invitees.length === 1) {
@@ -200,6 +202,7 @@ Deno.serve(async (req) => {
           code,
           invited_by: user.id,
           invited_by_name: senderName,
+          ...(roleKey ? { role_key: roleKey } : {}),
         }),
       });
 
@@ -213,7 +216,9 @@ Deno.serve(async (req) => {
       const inviteUrl = `${SITE_URL}/login?invite=${code}`;
 
       // Build email
-      const roleLabel = role === "board_member" ? "Board Member" : role === "property_manager" ? "Property Manager" : role === "staff" ? "Staff" : "Resident";
+      const SEAT_LABELS: Record<string, string> = { president: "President", vice_president: "Vice President", treasurer: "Treasurer", secretary: "Secretary", member_at_large: "Member at Large" };
+      const seatLabel = roleKey && SEAT_LABELS[roleKey] ? ` (${SEAT_LABELS[roleKey]})` : "";
+      const roleLabel = role === "board_member" ? `Board Member${seatLabel}` : role === "property_manager" ? "Property Manager" : role === "staff" ? "Staff" : "Resident";
       const unitText = unit ? ` (Unit ${unit})` : "";
 
       const htmlBody = `

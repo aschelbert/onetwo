@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UX Proposals v2 — Complete</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --navy: #1e293b; --ink-900: #0f172a; --ink-700: #334155; --ink-500: #64748b;
+    --ink-400: #94a3b8; --ink-200: #e2e8f0; --ink-100: #f1f5f9; --ink-50: #f8fafc;
+    --accent: #2563eb; --accent-light: #eff6ff; --sage: #16a34a; --sage-light: #f0fdf4;
+    --red: #dc2626; --red-light: #fef2f2; --amber: #d97706; --amber-light: #fffbeb;
+    --purple: #7c3aed; --purple-light: #f5f3ff;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #f1f5f9; color: var(--ink-900); }
+
+  .top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--navy); height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 12px; }
+  .top-bar h1 { color: white; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .tabs { display: flex; gap: 3px; overflow-x: auto; }
+  .tab { padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.45); cursor: pointer; border: none; background: none; white-space: nowrap; }
+  .tab:hover { color: white; background: rgba(255,255,255,0.08); }
+  .tab.active { color: white; background: rgba(255,255,255,0.14); }
+
+  .content { padding-top: 52px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+  .col-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; padding-left: 2px; }
+  .col-label.old { color: var(--ink-400); }
+  .col-label.new { color: var(--accent); }
+
+  .frame { border-radius: 10px; overflow: hidden; border: 1px solid var(--ink-200); background: white; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+  .f-nav { background: var(--navy); height: 44px; display: flex; align-items: center; padding: 0 12px; gap: 12px; }
+  .f-nav .logo { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); flex-shrink: 0; }
+  .f-nav .n { padding: 4px 8px; border-radius: 5px; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.4); white-space: nowrap; }
+  .f-nav .n.act { color: white; background: rgba(255,255,255,0.12); }
+  .f-nav .av { width: 22px; height: 22px; border-radius: 50%; background: #475569; margin-left: auto; font-size: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; flex-shrink: 0; }
+
+  .kpi-bar { display: flex; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--ink-100); overflow-x: auto; }
+  .kpi { flex: 1; min-width: 60px; text-align: center; padding: 5px 3px; border-radius: 6px; cursor: pointer; }
+  .kpi:hover { background: var(--ink-50); }
+  .kpi-val { font-size: 14px; font-weight: 800; }
+  .kpi-val.g { color: var(--sage); } .kpi-val.w { color: var(--amber); } .kpi-val.r { color: var(--red); } .kpi-val.b { color: var(--accent); }
+  .kpi-lbl { font-size: 7px; font-weight: 600; color: var(--ink-400); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+
+  .tab-bar { display: flex; gap: 1px; padding: 6px 12px; border-bottom: 1px solid var(--ink-200); overflow-x: auto; background: white; }
+  .tb { padding: 5px 9px; border-radius: 5px; font-size: 10px; font-weight: 600; color: var(--ink-400); cursor: pointer; white-space: nowrap; position: relative; }
+  .tb:hover { color: var(--ink-700); background: var(--ink-50); }
+  .tb.act { color: var(--accent); background: var(--accent-light); }
+  .tb .badge { position: absolute; top: -2px; right: -2px; background: var(--red); color: white; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 8px; }
+
+  .pg { padding: 14px; background: var(--ink-50); min-height: 460px; }
+
+  .c { background: white; border-radius: 10px; border: 1px solid var(--ink-200); padding: 12px; margin-bottom: 10px; }
+  .c-title { font-size: 11px; font-weight: 700; color: var(--ink-700); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+
+  .mm { text-align: center; padding: 8px 4px; background: var(--ink-50); border-radius: 6px; }
+  .mm-v { font-size: 14px; font-weight: 800; }
+  .mm-l { font-size: 7px; color: var(--ink-400); font-weight: 600; margin-top: 1px; }
+
+  .pbar { height: 4px; background: var(--ink-100); border-radius: 2px; overflow: hidden; margin: 4px 0; }
+  .pbar-fill { height: 100%; border-radius: 2px; }
+
+  .trow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ink-100); font-size: 10px; }
+  .trow:last-child { border-bottom: none; }
+
+  .badge-sm { font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+  .badge-sage { background: var(--sage-light); color: var(--sage); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-accent { background: var(--accent-light); color: var(--accent); }
+  .badge-purple { background: var(--purple-light); color: var(--purple); }
+
+  .btn { padding: 5px 12px; border-radius: 6px; font-size: 10px; font-weight: 600; border: none; cursor: pointer; display: inline-block; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-outline { background: white; border: 1px solid var(--ink-200); color: var(--ink-700); }
+  .btn-sage { background: var(--sage); color: white; }
+
+  .note { background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 12px 14px; margin: 16px 24px; font-size: 11px; color: #854d0e; line-height: 1.5; max-width: 1400px; }
+  .note b { font-weight: 700; }
+  .note.concern { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+  .note.fix { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+
+  .anno { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 8px; font-weight: 700; padding: 2px 5px; border-radius: 4px; margin-left: 3px; }
+  .anno.new { background: #dcfce7; color: #166534; }
+  .anno.kept { background: #f5f3ff; color: #7c3aed; }
+  .anno.moved { background: #fef3c7; color: #92400e; }
+
+  .sub-nav { display: flex; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--ink-100); background: white; }
+  .sub-pill { font-size: 9px; font-weight: 700; padding: 4px 10px; border-radius: 5px; color: var(--ink-400); cursor: pointer; }
+  .sub-pill:hover { color: var(--ink-700); background: var(--ink-50); }
+  .sub-pill.act { background: var(--accent-light); color: var(--accent); }
+
+  .comp-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: white; border: 1px solid var(--ink-100); }
+  .comp-check { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; margin-top: 1px; }
+  .comp-check.done { background: var(--sage); color: white; }
+  .comp-check.todo { border: 2px solid var(--ink-200); }
+  .comp-check.warn { border: 2px solid var(--amber); background: var(--amber-light); }
+
+  .mtg { display: flex; gap: 10px; padding: 10px; background: white; border: 1px solid var(--ink-100); border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
+  .mtg:hover { border-color: var(--accent); }
+  .mtg-date { width: 42px; text-align: center; flex-shrink: 0; }
+  .mtg-mon { font-size: 9px; font-weight: 700; color: var(--accent); text-transform: uppercase; }
+  .mtg-day { font-size: 16px; font-weight: 800; color: var(--ink-900); }
+  .mtg-info { flex: 1; min-width: 0; }
+  .mtg-title { font-size: 11px; font-weight: 700; }
+  .mtg-sub { font-size: 9px; color: var(--ink-400); margin-top: 1px; }
+
+  .vote-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin: 4px 0; }
+  .vote-bar .yes { background: var(--sage); }
+  .vote-bar .pending { background: var(--ink-100); }
+
+  .wo-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .wo-dot.done { background: var(--sage); }
+  .wo-dot.current { background: var(--accent); box-shadow: 0 0 4px rgba(37,99,235,0.4); }
+  .wo-dot.future { background: var(--ink-100); }
+
+  /* Action item */
+  .ai { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; background: white; border: 1px solid var(--ink-100); cursor: pointer; }
+  .ai:hover { border-color: var(--accent); background: var(--accent-light); }
+  .ai-icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .ai-body { flex: 1; min-width: 0; }
+  .ai-title { font-size: 10px; font-weight: 600; }
+  .ai-meta { font-size: 9px; color: var(--ink-400); margin-top: 1px; }
+  .ai-arrow { color: var(--ink-300); font-size: 12px; }
+
+  /* Category card */
+  .cat-card { background: white; border-radius: 10px; border: 1px solid var(--ink-200); padding: 12px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .cat-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(37,99,235,0.12); transform: translateY(-1px); }
+  .cat-icon { font-size: 24px; margin-bottom: 4px; }
+  .cat-name { font-size: 10px; font-weight: 700; }
+  .cat-count { font-size: 8px; color: var(--ink-400); margin-top: 2px; }
+
+  /* Pill strip */
+  .pill-strip { display: flex; gap: 6px; padding: 0 0 10px; overflow-x: auto; }
+  .pill { padding: 4px 10px; border-radius: 20px; font-size: 9px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+  .pill-red { background: var(--red-light); color: var(--red); border: 1px solid #fecaca; }
+  .pill-amber { background: var(--amber-light); color: var(--amber); border: 1px solid #fde68a; }
+  .pill-sage { background: var(--sage-light); color: var(--sage); border: 1px solid #bbf7d0; }
+  .pill-accent { background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; }
+
+  /* Grade badge */
+  .grade { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; font-size: 14px; font-weight: 900; }
+  .grade-a { background: var(--sage-light); color: var(--sage); }
+  .grade-b { background: var(--accent-light); color: var(--accent); }
+  .grade-c { background: var(--amber-light); color: var(--amber); }
+
+  /* Comm channel icons */
+  .ch-strip { display: flex; gap: 4px; }
+  .ch { padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 600; }
+  .ch-email { background: #eff6ff; color: #2563eb; }
+  .ch-mail { background: #fef3c7; color: #92400e; }
+  .ch-announce { background: #f0fdf4; color: #166534; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>Proposals v2</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="show('today')">Today View</button>
+    <button class="tab" onclick="show('cases')">Cases</button>
+    <button class="tab" onclick="show('money')">Money</button>
+    <button class="tab" onclick="show('spending')">Spending Detail</button>
+    <button class="tab" onclick="show('board')">Board</button>
+    <button class="tab" onclick="show('comms')">Comms (Corrected)</button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 1: TODAY VIEW                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="today" class="panel active">
+  <div class="note">
+    <b>Dashboard &rarr; Today.</b> Same data, reframed around "what do I need to do right now?" The volunteer board president opens this for 10 minutes at night. Financial charts and detailed metrics move to Money. What stays: alerts, action items, grades, meetings, and activity. What's new: action items are the hero &mdash; not KPI grids.
+  </div>
+
+  <div class="split">
+    <!-- CURRENT -->
+    <div>
+      <div class="col-label old">Current &mdash; Dashboard</div>
+      <div class="frame">
+        <div class="f-nav">
+          <div class="logo"></div>
+          <div class="n act">Dashboard</div>
+          <div class="n">The Building</div>
+          <div class="n">Fiscal Lens</div>
+          <div class="n">Board Room</div>
+          <div class="n">Assoc Team</div>
+          <div class="n">Archives</div>
+          <div class="av">SP</div>
+        </div>
+        <div class="pg">
+          <!-- Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <div>
+              <div style="font-size:14px;font-weight:800;">Welcome back, Sarah</div>
+              <div style="font-size:9px;color:var(--ink-400);">The Meridian &middot; Friday, October 17, 2026</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <div style="text-align:center;"><div class="grade grade-b">B</div><div style="font-size:7px;color:var(--ink-400);margin-top:2px;">BUILDING</div></div>
+              <div style="text-align:center;"><div class="grade grade-b">B</div><div style="font-size:7px;color:var(--ink-400);margin-top:2px;">COMPLIANCE</div></div>
+            </div>
+          </div>
+
+          <!-- Attention pills -->
+          <div class="pill-strip">
+            <div class="pill pill-red">1 Overdue Filing</div>
+            <div class="pill pill-red">2 Urgent Cases</div>
+            <div class="pill pill-amber">Insurance Expiring</div>
+            <div class="pill pill-red">1 Unit 90+ Days</div>
+            <div class="pill pill-amber">Low Reserves (45%)</div>
+          </div>
+
+          <!-- 4 KPIs -->
+          <div class="g4" style="margin-bottom:10px;">
+            <div class="mm"><div class="mm-v g">94%</div><div class="mm-l">Collection</div></div>
+            <div class="mm"><div class="mm-v w">45%</div><div class="mm-l">Reserves</div></div>
+            <div class="mm"><div class="mm-v b">B</div><div class="mm-l">Compliance</div></div>
+            <div class="mm"><div class="mm-v r">4</div><div class="mm-l">Open Cases</div></div>
+          </div>
+
+          <!-- 2-col: alerts + actions -->
+          <div class="g2">
+            <div class="c" style="border-color:#fecaca;">
+              <div class="c-title" style="color:var(--red);">Fiduciary Alerts</div>
+              <div style="font-size:9px;line-height:1.6;">
+                <div style="border-left:3px solid var(--red);padding:3px 8px;margin-bottom:4px;background:var(--red-light);border-radius:0 4px 4px 0;">D&O insurance expires in 30 days</div>
+                <div style="border-left:3px solid var(--red);padding:3px 8px;margin-bottom:4px;background:var(--red-light);border-radius:0 4px 4px 0;">Reserve fund below 50%</div>
+                <div style="border-left:3px solid var(--amber);padding:3px 8px;background:var(--amber-light);border-radius:0 4px 4px 0;">Unit 402 delinquent 92 days</div>
+              </div>
+            </div>
+            <div class="c">
+              <div class="c-title">Action Items</div>
+              <div style="font-size:9px;line-height:1.8;">
+                <div class="trow"><span class="badge-sm badge-red">Overdue</span><span style="flex:1;margin-left:4px;">File DC biennial report</span><span>&rarr;</span></div>
+                <div class="trow"><span class="badge-sm badge-red">Urgent</span><span style="flex:1;margin-left:4px;">Pipe repair approval vote</span><span>&rarr;</span></div>
+                <div class="trow"><span class="badge-sm badge-amber">Soon</span><span style="flex:1;margin-left:4px;">Q4 Board Meeting Oct 22</span><span>&rarr;</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial cards -->
+          <div class="g2">
+            <div class="c">
+              <div class="c-title">Delinquency Aging</div>
+              <div style="font-size:9px;">
+                <div class="trow"><span style="flex:1;">0-30d</span><span>2 units</span></div>
+                <div class="trow"><span style="flex:1;">31-60d</span><span>1 unit</span></div>
+                <div class="trow"><span style="flex:1;color:var(--red);">90+d</span><span style="color:var(--red);font-weight:700;">1 unit &middot; $2,800</span></div>
+              </div>
+            </div>
+            <div class="c">
+              <div class="c-title">Budget Burn</div>
+              <div class="pbar"><div class="pbar-fill" style="width:67%;background:var(--amber);"></div></div>
+              <div style="font-size:9px;color:var(--ink-400);">67% spent</div>
+              <div style="font-size:9px;color:var(--red);font-weight:600;margin-top:4px;">Landscaping: 112%</div>
+            </div>
+          </div>
+
+          <!-- Meetings + Activity -->
+          <div class="g2">
+            <div class="c">
+              <div class="c-title">Upcoming Meetings</div>
+              <div class="mtg" style="margin:0;">
+                <div class="mtg-date"><div class="mtg-mon">Oct</div><div class="mtg-day">22</div></div>
+                <div class="mtg-info"><div class="mtg-title">Q4 Board Meeting</div><div class="mtg-sub">7:00 PM &middot; Comm Room</div></div>
+              </div>
+            </div>
+            <div class="c">
+              <div class="c-title">Recent Activity</div>
+              <div style="font-size:9px;line-height:1.8;">
+                <div class="trow"><span style="flex:1;">Minutes published: Q3 Meeting</span><span style="color:var(--ink-400);">Oct 14</span></div>
+                <div class="trow"><span style="flex:1;">Insurance renewed: D&O policy</span><span style="color:var(--ink-400);">Oct 10</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED: TODAY -->
+    <div>
+      <div class="col-label new">Proposed &mdash; Today</div>
+      <div class="frame">
+        <div class="f-nav">
+          <div class="logo"></div>
+          <div class="n act">Today</div>
+          <div class="n">Money</div>
+          <div class="n">Cases</div>
+          <div class="n">Board</div>
+          <div class="n">Building</div>
+          <div class="av">SP</div>
+        </div>
+        <div class="pg">
+          <!-- Greeting -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+            <div>
+              <div style="font-size:16px;font-weight:800;">Good evening, Sarah</div>
+              <div style="font-size:9px;color:var(--ink-400);">The Meridian &middot; Friday, October 17</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <div style="text-align:center;"><div class="grade grade-b">B</div><div style="font-size:7px;color:var(--ink-400);margin-top:2px;">BUILDING</div></div>
+              <div style="text-align:center;"><div class="grade grade-b">B</div><div style="font-size:7px;color:var(--ink-400);margin-top:2px;">COMPLIANCE</div></div>
+            </div>
+          </div>
+
+          <!-- Alert banner (critical only, max 1) -->
+          <div style="background:var(--red-light);border:1px solid #fecaca;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">&#9888;&#65039;</span>
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:700;color:#991b1b;">D&O insurance expires Oct 17 &mdash; board members personally exposed</div>
+              <div style="font-size:9px;color:#991b1b;opacity:0.7;">Duty of Care &middot; Fix this to maintain your fiduciary compliance</div>
+            </div>
+            <span class="btn btn-primary" style="font-size:9px;flex-shrink:0;">Fix Now &rarr;</span>
+          </div>
+
+          <!-- YOUR ACTION ITEMS — the hero -->
+          <div style="font-size:11px;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;">
+            <span>Your Action Items</span>
+            <span style="font-size:9px;font-weight:600;color:var(--accent);cursor:pointer;">View all (7) &rarr;</span>
+          </div>
+
+          <div class="ai" style="border-color:#fecaca;">
+            <div class="ai-icon" style="background:var(--red-light);">&#128197;</div>
+            <div class="ai-body">
+              <div class="ai-title">File DC biennial report <span class="badge-sm badge-red" style="margin-left:4px;">16 days overdue</span></div>
+              <div class="ai-meta">Treasurer &middot; Due Oct 1 &middot; Checklist item</div>
+            </div>
+            <div class="ai-arrow">&rarr;</div>
+          </div>
+
+          <div class="ai" style="border-color:var(--amber);">
+            <div class="ai-icon" style="background:var(--amber-light);">&#128499;&#65039;</div>
+            <div class="ai-body">
+              <div class="ai-title">Vote on pipe repair ($3,800) <span class="badge-sm badge-amber">2/3 votes</span></div>
+              <div class="ai-meta">Your vote needed &middot; Spending &middot; Urgent</div>
+            </div>
+            <div class="ai-arrow">&rarr;</div>
+          </div>
+
+          <div class="ai">
+            <div class="ai-icon" style="background:var(--accent-light);">&#127963;&#65039;</div>
+            <div class="ai-body">
+              <div class="ai-title">Q4 Board Meeting <span class="badge-sm badge-accent">In 5 days</span></div>
+              <div class="ai-meta">Oct 22 &middot; 7:00 PM &middot; 3 agenda items &middot; Minutes prep needed</div>
+            </div>
+            <div class="ai-arrow">&rarr;</div>
+          </div>
+
+          <div class="ai">
+            <div class="ai-icon" style="background:var(--red-light);">&#128176;</div>
+            <div class="ai-body">
+              <div class="ai-title">Unit 402 delinquent 92 days ($2,800)</div>
+              <div class="ai-meta">No collection case open &middot; DC super-lien eligible</div>
+            </div>
+            <div class="ai-arrow">&rarr;</div>
+          </div>
+
+          <div class="ai">
+            <div class="ai-icon" style="background:var(--amber-light);">&#128203;</div>
+            <div class="ai-body">
+              <div class="ai-title">Annual budget approval <span class="badge-sm badge-amber">Due Jan 31</span></div>
+              <div class="ai-meta">Checklist item &middot; Treasurer &middot; 2 of 9 steps done</div>
+            </div>
+            <div class="ai-arrow">&rarr;</div>
+          </div>
+
+          <!-- Quick stats strip -->
+          <div class="g3" style="margin-top:12px;">
+            <div class="mm"><div class="mm-v g">94%</div><div class="mm-l">Collection Rate</div></div>
+            <div class="mm"><div class="mm-v w">45%</div><div class="mm-l">Reserve Funded</div></div>
+            <div class="mm"><div class="mm-v b">18/45</div><div class="mm-l">Checklist Done</div></div>
+          </div>
+
+          <!-- Recent activity -->
+          <div style="margin-top:12px;font-size:9px;color:var(--ink-400);">
+            <div style="font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Recent</div>
+            <div class="trow"><span style="flex:1;color:var(--ink-700);">Q3 Meeting minutes published</span><span>Oct 14</span></div>
+            <div class="trow"><span style="flex:1;color:var(--ink-700);">Assessment collected &mdash; Unit 301</span><span>Oct 15</span></div>
+            <div class="trow"><span style="flex:1;color:var(--ink-700);">Hallway paint WO approved</span><span>Oct 12</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:24px;">
+    <b>What moved vs. what stayed:</b><br><br>
+    <b>Stayed in Today:</b> Grades, alert banner (critical only), action items (priority-sorted, role-filtered), quick stats strip, meetings, recent activity.<br>
+    <b>Moved to Money:</b> Delinquency aging chart, budget burn details, financial KPI grid, collection breakdown.<br>
+    <b>Key change:</b> Action items are now the primary content &mdash; each is a tappable card that navigates directly to the relevant page (Board &gt; Checklist, Money &gt; Spending, Cases, etc.). The board president's question is "what do I need to do?" not "what are my metrics?"
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 2: CASES                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="cases" class="panel">
+  <div class="note">
+    <b>Issues &rarr; Cases (promoted to top-level nav).</b> Currently buried inside Board Room's "Daily Operations" tab. Cases are the product's core differentiator &mdash; DC-specific workflows with legal citations and step-by-step guidance for every situation a board faces. The 10 raw categories group into 4 human-readable groups. Default to pre-legal approach (don't ask users to choose upfront). DACI auto-assignment preserved.
+  </div>
+
+  <div class="split">
+    <!-- CURRENT -->
+    <div>
+      <div class="col-label old">Current &mdash; Issues (10 category grid + 3-step wizard)</div>
+      <div class="frame">
+        <div class="f-nav">
+          <div class="logo"></div>
+          <div class="n">Dashboard</div>
+          <div class="n">The Building</div>
+          <div class="n">Fiscal Lens</div>
+          <div class="n act">Board Room</div>
+          <div class="n">Assoc Team</div>
+          <div class="av">SP</div>
+        </div>
+        <div class="tab-bar">
+          <div class="tb">Duties & Roles</div>
+          <div class="tb">Governance Calendar</div>
+          <div class="tb act">Daily Operations</div>
+          <div class="tb">Meetings</div>
+          <div class="tb">Votes</div>
+          <div class="tb">Communications</div>
+        </div>
+        <div class="pg">
+          <div style="display:flex;gap:4px;margin-bottom:10px;">
+            <span class="btn btn-primary" style="font-size:9px;">Open Cases</span>
+            <span class="btn btn-outline" style="font-size:9px;">Request Inbox</span>
+            <span class="btn btn-outline" style="font-size:9px;">Archive</span>
+            <span class="btn btn-outline" style="font-size:9px;margin-left:auto;">+ New Case</span>
+          </div>
+
+          <!-- 10 category grid -->
+          <div style="font-size:9px;font-weight:700;color:var(--ink-400);margin-bottom:6px;">SELECT CATEGORY (10)</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px;">
+            <div class="cat-card"><div class="cat-icon">&#128176;</div><div class="cat-name">Fiscal Lens</div><div class="cat-count">5 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128295;</div><div class="cat-name">Maintenance</div><div class="cat-count">5 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9878;&#65039;</div><div class="cat-name">Rule Enforce</div><div class="cat-count">4 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127963;&#65039;</div><div class="cat-name">Legal & Risk</div><div class="cat-count">4 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127963;&#65039;</div><div class="cat-name">Governance</div><div class="cat-count">3 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9876;&#65039;</div><div class="cat-name">Disputes</div><div class="cat-count">3 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9881;&#65039;</div><div class="cat-name">Operations</div><div class="cat-count">3 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127919;</div><div class="cat-name">Strategic</div><div class="cat-count">2 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128680;</div><div class="cat-name">Crisis</div><div class="cat-count">2 situations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128193;</div><div class="cat-name">Administrative</div><div class="cat-count">5 situations</div></div>
+          </div>
+
+          <!-- Then approach selection -->
+          <div style="font-size:9px;font-weight:700;color:var(--ink-400);margin-bottom:6px;">STEP 2: CHOOSE APPROACH</div>
+          <div class="g3" style="margin-bottom:8px;">
+            <div style="border:2px solid var(--sage);background:var(--sage-light);border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:var(--sage);">Pre-Legal</div>
+              <div style="font-size:8px;color:#166534;">Board-managed steps</div>
+            </div>
+            <div style="border:2px solid var(--amber);background:var(--amber-light);border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:var(--amber);">Self-Represented</div>
+              <div style="font-size:8px;color:#92400e;">Liens, small claims</div>
+            </div>
+            <div style="border:2px solid var(--red);background:var(--red-light);border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:var(--red);">Legal Counsel</div>
+              <div style="font-size:8px;color:#991b1b;">Attorney-led</div>
+            </div>
+          </div>
+          <div style="font-size:9px;color:var(--ink-400);text-align:center;">Users must pick one of 3 approaches before seeing workflow steps</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROPOSED -->
+    <div>
+      <div class="col-label new">Proposed &mdash; Cases (top-level, grouped categories)</div>
+      <div class="frame">
+        <div class="f-nav">
+          <div class="logo"></div>
+          <div class="n">Today</div>
+          <div class="n">Money</div>
+          <div class="n act">Cases</div>
+          <div class="n">Board</div>
+          <div class="n">Building</div>
+          <div class="av">SP</div>
+        </div>
+        <div class="kpi-bar">
+          <div class="kpi"><div class="kpi-val r">4</div><div class="kpi-lbl">Open</div></div>
+          <div class="kpi"><div class="kpi-val w">2</div><div class="kpi-lbl">Urgent</div></div>
+          <div class="kpi"><div class="kpi-val b">3</div><div class="kpi-lbl">Requests</div></div>
+          <div class="kpi"><div class="kpi-val g">12</div><div class="kpi-lbl">Resolved</div></div>
+        </div>
+        <div class="tab-bar">
+          <div class="tb act">Open Cases<span class="badge">4</span></div>
+          <div class="tb">Requests<span class="badge">3</span></div>
+          <div class="tb">Resolved</div>
+          <div class="tb" style="margin-left:auto;">+ New Case</div>
+        </div>
+        <div class="pg">
+          <!-- Case list with priority sorting -->
+          <div style="display:flex;gap:4px;margin-bottom:8px;">
+            <span class="btn btn-primary" style="font-size:8px;">All</span>
+            <span class="btn btn-outline" style="font-size:8px;">My Cases</span>
+            <span class="btn btn-outline" style="font-size:8px;">Overdue</span>
+            <input style="flex:1;padding:4px 8px;border:1px solid var(--ink-200);border-radius:6px;font-size:9px;margin-left:4px;" placeholder="Search cases..." />
+          </div>
+
+          <!-- Case cards -->
+          <div class="c" style="border-left:3px solid var(--red);padding:10px 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;font-weight:800;">Emergency Pipe Repair</div>
+                <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">
+                  <span class="badge-sm badge-red">Urgent</span>
+                  <span style="margin-left:4px;">Unit 204 &middot; Maintenance &middot; Assigned: VP</span>
+                </div>
+              </div>
+              <span class="badge-sm badge-sage">Pre-Legal</span>
+            </div>
+            <!-- Progress -->
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink-400);">
+                <span>Step 3 of 5: Obtain vendor bids</span><span>60%</span>
+              </div>
+              <div class="pbar"><div class="pbar-fill" style="width:60%;background:var(--accent);"></div></div>
+            </div>
+            <div style="font-size:9px;color:var(--accent);margin-top:4px;font-weight:600;">Next: Review bids and schedule board vote &rarr;</div>
+          </div>
+
+          <div class="c" style="border-left:3px solid var(--red);padding:10px 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;font-weight:800;">Unit 402 Delinquent Collections</div>
+                <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">
+                  <span class="badge-sm badge-red">Urgent</span>
+                  <span style="margin-left:4px;">Unit 402 &middot; Financial &middot; Assigned: Treasurer</span>
+                </div>
+              </div>
+              <span class="badge-sm badge-sage">Pre-Legal</span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink-400);"><span>Step 2 of 7: Send formal demand letter</span><span>28%</span></div>
+              <div class="pbar"><div class="pbar-fill" style="width:28%;background:var(--accent);"></div></div>
+            </div>
+            <div style="font-size:9px;color:var(--accent);margin-top:4px;font-weight:600;">Next: Send certified demand letter &rarr;</div>
+          </div>
+
+          <div class="c" style="border-left:3px solid var(--amber);padding:10px 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;font-weight:800;">Noise Complaint &mdash; Unit 305</div>
+                <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">
+                  <span class="badge-sm badge-amber">High</span>
+                  <span style="margin-left:4px;">Unit 305 &middot; Rule Enforcement &middot; Assigned: VP</span>
+                </div>
+              </div>
+              <span class="badge-sm badge-sage">Pre-Legal</span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--ink-400);"><span>Step 1 of 4: Document evidence</span><span>25%</span></div>
+              <div class="pbar"><div class="pbar-fill" style="width:25%;background:var(--accent);"></div></div>
+            </div>
+            <div style="font-size:9px;color:var(--accent);margin-top:4px;font-weight:600;">Next: Document incidents and evidence &rarr;</div>
+          </div>
+
+          <!-- Approach banner (not a gate) -->
+          <div style="background:var(--sage-light);border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:9px;color:#166534;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;">&#9989;</span>
+            <div>
+              <b>All cases start with Pre-Legal steps.</b> If a case escalates, you can add Self-Represented or Legal Counsel approach anytime from the case detail.
+              <span class="anno new">no upfront choice needed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Case wizard comparison -->
+  <div class="note">
+    <b>Case creation simplified:</b> 10 categories &rarr; 4 groups (same 10 categories, just organized). Approach selection removed from upfront wizard &mdash; all cases default to Pre-Legal. If it escalates, add another approach from the case detail. DACI auto-assignment still fires on category selection.
+  </div>
+
+  <div class="split">
+    <div>
+      <div class="col-label old">Current &mdash; 10 flat categories</div>
+      <div class="frame" style="min-height:0;">
+        <div class="pg" style="min-height:0;">
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">
+            <div class="cat-card"><div class="cat-icon">&#128176;</div><div class="cat-name" style="font-size:8px;">Fiscal Lens</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128295;</div><div class="cat-name" style="font-size:8px;">Maintenance</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9878;&#65039;</div><div class="cat-name" style="font-size:8px;">Rule Enforce</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127963;&#65039;</div><div class="cat-name" style="font-size:8px;">Legal & Risk</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127963;&#65039;</div><div class="cat-name" style="font-size:8px;">Governance</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9876;&#65039;</div><div class="cat-name" style="font-size:8px;">Disputes</div></div>
+            <div class="cat-card"><div class="cat-icon">&#9881;&#65039;</div><div class="cat-name" style="font-size:8px;">Operations</div></div>
+            <div class="cat-card"><div class="cat-icon">&#127919;</div><div class="cat-name" style="font-size:8px;">Strategic</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128680;</div><div class="cat-name" style="font-size:8px;">Crisis</div></div>
+            <div class="cat-card"><div class="cat-icon">&#128193;</div><div class="cat-name" style="font-size:8px;">Admin</div></div>
+          </div>
+          <div style="text-align:center;font-size:9px;color:var(--ink-400);margin-top:8px;">Volunteer must know the difference between<br>"Governance" and "Strategic" and "Admin"</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label new">Proposed &mdash; 4 groups (same 10 categories inside)</div>
+      <div class="frame" style="min-height:0;">
+        <div class="pg" style="min-height:0;">
+          <div class="g2" style="gap:10px;">
+            <div class="cat-card" style="text-align:left;padding:14px;">
+              <div style="font-size:18px;margin-bottom:4px;">&#128176;</div>
+              <div style="font-size:12px;font-weight:800;">Money Issues</div>
+              <div style="font-size:9px;color:var(--ink-400);margin-top:4px;line-height:1.4;">Collections, budgets, special assessments, delinquencies, audits</div>
+              <div style="font-size:8px;color:var(--ink-400);margin-top:6px;">Fiscal Lens &middot; 5 workflows</div>
+            </div>
+            <div class="cat-card" style="text-align:left;padding:14px;">
+              <div style="font-size:18px;margin-bottom:4px;">&#127959;</div>
+              <div style="font-size:12px;font-weight:800;">Building Issues</div>
+              <div style="font-size:9px;color:var(--ink-400);margin-top:4px;line-height:1.4;">Repairs, emergencies, vendors, inspections, maintenance</div>
+              <div style="font-size:8px;color:var(--ink-400);margin-top:6px;">Maintenance + Operations + Crisis &middot; 10 workflows</div>
+            </div>
+            <div class="cat-card" style="text-align:left;padding:14px;">
+              <div style="font-size:18px;margin-bottom:4px;">&#128101;</div>
+              <div style="font-size:12px;font-weight:800;">People Issues</div>
+              <div style="font-size:9px;color:var(--ink-400);margin-top:4px;line-height:1.4;">Violations, noise, fines, disputes, pets, architectural reviews</div>
+              <div style="font-size:8px;color:var(--ink-400);margin-top:6px;">Enforcement + Disputes &middot; 7 workflows</div>
+            </div>
+            <div class="cat-card" style="text-align:left;padding:14px;">
+              <div style="font-size:18px;margin-bottom:4px;">&#127963;&#65039;</div>
+              <div style="font-size:12px;font-weight:800;">Board Issues</div>
+              <div style="font-size:9px;color:var(--ink-400);margin-top:4px;line-height:1.4;">Legal, governance, elections, insurance, filings, strategic plans</div>
+              <div style="font-size:8px;color:var(--ink-400);margin-top:6px;">Legal + Governance + Strategic + Admin &middot; 14 workflows</div>
+            </div>
+          </div>
+          <div style="text-align:center;font-size:9px;color:var(--sage);margin-top:8px;font-weight:600;">Same 10 categories &amp; 36 workflows underneath &mdash; just grouped by "what kind of problem?"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 3: MONEY (same as before)                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="money" class="panel">
+  <div class="note fix">
+    <b>Fiscal Lens &rarr; Money (6 tabs).</b> Spending Decisions + WO &amp; Invoices merge into one "Spending" tab showing the full lifecycle. COA + GL merge into "Ledger." Statements become contextual report buttons on the Overview. Pending spending votes surface on the Overview so board members don't miss them.
+  </div>
+
+  <div class="split">
+    <div>
+      <div class="col-label old">Current &mdash; Fiscal Lens (9 tabs)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Fiscal Lens</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb act">Overview</div>
+          <div class="tb">Unit Ledger</div>
+          <div class="tb">Chart of Accounts</div>
+          <div class="tb">General Ledger</div>
+          <div class="tb">WO & Invoices</div>
+          <div class="tb">Budget</div>
+          <div class="tb">Reserves</div>
+          <div class="tb">Spending</div>
+          <div class="tb">Statements</div>
+        </div>
+        <div class="pg" style="min-height:200px;">
+          <div style="text-align:center;padding:30px;color:var(--ink-400);font-size:11px;">
+            9 tabs. Spending buried as tab 8 of 9.<br>COA &amp; GL separate tabs that volunteers don't understand.<br>All features present but hard to find.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label new">Revised &mdash; Money (6 tabs, spending preserved)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Money</div><div class="av">SP</div></div>
+        <div class="kpi-bar">
+          <div class="kpi"><div class="kpi-val g">94%</div><div class="kpi-lbl">Collection</div></div>
+          <div class="kpi"><div class="kpi-val r">$4.2K</div><div class="kpi-lbl">Owed</div></div>
+          <div class="kpi"><div class="kpi-val w">67%</div><div class="kpi-lbl">Budget</div></div>
+          <div class="kpi"><div class="kpi-val w">45%</div><div class="kpi-lbl">Reserves</div></div>
+          <div class="kpi"><div class="kpi-val b">$24K</div><div class="kpi-lbl">Cash</div></div>
+          <div class="kpi"><div class="kpi-val b">2</div><div class="kpi-lbl">Votes</div></div>
+        </div>
+        <div class="tab-bar">
+          <div class="tb act">Overview</div>
+          <div class="tb">Who Owes</div>
+          <div class="tb">Spending<span class="badge">2</span></div>
+          <div class="tb">Budget</div>
+          <div class="tb">Reserves</div>
+          <div class="tb">Ledger</div>
+        </div>
+        <div class="pg" style="min-height:200px;">
+          <div class="c" style="border-color:var(--accent);border-width:2px;">
+            <div class="c-title">&#128499;&#65039; Pending Spending Votes</div>
+            <div style="font-size:10px;">
+              <div class="trow">
+                <span class="badge-sm badge-amber">URGENT</span>
+                <span style="flex:1;font-weight:600;margin-left:4px;">Pipe repair</span>
+                <span style="font-weight:700;">$3,800</span>
+                <span class="btn btn-primary" style="font-size:8px;margin-left:4px;padding:2px 6px;">Vote</span>
+              </div>
+              <div class="trow">
+                <span class="badge-sm badge-accent">NORMAL</span>
+                <span style="flex:1;font-weight:600;margin-left:4px;">Camera replacement</span>
+                <span style="font-weight:700;">$4,200</span>
+                <span class="btn btn-outline" style="font-size:8px;margin-left:4px;padding:2px 6px;">Review</span>
+              </div>
+            </div>
+          </div>
+          <div class="g2">
+            <div class="c">
+              <div class="c-title">&#9200; Past Due</div>
+              <div style="font-size:9px;"><div class="trow"><span style="flex:1;">0-30d</span><span style="color:var(--amber);font-weight:700;">2 &middot; $750</span></div><div class="trow"><span style="flex:1;color:var(--red);">90+d</span><span style="color:var(--red);font-weight:700;">1 &middot; $2,800</span></div></div>
+            </div>
+            <div class="c">
+              <div class="c-title">&#128200; Budget YTD</div>
+              <div class="pbar"><div class="pbar-fill" style="width:67%;background:var(--amber);"></div></div>
+              <div style="font-size:9px;color:var(--red);font-weight:600;">Landscaping: 112%</div>
+            </div>
+          </div>
+          <div class="c">
+            <div class="c-title" style="display:flex;justify-content:space-between;"><span>&#128196; Reports</span><span class="anno moved">was Statements tab</span></div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <span class="btn btn-outline" style="font-size:8px;">Balance Sheet</span>
+              <span class="btn btn-outline" style="font-size:8px;">P&L</span>
+              <span class="btn btn-outline" style="font-size:8px;">Budget Variance</span>
+              <span class="btn btn-outline" style="font-size:8px;">Form 1120-H</span>
+              <span class="btn btn-outline" style="font-size:8px;">DC D-20</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 4: SPENDING DETAIL (same as before)                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="spending" class="panel">
+  <div class="note fix">
+    <b>Spending tab = full governance lifecycle.</b> Merges Spending Decisions + WO &amp; Invoices into one tab. Board voting, funding analysis (6 strategies), spending authority thresholds, work order tracking, and GL posting &mdash; all in a single lifecycle view: <b>Request &rarr; Vote &rarr; WO &rarr; Invoice &rarr; Paid &rarr; GL</b>.
+  </div>
+  <div class="split">
+    <div>
+      <div class="col-label old">Current &mdash; Spending Decisions (tab 8 of 9)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Fiscal Lens</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb">Overview</div><div class="tb">Unit Ledger</div><div class="tb">COA</div><div class="tb">GL</div><div class="tb">WO & Invoices</div><div class="tb">Budget</div><div class="tb">Reserves</div><div class="tb act">Spending</div><div class="tb">Statements</div>
+        </div>
+        <div class="pg">
+          <div class="c" style="border-color:var(--amber);">
+            <div style="display:flex;justify-content:space-between;">
+              <div><div style="font-size:12px;font-weight:800;">Pipe Repair</div><div style="font-size:9px;color:var(--ink-400);">PlumbCo &middot; <span class="badge-sm badge-amber">URGENT</span></div></div>
+              <div style="text-align:right;"><div style="font-size:14px;font-weight:800;">$3,800</div><div style="font-size:8px;color:var(--ink-400);">Under $5K threshold</div></div>
+            </div>
+            <div class="vote-bar" style="margin-top:6px;"><div class="yes" style="width:66%;"></div><div class="pending" style="width:34%;"></div></div>
+            <div style="font-size:9px;margin-top:2px;"><span style="color:var(--sage);">2 approve</span> &middot; 1 remaining</div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span class="btn btn-sage" style="font-size:9px;">Approve</span>
+              <span class="btn btn-outline" style="font-size:9px;border-color:var(--red);color:var(--red);">Deny</span>
+              <span class="btn btn-outline" style="font-size:9px;">Funding Analysis</span>
+            </div>
+          </div>
+          <div style="text-align:center;font-size:9px;color:var(--ink-400);padding:10px;">After approval, user goes to separate WO &amp; Invoices tab to track execution</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label new">Revised &mdash; Unified Spending tab</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Money</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb">Overview</div><div class="tb">Who Owes</div><div class="tb act">Spending<span class="badge">2</span></div><div class="tb">Budget</div><div class="tb">Reserves</div><div class="tb">Ledger</div>
+        </div>
+        <div class="sub-nav">
+          <span class="sub-pill act">Pending Votes (2)</span>
+          <span class="sub-pill">Work Orders (3)</span>
+          <span class="sub-pill">Invoices (5)</span>
+          <span class="sub-pill">History</span>
+        </div>
+        <div class="pg">
+          <!-- Voting card with inline funding -->
+          <div class="c" style="border-color:var(--amber);">
+            <div style="display:flex;justify-content:space-between;">
+              <div><div style="font-size:12px;font-weight:800;">Pipe Repair</div><div style="font-size:9px;color:var(--ink-400);">PlumbCo &middot; <span class="badge-sm badge-amber">URGENT</span></div></div>
+              <div style="text-align:right;"><div style="font-size:14px;font-weight:800;">$3,800</div><div style="font-size:8px;color:var(--ink-400);">Under threshold</div></div>
+            </div>
+            <div class="vote-bar" style="margin-top:6px;"><div class="yes" style="width:66%;"></div><div class="pending" style="width:34%;"></div></div>
+            <div style="font-size:9px;margin-top:2px;"><span style="color:var(--sage);">2 approve</span> &middot; 1 remaining</div>
+            <div style="background:var(--ink-50);border-radius:6px;padding:8px;margin-top:6px;font-size:9px;">
+              <div style="font-weight:700;color:var(--accent);margin-bottom:2px;">Funding: <span class="badge-sm badge-sage">Operating Fund (recommended)</span></div>
+              <div style="color:var(--ink-400);">$24K available &middot; Maintains 84% cash position</div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span class="btn btn-sage" style="font-size:9px;">Approve</span>
+              <span class="btn btn-outline" style="font-size:9px;border-color:var(--red);color:var(--red);">Deny</span>
+            </div>
+          </div>
+          <!-- Approved item with lifecycle -->
+          <div class="c" style="border-color:var(--sage);">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div><div style="font-size:11px;font-weight:800;">Hallway Paint</div><div style="font-size:9px;color:var(--ink-400);">ColorPro &middot; $2,100</div></div>
+              <span class="badge-sm badge-sage">APPROVED</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:8px;font-size:8px;">
+              <div style="text-align:center;"><div class="wo-dot done" style="margin:0 auto;"></div><div style="color:var(--sage);margin-top:2px;">Voted</div></div>
+              <div style="flex:1;height:2px;background:var(--sage);"></div>
+              <div style="text-align:center;"><div class="wo-dot done" style="margin:0 auto;"></div><div style="color:var(--sage);margin-top:2px;">WO</div></div>
+              <div style="flex:1;height:2px;background:var(--sage);"></div>
+              <div style="text-align:center;"><div class="wo-dot current" style="margin:0 auto;"></div><div style="color:var(--accent);margin-top:2px;font-weight:700;">Invoiced</div></div>
+              <div style="flex:1;height:2px;background:var(--ink-100);"></div>
+              <div style="text-align:center;"><div class="wo-dot future" style="margin:0 auto;"></div><div style="color:var(--ink-400);margin-top:2px;">Paid</div></div>
+              <div style="flex:1;height:2px;background:var(--ink-100);"></div>
+              <div style="text-align:center;"><div class="wo-dot future" style="margin:0 auto;"></div><div style="color:var(--ink-400);margin-top:2px;">GL</div></div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <span class="btn btn-primary" style="font-size:8px;">Mark Paid &rarr; GL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 5: BOARD (abbreviated, same as before)             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="board" class="panel">
+  <div class="note fix">
+    <b>Board Room &rarr; Board (kept top-level).</b> Renamed for clarity, not demoted. 6 tabs &rarr; 5 tabs. "Daily Operations" (embedded case manager) moves to top-level Cases. "Communications" broadens to "Comms" (see next tab for detail). All fiduciary education, compliance checklist, step-by-step guidance, role matrix, and meeting/vote management preserved.
+  </div>
+  <div class="split">
+    <div>
+      <div class="col-label old">Current &mdash; Board Room (6 tabs)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Board Room</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb act">Duties & Roles</div>
+          <div class="tb">Gov Calendar</div>
+          <div class="tb">Daily Ops</div>
+          <div class="tb">Meetings</div>
+          <div class="tb">Votes</div>
+          <div class="tb">Communications</div>
+        </div>
+        <div class="pg" style="min-height:260px;">
+          <div style="text-align:center;padding:30px;color:var(--ink-400);font-size:11px;">
+            All hand-holding features present.<br>
+            "Board Room" name is opaque for new users.<br>
+            "Governance Calendar" = compliance runbook.<br>
+            "Daily Ops" = embedded case manager (belongs in Cases).<br>
+            "Communications" undersells the full comms system.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label new">Revised &mdash; Board (5 tabs, top-level)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n">Today</div><div class="n">Money</div><div class="n">Cases</div><div class="n act">Board</div><div class="n">Building</div><div class="av">SP</div></div>
+        <div class="kpi-bar">
+          <div class="kpi"><div class="kpi-val g">B</div><div class="kpi-lbl">Compliance</div></div>
+          <div class="kpi"><div class="kpi-val r">2</div><div class="kpi-lbl">Alerts</div></div>
+          <div class="kpi"><div class="kpi-val b">Oct 22</div><div class="kpi-lbl">Meeting</div></div>
+          <div class="kpi"><div class="kpi-val b">18/45</div><div class="kpi-lbl">Checklist</div></div>
+        </div>
+        <div class="tab-bar">
+          <div class="tb act">My Duties</div>
+          <div class="tb">Checklist<span class="badge">2</span></div>
+          <div class="tb">Meetings</div>
+          <div class="tb">Votes</div>
+          <div class="tb">Comms <span class="anno">full breadth</span></div>
+        </div>
+        <div class="pg" style="min-height:260px;">
+          <!-- Fiduciary duties preserved -->
+          <div class="c" style="background:linear-gradient(135deg,#f0f9ff,#f8fafc);border-color:#bfdbfe;">
+            <div class="c-title">&#9878;&#65039; Your Fiduciary Duties <span class="anno kept">preserved</span></div>
+            <div class="g3">
+              <div style="background:white;border-radius:8px;padding:8px;border:1px solid var(--ink-100);text-align:center;">
+                <div style="font-size:16px;">&#128270;</div>
+                <div style="font-size:10px;font-weight:700;">Care</div>
+                <div style="font-size:8px;color:var(--ink-400);">Prudent decisions</div>
+                <div style="font-size:9px;color:var(--accent);margin-top:2px;">8/12</div>
+              </div>
+              <div style="background:white;border-radius:8px;padding:8px;border:1px solid var(--ink-100);text-align:center;">
+                <div style="font-size:16px;">&#129309;</div>
+                <div style="font-size:10px;font-weight:700;">Loyalty</div>
+                <div style="font-size:8px;color:var(--ink-400);">Association first</div>
+                <div style="font-size:9px;color:var(--accent);margin-top:2px;">4/6</div>
+              </div>
+              <div style="background:white;border-radius:8px;padding:8px;border:1px solid var(--ink-100);text-align:center;">
+                <div style="font-size:16px;">&#128220;</div>
+                <div style="font-size:10px;font-weight:700;">Obedience</div>
+                <div style="font-size:8px;color:var(--ink-400);">Follow bylaws</div>
+                <div style="font-size:9px;color:var(--accent);margin-top:2px;">2/4</div>
+              </div>
+            </div>
+          </div>
+          <div class="c">
+            <div class="c-title">&#128101; Your Responsibilities (President)</div>
+            <div style="font-size:9px;">
+              <div class="trow"><span style="flex:1;font-weight:600;">Renew D&O insurance</span><span class="badge-sm badge-red">Action</span></div>
+              <div class="trow"><span style="flex:1;font-weight:600;">Chair Q4 board meeting</span><span class="badge-sm badge-amber">Soon</span></div>
+              <div class="trow"><span style="flex:1;font-weight:600;">Bylaws review</span><span class="badge-sm badge-sage">Done</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB 6: COMMS (CORRECTED)                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div id="comms" class="panel">
+  <div class="note concern">
+    <b>Earlier mistake:</b> Renamed "Communications" to "Letters." That lost the full breadth: announcements (6 categories, priority levels, pinning), email blasts (bulk delivery, bounce tracking), physical mail (3 delivery methods incl. certified, cost tracking), 20 templates across 6 categories, case-linked communications, community vs. unit scoping, and the resident-facing Community Room.
+  </div>
+  <div class="note fix">
+    <b>Fix:</b> Tab stays named <b>"Comms"</b> (short, clear, comprehensive). Sub-navigation covers all channels: <b>Send, Templates, Announcements, History</b>. The resident-facing Community Room stays as its own page under Building. Nothing is lost.
+  </div>
+
+  <div class="split">
+    <div>
+      <div class="col-label old">Current &mdash; Communications tab (inside Board Room)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n act" style="font-size:9px;">Board Room</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb">Duties</div>
+          <div class="tb">Gov Calendar</div>
+          <div class="tb">Daily Ops</div>
+          <div class="tb">Meetings</div>
+          <div class="tb">Votes</div>
+          <div class="tb act">Communications</div>
+        </div>
+        <div class="pg">
+          <div style="display:flex;gap:4px;margin-bottom:8px;">
+            <span class="btn btn-primary" style="font-size:9px;">Feed</span>
+            <span class="btn btn-outline" style="font-size:9px;">Templates</span>
+            <span class="btn btn-outline" style="font-size:9px;margin-left:auto;">+ Compose</span>
+            <span class="btn btn-outline" style="font-size:9px;">+ Quick Announcement</span>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:10px;">
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">All</span>
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">Community</span>
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">Unit</span>
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">&#128226; Announce</span>
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">&#128231; Email</span>
+            <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;">&#128238; Mail</span>
+          </div>
+          <!-- Feed items -->
+          <div class="c" style="padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="font-size:11px;font-weight:700;">Q4 Assessment Notice</div>
+              <div class="ch-strip">
+                <span class="ch ch-announce">&#128226; Published</span>
+                <span class="ch ch-email">&#128231; 47/50 delivered</span>
+                <span class="ch ch-mail">&#128238; 50 sent (First Class)</span>
+              </div>
+            </div>
+            <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">Community &middot; Oct 1 &middot; Template: Assessment Increase &middot; By Sarah P.</div>
+          </div>
+          <div class="c" style="padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="font-size:11px;font-weight:700;">Violation Warning &mdash; Unit 305</div>
+              <div class="ch-strip">
+                <span class="ch ch-email">&#128231; Delivered</span>
+                <span class="ch ch-mail">&#128238; Certified + ERR</span>
+              </div>
+            </div>
+            <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">Unit &middot; Oct 8 &middot; Template: First Warning &middot; Case #ENF-204 &middot; By Sarah P.</div>
+          </div>
+          <div class="c" style="padding:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div style="font-size:11px;font-weight:700;">Elevator Maintenance Scheduled</div>
+              <div class="ch-strip">
+                <span class="ch ch-announce">&#128226; Pinned</span>
+                <span class="ch ch-email">&#128231; 48/50</span>
+              </div>
+            </div>
+            <div style="font-size:9px;color:var(--ink-400);margin-top:2px;">Community &middot; Oct 12 &middot; Maintenance category &middot; By Sarah P.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="col-label new">Revised &mdash; Comms tab (inside Board, full breadth)</div>
+      <div class="frame">
+        <div class="f-nav"><div class="logo"></div><div class="n">Today</div><div class="n">Money</div><div class="n">Cases</div><div class="n act">Board</div><div class="n">Building</div><div class="av">SP</div></div>
+        <div class="tab-bar">
+          <div class="tb">My Duties</div>
+          <div class="tb">Checklist</div>
+          <div class="tb">Meetings</div>
+          <div class="tb">Votes</div>
+          <div class="tb act">Comms</div>
+        </div>
+        <div class="sub-nav">
+          <span class="sub-pill act">Send</span>
+          <span class="sub-pill">Templates (20)</span>
+          <span class="sub-pill">Announcements</span>
+          <span class="sub-pill">History</span>
+        </div>
+        <div class="pg">
+          <!-- Compose preview -->
+          <div class="c" style="border-color:var(--accent);">
+            <div class="c-title" style="display:flex;justify-content:space-between;">
+              <span>&#9993;&#65039; New Communication</span>
+            </div>
+            <div class="g2" style="margin-bottom:8px;">
+              <div>
+                <div style="font-size:8px;font-weight:700;color:var(--ink-400);margin-bottom:3px;">SCOPE</div>
+                <div style="display:flex;gap:4px;">
+                  <span class="btn btn-primary" style="font-size:8px;">&#127963;&#65039; Community</span>
+                  <span class="btn btn-outline" style="font-size:8px;">&#128100; Unit</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:8px;font-weight:700;color:var(--ink-400);margin-bottom:3px;">CHANNELS</div>
+                <div style="display:flex;gap:4px;">
+                  <span class="btn btn-primary" style="font-size:8px;">&#128226; Announce</span>
+                  <span class="btn btn-primary" style="font-size:8px;">&#128231; Email</span>
+                  <span class="btn btn-outline" style="font-size:8px;">&#128238; Mail</span>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:8px;font-weight:700;color:var(--ink-400);margin-bottom:3px;">TEMPLATE (optional)</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128683; Violation (4)</span>
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128176; Collection (3)</span>
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128276; Notice (8)</span>
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128075; Welcome (1)</span>
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128295; Maintenance (2)</span>
+              <span style="font-size:8px;padding:3px 6px;border:1px solid var(--ink-200);border-radius:4px;cursor:pointer;background:var(--ink-50);">&#128172; General (2)</span>
+            </div>
+            <div style="background:var(--ink-50);border-radius:6px;padding:8px;font-size:9px;color:var(--ink-500);">
+              Subject, body, merge variables ({{owner_name}}, {{unit_number}}, {{amount_due}}...) &mdash; same compose panel as current, just reorganized into sub-nav
+            </div>
+          </div>
+
+          <!-- Mail options when physical mail selected -->
+          <div class="c" style="background:var(--amber-light);border-color:#fde68a;">
+            <div class="c-title" style="color:var(--amber);">&#128238; Physical Mail Options <span class="anno kept">preserved</span></div>
+            <div style="font-size:9px;display:flex;gap:8px;">
+              <div style="flex:1;background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid var(--ink-200);">
+                <div style="font-weight:700;">First Class</div>
+                <div style="color:var(--ink-400);">~$0.70/letter</div>
+              </div>
+              <div style="flex:1;background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid var(--ink-200);">
+                <div style="font-weight:700;">Certified</div>
+                <div style="color:var(--ink-400);">~$8.16/letter</div>
+              </div>
+              <div style="flex:1;background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid var(--ink-200);">
+                <div style="font-weight:700;">Certified + ERR</div>
+                <div style="color:var(--ink-400);">~$11.16/letter</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Announcement priority options -->
+          <div class="c">
+            <div class="c-title">&#128226; Announcement Priority <span class="anno kept">preserved</span></div>
+            <div style="font-size:9px;display:flex;gap:8px;">
+              <div style="flex:1;background:var(--ink-50);border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-weight:700;">Normal</div>
+                <div style="color:var(--ink-400);">Standard feed</div>
+              </div>
+              <div style="flex:1;background:var(--amber-light);border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-weight:700;color:var(--amber);">Important</div>
+                <div style="color:var(--ink-400);">Highlighted</div>
+              </div>
+              <div style="flex:1;background:var(--red-light);border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-weight:700;color:var(--red);">Urgent</div>
+                <div style="color:var(--ink-400);">Auto-pinned</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:9px;color:var(--ink-500);padding:8px;background:white;border-radius:8px;border:1px solid var(--ink-100);line-height:1.5;">
+            <b>Full capability preserved:</b> 3 delivery channels, 20 templates with merge variables, community &amp; unit scoping, case-linked comms, mail cost tracking, email bounce tracking, announcement pinning &amp; categories, communication log with per-channel status. Resident-facing Community Room stays under Building &gt; Community tab.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
