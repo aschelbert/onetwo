@@ -124,7 +124,7 @@ interface FinancialState {
   isMonthLocked: (period: string) => boolean;
 
   // Manual GL
-  postManualEntry: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number) => void;
+  postManualEntry: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number, reason?: string) => void;
   postTransfer: (date: string, memo: string, fromAcct: string, toAcct: string, amount: number) => void;
   postReversal: (originalEntry: GLEntry, memo?: string) => GLEntry;
 
@@ -748,8 +748,18 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       return { chartOfAccounts: s.chartOfAccounts.filter((a) => a.num !== num) };
     }),
 
-  postManualEntry: (date, memo, debitAcct, creditAcct, amount) => {
-    get().glPost(date, memo, debitAcct, creditAcct, amount, 'manual', null);
+  postManualEntry: (date, memo, debitAcct, creditAcct, amount, reason?) => {
+    const entry = get().glPost(date, memo, debitAcct, creditAcct, amount, 'manual', null);
+    // Patch postedBy and reason onto the entry in state
+    if (entry) {
+      set(s => ({
+        generalLedger: s.generalLedger.map(e =>
+          e.id === entry.id
+            ? { ...e, postedBy: { flow: 'manual' as const }, reason: reason || null }
+            : e,
+        ),
+      }));
+    }
   },
 
   postTransfer: (date, memo, fromAcct, toAcct, amount) => {

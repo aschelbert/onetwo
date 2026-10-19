@@ -15,6 +15,7 @@ import UnitDrawer from '@/features/financial/drawers/UnitDrawer';
 import LateUnitsDrawer from '@/features/financial/drawers/LateUnitsDrawer';
 import PayBillDrawer from '@/features/financial/drawers/PayBillDrawer';
 import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
+import ManualJournalDrawer from '@/features/financial/drawers/ManualJournalDrawer';
 
 export type DrawerId =
   | 'runbook'
@@ -24,6 +25,7 @@ export type DrawerId =
   | 'payment_batch'
   | 'bill'
   | 'approval'
+  | 'manual_journal'
   | 'meeting'
   | 'case_new'
   | 'vote'
@@ -153,6 +155,14 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
     case 'approval':
       return (
         <SpendingDrawer
+          open={open}
+          onClose={onClose}
+        />
+      );
+
+    case 'manual_journal':
+      return (
+        <ManualJournalDrawer
           open={open}
           onClose={onClose}
         />

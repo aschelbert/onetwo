@@ -227,6 +227,9 @@ export function rowToGLEntry(r: Record<string, unknown>): GLEntry {
     sourceId: (r.source_id as string) || null,
     posted: r.posted as string,
     status: r.status as 'posted' | 'void',
+    postedBy: (r.posted_by as GLEntry['postedBy']) || null,
+    proof: (r.proof as GLEntry['proof']) || null,
+    reason: (r.reason as string) || null,
   };
 }
 
@@ -247,6 +250,7 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
     tenant_id: tenantId, local_id: entry.id, date: entry.date, memo: entry.memo,
     debit_acct: entry.debitAcct, credit_acct: entry.creditAcct, amount: entry.amount,
     source: entry.source, source_id: entry.sourceId, posted: entry.posted, status: entry.status,
+    posted_by: entry.postedBy || null, proof: entry.proof || null, reason: entry.reason || null,
   });
   if (error) { logDbError('createGLEntry error:', error); return false; }
   return true;
