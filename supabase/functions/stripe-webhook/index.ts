@@ -1,35 +1,12 @@
 // supabase/functions/stripe-webhook/index.ts
-// Zero dependencies — raw fetch to Supabase REST API + Stripe signature via Web Crypto
+// Handles Stripe webhooks for unit-owner payments and refunds.
+// Subscription lifecycle is now handled by Chargebee (chargebee-webhook).
+// Zero dependencies -- raw fetch to Supabase REST API + Stripe signature via Web Crypto.
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
-
-// Admin console (govops) project — for syncing tenancies
-const GOVOPS_URL = Deno.env.get("GOVOPS_SUPABASE_URL") || "";
-const GOVOPS_SERVICE_KEY = Deno.env.get("GOVOPS_SUPABASE_SERVICE_ROLE_KEY") || "";
-
-const DEFAULT_TRIAL_DAYS = 30;
-
-async function getTrialDays(): Promise<number> {
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/rpc/get_trial_days`, {
-      method: "POST",
-      headers: {
-        "apikey": SB_SERVICE_KEY,
-        "Authorization": `Bearer ${SB_SERVICE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: "{}",
-    });
-    if (res.ok) {
-      const val = await res.json();
-      if (typeof val === "number" && val >= 0) return val;
-    }
-  } catch { /* fall through */ }
-  return DEFAULT_TRIAL_DAYS;
-}
 
 // Supabase REST helper (service role bypasses RLS)
 async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown) {
@@ -69,62 +46,6 @@ async function sbRpc(fn: string, args: Record<string, unknown>) {
     throw new Error(`RPC ${fn} failed: ${err}`);
   }
   return await res.json();
-}
-
-// Sync tenancy to admin console (govops) — best-effort, non-blocking
-async function syncToAdminConsole(tenantId: string, meta: Record<string, string>, result: Record<string, unknown>, customerId: string | null, subscriptionId: string | null) {
-  if (!GOVOPS_URL || !GOVOPS_SERVICE_KEY) {
-    console.log("Govops env vars not set, skipping admin console sync");
-    return;
-  }
-  try {
-    const tierToSubscriptionId: Record<string, string> = {
-      essentials: "essentials",
-      board: "board",
-      estate: "estate",
-      compliance_pro: "essentials",
-      community_plus: "board",
-      management_suite: "estate",
-    };
-    const address = [meta.address_street, meta.address_city, meta.address_state, meta.address_zip]
-      .filter(Boolean).join(", ") || null;
-    const trialDays = await getTrialDays();
-    const trialEndsAt = result.trial_ends_at || new Date(Date.now() + trialDays * 86400000).toISOString();
-
-    const res = await fetch(`${GOVOPS_URL}/rest/v1/tenancies`, {
-      method: "POST",
-      headers: {
-        "apikey": GOVOPS_SERVICE_KEY,
-        "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal",
-      },
-      body: JSON.stringify({
-        id: tenantId,
-        name: meta.building_name,
-        slug: result.subdomain || meta.subdomain || "",
-        address,
-        units: parseInt(meta.total_units) || 0,
-        subscription_id: tierToSubscriptionId[meta.tier] || "compliance-pro",
-        status: "trial",
-        billing_cycle: "monthly",
-        board_members: 1,
-        residents: 0,
-        managers: 0,
-        staff: 0,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId,
-        trial_ends_at: trialEndsAt,
-      }),
-    });
-    if (res.ok) {
-      console.log("Synced tenancy to admin console");
-    } else {
-      console.error("Admin console sync failed:", await res.text());
-    }
-  } catch (err) {
-    console.error("Admin console sync error:", err);
-  }
 }
 
 // Simple Stripe signature verification using Web Crypto
@@ -179,7 +100,6 @@ Deno.serve(async (req) => {
     event = JSON.parse(body);
   } else if (STRIPE_KEY) {
     // Fallback: verify the event by retrieving it from Stripe's API.
-    // This handles signing-secret mismatches (e.g. duplicate webhook endpoints).
     try {
       const raw = JSON.parse(body);
       if (raw.id && typeof raw.id === "string" && raw.id.startsWith("evt_")) {
@@ -206,12 +126,12 @@ Deno.serve(async (req) => {
   try {
     switch (event.type) {
 
-      // ═══ CHECKOUT COMPLETED → Unit payment or Provision tenant ═══
+      // ═══ CHECKOUT COMPLETED → Unit payment reconciliation ═══
       case "checkout.session.completed": {
         const session = event.data.object;
         const meta = session.metadata || {};
 
-        // ═══ UNIT PAYMENT checkout ═══
+        // Only handle unit payment checkouts (invoice_id + tenant_id in metadata)
         if (meta.invoice_id && meta.tenant_id) {
           console.log(`Unit payment checkout: invoice=${meta.invoice_id} tenant=${meta.tenant_id}`);
           try {
@@ -223,239 +143,9 @@ Deno.serve(async (req) => {
           } catch (err) {
             console.error("Unit payment reconciliation failed:", err);
           }
-          break;
+        } else {
+          console.log("Non-unit-payment checkout, skipping (subscription provisioning handled by Chargebee)");
         }
-
-        // ═══ ONBOARDING checkout ═══
-        if (!meta.building_name || !meta.user_id) {
-          console.log("Non-onboarding checkout, skipping");
-          break;
-        }
-
-        // Idempotency: skip if user already has a tenant
-        const existing = await sbQuery("GET", "tenant_users", {
-          "user_id": `eq.${meta.user_id}`,
-          "select": "tenant_id",
-        });
-        if (existing?.tenant_id) {
-          console.log(`User ${meta.user_id} already provisioned (tenant ${existing.tenant_id}), skipping`);
-          break;
-        }
-
-        console.log(`Provisioning: ${meta.building_name} for ${meta.user_id}`);
-
-        const result = await sbRpc("provision_tenant", {
-          p_name: meta.building_name,
-          p_subdomain: meta.subdomain || null,
-          p_address: {
-            street: meta.address_street || "",
-            city: meta.address_city || "",
-            state: meta.address_state || "",
-            zip: meta.address_zip || "",
-          },
-          p_total_units: parseInt(meta.total_units) || 0,
-          p_year_built: meta.year_built || null,
-          p_tier: meta.tier,
-          p_contact_name: meta.contact_name || "",
-          p_contact_email: meta.contact_email || "",
-          p_contact_phone: meta.contact_phone || "",
-          p_user_id: meta.user_id,
-          p_stripe_customer_id: session.customer || null,
-          p_stripe_subscription_id: session.subscription || null,
-          p_board_title: meta.board_title || "President",
-        });
-
-        console.log("Provisioned:", JSON.stringify(result));
-
-        // Sync to admin console (best-effort, non-fatal)
-        await syncToAdminConsole(
-          result.tenant_id,
-          meta,
-          result,
-          session.customer || null,
-          session.subscription || null,
-        );
-        break;
-      }
-
-      // ═══ INVOICE PAID ═══
-      case "invoice.paid": {
-        const invoice = event.data.object;
-        const subId = invoice.subscription;
-        if (!subId) break;
-
-        // Find tenant
-        const sub = await sbQuery("GET", "subscriptions", {
-          "stripe_subscription_id": `eq.${subId}`,
-          "select": "tenant_id",
-        });
-        if (!sub?.tenant_id) break;
-
-        // Record invoice
-        await sbQuery("POST", "invoices", {}, {
-          tenant_id: sub.tenant_id,
-          stripe_invoice_id: invoice.id,
-          amount: invoice.amount_paid,
-          status: "paid",
-          invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
-          due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString().split("T")[0] : null,
-          paid_date: new Date().toISOString().split("T")[0],
-        });
-
-        // Update subscription and tenant status
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "active" });
-        await sbQuery("PATCH", `tenants?id=eq.${sub.tenant_id}&status=eq.onboarding`, {}, { status: "active" });
-
-        // Sync status to admin console
-        if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
-          await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
-            method: "PATCH",
-            headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "active" }),
-          }).catch(e => console.error("Govops sync (active):", e));
-        }
-        break;
-      }
-
-      // ═══ PAYMENT FAILED ═══
-      case "invoice.payment_failed": {
-        const invoice = event.data.object;
-        const subId = invoice.subscription;
-        if (!subId) break;
-
-        const sub = await sbQuery("GET", "subscriptions", {
-          "stripe_subscription_id": `eq.${subId}`,
-          "select": "tenant_id",
-        });
-        if (!sub?.tenant_id) break;
-
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "past_due" });
-
-        await sbQuery("POST", "invoices", {}, {
-          tenant_id: sub.tenant_id,
-          stripe_invoice_id: invoice.id,
-          amount: invoice.amount_due,
-          status: "overdue",
-          invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
-          due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString().split("T")[0] : null,
-        });
-
-        await sbQuery("POST", "audit_log", {}, {
-          tenant_id: sub.tenant_id,
-          actor_name: "Stripe", actor_role: "system",
-          action: "invoice.payment_failed", target: invoice.id,
-          details: `Payment of $${(invoice.amount_due / 100).toFixed(2)} failed`,
-        });
-        break;
-      }
-
-      // ═══ SUBSCRIPTION CANCELED ═══
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object;
-        const sub = await sbQuery("GET", "subscriptions", {
-          "stripe_subscription_id": `eq.${subscription.id}`,
-          "select": "tenant_id",
-        });
-        if (!sub?.tenant_id) break;
-
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, { status: "canceled", cancel_at_period_end: false });
-        await sbQuery("PATCH", `tenants?id=eq.${sub.tenant_id}`, {}, { status: "churned" });
-
-        await sbQuery("POST", "audit_log", {}, {
-          tenant_id: sub.tenant_id,
-          actor_name: "Stripe", actor_role: "system",
-          action: "subscription.canceled", target: subscription.id,
-          details: "Subscription ended — tenant churned",
-        });
-
-        // Sync status to admin console
-        if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
-          await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
-            method: "PATCH",
-            headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "churned" }),
-          }).catch(e => console.error("Govops sync (churned):", e));
-        }
-        break;
-      }
-
-      // ═══ SUBSCRIPTION UPDATED ═══
-      case "customer.subscription.updated": {
-        const subscription = event.data.object;
-        const sub = await sbQuery("GET", "subscriptions", {
-          "stripe_subscription_id": `eq.${subscription.id}`,
-          "select": "tenant_id,tier",
-        });
-        if (!sub?.tenant_id) break;
-
-        const statusMap: Record<string, string> = {
-          active: "active", trialing: "trialing", past_due: "past_due",
-        };
-
-        // Price ID -> tier lookup
-        // TODO: replace placeholder price IDs with actual Stripe price IDs
-        const PRICE_TO_TIER: Record<string, string> = {
-          "price_essentials_monthly": "essentials",
-          "price_essentials_annual": "essentials",
-          "price_board_monthly": "board",
-          "price_board_annual": "board",
-          "price_estate_monthly": "estate",
-          "price_estate_annual": "estate",
-          // Legacy prices map to new tiers
-          "price_1T3qQD2eQBbijDsqxvNiEs8U": "essentials",
-          "price_1T3qQD2eQBbijDsqbcwCMX7v": "essentials",
-          "price_1T36YO2eQBbijDsqkULOdtRi": "board",
-          "price_1T3qQg2eQBbijDsqHaOVBbtA": "board",
-          "price_1T3qRQ2eQBbijDsq7PP4vlxh": "estate",
-          "price_1T3qSR2eQBbijDsqzVEUuZD4": "estate",
-        };
-        const TIER_MONTHLY_RATES: Record<string, number> = {
-          essentials: 79, board: 199, estate: 399,
-        };
-        const TIER_SUBSCRIPTION_SLUGS: Record<string, string> = {
-          essentials: "essentials", board: "board", estate: "estate",
-        };
-        const TIER_FEATURES: Record<string, Record<string, boolean>> = {
-          essentials: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: false, reserve_study_tools: false },
-          board: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: false },
-          estate: { fiscal_lens: true, case_ops: true, compliance_runbook: true, ai_advisor: true, document_vault: true, payment_processing: true, votes_resolutions: true, community_portal: true, vendor_management: true, reserve_study_tools: true },
-        };
-
-        // Build update payload
-        const updatePayload: Record<string, unknown> = {
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          status: statusMap[subscription.status] || "canceled",
-          cancel_at_period_end: subscription.cancel_at_period_end || false,
-        };
-
-        // Detect tier change from price ID
-        const currentPriceId = subscription.items?.data?.[0]?.price?.id;
-        const detectedTier = currentPriceId ? PRICE_TO_TIER[currentPriceId] : null;
-
-        if (detectedTier && detectedTier !== sub.tier) {
-          updatePayload.tier = detectedTier;
-          updatePayload.monthly_rate = TIER_MONTHLY_RATES[detectedTier];
-
-          // Update tenant_features
-          const features = TIER_FEATURES[detectedTier];
-          if (features) {
-            await sbQuery("PATCH", `tenant_features?tenant_id=eq.${sub.tenant_id}`, {}, features);
-          }
-
-          // Sync tier change to govops
-          if (GOVOPS_URL && GOVOPS_SERVICE_KEY) {
-            await fetch(`${GOVOPS_URL}/rest/v1/tenancies?id=eq.${sub.tenant_id}`, {
-              method: "PATCH",
-              headers: { "apikey": GOVOPS_SERVICE_KEY, "Authorization": `Bearer ${GOVOPS_SERVICE_KEY}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ subscription_id: TIER_SUBSCRIPTION_SLUGS[detectedTier] }),
-            }).catch(e => console.error("Govops sync (tier change):", e));
-          }
-
-          console.log(`Tier changed: ${sub.tier} → ${detectedTier} for tenant ${sub.tenant_id}`);
-        }
-
-        await sbQuery("PATCH", `subscriptions?tenant_id=eq.${sub.tenant_id}`, {}, updatePayload);
         break;
       }
 
@@ -516,7 +206,6 @@ Deno.serve(async (req) => {
         });
 
         // Update unit balance (increase by refund amount)
-        // Use raw SQL via RPC since we need an increment
         const currentUnit = await sbQuery("GET", "units", {
           "tenant_id": `eq.${refundInvoice.tenant_id}`,
           "number": `eq.${refundInvoice.unit_number}`,
@@ -544,4 +233,3 @@ Deno.serve(async (req) => {
     status: 200, headers: { "Content-Type": "application/json" },
   });
 });
-

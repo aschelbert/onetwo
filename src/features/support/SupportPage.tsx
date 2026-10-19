@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { ROLE_LABELS } from '@/types/auth';
 import { getInitials } from '@/lib/formatters';
-import { Plus, Send, MessageCircle, Paperclip, X } from 'lucide-react';
+import { ON_CALL } from '@/lib/tiers';
+import { Plus, Send, MessageCircle, Paperclip, X, CalendarCheck, PhoneCall } from 'lucide-react';
 
 // Secondary Supabase client — connects to admin project for support tables
 const adminUrl = import.meta.env.VITE_ADMIN_SUPABASE_URL as string;
@@ -64,6 +66,7 @@ function timeAgo(date: string) {
 export default function SupportPage() {
   const { currentUser, currentRole } = useAuthStore();
   const tenant = useTenantContext();
+  const navigate = useNavigate();
   const [tenancyId, setTenancyId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -300,8 +303,62 @@ export default function SupportPage() {
     );
   }
 
+  const hasOnCall = tenant.features.onCall === true;
+  const onCallHours = tenant.tier === 'facilities' ? ON_CALL.facilities.hours : ON_CALL.self_managed.hours;
+  const advisorName = 'Your On Call Advisor';
+
   return (
-    <div className="flex bg-white rounded-xl border border-ink-200 overflow-hidden h-full">
+    <div className="flex flex-col gap-4 h-full">
+      {/* On Call section */}
+      {hasOnCall ? (
+        <div className="bg-white rounded-xl border border-ink-200 px-5 py-4 flex items-center gap-5">
+          <div className="w-10 h-10 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center flex-shrink-0">
+            <PhoneCall className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-ink-900">{advisorName}</h3>
+            <p className="text-xs text-ink-500 mt-0.5">
+              Replies within one business day. Up to {onCallHours} hours of support per month.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="#"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-ink-700 bg-mist-50 border border-ink-200 rounded-lg hover:bg-mist-100 transition-colors"
+            >
+              <CalendarCheck className="w-3.5 h-3.5" />
+              Book your monthly call
+            </a>
+            <button
+              onClick={() => { setShowNewForm(true); setSelectedId(null); }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-white bg-ink-900 rounded-lg hover:bg-ink-800 transition-colors"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Message your advisor
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="rounded-lg px-4 py-3 flex items-center gap-3"
+          style={{ background: '#fff0f1', borderLeft: '4px solid #D62839' }}
+        >
+          <span className="shrink-0 text-xs font-bold text-white bg-brand-red rounded-full px-2.5 py-0.5">
+            On Call
+          </span>
+          <p className="text-sm text-ink-800 flex-1">
+            Get expert support from a dedicated advisor starting at $249/mo.
+          </p>
+          <button
+            onClick={() => navigate('/subscription')}
+            className="text-sm font-medium text-brand-red hover:underline shrink-0"
+          >
+            Learn more
+          </button>
+        </div>
+      )}
+
+    <div className="flex bg-white rounded-xl border border-ink-200 overflow-hidden flex-1 min-h-0">
       {/* Left — thread list */}
       <div className="w-[300px] flex-shrink-0 border-r border-ink-200 flex flex-col">
         <div className="p-3 border-b border-ink-100 flex items-center justify-between">
@@ -599,6 +656,7 @@ export default function SupportPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

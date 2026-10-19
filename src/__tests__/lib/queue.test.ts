@@ -45,7 +45,7 @@ function makeInputs(overrides: Partial<QueueInputs> = {}): QueueInputs {
   const items = overrides.items ?? [];
   const completions = overrides.completions ?? {};
   return {
-    me: { roleKey: 'president', name: 'Alice' },
+    me: { roleKey: 'president', name: 'Alice', isOwner: true },
     seasons: makeSeasons(items, completions),
     items,
     completions,

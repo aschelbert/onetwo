@@ -1,6 +1,6 @@
 // supabase/functions/notify-signup/index.ts
 // Sends internal notification email to alyssa@getonetwo.com when someone
-// signs up for the demo or joins the waitlist.
+// signs up for the demo or a new building is provisioned.
 // Fire-and-forget from client — failures logged but don't block UX.
 
 const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
@@ -19,11 +19,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const type: "demo" | "waitlist" = body.type;
+    const type: "demo" | "building" = body.type;
 
-    if (!type || !["demo", "waitlist"].includes(type)) {
+    if (!type || !["demo", "building"].includes(type)) {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid type (demo | waitlist)" }),
+        JSON.stringify({ error: "Missing or invalid type (demo | building)" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
@@ -73,36 +73,26 @@ Deno.serve(async (req) => {
 
       detailsText = `Name: ${name}\nEmail: ${email}\nCommunity: ${condo_name || "—"}\nUnits: ${unit_count || "—"}\nRole: ${memberLabel[member_type] || member_type || "—"}\nTier Interest: ${tierLabel[subscription_interest] || subscription_interest || "—"}`;
     } else {
-      // waitlist
-      const { name, email, community_name, unit_count, board_role, spot_number } = body;
+      // building — called by chargebee-checkout / provision_tenant
+      const { name, email, plan } = body;
       if (!name || !email) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields for waitlist notification" }),
+          JSON.stringify({ error: "Missing required fields for building notification" }),
           { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
         );
       }
 
-      const roleLabel: Record<string, string> = {
-        president: "President",
-        treasurer: "Treasurer",
-        secretary: "Secretary",
-        member: "Member",
-      };
-
-      subject = `New Waitlist Signup (#${spot_number}): ${name}`;
+      subject = `New building: ${name}`;
 
       detailsHtml = `
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Name</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${name}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Building</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${name}</td></tr>
         <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;font-weight:600;"><a href="mailto:${email}" style="color:#d62839;">${email}</a></td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Community</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${community_name || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Units</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${unit_count || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Board Role</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${roleLabel[board_role] || board_role || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Spot #</td><td style="padding:8px 12px;font-size:13px;font-weight:600;color:#d62839;">#${spot_number}</td></tr>`;
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Plan</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${plan || "—"}</td></tr>`;
 
-      detailsText = `Name: ${name}\nEmail: ${email}\nCommunity: ${community_name || "—"}\nUnits: ${unit_count || "—"}\nBoard Role: ${roleLabel[board_role] || board_role || "—"}\nSpot: #${spot_number}`;
+      detailsText = `Building: ${name}\nEmail: ${email}\nPlan: ${plan || "—"}`;
     }
 
-    const typeLabel = type === "demo" ? "Demo Signup" : "Waitlist Signup";
+    const typeLabel = type === "demo" ? "Demo Signup" : "New Building";
 
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
@@ -112,9 +102,9 @@ Deno.serve(async (req) => {
           </div>
         </div>
 
-        <div style="background: ${type === "demo" ? "#e0f2fe" : "#fde8ea"}; border-radius: 12px; padding: 16px 20px; text-align: center; margin-bottom: 20px;">
-          <p style="color: ${type === "demo" ? "#0369a1" : "#d62839"}; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0;">
-            New ${typeLabel}
+        <div style="background: ${type === "demo" ? "#e0f2fe" : "#d1fae5"}; border-radius: 12px; padding: 16px 20px; text-align: center; margin-bottom: 20px;">
+          <p style="color: ${type === "demo" ? "#0369a1" : "#059669"}; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0;">
+            ${typeLabel}
           </p>
         </div>
 
@@ -127,7 +117,7 @@ Deno.serve(async (req) => {
         </div>
       </div>`;
 
-    const textBody = `New ${typeLabel}\n${"=".repeat(30)}\n${detailsText}`;
+    const textBody = `${typeLabel}\n${"=".repeat(30)}\n${detailsText}`;
 
     const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
     const res = await fetch("https://api.mailjet.com/v3.1/send", {

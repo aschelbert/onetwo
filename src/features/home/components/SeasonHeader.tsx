@@ -89,10 +89,13 @@ export default function SeasonHeader({ season, firstName, urgentCount, health }:
     return () => document.removeEventListener('mousedown', handleClick);
   }, [healthOpen]);
 
+  const isSetup = season.seasonId === 'setup';
   const startLabel = MONTH_ABBR[(season.startMonth - 1) % 12] || '';
   const endLabel = MONTH_ABBR[(season.endMonth - 1) % 12] || '';
 
-  const seasonLine = `${season.label.toUpperCase()} \u00B7 ${startLabel} TO ${endLabel} \u00B7 ${season.daysLeft} DAYS LEFT`;
+  const seasonLine = isSetup
+    ? 'SETUP SEASON'
+    : `${season.label.toUpperCase()} \u00B7 ${startLabel} TO ${endLabel} \u00B7 ${season.daysLeft} DAYS LEFT`;
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();

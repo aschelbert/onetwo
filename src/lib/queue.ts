@@ -34,7 +34,7 @@ export interface QueueItem {
 }
 
 export interface QueueInputs {
-  me: { roleKey: BoardRoleKey; name: string };
+  me: { roleKey: BoardRoleKey; name: string; isOwner: boolean };
   seasons: SeasonState[];
   items: ComplianceItem[];
   completions: Record<string, boolean>;
@@ -91,6 +91,7 @@ export interface QueueInputs {
     daysPastDue: number;
   }>;
   settings: BuildingSettings;
+  presidentSeated?: boolean;
   today?: Date;
   horizonDays?: number;
 }
@@ -132,10 +133,12 @@ function isFixedDate(due: string): boolean {
 
 function roleState(
   itemRole: BoardRoleKey | undefined,
-  backstopRole: BoardRoleKey | undefined,
+  backstopRole: BoardRoleKey | 'owner' | undefined,
   myRole: BoardRoleKey,
+  isOwner?: boolean,
 ): 'mine' | 'backstop' | 'other' {
   if (itemRole === myRole) return 'mine';
+  if (backstopRole === 'owner' && isOwner) return 'backstop';
   if (backstopRole === myRole) return 'backstop';
   return 'other';
 }
@@ -175,6 +178,8 @@ export function buildQueue(i: QueueInputs): QueueResult {
   const meetingHorizonDate = new Date(today);
   meetingHorizonDate.setDate(meetingHorizonDate.getDate() + MEETING_HORIZON_DAYS);
   const meetingHorizonStr = toDateStr(meetingHorizonDate);
+
+  const backstop: BoardRoleKey | 'owner' = (i.presidentSeated ?? true) ? 'president' : 'owner';
 
   const queue: QueueItem[] = [];
 
@@ -228,7 +233,7 @@ export function buildQueue(i: QueueInputs): QueueResult {
     if (!isOverdue && !isDueSoon) continue;
 
     const filingRole = f.responsible ? roleFromString(f.responsible) : 'president';
-    const rs = roleState(filingRole, 'president', i.me.roleKey);
+    const rs = roleState(filingRole, backstop, i.me.roleKey, i.me.isOwner);
     const tone = dueTone(f.dueDate, todayStr);
     const priority = isOverdue ? PRIORITY_OVERDUE : PRIORITY_DUE_SOON;
 
@@ -268,7 +273,7 @@ export function buildQueue(i: QueueInputs): QueueResult {
       if (caseInfo && (caseInfo.status === 'closed' || caseInfo.status === 'resolved')) continue;
 
       const stepRole = step.ownerRole ?? 'president';
-      const rs = roleState(stepRole, 'president', i.me.roleKey);
+      const rs = roleState(stepRole, backstop, i.me.roleKey, i.me.isOwner);
       const tone = step.dueDate ? dueTone(step.dueDate, todayStr) : 'normal';
       const isOverdue = step.dueDate ? step.dueDate < todayStr : false;
       const casePriority = caseInfo ? priorityCasePriority(caseInfo.priority) : 4;
@@ -302,7 +307,7 @@ export function buildQueue(i: QueueInputs): QueueResult {
       if (c.status === 'closed' || c.status === 'resolved') continue;
 
       const stepRole = c.nextStep.ownerRole ?? 'president';
-      const rs = roleState(stepRole, 'president', i.me.roleKey);
+      const rs = roleState(stepRole, backstop, i.me.roleKey, i.me.isOwner);
       const tone = c.nextStep.dueDate ? dueTone(c.nextStep.dueDate, todayStr) : 'normal';
       const isOverdue = c.nextStep.dueDate ? c.nextStep.dueDate < todayStr : false;
       const priority = isOverdue ? PRIORITY_OVERDUE
@@ -428,7 +433,7 @@ export function buildQueue(i: QueueInputs): QueueResult {
       title: r.title,
       why: r.unit ? `From unit ${r.unit}` : 'New request',
       roleKey: 'vice_president',
-      roleState: roleState('vice_president', 'president', i.me.roleKey),
+      roleState: roleState('vice_president', backstop, i.me.roleKey, i.me.isOwner),
       containerLine: 'Owner requests',
       dueDate: null,
       dueTone: 'normal',
@@ -471,7 +476,7 @@ export function buildQueue(i: QueueInputs): QueueResult {
       title: `Start collections for Unit ${d.unit}?`,
       why: `$${d.balance.toLocaleString()} overdue ${d.daysPastDue} days`,
       roleKey: 'treasurer',
-      roleState: roleState('treasurer', 'president', i.me.roleKey),
+      roleState: roleState('treasurer', backstop, i.me.roleKey, i.me.isOwner),
       containerLine: 'Collections',
       dueDate: null,
       dueTone: 'overdue',

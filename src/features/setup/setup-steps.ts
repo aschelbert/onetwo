@@ -50,63 +50,67 @@ export interface CompletionContext {
 
 export const SETUP_STEPS: StepConfig[] = [
   {
-    stepNumber: 0,
-    title: 'Complete Your Profile',
-    description: 'Finish setting up your account with a few details deferred from signup.',
-    required: false,
-    subTasks: [
-      {
-        id: 'profile_board_title',
-        label: 'Set your board title',
-        navigateTo: '/account',
-        checkComplete: (ctx) => ctx.hasBoardTitle,
-      },
-      {
-        id: 'profile_phone',
-        label: 'Add your phone number',
-        navigateTo: '/account',
-        checkComplete: (ctx) => ctx.hasPhone,
-      },
-      {
-        id: 'profile_address',
-        label: 'Complete building address (city, state, zip)',
-        navigateTo: '/building',
-        checkComplete: (ctx) => ctx.hasFullAddress,
-      },
-    ],
-  },
-  {
     stepNumber: 1,
-    title: 'Building Profile',
-    description: 'Set up your building\'s basic information, address, and property details.',
+    title: 'Units and owners',
+    description: 'Add your units with owner names and contact info.',
     required: true,
     subTasks: [
       {
-        id: 'bp_profile',
-        label: 'Set up building profile',
-        navigateTo: '/building',
-        checkComplete: (ctx) => ctx.onboarding.buildingProfileComplete,
-      },
-      {
-        id: 'bp_details',
-        label: 'Add building details & amenities',
-        navigateTo: '/building?tab=details',
-        checkComplete: (ctx) => ctx.hasDetails,
+        id: 'units_add',
+        label: 'Configure units & owners',
+        navigateTo: '/building?tab=units',
+        checkComplete: (ctx) => ctx.onboarding.unitsConfigured || ctx.unitCount >= 1,
       },
     ],
   },
   {
     stepNumber: 2,
-    title: 'Legal & Compliance',
-    description: 'Upload governing documents, add insurance policies, and register vendors.',
-    required: false,
+    title: 'Bylaws facts and board roles',
+    description: 'Upload bylaws and assign board seats.',
+    required: true,
     subTasks: [
       {
-        id: 'legal_docs',
+        id: 'bylaws_upload',
         label: 'Upload bylaws & documents',
         navigateTo: '/building?tab=legal',
         checkComplete: (ctx) => ctx.onboarding.bylawsUploaded || ctx.docsCount >= 1,
       },
+      {
+        id: 'board_roles',
+        label: 'Assign board seats',
+        navigateTo: '/boardroom?tab=roles',
+        checkComplete: (ctx) => ctx.boardCount >= 2,
+      },
+    ],
+  },
+  {
+    stepNumber: 3,
+    title: 'Bank accounts and opening balances',
+    description: 'Add your bank accounts with opening balances.',
+    required: true,
+    subTasks: [
+      {
+        id: 'fin_coa',
+        label: 'Set up chart of accounts',
+        navigateTo: '/financial',
+        financialTab: 'coa',
+        checkComplete: (ctx) => ctx.coaCount >= 1,
+      },
+      {
+        id: 'fin_gl',
+        label: 'Enter opening balances',
+        navigateTo: '/financial',
+        financialTab: 'ledger',
+        checkComplete: (ctx) => ctx.glEntryCount >= 1,
+      },
+    ],
+  },
+  {
+    stepNumber: 4,
+    title: 'Insurance, documents, vendors',
+    description: 'Add insurance policies, key documents, and vendor contacts.',
+    required: false,
+    subTasks: [
       {
         id: 'legal_insurance',
         label: 'Add insurance policies',
@@ -118,84 +122,6 @@ export const SETUP_STEPS: StepConfig[] = [
         label: 'Add vendors & service providers',
         navigateTo: '/building?tab=vendors',
         checkComplete: (ctx) => ctx.vendorCount >= 1,
-      },
-    ],
-  },
-  {
-    stepNumber: 3,
-    title: 'Unit Roster',
-    description: 'Add your units manually or import from a CSV file.',
-    required: true,
-    subTasks: [
-      {
-        id: 'units_add',
-        label: 'Configure units & fees',
-        navigateTo: '/building?tab=units',
-        checkComplete: (ctx) => ctx.onboarding.unitsConfigured || ctx.unitCount >= 1,
-      },
-    ],
-  },
-  {
-    stepNumber: 4,
-    title: 'Financial Setup',
-    description: 'Set up your chart of accounts, record year-to-date transactions, configure your budget, and define reserve items.',
-    required: false,
-    subTasks: [
-      {
-        id: 'fin_coa',
-        label: 'Set up chart of accounts',
-        navigateTo: '/financial',
-        financialTab: 'coa',
-        checkComplete: (ctx) => ctx.coaCount >= 1,
-      },
-      {
-        id: 'fin_gl',
-        label: 'Enter year-to-date GL transactions',
-        navigateTo: '/financial',
-        financialTab: 'ledger',
-        checkComplete: (ctx) => ctx.glEntryCount >= 1,
-      },
-      {
-        id: 'fin_budget',
-        label: 'Configure annual budget',
-        navigateTo: '/financial',
-        financialTab: 'budget',
-        checkComplete: (ctx) => ctx.budgetCount >= 1,
-      },
-      {
-        id: 'fin_reserves',
-        label: 'Define reserve fund items',
-        navigateTo: '/financial',
-        financialTab: 'reserves',
-        checkComplete: (ctx) => ctx.reserveCount >= 1,
-      },
-    ],
-  },
-  {
-    stepNumber: 5,
-    title: 'Invite Users',
-    description: 'Invite board members, property managers, and residents to the platform.',
-    required: false,
-    subTasks: [
-      {
-        id: 'invite_team',
-        label: 'Invite board members',
-        navigateTo: '/building?tab=contacts',
-        checkComplete: (ctx) => ctx.onboarding.firstUserInvited || ctx.boardCount >= 1,
-      },
-    ],
-  },
-  {
-    stepNumber: 6,
-    title: 'Review & Complete',
-    description: 'Review your setup and complete onboarding.',
-    required: true,
-    subTasks: [
-      {
-        id: 'go_live',
-        label: 'Review & complete setup',
-        navigateTo: null,
-        checkComplete: (ctx) => ctx.onboarding.goLive,
       },
     ],
   },

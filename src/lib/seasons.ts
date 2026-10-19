@@ -196,12 +196,16 @@ export function buildSeasons(args: {
   settings: BuildingSettings;
   tenantStatus: 'onboarding' | 'active' | string;
   setupProgress?: { completed: number; total: number };
+  /** ISO date of tenant creation — used for setup season start. */
+  tenantCreatedAt?: string;
+  /** ISO date of trial end — used for setup season end. */
+  trialEndsAt?: string | null;
   today?: Date;
   /** Cases for milestone step progress — when a milestone has a linked CATS case,
    *  the milestone's progress reads from the case's steps. */
   cases?: CaseTrackerCase[];
 }): SeasonState[] {
-  const { items, completions, filings, settings, tenantStatus, setupProgress, today: todayArg, cases: casesList } = args;
+  const { items, completions, filings, settings, tenantStatus, setupProgress, tenantCreatedAt, trialEndsAt, today: todayArg, cases: casesList } = args;
   const today = todayArg ?? new Date();
   const todayStr = today.toISOString().split('T')[0];
   const currentYear = today.getFullYear();
@@ -234,6 +238,10 @@ export function buildSeasons(args: {
 
   const seasons: SeasonState[] = [];
 
+  // Use date-only arithmetic (strip time) to avoid DST / UTC-local drift
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const DAY_MS = 1000 * 60 * 60 * 24;
+
   for (const window of windows) {
     const seasonMilestones = activeMilestones
       .filter(m => m.seasonId === window.seasonId)
@@ -247,9 +255,6 @@ export function buildSeasons(args: {
     const completedCount = milestoneStates.reduce((sum, ms) => sum + ms.completedCount, 0);
 
     const isCurrent = window.startDate <= todayStr && todayStr <= window.endDate;
-    // Use date-only arithmetic (strip time) to avoid DST / UTC-local drift
-    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const DAY_MS = 1000 * 60 * 60 * 24;
     const daysLeft = isCurrent
       ? Math.max(0, Math.round((new Date(window.endDate).getTime() - todayDate.getTime()) / DAY_MS))
       : todayStr < window.startDate
@@ -281,18 +286,24 @@ export function buildSeasons(args: {
       ownerRole: m.ownerRole,
     }));
 
+    const setupStart = tenantCreatedAt ? tenantCreatedAt.substring(0, 10) : todayStr;
+    const setupEnd = trialEndsAt ? trialEndsAt.substring(0, 10) : todayStr;
+    const setupDaysLeft = setupEnd > todayStr
+      ? Math.max(0, Math.round((new Date(setupEnd).getTime() - todayDate.getTime()) / DAY_MS))
+      : 0;
+
     const setupWindow: SeasonState = {
       seasonId: 'setup',
       label: SEASON_LABELS.setup,
       startMonth: 0,
       endMonth: 0,
-      startDate: todayStr,
-      endDate: todayStr,
+      startDate: setupStart,
+      endDate: setupEnd,
       milestones: setupMilestoneStates,
       completedCount: setupCompleted,
       totalCount: setupTotal,
       isCurrent: true,
-      daysLeft: 0,
+      daysLeft: setupDaysLeft,
     };
 
     seasons.unshift(setupWindow);

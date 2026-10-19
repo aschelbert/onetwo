@@ -51,9 +51,8 @@ export default function ActiveCaseWidget() {
   const [createSearchQuery, setCreateSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  // When v2Cases is enabled, the widget is not rendered — cases are managed
-  // via the CasesTab in Board Room and CasePage depth view.
-  if (tenant.features.v2Cases) return null;
+  // v2Cases is always enabled — cases are managed via CasesTab
+  return null;
 
   // New case wizard (single-step: pick situation then fill details)
   const [wizSitKey, setWizSitKey] = useState<string | null>(null); // "catId:sitId"

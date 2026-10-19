@@ -45,6 +45,7 @@ export interface BuildingMember {
   joined: string;
   boardTitle: string | null;
   roleKey?: BoardRoleKey;
+  isAccountOwner?: boolean;
 }
 
 export interface BuildingInvite {

@@ -16,7 +16,9 @@ import { useReportsStore } from '@/store/useReportsStore';
 import { DEFAULT_SETTINGS, type BuildingSettings } from '@/lib/buildingSettings';
 import { toBoardRoleKey, type BoardRoleKey } from '@/types/auth';
 import { DollarSign, PiggyBank } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import SeasonHeader from './components/SeasonHeader';
+import SetupSeasonHome from './components/SetupSeasonHome';
 import YourWeek from './components/YourWeek';
 import BoardThisSeason from './components/BoardThisSeason';
 import StreaksCard from './components/StreaksCard';
@@ -61,13 +63,20 @@ export default function HomePage() {
     fiscalYearStartMonth: DEFAULT_SETTINGS.fiscalYearStartMonth,
   }), []);
 
-  // Current user's board role
+  // Current user's board role — prefer TenantProvider context, fall back to name match
   const myRoleKey: BoardRoleKey = useMemo(() => {
+    if (tenant.me.roleKey) return tenant.me.roleKey as BoardRoleKey;
     const me = building.board.find(
       (m) => m.name === currentUser.name || m.email === currentUser.email,
     );
     return me?.roleKey ?? toBoardRoleKey(null);
-  }, [building.board, currentUser.name, currentUser.email]);
+  }, [tenant.me.roleKey, building.board, currentUser.name, currentUser.email]);
+
+  // Is a president currently seated on the board?
+  const presidentSeated = useMemo(
+    () => building.board.some(m => m.roleKey === 'president'),
+    [building.board],
+  );
 
   // Compliance items
   const refreshResult = useMemo(
@@ -171,7 +180,7 @@ export default function HomePage() {
   const queueResult = useMemo(
     () =>
       buildQueue({
-        me: { roleKey: myRoleKey, name: currentUser.name },
+        me: { roleKey: myRoleKey, name: currentUser.name, isOwner: tenant.me.isAccountOwner },
         seasons,
         items: allRunbookItems,
         completions: comp.completions,
@@ -218,8 +227,9 @@ export default function HomePage() {
         meetings: meetings.map((m) => ({ id: m.id, title: m.title, date: m.date, status: m.status })),
         delinquency,
         settings,
+        presidentSeated,
       }),
-    [myRoleKey, currentUser.name, seasons, allRunbookItems, comp.completions, comp.filings, issues.cases, issues.issues, elections.elections, spending.approvals, meetings, delinquency, settings],
+    [myRoleKey, currentUser.name, presidentSeated, tenant.me.isAccountOwner, seasons, allRunbookItems, comp.completions, comp.filings, issues.cases, issues.issues, elections.elections, spending.approvals, meetings, delinquency, settings],
   );
 
   // Count of urgent items for the header
@@ -285,6 +295,70 @@ export default function HomePage() {
   // KPI helpers
   const collectionRate = metrics.collectionRate;
   const reservesFunded = reservePct;
+
+  // Sample data state
+  const [loadingSample, setLoadingSample] = useState(false);
+  // TODO Phase 8: detect sample data via tenant.sampleDataLoadedAt
+  const sampleLoaded = false;
+
+  const handleLoadSample = useCallback(async () => {
+    if (!supabase || tenant.isDemo) return;
+    setLoadingSample(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/load-sample-building`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ tenantId: tenant.id }),
+        },
+      );
+      if (res.ok) window.location.reload();
+    } finally {
+      setLoadingSample(false);
+    }
+  }, [tenant.id, tenant.isDemo]);
+
+  const handleRemoveSample = useCallback(async () => {
+    if (!supabase || tenant.isDemo) return;
+    setLoadingSample(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/load-sample-building`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ tenantId: tenant.id, remove: true }),
+        },
+      );
+      if (res.ok) window.location.reload();
+    } finally {
+      setLoadingSample(false);
+    }
+  }, [tenant.id, tenant.isDemo]);
+
+  // ── Onboarding: show setup season home ──
+  if (tenant.status === 'onboarding') {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <SetupSeasonHome
+          firstName={firstName}
+          onLoadSample={handleLoadSample}
+          onRemoveSample={handleRemoveSample}
+          sampleLoaded={sampleLoaded}
+          loadingSample={loadingSample}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto">

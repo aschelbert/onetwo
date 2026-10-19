@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS, DEFAULT_TRIAL_DAYS, DEFAULT_BILLING_INTERVAL, describeTier, recommendTier } from '@/lib/tiers';
-import type { ActiveTier, BuildingAmenity } from '@/lib/tiers';
-import { Check } from 'lucide-react';
+import { BOARD_ROLE_LABELS } from '@/types/auth';
+import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
 import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
+import { useSignupState } from './signup/useSignupState';
+import SignupBuildingStep from './signup/SignupBuildingStep';
+import SignupPlanStep from './signup/SignupPlanStep';
+import SignupAccountStep from './signup/SignupAccountStep';
+import SignupSummary from './signup/SignupSummary';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -20,7 +24,7 @@ const Logo = () => (
 export default function AuthPage() {
   const { authStep, setAuthStep, setAuthJoinRole, login, skipToDemo, buildingMembers, buildingInvites, addMember, demoExitSource } = useAuthStore();
 
-  // ── Core form state ──
+  // ── Core form state (login + invite) ──
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -33,14 +37,8 @@ export default function AuthPage() {
   const [inviteData, setInviteData] = useState<any>(null);
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
 
-  // ── Building form ──
-  const [bldgName, setBldgName] = useState('');
-  const [bldgSubdomain, setBldgSubdomain] = useState('');
-  const [subdomainStatus, setSubdomainStatus] = useState<'idle'|'checking'|'available'|'taken'>('idle');
-  const [bldgStreet, setBldgStreet] = useState('');
-  const [bldgUnits, setBldgUnits] = useState<number | ''>('');
-  const [bldgAmenities, setBldgAmenities] = useState<BuildingAmenity[]>([]);
-  const [selectedTier, setSelectedTier] = useState<ActiveTier>('essentials');
+  // ── Signup wizard state (3-step) ──
+  const signup = useSignupState();
 
   // ── UI state ──
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -59,53 +57,13 @@ export default function AuthPage() {
     });
   }, []);
 
-  // ── Subdomain auto-generation (silent) ──
-  const sanitizeSubdomain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
-
-  useEffect(() => {
-    const suggested = sanitizeSubdomain(
-      bldgName.replace(/\b(condominium|condos?|hoa|association|residences|towers|gardens|estates|the|of)\b/gi, '')
-    );
-    setBldgSubdomain(suggested);
-  }, [bldgName]);
-
-  // ── Subdomain availability check (silent) ──
-  useEffect(() => {
-    if (!bldgSubdomain || bldgSubdomain.length < 3 || !isBackendEnabled || !supabase) {
-      setSubdomainStatus('idle');
-      return;
-    }
-    setSubdomainStatus('checking');
-    const timer = setTimeout(async () => {
-      try {
-        const { data } = await supabase!
-          .from('tenants')
-          .select('id')
-          .eq('subdomain', bldgSubdomain)
-          .maybeSingle();
-        setSubdomainStatus(data ? 'taken' : 'available');
-      } catch {
-        setSubdomainStatus('idle');
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [bldgSubdomain]);
-
   // ── Session check on mount ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    // ?demo=1 → skip directly to demo (no lead form)
-    if (params.get('demo') === '1') {
-      setSessionChecking(false);
-      skipToDemo();
-      return;
-    }
-
-    // ?create=1 → show signup screen
+    // ?create=1 → show signup wizard
     if (params.get('create') === '1') {
       setAuthStep('signup');
-      // If coming from demo, show lead-capture modal (once per browser)
       if (params.get('from') === 'demo' && !wasAlreadyShown()) {
         setShowLeadModal(true);
       }
@@ -152,7 +110,6 @@ export default function AuthPage() {
       addMember(m);
       login(m);
 
-      // Redirect to tenant subdomain if on root domain
       const hostname = window.location.hostname;
       if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
         const { data: sessionData } = await supabase!.auth.getSession();
@@ -164,7 +121,6 @@ export default function AuthPage() {
       return false;
     };
 
-    // Unified session check
     const sbAccess = params.get('sb_access');
     const sbRefresh = params.get('sb_refresh');
     const hasUrlTokens = !!(sbAccess && sbRefresh);
@@ -184,46 +140,29 @@ export default function AuthPage() {
 
           let user = (await supabase!.auth.getSession()).data.session?.user ?? null;
 
-          // Handle token_hash from admin console (platform admin handoff)
           if (tokenHash && !user) {
-            const { data, error } = await supabase!.auth.verifyOtp({
-              token_hash: tokenHash,
-              type: 'magiclink',
-            });
-            if (!error && data.user) {
-              user = data.user;
-              window.history.replaceState({}, '', '/login');
-            }
+            const { data, error } = await supabase!.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' });
+            if (!error && data.user) { user = data.user; window.history.replaceState({}, '', '/login'); }
           }
 
           if (hasUrlTokens && !user) {
-            const { data, error } = await supabase!.auth.setSession({
-              access_token: sbAccess!,
-              refresh_token: sbRefresh!,
-            });
-            if (!error && data.user) {
-              user = data.user;
-              window.history.replaceState({}, '', '/login');
-            }
+            const { data, error } = await supabase!.auth.setSession({ access_token: sbAccess!, refresh_token: sbRefresh! });
+            if (!error && data.user) { user = data.user; window.history.replaceState({}, '', '/login'); }
           }
 
-          // Restore session from pre-checkout save if session was lost during Stripe redirect
           if (!user && isProvisioned) {
             try {
               const saved = sessionStorage.getItem('onetwo_checkout_tokens');
               if (saved) {
                 const { access_token, refresh_token } = JSON.parse(saved);
                 const { data, error } = await supabase!.auth.setSession({ access_token, refresh_token });
-                if (!error && data.user) {
-                  user = data.user;
-                }
+                if (!error && data.user) user = data.user;
                 sessionStorage.removeItem('onetwo_checkout_tokens');
               }
-            } catch { /* ignore parse errors */ }
+            } catch { /* ignore */ }
           }
 
           if (user) {
-            // If returning from checkout, poll for tenant_users row
             if (isProvisioned) {
               setProvisioningStatus('Setting up your building...');
               window.history.replaceState({}, '', '/login');
@@ -234,7 +173,6 @@ export default function AuthPage() {
                   .select('tenant_id, role, board_title, unit')
                   .eq('user_id', user.id)
                   .maybeSingle();
-
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
                   sessionStorage.removeItem('onetwo_checkout_tokens');
@@ -269,7 +207,6 @@ export default function AuthPage() {
               return;
             }
 
-            // Check if user is a platform admin
             const { data: admin } = await supabase!
               .from('platform_admins')
               .select('name, role')
@@ -278,21 +215,14 @@ export default function AuthPage() {
 
             if (admin) {
               const m = {
-                id: user.id,
-                name: admin.name || user.email?.split('@')[0] || 'Admin',
-                email: user.email || '',
-                phone: '',
-                role: 'PLATFORM_ADMIN' as Role,
-                unit: '',
-                status: 'active' as const,
-                joined: new Date().toISOString().split('T')[0],
-                boardTitle: null,
+                id: user.id, name: admin.name || user.email?.split('@')[0] || 'Admin',
+                email: user.email || '', phone: '', role: 'PLATFORM_ADMIN' as Role,
+                unit: '', status: 'active' as const,
+                joined: new Date().toISOString().split('T')[0], boardTitle: null,
               };
               addMember(m);
               login(m);
-              if (tokenHash) {
-                useAuthStore.getState().switchRole('BOARD_MEMBER');
-              }
+              if (tokenHash) useAuthStore.getState().switchRole('BOARD_MEMBER');
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
@@ -314,26 +244,17 @@ export default function AuthPage() {
     }
   }, []);
 
-  // ── Login handler (preserved) ──
+  // ── Login handler ──
   const handleLogin = async () => {
     if (!email || !password) return;
 
     if (isBackendEnabled && supabase) {
       setLoginLoading(true);
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.toLowerCase(),
-          password,
-        });
-
-        if (error) {
-          console.error('Incorrect email or password.');
-          setLoginLoading(false);
-          return;
-        }
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password });
+        if (error) { console.error('Incorrect email or password.'); setLoginLoading(false); return; }
 
         if (data.user) {
-          // Check if user is a platform admin
           const { data: admin } = await supabase!
             .from('platform_admins')
             .select('name, role')
@@ -341,12 +262,8 @@ export default function AuthPage() {
             .maybeSingle();
 
           if (admin) {
-            const member = buildingMembers.find(
-              (m) => m.email.toLowerCase() === email.toLowerCase()
-            );
-            if (member) {
-              login(member);
-            } else {
+            const member = buildingMembers.find(m => m.email.toLowerCase() === email.toLowerCase());
+            if (member) { login(member); } else {
               const adminMember = {
                 id: data.user.id, name: admin.name, email: data.user.email || email,
                 phone: '', role: 'PLATFORM_ADMIN' as Role, unit: '', status: 'active' as const,
@@ -359,7 +276,6 @@ export default function AuthPage() {
             return;
           }
 
-          // Check if user belongs to a tenant
           const { data: tenantUser } = await supabase!
             .from('tenant_users')
             .select('tenant_id, role, board_title, unit')
@@ -374,20 +290,15 @@ export default function AuthPage() {
               .maybeSingle();
 
             const roleMap: Record<string, Role> = {
-              board_member: 'BOARD_MEMBER',
-              resident: 'RESIDENT',
-              staff: 'STAFF',
-              property_manager: 'PROPERTY_MANAGER',
+              board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER',
             };
 
             const member = {
               id: data.user.id,
               name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              email: data.user.email || email,
-              phone: '',
+              email: data.user.email || email, phone: '',
               role: roleMap[tenantUser.role] || ('BOARD_MEMBER' as Role),
-              unit: tenantUser.unit || '',
-              status: 'active' as const,
+              unit: tenantUser.unit || '', status: 'active' as const,
               joined: new Date().toISOString().split('T')[0],
               boardTitle: tenantUser.board_title || null,
             };
@@ -408,30 +319,25 @@ export default function AuthPage() {
             return;
           }
 
-          console.error('Your account is not linked to a building yet. Contact your building administrator.');
+          console.error('Your account is not linked to a building yet.');
           setLoginLoading(false);
           return;
         }
       } catch (err) {
-        console.warn('Supabase login attempt failed, trying demo:', err);
+        console.warn('Supabase login attempt failed:', err);
       }
       setLoginLoading(false);
     }
 
     // Fall back to demo store
     const isDemoEnabled = import.meta.env.VITE_DEMO_ENABLED === 'true';
-    if (!isDemoEnabled) {
-      console.error('No account found with that email.');
-      return;
-    }
-    const member = buildingMembers.find(
-      (m) => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active'
-    );
-    if (!member) { console.error('No account found with that email.'); return; }
+    if (!isDemoEnabled) { console.error('No account found.'); return; }
+    const member = buildingMembers.find(m => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active');
+    if (!member) { console.error('No account found.'); return; }
     login(member);
   };
 
-  // ── Invite code handler (inline on signup screen) ──
+  // ── Invite code handler ──
   const handleInviteCode = async () => {
     const code = inviteCode.trim().toUpperCase();
     if (!code) return;
@@ -444,19 +350,18 @@ export default function AuthPage() {
           setInviteData(data);
           setAuthJoinRole(data.role === 'board_member' ? 'BOARD_MEMBER' : data.role === 'property_manager' ? 'PROPERTY_MANAGER' : data.role === 'staff' ? 'STAFF' : 'RESIDENT');
           setInviteLoading(false);
-          return true; // valid
+          return true;
         } else if (data?.error) {
           console.error(data.error);
           setInviteLoading(false);
           return false;
         }
       } catch (err) {
-        console.warn('Supabase invite check failed, trying demo:', err);
+        console.warn('Invite check failed:', err);
       }
       setInviteLoading(false);
     }
 
-    // Demo fallback
     const inv = buildingInvites.find(i => i.code === code && i.status === 'pending');
     if (!inv) return false;
     setInviteMatch(inv);
@@ -464,25 +369,25 @@ export default function AuthPage() {
     return true;
   };
 
-  // ── Signup handler (Screen 1 → creates auth user) ──
+  // ── Signup handler (Screen 1: validates invite or goes to wizard) ──
   const handleSignup = async () => {
     if (!email) return;
     if (!password || password.length < 6) return;
 
-    // If invite code is entered, validate it first
     if (inviteCode.trim()) {
       const valid = await handleInviteCode();
       if (!valid) return;
-      // Invite users skip building screen → go to confirm
       setAuthStep('confirm');
       return;
     }
 
-    // New subscriber → go to building screen
+    // Carry email/password into the wizard
+    signup.set('email', email);
+    signup.set('password', password);
     setAuthStep('building');
   };
 
-  // ── Complete join for invite code users (on confirm screen) ──
+  // ── Complete join for invite code users ──
   const handleCompleteJoin = async () => {
     if (!firstName || !lastName) return;
     if (!password || password.length < 6) return;
@@ -493,27 +398,21 @@ export default function AuthPage() {
       setSending(true);
       try {
         const { error: authError } = await supabase.auth.signUp({
-          email: finalEmail,
-          password: password,
-          options: { data: { full_name: name } },
+          email: finalEmail, password, options: { data: { full_name: name } },
         });
 
         if (authError) {
           if (authError.message.includes('already registered')) {
             const { data: signIn } = await supabase.auth.signInWithPassword({ email: finalEmail, password });
             if (!signIn?.user) { console.error('Account exists. Please sign in.'); setSending(false); return; }
-          } else {
-            console.error(authError.message); setSending(false); return;
-          }
+          } else { console.error(authError.message); setSending(false); return; }
         }
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { console.error('Authentication failed'); setSending(false); return; }
 
         const { data: acceptResult, error: acceptErr } = await supabase.rpc('accept_invitation', {
-          p_code: inviteCode.trim().toUpperCase(),
-          p_user_id: user.id,
-          p_name: name,
+          p_code: inviteCode.trim().toUpperCase(), p_user_id: user.id, p_name: name,
         });
 
         if (acceptErr || !acceptResult?.success) {
@@ -558,60 +457,47 @@ export default function AuthPage() {
     login(newMember);
   };
 
-  // ── Building screen → confirm screen ──
-  const handleBuildingContinue = () => {
-    if (!bldgName) return;
-    if (!bldgStreet.trim()) return;
-    if (!firstName || !lastName) return;
-    if (subdomainStatus === 'taken') {
-      // Auto-append a number to make it unique
-      setBldgSubdomain(bldgSubdomain + Math.floor(Math.random() * 99));
-    }
-    setAuthStep('confirm');
-  };
+  // ── 3-step wizard: Start (creates auth user + calls chargebee-checkout) ──
+  const handleStart = async () => {
+    const s = signup.state;
+    if (!s.email || !s.password || s.password.length < 6) return;
 
-  // ── Stripe Checkout (simplified: Community Plus monthly only) ──
-  const handleStripeCheckout = async () => {
     if (!isBackendEnabled || !supabase) {
-      // Demo mode fallback — skip payment, enter app
-      handleDemoOnboarding();
+      // Demo fallback
+      const name = `${s.firstName.trim()} ${s.lastName.trim()}`.trim() || 'Demo User';
+      const newMember = {
+        id: `user-${Date.now()}`, name, email: s.email, phone: '',
+        role: 'BOARD_MEMBER' as Role, unit: '', status: 'active' as const,
+        joined: new Date().toISOString().split('T')[0],
+        boardTitle: s.roleKey ? BOARD_ROLE_LABELS[s.roleKey] : 'President',
+      };
+      addMember(newMember);
+      login(newMember);
       return;
     }
 
     setCheckoutLoading(true);
     try {
-      const signupEmail = email;
-      if (!signupEmail) { setCheckoutLoading(false); return; }
-      if (!password || password.length < 6) { setCheckoutLoading(false); return; }
-
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const fullName = `${s.firstName.trim()} ${s.lastName.trim()}`.trim();
 
       const { error: authError } = await supabase.auth.signUp({
-        email: signupEmail,
-        password: password,
-        options: { data: { full_name: fullName } },
+        email: s.email, password: s.password, options: { data: { full_name: fullName } },
       });
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: signupEmail,
-            password: password,
-          });
+          const { error: signInError } = await supabase.auth.signInWithPassword({ email: s.email, password: s.password });
           if (signInError) {
-            console.error('An account with this email already exists. Please sign in with the correct password, or use a different email.');
+            console.error('An account with this email already exists. Please sign in.');
             setCheckoutLoading(false);
             return;
           }
-        } else {
-          console.error(authError.message); setCheckoutLoading(false); return;
-        }
+        } else { console.error(authError.message); setCheckoutLoading(false); return; }
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { console.error('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+      if (!session) { console.error('Authentication failed.'); setCheckoutLoading(false); return; }
 
-      // Check if user already has a tenant
       const { data: existingTenant } = await supabase
         .from('tenant_users')
         .select('tenant_id')
@@ -619,16 +505,18 @@ export default function AuthPage() {
         .maybeSingle();
 
       if (existingTenant) {
-        console.log('Your account is already set up. Redirecting to login...');
         setAuthStep('login');
         setCheckoutLoading(false);
         return;
       }
 
-      const tier = TIERS.find(t => t.id === selectedTier)!;
+      // Derive role/roleKey for the building payload
+      const role = s.iAmRole;
+      const roleKey = role === 'board_member' ? (s.roleKey || 'president') : null;
+      const addressFlag = s.addressResult?.status || 'skip';
 
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
         {
           method: 'POST',
           headers: {
@@ -637,18 +525,27 @@ export default function AuthPage() {
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
-            tier: selectedTier,
-            priceId: tier.stripePriceMonthly,
-            billingInterval: DEFAULT_BILLING_INTERVAL,
-            buildingName: bldgName,
-            subdomain: bldgSubdomain,
-            address: { street: bldgStreet, city: '', state: '', zip: '' },
-            totalUnits: typeof bldgUnits === 'number' ? bldgUnits : 0,
-            yearBuilt: '',
-            contactName: `${firstName} ${lastName}`.trim(),
-            contactPhone: '',
-            boardTitle: 'President',
-            origin: window.location.origin,
+            plan: s.planPicker.plan,
+            interval: s.planPicker.interval,
+            onCall: s.planPicker.onCall,
+            pmSeat: s.planPicker.pmSeat,
+            setup: s.planPicker.setup,
+            building: {
+              name: s.buildingName,
+              address: { street: s.addressResult?.fullAddress || s.addressQuery, city: '', state: 'DC', zip: '' },
+              totalUnits: typeof s.totalUnits === 'number' ? s.totalUnits : 0,
+              contactName: fullName,
+              boardTitle: roleKey ? BOARD_ROLE_LABELS[roleKey] : undefined,
+              marAddressId: s.addressResult?.marAddressId || null,
+              ssl: s.addressResult?.ssl || null,
+              ward: s.addressResult?.ward || null,
+              // Extended fields for provision_tenant
+              role,
+              roleKey,
+              firstName: s.firstName,
+              lastName: s.lastName,
+              addressFlag,
+            },
           }),
         }
       );
@@ -656,71 +553,35 @@ export default function AuthPage() {
       const data = await res.json();
       if (data.error) { console.error(data.error); setCheckoutLoading(false); return; }
 
-      if (data.url) {
-        // Link demo lead if this signup came from the demo
+      if (data.provisioned) {
         const fromDemo = new URLSearchParams(window.location.search).get('from') === 'demo';
         if (fromDemo && supabase) {
-          supabase.rpc('link_demo_lead', { p_email: email.trim().toLowerCase() }).then(() => {}, () => {});
+          supabase.rpc('link_demo_lead', { p_email: s.email.trim().toLowerCase() }).then(() => {}, () => {});
         }
         sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
+          access_token: session.access_token, refresh_token: session.refresh_token,
+        }));
+        window.location.href = '/login?provisioned=1';
+        return;
+      }
+
+      if (data.url) {
+        const fromDemo = new URLSearchParams(window.location.search).get('from') === 'demo';
+        if (fromDemo && supabase) {
+          supabase.rpc('link_demo_lead', { p_email: s.email.trim().toLowerCase() }).then(() => {}, () => {});
+        }
+        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+          access_token: session.access_token, refresh_token: session.refresh_token,
         }));
         window.location.href = data.url;
       } else {
-        console.error('Failed to create checkout session'); setCheckoutLoading(false);
+        console.error('Failed to create checkout session');
+        setCheckoutLoading(false);
       }
     } catch (err: any) {
       console.error(err.message || 'Checkout failed');
       setCheckoutLoading(false);
     }
-  };
-
-  // ── Demo mode onboarding (no Stripe) ──
-  const handleDemoOnboarding = () => {
-    const name = `${firstName.trim()} ${lastName.trim()}`.trim() || 'Demo User';
-    const newMember = {
-      id: `user-${Date.now()}`, name, email, phone: '',
-      role: 'BOARD_MEMBER' as Role, unit: '', status: 'active' as const,
-      joined: new Date().toISOString().split('T')[0], boardTitle: 'President',
-    };
-    addMember(newMember);
-    login(newMember);
-  };
-
-  // ── "Explore First" — create account without payment ──
-  const handleExploreFirst = async () => {
-    if (isBackendEnabled && supabase) {
-      setSending(true);
-      try {
-        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-        const { error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName } },
-        });
-
-        if (authError) {
-          if (authError.message.includes('already registered')) {
-            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-            if (signInError) {
-              console.error('An account with this email already exists. Please sign in.');
-              setSending(false);
-              return;
-            }
-          } else {
-            console.error(authError.message); setSending(false); return;
-          }
-        }
-        // In the real flow, "Explore First" enters the app in trial mode.
-        // The tenant will be provisioned when they eventually set up payment.
-        // For now, fall through to demo onboarding.
-      } catch (err: any) {
-        console.warn('Explore First signup failed, entering demo:', err);
-      }
-      setSending(false);
-    }
-    handleDemoOnboarding();
   };
 
   // ── Loading state ──
@@ -735,7 +596,6 @@ export default function AuthPage() {
     );
   }
 
-  // ── Is this an invite-code signup? (for confirm screen logic) ──
   const isInviteFlow = !!(inviteData?.valid || inviteMatch);
 
   return (
@@ -749,7 +609,7 @@ export default function AuthPage() {
             {provisioningTimedOut && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
                 <p className="text-sm font-semibold text-amber-900 mb-1">Your building is still being set up</p>
-                <p className="text-xs text-amber-700 mb-3">Payment was received but setup is taking longer than usual. Please sign in below — your building will be ready shortly.</p>
+                <p className="text-xs text-amber-700 mb-3">Payment was received but setup is taking longer than usual. Please sign in below.</p>
                 <button onClick={() => { setProvisioningTimedOut(false); window.location.href = '/login?provisioned=1'; }}
                   className="w-full py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700">Retry Setup Check</button>
               </div>
@@ -796,7 +656,6 @@ export default function AuthPage() {
                   onKeyDown={e => e.key === 'Enter' && !showInviteField && handleSignup()} />
               </div>
 
-              {/* Expandable invite code field */}
               {!showInviteField ? (
                 <button onClick={() => setShowInviteField(true)}
                   className="text-sm text-accent-600 hover:text-accent-700 font-medium cursor-pointer">
@@ -818,221 +677,105 @@ export default function AuthPage() {
 
               <div className="flex items-center justify-between text-sm pt-1">
                 <a onClick={() => setAuthStep('login')} className="text-ink-500 hover:text-ink-700 cursor-pointer">Already have an account? <span className="text-accent-600 font-semibold">Sign In</span></a>
-                <a onClick={() => skipToDemo()} className="text-accent-600 font-semibold cursor-pointer hover:underline">Try the Demo</a>
               </div>
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
           </div>
         )}
 
-        {/* ══════ SCREEN 2: NAME YOUR BUILDING (new subscribers only) ══════ */}
-        {authStep === 'building' && (() => {
-          const unitVal = typeof bldgUnits === 'number' ? bldgUnits : 0;
-          const recommended = recommendTier(unitVal, bldgAmenities);
-          const amenityOptions: { id: BuildingAmenity; label: string }[] = [
-            { id: 'elevator', label: 'Elevator' },
-            { id: 'pool', label: 'Pool' },
-            { id: 'gym', label: 'Gym' },
-            { id: 'sport_court', label: 'Tennis / Sport Court' },
-            { id: 'parking_garage', label: 'Parking Garage' },
-            { id: 'roof_deck', label: 'Roof Deck' },
-          ];
-          const toggleAmenity = (a: BuildingAmenity) => {
-            setBldgAmenities(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
-          };
-          // Auto-update selected tier when recommendation changes
-          if (selectedTier !== recommended && !(['board', 'estate'].includes(selectedTier) && recommended === 'essentials')) {
-            // Only auto-select when user hasn't manually chosen a higher tier
-          }
-          return (
+        {/* ══════ 3-STEP WIZARD: BUILDING → PLAN → ACCOUNT ══════ */}
+        {authStep === 'building' && (
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Summary sidebar (hidden on mobile) */}
+            <div className="hidden lg:block w-72 flex-shrink-0">
+              <SignupSummary state={signup.state} trialDays={trialDays} />
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8 flex-1">
+              <Logo />
+              <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">
+                {signup.state.step === 'building' && 'Name Your Building'}
+                {signup.state.step === 'plan' && 'Choose Your Plan'}
+                {signup.state.step === 'account' && 'Create Your Account'}
+              </h2>
+              <p className="text-sm text-ink-400 text-center mb-6">
+                {signup.state.step === 'building' && 'Tell us about your building'}
+                {signup.state.step === 'plan' && `${trialDays}-day free trial on every plan`}
+                {signup.state.step === 'account' && 'Almost there — just a few details'}
+              </p>
+
+              {signup.state.step === 'building' && (
+                <SignupBuildingStep
+                  state={signup.state}
+                  set={signup.set}
+                  setAmenities={signup.setAmenities}
+                  canAdvance={signup.canAdvanceFromBuilding}
+                  onNext={signup.goNext}
+                />
+              )}
+
+              {signup.state.step === 'plan' && (
+                <SignupPlanStep
+                  state={signup.state}
+                  setPlanPicker={signup.setPlanPicker}
+                  trialDays={trialDays}
+                  canAdvance={signup.canAdvanceFromPlan}
+                  onNext={signup.goNext}
+                  onBack={signup.goBack}
+                />
+              )}
+
+              {signup.state.step === 'account' && (
+                <SignupAccountStep
+                  state={signup.state}
+                  set={signup.set}
+                  canSubmit={signup.canSubmit}
+                  submitting={checkoutLoading}
+                  onSubmit={handleStart}
+                  onBack={signup.goBack}
+                />
+              )}
+
+              <div className="mt-4 text-center">
+                <a onClick={() => setAuthStep('signup')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Get Started</a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════ SCREEN: CONFIRM (invite code users) ══════ */}
+        {authStep === 'confirm' && isInviteFlow && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Name Your Building</h2>
-            <p className="text-sm text-ink-400 text-center mb-6">Tell us about your building to get started</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Building / Association Name</label>
-                <input value={bldgName} onChange={e => setBldgName(e.target.value)}
-                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="e.g., Sunny Acres Condominium" autoFocus />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Street Address</label>
-                <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)}
-                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="123 Main St" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">How many units?</label>
-                <input type="number" min={1} value={bldgUnits} onChange={e => {
-                  const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-                  setBldgUnits(v);
-                  if (typeof v === 'number') {
-                    setSelectedTier(recommendTier(v, bldgAmenities));
-                  }
-                }}
-                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="e.g., 12" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Which of these does your building have?</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {amenityOptions.map(a => (
-                    <button key={a.id} type="button"
-                      onClick={() => {
-                        const next = bldgAmenities.includes(a.id) ? bldgAmenities.filter(x => x !== a.id) : [...bldgAmenities, a.id];
-                        setBldgAmenities(next);
-                        const uv = typeof bldgUnits === 'number' ? bldgUnits : 0;
-                        setSelectedTier(recommendTier(uv, next));
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        bldgAmenities.includes(a.id)
-                          ? 'bg-accent-50 border-accent-400 text-accent-700'
-                          : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
-                      }`}>
-                      {a.label}
-                    </button>
-                  ))}
-                  <button type="button"
-                    onClick={() => { setBldgAmenities([]); setSelectedTier(recommendTier(typeof bldgUnits === 'number' ? bldgUnits : 0, [])); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      bldgAmenities.length === 0
-                        ? 'bg-ink-100 border-ink-300 text-ink-700'
-                        : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
-                    }`}>
-                    None
-                  </button>
-                </div>
-              </div>
-
-              {/* Plan recommendation */}
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">Recommended plan</label>
-                <div className="space-y-2">
-                  {TIERS.map(tier => {
-                    const isRec = tier.id === recommended;
-                    const isSel = tier.id === selectedTier;
-                    const features = describeTier(tier.id).slice(0, 4);
-                    return (
-                      <button key={tier.id} type="button"
-                        onClick={() => setSelectedTier(tier.id)}
-                        className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
-                          isSel ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
-                        }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-ink-900 text-sm">{tier.name}</p>
-                            {isRec && <span className="text-[10px] bg-accent-100 text-accent-700 px-1.5 py-0.5 rounded font-semibold">Recommended</span>}
-                          </div>
-                          <p className="text-sm font-bold text-accent-600">${tier.monthly}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                        </div>
-                        {isSel && features.length > 0 && (
-                          <ul className="mt-1.5 space-y-0.5">
-                            {features.map((f, i) => (
-                              <li key={i} className="text-xs text-ink-500 flex items-start gap-1.5">
-                                <Check className="w-3 h-3 text-sage-500 mt-0.5 flex-shrink-0" />
-                                {f}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
+            <p className="text-xs text-accent-600 text-center mb-4">
+              Joining as {inviteData?.role === 'board_member' ? 'Board Member' : inviteData?.role === 'property_manager' ? 'Property Manager' : inviteMatch?.role === 'BOARD_MEMBER' ? 'Board Member' : inviteMatch?.role === 'PROPERTY_MANAGER' ? 'Property Manager' : 'Resident'}
+              {(inviteData?.unit || inviteMatch?.unit) ? ` \u00B7 Unit ${inviteData?.unit || inviteMatch?.unit}` : ''}
+            </p>
+            <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">First Name</label>
+                  <label className="block text-xs font-medium text-ink-700 mb-1">First Name</label>
                   <input value={firstName} onChange={e => setFirstName(e.target.value)}
-                    className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="First" />
+                    className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">Last Name</label>
+                  <label className="block text-xs font-medium text-ink-700 mb-1">Last Name</label>
                   <input value={lastName} onChange={e => setLastName(e.target.value)}
-                    className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="Last" />
+                    className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" />
                 </div>
               </div>
-              <button onClick={handleBuildingContinue}
-                className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800">
-                Continue</button>
+              <button onClick={handleCompleteJoin} disabled={sending}
+                className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50 mt-2">
+                {sending ? 'Creating Account...' : 'Create Account & Enter'}</button>
             </div>
             <div className="mt-4 text-center">
               <a onClick={() => setAuthStep('signup')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back</a>
             </div>
           </div>
-          );
-        })()}
-
-        {/* ══════ SCREEN 3: YOU'RE IN (Confirmation + soft payment ask) ══════ */}
-        {authStep === 'confirm' && (
-          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
-            <Logo />
-
-            {isInviteFlow ? (
-              /* ── Invite code user: collect name, then enter app ── */
-              <>
-                <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
-                <p className="text-xs text-accent-600 text-center mb-4">
-                  Joining as {inviteData?.role === 'board_member' ? 'Board Member' : inviteData?.role === 'property_manager' ? 'Property Manager' : inviteMatch?.role === 'BOARD_MEMBER' ? 'Board Member' : inviteMatch?.role === 'PROPERTY_MANAGER' ? 'Property Manager' : 'Resident'}
-                  {(inviteData?.unit || inviteMatch?.unit) ? ` \u00B7 Unit ${inviteData?.unit || inviteMatch?.unit}` : ''}
-                </p>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-ink-700 mb-1">First Name</label>
-                      <input value={firstName} onChange={e => setFirstName(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-700 mb-1">Last Name</label>
-                      <input value={lastName} onChange={e => setLastName(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" />
-                    </div>
-                  </div>
-                  <button onClick={handleCompleteJoin} disabled={sending}
-                    className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50 mt-2">
-                    {sending ? 'Creating Account...' : 'Create Account & Enter'}</button>
-                </div>
-                <div className="mt-4 text-center">
-                  <a onClick={() => setAuthStep('signup')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back</a>
-                </div>
-              </>
-            ) : (
-              /* ── New subscriber: welcome + soft payment ask ── */
-              <>
-                {/* Checkmark animation */}
-                <div className="flex justify-center mb-4">
-                  <div className="w-16 h-16 rounded-full bg-sage-100 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                </div>
-                <h2 className="font-display text-xl font-bold text-ink-900 text-center mb-1">
-                  Welcome to {bldgName || 'your building'}
-                </h2>
-                <p className="text-sm text-ink-400 text-center mb-6">
-                  Your {trialDays}-day free trial is active
-                </p>
-
-                <div className="space-y-3">
-                  <button onClick={handleStripeCheckout} disabled={checkoutLoading}
-                    className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50">
-                    {checkoutLoading ? 'Setting up...' : 'Set Up Payment'}</button>
-
-                  <button onClick={handleExploreFirst} disabled={sending}
-                    className="w-full py-3.5 border-2 border-ink-200 text-ink-700 rounded-xl font-semibold text-sm hover:bg-ink-50 disabled:opacity-50">
-                    {sending ? 'Setting up...' : 'Explore First \u2192'}</button>
-                </div>
-
-                <p className="text-center text-xs text-ink-400 mt-4">
-                  You can set up payment anytime in Settings
-                </p>
-              </>
-            )}
-          </div>
         )}
 
-        {/* ══════ SCREEN: DEMO (direct entry) ══════ */}
+        {/* ══════ SCREEN: DEMO (direct entry — only if VITE_DEMO_ENABLED) ══════ */}
         {authStep === 'demo' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
@@ -1045,7 +788,6 @@ export default function AuthPage() {
 
       </div>
 
-      {/* Demo lead-capture modal — shown once when arriving from demo */}
       {showLeadModal && (
         <DemoLeadModal
           onClose={(capturedEmail) => {

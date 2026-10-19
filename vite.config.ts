@@ -14,7 +14,6 @@ const APP_ROUTES = [
 ]
 
 const STATIC_PAGES: Record<string, string> = {
-  '/demo': '/demo.html',
 }
 
 function multiPagePlugin(): Plugin {
@@ -60,7 +59,6 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         app: path.resolve(__dirname, 'app.html'),
-        demo: path.resolve(__dirname, 'demo.html'),
       },
     },
   },

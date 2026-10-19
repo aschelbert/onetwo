@@ -30,7 +30,10 @@ export default function PermissionsTab() {
 
   const isFeatureAvailable = (featureId: string) => {
     if ((CORE_FEATURES as readonly string[]).includes(featureId)) return true;
-    return role.tiers.some(tier => TIER_FEATURES[tier][featureId as keyof Tenant['features']]);
+    if (role.requires === 'facilities') {
+      return TIER_FEATURES.facilities?.[featureId as keyof Tenant['features']] ?? false;
+    }
+    return Object.values(TIER_FEATURES).some(features => features[featureId as keyof Tenant['features']]);
   };
 
   const getPermission = (featureId: string) => {
@@ -77,7 +80,7 @@ export default function PermissionsTab() {
             <h4 className="font-bold text-ink-900 text-lg">{role.name}</h4>
             <p className="text-sm text-ink-600 mt-1">{role.description}</p>
             <div className="flex gap-6 mt-3">
-              <div><span className="text-xs text-ink-400 uppercase font-semibold">Plans</span><p className="font-bold text-ink-900">{role.tiers.length}</p></div>
+              <div><span className="text-xs text-ink-400 uppercase font-semibold">Requires</span><p className="font-bold text-ink-900">{role.requires === null ? 'Any plan' : role.requires === 'facilities' ? 'Plus Facilities' : 'PM Seat'}</p></div>
               <div><span className="text-xs text-ink-400 uppercase font-semibold">Features</span><p className="font-bold text-ink-900">{availableFeatures.length}</p></div>
               <div><span className="text-xs text-ink-400 uppercase font-semibold">Permissions</span><p className="font-bold text-ink-900">{totalPerms}</p></div>
             </div>

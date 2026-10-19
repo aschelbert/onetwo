@@ -1,11 +1,37 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
-import { TIERS, getTierById, getTierDisplayName, describeTier, isActiveTier } from '@/lib/tiers';
-import type { SubscriptionTier, ActiveTier } from '@/lib/tiers';
-import { Shield, AlertTriangle, Check, X, CreditCard, RotateCcw } from 'lucide-react';
+import {
+  PLANS,
+  normalizePlan,
+  planFeatures,
+  onCallPrice,
+  periodTotal,
+  setupPrice,
+  ON_CALL,
+  PM_SEAT,
+  PM_SEAT_LABEL,
+  SETUP_LABEL,
+} from '@/lib/tiers';
+import type { PlanId, BillingInterval } from '@/lib/tiers';
+import {
+  Shield,
+  AlertTriangle,
+  Check,
+  X,
+  CreditCard,
+  ExternalLink,
+  Loader2,
+  Phone,
+  UserCog,
+  Wrench,
+  ToggleLeft,
+  ToggleRight,
+} from 'lucide-react';
+
+// ── Types ──
 
 interface SubscriptionData {
   tier: string;
@@ -15,12 +41,20 @@ interface SubscriptionData {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   stripe_subscription_id: string | null;
+  chargebee_subscription_id: string | null;
   trial_ends_at: string | null;
   created_at: string | null;
+  addon_on_call: boolean;
+  pm_addon: boolean;
+  billing_interval: string;
+  setup_paid_at: string | null;
+  setup_amount: number | null;
 }
 
+// ── Helpers ──
+
 function formatDate(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '\u2014';
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
@@ -47,14 +81,15 @@ function StatusBadge({ status, cancelPending }: { status: string; cancelPending:
   );
 }
 
-// ── Demo pricing preview ── TODO 17: replace with real tier prices
+// ── Demo pricing preview ──
+
 const DEMO_PRICING = {
-  plan: { name: 'Facilities', price: 278 },
+  plan: { name: 'Plus Facilities', price: 279 },
   addOns: [
     { name: 'On Call', price: 499, enabled: true },
-    { name: 'PM Seat', price: 79, enabled: false },
+    { name: PM_SEAT_LABEL, price: 79, enabled: false },
   ],
-  setup: { name: 'Setup Fee', price: 599, oneTime: true },
+  setup: { name: SETUP_LABEL, price: 599, oneTime: true },
 };
 
 function DemoSubscriptionPreview() {
@@ -138,43 +173,141 @@ function DemoSubscriptionPreview() {
   );
 }
 
+// ── Main Component ──
+
 export default function SubscriptionPage() {
   const { currentRole, currentUser } = useAuthStore();
   const tenant = useTenantContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [sub, setSub] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [selectedTier, setSelectedTier] = useState<ActiveTier | null>(null);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelConfirmText, setCancelConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Load subscription data
-  useEffect(() => {
+  // Checkout builder state (no chargebee_subscription_id branch)
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>('self_managed');
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
+  const [onCallChecked, setOnCallChecked] = useState(false);
+  const [pmSeatChecked, setPmSeatChecked] = useState(false);
+  const [setupChecked, setSetupChecked] = useState(false);
+
+  // PM seat disable check
+  const [hasPmUser, setHasPmUser] = useState(false);
+
+  // Polling state for post-checkout
+  const pollingRef = useRef(false);
+
+  // ── Load subscription data ──
+  const loadSubscription = useCallback(async () => {
     if (!isBackendEnabled || !supabase || tenant.isDemo) {
       setLoading(false);
       return;
     }
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('subscriptions')
+        .select(
+          'tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, chargebee_subscription_id, trial_ends_at, created_at, addon_on_call, pm_addon, billing_interval, setup_paid_at, setup_amount'
+        )
+        .eq('tenant_id', tenant.id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      setSub(data);
+      if (data) {
+        const plan = normalizePlan(data.tier);
+        setSelectedPlan(plan);
+        setBillingInterval((data.billing_interval as BillingInterval) || 'monthly');
+        setOnCallChecked(data.addon_on_call ?? false);
+        setPmSeatChecked(data.pm_addon ?? false);
+      }
+    } catch (err: any) {
+      console.warn('Failed to load subscription:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [tenant.id, tenant.isDemo]);
+
+  useEffect(() => {
+    loadSubscription();
+  }, [loadSubscription]);
+
+  // Check for existing property_manager users (disables PM seat toggle)
+  useEffect(() => {
+    if (!isBackendEnabled || !supabase || tenant.isDemo) return;
     (async () => {
       try {
-        const { data, error: fetchErr } = await supabase
-          .from('subscriptions')
-          .select('tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, trial_ends_at, created_at')
+        const { data } = await supabase
+          .from('tenant_users')
+          .select('id')
           .eq('tenant_id', tenant.id)
-          .maybeSingle();
-        if (fetchErr) throw fetchErr;
-        setSub(data);
-      } catch (err: any) {
-        console.warn('Failed to load subscription:', err);
-      } finally {
-        setLoading(false);
+          .eq('role', 'property_manager')
+          .limit(1);
+        setHasPmUser((data?.length ?? 0) > 0);
+      } catch {
+        // ignore
       }
     })();
   }, [tenant.id, tenant.isDemo]);
 
-  // Call edge function
-  const callManageSubscription = async (action: string, extra?: Record<string, string>) => {
+  // ── Poll for chargebee_subscription_id after checkout redirect ──
+  useEffect(() => {
+    if (searchParams.get('billing') !== '1') return;
+    if (pollingRef.current) return;
+    pollingRef.current = true;
+
+    let attempts = 0;
+    const maxAttempts = 15;
+    const interval = 1200;
+
+    const poll = async () => {
+      if (!supabase) return;
+      attempts++;
+      try {
+        const { data } = await supabase
+          .from('subscriptions')
+          .select(
+            'tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, chargebee_subscription_id, trial_ends_at, created_at, addon_on_call, pm_addon, billing_interval, setup_paid_at, setup_amount'
+          )
+          .eq('tenant_id', tenant.id)
+          .maybeSingle();
+
+        if (data?.chargebee_subscription_id) {
+          setSub(data);
+          setSuccessMsg('Billing is set up! Your subscription is active.');
+          // Remove the query param
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('billing');
+            return next;
+          });
+          pollingRef.current = false;
+          return;
+        }
+      } catch {
+        // ignore polling errors
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(poll, interval);
+      } else {
+        pollingRef.current = false;
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('billing');
+          return next;
+        });
+        setError('Billing setup is still processing. Refresh the page in a moment.');
+      }
+    };
+
+    poll();
+  }, [searchParams, tenant.id, setSearchParams]);
+
+  // ── Edge function helper ──
+
+  const callManageSubscription = async (action: string, extra?: Record<string, any>) => {
     if (!supabase) return null;
     setError(null);
     setSuccessMsg(null);
@@ -192,10 +325,13 @@ export default function SubscriptionPage() {
             'Authorization': `Bearer ${session.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({ action, ...extra }),
+          body: JSON.stringify({ action, tenant_id: tenant.id, ...extra }),
         },
       );
       const data = await res.json();
+      if (res.status === 402 && data.needsCard) {
+        return data; // Let caller handle 402
+      }
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Request failed');
       }
@@ -208,35 +344,125 @@ export default function SubscriptionPage() {
     }
   };
 
-  const handleChangeTier = async () => {
-    if (!selectedTier || selectedTier === sub?.tier) return;
-    const result = await callManageSubscription('change-tier', { newTier: selectedTier });
-    if (result?.success) {
-      setSub(prev => prev ? { ...prev, tier: selectedTier, monthly_rate: getTierById(selectedTier)?.monthly || prev.monthly_rate } : prev);
-      setSelectedTier(null);
-      setSuccessMsg(`Plan changed to ${getTierDisplayName(selectedTier)}. Takes effect at your next billing date.`);
+  // ── Checkout (no chargebee sub) ──
+
+  const handleCheckout = async () => {
+    if (!supabase) return;
+    setError(null);
+    setActionLoading('checkout');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            tenantId: tenant.id,
+            plan: selectedPlan,
+            interval: billingInterval,
+            onCall: onCallChecked,
+            pmSeat: pmSeatChecked,
+            setup: setupChecked,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Checkout failed');
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleCancel = async () => {
-    const result = await callManageSubscription('cancel');
+  // ── Chargebee management actions ──
+
+  const handleChangePlan = async () => {
+    if (!sub) return;
+    const currentPlan = normalizePlan(sub.tier);
+    const newPlan: PlanId = currentPlan === 'self_managed' ? 'facilities' : 'self_managed';
+    const result = await callManageSubscription('change-plan', { plan: newPlan });
     if (result?.success) {
-      setSub(prev => prev ? { ...prev, cancel_at_period_end: true } : prev);
-      setShowCancelModal(false);
-      setCancelConfirmText('');
-      setSuccessMsg(`Cancellation scheduled. Access continues until ${formatDate(result.periodEnd || sub?.current_period_end || null)}.`);
+      await loadSubscription();
+      setSuccessMsg(`Plan changed to ${PLANS[newPlan].name}.`);
     }
   };
 
-  const handleReactivate = async () => {
-    const result = await callManageSubscription('reactivate');
+  const handleToggleOnCall = async () => {
+    if (!sub) return;
+    const newValue = !sub.addon_on_call;
+    const result = await callManageSubscription('set-on-call', { enabled: newValue });
     if (result?.success) {
-      setSub(prev => prev ? { ...prev, cancel_at_period_end: false } : prev);
-      setSuccessMsg('Subscription reactivated! Your plan will continue as normal.');
+      setSub(prev => prev ? { ...prev, addon_on_call: newValue } : prev);
+      setSuccessMsg(newValue ? 'On Call add-on enabled.' : 'On Call add-on removed.');
+    }
+  };
+
+  const handleTogglePmSeat = async () => {
+    if (!sub || hasPmUser) return;
+    const newValue = !sub.pm_addon;
+    const result = await callManageSubscription('set-pm-seat', { enabled: newValue });
+    if (result?.success) {
+      setSub(prev => prev ? { ...prev, pm_addon: newValue } : prev);
+      setSuccessMsg(newValue ? 'Property manager seat add-on enabled.' : 'Property manager seat add-on removed.');
+    }
+  };
+
+  const handleBuySetup = async () => {
+    const result = await callManageSubscription('buy-setup');
+    if (result?.needsCard) {
+      handleOpenPortal();
+      return;
+    }
+    if (result?.success) {
+      await loadSubscription();
+      setSuccessMsg('Setup purchased successfully.');
+    }
+  };
+
+  const handleOpenPortal = async () => {
+    if (!supabase) return;
+    setActionLoading('portal');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-portal`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ tenant_id: tenant.id }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to open billing portal');
+      if (data.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   // ── Guards ──
+
   if (currentRole !== 'BOARD_MEMBER') {
     return (
       <div className="max-w-2xl mx-auto p-6">
@@ -263,19 +489,250 @@ export default function SubscriptionPage() {
     );
   }
 
-  if (!sub || !sub.stripe_subscription_id) {
+  // ── Derived values ──
+
+  const hasChargebee = !!sub?.chargebee_subscription_id;
+
+  // ── No Chargebee subscription: checkout builder ──
+
+  if (!hasChargebee) {
+    const total = periodTotal({ plan: selectedPlan, onCall: onCallChecked, pmSeat: pmSeatChecked, interval: billingInterval });
+    const setup = setupChecked ? setupPrice(selectedPlan) : 0;
+    const isPolling = searchParams.get('billing') === '1';
+
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-8 text-center">
-          <CreditCard className="w-10 h-10 text-ink-300 mx-auto mb-3" />
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">No Active Subscription</h2>
-          <p className="text-sm text-ink-500">No active Stripe subscription found for this building.</p>
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
+        <h1 className="font-display text-2xl font-bold text-ink-900">Set up billing</h1>
+
+        {/* Status messages */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-sm text-red-700">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {error}
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+        {successMsg && (
+          <div className="bg-sage-50 border border-sage-200 rounded-lg p-3 flex items-center gap-2 text-sm text-sage-700">
+            <Check className="w-4 h-4 flex-shrink-0" />
+            {successMsg}
+            <button onClick={() => setSuccessMsg(null)} className="ml-auto text-sage-400 hover:text-sage-600"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+
+        {isPolling && (
+          <div className="bg-accent-50 border border-accent-200 rounded-lg p-3 flex items-center gap-2 text-sm text-accent-700">
+            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+            Confirming your subscription...
+          </div>
+        )}
+
+        {/* Current plan info */}
+        {sub && (
+          <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-4">
+            <p className="text-xs text-ink-400 mb-0.5">Current plan on file</p>
+            <p className="text-sm font-semibold text-ink-900">{PLANS[normalizePlan(sub.tier)].name}</p>
+          </div>
+        )}
+
+        {/* Plan cards */}
+        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-4">Choose your plan</h2>
+          <div className="space-y-3">
+            {(Object.keys(PLANS) as PlanId[]).map((pid) => {
+              const p = PLANS[pid];
+              const isSelected = pid === selectedPlan;
+              return (
+                <button
+                  key={pid}
+                  onClick={() => setSelectedPlan(pid)}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                    isSelected
+                      ? 'border-accent-600 bg-accent-50'
+                      : 'border-ink-200 hover:border-ink-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-bold text-ink-900">{p.name}</p>
+                    <p className="text-lg font-bold text-accent-600">
+                      ${billingInterval === 'annual' ? Math.round(p.annual / 10) : p.monthly}
+                      <span className="text-xs font-normal text-ink-400">/mo</span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-ink-500">{p.tagline}</p>
+                  {isSelected && (
+                    <ul className="mt-2 space-y-0.5">
+                      {p.includes.slice(0, 6).map((line, i) => (
+                        <li key={i} className="text-xs text-ink-500 flex items-start gap-1.5">
+                          <Check className="w-3 h-3 text-sage-500 mt-0.5 flex-shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Billing interval toggle */}
+        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-3">Billing interval</h2>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setBillingInterval('monthly')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+                billingInterval === 'monthly'
+                  ? 'border-accent-600 bg-accent-50 text-accent-700'
+                  : 'border-ink-200 text-ink-600 hover:border-ink-300'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingInterval('annual')}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+                billingInterval === 'annual'
+                  ? 'border-accent-600 bg-accent-50 text-accent-700'
+                  : 'border-ink-200 text-ink-600 hover:border-ink-300'
+              }`}
+            >
+              Annual <span className="text-xs font-normal">(save ~17%)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Add-ons */}
+        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-4">Add-ons</h2>
+          <div className="space-y-3">
+            {/* On Call */}
+            <label className="flex items-center justify-between p-3 rounded-lg border border-ink-200 cursor-pointer hover:bg-ink-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={onCallChecked}
+                  onChange={(e) => setOnCallChecked(e.target.checked)}
+                  className="w-4 h-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-ink-900">On Call</p>
+                  <p className="text-xs text-ink-400">
+                    {ON_CALL[selectedPlan].hours} hours/mo of expert support
+                  </p>
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-accent-600">
+                ${onCallPrice(selectedPlan, billingInterval) === ON_CALL[selectedPlan].annual
+                  ? `${Math.round(ON_CALL[selectedPlan].annual / 10)}`
+                  : ON_CALL[selectedPlan].monthly}/mo
+              </span>
+            </label>
+
+            {/* PM Seat */}
+            <label className="flex items-center justify-between p-3 rounded-lg border border-ink-200 cursor-pointer hover:bg-ink-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={pmSeatChecked}
+                  onChange={(e) => setPmSeatChecked(e.target.checked)}
+                  className="w-4 h-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-ink-900">Property manager seat</p>
+                  <p className="text-xs text-ink-400">Property manager access</p>
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-accent-600">
+                ${billingInterval === 'annual' ? Math.round(PM_SEAT.annual / 10) : PM_SEAT.monthly}/mo
+              </span>
+            </label>
+
+            {/* Setup */}
+            <label className="flex items-center justify-between p-3 rounded-lg border border-ink-200 cursor-pointer hover:bg-ink-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={setupChecked}
+                  onChange={(e) => setSetupChecked(e.target.checked)}
+                  className="w-4 h-4 rounded border-ink-300 text-accent-600 focus:ring-accent-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-ink-900">Setup with us</p>
+                  <p className="text-xs text-ink-400">One-time onboarding assistance</p>
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-accent-600">
+                ${setupPrice(selectedPlan)} <span className="text-xs font-normal text-ink-400">billed today</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Running total */}
+        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-3">Summary</h2>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-ink-600">{PLANS[selectedPlan].name} ({billingInterval})</span>
+              <span className="font-semibold text-ink-900">
+                ${billingInterval === 'annual' ? Math.round(PLANS[selectedPlan].annual / 10) : PLANS[selectedPlan].monthly}/mo
+              </span>
+            </div>
+            {onCallChecked && (
+              <div className="flex justify-between">
+                <span className="text-ink-600">On Call</span>
+                <span className="font-semibold text-ink-900">
+                  ${billingInterval === 'annual' ? Math.round(ON_CALL[selectedPlan].annual / 10) : ON_CALL[selectedPlan].monthly}/mo
+                </span>
+              </div>
+            )}
+            {pmSeatChecked && (
+              <div className="flex justify-between">
+                <span className="text-ink-600">Property manager seat</span>
+                <span className="font-semibold text-ink-900">
+                  ${billingInterval === 'annual' ? Math.round(PM_SEAT.annual / 10) : PM_SEAT.monthly}/mo
+                </span>
+              </div>
+            )}
+            <div className="border-t border-ink-100 pt-2 flex justify-between">
+              <span className="font-semibold text-ink-900">Monthly total</span>
+              <span className="font-bold text-accent-600">${total}/mo</span>
+            </div>
+            {setup > 0 && (
+              <div className="flex justify-between text-ink-500">
+                <span>+ Setup with us (one-time)</span>
+                <span className="font-semibold">${setup}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Checkout button */}
+        <button
+          onClick={handleCheckout}
+          disabled={actionLoading === 'checkout' || isPolling}
+          className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {actionLoading === 'checkout' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Redirecting...
+            </>
+          ) : (
+            'Continue to payment'
+          )}
+        </button>
       </div>
     );
   }
 
-  const currentTier = getTierById(sub.tier);
+  // ── With Chargebee subscription: management view ──
+
+  const currentPlan = normalizePlan(sub!.tier);
+  const currentInterval: BillingInterval = (sub!.billing_interval as BillingInterval) || 'monthly';
+  const alternatePlan: PlanId = currentPlan === 'self_managed' ? 'facilities' : 'self_managed';
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -297,182 +754,200 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {/* ── Current Plan Card ── */}
+      {/* 1. Current Plan Card */}
       <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-lg font-bold text-ink-900">Current Plan</h2>
-          <StatusBadge status={sub.status} cancelPending={sub.cancel_at_period_end} />
+          <StatusBadge status={sub!.status} cancelPending={sub!.cancel_at_period_end} />
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-ink-400 text-xs mb-0.5">Plan</p>
-            <p className="font-semibold text-ink-900">{currentTier?.name || sub.tier}</p>
+            <p className="font-semibold text-ink-900">{PLANS[currentPlan].name}</p>
           </div>
           <div>
-            <p className="text-ink-400 text-xs mb-0.5">Price</p>
-            <p className="font-semibold text-ink-900">${(sub.monthly_rate / 100).toFixed(0)}/mo</p>
+            <p className="text-ink-400 text-xs mb-0.5">Interval</p>
+            <p className="font-semibold text-ink-900 capitalize">{currentInterval}</p>
           </div>
           <div>
-            <p className="text-ink-400 text-xs mb-0.5">{sub.status === 'trialing' ? 'Trial Period' : 'Current Period'}</p>
+            <p className="text-ink-400 text-xs mb-0.5">Next billing date</p>
             <p className="text-ink-700">
-              {formatDate(sub.current_period_start || (sub.status === 'trialing' ? sub.created_at : null))}
-              {' — '}
-              {formatDate(sub.current_period_end || (sub.status === 'trialing' ? sub.trial_ends_at : null))}
+              {sub!.cancel_at_period_end ? 'N/A' : formatDate(sub!.current_period_end)}
             </p>
           </div>
-          <div>
-            <p className="text-ink-400 text-xs mb-0.5">{sub.status === 'trialing' ? 'Trial Ends' : 'Next Billing Date'}</p>
-            <p className="text-ink-700">
-              {sub.cancel_at_period_end
-                ? 'N/A'
-                : formatDate(sub.current_period_end || (sub.status === 'trialing' ? sub.trial_ends_at : null))}
-            </p>
-          </div>
+          {sub!.status === 'trialing' && sub!.trial_ends_at && (
+            <div>
+              <p className="text-ink-400 text-xs mb-0.5">Trial ends</p>
+              <p className="text-ink-700">{formatDate(sub!.trial_ends_at)}</p>
+            </div>
+          )}
         </div>
 
-        {/* Cancel pending warning */}
-        {sub.cancel_at_period_end && (
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-800">Cancellation Scheduled</p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  Your subscription will end on {formatDate(sub.current_period_end)}. All users will lose access after this date.
-                </p>
-                <button
-                  onClick={handleReactivate}
-                  disabled={actionLoading === 'reactivate'}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  {actionLoading === 'reactivate' ? 'Reactivating...' : 'Reactivate Subscription'}
-                </button>
-              </div>
-            </div>
-          </div>
+        {!sub!.cancel_at_period_end && sub!.status !== 'canceled' && (
+          <button
+            onClick={handleChangePlan}
+            disabled={actionLoading === 'change-plan'}
+            className="mt-4 px-4 py-2 border-2 border-accent-300 text-accent-600 rounded-lg text-sm font-semibold hover:bg-accent-50 transition-colors disabled:opacity-50"
+          >
+            {actionLoading === 'change-plan'
+              ? 'Updating...'
+              : `Move to ${PLANS[alternatePlan].name}`}
+          </button>
+        )}
+        {sub!.billing_interval === 'monthly' && sub!.status === 'active' && !sub!.cancel_at_period_end && (
+          <button
+            onClick={async () => {
+              const result = await callManageSubscription('set-interval', { interval: 'annual' });
+              if (result?.success) {
+                await loadSubscription();
+                setSuccessMsg('Switched to annual billing.');
+              }
+            }}
+            disabled={actionLoading === 'set-interval'}
+            className="mt-2 px-4 py-2 border-2 border-accent-300 text-accent-600 rounded-lg text-sm font-semibold hover:bg-accent-50 transition-colors"
+          >
+            {actionLoading === 'set-interval' ? 'Updating...' : 'Switch to annual'}
+          </button>
         )}
       </div>
 
-      {/* ── Change Plan Section ── */}
-      {!sub.cancel_at_period_end && sub.status !== 'canceled' && (
-        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">Change Plan</h2>
-          <p className="text-xs text-ink-400 mb-4">Changes take effect at your next billing date. No proration.</p>
-
-          <div className="space-y-3">
-            {TIERS.map(tier => {
-              const isCurrent = tier.id === sub.tier;
-              const isSelected = tier.id === selectedTier;
-              const featureLines = describeTier(tier.id);
-              return (
-                <button
-                  key={tier.id}
-                  onClick={() => !isCurrent && setSelectedTier(tier.id)}
-                  disabled={isCurrent}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                    isCurrent
-                      ? 'border-accent-600 bg-accent-50 cursor-default'
-                      : isSelected
-                        ? 'border-accent-400 bg-accent-50'
-                        : 'border-ink-200 hover:border-ink-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-bold text-ink-900">
-                        {tier.name}
-                        {isCurrent && <span className="ml-2 text-xs font-normal text-accent-600">Current Plan</span>}
-                      </p>
-                    </div>
-                    <p className="text-lg font-bold text-accent-600">${tier.monthly}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                  </div>
-                  {isSelected && featureLines.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {featureLines.slice(0, 6).map((line, i) => (
-                        <li key={i} className="text-xs text-ink-500 flex items-start gap-1.5">
-                          <Check className="w-3 h-3 text-sage-500 mt-0.5 flex-shrink-0" />
-                          {line}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedTier && selectedTier !== sub.tier && (
-            <button
-              onClick={handleChangeTier}
-              disabled={actionLoading === 'change-tier'}
-              className="mt-4 w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50"
-            >
-              {actionLoading === 'change-tier' ? 'Updating...' : `Switch to ${getTierDisplayName(selectedTier)}`}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Cancel Subscription Section ── */}
-      {!sub.cancel_at_period_end && sub.status !== 'canceled' && (
-        <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">Cancel Subscription</h2>
-          <p className="text-xs text-ink-400 mb-4">
-            Cancellation takes effect at the end of your current billing period. All users will lose access.
-          </p>
-          <button
-            onClick={() => setShowCancelModal(true)}
-            className="px-4 py-2 border-2 border-red-300 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors"
-          >
-            Cancel Subscription
-          </button>
-        </div>
-      )}
-
-      {/* ── Cancel Confirmation Modal ── */}
-      {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl border border-ink-100 p-6 w-full max-w-md mx-4">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="font-display text-lg font-bold text-ink-900">Cancel Subscription?</h3>
-              <p className="text-sm text-ink-500 mt-1">
-                This will cancel your subscription at the end of the current billing period ({formatDate(sub.current_period_end)}).
-                <strong className="text-ink-700"> All users will lose access</strong> after that date.
+      {/* 2. On Call Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
+              <Phone className="w-4.5 h-4.5 text-accent-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-ink-900">On Call</h2>
+              <p className="text-xs text-ink-400">
+                {ON_CALL[currentPlan].hours} hours/mo of expert support
               </p>
             </div>
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-ink-700 mb-1">
-                Type <span className="font-bold">"{tenant.name}"</span> to confirm
-              </label>
-              <input
-                value={cancelConfirmText}
-                onChange={e => setCancelConfirmText(e.target.value)}
-                className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm"
-                placeholder={tenant.name}
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setShowCancelModal(false); setCancelConfirmText(''); }}
-                className="flex-1 py-2.5 border border-ink-200 text-ink-700 rounded-lg text-sm font-semibold hover:bg-ink-50"
-              >
-                Keep Subscription
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={cancelConfirmText !== tenant.name || actionLoading === 'cancel'}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
-              >
-                {actionLoading === 'cancel' ? 'Canceling...' : 'Confirm Cancel'}
-              </button>
-            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-ink-600">
+              ${currentInterval === 'annual'
+                ? Math.round(ON_CALL[currentPlan].annual / 10)
+                : ON_CALL[currentPlan].monthly}/mo
+            </span>
+            <button
+              onClick={handleToggleOnCall}
+              disabled={actionLoading === 'set-on-call'}
+              className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
+              title={sub!.addon_on_call ? 'Disable On Call' : 'Enable On Call'}
+            >
+              {sub!.addon_on_call ? (
+                <ToggleRight className="w-8 h-8 text-accent-600" />
+              ) : (
+                <ToggleLeft className="w-8 h-8" />
+              )}
+            </button>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* 3. PM Seat Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
+              <UserCog className="w-4.5 h-4.5 text-accent-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-ink-900">Property manager seat</h2>
+              <p className="text-xs text-ink-400">
+                Property manager access
+                {hasPmUser && <span className="text-amber-600 ml-1">(active PM user exists)</span>}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-ink-600">$79/mo</span>
+            <button
+              onClick={handleTogglePmSeat}
+              disabled={actionLoading === 'set-pm-seat' || hasPmUser}
+              className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
+              title={
+                hasPmUser
+                  ? 'Cannot disable while a property manager user exists'
+                  : sub!.pm_addon
+                    ? 'Disable property manager seat'
+                    : 'Enable property manager seat'
+              }
+            >
+              {sub!.pm_addon ? (
+                <ToggleRight className="w-8 h-8 text-accent-600" />
+              ) : (
+                <ToggleLeft className="w-8 h-8" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Setup Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
+              <Wrench className="w-4.5 h-4.5 text-accent-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-ink-900">Setup with us</h2>
+              {sub!.setup_paid_at ? (
+                <p className="text-xs text-ink-400">
+                  Purchased {formatDate(sub!.setup_paid_at)}
+                  {sub!.setup_amount != null && ` \u2014 $${sub!.setup_amount}`}
+                </p>
+              ) : (
+                <p className="text-xs text-ink-400">One-time onboarding assistance</p>
+              )}
+            </div>
+          </div>
+          {!sub!.setup_paid_at ? (
+            <button
+              onClick={handleBuySetup}
+              disabled={actionLoading === 'buy-setup'}
+              className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 disabled:opacity-50 transition-colors"
+            >
+              {actionLoading === 'buy-setup' ? 'Processing...' : `Book setup \u2014 $${setupPrice(currentPlan)}`}
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 text-sage-600">
+              <Check className="w-4 h-4" />
+              <span className="text-sm font-semibold">Purchased</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. Billing / Portal Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
+              <CreditCard className="w-4.5 h-4.5 text-accent-600" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-ink-900">Billing</h2>
+              <p className="text-xs text-ink-400">Manage payment methods, invoices, and cancellation</p>
+            </div>
+          </div>
+          <button
+            onClick={handleOpenPortal}
+            disabled={actionLoading === 'portal'}
+            className="px-4 py-2 border-2 border-accent-300 text-accent-600 rounded-lg text-sm font-semibold hover:bg-accent-50 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {actionLoading === 'portal' ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ExternalLink className="w-4 h-4" />
+            )}
+            Manage billing
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

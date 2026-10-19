@@ -20,10 +20,10 @@ interface FeedbackItem {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const ASSOC_MAP: Record<string, { name: string; plan: string; color: string }> = {
-  a1: { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', color: '#dc2626' },
-  a2: { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', color: '#2563eb' },
-  a3: { name: 'Dupont Circle Lofts', plan: 'Management Suite', color: '#7c3aed' },
-  a4: { name: 'Adams Morgan Commons', plan: 'Compliance Pro', color: '#dc2626' },
+  a1: { name: '1302 R Street NW Condominium', plan: 'Self-Managed', color: '#dc2626' },
+  a2: { name: 'Capitol Hill Terraces HOA', plan: 'Plus Facilities', color: '#2563eb' },
+  a3: { name: 'Dupont Circle Lofts', plan: 'Plus Facilities', color: '#7c3aed' },
+  a4: { name: 'Adams Morgan Commons', plan: 'Self-Managed', color: '#dc2626' },
 };
 
 const IMPACT_COLORS: Record<Impact, string> = {

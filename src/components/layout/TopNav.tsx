@@ -20,6 +20,8 @@ import {
 import SyncIndicator from '@/components/shared/SyncIndicator';
 import RoleChip from '@/components/ui/RoleChip';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import TrialBar from '@/features/home/components/TrialBar';
+import { canSetup as canSetupFn } from '@/lib/ownership';
 
 export default function TopNav() {
   const { currentUser, currentRole, switchRole, isAdminPreview, signOut } = useAuthStore();
@@ -68,6 +70,8 @@ export default function TopNav() {
   };
 
   return (
+    <>
+    <TrialBar />
     <nav className="bg-navy sticky top-0 z-50" style={{ height: 58 }}>
       <div className="h-full px-4 sm:px-6 flex items-center justify-between">
         {/* Left: Logo + hamburger (mobile) */}
@@ -175,7 +179,7 @@ export default function TopNav() {
                     <Users className="w-4 h-4 text-ink-400" /> User Management
                   </button>
                 )}
-                {currentRole === 'BOARD_MEMBER' && (
+                {(currentRole === 'BOARD_MEMBER' || canSetupFn(tenant.me)) && (
                   <button onClick={() => goTo('/subscription')} className="w-full text-left px-4 py-2.5 text-sm text-ink-700 hover:bg-mist-50 flex items-center gap-3">
                     <CreditCard className="w-4 h-4 text-ink-400" /> Subscription
                   </button>
@@ -242,5 +246,6 @@ export default function TopNav() {
         </div>
       )}
     </nav>
+    </>
   );
 }

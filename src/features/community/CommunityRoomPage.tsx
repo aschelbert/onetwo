@@ -32,7 +32,7 @@ const REQ_CATS = [
 
 export default function CommunityRoomPage() {
   const tenant = useTenantContext();
-  const isManagementSuite = tenant.tier === 'estate' || tenant.tier === 'management_suite' || tenant.isDemo;
+  const hasFacilities = tenant.features.facilities || tenant.isDemo;
   // v2 flags removed -- always true
   const [whoDoesWhatRole, setWhoDoesWhatRole] = useState<BoardRoleKey>('president');
   const amenitiesStore = useAmenitiesStore();
@@ -41,7 +41,7 @@ export default function CommunityRoomPage() {
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const amenityUnread = amenitiesStore.getUnreadCount(user.id);
   const amenityPending = amenitiesStore.getPendingApprovals().length;
-  const validTabs: TabId[] = isManagementSuite
+  const validTabs: TabId[] = hasFacilities
     ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
     : ['announcements', 'requests', 'meetings', 'votes'];
   const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
@@ -89,7 +89,7 @@ export default function CommunityRoomPage() {
     { id: 'requests', label: 'Requests', badge: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
-    ...(isManagementSuite ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
+    ...(hasFacilities ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
@@ -139,13 +139,13 @@ export default function CommunityRoomPage() {
         <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div><h2 className="font-display text-2xl font-bold">🏠 Community Room</h2></div>
         </div>
-        <div className={`grid grid-cols-3 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
+        <div className={`grid grid-cols-3 ${hasFacilities && isBoard ? 'sm:grid-cols-6' : hasFacilities ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
           {[
             { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', sub: 'Active', tab: 'announcements' as TabId },
             { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', sub: 'Pending', tab: 'requests' as TabId },
             { val: upcoming.length, label: 'Upcoming Meetings', sub: 'Scheduled', tab: 'meetings' as TabId },
             { val: openElections, label: 'Open Votes', sub: openElections > 0 ? 'Active' : 'None active', tab: 'votes' as TabId },
-            ...(isManagementSuite ? [
+            ...(hasFacilities ? [
               { val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', sub: 'Booked', tab: 'amenities' as TabId },
               ...(isBoard ? [{ val: amenityPending, label: 'Pending Approvals', sub: amenityPending > 0 ? 'Needs attention' : 'All clear', tab: 'amenities' as TabId }] : []),
             ] : []),
@@ -364,7 +364,7 @@ export default function CommunityRoomPage() {
         {tab === 'votes' && <VotingPage />}
 
         {/* ═══ AMENITIES ═══ */}
-        {tab === 'amenities' && isManagementSuite && <AmenitiesTab />}
+        {tab === 'amenities' && hasFacilities && <AmenitiesTab />}
 
       </div>
 

@@ -119,10 +119,10 @@ const STAGE_COLORS: Record<Stage, string> = { identified: '#6b7280', scoped: '#d
 const PRIORITY_COLORS: Record<Priority, string> = { high: 'bg-red-100 text-red-700', medium: 'bg-amber-100 text-amber-700', low: 'bg-ink-100 text-ink-500' };
 
 const ASSOC_MAP: Record<string, { name: string; plan: string; color: string; units: number }> = {
-  a1: { name: '1302 R Street NW Condominium', plan: 'Compliance Pro', color: '#dc2626', units: 12 },
-  a2: { name: 'Capitol Hill Terraces HOA', plan: 'Community Plus', color: '#2563eb', units: 48 },
-  a3: { name: 'Dupont Circle Lofts', plan: 'Management Suite', color: '#7c3aed', units: 32 },
-  a4: { name: 'Adams Morgan Commons', plan: 'Compliance Pro', color: '#dc2626', units: 24 },
+  a1: { name: '1302 R Street NW Condominium', plan: 'Self-Managed', color: '#dc2626', units: 12 },
+  a2: { name: 'Capitol Hill Terraces HOA', plan: 'Plus Facilities', color: '#2563eb', units: 48 },
+  a3: { name: 'Dupont Circle Lofts', plan: 'Plus Facilities', color: '#7c3aed', units: 32 },
+  a4: { name: 'Adams Morgan Commons', plan: 'Self-Managed', color: '#dc2626', units: 24 },
 };
 
 const FEEDBACK_REF: Record<string, FeedbackRef> = {

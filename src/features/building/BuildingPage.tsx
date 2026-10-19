@@ -53,7 +53,7 @@ export default function BuildingPage() {
   const tenant = useTenantContext();
   const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-  const isPMAddon = tenant.tier === 'pm_addon';
+  const isPMAddon = tenant.addons?.pmSeat ?? false;
 
   const [tab, setTab] = useTabParam<TabId>('tab', 'people', [...TABS]);
   const [modal, setModal] = useState<ModalState>(null);
