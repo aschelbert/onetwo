@@ -26,14 +26,14 @@ alter table meeting_agenda_items enable row level security;
 
 create policy "Tenant members can view agenda items"
   on meeting_agenda_items for select
-  using (tenant_id in (select tenant_id from tenant_memberships where user_id = auth.uid()));
+  using (tenant_id in (select tenant_id from tenant_users where user_id = auth.uid()));
 
 create policy "Board members can manage agenda items"
   on meeting_agenda_items for all
-  using (tenant_id in (select tenant_id from tenant_memberships where user_id = auth.uid()))
-  with check (tenant_id in (select tenant_id from tenant_memberships where user_id = auth.uid()));
+  using (tenant_id in (select tenant_id from tenant_users where user_id = auth.uid()))
+  with check (tenant_id in (select tenant_id from tenant_users where user_id = auth.uid()));
 
--- Updated_at trigger (reuse handle_updated_at if it exists)
+-- Updated_at trigger
 create trigger set_updated_at
   before update on meeting_agenda_items
-  for each row execute function handle_updated_at();
+  for each row execute function update_updated_at();
