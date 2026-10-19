@@ -238,36 +238,9 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMee
       }
 
       case 'open_case': {
-        if (tenant.features.v2Cases) {
-          // v2: open the full OpenCaseDrawer with runbook context
-          setShowCaseDrawer(true);
-          return; // Don't close — let the drawer handle it
-        }
-        // Legacy: create an issue case -- completion NOT written, item stays open
-        const catMap: Record<string, string> = {
-          governance: 'governance',
-          financial: 'financial',
-          insurance: 'governance',
-          maintenance: 'maintenance',
-          records: 'governance',
-          'owner-relations': 'owner-relations',
-          ethics: 'governance',
-          legal: 'governance',
-        };
-        const catId = catMap[category?.id || ''] || 'governance';
-        issues.createCase({
-          catId,
-          sitId: 'board-meetings',
-          approach: 'self',
-          title: `${item.task}`,
-          unit: 'N/A',
-          owner: 'Board',
-          priority: item.critical ? 'high' : 'medium',
-          notes: `Linked from runbook item ${itemId}. ${item.legalRef}`,
-        });
-        // Do NOT write completion -- item stays open until case resolves
-        onClose();
-        break;
+        // Open the full OpenCaseDrawer with runbook context
+        setShowCaseDrawer(true);
+        return; // Don't close — let the drawer handle it
       }
 
       case 'schedule_meeting': {

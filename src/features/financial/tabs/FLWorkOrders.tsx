@@ -152,7 +152,7 @@ export default function FLWorkOrders() {
 
       {showCreate && (
         <Modal title="Create Work Order" onClose={() => setShowCreate(false)} onSave={() => {
-          if (!woForm.title || !woForm.vendor) { alert('Title and vendor required'); return; }
+          if (!woForm.title || !woForm.vendor) return;
           createWorkOrder({ title: woForm.title, vendor: woForm.vendor, amount: parseFloat(woForm.amount) || 0, acctNum: woForm.acctNum, caseId: woForm.caseId || undefined });
           setShowCreate(false);
         }} saveLabel="Create">
@@ -182,7 +182,7 @@ export default function FLWorkOrders() {
 
       {showInvoice && (
         <Modal title="Receive Invoice" onClose={() => setShowInvoice(null)} onSave={() => {
-          if (!invForm.invoiceNum) { alert('Invoice number required'); return; }
+          if (!invForm.invoiceNum) return;
           receiveInvoice(showInvoice, invForm.invoiceNum, parseFloat(invForm.amount) || 0);
           setShowInvoice(null);
         }} saveLabel="Record Invoice">
@@ -196,7 +196,7 @@ export default function FLWorkOrders() {
       {showCreateInvoice && (
         <Modal title="Create Unit Invoice" subtitle="Bill a unit for fees or special assessments" onClose={() => setShowCreateInvoice(false)} onSave={() => {
           const amt = parseFloat(uiForm.amount);
-          if (!uiForm.unitNum || !amt || amt <= 0 || !uiForm.description.trim()) { alert('Unit, amount, and description are required'); return; }
+          if (!uiForm.unitNum || !amt || amt <= 0 || !uiForm.description.trim()) return;
           createUnitInvoice(uiForm.unitNum, uiForm.type, amt, uiForm.description, uiForm.caseId || undefined);
           setShowCreateInvoice(false);
         }} saveLabel="Create Invoice">

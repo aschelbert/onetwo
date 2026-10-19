@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt, getOrdinalSuffix } from '@/lib/formatters';
 import { supabase } from '@/lib/supabase';
 import type { Unit, UnitInvoice } from '@/types/financial';
@@ -13,6 +14,7 @@ const StripeIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
 export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
   const store = useFinancialStore();
   const { hoaDueDay, recordUnitPayment, markSpecialAssessmentPaid, stripeConnectId, stripeOnboardingComplete, unitInvoices } = store;
+  const { run: undoable } = useUndoableAction();
   const [recurringSetup, setRecurringSetup] = useState(false);
   const [modal, setModal] = useState<null | 'setupRecurring'>(null);
   const [page, setPage] = useState(0);
@@ -33,7 +35,7 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
   const pagedInvoices = myInvoices.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleStripePayment = async (amount: number, description: string, onSuccess: () => void) => {
-    if (!supabase) { alert('Backend not connected.'); return; }
+    if (!supabase) { console.error('Backend not connected.'); return; }
     try {
       const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
         body: { action: 'create_checkout', amount, description, unitNumber: activeUnit.number, stripeConnectId, returnUrl: window.location.href },
@@ -41,29 +43,29 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
       if (error) throw error;
       if (data?.checkoutUrl) window.location.href = data.checkoutUrl;
       else onSuccess();
-    } catch (err) { console.error('Stripe checkout error:', err); alert('Failed to create checkout session.'); }
+    } catch (err) { console.error('Stripe checkout error:', err); console.error('Failed to create checkout session.'); }
   };
 
   const handleSetupRecurring = async () => {
-    if (!supabase) { alert('Backend not connected.'); return; }
+    if (!supabase) { console.error('Backend not connected.'); return; }
     try {
       const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
         body: { action: 'create_subscription', amount: activeUnit.monthlyFee, unitNumber: activeUnit.number, stripeConnectId, returnUrl: window.location.href },
       });
       if (error) throw error;
       if (data?.checkoutUrl) window.location.href = data.checkoutUrl;
-    } catch (err) { console.error('Stripe subscription error:', err); alert('Failed to set up recurring payment.'); }
+    } catch (err) { console.error('Stripe subscription error:', err); console.error('Failed to set up recurring payment.'); }
   };
 
   const handleManageBilling = async () => {
-    if (!supabase) { alert('Backend not connected.'); return; }
+    if (!supabase) { console.error('Backend not connected.'); return; }
     try {
       const { data, error } = await supabase.functions.invoke('connect-stripe-account', {
         body: { action: 'create_billing_portal', stripeConnectId, returnUrl: window.location.href },
       });
       if (error) throw error;
       if (data?.portalUrl) window.location.href = data.portalUrl;
-    } catch (err) { console.error('Billing portal error:', err); alert('Failed to open billing portal.'); }
+    } catch (err) { console.error('Billing portal error:', err); console.error('Failed to open billing portal.'); }
   };
 
   const statusBadge = (status: UnitInvoice['status']) => {
@@ -131,7 +133,7 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
             ) : (
               <div className="flex gap-2 mt-3">
                 <button onClick={handleManageBilling} className="flex-1 py-2.5 bg-white border border-ink-200 text-ink-700 rounded-lg font-medium text-sm hover:bg-ink-50">Manage Billing →</button>
-                <button onClick={() => { if (confirm('Cancel recurring payment?')) setRecurringSetup(false); }} className="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium text-sm hover:bg-red-100 border border-red-200">Cancel</button>
+                <button onClick={() => { setRecurringSetup(false); undoable({ label: 'Recurring payment cancelled', commit: () => {}, undo: () => setRecurringSetup(true) }); }} className="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium text-sm hover:bg-red-100 border border-red-200">Cancel</button>
               </div>
             )}
           </div>

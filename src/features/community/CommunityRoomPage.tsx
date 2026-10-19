@@ -33,7 +33,7 @@ const REQ_CATS = [
 export default function CommunityRoomPage() {
   const tenant = useTenantContext();
   const isManagementSuite = tenant.tier === 'estate' || tenant.tier === 'management_suite' || tenant.isDemo;
-  const v2BoardRoom = !!tenant.features?.v2BoardRoom;
+  // v2 flags removed -- always true
   const [whoDoesWhatRole, setWhoDoesWhatRole] = useState<BoardRoleKey>('president');
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
@@ -368,8 +368,8 @@ export default function CommunityRoomPage() {
 
       </div>
 
-      {/* ═══ WHO DOES WHAT (v2BoardRoom) ═══ */}
-      {v2BoardRoom && (
+      {/* ═══ WHO DOES WHAT (true) ═══ */}
+      {true && (
         <div className="bg-white rounded-xl border border-ink-100 p-6 mt-4">
           <div className="mb-4">
             <h3 className="font-display text-lg font-bold text-ink-900">Who does what</h3>

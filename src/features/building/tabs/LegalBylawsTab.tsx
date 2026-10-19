@@ -1,5 +1,6 @@
 import { useBuildingStore } from '@/store/useBuildingStore';
 import type { LegalDocument } from '@/store/useBuildingStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 
 /** Required governing documents based on DC condominium law and common HOA best practices.
  *  The `required` flag indicates whether the document is legally required (true) or recommended best practice (false).
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export default function LegalBylawsTab({ store, openAdd, openEdit, isBoard }: Props) {
+  const { run: runUndoable } = useUndoableAction();
   const docs = store.legalDocuments;
   const state = store.address.state;
 
@@ -123,7 +125,7 @@ export default function LegalBylawsTab({ store, openAdd, openEdit, isBoard }: Pr
                         </span>
                         <span className="text-[11px] text-ink-400">{doc.version} · {doc.size}{doc.attachments && doc.attachments.length > 0 ? ` · 📎 ${doc.attachments.length} file${doc.attachments.length > 1 ? 's' : ''}` : ' · ⚠ No file attached'}</span>
                         <button onClick={() => openEdit(doc.id, { name: doc.name, version: doc.version, size: doc.size, status: doc.status })} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                        <button onClick={() => { if (confirm('Remove?')) store.removeLegalDocument(doc.id); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
+                        <button onClick={() => { const d = doc; store.removeLegalDocument(d.id); runUndoable({ label: `Removed ${d.name}`, undo: () => store.addLegalDocument({ name: d.name, version: d.version, size: d.size, status: d.status }), commit: () => {} }); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
                       </div>
                     )}
                     {!doc && (
@@ -166,7 +168,7 @@ export default function LegalBylawsTab({ store, openAdd, openEdit, isBoard }: Pr
                         </span>
                         <span className="text-[11px] text-ink-400">{doc.version} · {doc.size}{doc.attachments && doc.attachments.length > 0 ? ` · 📎 ${doc.attachments.length} file${doc.attachments.length > 1 ? 's' : ''}` : ' · ⚠ No file attached'}</span>
                         <button onClick={() => openEdit(doc.id, { name: doc.name, version: doc.version, size: doc.size, status: doc.status })} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                        <button onClick={() => { if (confirm('Remove?')) store.removeLegalDocument(doc.id); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
+                        <button onClick={() => { const d = doc; store.removeLegalDocument(d.id); runUndoable({ label: `Removed ${d.name}`, undo: () => store.addLegalDocument({ name: d.name, version: d.version, size: d.size, status: d.status }), commit: () => {} }); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
                       </div>
                     )}
                     {!doc && (
@@ -205,7 +207,7 @@ export default function LegalBylawsTab({ store, openAdd, openEdit, isBoard }: Pr
                       {doc.status === 'current' ? '✓ Current' : '⚠ Review Due'}
                     </span>
                     <button onClick={() => openEdit(doc.id, { name: doc.name, version: doc.version, size: doc.size, status: doc.status })} className="text-xs text-accent-600 font-medium">Edit</button>
-                    <button onClick={() => { if (confirm('Remove?')) store.removeLegalDocument(doc.id); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                    <button onClick={() => { const d = doc; store.removeLegalDocument(d.id); runUndoable({ label: `Removed ${d.name}`, undo: () => store.addLegalDocument({ name: d.name, version: d.version, size: d.size, status: d.status }), commit: () => {} }); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
                   </div>
                 </div>
               ))}

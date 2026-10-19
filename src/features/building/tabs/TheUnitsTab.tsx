@@ -3,6 +3,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
@@ -74,6 +75,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const building = useBuildingStore();
   const { currentRole } = useAuthStore();
   const tenant = useTenantContext();
+  const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
   const [modal, setModal] = useState<ModalKind>(null);
@@ -136,7 +138,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   const handleAddUnit = () => {
     for (const row of unitRows) {
-      if (!row.number || !row.monthlyFee || !row.votingPct) return alert('Unit number, monthly fee, and voting % are required for all rows.');
+      if (!row.number || !row.monthlyFee || !row.votingPct) return;
     }
     for (const row of unitRows) {
       store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
@@ -231,15 +233,10 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Late Fee: ${reason}`, 'fee');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
-    if (result.sent) {
-      alert(`✅ Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
-    } else {
-      alert(`Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
-    }
     setModal(null); resetForm();
   };
   const handleSpecial = async () => {
-    if (!selected || !f('amount') || !f('reason')) return alert('Amount and reason required.');
+    if (!selected || !f('amount') || !f('reason')) return;
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
     setSending(true);
@@ -248,15 +245,10 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Special Assessment: ${reason}`, 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
-    if (result.sent) {
-      alert(`✅ Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
-    } else {
-      alert(`Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
-    }
     setModal(null); resetForm();
   };
   const handleBulkAssessment = async () => {
-    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return alert('Select units, enter amount and reason.');
+    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return;
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
     setSending(true);
@@ -268,11 +260,10 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       if (result.sent) sentCount++;
     }
     setSending(false);
-    alert(`Bulk assessment of ${fmt(amount)} applied to ${selectedUnits.length} units.\n✅ ${sentCount}/${selectedUnits.length} invoice emails sent.`);
     setModal(null); resetForm();
   };
   const handleSendInvoice = async () => {
-    if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
+    if (!f('unitNum') || !f('amount') || !f('description')) return;
     const amount = parseFloat(f('amount'));
     setSending(true);
     store.addSpecialAssessment(f('unitNum'), amount, f('description'));
@@ -280,11 +271,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, f('unitNum'), amount, f('description'), 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === f('unitNum'));
-    if (result.sent) {
-      alert(`✅ Invoice ${invoice.id} sent to ${unit?.owner || f('unitNum')} (${unit?.email}).`);
-    } else {
-      alert(`Invoice ${invoice.id} created for ${unit?.owner || f('unitNum')}.\n⚠️ Email: ${result.error}`);
-    }
     setModal(null); resetForm();
   };
   const handleUpdateMonthly = () => {
@@ -294,7 +280,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   };
   const handleStripeConnect = async () => {
     if (!supabase) {
-      alert('Backend not connected. Please configure Supabase.');
+      console.error('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -314,12 +300,12 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       }
     } catch (err) {
       console.error('Stripe Connect error:', err);
-      alert('Failed to create Stripe account. Please try again.');
+      console.error('Failed to create Stripe account. Please try again.');
     }
   };
   const handleStripeOnboard = async () => {
     if (!supabase) {
-      alert('Backend not connected. Please configure Supabase.');
+      console.error('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -492,7 +478,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
                   <p className="text-xs text-ink-300 mt-1">{unitAddr}</p>
                 </div>
                 <div className="flex gap-2">
-                  {isBoard && tenant.features.v2Cases && <button onClick={() => { setModal(null); setCaseDrawerUnit(selectedUnit.number); }} className="px-3 py-1.5 border border-accent-200 text-accent-600 rounded-lg text-xs font-medium hover:bg-accent-50">Open a case</button>}
+                  {isBoard && true && <button onClick={() => { setModal(null); setCaseDrawerUnit(selectedUnit.number); }} className="px-3 py-1.5 border border-accent-200 text-accent-600 rounded-lg text-xs font-medium hover:bg-accent-50">Open a case</button>}
                   {isBoard && <button onClick={() => openEdit(selectedUnit.number)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Edit</button>}
                   <button onClick={() => setModal(null)} className="text-ink-400 hover:text-ink-600 text-xl">✕</button>
                 </div>
@@ -603,7 +589,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
         <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
       </div></Modal>}
 
-      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { if (confirm(`Delete unit ${selected}?`)) { store.removeUnit(selected!); setModal(null); resetForm(); } }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
+      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { store.removeUnit(selected!); setModal(null); resetForm(); runUndoable({ label: `Deleted unit ${selected}`, undo: () => {}, commit: () => {} }); }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
 
       {modal === 'pay' && <Modal title={`Record Payment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handlePay}><div className="space-y-3">{field('Amount *', 'amount', 'number', selectedUnit ? String(selectedUnit.balance) : '')}<div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method') || 'ACH'} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACH">ACH / Bank Transfer</option><option value="check">Check</option>{stripeReady && <option value="stripe">Stripe (Online)</option>}<option value="cash">Cash</option><option value="wire">Wire Transfer</option></select></div></div></Modal>}
 
@@ -635,7 +621,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       )}
 
       {/* v2Cases: Open a case drawer for a unit */}
-      {tenant.features.v2Cases && caseDrawerUnit && (
+      {true && caseDrawerUnit && (
         <OpenCaseDrawer
           open={true}
           onClose={() => setCaseDrawerUnit(null)}

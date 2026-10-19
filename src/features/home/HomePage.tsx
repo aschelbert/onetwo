@@ -12,6 +12,7 @@ import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { buildSeasons, currentSeason } from '@/lib/seasons';
 import { buildQueue } from '@/lib/queue';
 import { computeBoardHealth, computeStreaks, computeBadges } from '@/lib/boardHealth';
+import { useReportsStore } from '@/store/useReportsStore';
 import { DEFAULT_SETTINGS, type BuildingSettings } from '@/lib/buildingSettings';
 import { toBoardRoleKey, type BoardRoleKey } from '@/types/auth';
 import { DollarSign, PiggyBank } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function HomePage() {
   const elections = useElectionStore();
   const spending = useSpendingStore();
   const fin = useFinancialStore();
+  const reportsStore = useReportsStore();
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -133,6 +135,8 @@ export default function HomePage() {
     (k) => (comp.itemAttachments[k]?.length ?? 0) > 0,
   ).length;
   const proofCoverage = allRunbookItems.length > 0 ? attachedCount / allRunbookItems.length : 0;
+  const hpElapsedMonths = new Date().getMonth() + 1;
+  const reportsGeneratedPct = hpElapsedMonths > 0 ? Math.min(100, Math.round((reportsStore.reports.filter(r => r.type === 'financial_statement').length / hpElapsedMonths) * 100)) : 0;
 
   const healthInputs = useMemo(
     () => ({
@@ -154,8 +158,9 @@ export default function HomePage() {
       })),
       proofCoverage,
       documentsCurrentPct,
+      reportsGeneratedPct,
     }),
-    [allRunbookItems, comp.completions, comp.filings, metrics.collectionRate, reservePct, meetings, proofCoverage, documentsCurrentPct],
+    [allRunbookItems, comp.completions, comp.filings, metrics.collectionRate, reservePct, meetings, proofCoverage, documentsCurrentPct, reportsGeneratedPct],
   );
 
   const health = useMemo(() => computeBoardHealth(healthInputs), [healthInputs]);

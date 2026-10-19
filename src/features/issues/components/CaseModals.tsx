@@ -28,7 +28,7 @@ export function BoardVoteModal({ c, boardMembers, store, defaultMotion, onClose 
   });
 
   const handleSave = () => {
-    if (!motion.trim()) return alert('Motion text is required.');
+    if (!motion.trim()) return;
     const voteList = boardMembers.map(m => ({ name: m.name, role: m.role, vote: votes[m.name] || '' }));
     store.saveBoardVote(c.id, motion, date, voteList);
     onClose();
@@ -119,7 +119,7 @@ export function CommModal({ caseId, store, onClose, catId, sitId, issueId }: Mod
   const [templateSentVia, setTemplateSentVia] = useState('email');
 
   const handleQuickSave = () => {
-    if (!subject.trim() || !recipient.trim()) return alert('Subject and recipient are required.');
+    if (!subject.trim() || !recipient.trim()) return;
     const commData = {
       type, subject, date: new Date().toISOString().split('T')[0],
       method, recipient, sentBy, notes, status: 'sent'
@@ -368,7 +368,7 @@ export function DocModal({ caseId, store, stepIdx, onClose }: ModalProps & { cas
   const [size, setSize] = useState('');
 
   const handleSave = () => {
-    if (!name.trim()) return alert('Document name is required.');
+    if (!name.trim()) return;
     const doc = {
       name, type,
       date: new Date().toISOString().split('T')[0],
@@ -610,7 +610,7 @@ export function InvoiceCreateModal({ caseId, caseUnit, store, onClose }: ModalPr
   const [description, setDescription] = useState('');
 
   const handleSave = () => {
-    if (!unitNum || !amount || !description.trim()) return alert('Unit, amount, and description are required.');
+    if (!unitNum || !amount || !description.trim()) return;
     const invoice = fin.createUnitInvoice(unitNum, invType, parseFloat(amount), description, caseId);
     store.linkInvoice(caseId, invoice.id);
     onClose();
@@ -909,7 +909,7 @@ export function AddBidModal({ caseId, stepIdx, store, onClose }: ModalProps & { 
   const [notes, setNotes] = useState('');
 
   const handleSave = () => {
-    if (!vendorName.trim() || !amount) return alert('Vendor name and amount are required.');
+    if (!vendorName.trim() || !amount) return;
     store.addBid(caseId, stepIdx, {
       vendorName: vendorName.trim(),
       amount: parseFloat(amount),

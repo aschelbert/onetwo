@@ -41,8 +41,8 @@ export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
 
-  // When v2Cases is enabled and not embedded, redirect /issues to /boardroom?tab=cases
-  if (tenant.features.v2Cases && !embedded) {
+  // v2 is the only path -- redirect /issues to /boardroom?tab=cases when not embedded
+  if (!embedded) {
     return <Navigate to="/boardroom?tab=cases" replace />;
   }
 
@@ -878,7 +878,6 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       if (!docName) return;
       const legalDoc = legalDocuments.find(d => d.name === docName);
       if (!legalDoc || !legalDoc.attachments || legalDoc.attachments.length === 0) {
-        alert(`"${docName}" not found in Legal & Bylaws. Please upload it in the Legal & Bylaws tab first.`);
         return;
       }
       const att = legalDoc.attachments[0];
@@ -893,7 +892,6 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       // Insurance: aggregate all policies into a single certificate attachment
       const policiesWithAttachments = insurance.filter(p => p.attachments && p.attachments.length > 0);
       if (policiesWithAttachments.length === 0) {
-        alert('No insurance certificates found. Please upload them in the Insurance tab first.');
         return;
       }
       const firstAtt = policiesWithAttachments[0].attachments[0];
@@ -1286,7 +1284,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       )}
       {showWOModal && (
         <Modal title="Create Work Order" onClose={() => setShowWOModal(false)} onSave={() => {
-          if (!woForm.title || !woForm.vendor || !woForm.amount) { alert('Title, vendor, and amount required'); return; }
+          if (!woForm.title || !woForm.vendor || !woForm.amount) return;
           fin.createWorkOrder({ title: woForm.title, vendor: woForm.vendor, amount: parseFloat(woForm.amount), acctNum: woForm.acctNum, caseId });
           const newWO = fin.workOrders[fin.workOrders.length - 1];
           if (newWO) store.linkWO(caseId, newWO.id);

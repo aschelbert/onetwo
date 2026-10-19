@@ -164,7 +164,7 @@ export default function PlatformAdminPage() {
   const totalRevenueYTD = store.glEntries.filter(e => e.creditAcct.startsWith('4')).reduce((s, e) => s + e.amount, 0);
 
   const handleAddTenancy = () => {
-    if (!bldgForm.name || !bldgForm.contactEmail) { alert('Building name and contact email required'); return; }
+    if (!bldgForm.name || !bldgForm.contactEmail) return;
     const id = `bld-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
     const trialEnd = new Date(Date.now() + store.trialDays * 86400000).toISOString().split('T')[0];

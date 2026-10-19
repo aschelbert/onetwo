@@ -182,7 +182,7 @@ export default function SupportPage() {
 
   const handleAttachment = (file: File, setFile: (f: File | null) => void, setPreview: (p: string | null) => void) => {
     if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB'); return; }
+    if (file.size > 5 * 1024 * 1024) return;
     setFile(file);
     const url = URL.createObjectURL(file);
     setPreview(url);

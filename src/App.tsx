@@ -6,7 +6,7 @@ import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
-import DashboardPage from '@/features/dashboard/DashboardPage';
+import ResidentDashboard from '@/features/dashboard/ResidentDashboard';
 import HomePage from '@/features/home/HomePage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
@@ -15,17 +15,13 @@ import BuildingPage from '@/features/building/BuildingPage';
 import ArchivesPage from '@/features/archives/ArchivesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
-import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
-import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
-import AssociationTeamPage from '@/features/association-team/AssociationTeamPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
-import ActiveCaseWidget from '@/components/ActiveCaseWidget';
-import TenantProvider, { useTenantContext } from '@/components/TenantProvider';
+import TenantProvider from '@/components/TenantProvider';
 import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
@@ -48,7 +44,7 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Global Supabase auth state listener — keeps auth store in sync with session
+// Global Supabase auth state listener -- keeps auth store in sync with session
 function AuthListener() {
   const ranRef = useRef(false);
   useEffect(() => {
@@ -64,7 +60,7 @@ function AuthListener() {
         return;
       }
 
-      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set
+      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED -- restore auth if not already set
       if (session && !isAuthenticated) {
         try {
           // Check if platform admin first
@@ -140,7 +136,7 @@ function AuthListener() {
             login(m);
           }
         } catch {
-          // Session exists but lookup failed — don't crash
+          // Session exists but lookup failed -- don't crash
         }
       }
     });
@@ -200,32 +196,24 @@ function RequirePM({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * HomeOrDashboard — renders the new HomePage for board members and property
- * managers when tenant.features.v2Home is enabled; otherwise falls back to
- * the existing DashboardPage.
+ * HomeOrDashboard -- renders HomePage for board/PM roles,
+ * ResidentDashboard for residents.
+ * v2 flags have been removed; Home is the only board/PM path.
  */
 function HomeOrDashboard() {
   const { currentRole } = useAuthStore();
-  const tenant = useTenantContext();
-  const isV2 = tenant.features.v2Home;
   const isBoardOrPM = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
-  if (isV2 && isBoardOrPM) {
+  if (isBoardOrPM) {
     return <HomePage />;
   }
-  return <DashboardPage />;
+  return <ResidentDashboard />;
 }
 
 function AIAdvisorWrapper() {
   const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) return null;
   return <AIAdvisor />;
-}
-
-function ActiveCaseWidgetWrapper() {
-  const { isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return null;
-  return <ActiveCaseWidget />;
 }
 
 /** Wrapper to extract `id` param from route and pass to CasePage */
@@ -243,11 +231,10 @@ export default function App() {
       <AuthListener />
       <Routes>
         {/* Public */}
-        {/* Landing page is served by static index.html via Vite middleware */}
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Admin console — own layout (sidebar nav), outside AppShell */}
+        {/* Admin console -- own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />
 
         {/* Portfolio (PM) routes */}
@@ -259,23 +246,25 @@ export default function App() {
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
           <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeOrDashboard /></ErrorBoundary>} />
-          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
-          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
-          <Route path="/cases/:id" element={<ErrorBoundary fallbackLevel="page"><CasePageRouteWrapper /></ErrorBoundary>} />
-          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
-          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />
-          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
           <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
-          <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamPage /></ErrorBoundary>} />
-          <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
+          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
+          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
+          <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />
+          <Route path="/cases/:id" element={<ErrorBoundary fallbackLevel="page"><CasePageRouteWrapper /></ErrorBoundary>} />
           <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
           <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
           <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
           <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
           <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
-          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
+
+          {/* Redirects for removed routes */}
+          <Route path="/issues" element={<Navigate to="/cases" replace />} />
+          <Route path="/association-team" element={<Navigate to="/building?tab=people" replace />} />
+          <Route path="/admin/users" element={<Navigate to="/building?tab=people" replace />} />
+          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/property-log" element={<Navigate to="/building?tab=people" replace />} />
         </Route>
 
         {/* Dev-only UI kit route */}
@@ -286,9 +275,8 @@ export default function App() {
         {/* Catch-all */}
         <Route path="*" element={<CatchAll />} />
       </Routes>
-      {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
+      {/* AI Advisor hidden -- revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
-      <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
     </ErrorBoundary>
