@@ -159,8 +159,20 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, currentRole } = useAuthStore();
-  if (isAuthenticated) {
+  const { isAuthenticated, currentRole, signOut } = useAuthStore();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const fromDemo = params.get('from') === 'demo';
+
+  // Demo exit: user is still authenticated but navigated here with ?from=demo.
+  // Sign out in an effect so the auth page can render with the query params intact.
+  useEffect(() => {
+    if (isAuthenticated && fromDemo) {
+      signOut();
+    }
+  }, [isAuthenticated, fromDemo, signOut]);
+
+  if (isAuthenticated && !fromDemo) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const host = window.location.hostname;
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';

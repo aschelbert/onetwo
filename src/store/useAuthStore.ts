@@ -133,11 +133,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     });
   },
 
-  leaveDemo: (source) => {
-    get().signOut();
-    // Re-set after signOut clears it so AuthPage can read the source
-    set({ demoExitSource: source });
-  },
+  leaveDemo: (source) => set({ demoExitSource: source }),
 
   updateProfile: (updates) =>
     set((state) => ({
