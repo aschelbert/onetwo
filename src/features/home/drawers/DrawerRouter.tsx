@@ -2,40 +2,42 @@
  * DrawerRouter — Maps drawer IDs from the Home page to their corresponding
  * drawer components. Used when v2 feature flags are enabled.
  *
- * New IDs that map to LegacyActionDrawer (placeholder) until their full
- * drawers land in later handoffs: payment, meeting, case_new,
- * vote, approval, request, collections_offer, case_step, payment_batch.
+ * IDs that still map to LegacyActionDrawer (placeholder) until their full
+ * drawers land in later handoffs: meeting, case_new, vote, request,
+ * collections_offer, case_step.
  */
 
 import DrawerShell from '@/components/ui/DrawerShell';
 import RunbookDrawer from '@/features/compliance/RunbookDrawer';
 import CloseMonthDrawer from '@/features/financial/CloseMonthDrawer';
 import ComposeDrawer from '@/features/boardroom/components/ComposeDrawer';
+import UnitDrawer from '@/features/financial/drawers/UnitDrawer';
+import LateUnitsDrawer from '@/features/financial/drawers/LateUnitsDrawer';
+import PayBillDrawer from '@/features/financial/drawers/PayBillDrawer';
+import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
 
 export type DrawerId =
   | 'runbook'
   | 'close_month'
   | 'compose'
   | 'payment'
+  | 'payment_batch'
+  | 'bill'
+  | 'approval'
   | 'meeting'
   | 'case_new'
   | 'vote'
-  | 'approval'
   | 'request'
   | 'collections_offer'
-  | 'case_step'
-  | 'payment_batch';
+  | 'case_step';
 
 const LEGACY_LABELS: Record<string, string> = {
-  payment: 'Record Payment',
   meeting: 'Meeting',
   case_new: 'New Case',
   vote: 'Board Vote',
-  approval: 'Spending Approval',
   request: 'Owner Request',
   collections_offer: 'Collections',
   case_step: 'Case Step',
-  payment_batch: 'Payment Batch',
 };
 
 interface DrawerRouterProps {
@@ -124,14 +126,44 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
       );
 
     case 'payment':
+      return (
+        <UnitDrawer
+          open={open}
+          onClose={onClose}
+          unitNumber={context.unitNumber || ''}
+        />
+      );
+
+    case 'payment_batch':
+      return (
+        <LateUnitsDrawer
+          open={open}
+          onClose={onClose}
+        />
+      );
+
+    case 'bill':
+      return (
+        <PayBillDrawer
+          open={open}
+          onClose={onClose}
+        />
+      );
+
+    case 'approval':
+      return (
+        <SpendingDrawer
+          open={open}
+          onClose={onClose}
+        />
+      );
+
     case 'meeting':
     case 'case_new':
     case 'vote':
-    case 'approval':
     case 'request':
     case 'collections_offer':
     case 'case_step':
-    case 'payment_batch':
       return (
         <LegacyActionDrawer
           drawerId={drawerId}

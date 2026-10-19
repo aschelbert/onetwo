@@ -135,6 +135,14 @@ interface FinancialState {
   addSpecialAssessment: (unitNum: string, amount: number, reason: string) => void;
   markSpecialAssessmentPaid: (unitNum: string, assessmentId: string) => void;
 
+  // ── v2 Fiscal Lens thin wrappers (handoff 12) ──
+  recordPayment: (unitNum: string, amount: number, method: string, date?: string) => void;
+  imposeFee: (unitNum: string, amount: number, reason: string) => void;
+  waiveFee: (unitNum: string, feeIndex: number) => void;
+  invoiceUnit: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string) => void;
+  recordBill: (vendor: string, invoiceNum: string, amount: number, glAccount: string, date?: string) => void;
+  payBill: (workOrderId: string) => void;
+
   // Stripe
   stripeConnectId: string | null;
   stripeOnboardingComplete: boolean;
@@ -1047,6 +1055,28 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       });
       syncUnit(inv.unitNumber);
     }
+  },
+
+  // ── v2 Fiscal Lens thin wrappers (handoff 12) ──────────────────────
+  recordPayment: (unitNum, amount, method, _date?) => {
+    get().recordUnitPayment(unitNum, amount, method);
+  },
+  imposeFee: (unitNum, amount, reason) => {
+    get().imposeLateFee(unitNum, amount, reason);
+  },
+  waiveFee: (unitNum, feeIndex) => {
+    get().waiveLateFee(unitNum, feeIndex);
+  },
+  invoiceUnit: (unitNum, type, amount, description) => {
+    get().createUnitInvoice(unitNum, type, amount, description);
+  },
+  recordBill: (vendor, invoiceNum, amount, glAccount, date?) => {
+    const today = date || new Date().toISOString().split('T')[0];
+    const m = get().glAccountMapping;
+    get().glPost(today, `${vendor} — ${invoiceNum}`, glAccount, m.bankAccount, amount, 'expense', invoiceNum);
+  },
+  payBill: (workOrderId) => {
+    get().payWorkOrder(workOrderId);
   },
 }), {
   name: 'onetwo-financial',
