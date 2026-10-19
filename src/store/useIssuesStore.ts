@@ -2479,6 +2479,9 @@ interface IssuesState {
   shellActiveStep: number;
   shellActiveStepCaseId: string | null;
   setShellActiveStep: (caseId: string, stepIdx: number) => void;
+
+  // Step engine: milestone case linking
+  createCaseForMilestone: (milestoneId: string, catId: string, situationId: string, approach: CaseApproach, title: string, tenantId?: string) => string;
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -3244,6 +3247,33 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps };
       })
     }));
+  },
+
+  // ─── Step Engine: create case linked to milestone ────────
+  createCaseForMilestone: (milestoneId, catId, situationId, approach, title, tenantId?) => {
+    const s = get();
+    // Delegate to createCase with milestone link metadata
+    const caseId = s.createCase({
+      catId,
+      sitId: situationId,
+      approach,
+      title,
+      unit: '',
+      owner: 'Board',
+      priority: 'medium',
+      notes: `Auto-created from milestone ${milestoneId}`,
+      source: 'milestone',
+      sourceId: milestoneId,
+    }, tenantId);
+
+    // Stamp the linkedMilestoneId on the newly created case
+    set(st => ({
+      cases: st.cases.map(c =>
+        c.id === caseId ? { ...c, linkedMilestoneId: milestoneId } : c,
+      ),
+    }));
+
+    return caseId;
   },
 }), {
   name: 'onetwo-issues',
