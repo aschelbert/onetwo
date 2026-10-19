@@ -161,7 +161,7 @@ function LoginRoute() {
   if (isAuthenticated) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
@@ -174,7 +174,7 @@ function CatchAll() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
     const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';

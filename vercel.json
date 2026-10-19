@@ -58,6 +58,9 @@
     { "source": "/portfolio", "destination": "/app.html" },
     { "source": "/association-team", "destination": "/app.html" },
     { "source": "/association-team/:path*", "destination": "/app.html" },
+    { "source": "/cases/:path*", "destination": "/app.html" },
+    { "source": "/board-ops/:path*", "destination": "/app.html" },
+    { "source": "/property-log", "destination": "/app.html" },
     { "source": "/demo", "destination": "/demo.html" }
   ]
 }
