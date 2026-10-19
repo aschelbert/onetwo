@@ -3,19 +3,22 @@
  * drawer components. Used when v2 feature flags are enabled.
  *
  * New IDs that map to LegacyActionDrawer (placeholder) until their full
- * drawers land in later handoffs: payment, meeting, case_new, compose,
+ * drawers land in later handoffs: payment, meeting, case_new,
  * vote, approval, request, collections_offer, case_step, payment_batch.
  */
 
 import DrawerShell from '@/components/ui/DrawerShell';
+import RunbookDrawer from '@/features/compliance/RunbookDrawer';
+import CloseMonthDrawer from '@/features/financial/CloseMonthDrawer';
+import ComposeDrawer from '@/features/boardroom/components/ComposeDrawer';
 
 export type DrawerId =
   | 'runbook'
   | 'close_month'
+  | 'compose'
   | 'payment'
   | 'meeting'
   | 'case_new'
-  | 'compose'
   | 'vote'
   | 'approval'
   | 'request'
@@ -24,12 +27,9 @@ export type DrawerId =
   | 'payment_batch';
 
 const LEGACY_LABELS: Record<string, string> = {
-  runbook: 'Runbook Item',
-  close_month: 'Close Month',
   payment: 'Record Payment',
   meeting: 'Meeting',
   case_new: 'New Case',
-  compose: 'Compose Message',
   vote: 'Board Vote',
   approval: 'Spending Approval',
   request: 'Owner Request',
@@ -96,16 +96,36 @@ function LegacyActionDrawer({
 export default function DrawerRouter({ drawerId, open, onClose, context = {} }: DrawerRouterProps) {
   if (!drawerId || !open) return null;
 
-  // All drawer IDs route to LegacyActionDrawer for now.
-  // When RunbookDrawer and CloseMonthDrawer land (handoffs 05/11),
-  // their cases will be updated to import and render the real drawers.
   switch (drawerId) {
     case 'runbook':
+      return (
+        <RunbookDrawer
+          itemId={context.itemId || ''}
+          onClose={onClose}
+        />
+      );
+
     case 'close_month':
+      return (
+        <CloseMonthDrawer
+          open={open}
+          onClose={onClose}
+          period={context.period || new Date().toISOString().slice(0, 7)}
+        />
+      );
+
+    case 'compose':
+      return (
+        <ComposeDrawer
+          open={open}
+          onClose={onClose}
+          prefillRecipient={context.recipient}
+        />
+      );
+
     case 'payment':
     case 'meeting':
     case 'case_new':
-    case 'compose':
     case 'vote':
     case 'approval':
     case 'request':
