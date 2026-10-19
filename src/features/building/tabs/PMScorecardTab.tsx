@@ -5,6 +5,7 @@ import type { CategoryRatings, Category } from '@/lib/services/scorecard';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { getActiveTenantId } from '@/lib/supabase';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import Modal from '@/components/ui/Modal';
 
 // ─── Constants ────────────────────────────────────────
@@ -88,6 +89,7 @@ export default function PMScorecardTab() {
   const store = useScorecardStore();
   const { currentUser } = useAuthStore();
   const { management } = useBuildingStore();
+  const { run: runUndoable } = useUndoableAction();
 
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0]);
   const [modal, setModal] = useState<ModalType>(null);
@@ -401,7 +403,7 @@ export default function PMScorecardTab() {
                       View
                     </button>
                     <button
-                      onClick={() => { if (confirm('Delete this review?')) store.deleteReview(review.id); }}
+                      onClick={() => { store.deleteReview(review.id); runUndoable({ label: 'Deleted review', undo: () => {}, commit: () => {} }); }}
                       className="text-xs text-red-400 hover:text-red-600"
                     >
                       Delete

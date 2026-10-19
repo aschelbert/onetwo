@@ -25,6 +25,7 @@ function makeInputs(overrides: Partial<HealthInputs> = {}): HealthInputs {
     ],
     proofCoverage: 0.9,
     documentsCurrentPct: 80,
+    reportsGeneratedPct: 80,
     today,
     ...overrides,
   };
@@ -38,6 +39,7 @@ describe('computeBoardHealth', () => {
       monthsClosedOnTime: 12,
       proofCoverage: 1,
       documentsCurrentPct: 100,
+      reportsGeneratedPct: 100,
     });
     const result = computeBoardHealth(inputs);
     expect(result.score).toBe(100);

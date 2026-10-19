@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTabParam } from '@/hooks/useTabParam';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore, type Meeting } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -12,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { refreshComplianceRequirements, type ComplianceCategory } from '@/lib/complianceRefresh';
 import { computeBoardHealth } from '@/lib/boardHealth';
+import { useReportsStore } from '@/store/useReportsStore';
 import VotingPage from '@/features/elections/ElectionsPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import CommunicationsTab from './tabs/CommunicationsTab';
@@ -75,19 +77,18 @@ export default function BoardRoomPage() {
   const elections = useElectionStore();
   const { currentRole, currentUser, buildingMembers } = useAuthStore();
   const letterStore = useLetterStore();
+  const reportsStore = useReportsStore();
   const navigate = useNavigate();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const tenant = useTenantContext();
-  const v2Drawers = !!tenant.features?.v2Drawers;
-  const v2BoardRoom = !!tenant.features?.v2BoardRoom;
+  const { run: undoable } = useUndoableAction();
   const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const v2ValidTabs: TabId[] = ['before', 'meeting_day', 'after', 'outbox', 'cases', 'roles'];
-  const v1ValidTabs: TabId[] = ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops'];
-  const [tab, setTab] = useTabParam<TabId>('tab', v2BoardRoom ? 'before' : 'duties', v2BoardRoom ? v2ValidTabs : v1ValidTabs);
+  const validTabs: TabId[] = ['before', 'meeting_day', 'after', 'outbox', 'cases', 'roles'];
+  const [tab, setTab] = useTabParam<TabId>('tab', 'before', validTabs);
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
   const [targetId, setTargetId] = useState('');
@@ -130,6 +131,8 @@ export default function BoardRoomPage() {
   const allItems = categories.flatMap(c => c.items);
   const attachedCount = Object.keys(comp.itemAttachments).filter(k => (comp.itemAttachments[k]?.length ?? 0) > 0).length;
   const proofCoverage = allItems.length > 0 ? attachedCount / allItems.length : 0;
+  const elapsedMonths = new Date().getMonth() + 1;
+  const reportsGeneratedPct = elapsedMonths > 0 ? Math.min(100, Math.round((reportsStore.reports.filter(r => r.type === 'financial_statement').length / elapsedMonths) * 100)) : 0;
   const healthResult = computeBoardHealth({
     runbookItems: allItems.map(i => ({ id: i.id, due: i.due, critical: i.critical, scope: i.scope })),
     completions: comp.completions,
@@ -140,6 +143,7 @@ export default function BoardRoomPage() {
     meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: m.noticeSentAt ?? null, minutesApprovedAt: m.minutesApprovedAt ?? null, quorumMet: m.quorumMet })),
     proofCoverage,
     documentsCurrentPct,
+    reportsGeneratedPct,
   });
   const healthIndex = healthResult.score;
   const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
@@ -181,7 +185,7 @@ export default function BoardRoomPage() {
     try {
       const sbUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const sbKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      if (!sbUrl || !sbKey) { alert('Meeting saved! Email not sent — Supabase not configured.'); return; }
+      if (!sbUrl || !sbKey) { console.error('Meeting saved! Email not sent — Supabase not configured.'); return; }
       const session = supabase ? (await supabase.auth.getSession()).data.session : null;
       const recipients = buildingMembers.filter(m => m.email && m.status === 'active').map(m => ({ email: m.email, name: m.name }));
       const res = await fetch(`${sbUrl}/functions/v1/send-meeting-notice`, {
@@ -191,17 +195,16 @@ export default function BoardRoomPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.sent > 0) alert(`Meeting notice emailed to ${data.sent} member${data.sent !== 1 ? 's' : ''}.`);
-        else alert('Meeting saved. No recipients to email.');
-      } else { alert('Meeting saved but email failed to send.'); }
-    } catch { alert('Meeting saved but email failed to send.'); }
+        if (data.sent > 0) console.log(`Meeting notice emailed to ${data.sent} member${data.sent !== 1 ? 's' : ''}.`);
+      } else { console.error('Meeting saved but email failed to send.'); }
+    } catch { console.error('Meeting saved but email failed to send.'); }
     finally { setSendingEmail(false); }
   };
 
   const saveMeeting = () => {
-    if (!mForm.title || !mForm.date) { alert('Title and date required'); return; }
+    if (!mForm.title || !mForm.date) return;
     const agenda = mForm.agenda.split('\n').map(s => s.trim()).filter(Boolean);
-    if (agenda.length === 0) { alert('At least one agenda item is required'); return; }
+    if (agenda.length === 0) return;
     if (modal === 'addMeeting') {
       mtg.addMeeting({ title: mForm.title, type: mForm.type, status: mForm.status, date: mForm.date, time: mForm.time, location: mForm.location, virtualLink: mForm.virtualLink, agenda, notes: mForm.notes });
       const freshMeetings = useMeetingsStore.getState().meetings;
@@ -249,7 +252,7 @@ export default function BoardRoomPage() {
     }
   };
   const saveAttendees = () => { mtg.updateAttendees(targetId, { board: attForm.board, owners: attForm.owners.split('\n').map(s => s.trim()).filter(Boolean), guests: attForm.guests.split('\n').map(s => s.trim()).filter(Boolean) }); setModal(null); };
-  const handleCreateCase = () => { if (!newCaseForm.title) { alert('Title required'); return; } const caseId = issues.createCase({ catId: newCaseForm.catId, sitId: newCaseForm.sitId, approach: 'self', title: newCaseForm.title, unit: 'N/A', owner: 'Board', priority: newCaseForm.priority as any, notes: `Linked from Board Room` }); setModal(null); };
+  const handleCreateCase = () => { if (!newCaseForm.title) return; const caseId = issues.createCase({ catId: newCaseForm.catId, sitId: newCaseForm.sitId, approach: 'self', title: newCaseForm.title, unit: 'N/A', owner: 'Board', priority: newCaseForm.priority as any, notes: `Linked from Board Room` }); setModal(null); };
 
   const GOV_SITS = [
     { id: 'board-meetings', label: 'Board Meetings' }, { id: 'elections', label: 'Elections' },
@@ -283,10 +286,10 @@ export default function BoardRoomPage() {
               <button onClick={() => openAttendees(m)} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">Attendees</button>
               <button onClick={() => openMinutes(m)} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">{m.minutes ? 'Edit Minutes' : 'Add Minutes'}</button>
               <button onClick={() => { setTargetId(m.id); setPendingFile(null); setModal('addDocument'); }} className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-mist-50">📎 Documents</button>
-              {(m.status === 'SCHEDULED' || m.status === 'RESCHEDULED') && <button onClick={() => { if (confirm(`Send meeting notice for "${m.title}" to all building members?`)) sendMeetingNotice({ title: m.title, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda }); }} disabled={sendingEmail} className="px-3 py-1.5 border border-accent-200 text-accent-700 rounded-lg text-xs font-medium hover:bg-accent-50 disabled:opacity-50">{sendingEmail ? 'Sending...' : '📧 Send Notice'}</button>}
+              {(m.status === 'SCHEDULED' || m.status === 'RESCHEDULED') && <button onClick={() => { sendMeetingNotice({ title: m.title, date: m.date, time: m.time, location: m.location, virtualLink: m.virtualLink, agenda: m.agenda }); }} disabled={sendingEmail} className="px-3 py-1.5 border border-accent-200 text-accent-700 rounded-lg text-xs font-medium hover:bg-accent-50 disabled:opacity-50">{sendingEmail ? 'Sending...' : '📧 Send Notice'}</button>}
               <button onClick={() => { setTargetId(m.id); setNewCaseForm({ catId: 'governance', sitId: 'board-meetings', title: `${m.title} — `, priority: 'medium' }); setModal('createCaseForMeeting'); }} className="px-3 py-1.5 border border-violet-200 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-50">+ Case</button>
               <button onClick={() => { setTargetId(m.id); setLinkCaseId(''); setModal('linkCaseToMeeting'); }} className="px-3 py-1.5 border border-violet-200 text-violet-700 rounded-lg text-xs font-medium hover:bg-violet-50">🔗 Link Case</button>
-              <button onClick={() => { if (confirm('Delete?')) mtg.deleteMeeting(m.id); }} className="px-3 py-1.5 text-red-500 text-xs font-medium hover:text-red-700">Delete</button>
+              <button onClick={() => { mtg.deleteMeeting(m.id); undoable({ label: 'Meeting deleted', commit: () => {}, undo: () => mtg.addMeeting(m) }); }} className="px-3 py-1.5 text-red-500 text-xs font-medium hover:text-red-700">Delete</button>
             </div>}
             {m.notes && <div className="bg-mist-50 rounded-lg p-3 text-sm text-ink-600">{m.notes}</div>}
             {m.agenda.length > 0 && (<div><p className="font-bold text-ink-900 mb-2">Agenda</p><div className="bg-mist-50 rounded-lg p-4 space-y-2">{m.agenda.map((item, i) => (<div key={i} className="flex items-start gap-3 text-sm"><span className="w-6 h-6 rounded-full bg-accent-100 text-accent-700 flex items-center justify-center shrink-0 text-xs font-bold">{i + 1}</span><span className="text-ink-700">{item}</span></div>))}</div></div>)}
@@ -328,10 +331,8 @@ export default function BoardRoomPage() {
                           const minutesSummary = m.minutes ? `\n\nMinutes Summary:\n${m.minutes.slice(0, 500)}${m.minutes.length > 500 ? '...' : ''}` : '';
                           const recapBody = `The ${m.title} was held on ${new Date(m.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}. Minutes have been approved by the board.\n\nAgenda items discussed:\n${agendaSummary}${minutesSummary}`;
                           setTimeout(() => {
-                            if (confirm(`Minutes approved! Would you like to post a meeting recap to the Community Room?`)) {
-                              setForm({ annTitle: `${m.title} — Recap & Approved Minutes`, annBody: recapBody, annCategory: 'meeting', annPinned: 'false', annSendEmail: 'false' });
-                              setModal('addAnnouncement');
-                            }
+                            setForm({ annTitle: `${m.title} — Recap & Approved Minutes`, annBody: recapBody, annCategory: 'meeting', annPinned: 'false', annSendEmail: 'false' });
+                            setModal('addAnnouncement');
                           }, 300);
                         }
                       }}
@@ -377,15 +378,7 @@ export default function BoardRoomPage() {
   // ─── Tab definitions ───
   const pendingCommsCount = comp.communications.filter(c => c.status === 'pending').length;
   const openCasesCount = issues.cases.filter(c => c.status === 'open').length;
-  const V1_TABS: { id: TabId; label: string; badge?: number }[] = [
-    { id: 'duties', label: 'Duties & Roles' },
-    { id: 'runbook', label: 'Governance Calendar', badge: (overdueFilings + catScores.flatMap(c => c.items).filter(i => i.scope === 'governance' && !isItemComplete(i.id, i.howTo.length)).length) || undefined },
-    { id: 'dailyops', label: 'Daily Operations', badge: openCasesCount || undefined },
-    { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
-    { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
-    { id: 'communications', label: 'Communications', badge: pendingCommsCount || undefined },
-  ];
-  const V2_TABS: { id: TabId; label: string; badge?: number }[] = [
+  const TABS: { id: TabId; label: string; badge?: number }[] = [
     { id: 'before', label: 'Before the Meeting' },
     { id: 'meeting_day', label: 'Meeting Day' },
     { id: 'after', label: 'After' },
@@ -393,7 +386,6 @@ export default function BoardRoomPage() {
     { id: 'cases', label: 'Cases', badge: openCasesCount || undefined },
     { id: 'roles', label: 'Roles' },
   ];
-  const TABS = v2BoardRoom ? V2_TABS : V1_TABS;
 
   return (
     <div className="space-y-0">
@@ -530,8 +522,8 @@ export default function BoardRoomPage() {
           </div>);
         })()}
 
-        {/* ═══ RUNBOOK TAB — v2Drawers compact list ═══ */}
-        {tab === 'runbook' && v2Drawers && (() => {
+        {/* ═══ RUNBOOK TAB — true compact list ═══ */}
+        {tab === 'runbook' && true && (() => {
           const allItems = catScores.flatMap(c => c.items).filter(i => i.scope === 'governance');
           const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
 
@@ -631,7 +623,7 @@ export default function BoardRoomPage() {
         })()}
 
         {/* Runbook Drawer (v2) */}
-        {v2Drawers && drawerItemId && (
+        {true && drawerItemId && (
           <RunbookDrawer
             itemId={drawerItemId}
             onClose={() => setDrawerItemId(null)}
@@ -643,7 +635,7 @@ export default function BoardRoomPage() {
         )}
 
         {/* ═══ RUNBOOK TAB (legacy — with filings integrated) ═══ */}
-        {tab === 'runbook' && !v2Drawers && (() => {
+        {tab === 'runbook' && !true && (() => {
           const allItems = catScores.flatMap(c => c.items).filter(i => i.scope === 'governance');
           const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
           const inProgressCount = allItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length;
@@ -747,7 +739,7 @@ export default function BoardRoomPage() {
                         {fi.status === 'pending' && <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Mark Filed</button>}
                       </div>
                     </div>
-                    <button onClick={() => { if (confirm('Remove?')) comp.deleteFiling(fi.id); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
+                    <button onClick={() => { comp.deleteFiling(fi.id); undoable({ label: 'Filing removed', commit: () => {}, undo: () => {} }); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
                   </div>);
                 }
                 const { item, catLabel, catIcon } = u;
@@ -821,16 +813,14 @@ export default function BoardRoomPage() {
                     const promptComm = (itemTask: string) => {
                       if (!requiresComm) return;
                       setTimeout(() => {
-                        if (confirm(`"${itemTask}" is complete. This item may require owner notification. Would you like to draft a communication?`)) {
-                          sf('commType', 'notice');
-                          sf('commSubject', itemTask);
-                          sf('commDate', new Date().toISOString().split('T')[0]);
-                          sf('commMethod', 'email');
-                          sf('commRecipients', 'All owners (50 units)');
-                          sf('commRespondedBy', currentUser?.name || '');
-                          sf('commNotes', `Auto-generated from compliance runbook: ${itemTask}`);
-                          setModal('addComm');
-                        }
+                        sf('commType', 'notice');
+                        sf('commSubject', itemTask);
+                        sf('commDate', new Date().toISOString().split('T')[0]);
+                        sf('commMethod', 'email');
+                        sf('commRecipients', 'All owners (50 units)');
+                        sf('commRespondedBy', currentUser?.name || '');
+                        sf('commNotes', `Auto-generated from compliance runbook: ${itemTask}`);
+                        setModal('addComm');
                       }, 200);
                     };
                     const toggleStep = (si: number) => {
@@ -940,7 +930,7 @@ export default function BoardRoomPage() {
                             {fi.status === 'pending' && <button onClick={() => { setTargetId(fi.id); setForm({ filedDate: new Date().toISOString().split('T')[0], confirmationNum: '' }); setModal('markFiled'); }} className="px-3 py-1 bg-sage-600 text-white rounded text-xs font-medium hover:bg-sage-700">Mark Filed</button>}
                           </div>
                         </div>
-                        <button onClick={() => { if (confirm('Remove?')) comp.deleteFiling(fi.id); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
+                        <button onClick={() => { comp.deleteFiling(fi.id); undoable({ label: 'Filing removed', commit: () => {}, undo: () => {} }); }} className="text-xs text-red-400 hover:text-red-600 shrink-0">Remove</button>
                       </div>);
                     })}
                   </div>
@@ -1073,7 +1063,7 @@ export default function BoardRoomPage() {
         {/* ═══ V2 TABS ═══ */}
         {/* Before / Meeting Day / After — render existing Meetings tab content */}
         {tab === 'before' && (
-          v2BoardRoom
+          true
             ? <BeforeTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
             : (() => {
                 return (<div className="space-y-6">
@@ -1086,7 +1076,7 @@ export default function BoardRoomPage() {
         )}
 
         {tab === 'meeting_day' && (
-          v2BoardRoom
+          true
             ? <MeetingDayTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
             : (() => {
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -1106,7 +1096,7 @@ export default function BoardRoomPage() {
         )}
 
         {tab === 'after' && (
-          v2BoardRoom
+          true
             ? <AfterTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
             : (() => {
                 return (<div className="space-y-6">
@@ -1120,12 +1110,8 @@ export default function BoardRoomPage() {
         {/* Outbox tab */}
         {tab === 'outbox' && <OutboxTab />}
 
-        {/* Cases tab — v2Cases renders CasesTab; fallback to IssuesPage */}
-        {tab === 'cases' && (
-          tenant.features.v2Cases
-            ? <CasesTab />
-            : <IssuesPage embedded />
-        )}
+        {/* Cases tab */}
+        {tab === 'cases' && <CasesTab />}
 
         {/* Roles tab — combined Role Charters + Calendar */}
         {tab === 'roles' && <RolesCalendarTab />}
@@ -1133,9 +1119,9 @@ export default function BoardRoomPage() {
       </div>
 
       {/* ═══ MODALS ═══ */}
-      {modal === 'addFiling' && (<Modal title="Add Regulatory Filing" onClose={() => setModal(null)} onSave={() => { if (!f('name') || !f('dueDate')) { alert('Name and due date required'); return; } comp.addFiling({ name: f('name'), category: f('category'), dueDate: f('dueDate'), responsible: f('responsible'), recurrence: f('recurrence'), legalRef: f('legalRef'), notes: f('notes') }); setModal(null); }}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Filing Name *</label><input value={f('name')} onChange={e => sf('name', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Annual Fire Safety Inspection" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['tax','government','inspection','financial','governance','other'].map(c => <option key={c}>{c}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Recurrence</label><select value={f('recurrence')} onChange={e => sf('recurrence', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['annual','biennial','quarterly','one-time'].map(r => <option key={r}>{r}</option>)}</select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Date *</label><input type="date" value={f('dueDate')} onChange={e => sf('dueDate', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Responsible</label><select value={f('responsible')} onChange={e => sf('responsible', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['President','Vice President','Treasurer','Secretary','Member at Large'].map(r => <option key={r}>{r}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Legal Reference</label><input value={f('legalRef')} onChange={e => sf('legalRef', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="DC Code § 29-102.11" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
+      {modal === 'addFiling' && (<Modal title="Add Regulatory Filing" onClose={() => setModal(null)} onSave={() => { if (!f('name') || !f('dueDate')) return; comp.addFiling({ name: f('name'), category: f('category'), dueDate: f('dueDate'), responsible: f('responsible'), recurrence: f('recurrence'), legalRef: f('legalRef'), notes: f('notes') }); setModal(null); }}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Filing Name *</label><input value={f('name')} onChange={e => sf('name', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Annual Fire Safety Inspection" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Category</label><select value={f('category')} onChange={e => sf('category', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['tax','government','inspection','financial','governance','other'].map(c => <option key={c}>{c}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Recurrence</label><select value={f('recurrence')} onChange={e => sf('recurrence', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['annual','biennial','quarterly','one-time'].map(r => <option key={r}>{r}</option>)}</select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Date *</label><input type="date" value={f('dueDate')} onChange={e => sf('dueDate', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Responsible</label><select value={f('responsible')} onChange={e => sf('responsible', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['President','Vice President','Treasurer','Secretary','Member at Large'].map(r => <option key={r}>{r}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Legal Reference</label><input value={f('legalRef')} onChange={e => sf('legalRef', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="DC Code § 29-102.11" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
       {modal === 'markFiled' && (<Modal title="Mark as Filed" onClose={() => setModal(null)} onSave={() => { const filing = comp.filings.find(fi => fi.id === targetId); comp.markFilingComplete(targetId, f('filedDate'), f('confirmationNum')); if (filing) { comp.addCommunication({ type: 'notice', subject: `Filing Complete: ${filing.name}`, date: f('filedDate') || new Date().toISOString().split('T')[0], method: 'portal', recipients: 'Board record', respondedBy: filing.responsible, status: 'sent', notes: `Filed ${f('filedDate')}. Confirmation: ${f('confirmationNum') || 'N/A'}. ${filing.legalRef}` }); } setModal(null); }} saveLabel="Confirm Filed"><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Date Filed</label><input type="date" value={f('filedDate')} onChange={e => sf('filedDate', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Confirmation #</label><input value={f('confirmationNum')} onChange={e => sf('confirmationNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>)}
-      {modal === 'addComm' && (<Modal title="Log Communication" onClose={() => setModal(null)} onSave={() => { if (!f('subject')) { alert('Subject required'); return; } comp.addCommunication({ type: f('type'), subject: f('subject'), date: f('date'), method: f('method'), recipients: f('recipients'), respondedBy: null, status: f('status') as any, notes: f('notes') }); setModal(null); }}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={f('type')} onChange={e => sf('type', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['notice','minutes','financial','response','resale','violation','other'].map(t => <option key={t}>{t}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Subject *</label><input value={f('subject')} onChange={e => sf('subject', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Date</label><input type="date" value={f('date')} onChange={e => sf('date', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method')} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['email','mail','mail+email','email+portal','certified mail','posted'].map(m => <option key={m}>{m}</option>)}</select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Recipients</label><input value={f('recipients')} onChange={e => sf('recipients', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['sent','pending','draft'].map(s => <option key={s}>{s}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
+      {modal === 'addComm' && (<Modal title="Log Communication" onClose={() => setModal(null)} onSave={() => { if (!f('subject')) return; comp.addCommunication({ type: f('type'), subject: f('subject'), date: f('date'), method: f('method'), recipients: f('recipients'), respondedBy: null, status: f('status') as any, notes: f('notes') }); setModal(null); }}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Type</label><select value={f('type')} onChange={e => sf('type', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['notice','minutes','financial','response','resale','violation','other'].map(t => <option key={t}>{t}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Subject *</label><input value={f('subject')} onChange={e => sf('subject', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Date</label><input type="date" value={f('date')} onChange={e => sf('date', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method')} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['email','mail','mail+email','email+portal','certified mail','posted'].map(m => <option key={m}>{m}</option>)}</select></div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Recipients</label><input value={f('recipients')} onChange={e => sf('recipients', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{['sent','pending','draft'].map(s => <option key={s}>{s}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Notes</label><textarea value={f('notes')} onChange={e => sf('notes', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
 
       {/* Meeting modals */}
       {(modal === 'addMeeting' || modal === 'editMeeting') && (<Modal title={modal === 'addMeeting' ? 'Schedule Meeting' : 'Edit Meeting'} onClose={() => setModal(null)} onSave={saveMeeting} saveLabel={modal === 'addMeeting' ? 'Schedule' : 'Save'}><div className="space-y-3">
@@ -1221,8 +1207,8 @@ export default function BoardRoomPage() {
       {modal === 'attendees' && (<Modal title="Manage Attendees" onClose={() => setModal(null)} onSave={saveAttendees}><div className="space-y-4"><div><label className="block text-xs font-medium text-ink-700 mb-2">Board Members</label><div className="space-y-1">{board.map(b => (<label key={b.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={attForm.board.includes(b.name)} onChange={e => { if (e.target.checked) setAttForm({ ...attForm, board: [...attForm.board, b.name] }); else setAttForm({ ...attForm, board: attForm.board.filter(n => n !== b.name) }); }} className="h-4 w-4" />{b.name} <span className="text-ink-400">({b.role})</span></label>))}</div></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Owners (one per line)</label><textarea value={attForm.owners} onChange={e => setAttForm({ ...attForm, owners: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={3} /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Guests</label><textarea value={attForm.guests} onChange={e => setAttForm({ ...attForm, guests: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" rows={2} /></div></div></Modal>)}
       {modal === 'minutes' && (<Modal title="Meeting Minutes" onClose={() => setModal(null)} onSave={() => { mtg.updateMinutes(targetId, minText); setModal(null); }} wide><textarea value={minText} onChange={e => setMinText(e.target.value)} className="w-full px-4 py-3 border border-ink-200 rounded-lg text-sm font-mono" rows={12} /></Modal>)}
 
-      {modal === 'addFilingAtt' && (<Modal title="Attach Proof of Filing" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return alert('Select a file.'); comp.addFilingAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" label="Drop proof of filing here or click to browse" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
-      {modal === 'addRunbookAtt' && (<Modal title="Attach Document to Checklist Item" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return alert('Select a file.'); comp.addItemAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
+      {modal === 'addFilingAtt' && (<Modal title="Attach Proof of Filing" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return; comp.addFilingAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" label="Drop proof of filing here or click to browse" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
+      {modal === 'addRunbookAtt' && (<Modal title="Attach Document to Checklist Item" onClose={() => setModal(null)} onSave={() => { if (!pendingFile) return; comp.addItemAttachment(targetId, { name: pendingFile.name, size: pendingFile.size, uploadedAt: new Date().toISOString().split('T')[0] }); setModal(null); setPendingFile(null); }} saveLabel="Attach"><div className="space-y-3"><FileUpload onFileSelected={fObj => setPendingFile(fObj)} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />{pendingFile && <div className="bg-sage-50 border border-sage-200 rounded-lg p-3"><p className="text-xs text-sage-700">📎 <strong>{pendingFile.name}</strong> ({pendingFile.size})</p></div>}</div></Modal>)}
       {modal === 'linkCaseToMeeting' && (<Modal title="Link Existing Case" onClose={() => setModal(null)} onSave={() => { if (linkCaseId) { mtg.linkCase(targetId, linkCaseId); setModal(null); } }} saveLabel="Link"><div className="space-y-3"><p className="text-xs text-ink-500">Select an existing case from Case Ops.</p><select value={linkCaseId} onChange={e => setLinkCaseId(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select a case...</option>{issues.cases.filter(c => c.status !== 'closed').map(c => <option key={c.id} value={c.id}>{c.id}: {c.title} ({c.status})</option>)}</select></div></Modal>)}
       {modal === 'createCaseForMeeting' && (<Modal title="Create Case" onClose={() => setModal(null)} onSave={handleCreateCase} saveLabel="Create"><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Case Title *</label><input value={newCaseForm.title} onChange={e => setNewCaseForm({ ...newCaseForm, title: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Workflow</label><select value={newCaseForm.sitId} onChange={e => setNewCaseForm({ ...newCaseForm, sitId: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">{GOV_SITS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Priority</label><select value={newCaseForm.priority} onChange={e => setNewCaseForm({ ...newCaseForm, priority: e.target.value })} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div></div></div></Modal>)}
       {modal === 'addDocument' && (() => { const meeting = meetings.find(m => m.id === targetId); return (
@@ -1256,7 +1242,7 @@ export default function BoardRoomPage() {
 
       {/* Announcement modal */}
       {modal === 'addAnnouncement' && (<Modal title="Post Announcement" onClose={() => { if (!sendingEmail) setModal(null); }} onSave={async () => {
-        if (!f('annTitle') || !f('annBody')) { alert('Title and body required'); return; }
+        if (!f('annTitle') || !f('annBody')) return;
         const boardMember = board.find(b => b.name === currentUser.name);
         const roleName = boardMember?.role || currentRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
         comp.addAnnouncement({
@@ -1276,7 +1262,7 @@ export default function BoardRoomPage() {
             const session = supabase ? (await supabase.auth.getSession()).data.session : null;
             const recipients = buildingMembers.filter(m => m.email && m.status === 'active').map(m => ({ email: m.email, name: m.name }));
             if (!sbUrl || !sbKey) {
-              alert('Announcement posted! Email not sent — Supabase not configured.');
+              console.error('Announcement posted! Email not sent — Supabase not configured.');
             } else {
               const res = await fetch(`${sbUrl}/functions/v1/send-announcement`, {
                 method: 'POST',
@@ -1296,22 +1282,20 @@ export default function BoardRoomPage() {
               if (res.ok) {
                 const data = await res.json();
                 if (data.sent > 0) {
-                  alert(`Announcement posted and emailed to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}.`);
-                } else {
-                  alert('Announcement posted! Email sending is not configured yet — deploy the send-announcement Edge Function.');
+                  console.log(`Announcement posted and emailed to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}.`);
                 }
               } else {
                 const errText = await res.text();
                 if (res.status === 404) {
-                  alert('Announcement posted! To enable email, deploy the Edge Function:\nsupabase functions deploy send-announcement --no-verify-jwt');
+                  console.error('Announcement posted! To enable email, deploy the Edge Function.');
                 } else {
-                  alert(`Announcement posted but email failed: ${errText.slice(0, 100)}`);
+                  console.error(`Announcement posted but email failed: ${errText.slice(0, 100)}`);
                 }
               }
             }
           } catch (e) {
             console.error('Announcement email error:', e);
-            alert('Announcement posted! Email sending encountered an error.');
+            console.error('Announcement posted! Email sending encountered an error.');
           } finally {
             setSendingEmail(false);
           }

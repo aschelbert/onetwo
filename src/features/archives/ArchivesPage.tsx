@@ -8,6 +8,7 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { generateReportSnapshot } from '@/features/archives/reports/reportGenerators';
 import CaseReportRenderer from '@/features/archives/reports/renderers/CaseReportRenderer';
@@ -292,6 +293,7 @@ export default function ArchivesPage() {
   const mtg = useMeetingsStore();
   const building = useBuildingStore();
   const finStore = useFinancialStore();
+  const { run: undoable } = useUndoableAction();
 
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
@@ -406,8 +408,8 @@ export default function ArchivesPage() {
       return { pct: c.items.length > 0 ? Math.round((passed / c.items.length) * 100) : 100, weight: c.weight };
     });
     const totalWeight = catScores.reduce((s, c) => s + c.weight, 0);
-    const healthIndex = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
-    const grade = healthIndex >= 90 ? 'A' : healthIndex >= 80 ? 'B' : healthIndex >= 70 ? 'C' : healthIndex >= 60 ? 'D' : 'F';
+    const healthPct = Math.round(catScores.reduce((s, c) => s + (c.pct * c.weight) / totalWeight, 0));
+    const grade = healthPct >= 90 ? 'A' : healthPct >= 80 ? 'B' : healthPct >= 70 ? 'C' : healthPct >= 60 ? 'D' : 'F';
 
     refreshResult.categories.forEach(cat => {
       cat.items.forEach(item => {
@@ -426,7 +428,7 @@ export default function ArchivesPage() {
       periodEnd: pEnd,
       createdAt: new Date().toISOString(),
       createdBy: currentUser?.name || 'Board Member',
-      compliance: { runbookCompletions: { ...comp.completions }, healthIndex, grade },
+      compliance: { runbookCompletions: { ...comp.completions }, grade },
       regulatoryRefresh: {
         refreshedAt: refreshResult.refreshedAt,
         jurisdiction: refreshResult.jurisdiction,
@@ -456,7 +458,6 @@ export default function ArchivesPage() {
 
     archiveStore.addArchive(snapshot);
     setShowCreateArchiveModal(false);
-    alert(`✅ Archive created for FY ${year}.\n\nRegulatory refresh completed:\n• Jurisdiction: ${refreshResult.jurisdiction}\n• Documents detected: ${refreshResult.documentsDetected.length}\n• Compliance items: ${totalChecklistItems}\n• ${refreshResult.regulatoryNotes.length} regulatory notes`);
   };
 
   // ── Filtered reports ───────────────────────────────────────────────────────
@@ -581,7 +582,7 @@ export default function ArchivesPage() {
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {isBoard && (
                             <button
-                              onClick={e => { e.stopPropagation(); if (confirm('Delete this report?')) { reportsStore.deleteReport(r.id); if (canonical) reportStore.deleteReport(canonical.id); if (isExpanded) setExpandedReportId(null); } }}
+                              onClick={e => { e.stopPropagation(); reportsStore.deleteReport(r.id); if (canonical) reportStore.deleteReport(canonical.id); if (isExpanded) setExpandedReportId(null); undoable({ label: 'Report deleted', commit: () => {}, undo: () => {} }); }}
                               className="text-xs text-red-400 hover:text-red-600 px-1"
                             >
                               ×
@@ -679,7 +680,7 @@ export default function ArchivesPage() {
                         </div>
                         {isBoard && (
                           <button
-                            onClick={e => { e.stopPropagation(); if (confirm('Delete this archive? This cannot be undone.')) archiveStore.deleteArchive(a.id); }}
+                            onClick={e => { e.stopPropagation(); archiveStore.deleteArchive(a.id); undoable({ label: 'Archive deleted', commit: () => {}, undo: () => {} }); }}
                             className="text-xs text-red-400 hover:text-red-600 ml-2"
                           >Delete</button>
                         )}
@@ -938,7 +939,7 @@ function ArchiveDetail({ archive, section, setSection }: { archive: ArchiveSnaps
       {section === 'overview' && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Card label="Compliance Grade" val={a.compliance.grade} sub={`${a.compliance.healthIndex}%`} />
+            <Card label="Compliance Grade" val={a.compliance.grade} />
             <Card label="Meetings Held" val={String(a.meetings.filter(m => m.status === 'COMPLETED').length)} sub={`${a.meetings.length} total`} />
             <Card label="Filings Complete" val={String(a.filings.filter(f => f.status === 'filed').length)} sub={`of ${a.filings.length}`} />
             <Card label="Collection Rate" val={`${a.financial.collectionRate}%`} sub={fmt(a.financial.totalAR) + ' AR'} />
@@ -963,8 +964,8 @@ function ArchiveDetail({ archive, section, setSection }: { archive: ArchiveSnaps
         <div className="space-y-3">
           <h3 className="font-display text-lg font-bold text-ink-900">Compliance Runbook Snapshot</h3>
           <div className="flex items-center gap-3 mb-4">
-            <span className={`text-3xl font-bold ${a.compliance.healthIndex >= 80 ? 'text-sage-600' : a.compliance.healthIndex >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>{a.compliance.grade}</span>
-            <span className="text-sm text-ink-500">Health Index: {a.compliance.healthIndex}%</span>
+            <span className={`text-3xl font-bold ${a.compliance.grade <= 'B' ? 'text-sage-600' : a.compliance.grade <= 'C' ? 'text-yellow-600' : 'text-red-600'}`}>{a.compliance.grade}</span>
+            <span className="text-sm text-ink-500">Compliance Grade</span>
           </div>
           <div className="bg-mist-50 rounded-xl border border-mist-200 p-4 space-y-2">
             <p className="text-xs font-bold text-ink-800 mb-2">Checklist Item Status</p>

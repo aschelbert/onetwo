@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import type { FeeScheduleItem } from '@/store/useFeeScheduleStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
@@ -34,6 +35,7 @@ function freqLabel(freq: string): string {
 
 export default function FeeScheduleTab() {
   const { currentRole } = useAuthStore();
+  const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const { fees, addFee, updateFee, removeFee, toggleFee } = useFeeScheduleStore();
 
@@ -78,7 +80,7 @@ export default function FeeScheduleTab() {
   };
 
   const handleSave = () => {
-    if (!f('name')) { alert('Name is required'); return; }
+    if (!f('name')) return;
     const data = {
       name: f('name'),
       category: (f('category') || 'assessment') as FeeScheduleItem['category'],
@@ -212,7 +214,7 @@ export default function FeeScheduleTab() {
                   <div className="flex items-center justify-end gap-2">
                     <button onClick={() => openEdit(fee)} className="text-xs text-accent-600 font-medium hover:text-accent-700">Edit</button>
                     {!fee.isDefault && (
-                      <button onClick={() => { if (confirm(`Delete "${fee.name}"?`)) removeFee(fee.id); }} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      <button onClick={() => { removeFee(fee.id); runUndoable({ label: `Deleted ${fee.name}`, undo: () => {}, commit: () => {} }); }} className="text-xs text-red-400 hover:text-red-600">Delete</button>
                     )}
                   </div>
                 </td>

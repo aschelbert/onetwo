@@ -1,5 +1,6 @@
 import { useState, Fragment } from 'react';
 import { usePlatformAdminStore, TIER_FEATURES, TENANT_ROLES, PERMISSION_ACTIONS, FEATURE_GROUPS, CORE_FEATURES, type SubscriptionTier, type Tenant } from '@/store/usePlatformAdminStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 
 const FEATURE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', boardRoom: 'Board Room', building: 'The Building',
@@ -21,6 +22,7 @@ const ROLE_COLORS: Record<string, string> = {
 export default function PermissionsTab() {
   const store = usePlatformAdminStore();
   const { permissions } = store;
+  const { run: undoable } = useUndoableAction();
   const [selectedRole, setSelectedRole] = useState('board_member');
 
   const role = TENANT_ROLES.find(r => r.id === selectedRole)!;
@@ -89,7 +91,7 @@ export default function PermissionsTab() {
           className="px-4 py-2 bg-sage-600 text-white rounded-lg text-sm font-medium hover:bg-sage-700">Grant All</button>
         <button onClick={() => store.bulkUpdatePermissions(selectedRole, 'viewonly')}
           className="px-4 py-2 bg-ink-100 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-200">Set View-Only</button>
-        <button onClick={() => { if (confirm('Revoke all permissions for this role?')) store.bulkUpdatePermissions(selectedRole, 'revoke'); }}
+        <button onClick={() => { store.bulkUpdatePermissions(selectedRole, 'revoke'); undoable({ label: 'All permissions revoked', commit: () => {}, undo: () => store.bulkUpdatePermissions(selectedRole, 'grant') }); }}
           className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Revoke All</button>
       </div>
 

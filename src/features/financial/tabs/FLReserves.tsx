@@ -207,7 +207,7 @@ export default function FLReserves() {
       {(showAdd || editId) && (
         <Modal title={editId ? 'Edit Reserve Item' : 'Add Reserve Item'} onClose={() => { setShowAdd(false); setEditId(null); }} onSave={() => {
           const data = { name: form.name, estimatedCost: parseFloat(form.estimatedCost) || 0, currentFunding: parseFloat(form.currentFunding) || 0, usefulLife: parseFloat(form.usefulLife) || 0, lastReplaced: form.lastReplaced, yearsRemaining: parseFloat(form.yearsRemaining) || 0, isContingency: form.isContingency };
-          if (!data.name) { alert('Name required'); return; }
+          if (!data.name) return;
           if (editId) { updateReserveItem(editId, data); } else { addReserveItem(data); }
           setShowAdd(false); setEditId(null);
           setForm({ name: '', estimatedCost: '', currentFunding: '', usefulLife: '', lastReplaced: '', yearsRemaining: '', isContingency: false });

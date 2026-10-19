@@ -59,18 +59,19 @@ export default function FinancialPage() {
   const store = useFinancialStore();
   const { activeTab, setActiveTab, seedGeneralLedger, generalLedger, getBalanceSheet, getIncomeMetrics, getBudgetVariance, reserveItems } = store;
   const tenant = useTenantContext();
-  const isV2 = tenant.features.v2FiscalLens ?? false;
+  // v2 flags removed -- Fiscal Lens v2 is the only path
+  const isV2 = true;
 
   useEffect(() => {
     if (generalLedger.length === 0) seedGeneralLedger();
   }, []);
 
-  // If v2 is enabled and current tab is not in v2 tabs, reset to this_month
+  // Ensure current tab is valid for v2 tabs
   useEffect(() => {
-    if (isV2 && !V2_TABS.some(t => t.id === activeTab)) {
+    if (!V2_TABS.some(t => t.id === activeTab)) {
       setActiveTab('this_month');
     }
-  }, [isV2]);
+  }, []);
 
   const tabs = isV2 ? V2_TABS : LEGACY_TABS;
 
@@ -100,6 +101,7 @@ export default function FinancialPage() {
     meetings: [],
     proofCoverage: 0,
     documentsCurrentPct: 0,
+    reportsGeneratedPct: 0,
   };
   const boardHealth = computeBoardHealth(financialHealthInputs);
   const financialScore = boardHealth.financial;

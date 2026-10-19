@@ -31,11 +31,8 @@ const BOTTOM_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   'admin-console': Shield,
 };
 
-// Primary tabs shown in the bottom bar (by nav item id)
-const PRIMARY_IDS = new Set(['dashboard', 'boardroom', 'financial', 'community']);
-
-// v2Home bottom nav: Home, Board Room, Fiscal Lens, More
-const V2_PRIMARY: NavItem[] = [
+// Bottom nav: Home, Board Room, Fiscal Lens, More
+const PRIMARY_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'home' },
   { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
   { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
@@ -49,7 +46,7 @@ export default function BottomNav() {
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isV2Home = tenant.features.v2Home && (currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER');
+  const isBoardOrPM = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
   const navItems = permissions.length > 0
     ? getNavigationForRole(currentRole, permissions, tenant.features)
@@ -57,12 +54,12 @@ export default function BottomNav() {
 
   const filtered = navItems.filter(i => !i.separator);
 
-  const primaryTabs = isV2Home
-    ? V2_PRIMARY
-    : filtered.filter(i => PRIMARY_IDS.has(i.id));
-  const overflowTabs = isV2Home
+  const primaryTabs = isBoardOrPM
+    ? PRIMARY_NAV
+    : filtered.filter(i => ['dashboard', 'community', 'financial'].includes(i.id));
+  const overflowTabs = isBoardOrPM
     ? filtered.filter(i => !['dashboard', 'boardroom', 'financial'].includes(i.id))
-    : filtered.filter(i => !PRIMARY_IDS.has(i.id));
+    : filtered.filter(i => !['dashboard', 'community', 'financial'].includes(i.id));
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';

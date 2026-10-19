@@ -23,24 +23,7 @@ import { usePayrollStore } from '@/store/usePayrollStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
-/**
- * Dev-only override: merge localStorage JSON over v2 feature flags in non-production builds.
- */
-function applyV2Overrides(features: Record<string, boolean>): Record<string, boolean> {
-  if (!import.meta.env.DEV) return features;
-  try {
-    const raw = localStorage.getItem('onetwo_v2_flags');
-    if (raw) {
-      const overrides = JSON.parse(raw);
-      if (overrides && typeof overrides === 'object') {
-        return { ...features, ...overrides };
-      }
-    }
-  } catch {
-    // ignore malformed JSON
-  }
-  return features;
-}
+// v2 flags have been removed -- all tenants are on v2 now.
 
 export interface OnboardingState {
   accountCreated: boolean;
@@ -182,7 +165,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         subdomain: t.subdomain,
         status: t.status,
         tier: sub?.tier || 'compliance_pro',
-        features: feat ? applyV2Overrides({
+        features: feat ? ({
           fiscalLens: feat.fiscal_lens,
           caseOps: feat.case_ops,
           complianceRunbook: feat.compliance_runbook,
@@ -193,12 +176,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           communityPortal: feat.community_portal,
           vendorManagement: feat.vendor_management,
           reserveStudyTools: feat.reserve_study_tools,
-          v2Home: feat.v2_home ?? false,
-          v2Drawers: feat.v2_drawers ?? false,
-          v2BoardRoom: feat.v2_board_room ?? false,
-          v2FiscalLens: feat.v2_fiscal_lens ?? false,
-          v2Cases: feat.v2_cases ?? false,
-          v2Building: feat.v2_building ?? false,
         }) : {},
         address: {
           street: addr.street || '',
@@ -372,7 +349,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           subdomain: t.subdomain,
           status: t.status,
           tier: sub?.tier || 'compliance_pro',
-          features: feat ? applyV2Overrides({
+          features: feat ? {
             fiscalLens: feat.fiscal_lens,
             caseOps: feat.case_ops,
             complianceRunbook: feat.compliance_runbook,
@@ -383,13 +360,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
             communityPortal: feat.community_portal,
             vendorManagement: feat.vendor_management,
             reserveStudyTools: feat.reserve_study_tools,
-            v2Home: feat.v2_home ?? false,
-            v2Drawers: feat.v2_drawers ?? false,
-            v2BoardRoom: feat.v2_board_room ?? false,
-            v2FiscalLens: feat.v2_fiscal_lens ?? false,
-            v2Cases: feat.v2_cases ?? false,
-            v2Building: feat.v2_building ?? false,
-          }) : {},
+          } : {},
           address: {
             street: addr.street || '',
             city: addr.city || '',

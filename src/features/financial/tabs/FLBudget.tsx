@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
 export default function FLBudget() {
   const store = useFinancialStore();
   const { getBudgetVariance, budgetCategories, addBudgetCategory, updateBudgetCategory, deleteBudgetCategory, getCategorySpent, addExpense, deleteExpense, getOperatingBudget, annualReserveContribution, setAnnualReserveContribution } = store;
+  const { run: undoable } = useUndoableAction();
 
   const [showAddCat, setShowAddCat] = useState(false);
   const [catForm, setCatForm] = useState({ name: '', budgeted: '' });
@@ -36,10 +38,7 @@ export default function FLBudget() {
 
   const handleAddCategory = () => {
     const budgeted = parseFloat(catForm.budgeted);
-    if (!catForm.name || !budgeted || budgeted <= 0) { alert('Fill all fields'); return; }
-    if (ob.totalAllocated + budgeted > ob.operatingBudget) {
-      if (!confirm(`Adding ${fmt(budgeted)} will exceed operating budget by ${fmt(ob.totalAllocated + budgeted - ob.operatingBudget)}.\n\nProceed anyway?`)) return;
-    }
+    if (!catForm.name || !budgeted || budgeted <= 0) return;
     addBudgetCategory(catForm.name, budgeted);
     setCatForm({ name: '', budgeted: '' });
     setShowAddCat(false);
@@ -48,19 +47,16 @@ export default function FLBudget() {
   const handleEditCategory = () => {
     if (!editCatId) return;
     const budgeted = parseFloat(editCatForm.budgeted);
-    if (!editCatForm.name || !budgeted || budgeted <= 0) { alert('Fill all fields'); return; }
+    if (!editCatForm.name || !budgeted || budgeted <= 0) return;
     const oldCat = budgetCategories.find(c => c.id === editCatId);
     const newTotal = ob.totalAllocated - (oldCat?.budgeted || 0) + budgeted;
-    if (newTotal > ob.operatingBudget) {
-      if (!confirm(`This change will exceed operating budget by ${fmt(newTotal - ob.operatingBudget)}.\n\nProceed anyway?`)) return;
-    }
     updateBudgetCategory(editCatId, { name: editCatForm.name, budgeted });
     setEditCatId(null);
   };
 
   const handleDeleteCategory = (id: string, name: string) => {
-    if (!confirm(`Delete category "${name}" and all its expense records?`)) return;
     deleteBudgetCategory(id);
+    undoable({ label: `Category "${name}" deleted`, commit: () => {}, undo: () => {} });
   };
 
   return (
@@ -243,7 +239,7 @@ export default function FLBudget() {
       {showReserveEdit && (
         <Modal title="Annual Reserve Contribution" onClose={() => setShowReserveEdit(false)} onSave={() => {
           const val = parseFloat(reserveInput);
-          if (isNaN(val) || val < 0) { alert('Enter a valid amount'); return; }
+          if (isNaN(val) || val < 0) return;
           setAnnualReserveContribution(val);
           setShowReserveEdit(false);
         }} saveLabel="Update">
@@ -302,7 +298,7 @@ export default function FLBudget() {
                 <div className="flex gap-2">
                   <button onClick={() => {
                     const amt = parseFloat(expForm.amount);
-                    if (!expForm.description || !amt || !expForm.vendor || !expForm.invoice) { alert('All fields required'); return; }
+                    if (!expForm.description || !amt || !expForm.vendor || !expForm.invoice) return;
                     addExpense(viewCat.id, { description: expForm.description, amount: amt, date: expForm.date, vendor: expForm.vendor, invoice: expForm.invoice });
                     setExpForm({ description: '', amount: '', date: new Date().toISOString().split('T')[0], vendor: '', invoice: '' });
                     setShowAddExp(false);
@@ -329,7 +325,7 @@ export default function FLBudget() {
                       </div>
                       <div className="text-right ml-4">
                         <p className="text-2xl font-bold text-ink-900">{fmt(exp.amount)}</p>
-                        <button onClick={() => { if (confirm('Delete this expense?')) deleteExpense(viewCat.id, exp.id); }} className="mt-2 text-xs text-red-600 hover:text-red-800">Delete</button>
+                        <button onClick={() => { deleteExpense(viewCat.id, exp.id); undoable({ label: 'Expense deleted', commit: () => {}, undo: () => {} }); }} className="mt-2 text-xs text-red-600 hover:text-red-800">Delete</button>
                       </div>
                     </div>
                   </div>

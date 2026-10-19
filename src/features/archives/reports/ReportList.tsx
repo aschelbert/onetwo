@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useReportStore } from '@/store/useReportStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import type { GeneratedReport, ReportCategory, ReportType } from '@/lib/services/reports';
 import { CATEGORY_MAP, REPORT_TYPE_MAP, CATEGORIES, REPORT_TYPES } from './reportCategories';
 import CaseReportRenderer from './renderers/CaseReportRenderer';
@@ -27,6 +28,7 @@ function ReportRenderer({ report }: { report: GeneratedReport }) {
 
 export default function ReportList() {
   const { reports, deleteReport } = useReportStore();
+  const { run: undoable } = useUndoableAction();
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState<ReportCategory | ''>('');
   const [filterType, setFilterType] = useState<ReportType | ''>('');
@@ -121,7 +123,7 @@ export default function ReportList() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={e => { e.stopPropagation(); if (confirm('Delete this report?')) { deleteReport(report.id); if (expandedId === report.id) setExpandedId(null); } }}
+                        onClick={e => { e.stopPropagation(); deleteReport(report.id); if (expandedId === report.id) setExpandedId(null); undoable({ label: 'Report deleted', commit: () => {}, undo: () => {} }); }}
                         className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium"
                       >
                         Delete

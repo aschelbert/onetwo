@@ -309,7 +309,7 @@ export default function AuthPage() {
 
   // ── Login handler (preserved) ──
   const handleLogin = async () => {
-    if (!email || !password) { alert('Please enter email and password.'); return; }
+    if (!email || !password) return;
 
     if (isBackendEnabled && supabase) {
       setLoginLoading(true);
@@ -320,7 +320,7 @@ export default function AuthPage() {
         });
 
         if (error) {
-          alert('Incorrect email or password.');
+          console.error('Incorrect email or password.');
           setLoginLoading(false);
           return;
         }
@@ -401,7 +401,7 @@ export default function AuthPage() {
             return;
           }
 
-          alert('Your account is not linked to a building yet. Contact your building administrator.');
+          console.error('Your account is not linked to a building yet. Contact your building administrator.');
           setLoginLoading(false);
           return;
         }
@@ -414,20 +414,20 @@ export default function AuthPage() {
     // Fall back to demo store
     const isDemoEnabled = import.meta.env.VITE_DEMO_ENABLED === 'true';
     if (!isDemoEnabled) {
-      alert('No account found with that email.');
+      console.error('No account found with that email.');
       return;
     }
     const member = buildingMembers.find(
       (m) => m.email.toLowerCase() === email.toLowerCase() && m.status === 'active'
     );
-    if (!member) { alert('No account found with that email.'); return; }
+    if (!member) { console.error('No account found with that email.'); return; }
     login(member);
   };
 
   // ── Invite code handler (inline on signup screen) ──
   const handleInviteCode = async () => {
     const code = inviteCode.trim().toUpperCase();
-    if (!code) { alert('Please enter your invitation code.'); return; }
+    if (!code) return;
 
     if (isBackendEnabled && supabase) {
       setInviteLoading(true);
@@ -439,7 +439,7 @@ export default function AuthPage() {
           setInviteLoading(false);
           return true; // valid
         } else if (data?.error) {
-          alert(data.error);
+          console.error(data.error);
           setInviteLoading(false);
           return false;
         }
@@ -451,7 +451,7 @@ export default function AuthPage() {
 
     // Demo fallback
     const inv = buildingInvites.find(i => i.code === code && i.status === 'pending');
-    if (!inv) { alert('Invalid or expired invitation code.'); return false; }
+    if (!inv) return false;
     setInviteMatch(inv);
     setAuthJoinRole(inv.role);
     return true;
@@ -459,8 +459,8 @@ export default function AuthPage() {
 
   // ── Signup handler (Screen 1 → creates auth user) ──
   const handleSignup = async () => {
-    if (!email) { alert('Please enter your email.'); return; }
-    if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+    if (!email) return;
+    if (!password || password.length < 6) return;
 
     // If invite code is entered, validate it first
     if (inviteCode.trim()) {
@@ -477,8 +477,8 @@ export default function AuthPage() {
 
   // ── Complete join for invite code users (on confirm screen) ──
   const handleCompleteJoin = async () => {
-    if (!firstName || !lastName) { alert('Please enter your name.'); return; }
-    if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+    if (!firstName || !lastName) return;
+    if (!password || password.length < 6) return;
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = email;
 
@@ -494,14 +494,14 @@ export default function AuthPage() {
         if (authError) {
           if (authError.message.includes('already registered')) {
             const { data: signIn } = await supabase.auth.signInWithPassword({ email: finalEmail, password });
-            if (!signIn?.user) { alert('Account exists. Please sign in.'); setSending(false); return; }
+            if (!signIn?.user) { console.error('Account exists. Please sign in.'); setSending(false); return; }
           } else {
-            alert(authError.message); setSending(false); return;
+            console.error(authError.message); setSending(false); return;
           }
         }
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { alert('Authentication failed'); setSending(false); return; }
+        if (!user) { console.error('Authentication failed'); setSending(false); return; }
 
         const { data: acceptResult, error: acceptErr } = await supabase.rpc('accept_invitation', {
           p_code: inviteCode.trim().toUpperCase(),
@@ -510,7 +510,7 @@ export default function AuthPage() {
         });
 
         if (acceptErr || !acceptResult?.success) {
-          alert(acceptResult?.error || acceptErr?.message || 'Failed to accept invitation');
+          console.error(acceptResult?.error || acceptErr?.message || 'Failed to accept invitation');
           setSending(false);
           return;
         }
@@ -534,7 +534,7 @@ export default function AuthPage() {
         setSending(false);
         return;
       } catch (err: any) {
-        alert(err.message || 'Failed to join');
+        console.error(err.message || 'Failed to join');
         setSending(false);
         return;
       }
@@ -553,9 +553,9 @@ export default function AuthPage() {
 
   // ── Building screen → confirm screen ──
   const handleBuildingContinue = () => {
-    if (!bldgName) { alert('Please enter your building name.'); return; }
-    if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
-    if (!firstName || !lastName) { alert('Please enter your name.'); return; }
+    if (!bldgName) return;
+    if (!bldgStreet.trim()) return;
+    if (!firstName || !lastName) return;
     if (subdomainStatus === 'taken') {
       // Auto-append a number to make it unique
       setBldgSubdomain(bldgSubdomain + Math.floor(Math.random() * 99));
@@ -574,8 +574,8 @@ export default function AuthPage() {
     setCheckoutLoading(true);
     try {
       const signupEmail = email;
-      if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
-      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      if (!signupEmail) { setCheckoutLoading(false); return; }
+      if (!password || password.length < 6) { setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
@@ -592,17 +592,17 @@ export default function AuthPage() {
             password: password,
           });
           if (signInError) {
-            alert('An account with this email already exists. Please sign in with the correct password, or use a different email.');
+            console.error('An account with this email already exists. Please sign in with the correct password, or use a different email.');
             setCheckoutLoading(false);
             return;
           }
         } else {
-          alert(authError.message); setCheckoutLoading(false); return;
+          console.error(authError.message); setCheckoutLoading(false); return;
         }
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+      if (!session) { console.error('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
 
       // Check if user already has a tenant
       const { data: existingTenant } = await supabase
@@ -612,7 +612,7 @@ export default function AuthPage() {
         .maybeSingle();
 
       if (existingTenant) {
-        alert('Your account is already set up. Redirecting to login...');
+        console.log('Your account is already set up. Redirecting to login...');
         setAuthStep('login');
         setCheckoutLoading(false);
         return;
@@ -647,7 +647,7 @@ export default function AuthPage() {
       );
 
       const data = await res.json();
-      if (data.error) { alert(data.error); setCheckoutLoading(false); return; }
+      if (data.error) { console.error(data.error); setCheckoutLoading(false); return; }
 
       if (data.url) {
         sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
@@ -656,10 +656,10 @@ export default function AuthPage() {
         }));
         window.location.href = data.url;
       } else {
-        alert('Failed to create checkout session'); setCheckoutLoading(false);
+        console.error('Failed to create checkout session'); setCheckoutLoading(false);
       }
     } catch (err: any) {
-      alert(err.message || 'Checkout failed');
+      console.error(err.message || 'Checkout failed');
       setCheckoutLoading(false);
     }
   };
@@ -692,12 +692,12 @@ export default function AuthPage() {
           if (authError.message.includes('already registered')) {
             const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
             if (signInError) {
-              alert('An account with this email already exists. Please sign in.');
+              console.error('An account with this email already exists. Please sign in.');
               setSending(false);
               return;
             }
           } else {
-            alert(authError.message); setSending(false); return;
+            console.error(authError.message); setSending(false); return;
           }
         }
         // In the real flow, "Explore First" enters the app in trial mode.

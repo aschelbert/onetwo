@@ -1,3 +1,9 @@
+/**
+ * @deprecated This store is deprecated as of Handoff 14.
+ * All board_tasks have been migrated to cases via migrateToCases.
+ * The board_tasks table is marked for removal after a 30-day grace period.
+ * This store remains only for backward compatibility during the transition.
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';

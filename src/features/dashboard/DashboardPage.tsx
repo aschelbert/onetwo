@@ -8,6 +8,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { computeBoardHealth } from '@/lib/boardHealth';
+import { useReportsStore } from '@/store/useReportsStore';
 import { computeFiduciaryAlerts } from '@/lib/fiduciaryAlerts';
 import { getBudgetAlerts } from '@/lib/fundingAnalysis';
 import { fmt } from '@/lib/formatters';
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const spending = useSpendingStore();
   const elections = useElectionStore();
   const archives = useArchiveStore();
+  const reportsStore = useReportsStore();
   const navigate = useNavigate();
 
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
@@ -54,6 +56,8 @@ export default function DashboardPage() {
   const documentsCurrentPct = totalDocs > 0 ? Math.round((currentDocs / totalDocs) * 100) : 0;
   const attachedCount = Object.keys(comp.itemAttachments).filter(k => (comp.itemAttachments[k]?.length ?? 0) > 0).length;
   const proofCoverage = allRunbookItems.length > 0 ? attachedCount / allRunbookItems.length : 0;
+  const dbElapsedMonths = new Date().getMonth() + 1;
+  const reportsGeneratedPct = dbElapsedMonths > 0 ? Math.min(100, Math.round((reportsStore.reports.filter(r => r.type === 'financial_statement').length / dbElapsedMonths) * 100)) : 0;
   const healthResult = computeBoardHealth({
     runbookItems: allRunbookItems.map(i => ({ id: i.id, due: i.due, critical: i.critical, scope: i.scope })),
     completions: comp.completions,
@@ -64,6 +68,7 @@ export default function DashboardPage() {
     meetings: meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: null, minutesApprovedAt: null, quorumMet: undefined })),
     proofCoverage,
     documentsCurrentPct,
+    reportsGeneratedPct,
   });
   const totalItems = allRunbookItems.length;
   const completedItems = Object.values(comp.completions).filter(Boolean).length;

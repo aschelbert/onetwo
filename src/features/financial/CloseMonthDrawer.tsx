@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
+import { useReportsStore } from '@/store/useReportsStore';
+import { useReportStore } from '@/store/useReportStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
+import { generateReportSnapshot } from '@/features/archives/reports/reportGenerators';
 import { buildStatement, closeChecklist, periodLabel } from '@/lib/monthClose';
 import { fmt } from '@/lib/formatters';
 import DrawerShell from '@/components/ui/DrawerShell';
@@ -18,6 +21,7 @@ interface CloseMonthDrawerProps {
 export default function CloseMonthDrawer({ open, onClose, period }: CloseMonthDrawerProps) {
   const store = useFinancialStore();
   const commsStore = useCommunicationsStore();
+  const reportsStore = useReportsStore();
   const tenant = useTenantContext();
   const currentUser = useAuthStore(s => s.currentUser);
   const { run: runUndo } = useUndoableAction();
@@ -105,6 +109,42 @@ export default function CloseMonthDrawer({ open, onClose, period }: CloseMonthDr
         createdBy: closedByName,
       });
     }
+
+    // Auto-generate a financial statement report for this period
+    const [pYear, pMonth] = period.split('-').map(Number);
+    const periodStart = `${pYear}-${String(pMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(pYear, pMonth, 0).getDate();
+    const periodEnd = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const now = new Date().toISOString();
+
+    const snapshot = generateReportSnapshot('financial_snapshot', {
+      periodStart,
+      periodEnd,
+    });
+
+    reportsStore.addReport({
+      id: 'rpt_' + Date.now(),
+      name: `Financial Statement — ${monthName}`,
+      type: 'financial_statement',
+      periodStart,
+      periodEnd,
+      periodLabel: monthName,
+      sections: ['income', 'expenses', 'reserve', 'cashflow', 'variance'],
+      generatedAt: now,
+      generatedBy: closedByName,
+    });
+
+    useReportStore.getState().addReport({
+      configId: '',
+      name: `Financial Statement — ${monthName}`,
+      type: 'financial_snapshot',
+      category: 'board_governance',
+      generatedAt: now,
+      generatedBy: closedByName,
+      snapshot,
+      periodStart,
+      periodEnd,
+    });
 
     setIsClosing(false);
     onClose();

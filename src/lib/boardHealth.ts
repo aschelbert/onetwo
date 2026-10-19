@@ -24,6 +24,7 @@ export interface HealthInputs {
   }>;
   proofCoverage: number;            // 0..1
   documentsCurrentPct: number;      // 0..100
+  reportsGeneratedPct: number;      // 0..100 — fraction of expected monthly reports that exist
   today?: Date;
 }
 
@@ -253,8 +254,8 @@ export function computeBoardHealth(i: HealthInputs): HealthResult {
   let recMax = 0;
   let recPoints = 0;
 
-  // Proof coverage (5 max)
-  const proofMax = 5;
+  // Proof coverage (3 max)
+  const proofMax = 3;
   recMax += proofMax;
   const proofPts = Math.round(Math.min(i.proofCoverage, 1) * proofMax);
   recPoints += proofPts;
@@ -265,8 +266,8 @@ export function computeBoardHealth(i: HealthInputs): HealthResult {
     detail: `${Math.round(i.proofCoverage * 100)}% of items have attachments`,
   });
 
-  // Documents current (5 max)
-  const docMax = 5;
+  // Documents current (3 max)
+  const docMax = 3;
   recMax += docMax;
   const docPts = Math.round((Math.min(i.documentsCurrentPct, 100) / 100) * docMax);
   recPoints += docPts;
@@ -275,6 +276,18 @@ export function computeBoardHealth(i: HealthInputs): HealthResult {
     points: docPts,
     max: docMax,
     detail: `${Math.round(i.documentsCurrentPct)}% of documents are current`,
+  });
+
+  // Reports generated (4 max)
+  const rptMax = 4;
+  recMax += rptMax;
+  const rptPts = Math.round((Math.min(i.reportsGeneratedPct, 100) / 100) * rptMax);
+  recPoints += rptPts;
+  breakdown.push({
+    label: 'Reports generated',
+    points: rptPts,
+    max: rptMax,
+    detail: `${Math.round(i.reportsGeneratedPct)}% of expected reports exist`,
   });
 
   // ── Compute final score ──

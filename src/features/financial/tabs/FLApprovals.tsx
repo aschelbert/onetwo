@@ -5,6 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useTenantContext } from '@/components/TenantProvider';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt } from '@/lib/formatters';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
 import Modal from '@/components/ui/Modal';
@@ -53,7 +54,8 @@ export default function FLApprovals() {
   const { board } = useBuildingStore();
   const financialStore = useFinancialStore();
   const tenant = useTenantContext();
-  const isV2 = tenant.features.v2FiscalLens ?? false;
+  const { run: undoable } = useUndoableAction();
+  const isV2 = true; // v2 flags removed -- always v2
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,8 +90,8 @@ export default function FLApprovals() {
   // Handle adding a new request
   const handleAddRequest = () => {
     const amount = parseFloat(form.amount);
-    if (!form.title.trim()) { alert('Title is required'); return; }
-    if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
+    if (!form.title.trim()) return;
+    if (!amount || amount <= 0) return;
     addApproval({
       title: form.title.trim(),
       description: form.description.trim(),
@@ -226,7 +228,7 @@ export default function FLApprovals() {
                       )}
                     </div>
                     <button
-                      onClick={() => { if (confirm(`Delete "${approval.title}"?`)) deleteApproval(approval.id); }}
+                      onClick={() => { deleteApproval(approval.id); undoable({ label: 'Approval deleted', commit: () => {}, undo: () => {} }); }}
                       className="text-xs text-red-400 hover:text-red-600 shrink-0"
                     >
                       Delete

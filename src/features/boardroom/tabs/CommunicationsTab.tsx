@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
+import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import ComposePanel from '../components/ComposePanel';
@@ -83,6 +84,7 @@ export default function CommunicationsTab() {
   const { currentUser, currentRole, buildingMembers } = useAuthStore();
   const { units } = useFinancialStore();
   const { board } = useBuildingStore();
+  const { run: undoable } = useUndoableAction();
   const communications = useCommunicationsStore(s => s.communications);
 
   // ─── View state ─────────────────────────────────────
@@ -169,7 +171,7 @@ export default function CommunicationsTab() {
   }
 
   async function saveAnnouncement() {
-    if (!annForm.title || !annForm.body) { alert('Title and body required'); return; }
+    if (!annForm.title || !annForm.body) return;
     const boardMember = board.find(b => b.name === currentUser.name);
     const roleName = boardMember?.role || currentRole.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
     comp.addAnnouncement({
@@ -185,7 +187,7 @@ export default function CommunicationsTab() {
         const session = supabase ? (await supabase.auth.getSession()).data.session : null;
         const recipients = buildingMembers.filter(m => m.email && m.status === 'active').map(m => ({ email: m.email, name: m.name }));
         if (!sbUrl || !sbKey) {
-          alert('Announcement posted! Email not sent — Supabase not configured.');
+          console.error('Announcement posted! Email not sent — Supabase not configured.');
         } else {
           const res = await fetch(`${sbUrl}/functions/v1/send-announcement`, {
             method: 'POST',
@@ -194,17 +196,16 @@ export default function CommunicationsTab() {
           });
           if (res.ok) {
             const data = await res.json();
-            if (data.sent > 0) alert(`Announcement posted and emailed to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}.`);
-            else alert('Announcement posted! Email sending is not configured yet — deploy the send-announcement Edge Function.');
+            if (data.sent > 0) console.log(`Announcement posted and emailed to ${data.sent} recipient${data.sent !== 1 ? 's' : ''}.`);
           } else {
             const errText = await res.text();
-            if (res.status === 404) alert('Announcement posted! To enable email, deploy the Edge Function:\nsupabase functions deploy send-announcement --no-verify-jwt');
-            else alert(`Announcement posted but email failed: ${errText.slice(0, 100)}`);
+            if (res.status === 404) console.error('Announcement posted! To enable email, deploy the Edge Function.');
+            else console.error(`Announcement posted but email failed: ${errText.slice(0, 100)}`);
           }
         }
       } catch (e) {
         console.error('Announcement email error:', e);
-        alert('Announcement posted! Email sending encountered an error.');
+        console.error('Announcement posted! Email sending encountered an error.');
       } finally {
         setSendingEmail(false);
       }
@@ -213,7 +214,7 @@ export default function CommunicationsTab() {
   }
 
   function saveCommunication() {
-    if (!commForm.subject) { alert('Subject required'); return; }
+    if (!commForm.subject) return;
     comp.addCommunication({ type: commForm.type, subject: commForm.subject, date: commForm.date, method: commForm.method, recipients: commForm.recipients, respondedBy: null, status: commForm.status as OwnerCommunication['status'], notes: commForm.notes });
     setModal(null);
   }
@@ -429,7 +430,7 @@ export default function CommunicationsTab() {
                             <div className="flex items-center gap-2 pt-1">
                               <button onClick={(e) => { e.stopPropagation(); openCompose({ autoTemplateId: template.id, scope: 'unit' }); }} className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800 transition-colors">Use Template</button>
                               <button onClick={(e) => { e.stopPropagation(); openTemplateEditor(template); }} className="px-3 py-1.5 text-accent-600 hover:text-accent-700 text-xs font-medium">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete template "${template.name}"?`)) { deleteTemplate(template.id); setExpandedTemplate(null); } }} className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteTemplate(template.id); setExpandedTemplate(null); undoable({ label: 'Template deleted', commit: () => {}, undo: () => {} }); }} className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
                             </div>
                           </div>
                         )}

@@ -266,7 +266,7 @@ export default function MeetingDayTab({ settings, isBoard }: MeetingDayTabProps)
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {isBoard && tenant.features.v2Cases && (
+              {isBoard && true && (
                 <button
                   onClick={() => setCaseDrawerMeeting(meeting.id)}
                   className="px-4 py-2.5 border border-accent-200 text-accent-600 rounded-lg text-sm font-medium hover:bg-accent-50 transition-colors"
@@ -618,7 +618,7 @@ export default function MeetingDayTab({ settings, isBoard }: MeetingDayTabProps)
       )}
 
       {/* v2Cases: Open a case drawer from a meeting */}
-      {tenant.features.v2Cases && caseDrawerMeeting && (
+      {true && caseDrawerMeeting && (
         <OpenCaseDrawer
           open={true}
           onClose={() => setCaseDrawerMeeting(null)}

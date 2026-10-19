@@ -14,7 +14,6 @@ export interface ArchiveSnapshot {
   // What's included — each section stores a frozen copy
   compliance: {
     runbookCompletions: Record<string, boolean>;
-    healthIndex: number;
     grade: string;
   };
   regulatoryRefresh: {
@@ -90,7 +89,6 @@ const seedArchives: ArchiveSnapshot[] = [
         e1: true, e2: true, e3: true,
         l1: true, l2: true,
       },
-      healthIndex: 100,
       grade: 'A+',
     },
     regulatoryRefresh: {
