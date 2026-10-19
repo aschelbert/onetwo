@@ -23,6 +23,8 @@ import { useTenantContext } from '@/components/TenantProvider';
 import RunbookDrawer from '@/features/compliance/RunbookDrawer';
 import RoleChip from '@/components/ui/RoleChip';
 import ProofBadge from '@/components/ui/ProofBadge';
+import BeforeTab from './tabs/BeforeTab';
+import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import { ChevronRight } from 'lucide-react';
 
 const ROLE_COLORS: Record<string, string> = { President:'accent', 'Vice President':'mist', Treasurer:'sage', Secretary:'yellow', 'Member at Large':'purple' };
@@ -132,7 +134,7 @@ export default function BoardRoomPage() {
     collectionRate: finMetrics.collectionRate,
     reservePctFunded: brReservePct,
     monthsClosedOnTime: 0,
-    meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: null, minutesApprovedAt: null, quorumMet: undefined })),
+    meetings: mtg.meetings.map(m => ({ date: m.date, status: m.status, noticeSentAt: m.noticeSentAt ?? null, minutesApprovedAt: null, quorumMet: undefined })),
     proofCoverage,
     documentsCurrentPct,
   });
@@ -1067,14 +1069,18 @@ export default function BoardRoomPage() {
 
         {/* ═══ V2 TABS ═══ */}
         {/* Before / Meeting Day / After — render existing Meetings tab content */}
-        {tab === 'before' && (() => {
-          return (<div className="space-y-6">
-            <div><h3 className="font-display text-lg font-bold text-ink-900">Before the Meeting</h3><p className="text-xs text-ink-400 mt-1">Prepare agendas, notices, and materials for upcoming meetings.</p></div>
-            {upcoming.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Upcoming</p><div className="space-y-3">{upcoming.map(m => renderMeeting(m, true))}</div></div>)}
-            {upcoming.length === 0 && <p className="text-center text-ink-400 py-8">No upcoming meetings. Schedule one to get started.</p>}
-            {isBoard && <div className="flex justify-center"><button onClick={openAddMeeting} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Schedule Meeting</button></div>}
-          </div>);
-        })()}
+        {tab === 'before' && (
+          v2BoardRoom
+            ? <BeforeTab settings={DEFAULT_SETTINGS} isBoard={isBoard} />
+            : (() => {
+                return (<div className="space-y-6">
+                  <div><h3 className="font-display text-lg font-bold text-ink-900">Before the Meeting</h3><p className="text-xs text-ink-400 mt-1">Prepare agendas, notices, and materials for upcoming meetings.</p></div>
+                  {upcoming.length > 0 && (<div><p className="text-xs font-bold text-ink-500 uppercase tracking-wide mb-3">Upcoming</p><div className="space-y-3">{upcoming.map(m => renderMeeting(m, true))}</div></div>)}
+                  {upcoming.length === 0 && <p className="text-center text-ink-400 py-8">No upcoming meetings. Schedule one to get started.</p>}
+                  {isBoard && <div className="flex justify-center"><button onClick={openAddMeeting} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800">+ Schedule Meeting</button></div>}
+                </div>);
+              })()
+        )}
 
         {tab === 'meeting_day' && (() => {
           const todayStr = new Date().toISOString().split('T')[0];
