@@ -3,8 +3,10 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import type { VendorBid, VendorReview, VendorContract } from '@/store/useVendorTrackerStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { fmt, formatDate } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 
 type SubTab = 'directory' | 'bids' | 'contracts';
 type ModalKind = null | 'addVendor' | 'editVendor' | 'addBid' | 'addReview' | 'addContract' | 'editContract';
@@ -48,9 +50,11 @@ export default function VendorsTab() {
   const { vendors, addVendor, updateVendor, removeVendor, toggleVendorStatus } = useBuildingStore();
   const { bids, reviews, contracts, addBid, updateBid, deleteBid, addReview, deleteReview, addContract, updateContract, deleteContract } = useVendorTrackerStore();
   const { currentUser } = useAuthStore();
+  const tenant = useTenantContext();
 
   const [subTab, setSubTab] = useState<SubTab>('directory');
   const [modal, setModal] = useState<ModalKind>(null);
+  const [caseDrawerVendor, setCaseDrawerVendor] = useState<string | null>(null);
   const [editId, setEditId] = useState('');
   const [expandedVendor, setExpandedVendor] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -196,6 +200,7 @@ export default function VendorsTab() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3" onClick={e => e.stopPropagation()}>
+                      {tenant.features.v2Cases && <button onClick={() => setCaseDrawerVendor(v.id)} className="text-xs text-accent-600 font-medium hover:text-accent-700">Open a case</button>}
                       <button onClick={() => toggleVendorStatus(v.id)} className={`text-xs font-medium ${v.status === 'active' ? 'text-yellow-600 hover:text-yellow-700' : 'text-sage-600 hover:text-sage-700'}`}>
                         {v.status === 'active' ? 'Deactivate' : 'Activate'}
                       </button>
@@ -745,6 +750,15 @@ export default function VendorsTab() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* v2Cases: Open a case drawer for a vendor */}
+      {tenant.features.v2Cases && caseDrawerVendor && (
+        <OpenCaseDrawer
+          open={true}
+          onClose={() => setCaseDrawerVendor(null)}
+          prefill={{ vendorId: caseDrawerVendor, source: 'vendor', sourceId: caseDrawerVendor }}
+        />
       )}
     </div>
   );

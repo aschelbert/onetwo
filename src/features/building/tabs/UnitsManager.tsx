@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import type { Unit } from '@/types/financial';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -15,9 +17,11 @@ export default function UnitsManager() {
   const store = useFinancialStore();
   const building = useBuildingStore();
   const { currentRole } = useAuthStore();
+  const tenant = useTenantContext();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
   const [modal, setModal] = useState<ModalKind>(null);
+  const [caseDrawerUnit, setCaseDrawerUnit] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'current' | 'delinquent' | 'for_sale'>('all');
@@ -228,6 +232,9 @@ export default function UnitsManager() {
                 <p className="text-sm text-ink-400">{selectedUnit.owner} · {selectedUnit.email}</p>
               </div>
               <div className="flex gap-2">
+                {isBoard && tenant.features.v2Cases && (
+                  <button onClick={() => { setModal(null); setCaseDrawerUnit(selectedUnit.number); }} className="px-3 py-1.5 border border-accent-200 text-accent-600 rounded-lg text-xs font-medium hover:bg-accent-50">Open a case</button>
+                )}
                 {isBoard && (
                   <button onClick={() => {
                     setForm({
@@ -607,6 +614,15 @@ export default function UnitsManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* v2Cases: Open a case drawer for a unit */}
+      {tenant.features.v2Cases && caseDrawerUnit && (
+        <OpenCaseDrawer
+          open={true}
+          onClose={() => setCaseDrawerUnit(null)}
+          prefill={{ unit: caseDrawerUnit, source: 'unit', sourceId: caseDrawerUnit }}
+        />
       )}
     </div>
   );

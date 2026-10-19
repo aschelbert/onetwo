@@ -26,6 +26,7 @@ import ProofBadge from '@/components/ui/ProofBadge';
 import BeforeTab from './tabs/BeforeTab';
 import MeetingDayTab from './tabs/MeetingDayTab';
 import AfterTab from './tabs/AfterTab';
+import CasesTab from './tabs/CasesTab';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import { ChevronRight } from 'lucide-react';
 
@@ -1119,8 +1120,12 @@ export default function BoardRoomPage() {
         {/* Outbox tab */}
         {tab === 'outbox' && <OutboxTab />}
 
-        {/* Cases tab — renders existing Daily Operations content */}
-        {tab === 'cases' && <IssuesPage embedded />}
+        {/* Cases tab — v2Cases renders CasesTab; fallback to IssuesPage */}
+        {tab === 'cases' && (
+          tenant.features.v2Cases
+            ? <CasesTab />
+            : <IssuesPage embedded />
+        )}
 
         {/* Roles tab — combined Role Charters + Calendar */}
         {tab === 'roles' && <RolesCalendarTab />}

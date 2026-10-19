@@ -24,8 +24,10 @@ import { outcomesFor, type Outcome } from '@/features/compliance/runbookOutcomes
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useLetterStore } from '@/store/useLetterStore';
+import { useTenantContext } from '@/components/TenantProvider';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 
 interface RunbookDrawerProps {
   itemId: string;
@@ -78,6 +80,8 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMee
   const { findItem, findCategoryForItem } = useRunbook();
   const comp = useComplianceStore();
   const issues = useIssuesStore();
+  const tenant = useTenantContext();
+  const [showCaseDrawer, setShowCaseDrawer] = useState(false);
   const letterStore = useLetterStore();
   const { run: runUndoable } = useUndoableAction();
 
@@ -234,7 +238,12 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMee
       }
 
       case 'open_case': {
-        // Create an issue case -- completion NOT written, item stays open
+        if (tenant.features.v2Cases) {
+          // v2: open the full OpenCaseDrawer with runbook context
+          setShowCaseDrawer(true);
+          return; // Don't close — let the drawer handle it
+        }
+        // Legacy: create an issue case -- completion NOT written, item stays open
         const catMap: Record<string, string> = {
           governance: 'governance',
           financial: 'financial',
@@ -370,6 +379,7 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMee
   const isComplete = !!comp.completions[itemId];
 
   return (
+    <>
     <DrawerShell
       open
       onClose={onClose}
@@ -632,5 +642,18 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMee
         </div>
       </div>
     </DrawerShell>
+    {showCaseDrawer && (
+      <OpenCaseDrawer
+        open={showCaseDrawer}
+        onClose={() => { setShowCaseDrawer(false); onClose(); }}
+        prefill={{
+          text: item?.task || '',
+          catId: category?.id,
+          source: 'runbook',
+          sourceId: itemId,
+        }}
+      />
+    )}
+    </>
   );
 }

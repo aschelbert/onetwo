@@ -4,6 +4,8 @@ import type { BuildingAsset, AssetCategory, AssetCondition, MaintenanceSchedule 
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
+import { useTenantContext } from '@/components/TenantProvider';
+import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import VendorsTab from './VendorsTab';
 
 // ── Helpers ──────────────────────────────────────
@@ -89,12 +91,14 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
   const finStore = useFinancialStore();
   const spendingStore = useSpendingStore();
   const amenitiesStore = useAmenitiesStore();
+  const tenant = useTenantContext();
 
   // ── Local state ──
   const [subView, setSubView] = useState<'registry' | 'calendar' | 'capital' | 'vendors'>('registry');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<AssetCategory | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [caseDrawerAsset, setCaseDrawerAsset] = useState<string | null>(null);
 
   // ── Derived data ──
   const topLevelAssets = useMemo(() => assets.filter(a => a.parentAssetId === null), [assets]);
@@ -187,6 +191,9 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
               {selectedAsset.notes && <p className="text-xs text-ink-400 mt-1">{selectedAsset.notes}</p>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {isBoard && tenant.features.v2Cases && (
+                <button onClick={() => setCaseDrawerAsset(selectedAsset.id)} className="text-xs text-accent-600 font-medium hover:text-accent-700">Open a case</button>
+              )}
               {isBoard && (
                 <button
                   onClick={() => openEdit(selectedAsset.id, {
@@ -1041,6 +1048,15 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
 
       {/* ═══════ CAPITAL PLANNING VIEW ═══════ */}
       {subView === 'capital' && <CapitalPlanningView assets={assets} finStore={finStore} spendingStore={spendingStore} />}
+
+      {/* v2Cases: Open a case drawer for an asset */}
+      {tenant.features.v2Cases && caseDrawerAsset && (
+        <OpenCaseDrawer
+          open={true}
+          onClose={() => setCaseDrawerAsset(null)}
+          prefill={{ assetId: caseDrawerAsset, source: 'asset', sourceId: caseDrawerAsset }}
+        />
+      )}
     </div>
   );
 }
@@ -1691,6 +1707,7 @@ function MaintenanceCalendarView({
           </div>
         </div>
       )}
+
     </div>
   );
 }
