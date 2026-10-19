@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
 import { computeBoardHealth, type HealthInputs } from '@/lib/boardHealth';
 import { CheckCircle } from 'lucide-react';
-import SegmentedControl from '@/components/ui/SegmentedControl';
 import FLDashboard from './tabs/FLDashboard';
 import FLChartOfAccounts from './tabs/FLChartOfAccounts';
 import FLGeneralLedger from './tabs/FLGeneralLedger';
@@ -16,8 +15,9 @@ import FLApprovals from './tabs/FLApprovals';
 import FLThisMonth from './tabs/FLThisMonth';
 import FLMoneyIn from './tabs/FLMoneyIn';
 import FLMoneyOut from './tabs/FLMoneyOut';
+import FLPlan from './tabs/FLPlan';
+import FLBooks from './tabs/FLBooks';
 import TheUnitsTab from '../building/tabs/TheUnitsTab';
-import GLMappingConfig from './tabs/GLMappingConfig';
 
 // ── Legacy tabs (v1) ─────────────────────────────────────────────────────
 
@@ -55,21 +55,11 @@ const V2_TABS = [
   { id: 'books', label: 'Books' },
 ];
 
-type BooksSubTab = 'coa' | 'ledger' | 'statements' | 'gl_mapping';
-const BOOKS_SEGMENTS: Array<{ value: BooksSubTab; label: string }> = [
-  { value: 'coa', label: 'Chart of Accounts' },
-  { value: 'ledger', label: 'General Ledger' },
-  { value: 'statements', label: 'Statements' },
-  { value: 'gl_mapping', label: 'GL Mapping' },
-];
-
 export default function FinancialPage() {
   const store = useFinancialStore();
   const { activeTab, setActiveTab, seedGeneralLedger, generalLedger, getBalanceSheet, getIncomeMetrics, getBudgetVariance, reserveItems } = store;
   const tenant = useTenantContext();
   const isV2 = tenant.features.v2FiscalLens ?? false;
-
-  const [booksSubTab, setBooksSubTab] = useState<BooksSubTab>('coa');
 
   useEffect(() => {
     if (generalLedger.length === 0) seedGeneralLedger();
@@ -137,30 +127,9 @@ export default function FinancialPage() {
       case 'money_out':
         return <FLMoneyOut />;
       case 'plan':
-        // Renders Budget and Reserves stacked until handoff 12
-        return (
-          <div className="space-y-8">
-            <FLBudget />
-            <FLReserves />
-          </div>
-        );
+        return <FLPlan />;
       case 'books':
-        return (
-          <div>
-            <div className="mb-4">
-              <SegmentedControl<BooksSubTab>
-                options={BOOKS_SEGMENTS}
-                value={booksSubTab}
-                onChange={setBooksSubTab}
-                size="sm"
-              />
-            </div>
-            {booksSubTab === 'coa' && <FLChartOfAccounts />}
-            {booksSubTab === 'ledger' && <FLGeneralLedger />}
-            {booksSubTab === 'statements' && <FLReports />}
-            {booksSubTab === 'gl_mapping' && <GLMappingConfig />}
-          </div>
-        );
+        return <FLBooks />;
       default:
         return <FLThisMonth />;
     }

@@ -18,6 +18,7 @@ import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
 import MeetingDrawer from '@/features/meetings/MeetingDrawer';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import CaseStepDrawer from '@/features/issues/components/CaseStepDrawer';
+import ManualJournalDrawer from '@/features/financial/drawers/ManualJournalDrawer';
 
 export type DrawerId =
   | 'runbook'
@@ -27,6 +28,7 @@ export type DrawerId =
   | 'payment_batch'
   | 'bill'
   | 'approval'
+  | 'manual_journal'
   | 'meeting'
   | 'case_new'
   | 'vote'
@@ -168,6 +170,14 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
           onClose={onClose}
           caseId={context.caseId || ''}
           stepIndex={parseInt(context.stepIndex || '0', 10)}
+        />
+      );
+
+    case 'manual_journal':
+      return (
+        <ManualJournalDrawer
+          open={open}
+          onClose={onClose}
         />
       );
 

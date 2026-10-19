@@ -35,6 +35,17 @@ export interface ChartOfAccountsEntry {
   reserveItem?: string;
 }
 
+export interface GLPostedBy {
+  flow: 'money_in' | 'money_out' | 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee' | 'refund' | 'payroll';
+  userName?: string;
+}
+
+export interface GLProof {
+  type: 'attachment' | 'letter' | 'invoice' | 'check_image' | 'receipt';
+  label?: string;
+  url?: string;
+}
+
 export interface GLEntry {
   id: string;
   date: string;
@@ -46,6 +57,9 @@ export interface GLEntry {
   sourceId: string | null;
   posted: string;
   status: 'posted' | 'void';
+  postedBy?: GLPostedBy | null;
+  proof?: GLProof | null;
+  reason?: string | null;
 }
 
 export interface Unit {
