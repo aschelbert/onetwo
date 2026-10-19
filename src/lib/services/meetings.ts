@@ -25,6 +25,12 @@ function rowToMeeting(row: Record<string, unknown>): Meeting {
     reminderScheduledFor: (row.reminder_scheduled_for as string) || null,
     packetReady: (row.packet_ready as boolean) || false,
     conflictCheckStatus: (row.conflict_check_status || []) as unknown[],
+    calledToOrderAt: (row.called_to_order_at as string) || null,
+    adjournedAt: (row.adjourned_at as string) || null,
+    quorumMet: row.quorum_met as boolean | undefined,
+    minutesGeneratedAt: (row.minutes_generated_at as string) || null,
+    minutesApprovedAt: (row.minutes_approved_at as string) || null,
+    minutesDoc: (row.minutes_doc as Meeting['minutesDoc']) || null,
   };
 }
 
@@ -50,11 +56,17 @@ function meetingToRow(m: Partial<Meeting>): Record<string, unknown> {
   if (m.reminderScheduledFor !== undefined) row.reminder_scheduled_for = m.reminderScheduledFor;
   if (m.packetReady !== undefined) row.packet_ready = m.packetReady;
   if (m.conflictCheckStatus !== undefined) row.conflict_check_status = m.conflictCheckStatus;
+  if (m.calledToOrderAt !== undefined) row.called_to_order_at = m.calledToOrderAt;
+  if (m.adjournedAt !== undefined) row.adjourned_at = m.adjournedAt;
+  if (m.quorumMet !== undefined) row.quorum_met = m.quorumMet;
+  if (m.minutesGeneratedAt !== undefined) row.minutes_generated_at = m.minutesGeneratedAt;
+  if (m.minutesApprovedAt !== undefined) row.minutes_approved_at = m.minutesApprovedAt;
+  if (m.minutesDoc !== undefined) row.minutes_doc = m.minutesDoc;
   return row;
 }
 
 function agendaItemToRow(meetingId: string, tenantId: string, item: AgendaItem): Record<string, unknown> {
-  return {
+  const row: Record<string, unknown> = {
     id: item.id,
     tenant_id: tenantId,
     meeting_id: meetingId,
@@ -65,6 +77,15 @@ function agendaItemToRow(meetingId: string, tenantId: string, item: AgendaItem):
     requires_vote: item.requiresVote,
     locked: item.locked,
   };
+  if (item.motionText !== undefined) row.motion_text = item.motionText;
+  if (item.movedBy !== undefined) row.moved_by = item.movedBy;
+  if (item.secondedBy !== undefined) row.seconded_by = item.secondedBy;
+  if (item.tally !== undefined) row.tally = item.tally;
+  if (item.outcome !== undefined) row.outcome = item.outcome;
+  if (item.notes !== undefined) row.notes = item.notes;
+  if (item.conflictsDeclared !== undefined) row.conflicts_declared = item.conflictsDeclared;
+  if (item.completedAt !== undefined) row.completed_at = item.completedAt;
+  return row;
 }
 
 export async function fetchMeetings(tenantId: string): Promise<Meeting[] | null> {
@@ -100,6 +121,14 @@ export async function fetchMeetings(tenantId: string): Promise<Meeting[] | null>
           sourceId: (row.source_id as string) || null,
           requiresVote: row.requires_vote as boolean,
           locked: row.locked as boolean,
+          motionText: (row.motion_text as string) || undefined,
+          movedBy: (row.moved_by as string) || undefined,
+          secondedBy: (row.seconded_by as string) || undefined,
+          tally: (row.tally as AgendaItem['tally']) || undefined,
+          outcome: (row.outcome as AgendaItem['outcome']) || undefined,
+          notes: (row.notes as string) || undefined,
+          conflictsDeclared: (row.conflicts_declared as string[]) || undefined,
+          completedAt: (row.completed_at as string) || undefined,
         });
         byMeeting.set(meetingId, items);
       }

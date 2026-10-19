@@ -16,6 +16,7 @@ import LateUnitsDrawer from '@/features/financial/drawers/LateUnitsDrawer';
 import PayBillDrawer from '@/features/financial/drawers/PayBillDrawer';
 import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
 import MeetingDrawer from '@/features/meetings/MeetingDrawer';
+import VoteDrawer from '@/features/elections/VoteDrawer';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import CaseStepDrawer from '@/features/issues/components/CaseStepDrawer';
 import ManualJournalDrawer from '@/features/financial/drawers/ManualJournalDrawer';
@@ -39,7 +40,6 @@ export type DrawerId =
 
 const LEGACY_LABELS: Record<string, string> = {
   case_new: 'New Case',
-  vote: 'Board Vote',
   request: 'Owner Request',
   collections_offer: 'Collections',
   capital_offer: 'Capital Project',
@@ -196,8 +196,15 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
         />
       );
 
-    case 'case_new':
     case 'vote':
+      return (
+        <VoteDrawer
+          open={open}
+          onClose={onClose}
+        />
+      );
+
+    case 'case_new':
     case 'request':
     case 'collections_offer':
     case 'capital_offer':
