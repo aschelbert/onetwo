@@ -3,7 +3,7 @@
  * drawer components. Used when v2 feature flags are enabled.
  *
  * IDs that still map to LegacyActionDrawer (placeholder) until their full
- * drawers land in later handoffs: meeting, case_new, vote, request,
+ * drawers land in later handoffs: case_new, vote, request,
  * collections_offer, case_step.
  */
 
@@ -15,6 +15,8 @@ import UnitDrawer from '@/features/financial/drawers/UnitDrawer';
 import LateUnitsDrawer from '@/features/financial/drawers/LateUnitsDrawer';
 import PayBillDrawer from '@/features/financial/drawers/PayBillDrawer';
 import SpendingDrawer from '@/features/financial/drawers/SpendingDrawer';
+import MeetingDrawer from '@/features/meetings/MeetingDrawer';
+import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 
 export type DrawerId =
   | 'runbook'
@@ -32,7 +34,6 @@ export type DrawerId =
   | 'case_step';
 
 const LEGACY_LABELS: Record<string, string> = {
-  meeting: 'Meeting',
   case_new: 'New Case',
   vote: 'Board Vote',
   request: 'Owner Request',
@@ -159,6 +160,20 @@ export default function DrawerRouter({ drawerId, open, onClose, context = {} }: 
       );
 
     case 'meeting':
+      return (
+        <MeetingDrawer
+          prefill={{
+            kind: context.kind as 'board' | 'annual' | 'special' | undefined,
+            runbookItemId: context.runbookItemId,
+            caseId: context.caseId,
+            approvalId: context.approvalId,
+            dateHint: context.dateHint,
+          }}
+          onClose={onClose}
+          settings={DEFAULT_SETTINGS}
+        />
+      );
+
     case 'case_new':
     case 'vote':
     case 'request':

@@ -32,6 +32,11 @@ interface RunbookDrawerProps {
   onClose: () => void;
   /** Optional: open legacy expanded view */
   onEditLegacy?: (itemId: string) => void;
+  /** v2: open MeetingDrawer with prefill instead of legacy modal */
+  onOpenMeetingDrawer?: (prefill: {
+    kind?: 'board' | 'annual' | 'special';
+    runbookItemId?: string;
+  }) => void;
 }
 
 const OUTCOME_ICONS: Record<string, React.ReactNode> = {
@@ -69,7 +74,7 @@ function getPrimaryLabel(outcome: Outcome | null): string {
   }
 }
 
-export default function RunbookDrawer({ itemId, onClose, onEditLegacy }: RunbookDrawerProps) {
+export default function RunbookDrawer({ itemId, onClose, onEditLegacy, onOpenMeetingDrawer }: RunbookDrawerProps) {
   const { findItem, findCategoryForItem } = useRunbook();
   const comp = useComplianceStore();
   const issues = useIssuesStore();
@@ -257,9 +262,10 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy }: Runbook
       }
 
       case 'schedule_meeting': {
-        // We navigate to meeting modal with prefill via onEditLegacy or close
-        // Completion is written only when the meeting is saved (handled by BoardRoomPage)
-        if (onEditLegacy) {
+        // v2: Open MeetingDrawer with prefill; legacy: navigate to meeting modal
+        if (onOpenMeetingDrawer) {
+          onOpenMeetingDrawer({ runbookItemId: itemId });
+        } else if (onEditLegacy) {
           onEditLegacy(itemId);
         }
         onClose();
@@ -336,6 +342,7 @@ export default function RunbookDrawer({ itemId, onClose, onEditLegacy }: Runbook
     runUndoable,
     onClose,
     onEditLegacy,
+    onOpenMeetingDrawer,
   ]);
 
   if (!item) {
