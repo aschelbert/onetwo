@@ -1,5 +1,5 @@
 // Day-one experience shown when tenant.status === 'onboarding'.
-// Displays: sample data card, 4 setup milestones, invite card, plan card.
+// Matches day-one-reference.html: choice card, milestones, invite card, plan card.
 
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,13 +7,15 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { canSetup } from '@/lib/ownership';
-import { CheckCircle2, Circle, ChevronRight, Users, Sparkles, Trash2 } from 'lucide-react';
+import { PLANS, planPrice } from '@/lib/tiers';
+import type { PlanId } from '@/lib/tiers';
 import type { MeInfo } from '@/components/TenantProvider';
 
 interface SetupMilestone {
   id: string;
   title: string;
-  description: string;
+  role: string;
+  time: string;
   navigateTo: string;
   complete: boolean;
 }
@@ -40,28 +42,32 @@ export default function SetupSeasonHome({ firstName, onLoadSample, onRemoveSampl
     {
       id: 'units_owners',
       title: 'Units and owners',
-      description: 'Add your units with owner names and contact info.',
+      role: 'President',
+      time: '20 min',
       navigateTo: '/building?tab=units',
       complete: tenant.totalUnits > 0,
     },
     {
       id: 'bylaws_board',
       title: 'Bylaws facts and board roles',
-      description: 'Upload bylaws and assign board seats.',
+      role: 'Secretary',
+      time: '15 min',
       navigateTo: '/boardroom?tab=roles',
       complete: building.legalDocuments.some(d => d.name.toLowerCase().includes('bylaw')) && building.board.length >= 2,
     },
     {
       id: 'bank_balances',
       title: 'Bank accounts and opening balances',
-      description: 'Connect or add your bank accounts with opening balances.',
+      role: 'Treasurer',
+      time: '30 min',
       navigateTo: '/financial?tab=coa',
       complete: fin.chartOfAccounts.filter(a => a.type === 'asset' && a.name.toLowerCase().includes('bank')).length > 0,
     },
     {
       id: 'insurance_docs_vendors',
       title: 'Insurance, documents, vendors',
-      description: 'Add insurance policies, key documents, and vendor contacts.',
+      role: 'Any board member',
+      time: '20 min',
       navigateTo: '/building?tab=insurance',
       complete: building.insurance.length > 0 && building.vendors.length > 0,
     },
@@ -69,138 +75,285 @@ export default function SetupSeasonHome({ firstName, onLoadSample, onRemoveSampl
 
   const completedCount = milestones.filter(m => m.complete).length;
 
+  // First incomplete milestone is "Next"
+  const nextMilestoneIdx = milestones.findIndex(m => !m.complete);
+
+  // Plan info
+  const planId = (tenant.tier === 'facilities' ? 'facilities' : 'self_managed') as PlanId;
+  const planName = PLANS[planId].name;
+  const interval = (tenant.billing.interval || 'monthly') as 'monthly' | 'annual';
+  const price = planPrice(planId, interval);
+
+  const setupFee = planId === 'facilities' ? 599 : 299;
+
   return (
-    <div className="space-y-6">
-      {/* Welcome greeting */}
-      <div className="bg-navy rounded-2xl p-6 md:p-8">
-        <p className="text-xs font-semibold text-white/50 tracking-widest mb-2">
-          SETUP SEASON
-        </p>
-        <h1 className="font-display text-xl md:text-2xl text-white leading-snug">
-          Welcome, {firstName}. Let's set up {tenant.name}.
-        </h1>
-        <p className="text-sm text-white/60 mt-2">
-          Complete these four milestones to get your building ready. You can do them in any order.
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* Season header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#155E75' }}>
+            Setup Season
+          </span>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 32, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>
+            Welcome, {firstName}. Let's set up {tenant.name}.
+          </h1>
+          <p style={{ fontSize: 15, color: '#4b5a6b', margin: 0 }}>
+            Four milestones before the building goes live. Most boards finish in an afternoon.
+          </p>
+        </div>
+        <div style={{
+          background: '#ffffff', border: '1px solid #e3e8ee', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16,
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#4b5a6b' }}>
+              Board Health
+            </span>
+            <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 34, fontWeight: 700, lineHeight: 1, color: '#8fa0b3' }}>
+              &ndash;&ndash;
+            </span>
+          </div>
+          <p style={{ fontSize: 12, maxWidth: 160, lineHeight: 1.4, color: '#4b5a6b', margin: 0 }}>
+            Scores once the units and the first close are in.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main column */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Sample data card */}
-          {isSetupUser && (
-            <div className="bg-white rounded-xl border border-ink-100 p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-brand-cyan/10 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-brand-cyan" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-ink-900">Sample building data</h3>
-                  <p className="text-xs text-ink-500 mt-0.5">
-                    {sampleLoaded
-                      ? 'Sample data is loaded. Remove it when you\'re ready to enter your own.'
-                      : 'Load sample units, board members, financials, and more to see how everything works.'}
-                  </p>
-                </div>
-                {sampleLoaded ? (
-                  <button
-                    onClick={onRemoveSample}
-                    disabled={loadingSample}
-                    className="shrink-0 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 flex items-center gap-1.5"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Remove
-                  </button>
-                ) : (
-                  <button
-                    onClick={onLoadSample}
-                    disabled={loadingSample}
-                    className="shrink-0 px-3 py-1.5 text-xs font-medium text-accent-600 border border-accent-200 rounded-lg hover:bg-accent-50 disabled:opacity-50"
-                  >
-                    {loadingSample ? 'Loading...' : 'Load sample data'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Setup milestones */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-ink-900">Setup milestones</h2>
-              <span className="text-xs text-ink-400">{completedCount} of {milestones.length} complete</span>
-            </div>
-            {/* Progress bar */}
-            <div className="h-1.5 bg-ink-100 rounded-full mb-5 overflow-hidden">
-              <div
-                className="h-full bg-brand-cyan rounded-full transition-all duration-500"
-                style={{ width: `${(completedCount / milestones.length) * 100}%` }}
-              />
-            </div>
-            <div className="space-y-3">
-              {milestones.map((ms) => (
-                <button
-                  key={ms.id}
-                  onClick={() => navigate(ms.navigateTo)}
-                  className="w-full text-left flex items-center gap-3 p-3 rounded-lg border border-ink-100 hover:border-ink-200 hover:bg-mist-50/50 transition-colors group"
-                >
-                  {ms.complete ? (
-                    <CheckCircle2 className="w-5 h-5 text-brand-cyan shrink-0" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-ink-300 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${ms.complete ? 'text-ink-400 line-through' : 'text-ink-900'}`}>
-                      {ms.title}
-                    </p>
-                    <p className="text-xs text-ink-400 mt-0.5">{ms.description}</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-ink-300 group-hover:text-ink-500 shrink-0" />
-                </button>
-              ))}
+      {/* Choice card: sample vs real */}
+      {isSetupUser && (
+        <div
+          style={{
+            background: '#ffffff', border: '1px solid #e3e8ee', borderRadius: 14,
+            padding: 0, overflow: 'hidden',
+            display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          }}
+          className="setup-choice-cols"
+        >
+          <div style={{ padding: 26, display: 'flex', flexDirection: 'column', gap: 12, borderRight: '1px solid #e3e8ee' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+              background: '#eef2f7', color: '#0D1B2E', alignSelf: 'flex-start',
+            }}>
+              Look around first
+            </span>
+            <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0 }}>
+              Load a sample building
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#4b5a6b', margin: 0 }}>
+              Fill {tenant.name} with sample data: 12 units, a year of books, two open cases and a half-finished
+              runbook, so every screen has something on it. Every sample row is marked and comes out with one click
+              when you are ready.
+            </p>
+            {sampleLoaded ? (
+              <button
+                type="button"
+                onClick={onRemoveSample}
+                disabled={loadingSample}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  minHeight: 44, padding: '0 18px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                  border: '1.5px solid #c9d2dc', cursor: 'pointer', fontFamily: 'inherit',
+                  background: '#ffffff', color: '#0D1B2E', alignSelf: 'flex-start',
+                  opacity: loadingSample ? 0.5 : 1,
+                }}
+              >
+                Remove sample data
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onLoadSample}
+                disabled={loadingSample}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  minHeight: 44, padding: '0 18px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                  border: '1.5px solid #c9d2dc', cursor: 'pointer', fontFamily: 'inherit',
+                  background: '#ffffff', color: '#0D1B2E', alignSelf: 'flex-start',
+                  opacity: loadingSample ? 0.5 : 1,
+                }}
+              >
+                {loadingSample ? 'Loading...' : 'Add sample data'}
+              </button>
+            )}
+          </div>
+          <div style={{ padding: 26, display: 'flex', flexDirection: 'column', gap: 12, background: '#f4fbf9' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+              background: '#155E75', color: '#ffffff', alignSelf: 'flex-start',
+            }}>
+              Recommended
+            </span>
+            <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 600, margin: 0 }}>
+              Set up for real
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#4b5a6b', margin: 0 }}>
+              Start with your unit roster and bylaws facts. The first milestone takes about twenty minutes
+              and your Board Health score appears as soon as it is done.
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const ms = milestones.find(m => !m.complete);
+                  if (ms) navigate(ms.navigateTo);
+                }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  minHeight: 44, padding: '0 18px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                  border: 0, cursor: 'pointer', fontFamily: 'inherit',
+                  background: '#0D1B2E', color: '#ffffff', alignSelf: 'flex-start',
+                }}
+              >
+                Start milestone 1
+              </button>
+              <a
+                href="/subscription?setup=1"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  minHeight: 44, padding: '0 18px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                  border: '1.5px solid #c9d2dc', cursor: 'pointer', fontFamily: 'inherit',
+                  background: '#ffffff', color: '#0D1B2E', textDecoration: 'none',
+                }}
+              >
+                Book Setup with us, ${setupFee}
+              </a>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Aside column */}
-        <div className="space-y-4">
+      {/* Main grid */}
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 22 }}
+        className="setup-main-cols"
+      >
+        {/* Left: Milestones */}
+        <div style={{
+          background: '#ffffff', border: '1px solid #e3e8ee', borderRadius: 14,
+          padding: 22, display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
+              Setup milestones
+            </h2>
+            <span style={{ fontSize: 13, color: '#4b5a6b' }}>{completedCount} of {milestones.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {milestones.map((ms, i) => {
+              const isNext = i === nextMilestoneIdx;
+              return (
+                <button
+                  key={ms.id}
+                  type="button"
+                  onClick={() => navigate(ms.navigateTo)}
+                  style={{
+                    display: 'flex', gap: 12, alignItems: 'center',
+                    padding: '14px 16px', border: '1px solid #e3e8ee', borderRadius: 12,
+                    background: '#ffffff', cursor: 'pointer', fontFamily: 'inherit',
+                    textAlign: 'left', color: '#0D1B2E', width: '100%', boxSizing: 'border-box',
+                  }}
+                >
+                  {ms.complete ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+                      background: '#ecfeff', color: '#155E75',
+                    }}>
+                      &#10003;
+                    </span>
+                  ) : isNext ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+                      background: '#fff0f1', color: '#D62839',
+                    }}>
+                      Next
+                    </span>
+                  ) : (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+                      background: '#eef2f7', color: '#4b5a6b',
+                    }}>
+                      {i + 1}
+                    </span>
+                  )}
+                  <span style={{ fontWeight: 600, flex: 1 }}>{ms.title}</span>
+                  <span style={{ fontSize: 12, color: '#4b5a6b' }}>{ms.role} &middot; {ms.time}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 13, lineHeight: 1.5, color: '#4b5a6b', margin: 0 }}>
+            Finish all four and Setup Season ends. The building moves into Budget Season, where the year is.
+          </p>
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
           {/* Invite card */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-ink-400" />
-              <h3 className="text-sm font-semibold text-ink-900">Invite your board</h3>
-            </div>
-            <p className="text-xs text-ink-500 mb-4">
-              Invite other board members so they can help with setup and see the building dashboard.
+          <div style={{
+            background: '#ffffff', border: '1px solid #e3e8ee', borderRadius: 14,
+            padding: 22, display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 600, margin: 0 }}>
+              Invite your neighbors and board
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: '#4b5a6b', margin: 0 }}>
+              Milestones go faster with the treasurer doing the treasurer's. Each invite lands in their inbox with
+              their role already set, and the first board member to accept takes the president seat unless you pick someone else.
             </p>
             <button
+              type="button"
               onClick={() => navigate('/building?tab=contacts&invite=1')}
-              className="w-full py-2 text-sm font-semibold text-accent-600 border border-accent-200 rounded-lg hover:bg-accent-50 transition-colors"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                minHeight: 44, padding: '0 18px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                border: '1.5px solid #c9d2dc', cursor: 'pointer', fontFamily: 'inherit',
+                background: '#ffffff', color: '#0D1B2E', alignSelf: 'flex-start',
+              }}
             >
               Send invites
             </button>
           </div>
 
           {/* Plan card */}
-          <div className="bg-white rounded-xl border border-ink-100 p-5">
-            <h3 className="text-sm font-semibold text-ink-900 mb-2">Your plan</h3>
-            <p className="text-xs text-ink-500 mb-1">
-              <span className="font-medium text-ink-700 capitalize">{tenant.tier.replace('_', ' ')}</span>
-              {' · '}
-              {tenant.billing.interval === 'annual' ? 'Annual' : 'Monthly'} billing
+          <div style={{
+            background: '#0D1B2E', border: '1px solid #0D1B2E', borderRadius: 14,
+            padding: 22, display: 'flex', flexDirection: 'column', gap: 10, color: '#ffffff',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A5F3FC' }}>
+              Your plan
+            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 600 }}>
+                {planName}
+              </span>
+              <span style={{ fontSize: 14, color: '#c7d2de' }}>
+                ${price} after trial
+              </span>
+            </div>
+            <p style={{ fontSize: 13, lineHeight: 1.5, color: '#c7d2de', margin: 0 }}>
+              Everything is on during the trial, including Plus Facilities features, so you can see what your building needs.
             </p>
-            {tenant.billing.status === 'in_trial' && (
-              <p className="text-xs text-brand-cyan font-medium">Free trial active</p>
-            )}
-            <button
-              onClick={() => navigate('/subscription')}
-              className="mt-3 text-xs font-medium text-accent-600 hover:underline"
+            <a
+              href="/subscription"
+              style={{ color: '#A5F3FC', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
             >
-              Manage subscription
-            </button>
+              Manage plan and billing
+            </a>
           </div>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 900px) {
+          .setup-choice-cols { grid-template-columns: 1fr !important; }
+          .setup-main-cols { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

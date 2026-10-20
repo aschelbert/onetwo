@@ -7,7 +7,7 @@ import {
   DEFAULT_TRIAL_DAYS,
 } from '@/lib/tiers';
 
-const FACILITIES_AMENITIES: BuildingAmenity[] = ['elevator', 'pool', 'sport_court'];
+const FACILITIES_AMENITIES: BuildingAmenity[] = ['elevator', 'pool', 'sport_court', 'staff_on_payroll'];
 
 /** Recommend a plan based on which amenity chips the user selected. */
 export function recommendPlan(amenities: BuildingAmenity[]): PlanId {
