@@ -61,6 +61,13 @@ export default function AuthPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
+    // Clear stale demo session — demo users shouldn't persist on the login page.
+    // This must run before setAuthStep so signOut's reset doesn't overwrite it.
+    const { currentUser: cu } = useAuthStore.getState();
+    if (cu.id === 'user1' || cu.id.startsWith('user-')) {
+      useAuthStore.getState().signOut();
+    }
+
     // ?create=1 → show signup wizard
     if (params.get('create') === '1') {
       setAuthStep('signup');
