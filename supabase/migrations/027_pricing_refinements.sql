@@ -6,9 +6,7 @@
 -- 1. Set trial_days to 21
 -- ════════════════════════════════════════════════════════════════════
 
-INSERT INTO platform_settings (key, value)
-VALUES ('trial_days', '21')
-ON CONFLICT (key) DO UPDATE SET value = '21';
+UPDATE platform_settings SET trial_days = 21, updated_at = now() WHERE id = 'default';
 
 -- ════════════════════════════════════════════════════════════════════
 -- 2. Add trial_expired_at column to subscriptions
@@ -98,7 +96,7 @@ BEGIN
 
   -- Get trial days from platform settings
   SELECT COALESCE(
-    (SELECT (value::int) FROM platform_settings WHERE key = 'trial_days'),
+    (SELECT trial_days FROM platform_settings WHERE id = 'default'),
     21
   ) INTO v_trial_days;
 

@@ -234,7 +234,7 @@ BEGIN
 
   -- Get trial days from platform settings
   SELECT COALESCE(
-    (SELECT (value::int) FROM platform_settings WHERE key = 'trial_days'),
+    (SELECT trial_days FROM platform_settings WHERE id = 'default'),
     30
   ) INTO v_trial_days;
 
@@ -391,15 +391,13 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- ════════════════════════════════════════════════════════════════════
--- 10. Add platform_settings keys for On Call
+-- 10. Add On Call columns to platform_settings
 -- ════════════════════════════════════════════════════════════════════
 
-INSERT INTO platform_settings (key, value)
-VALUES
-  ('on_call_advisor_name', ''),
-  ('on_call_advisor_photo_url', ''),
-  ('on_call_booking_url', '')
-ON CONFLICT (key) DO NOTHING;
+ALTER TABLE platform_settings
+  ADD COLUMN IF NOT EXISTS on_call_advisor_name text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS on_call_advisor_photo_url text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS on_call_booking_url text NOT NULL DEFAULT '';
 
 -- ════════════════════════════════════════════════════════════════════
 -- 11. Drop temp table
