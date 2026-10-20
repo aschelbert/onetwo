@@ -1,2418 +1,526 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <title>ONE two — HOA Management Software | Governance on Autopilot</title>
-    <meta name="description" content="ONE two is HOA management software that puts governance on autopilot. Compliance tracking, violation management, and board tools — weaving your bylaws into every decision so you govern with confidence.">
-    <meta name="keywords" content="HOA management software, HOA governance, HOA compliance, HOA board tools, homeowners association software, HOA violation tracking, community management software">
-
-    <!-- Canonical -->
-    <link rel="canonical" href="https://getonetwo.com/">
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://getonetwo.com/">
-    <meta property="og:title" content="ONE two — HOA Management Software | Governance on Autopilot">
-    <meta property="og:description" content="HOA management software that weaves your bylaws, local codes, and fiduciary duties into every step of running your building. Governance on autopilot. Compliance by default.">
-    <meta property="og:image" content="https://getonetwo.com/onetwo-og-image.jpg">
-    <meta property="og:site_name" content="ONE two">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ONE two — HOA Management Software | Governance on Autopilot">
-    <meta name="twitter:description" content="HOA management software that weaves your bylaws, local codes, and fiduciary duties into every step of running your building.">
-    <meta name="twitter:image" content="https://getonetwo.com/onetwo-og-image.jpg">
-
-    <!-- Structured Data: Organization -->
-    <script type="application/ld+json">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ONE two: everything a property manager does for your building, without the property manager</title>
+<meta name="description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial, no card.">
+<link rel="canonical" href="https://getonetwo.com/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://getonetwo.com/">
+<meta property="og:title" content="ONE two: everything a property manager does for your building, without the property manager">
+<meta property="og:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial, no card.">
+<meta property="og:image" content="https://getonetwo.com/og.png">
+<meta property="og:site_name" content="ONE two">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ONE two: everything a property manager does for your building, without the property manager">
+<meta name="twitter:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners.">
+<meta name="twitter:image" content="https://getonetwo.com/og.png">
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "ONE two",
+  "url": "https://getonetwo.com",
+  "logo": "https://getonetwo.com/onetwo-logo.jpg",
+  "description": "Everything a property manager does for your building, without the property manager. HOA management software for Washington, DC condo buildings.",
+  "sameAs": []
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ONE two",
+  "url": "https://getonetwo.com",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "description": "ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners.",
+  "offers": [
     {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "ONE two",
-      "url": "https://getonetwo.com",
-      "logo": "https://getonetwo.com/onetwo-logo.jpg",
-      "description": "HOA management software that puts governance on autopilot and compliance by default.",
-      "sameAs": []
-    }
-    </script>
-
-    <!-- Structured Data: SoftwareApplication -->
-    <script type="application/ld+json">
+      "@type": "Offer",
+      "name": "Self-Managed (Monthly)",
+      "price": "179",
+      "priceCurrency": "USD",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "billingDuration": "P1M"
+      }
+    },
     {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "ONE two",
-      "url": "https://getonetwo.com",
-      "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Web",
-      "description": "HOA management software that weaves your bylaws, local codes, and fiduciary duties into every step of running your building — governance on autopilot, compliance by default.",
-      "offers": [
-        {
-          "@type": "Offer",
-          "name": "Compliance Pro",
-          "price": "179",
-          "priceCurrency": "USD",
-          "priceSpecification": {
-            "@type": "UnitPriceSpecification",
-            "billingDuration": "P1M"
-          }
-        },
-        {
-          "@type": "Offer",
-          "name": "Community",
-          "price": "279",
-          "priceCurrency": "USD",
-          "priceSpecification": {
-            "@type": "UnitPriceSpecification",
-            "billingDuration": "P1M"
-          }
-        },
-        {
-          "@type": "Offer",
-          "name": "Management",
-          "price": "399",
-          "priceCurrency": "USD",
-          "priceSpecification": {
-            "@type": "UnitPriceSpecification",
-            "billingDuration": "P1M"
-          }
-        }
-      ]
+      "@type": "Offer",
+      "name": "Plus Facilities (Monthly)",
+      "price": "279",
+      "priceCurrency": "USD",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "billingDuration": "P1M"
+      }
+    },
+    {
+      "@type": "Offer",
+      "name": "Self-Managed (Annual)",
+      "price": "1790",
+      "priceCurrency": "USD",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "billingDuration": "P1Y"
+      }
+    },
+    {
+      "@type": "Offer",
+      "name": "Plus Facilities (Annual)",
+      "price": "2790",
+      "priceCurrency": "USD",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "billingDuration": "P1Y"
+      }
     }
-    </script>
-    <script>
-      // Subdomain routing: tenant subdomains go to the app, not marketing
-      (function() {
-        var h = window.location.hostname;
-        if (h === 'localhost' || h === '127.0.0.1') return;
-        var parts = h.split('.');
-        // If there's a subdomain (not www), redirect to /login which serves app.html
-        if (parts.length >= 3 && parts[0] !== 'www') {
-          window.location.replace('/login');
-        }
-      })();
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700;9..144,900&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --ink: #0f1a2e;
-            --paper: #ffffff;
-            --accent: #d62839;
-            --accent-light: #fde8ea;
-            --warm: #f59e0b;
-            --warm-light: #fef3c7;
-            --muted: #64748b;
-            --border: #e2e0dc;
-            --card: #ffffff;
-            --green: #059669;
-            --green-light: #d1fae5;
-        }
+  ]
+}
+</script>
+<script>
+  (function() {
+    var h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') return;
+    var parts = h.split('.');
+    if (parts.length >= 3 && parts[0] !== 'www') {
+      window.location.replace('/login');
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff;color:#0D1B2E;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#155E75}a:hover{color:#0D1B2E}
+h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-0.01em;margin:0}
+p{margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding:0 32px;box-sizing:border-box}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:10px;font-weight:600;font-size:16px;text-decoration:none;border:0;cursor:pointer;font-family:inherit}
+.btn-red{background:#D62839;color:#ffffff}.btn-red:hover{background:#b91c2c;color:#ffffff}
+.btn-ghost{background:transparent;color:#ffffff;border:1.5px solid rgba(255,255,255,.45)}.btn-ghost:hover{border-color:#ffffff;color:#ffffff}
+.btn-navy{background:#0D1B2E;color:#ffffff}.btn-navy:hover{background:#243b53;color:#ffffff}
+.btn-outline{background:#ffffff;color:#0D1B2E;border:1.5px solid #c9d2dc}.btn-outline:hover{border-color:#0D1B2E;color:#0D1B2E}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#155E75}
+.card{background:#ffffff;border:1px solid #e3e8ee;border-radius:16px}
+.muted{color:#4b5a6b}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;flex:none}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-radius:22px;overflow:hidden}
+.door{padding:44px 40px;display:flex;flex-direction:column;gap:16px}
+.line{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#D62839}
+.line::before{content:"";display:inline-block;width:28px;height:3px;background:#D62839;border-radius:2px}
+.line.light{color:#A5F3FC}.line.light::before{background:#A5F3FC}
+.plancard{text-align:left;font-family:inherit;color:#0D1B2E;background:#ffffff;border:1.5px solid #c9d2dc;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:12px;cursor:pointer}
+.plancard.on{border-color:#0D1B2E;box-shadow:0 0 0 3px rgba(13,27,46,.12)}
+.seg{min-height:40px;padding:0 16px;border-radius:999px;border:0;background:transparent;color:#4b5a6b;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.seg.on{background:#0D1B2E;color:#ffffff}
+.job{display:flex;gap:14px;align-items:center;text-align:left;font-family:inherit;color:#ffffff;background:transparent;border:1px solid #243b53;border-radius:14px;padding:14px 16px;cursor:pointer;width:100%;box-sizing:border-box;transition:background .3s,border-color .3s}
+.job:hover{border-color:#A5F3FC}
+.job.on{background:#13263d;border-color:#A5F3FC}
+@media (max-width:960px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.two,.doors{grid-template-columns:1fr}.navlinks{display:none !important}}
+@media (max-width:640px){.grid3,.grid4{grid-template-columns:1fr}.wrap{padding:0 16px}.door{padding:28px 22px}}
+@keyframes dial{from{stroke-dashoffset:339}to{stroke-dashoffset:61}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes stamp{0%{opacity:0;transform:scale(1.4) rotate(-8deg)}60%{opacity:1;transform:scale(.96) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(-8deg)}}
+.dial{animation:dial 1.8s ease both .3s}
+.f1{animation:rise .6s ease both .3s}.f2{animation:rise .6s ease both .6s}.f3{animation:rise .6s ease both .9s}.f4{animation:rise .6s ease both 1.2s}
+.stamp{animation:stamp .7s ease both 1s}
+@media (prefers-reduced-motion:reduce){*{animation:none !important}}
+</style>
+<style>
+.plancard .plan-selected[hidden],.plancard .plan-hint[hidden]{display:none}
+#compare[hidden]{display:none}
+.compare th{font-family:'Fraunces',Georgia,serif;font-size:16px;font-weight:600}
+</style>
+<script type="text/javascript">
+  (function(e,c){if(!c.__SV){var l,h;window.mixpanel=c;c._i=[];c.init=function(q,r,f){function t(d,a){var g=a.split(".");2==g.length&&(d=d[g[0]],a=g[1]);d[a]=function(){d.push([a].concat(Array.prototype.slice.call(arguments,0)))}}var b=c;"undefined"!==typeof f?b=c[f]=[]:f="mixpanel";b.people=b.people||[];b.toString=function(d){var a="mixpanel";"mixpanel"!==f&&(a+="."+f);d||(a+=" (stub)");return a};b.people.toString=function(){return b.toString(1)+".people (stub)"};l="disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders start_session_recording stop_session_recording people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");
+  for(h=0;h<l.length;h++)t(b,l[h]);var n="set set_once union unset remove delete".split(" ");b.get_group=function(){function d(p){a[p]=function(){b.push([g,[p].concat(Array.prototype.slice.call(arguments,0))])}}for(var a={},g=["get_group"].concat(Array.prototype.slice.call(arguments,0)),m=0;m<n.length;m++)d(n[m]);return a};c._i.push([q,r,f])};c.__SV=1.2;var k=e.createElement("script");k.type="text/javascript";k.async=!0;k.src="undefined"!==typeof MIXPANEL_CUSTOM_LIB_URL?MIXPANEL_CUSTOM_LIB_URL:"file:"===e.location.protocol&&"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//)?"https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js":"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";e=e.getElementsByTagName("script")[0];e.parentNode.insertBefore(k,e)}})(document,window.mixpanel||[])
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: var(--paper);
-            color: var(--ink);
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .display { font-family: 'Fraunces', serif; }
-
-        /* NAV */
-        nav {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            background: rgba(255,255,255,0.85);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-        }
-        .nav-inner {
-            max-width: 1200px; margin: 0 auto;
-            padding: 1rem 2rem;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .logo {
-            font-family: 'Fraunces', serif;
-            font-weight: 900; font-size: 1.5rem;
-            color: var(--ink);
-            text-decoration: none;
-        }
-        .logo span { color: var(--accent); }
-        .nav-links { display: flex; gap: 2rem; align-items: center; }
-        .nav-links a {
-            text-decoration: none; color: var(--muted);
-            font-size: 0.9rem; font-weight: 500;
-            transition: color 0.2s;
-        }
-        .nav-links a:hover { color: var(--ink); }
-
-        /* HAMBURGER */
-        .hamburger {
-            display: none;
-            background: none; border: none; cursor: pointer;
-            padding: 0.5rem; margin-left: 0.5rem;
-            flex-direction: column; gap: 5px;
-            z-index: 200;
-        }
-        .hamburger span {
-            display: block; width: 24px; height: 2px;
-            background: var(--ink); border-radius: 2px;
-            transition: all 0.3s;
-        }
-        .hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-        .hamburger.active span:nth-child(2) { opacity: 0; }
-        .hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-        .mobile-menu {
-            display: none;
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.98);
-            backdrop-filter: blur(20px);
-            z-index: 99;
-            padding: 6rem 2rem 2rem;
-            flex-direction: column; gap: 0.5rem;
-            overflow-y: auto;
-        }
-        .mobile-menu.open { display: flex; }
-        .mobile-menu a {
-            text-decoration: none; color: var(--ink);
-            font-size: 1.1rem; font-weight: 500;
-            padding: 0.85rem 0;
-            border-bottom: 1px solid var(--border);
-            transition: color 0.2s;
-        }
-        .mobile-menu a:last-child { border-bottom: none; }
-        .mobile-menu a:hover { color: var(--accent); }
-        .mobile-menu .btn {
-            margin-top: 0.75rem;
-            justify-content: center;
-            border-bottom: none;
-        }
-        .mobile-menu .btn.btn-primary { color: #fff !important; }
-        .btn {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            padding: 0.7rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 600; font-size: 0.9rem;
-            text-decoration: none;
-            transition: all 0.25s;
-            cursor: pointer; border: none;
-        }
-        .btn-primary {
-            background: var(--accent); color: #fff;
-            box-shadow: 0 2px 8px rgba(214,40,57,0.25);
-        }
-        .btn-primary:hover {
-            background: #b91c2c;
-            box-shadow: 0 4px 16px rgba(214,40,57,0.35);
-            transform: translateY(-1px);
-        }
-        .btn-outline {
-            background: transparent; color: var(--accent);
-            border: 2px solid var(--accent);
-        }
-        .btn-outline:hover {
-            background: var(--accent-light);
-        }
-
-        /* HERO */
-        .hero {
-            padding: 10rem 2rem 6rem;
-            max-width: 1200px; margin: 0 auto;
-            display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 4rem;
-            align-items: center;
-        }
-        .hero-badge {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: #ecfeff;
-            color: #155e75;
-            padding: 0.4rem 1rem;
-            border-radius: 100px;
-            font-size: 0.8rem; font-weight: 600;
-            margin-bottom: 1.5rem;
-            border: 1px solid #a5f3fc;
-        }
-        .hero h1 {
-            font-family: 'Fraunces', serif;
-            font-size: 3.8rem;
-            line-height: 1.1;
-            font-weight: 900;
-            letter-spacing: -0.02em;
-            margin-bottom: 1.5rem;
-        }
-        .hero h1 em {
-            font-style: italic;
-            color: var(--accent);
-        }
-        .hero p {
-            font-size: 1.15rem;
-            color: var(--muted);
-            line-height: 1.7;
-            margin-bottom: 2rem;
-            max-width: 520px;
-        }
-        .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
-
-        .hero-visual {
-            position: relative;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 25px 60px rgba(15,26,46,0.2), 0 0 0 1px rgba(255,255,255,0.05);
-            overflow: hidden;
-        }
-        .hero-visual::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--accent), var(--warm), var(--green));
-        }
-        .mock-header {
-            display: flex; align-items: center; gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-        .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
-        .mock-dot.r { background: #ef4444; }
-        .mock-dot.y { background: #f59e0b; }
-        .mock-dot.g { background: #22c55e; }
-        .mock-bar {
-            flex: 1;
-            height: 28px;
-            background: rgba(255,255,255,0.06);
-            border-radius: 6px;
-            display: flex; align-items: center;
-            padding: 0 0.75rem;
-            font-size: 0.7rem; color: rgba(255,255,255,0.35);
-        }
-        .mock-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-        .mock-card {
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 12px;
-            padding: 1.1rem;
-            transition: all 0.3s;
-        }
-        .mock-card:hover {
-            background: rgba(255,255,255,0.1);
-            transform: translateY(-2px);
-        }
-        .mock-card .mc-icon {
-            width: 32px; height: 32px;
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1rem;
-            margin-bottom: 0.6rem;
-        }
-        .mock-card h4 { color: #fff; font-size: 0.8rem; font-weight: 600; }
-        .mock-card p { color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.25rem; }
-        .mock-card .mc-stat {
-            margin-top: 0.6rem;
-            font-family: 'Fraunces', serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .mc-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
-        .mc-green { background: rgba(34,197,94,0.2); color: #4ade80; }
-        .mc-amber { background: rgba(245,158,11,0.2); color: #fbbf24; }
-        .mc-purple { background: rgba(168,85,247,0.2); color: #c084fc; }
-        .stat-blue { color: #60a5fa; }
-        .stat-green { color: #4ade80; }
-        .stat-amber { color: #fbbf24; }
-        .stat-purple { color: #c084fc; }
-
-        /* SOCIAL PROOF */
-        .social-proof {
-            max-width: 1200px; margin: 0 auto;
-            padding: 2rem 2rem 4rem;
-            display: flex; align-items: center; gap: 3rem;
-            flex-wrap: wrap;
-        }
-        .social-proof span {
-            font-size: 0.85rem; color: var(--muted); font-weight: 500;
-        }
-        .proof-stat {
-            display: flex; align-items: baseline; gap: 0.4rem;
-        }
-        .proof-stat strong {
-            font-family: 'Fraunces', serif;
-            font-size: 1.8rem; font-weight: 700;
-            color: var(--ink);
-        }
-        .proof-stat span { font-size: 0.85rem; color: var(--muted); }
-
-        /* SECTIONS */
-        section { padding: 5rem 2rem; }
-        .section-inner { max-width: 1200px; margin: 0 auto; }
-        .section-label {
-            display: inline-flex; align-items: center; gap: 0.4rem;
-            font-size: 0.8rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.08em;
-            color: var(--accent);
-            margin-bottom: 1rem;
-        }
-        .section-title {
-            font-family: 'Fraunces', serif;
-            font-size: 2.5rem;
-            font-weight: 700;
-            line-height: 1.2;
-            margin-bottom: 1rem;
-            max-width: 600px;
-        }
-        .section-desc {
-            font-size: 1.05rem;
-            color: var(--muted);
-            max-width: 560px;
-            margin-bottom: 3rem;
-        }
-
-        /* FEATURES */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-        }
-        .feature-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 2rem;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .feature-card::after {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0;
-            height: 3px; opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .feature-card:hover {
-            border-color: transparent;
-            box-shadow: 0 8px 30px rgba(15,26,46,0.08);
-            transform: translateY(-3px);
-        }
-        .feature-card:hover::after { opacity: 1; }
-        .feature-card:nth-child(1)::after { background: var(--accent); }
-        .feature-card:nth-child(2)::after { background: var(--green); }
-        .feature-card:nth-child(3)::after { background: var(--warm); }
-        .feature-card:nth-child(4)::after { background: #8b5cf6; }
-        .feature-card:nth-child(5)::after { background: #ec4899; }
-        .feature-card:nth-child(6)::after { background: #06b6d4; }
-
-        .feature-icon {
-            width: 48px; height: 48px;
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.4rem;
-            margin-bottom: 1.25rem;
-        }
-        .fi-blue { background: var(--accent-light); }
-        .fi-green { background: var(--green-light); }
-        .fi-amber { background: var(--warm-light); }
-        .fi-purple { background: #ede9fe; }
-        .fi-pink { background: #fce7f3; }
-        .fi-cyan { background: #cffafe; }
-
-        .feature-card h3 { font-weight: 700; font-size: 1.05rem; margin-bottom: 0.5rem; }
-        .feature-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
-        .feature-tag {
-            display: inline-block;
-            margin-top: 0.75rem;
-            padding: 0.2rem 0.6rem;
-            border-radius: 100px;
-            font-size: 0.7rem; font-weight: 600;
-            background: var(--accent-light); color: var(--accent);
-        }
-
-        /* DC SECTION */
-        .dc-section {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #fff;
-            border-radius: 24px;
-            margin: 0 2rem;
-            max-width: 1200px;
-            margin-left: auto; margin-right: auto;
-        }
-        .dc-section .section-inner { padding: 4rem; }
-        .dc-section .section-label { color: #a5f3fc; }
-        .dc-section .section-title { color: #fff; }
-        .dc-section .section-desc { color: rgba(255,255,255,0.6); }
-        .dc-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.25rem;
-        }
-        .dc-item {
-            display: flex; gap: 1rem; align-items: flex-start;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.14);
-            border-radius: 14px;
-            padding: 1.5rem;
-            transition: all 0.3s;
-        }
-        .dc-item:hover {
-            background: rgba(255,255,255,0.14);
-            border-color: rgba(255,255,255,0.22);
-        }
-        .dc-icon {
-            width: 40px; height: 40px; flex-shrink: 0;
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem;
-            background: rgba(245,158,11,0.15);
-        }
-        .dc-item h4 { font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 0.25rem; }
-        .dc-item p { font-size: 0.82rem; color: rgba(255,255,255,0.5); line-height: 1.5; }
-
-        /* BILLING TOGGLE */
-        .billing-toggle {
-            display: inline-flex; align-items: center; gap: 0.75rem;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 100px;
-            padding: 0.5rem 1.25rem;
-        }
-        .toggle-label {
-            font-size: 0.9rem; font-weight: 500;
-            color: var(--muted);
-            transition: color 0.3s;
-        }
-        .toggle-label.active { color: var(--ink); font-weight: 600; }
-        .toggle-save {
-            font-size: 0.7rem; font-weight: 700;
-            color: var(--green);
-            background: var(--green-light);
-            padding: 0.15rem 0.5rem;
-            border-radius: 100px;
-            margin-left: 0.25rem;
-        }
-        .toggle-switch {
-            width: 48px; height: 26px;
-            background: #e2e0dc;
-            border-radius: 100px;
-            border: none;
-            cursor: pointer;
-            position: relative;
-            transition: background 0.3s;
-            padding: 0;
-        }
-        .toggle-switch.active { background: var(--accent); }
-        .toggle-knob {
-            position: absolute;
-            top: 3px; left: 3px;
-            width: 20px; height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            transition: transform 0.3s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-        }
-        .toggle-switch.active .toggle-knob { transform: translateX(22px); }
-
-        /* PRICING */
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            align-items: start;
-        }
-        .price-card {
-            background: var(--card);
-            border: 2px solid var(--border);
-            border-radius: 20px;
-            padding: 2.5rem 2rem;
-            position: relative;
-            transition: all 0.3s;
-        }
-        .price-card:hover {
-            box-shadow: 0 12px 40px rgba(15,26,46,0.08);
-        }
-        .price-card.featured {
-            border-color: var(--accent);
-            box-shadow: 0 12px 40px rgba(214,40,57,0.12);
-        }
-        .price-badge {
-            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
-            background: var(--accent); color: #fff;
-            padding: 0.3rem 1.2rem;
-            border-radius: 100px;
-            font-size: 0.75rem; font-weight: 700;
-            letter-spacing: 0.03em;
-        }
-        .price-card h3 {
-            font-family: 'Fraunces', serif;
-            font-size: 1.35rem; font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-        .price-card .price-desc {
-            font-size: 0.85rem; color: var(--muted);
-            margin-bottom: 1.5rem;
-        }
-        .price-amount {
-            display: flex; align-items: baseline; gap: 0.3rem;
-            margin-bottom: 0.25rem;
-        }
-        .price-amount .dollar {
-            font-family: 'Fraunces', serif;
-            font-size: 3rem; font-weight: 900;
-            line-height: 1;
-            color: var(--ink);
-        }
-        .price-amount .period {
-            font-size: 0.9rem; color: var(--muted); font-weight: 500;
-        }
-        .price-unit {
-            font-size: 0.8rem; color: var(--muted);
-            margin-bottom: 2rem;
-        }
-        .price-features {
-            list-style: none;
-            margin-bottom: 2rem;
-        }
-        .price-features li {
-            padding: 0.5rem 0;
-            font-size: 0.88rem;
-            color: var(--ink);
-            display: flex; align-items: flex-start; gap: 0.6rem;
-        }
-        .price-features li::before {
-            content: '✓';
-            color: var(--green);
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-        .price-features li.disabled {
-            color: var(--muted);
-            text-decoration: line-through;
-            opacity: 0.5;
-        }
-        .price-features li.disabled::before {
-            content: '—';
-            color: var(--muted);
-        }
-        .price-btn { width: 100%; text-align: center; justify-content: center; }
-
-        /* FEATURE COMPARISON TABLE */
-        .compare-table-wrap {
-            margin-top: 4rem;
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            overflow: hidden;
-        }
-        .compare-table-header {
-            text-align: center;
-            padding: 2.5rem 2rem 1.5rem;
-        }
-        .compare-table-header h3 {
-            font-family: 'Fraunces', serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.35rem;
-        }
-        .compare-table-header p {
-            font-size: 0.9rem;
-            color: var(--muted);
-        }
-        .compare-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .compare-table thead th {
-            padding: 1rem 1.25rem;
-            font-size: 0.82rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--muted);
-            border-bottom: 2px solid var(--border);
-            text-align: center;
-        }
-        .compare-table thead th:first-child {
-            text-align: left;
-            padding-left: 2rem;
-            color: var(--ink);
-        }
-        .compare-table thead th.featured-col {
-            color: var(--accent);
-        }
-        .compare-table tbody td {
-            padding: 0.85rem 1.25rem;
-            font-size: 0.88rem;
-            text-align: center;
-            border-bottom: 1px solid var(--border);
-        }
-        .compare-table tbody td:first-child {
-            text-align: left;
-            padding-left: 2rem;
-            font-weight: 500;
-            color: var(--ink);
-        }
-        .compare-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-        .compare-table .section-row td {
-            background: #f8f7f5;
-            font-weight: 700;
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--muted);
-            padding: 0.65rem 1.25rem;
-        }
-        .compare-table .section-row td:first-child {
-            padding-left: 2rem;
-            color: var(--ink);
-        }
-        .compare-table .check {
-            color: var(--green);
-            font-weight: 700;
-            font-size: 1.05rem;
-        }
-        .compare-table .dash {
-            color: #d1d0cd;
-            font-size: 1rem;
-        }
-
-        /* ROLES SECTION */
-        .roles-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-            margin-top: 1.5rem;
-        }
-        .role-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .role-card:hover {
-            box-shadow: 0 8px 24px rgba(15,26,46,0.06);
-        }
-        .role-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            margin-bottom: 0.75rem;
-        }
-        .role-card h4 {
-            font-size: 0.95rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-        .role-card .role-desc {
-            font-size: 0.8rem;
-            color: var(--muted);
-            line-height: 1.5;
-            margin-bottom: 0.75rem;
-        }
-        .role-tier-badge {
-            display: inline-block;
-            font-size: 0.68rem;
-            font-weight: 700;
-            padding: 0.2rem 0.6rem;
-            border-radius: 100px;
-        }
-
-        @media (max-width: 768px) {
-            .compare-table-wrap { border-radius: 12px; }
-            .compare-table thead th { padding: 0.75rem 0.5rem; font-size: 0.68rem; }
-            .compare-table thead th:first-child { padding-left: 1rem; }
-            .compare-table tbody td { padding: 0.7rem 0.5rem; font-size: 0.8rem; }
-            .compare-table tbody td:first-child { padding-left: 1rem; }
-            .compare-table .section-row td:first-child { padding-left: 1rem; }
-            .roles-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 480px) {
-            .roles-grid { grid-template-columns: 1fr; }
-        }
-
-        /* CTA */
-        .cta-section {
-            text-align: center;
-            padding: 6rem 2rem;
-        }
-        .cta-section .section-title {
-            max-width: 700px; margin: 0 auto 1rem;
-        }
-        .cta-section .section-desc {
-            max-width: 500px; margin: 0 auto 2rem;
-        }
-        .cta-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-
-        /* FOOTER */
-        footer {
-            max-width: 1200px; margin: 0 auto;
-            padding: 3rem 2rem;
-            border-top: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            flex-wrap: wrap; gap: 1rem;
-        }
-        footer p { font-size: 0.85rem; color: var(--muted); }
-        .footer-links { display: flex; gap: 1.5rem; }
-        .footer-links a {
-            font-size: 0.85rem; color: var(--muted);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-        .footer-links a:hover { color: var(--ink); }
-
-        /* RESPONSIVE */
-        @media (max-width: 900px) {
-            .hero { grid-template-columns: 1fr; padding-top: 8rem; }
-            .hero h1 { font-size: 2.6rem; }
-            .hero-visual { display: none; }
-            .features-grid { grid-template-columns: 1fr; }
-            .dc-grid { grid-template-columns: 1fr; }
-            .pricing-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
-            .nav-links { display: none; }
-            .hamburger { display: flex; }
-            .social-proof { justify-content: center; }
-            .dc-section .section-inner { padding: 2.5rem 1.5rem; }
-            .diff-grid { grid-template-columns: 1fr !important; }
-            .community-flow { grid-template-columns: 1fr !important; text-align: center; }
-            .community-flow .flow-arrow { transform: rotate(90deg); }
-            .before-after-grid { grid-template-columns: 1fr !important; }
-            .before-after-grid .vs-divider { display: none; }
-        }
-        @media (min-width: 901px) and (max-width: 1100px) {
-            .features-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        /* ANIMATIONS */
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeInScreen {
-            from { opacity: 0; transform: scale(0.98); }
-            to { opacity: 1; transform: scale(1); }
-        }
-        .demo-tab {
-            padding: 0.65rem 1.25rem;
-            border-radius: 100px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: rgba(255,255,255,0.5);
-            cursor: pointer;
-            border: 1px solid transparent;
-            background: transparent;
-            transition: all 0.3s;
-            white-space: nowrap;
-        }
-        .demo-tab:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
-        .demo-tab.active {
-            color: #fff;
-            background: rgba(255,255,255,0.12);
-            border-color: rgba(255,255,255,0.2);
-        }
-        .demo-screen { display: none; position: relative; max-height: 420px; overflow: hidden; }
-        .demo-screen.active { display: block; }
-        .demo-screen::after {
-            content: '';
-            position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
-            background: linear-gradient(to bottom, transparent, rgba(15,23,42,0.95));
-            pointer-events: none; z-index: 1;
-        }
-        .screen-scroll {
-            animation: autoScroll 10s ease-in-out infinite;
-            animation-delay: 1.5s;
-        }
-        .demo-screen:hover .screen-scroll,
-        .demo-screen:hover .screen-scroll-slow {
-            animation-play-state: paused;
-        }
-        .screen-scroll-slow {
-            animation: autoScroll 14s ease-in-out infinite;
-            animation-delay: 2s;
-        }
-        @keyframes autoScroll {
-            0%, 12% { transform: translateY(0); }
-            42%, 58% { transform: translateY(var(--scroll-y, -120px)); }
-            88%, 100% { transform: translateY(0); }
-        }
-        .demo-desc { display: none; animation: fadeInScreen 0.35s ease-out; }
-        .demo-desc.active { display: block; }
-
-        /* ===== DEMO ANIMATION SYSTEM ===== */
-        /* Base staggered slide-up */
-        .demo-screen.active > .anim { opacity: 0; animation: demoSlideUp 0.5s ease-out forwards; }
-        .demo-screen.active > .anim:nth-child(1) { animation-delay: 0.05s; }
-        .demo-screen.active > .anim:nth-child(2) { animation-delay: 0.18s; }
-        .demo-screen.active > .anim:nth-child(3) { animation-delay: 0.3s; }
-        .demo-screen.active > .anim:nth-child(4) { animation-delay: 0.4s; }
-        .demo-screen.active > .anim:nth-child(5) { animation-delay: 0.5s; }
-        @keyframes demoSlideUp {
-            from { opacity: 0; transform: translateY(18px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        /* Progress bar fill */
-        .demo-screen.active .anim-bar {
-            width: 0% !important;
-            animation: barFill 1.1s cubic-bezier(0.22,1,0.36,1) 0.5s forwards;
-        }
-        @keyframes barFill { to { width: var(--bar-w) !important; } }
-        /* Card scale-in */
-        .demo-screen.active .anim-card { opacity: 0; animation: cardPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-        .demo-screen.active .anim-card:nth-child(1) { animation-delay: 0.2s; }
-        .demo-screen.active .anim-card:nth-child(2) { animation-delay: 0.32s; }
-        .demo-screen.active .anim-card:nth-child(3) { animation-delay: 0.44s; }
-        .demo-screen.active .anim-card:nth-child(4) { animation-delay: 0.56s; }
-        @keyframes cardPop {
-            from { opacity: 0; transform: scale(0.88) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        /* Row slide-in */
-        .demo-screen.active .anim-row { opacity: 0; animation: rowSlide 0.35s ease-out forwards; }
-        .demo-screen.active .anim-row:nth-child(1) { animation-delay: 0.25s; }
-        .demo-screen.active .anim-row:nth-child(2) { animation-delay: 0.38s; }
-        .demo-screen.active .anim-row:nth-child(3) { animation-delay: 0.5s; }
-        .demo-screen.active .anim-row:nth-child(4) { animation-delay: 0.62s; }
-        @keyframes rowSlide {
-            from { opacity: 0; transform: translateX(-14px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        /* Tag pop */
-        .demo-screen.active .anim-tag { opacity: 0; animation: tagPop 0.3s ease-out forwards; }
-        .demo-screen.active .anim-tag:nth-child(1) { animation-delay: 0.3s; }
-        .demo-screen.active .anim-tag:nth-child(2) { animation-delay: 0.38s; }
-        .demo-screen.active .anim-tag:nth-child(3) { animation-delay: 0.46s; }
-        .demo-screen.active .anim-tag:nth-child(4) { animation-delay: 0.54s; }
-        .demo-screen.active .anim-tag:nth-child(5) { animation-delay: 0.62s; }
-        .demo-screen.active .anim-tag:nth-child(6) { animation-delay: 0.70s; }
-        @keyframes tagPop {
-            from { opacity: 0; transform: scale(0.8); }
-            to { opacity: 1; transform: scale(1); }
-        }
-
-        /* === DASHBOARD — Radar scan + live counters === */
-        .scan-line {
-            position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(74,222,128,0.08), rgba(74,222,128,0.15), rgba(74,222,128,0.08), transparent);
-            pointer-events: none; border-radius: 12px;
-        }
-        .demo-screen.active .scan-line { animation: radarSweep 2s ease-in-out; }
-        @keyframes radarSweep { from { left: -100%; } to { left: 100%; } }
-        /* Counter elements start blank, JS fills them */
-        .count-up { font-variant-numeric: tabular-nums; }
-        /* Notification drop-in */
-        .demo-screen.active .notif-drop { opacity: 0; animation: notifIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .demo-screen.active .notif-drop:nth-child(1) { animation-delay: 0.6s; }
-        .demo-screen.active .notif-drop:nth-child(2) { animation-delay: 0.8s; }
-        @keyframes notifIn {
-            from { opacity: 0; transform: translateY(-10px) scale(0.97); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        /* Grade reveal — "?" fades to letter */
-        .grade-reveal { position: relative; }
-        .grade-reveal .grade-q { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-        .demo-screen.active .grade-reveal .grade-q { animation: gradeHide 0.3s ease-out 0.8s forwards; }
-        .demo-screen.active .grade-reveal .grade-val { opacity: 0; animation: gradeShow 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.9s forwards; }
-        @keyframes gradeHide { to { opacity: 0; transform: scale(0.5) rotateX(90deg); } }
-        @keyframes gradeShow { from { opacity: 0; transform: scale(1.5); } to { opacity: 1; transform: scale(1); } }
-
-        /* === BOARD ROOM — Compliance gauge + duty checkmark draw === */
-        .compliance-ring { transform: rotate(-90deg); }
-        .compliance-ring circle.track { fill: none; stroke: rgba(255,255,255,0.08); }
-        .compliance-ring circle.fill { fill: none; stroke: #4ade80; stroke-linecap: round;
-            stroke-dasharray: var(--circ); stroke-dashoffset: var(--circ); }
-        .demo-screen.active .compliance-ring circle.fill {
-            animation: ringDraw 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
-        }
-        @keyframes ringDraw { to { stroke-dashoffset: var(--offset); } }
-        /* Duty check draw */
-        .duty-check { stroke-dasharray: 20; stroke-dashoffset: 20; }
-        .demo-screen.active .duty-check { animation: checkDraw 0.5s ease-out forwards; }
-        .demo-screen.active .anim-card:nth-child(1) .duty-check { animation-delay: 0.55s; }
-        .demo-screen.active .anim-card:nth-child(2) .duty-check { animation-delay: 0.7s; }
-        .demo-screen.active .anim-card:nth-child(3) .duty-check { animation-delay: 0.85s; }
-        @keyframes checkDraw { to { stroke-dashoffset: 0; } }
-        /* Obligation counter */
-        .oblig-count { font-variant-numeric: tabular-nums; transition: color 0.3s; }
-
-        /* === BUILDING — Assessment scan + health reveal === */
-        .assess-bar-track { background: rgba(255,255,255,0.08); border-radius: 100px; height: 6px; overflow: hidden; }
-        .assess-bar-fill { height: 100%; border-radius: 100px; width: 0%;
-            background: linear-gradient(90deg, #22c55e, #4ade80); position: relative; }
-        .demo-screen.active .assess-bar-fill { animation: assessFill 0.8s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .demo-screen.active .assess-bar-fill.ab1 { animation-delay: 0.3s; }
-        .demo-screen.active .assess-bar-fill.ab2 { animation-delay: 0.55s; }
-        .demo-screen.active .assess-bar-fill.ab3 { animation-delay: 0.8s; }
-        .demo-screen.active .assess-bar-fill.ab4 { animation-delay: 1.05s; }
-        @keyframes assessFill { to { width: var(--bar-w); } }
-        /* Health grade computes after bars */
-        .health-grade { opacity: 0; }
-        .demo-screen.active .health-grade { animation: healthReveal 0.6s cubic-bezier(0.34,1.56,0.64,1) 1.4s forwards; }
-        @keyframes healthReveal { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
-
-        /* === FISCAL — Dollar tick counter === */
-        .dollar-tick { font-variant-numeric: tabular-nums; }
-
-        /* === CASES — Step sequence lights === */
-        .step-track { display: flex; gap: 3px; align-items: center; }
-        .step-dot { width: 18px; height: 18px; border-radius: 50%; font-size: 0.5rem; font-weight: 700;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.08);
-            transition: all 0.3s; flex-shrink: 0; }
-        .step-dot.lit { background: rgba(34,197,94,0.2); color: #4ade80; border-color: rgba(34,197,94,0.4); }
-        .step-dot.current { background: rgba(251,191,36,0.2); color: #fbbf24; border-color: rgba(251,191,36,0.4);
-            box-shadow: 0 0 8px rgba(251,191,36,0.3); }
-        .step-connector { flex: 1; height: 2px; background: rgba(255,255,255,0.06); min-width: 2px; }
-        .step-connector.done { background: rgba(34,197,94,0.3); }
-        /* Status transition */
-        .status-label { transition: all 0.3s; }
-
-        /* === ARCHIVES — Seal stamp === */
-        .seal-stamp { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(2.5) rotate(-15deg);
-            opacity: 0; pointer-events: none; font-size: 0.7rem; font-weight: 800;
-            color: rgba(239,68,68,0.6); border: 2px solid rgba(239,68,68,0.4);
-            padding: 0.2rem 0.6rem; border-radius: 4px; white-space: nowrap;
-            letter-spacing: 0.15em; text-transform: uppercase; }
-        .demo-screen.active .seal-stamp { animation: stampIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-        .demo-screen.active .anim-card:nth-child(1) .seal-stamp { animation-delay: 0.8s; }
-        .demo-screen.active .anim-card:nth-child(2) .seal-stamp { animation-delay: 1.1s; }
-        @keyframes stampIn { to { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(-15deg); } }
-        /* Lock icon */
-        .lock-anim { opacity: 0; }
-        .demo-screen.active .lock-anim { animation: lockIn 0.3s ease-out 0.6s forwards; }
-        @keyframes lockIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        .demo-container {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-            border-radius: 24px;
-            max-width: 1200px;
-            margin: 0 auto;
-            overflow: hidden;
-            box-shadow: 0 30px 80px rgba(15,26,46,0.3);
-        }
-        .demo-browser {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 16px;
-            overflow: hidden;
-            margin: 0 2rem 2rem;
-        }
-        .demo-browser-header {
-            display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.6rem 0.9rem;
-            background: rgba(255,255,255,0.04);
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .demo-browser-header .dots { display: flex; gap: 5px; }
-        .demo-browser-header .dots span { width: 9px; height: 9px; border-radius: 50%; }
-        .demo-browser-header .url-bar {
-            flex: 1; background: rgba(255,255,255,0.06);
-            border-radius: 6px; padding: 0.3rem 0.7rem;
-            font-size: 0.7rem; color: rgba(255,255,255,0.3);
-        }
-        .demo-body { padding: 1.25rem; }
-        .animate {
-            animation: slideUp 0.6s ease-out forwards;
-            opacity: 0;
-        }
-        .delay-1 { animation-delay: 0.1s; }
-        .delay-2 { animation-delay: 0.2s; }
-        .delay-3 { animation-delay: 0.3s; }
-        .delay-4 { animation-delay: 0.4s; }
-
-        /* WAITLIST MODAL */
-        .wl-overlay {
-            display: none; position: fixed; inset: 0; z-index: 9999;
-            background: rgba(15,26,46,0.55); backdrop-filter: blur(6px);
-            align-items: center; justify-content: center;
-            animation: wlFadeIn 0.2s ease-out;
-        }
-        .wl-overlay.active { display: flex; }
-        @keyframes wlFadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes wlSlideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        .wl-modal {
-            background: var(--card); border-radius: 20px; padding: 2.5rem;
-            max-width: 480px; width: 90%; position: relative;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.25);
-            animation: wlSlideUp 0.3s ease-out;
-            max-height: 90vh; overflow-y: auto;
-        }
-        .wl-close {
-            position: absolute; top: 1rem; right: 1rem;
-            background: none; border: none; font-size: 1.5rem;
-            color: var(--muted); cursor: pointer; line-height: 1;
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-            border-radius: 8px; transition: background 0.15s;
-        }
-        .wl-close:hover { background: var(--accent-light); color: var(--accent); }
-        .wl-modal h2 { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--ink); }
-        .wl-modal .wl-sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.5rem; }
-        .wl-field { margin-bottom: 1rem; }
-        .wl-field label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 0.35rem; }
-        .wl-field input, .wl-field select {
-            width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid var(--border);
-            border-radius: 10px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
-            background: var(--paper); color: var(--ink); transition: border-color 0.15s;
-        }
-        .wl-field input:focus, .wl-field select:focus { outline: none; border-color: var(--accent); }
-        .wl-row { display: flex; gap: 1rem; }
-        .wl-row .wl-field { flex: 1; }
-        .wl-error {
-            display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
-            padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.85rem; margin-bottom: 1rem;
-        }
-        .wl-error.visible { display: block; }
-        .wl-submit {
-            width: 100%; padding: 0.8rem; background: var(--accent); color: #fff;
-            border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600;
-            font-family: 'DM Sans', sans-serif; cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-        .wl-submit:hover { background: #b91c2c; }
-        .wl-submit:active { transform: scale(0.98); }
-        .wl-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-        .wl-success { text-align: center; }
-        .wl-success .wl-spot-badge {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 100px; height: 100px; border-radius: 50%;
-            background: var(--accent-light); margin: 0.5rem 0 1rem;
-        }
-        .wl-success .wl-spot-num { font-family: 'Fraunces', serif; font-size: 2.5rem; font-weight: 900; color: var(--accent); }
-        .wl-success .wl-spot-of { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
-        .wl-success .wl-confirm-msg { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem; }
-        .wl-gotit {
-            padding: 0.7rem 2rem; background: var(--ink); color: #fff;
-            border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600;
-            font-family: 'DM Sans', sans-serif; cursor: pointer; transition: background 0.2s;
-        }
-        .wl-gotit:hover { background: #1e293b; }
-    </style>
-    <!-- Mixpanel Analytics -->
-    <script type="text/javascript">
-      (function(e,c){if(!c.__SV){var l,h;window.mixpanel=c;c._i=[];c.init=function(q,r,f){function t(d,a){var g=a.split(".");2==g.length&&(d=d[g[0]],a=g[1]);d[a]=function(){d.push([a].concat(Array.prototype.slice.call(arguments,0)))}}var b=c;"undefined"!==typeof f?b=c[f]=[]:f="mixpanel";b.people=b.people||[];b.toString=function(d){var a="mixpanel";"mixpanel"!==f&&(a+="."+f);d||(a+=" (stub)");return a};b.people.toString=function(){return b.toString(1)+".people (stub)"};l="disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders start_session_recording stop_session_recording people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");
-      for(h=0;h<l.length;h++)t(b,l[h]);var n="set set_once union unset remove delete".split(" ");b.get_group=function(){function d(p){a[p]=function(){b.push([g,[p].concat(Array.prototype.slice.call(arguments,0))])}}for(var a={},g=["get_group"].concat(Array.prototype.slice.call(arguments,0)),m=0;m<n.length;m++)d(n[m]);return a};c._i.push([q,r,f])};c.__SV=1.2;var k=e.createElement("script");k.type="text/javascript";k.async=!0;k.src="undefined"!==typeof MIXPANEL_CUSTOM_LIB_URL?MIXPANEL_CUSTOM_LIB_URL:"file:"===e.location.protocol&&"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//)?"https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js":"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";e=e.getElementsByTagName("script")[0];e.parentNode.insertBefore(k,e)}})(document,window.mixpanel||[])
-
-      mixpanel.init('525ec0f5d555a0fac6933b7f5d02f907', {
-        autocapture: true,
-        record_sessions_percent: 100,
-      })
-    </script>
+  mixpanel.init('525ec0f5d555a0fac6933b7f5d02f907', {
+    autocapture: true,
+    record_sessions_percent: 100,
+  })
+</script>
 </head>
 <body>
+<div style="display:flex;flex-direction:column;width:100%">
+<header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
+  <div class="wrap row" style="min-height:72px">
+    <a href="#top" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0D1B2E"><img src="/onetwo-nav-logo.jpg" alt="ONE two" style="width:36px;height:34px;object-fit:cover;border-radius:6px"><span style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px">ONE <span style="font-weight:500">two</span></span></a>
+    <nav class="navlinks" style="display:flex;gap:28px" aria-label="Main"><a href="#replace" style="color:#0D1B2E;text-decoration:none;font-weight:500">Why no manager</a><a href="#score" style="color:#0D1B2E;text-decoration:none;font-weight:500">The score</a><a href="#pricing" style="color:#0D1B2E;text-decoration:none;font-weight:500">Pricing</a><a href="#owners" style="color:#0D1B2E;text-decoration:none;font-weight:500">Who can start</a></nav>
+    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="nav">Start free trial</a></div>
+  </div>
+</header>
 
-<!-- NAV -->
-<nav>
-    <div class="nav-inner">
-        <div style="display: flex; align-items: center;">
-            <a href="#" class="logo"><img src="/onetwo-nav-logo.jpg" alt="ONE two - HOA management software" style="height: 48px; display: block;"></a>
-            <span style="font-size: 0.85rem; color: var(--muted); font-weight: 400; margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border);">HOA handled.</span>
-        </div>
-        <div class="nav-links">
-            <a href="#features">Platform</a>
-            <a href="#differentiators">Why Us</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#compare-features">Features</a>
-            <a href="/demo">Chat with us!</a>
-            <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="color: #fff;">Get Started</a>
-            <a href="/login?demo=1" style="color: var(--primary); font-weight: 600; text-decoration: none;">Try the Demo</a>
-            <a href="/login" class="btn btn-outline" style="display:none;">Log In</a>
-        </div>
-        <button class="hamburger" onclick="toggleMobileMenu()" aria-label="Menu">
-            <span></span><span></span><span></span>
-        </button>
+<!-- HERO: ownership (D) + replacement (A) + score (B) -->
+<section id="top" style="background:#0D1B2E;color:#ffffff;padding:96px 0 88px;overflow:hidden">
+  <div class="wrap two">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <span class="eyebrow f1" style="color:#A5F3FC">For Washington, DC condo buildings</span>
+      <h1 class="f2" style="font-size:58px;line-height:1.04;color:#ffffff">Everything a property manager does for your building.<br><span style="color:#A5F3FC">Without the property manager.</span></h1>
+      <p class="f3" style="font-size:19px;line-height:1.55;color:#c7d2de;max-width:580px">ONE two does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.</p>
+      <div class="f3" style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-red" href="/login?create=1" style="min-height:54px;padding:0 26px;font-size:17px" data-cta="hero">Start your free 21 day trial</a><a class="btn btn-ghost" href="#pricing" style="min-height:54px;font-size:17px" data-cta="hero-pricing">See pricing</a></div>
+      <p class="f4" style="font-size:14px;color:#8fa0b3">No card to start. $179 a month after the trial, everything included.</p>
     </div>
-</nav>
-
-<!-- MOBILE MENU -->
-<div class="mobile-menu" id="mobileMenu">
-    <a href="#features" onclick="toggleMobileMenu()">Platform</a>
-    <a href="#differentiators" onclick="toggleMobileMenu()">Why Us</a>
-    <a href="#pricing" onclick="toggleMobileMenu()">Pricing</a>
-    <a href="#compare-features" onclick="toggleMobileMenu()">Features</a>
-    <a href="/demo">Chat with us!</a>
-    <a href="#" onclick="openWaitlist();toggleMobileMenu();return false" class="btn btn-primary" style="color: #fff;">Get Started</a>
-    <a href="/login?demo=1" style="font-weight: 600;">Try the Demo</a>
-</div>
-
-<!-- HERO -->
-<section class="hero" style="grid-template-columns: 1fr; text-align: center; padding-bottom: 3rem;">
-    <div class="animate" style="max-width: 780px; margin: 0 auto;">
-        <div class="hero-badge">🏛 Launching in Washington, DC</div>
-        <h1 class="display">
-            Governance on autopilot. Compliance by default. <em>HOA handled.</em>
-        </h1>
-        <p style="max-width: 620px; margin: 0 auto 2rem;">
-            <strong>ONE two</strong> weaves your HOA bylaws, local codes and fiduciary duties into every step of running your building — guiding through every decision so you can govern with the confidence that you're protecting your community for the long run.
-        </p>
-        <div class="hero-actions" style="justify-content: center;">
-            <a href="#pricing" class="btn btn-primary">See Plans & Pricing →</a>
-            <a href="#features" class="btn btn-outline">See It In Action ↓</a>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:24px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center">
+        <svg width="150" height="150" viewBox="0 0 120 120" role="img" aria-label="Board Health 82 of 100">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#e3e8ee" stroke-width="10"></circle>
+          <circle class="dial" cx="60" cy="60" r="54" fill="none" stroke="#155E75" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="61" style="transform:rotate(-90deg);transform-origin:60px 60px"></circle>
+          <text x="60" y="58" text-anchor="middle" font-family="Fraunces,Georgia,serif" font-size="38" font-weight="700" fill="#0D1B2E">82</text>
+          <text x="60" y="76" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="700" fill="#4b5a6b" letter-spacing="1">BOARD HEALTH</text>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div><span style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5a6b">1302 R St NW · 12 units</span><br><span style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600">Budget Season · 41 days left</span></div>
+          <div class="f1 row" style="font-size:13px"><span class="muted">Compliance</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
+          <div class="f2 row" style="font-size:13px"><span class="muted">Financial</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
+          <div class="f3 row" style="font-size:13px"><span class="muted">Governance</span><span class="pill" style="background:#fff0f1;color:#D62839">Needs you</span></div>
+          <div class="f4 row" style="font-size:13px"><span class="muted">Records</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
         </div>
+        <div class="f4" style="grid-column:1 / -1;padding:12px 14px;border-radius:12px;background:#fff0f1;display:flex;gap:10px;align-items:center;font-size:13px"><span class="pill" style="background:#D62839;color:#ffffff">Due Fri</span><span>Mail the draft budget to owners, 30 day notice. Treasurer. Moves Governance.</span></div>
+      </div>
+      <p style="font-size:12px;color:#8fa0b3;text-align:center">The same number the board sees is the one the owners see.</p>
     </div>
+  </div>
 </section>
 
-<!-- PLATFORM — INTERACTIVE DEMO + FEATURES -->
-<section id="demo" style="padding: 2rem 2rem 5rem;">
-    <div id="features"></div>
-    <div class="demo-container animate">
-        <!-- Tabs header -->
-        <div style="padding: 2rem 2rem 0; text-align: center;">
-            <div class="section-label" style="color: #a5f3fc;">⚡ Platform Features</div>
-            <h2 class="section-title display" style="color: #fff; max-width: 650px; margin: 0 auto 0.5rem;">Everything your board needs. Nothing it doesn't.</h2>
-            <p style="color: rgba(255,255,255,0.5); font-size: 0.95rem; max-width: 560px; margin: 0 auto 1.5rem;">Here's a look at what you'll find inside <strong style="color: rgba(255,255,255,0.8);">ONE two</strong>.</p>
-            <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
-                <button class="demo-tab active" onclick="showDemo('dashboard')">📊 Dashboard</button>
-                <button class="demo-tab" onclick="showDemo('boardroom')">🏛 Board Room</button>
-                <button class="demo-tab" onclick="showDemo('building')">🏢 The Building</button>
-                <button class="demo-tab" onclick="showDemo('fiscal')">💰 Fiscal Lens</button>
-                <button class="demo-tab" onclick="showDemo('cases')">⚡ Cases</button>
-                <button class="demo-tab" onclick="showDemo('archives')">📦 Archives</button>
-            </div>
-        </div>
-
-        <!-- Per-tab feature descriptions (update alongside screens) -->
-        <div style="padding: 0 2rem;">
-            <div class="demo-desc active" id="desc-dashboard">
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">📊</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Dashboard</div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Your command center. Building and compliance grades, fiduciary alerts, collection rates, reserve funding, open cases, and role-based action items — everything you need at a glance to know where your community stands.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-desc" id="desc-boardroom">
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">🏛</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Board Room <span style="font-size: 0.65rem; font-weight: 600; background: rgba(214,40,57,0.2); color: #fca5a5; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Compliance engine</span></div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Governance calendar, fiduciary duties (Care, Loyalty, Obedience), role responsibility matrix, daily operations tracker, votes & resolutions, and communications — all tied to DC jurisdiction requirements.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-desc" id="desc-building">
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">🏢</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">The Building</div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Building health score (A–F), property details, unit directory, contacts, legal & bylaws tracking, insurance status, vendor management, PM scorecard, and mailing tools.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-desc" id="desc-fiscal">
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">💰</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Fiscal Lens <span style="font-size: 0.65rem; font-weight: 600; background: rgba(34,197,94,0.2); color: #4ade80; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Full accounting</span></div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Double-entry general ledger, chart of accounts, budget burn rate tracking, reserve fund monitoring, delinquency aging, unit ledger with payment actions, work orders & invoices, and financial reports.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-desc" id="desc-cases">
-                <div onclick="openWaitlist()" style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, rgba(214,40,57,0.12), rgba(214,40,57,0.06)); border: 1px solid rgba(214,40,57,0.25); border-radius: 10px; padding: 0.75rem 1.25rem; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='linear-gradient(135deg, rgba(214,40,57,0.2), rgba(214,40,57,0.1))';this.style.borderColor='rgba(214,40,57,0.4)'" onmouseout="this.style.background='linear-gradient(135deg, rgba(214,40,57,0.12), rgba(214,40,57,0.06))';this.style.borderColor='rgba(214,40,57,0.25)'">
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <span style="font-size: 1rem;">🚀</span>
-                        <span style="color: rgba(255,255,255,0.85); font-size: 0.85rem; font-weight: 500;">Like what you see? Get early access when we launch.</span>
-                    </div>
-                    <span style="color: #f87171; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">Join Waitlist →</span>
-                </div>
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">⚡</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Case Workflow <span style="font-size: 0.65rem; font-weight: 600; background: rgba(251,191,36,0.2); color: #fbbf24; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.35rem; vertical-align: middle;">Unique to ONE two</span></div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Step-by-step case management with priority triage, pre-legal escalation paths, progress tracking, unit or common area association, and compliant resolution workflows. Community Room requests flow directly in.</div>
-                    </div>
-                </div>
-            </div>
-            <div class="demo-desc" id="desc-archives">
-                <div style="display: flex; align-items: flex-start; gap: 1.25rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                    <div style="font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem;">📦</div>
-                    <div>
-                        <div style="color: #fff; font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">The Archives</div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.85rem; line-height: 1.6;">Permanent, read-only annual snapshots of all compliance, financial, and governance records. Automatic regulatory refresh ensures requirements stay current year over year.</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Browser frame -->
-        <div class="demo-browser">
-            <div class="demo-browser-header">
-                <div class="dots"><span style="background:#ef4444;"></span><span style="background:#f59e0b;"></span><span style="background:#22c55e;"></span></div>
-                <div class="url-bar" id="demo-url">getonetwo.com/dashboard</div>
-            </div>
-            <div class="demo-body">
-
-                <!-- DASHBOARD SCREEN — "Live command center" -->
-                <div class="demo-screen active" id="screen-dashboard">
-                    <!-- Welcome banner with radar scan -->
-                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; position: relative; overflow: hidden;">
-                        <div class="scan-line"></div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1;">
-                            <div>
-                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">Welcome back, Sarah</div>
-                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem; margin-top: 0.15rem;">Parkview Terrace HOA · Board President</div>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <div class="grade-reveal" style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0.35rem 0.6rem; text-align: center; min-width: 44px;">
-                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.6);">Building</div>
-                                    <div style="font-size: 1.1rem; font-weight: 800; position: relative;">
-                                        <span class="grade-q" style="color: rgba(255,255,255,0.25);">—</span>
-                                        <span class="grade-val" style="color: #4ade80;">A</span>
-                                    </div>
-                                </div>
-                                <div class="grade-reveal" style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0.35rem 0.6rem; text-align: center; min-width: 44px;">
-                                    <div style="font-size: 0.55rem; color: rgba(255,255,255,0.6);">Compliance</div>
-                                    <div style="font-size: 1.1rem; font-weight: 800; position: relative;">
-                                        <span class="grade-q" style="color: rgba(255,255,255,0.25);">—</span>
-                                        <span class="grade-val" style="color: #4ade80;">A</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Fiduciary alert — status check -->
-                    <div class="anim" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;">
-                        <span style="font-size: 0.75rem; font-weight: 700; color: #4ade80; background: rgba(34,197,94,0.15); padding: 0.2rem 0.5rem; border-radius: 6px;">⚖ Fiduciary Alerts</span>
-                        <span style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">0 critical · 0 total — All obligations current ✓</span>
-                    </div>
-                    <!-- 4 stat cards with counting numbers -->
-                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
-                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
-                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Collection Rate</div>
-                            <div class="count-up" data-target="97" data-suffix="%" data-delay="300" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
-                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">$8,200/mo</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
-                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Reserve Funding</div>
-                            <div class="count-up" data-target="82" data-suffix="%" data-delay="450" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
-                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">$271K funded</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
-                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Compliance Score</div>
-                            <div class="count-up" data-target="92" data-suffix="%" data-delay="600" style="font-size: 1.5rem; font-weight: 800; color: #4ade80; font-family: 'Fraunces', serif;">—</div>
-                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">A grade · 39/42</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.75rem; text-align: center;">
-                            <div style="font-size: 0.65rem; color: rgba(255,255,255,0.4);">Open Cases</div>
-                            <div class="count-up" data-target="2" data-suffix="" data-delay="750" style="font-size: 1.5rem; font-weight: 800; color: #60a5fa; font-family: 'Fraunces', serif;">—</div>
-                            <div style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">0 urgent</div>
-                        </div>
-                    </div>
-                    <!-- Action items drop in like notifications -->
-                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
-                            <span style="color: #fff; font-size: 0.8rem; font-weight: 600;">⚡ Your Action Items <span style="background: rgba(34,197,94,0.2); color: #4ade80; padding: 0.15rem 0.4rem; border-radius: 100px; font-size: 0.65rem;">3</span></span>
-                            <span style="color: rgba(255,255,255,0.35); font-size: 0.65rem;">Role: President</span>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                            <div class="notif-drop" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.55rem 0.7rem; display: flex; justify-content: space-between; align-items: center;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="width: 7px; height: 7px; border-radius: 2px; background: #fbbf24;"></span>
-                                    <span style="color: #fff; font-size: 0.75rem; font-weight: 500;">Annual reserve study — schedule vendor</span>
-                                </div>
-                                <span style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">medium · open</span>
-                            </div>
-                            <div class="notif-drop" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.55rem 0.7rem; display: flex; justify-content: space-between; align-items: center;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="width: 7px; height: 7px; border-radius: 2px; background: #22c55e;"></span>
-                                    <span style="color: #fff; font-size: 0.75rem; font-weight: 500;">Review Q1 financial report</span>
-                                </div>
-                                <span style="font-size: 0.6rem; color: rgba(255,255,255,0.3);">low · open</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BOARD ROOM SCREEN — "Compliance tracking engine" -->
-                <div class="demo-screen" id="screen-boardroom">
-                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">🏛 Board Room</div>
-                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Governance calendar, meetings, votes & communications · DC jurisdiction</div>
-                            </div>
-                            <!-- Compliance ring gauge -->
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <div style="position: relative; width: 52px; height: 52px;">
-                                    <svg class="compliance-ring" width="52" height="52" viewBox="0 0 52 52" style="--circ: 138.2; --offset: 11.1;">
-                                        <circle class="track" cx="26" cy="26" r="22" stroke-width="5"/>
-                                        <circle class="fill" cx="26" cy="26" r="22" stroke-width="5"/>
-                                    </svg>
-                                    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
-                                        <span class="count-up" data-target="92" data-suffix="%" data-delay="400" style="font-size: 0.75rem; font-weight: 800; color: #4ade80;">—</span>
-                                    </div>
-                                </div>
-                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5); line-height: 1.4;">Compliance<br><span style="color: #4ade80; font-weight: 700;">39/42 items</span></div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Fiduciary duties with animated checkmarks -->
-                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem;">
-                        <div style="color: #fff; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem;">⚖ The Three Fiduciary Duties</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem;">
-                            <div class="anim-card" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15); border-radius: 10px; padding: 0.9rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 0.9rem;">🔍</span>
-                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </div>
-                                <div style="color: #fca5a5; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Care</div>
-                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Act as a reasonably prudent person.</div>
-                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="25" data-suffix="/25 current" data-delay="600" style="color: #4ade80; font-size: 0.65rem; font-weight: 600;">0/25 current</span></div>
-                            </div>
-                            <div class="anim-card" style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15); border-radius: 10px; padding: 0.9rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 0.9rem;">🤝</span>
-                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </div>
-                                <div style="color: #fbbf24; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Loyalty</div>
-                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Put the association's interests first.</div>
-                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="3" data-suffix="/3 current" data-delay="750" style="color: #4ade80; font-size: 0.65rem; font-weight: 600;">0/3 current</span></div>
-                            </div>
-                            <div class="anim-card" style="background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 0.9rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-size: 0.9rem;">📜</span>
-                                    <svg width="16" height="16" viewBox="0 0 16 16"><polyline class="duty-check" points="3,8 6.5,11.5 13,4.5" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </div>
-                                <div style="color: #4ade80; font-size: 0.8rem; font-weight: 700; margin-top: 0.25rem;">Duty of Obedience</div>
-                                <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.2rem;">Follow governing documents & law.</div>
-                                <div style="margin-top: 0.4rem;"><span class="oblig-count count-up" data-target="13" data-suffix="/14 — 1 pending" data-delay="900" style="color: #fbbf24; font-size: 0.65rem; font-weight: 600;">0/14 — 1 pending</span></div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Bottom grid -->
-                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
-                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Upcoming Meetings</div>
-                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.5rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
-                                <div style="background: rgba(239,68,68,0.2); border-radius: 6px; padding: 0.25rem 0.4rem; text-align: center; font-size: 0.55rem; color: #fca5a5; min-width: 38px;"><span style="display: block; font-weight: 800; font-size: 0.85rem;">15</span>MAR</div>
-                                <div><div style="color: #fff; font-size: 0.75rem; font-weight: 600;">Q1 Board Meeting</div><div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">19:00 · Community Room</div></div>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                                <div style="background: rgba(96,165,250,0.2); border-radius: 6px; padding: 0.25rem 0.4rem; text-align: center; font-size: 0.55rem; color: #93c5fd; min-width: 38px;"><span style="display: block; font-weight: 800; font-size: 0.85rem;">12</span>MAY</div>
-                                <div><div style="color: #fff; font-size: 0.75rem; font-weight: 600;">Annual Meeting</div><div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">18:00 · Community Room</div></div>
-                            </div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.9rem;">
-                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Role Responsibility Matrix</div>
-                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">President</span><span style="color: #4ade80; font-weight: 600;">16 items · 0 overdue</span></div>
-                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">Secretary</span><span style="color: #4ade80; font-weight: 600;">10 items · 0 overdue</span></div>
-                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">Treasurer</span><span style="color: #fbbf24; font-weight: 600;">8 items · 1 overdue</span></div>
-                            <div class="anim-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.7rem;"><span style="color: rgba(255,255,255,0.5);">VP</span><span style="color: #4ade80; font-weight: 600;">8 items · 0 overdue</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BUILDING SCREEN — "Property health assessment" -->
-                <div class="demo-screen" id="screen-building">
-                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">🏢 Parkview Terrace</div>
-                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">1420 R Street NW, Washington, DC 20009</div>
-                            </div>
-                            <!-- Health grade reveals AFTER assessment completes -->
-                            <div class="health-grade" style="text-align: right;">
-                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5);">Health Score</div>
-                                <div style="font-size: 1.8rem; font-weight: 900; font-family: 'Fraunces', serif; color: #4ade80; line-height: 1;">A</div>
-                                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">91%</div>
-                            </div>
-                        </div>
-                        <!-- Assessment bars fill sequentially -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-top: 0.9rem;">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Legal & Bylaws</span><span style="color: #4ade80; font-weight: 600;">88%</span></div>
-                                <div class="assess-bar-track"><div class="assess-bar-fill ab1" style="--bar-w: 88%;"></div></div>
-                            </div>
-                            <div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Insurance</span><span style="color: #4ade80; font-weight: 600;">100%</span></div>
-                                <div class="assess-bar-track"><div class="assess-bar-fill ab2" style="--bar-w: 100%;"></div></div>
-                            </div>
-                            <div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Governance</span><span style="color: #4ade80; font-weight: 600;">100%</span></div>
-                                <div class="assess-bar-track"><div class="assess-bar-fill ab3" style="--bar-w: 100%;"></div></div>
-                            </div>
-                            <div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.6rem; margin-bottom: 0.2rem;"><span style="color: rgba(255,255,255,0.5);">Delinquency</span><span style="color: #4ade80; font-weight: 600;">3%</span></div>
-                                <div class="assess-bar-track"><div class="assess-bar-fill ab4" style="--bar-w: 97%; background: linear-gradient(90deg, #22c55e, #4ade80);"></div></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="anim" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);">Building Details</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Contacts</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">The Units</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Legal & Bylaws</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Insurance</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.7rem; font-weight: 500; color: rgba(255,255,255,0.4);">Vendors</span>
-                    </div>
-                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
-                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Year Built</div><div style="color: #fff; font-weight: 700;">2004</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Units</div><div style="color: #fff; font-weight: 700;">24</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Floors</div><div style="color: #fff; font-weight: 700;">6</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem;"><div style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">Type</div><div style="color: #fff; font-weight: 700;">Mid-rise Condo</div></div>
-                    </div>
-                    <div class="anim" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Rooftop Deck</span>
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Fitness Center</span>
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Secure Lobby</span>
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Elevator</span>
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Package Room</span>
-                        <span class="anim-tag" style="padding: 0.3rem 0.65rem; border-radius: 100px; font-size: 0.7rem; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2);">✓ Garage Parking</span>
-                    </div>
-                </div>
-
-                <!-- FISCAL LENS SCREEN — "Ledger in motion" -->
-                <div class="demo-screen" id="screen-fiscal">
-                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">💰 Fiscal Lens</div>
-                                <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Double-entry general ledger, chart of accounts, budgets, reserves & reports</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <span class="dollar-tick count-up" data-target="87" data-suffix="%" data-delay="300" style="color: #4ade80; font-size: 1.8rem; font-weight: 900; font-family: 'Fraunces', serif;">—</span>
-                                <div style="font-size: 0.55rem; color: rgba(255,255,255,0.5);">Financial Health</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 0.4rem; margin-top: 0.75rem;">
-                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="42100" data-prefix="$" data-suffix="" data-delay="400" data-format="dollar" style="font-weight: 700; color: #fff;">—</div>Operating Cash</div>
-                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="97" data-suffix="%" data-delay="500" style="font-weight: 700; color: #4ade80;">—</div>Collection Rate</div>
-                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="41" data-suffix="%" data-delay="600" style="font-weight: 700; color: #4ade80;">—</div>Budget Used</div>
-                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="82" data-suffix="%" data-delay="700" style="font-weight: 700; color: #4ade80;">—</div>Reserves</div>
-                            <div style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 0.35rem; text-align: center; font-size: 0.55rem; color: rgba(255,255,255,0.6);"><div class="dollar-tick count-up" data-target="475" data-prefix="$" data-suffix="" data-delay="800" data-format="dollar" style="font-weight: 700; color: #fbbf24;">—</div>Receivables</div>
-                        </div>
-                    </div>
-                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem;">
-                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Budget Burn Rate</div>
-                            <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-bottom: 0.3rem;"><span>Spent</span><span style="color: #fff; font-weight: 600;">$12,340 / $30,000</span></div>
-                            <div style="background: rgba(255,255,255,0.1); border-radius: 100px; height: 8px; overflow: hidden;"><div class="anim-bar" style="--bar-w: 41%; height: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); border-radius: 100px;"></div></div>
-                            <div style="color: rgba(255,255,255,0.4); font-size: 0.65rem; margin-top: 0.3rem;">41% consumed · $17,660 remaining</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem;">
-                            <div style="color: #fff; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Delinquency Aging</div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="color: rgba(255,255,255,0.5);">Current (0–30 days)</span><span style="color: #fbbf24; font-weight: 600;">1 unit · $475</span></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);"><span style="color: rgba(255,255,255,0.5);">31–60 days</span><span style="color: #4ade80; font-weight: 600;">0 units · $0</span></div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; padding: 0.4rem 0; font-weight: 700;"><span style="color: rgba(255,255,255,0.7);">Total Outstanding</span><span style="color: #fbbf24;">$475</span></div>
-                        </div>
-                    </div>
-                    <div class="anim" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
-                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📊</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">Chart of Accounts</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📒</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">General Ledger</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📋</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">WO & Invoices</div></div>
-                        <div class="anim-card" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.7rem; text-align: center;"><div style="font-size: 1rem; margin-bottom: 0.2rem;">📈</div><div style="color: #fff; font-size: 0.7rem; font-weight: 600;">Financial Reports</div></div>
-                    </div>
-                </div>
-
-                <!-- CASE WORKFLOW SCREEN — "Step-by-step resolution" -->
-                <div class="demo-screen" id="screen-cases">
-                    <div class="anim" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <div>
-                                <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">⚡ Case Workflow</div>
-                                <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">Create, open, or resume a case</div>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                <span style="color: #fff; font-size: 0.8rem; font-weight: 600;">Open Cases <span style="background: rgba(96,165,250,0.2); color: #60a5fa; padding: 0.15rem 0.5rem; border-radius: 100px; margin-left: 0.25rem;">2</span></span>
-                                <button style="background: var(--accent); color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">+ New Case</button>
-                            </div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                            <!-- Case 1 with animated step track -->
-                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem;">
-                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.6rem;">
-                                    <div style="flex: 1;">
-                                        <div style="display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.2rem;">
-                                            <span style="font-size: 0.65rem; font-weight: 600; background: rgba(251,191,36,0.15); color: #fbbf24; padding: 0.1rem 0.4rem; border-radius: 4px;">medium</span>
-                                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">🏢 Unit Common</span>
-                                        </div>
-                                        <div style="color: #fff; font-size: 0.85rem; font-weight: 600;">Garage door sensor replacement</div>
-                                    </div>
-                                    <div class="count-up" data-target="64" data-suffix="%" data-delay="400" style="font-size: 1.1rem; font-weight: 800; color: #4ade80;">—</div>
-                                </div>
-                                <!-- Step sequence: 9 of 14 lit -->
-                                <div class="step-track case-steps" data-lit="9" data-total="14" style="margin-bottom: 0.3rem;">
-                                    <!-- JS will populate step dots -->
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">Step 9 of 14 · <span style="color: #fbbf24;">Pre-Legal</span></div>
-                                    <div style="color: rgba(255,255,255,0.3); font-size: 0.8rem;">→</div>
-                                </div>
-                            </div>
-                            <!-- Case 2 with animated step track -->
-                            <div class="anim-row" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem;">
-                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.6rem;">
-                                    <div style="flex: 1;">
-                                        <div style="display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.2rem;">
-                                            <span style="font-size: 0.65rem; font-weight: 600; background: rgba(96,165,250,0.15); color: #60a5fa; padding: 0.1rem 0.4rem; border-radius: 4px;">low</span>
-                                            <span style="font-size: 0.6rem; color: rgba(255,255,255,0.4);">👤 Unit 402</span>
-                                        </div>
-                                        <div style="color: #fff; font-size: 0.85rem; font-weight: 600;">Noise complaint — recurring late-night music</div>
-                                    </div>
-                                    <div class="count-up" data-target="21" data-suffix="%" data-delay="600" style="font-size: 1.1rem; font-weight: 800; color: #60a5fa;">—</div>
-                                </div>
-                                <!-- Step sequence: 3 of 14 lit -->
-                                <div class="step-track case-steps" data-lit="3" data-total="14" style="margin-bottom: 0.3rem;">
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="color: rgba(255,255,255,0.4); font-size: 0.6rem;">Step 3 of 14 · <span style="color: #60a5fa;">Pre-Legal</span></div>
-                                    <div style="color: rgba(255,255,255,0.3); font-size: 0.8rem;">→</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ARCHIVES SCREEN — "Sealed records vault" -->
-                <div class="demo-screen" id="screen-archives">
-                    <div class="anim" style="background: linear-gradient(135deg, #7f1d1d, #991b1b, #450a0a); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">📦 The Archives</div>
-                            <div style="color: rgba(252,165,165,0.7); font-size: 0.75rem;">Historical compliance records and audit trail</div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span class="lock-anim" style="font-size: 1rem;">🔒</span>
-                            <button style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">📦 Create Archive</button>
-                        </div>
-                    </div>
-                    <div class="anim" style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);">Archives</span>
-                        <span style="padding: 0.35rem 0.75rem; border-radius: 100px; font-size: 0.75rem; font-weight: 500; color: rgba(255,255,255,0.4);">Reports</span>
-                    </div>
-                    <div class="anim" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                        <!-- Card 1 — gets SEALED stamp -->
-                        <div class="anim-card" style="position: relative; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; overflow: hidden;">
-                            <div class="seal-stamp">🔒 Sealed</div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-                                <span style="font-size: 1.3rem;">📦</span>
-                                <span style="font-size: 0.6rem; font-weight: 600; color: #4ade80; background: rgba(34,197,94,0.15); padding: 0.15rem 0.5rem; border-radius: 100px;">Complete</span>
-                            </div>
-                            <div style="color: #fff; font-size: 0.9rem; font-weight: 700;">FY 2025 Annual Archive</div>
-                            <div style="color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.2rem;">Created Jan 15, 2026 · Read-only snapshot</div>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);">Compliance: A (94%) · Financial: A (91%) · 42 items archived</div>
-                        </div>
-                        <!-- Card 2 — gets SEALED stamp -->
-                        <div class="anim-card" style="position: relative; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; overflow: hidden;">
-                            <div class="seal-stamp">🔒 Sealed</div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
-                                <span style="font-size: 1.3rem;">📦</span>
-                                <span style="font-size: 0.6rem; font-weight: 600; color: #60a5fa; background: rgba(96,165,250,0.15); padding: 0.15rem 0.5rem; border-radius: 100px;">Complete</span>
-                            </div>
-                            <div style="color: #fff; font-size: 0.9rem; font-weight: 700;">FY 2024 Annual Archive</div>
-                            <div style="color: rgba(255,255,255,0.4); font-size: 0.7rem; margin-top: 0.2rem;">Created Jan 10, 2025 · Read-only snapshot</div>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 0.65rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);">Compliance: B (83%) · Financial: A (88%) · 40 items archived</div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
+<!-- PROOF STRIP -->
+<section style="background:#f4f6f9;border-bottom:1px solid #e9edf2;padding:28px 0">
+  <div class="wrap grid3" style="gap:32px">
+    <div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;line-height:1;color:#D62839">45</span><p style="font-size:15px;line-height:1.45;color:#2b3a4b">obligations from the DC Condominium Act and DLCP, each with a due date, an owner and a how-to</p></div>
+    <div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;line-height:1;color:#D62839">1</span><p style="font-size:15px;line-height:1.45;color:#2b3a4b">statement a month that every owner can read, from a ledger your accountant will respect</p></div>
+    <div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;line-height:1;color:#D62839">0</span><p style="font-size:15px;line-height:1.45;color:#2b3a4b">management fees, vendor markups or surprise line items. The association pays its vendors directly</p></div>
+  </div>
 </section>
 
-
-<!-- WHAT SETS US APART — BEFORE / AFTER -->
-<section id="differentiators" style="padding: 5rem 2rem;">
-    <div class="section-inner">
-        <div style="text-align: center; margin-bottom: 3rem;">
-            <div class="section-label">🔍 What Sets Us Apart</div>
-            <h2 class="section-title display" style="max-width: 700px; margin: 0 auto 1rem;">Compliance isn't a feature. It's the foundation.</h2>
-            <p class="section-desc" style="margin: 0 auto;">Most HOA tools give you spreadsheets. <strong>ONE two</strong> gives you a governance framework built on fiduciary law.</p>
-        </div>
-
-        <!-- Before / After grid -->
-        <div class="animate before-after-grid" style="display: grid; grid-template-columns: 1fr 56px 1fr; max-width: 1060px; margin: 0 auto;">
-
-            <!-- WITHOUT column -->
-            <div style="background: #f1eeea; border: 1px solid #ddd8d1; border-radius: 20px; padding: 2.25rem;">
-                <div style="font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; color: #94a3b8; padding-bottom: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #ddd8d1;">Without ONE two</div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚖️</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Fiduciary duties are abstract</div>
-                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">You know "duty of care" exists — but which tasks map to it? Which role is responsible? Nobody tracks it.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">💰</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Finances live in spreadsheets</div>
-                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">No double-entry ledger. Budget tracking is manual. Delinquencies surface too late. Reserve fund status is a guess.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚡</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Issues vanish into email threads</div>
-                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">Resident complains about noise. Board member says "I'll handle it." No steps documented, no escalation path, no audit trail.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">🏘</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Residents are in the dark</div>
-                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">No portal, no visibility into what the board is doing. Annual meetings are the only touchpoint. Trust erodes quietly.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #e5e0d9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">📦</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Records are scattered</div>
-                        <div style="font-size: 0.78rem; color: #b0a99e; line-height: 1.55; margin-top: 0.15rem;">Past decisions live in someone's inbox. New board members start from zero. No institutional memory.</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VS divider -->
-            <div class="vs-divider" style="display: flex; align-items: center; justify-content: center; z-index: 1;">
-                <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; box-shadow: 0 4px 16px rgba(214,40,57,0.25);">VS</div>
-            </div>
-
-            <!-- WITH column -->
-            <div style="background: #fff; border: 2px solid var(--accent); border-radius: 20px; padding: 2.25rem; position: relative; overflow: hidden;">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--warm), var(--green));"></div>
-                <div style="font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; color: var(--ink); padding-bottom: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border);">With <span style="color: var(--accent);">ONE two</span></div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--accent-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚖️</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Every task tagged to its fiduciary duty <span style="font-size: 0.6rem; font-weight: 700; background: var(--accent-light); color: var(--accent); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Board Room</span></div>
-                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Care, Loyalty, Obedience — 42 obligations mapped to roles, deadlines, and compliance status. You always know <em>why</em> it matters.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">💰</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Full double-entry accounting <span style="font-size: 0.6rem; font-weight: 700; background: var(--green-light); color: var(--green); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Fiscal Lens</span></div>
-                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">GL, chart of accounts, budget burn rate, reserve goals, delinquency aging, unit ledger — with one Financial Health score.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--warm-light); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">⚡</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Step-by-step compliant resolution <span style="font-size: 0.6rem; font-weight: 700; background: var(--warm-light); color: #92400e; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Case Workflow</span></div>
-                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Priority triage, pre-legal escalation, progress tracking, full audit trail. Accessible from anywhere in the app.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #dbeafe; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">🏘</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Owners submit → Board resolves → Everyone sees <span style="font-size: 0.6rem; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Community</span></div>
-                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Community Room requests flow into Case Workflow. Residents feel heard, the board has context, and every resolution is documented.</div>
-                    </div>
-                </div>
-
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                    <div style="width: 34px; height: 34px; border-radius: 10px; background: #ede9fe; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;">📦</div>
-                    <div>
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--ink);">Permanent annual archives <span style="font-size: 0.6rem; font-weight: 700; background: #ede9fe; color: #6d28d9; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; vertical-align: middle;">Archives</span></div>
-                        <div style="font-size: 0.78rem; color: var(--muted); line-height: 1.55; margin-top: 0.15rem;">Read-only compliance snapshots with automatic regulatory refresh. New board members inherit full institutional memory.</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<!-- WHY NO MANAGER (A) -->
+<section id="replace" style="padding:96px 0">
+  <div class="wrap two">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <span class="line">Why no manager</span>
+      <h2 style="font-size:40px;line-height:1.12">A management company sells a checklist and a phone number. Keep the phone number if you like.</h2>
+      <p class="muted" style="font-size:17px;line-height:1.6"><strong style="color:#0D1B2E">Keeping the building's long-term health on track is the real job.</strong> That means knowing what is due, running the meeting, handling the problems, keeping the books, planning for the roof and holding the records. A management company charges per unit, every month, plus fees on top, and the checklist is as far as most of them get. ONE two does all of it and your vendors get paid at their price, not a marked-up one.</p>
+      <p class="muted" style="font-size:17px;line-height:1.6"><strong style="color:#0D1B2E">The phone number is a person.</strong> Most boards find they do not need one once the checklist runs itself. If you do, add-on the <b>On Call</b> service to have a named advisor who knows your building and sits on your side of the table, not the manager's.</p>
     </div>
-</section>
-<!-- PRICING -->
-<section id="pricing">
-    <div class="section-inner">
-        <div style="text-align: center; margin-bottom: 3rem;">
-            <div class="section-label">💎 Simple Pricing</div>
-            <h2 class="section-title display" style="max-width: 600px; margin: 0 auto 1rem;">Plans that scale with your community</h2>
-            <p class="section-desc" style="margin: 0 auto 2rem;">
-                No per-unit nickel-and-diming. Flat pricing so you know exactly what you'll pay.
-            </p>
-            <div class="billing-toggle">
-                <span id="label-monthly" class="toggle-label active">Monthly</span>
-                <button id="toggle-btn" class="toggle-switch" onclick="toggleBilling()" aria-label="Toggle billing period">
-                    <span class="toggle-knob" id="toggle-knob"></span>
-                </button>
-                <span id="label-yearly" class="toggle-label">Yearly <span class="toggle-save">Save up to 16%</span></span>
-            </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;background:#f4f6f9;position:relative;overflow:hidden">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8fa0b3">Year in review · management company · 12 units</span>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:#4b5a6b">
+          <div class="row"><span>Management fee, $45 a unit a month</span><span>$6,480</span></div>
+          <div class="row"><span>Project oversight, 10% of roof repair</span><span>$1,800</span></div>
+          <div class="row"><span>Resale certificates, admin fees</span><span>$650</span></div>
+          <div class="row"><span>Mailings, copies, late fee processing</span><span>$420</span></div>
+          <div class="row" style="border-top:1px solid #c9d2dc;padding-top:8px;font-weight:700;color:#0D1B2E"><span>Paid this year</span><span>$9,350</span></div>
         </div>
-
-        <div class="pricing-grid">
-            <!-- COMPLIANCE PRO -->
-            <div class="price-card featured animate">
-                <div class="price-badge">Most Popular</div>
-                <h3 class="display">Compliance Pro</h3>
-                <div class="price-desc">Full governance & compliance engine for serious boards</div>
-                <div class="price-amount">
-                    <span class="dollar" id="price-compliance">$179</span>
-                    <span class="period" id="period-compliance">/mo</span>
-                </div>
-                <ul class="price-features">
-                    <li>Dashboard with Fiduciary Alerts & compliance grades</li>
-                    <li>Board Room: governance calendar, duties & roles</li>
-                    <li>Fiscal Lens: double-entry GL, budgets & reserves</li>
-                    <li>The Building: contacts, bylaws, insurance, vendors</li>
-                    <li>Case Workflow with pre-legal escalation paths</li>
-                    <li>Payment processing</li>
-                    <li>Reserve study tools</li>
-                    <li>Assessment tracking & processing</li>
-                    <li>Document Vault</li>
-                    <li>Property Log: inspections & condition tracking</li>
-                    <li>The Archives: annual compliance snapshots</li>
-                    <li>Jurisdiction compliance built in</li>
-                    <li>Email distribution</li>
-                </ul>
-                <a href="#" onclick="openWaitlist();return false" class="btn btn-primary price-btn">Join Waitlist →</a>
-            </div>
-
-            <!-- COMMUNITY PLUS -->
-            <div class="price-card animate delay-1">
-                <h3 class="display">Community Plus</h3>
-                <div class="price-desc">Compliance Pro + full community engagement</div>
-                <div class="price-amount">
-                    <span class="dollar" id="price-community">$279</span>
-                    <span class="period" id="period-community">/mo</span>
-                </div>
-                <ul class="price-features">
-                    <li>Everything in Compliance Pro</li>
-                    <li>Resident portal with issue reporting</li>
-                    <li>Community voting & resolutions</li>
-                    <li>Communications & notice templates</li>
-                    <li>PM Scorecard & vendor management</li>
-                    <li>Email distribution</li>
-                </ul>
-                <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
-            </div>
-
-            <!-- MANAGEMENT SUITE -->
-            <div class="price-card animate delay-2">
-                <h3 class="display">Management Suite</h3>
-                <div class="price-desc">Full platform for managed communities</div>
-                <div class="price-amount">
-                    <span class="dollar" id="price-management">$399</span>
-                    <span class="period" id="period-management">/mo</span>
-                </div>
-                <ul class="price-features">
-                    <li>Everything in Community Plus</li>
-                    <li>Property Manager role & tools</li>
-                    <li>Work order & invoice generation</li>
-                    <li>Email & postal distribution</li>
-                    <li>Mailing list management</li>
-                    <li>1099 reporting</li>
-                    <li>Staff management</li>
-                    <li>Priority support</li>
-                </ul>
-                <a href="#" onclick="openWaitlist();return false" class="btn btn-outline price-btn">Join Waitlist</a>
-            </div>
+        <span class="stamp" style="position:absolute;right:16px;top:40px;padding:6px 12px;border:3px solid #D62839;color:#D62839;font-weight:800;font-size:16px;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;background:rgba(255,255,255,.7)">Cancelled</span>
+      </div>
+      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;border-color:#0D1B2E">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#155E75">ONE two · Self-Managed · a year</span>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:#2b3a4b">
+          <div class="row"><span>Plan, everything included, 12 months</span><span>$2,148</span></div>
+          <div class="row"><span>Roof repair, paid to the roofer</span><span>at cost, 0%</span></div>
+          <div class="row"><span>Resale certificates, from your records</span><span>included</span></div>
+          <div class="row"><span>Mailings</span><span>postage at cost</span></div>
+          <div class="row" style="border-top:1px solid #c9d2dc;padding-top:8px;font-weight:700;color:#0D1B2E"><span>Paid this year</span><span>$2,148</span></div>
         </div>
-
-        <!-- FEATURE COMPARISON TABLE -->
-        <div id="compare-features" class="compare-table-wrap animate">
-            <div class="compare-table-header">
-                <h3 class="display">Compare Features</h3>
-                <p>Everything included in each plan at a glance</p>
-            </div>
-            <table class="compare-table">
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th class="featured-col">Compliance Pro</th>
-                        <th>Community Plus</th>
-                        <th>Management Suite</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr class="section-row"><td colspan="4">Core Governance</td></tr>
-                    <tr>
-                        <td>Dashboard with Fiduciary Alerts</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Board Room: calendar, duties & roles</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Compliance Runbook</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Jurisdiction compliance</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-
-                    <tr class="section-row"><td colspan="4">Financial & Case Management</td></tr>
-                    <tr>
-                        <td>Fiscal Lens: double-entry GL, budgets & reserves</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Case Workflow with pre-legal escalation</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Assessment tracking & processing</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Payment processing</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Reserve study tools</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-
-                    <tr class="section-row"><td colspan="4">Building & Records</td></tr>
-                    <tr>
-                        <td>The Building: contacts, bylaws, insurance, vendors</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Property Log: inspections & conditions</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>The Archives: annual compliance snapshots</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Document Vault</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-
-                    <tr class="section-row"><td colspan="4">Community & Communication</td></tr>
-                    <tr>
-                        <td>Resident portal with issue reporting</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Community portal</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Communications & notice templates</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Votes & resolutions</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Email distribution</td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Postal distribution</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Mailing list management</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Amenity scheduling & management</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-
-                    <tr class="section-row"><td colspan="4">Management & AI</td></tr>
-                    <!-- AI Advisor hidden for now -->
-                    <tr>
-                        <td>PM Scorecard & vendor management</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Work order & invoice generation</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>1099 reporting</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Staff management</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                    <tr>
-                        <td>Priority support</td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="dash">—</span></td>
-                        <td><span class="check">&#10003;</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- ROLES BY TIER -->
-        <div style="margin-top: 4rem; text-align: center;" class="animate">
-            <h3 class="display" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Roles Included by Plan</h3>
-            <p style="font-size: 0.9rem; color: var(--muted); max-width: 540px; margin: 0 auto;">Each plan supports different user roles so you can give the right access to the right people.</p>
-            <div class="roles-grid">
-                <div class="role-card">
-                    <div class="role-icon" style="background: var(--accent-light);">&#128737;&#65039;</div>
-                    <h4>Board Member</h4>
-                    <p class="role-desc">Full access to governance, financial tools, and fiduciary oversight</p>
-                    <span class="role-tier-badge" style="background: var(--green-light); color: var(--green);">All Plans</span>
-                </div>
-                <div class="role-card">
-                    <div class="role-icon" style="background: #dbeafe;">&#127968;</div>
-                    <h4>Resident</h4>
-                    <p class="role-desc">View dashboard, report issues, access building info and their unit</p>
-                    <span class="role-tier-badge" style="background: var(--green-light); color: var(--green);">All Plans</span>
-                </div>
-                <div class="role-card">
-                    <div class="role-icon" style="background: var(--warm-light);">&#128295;</div>
-                    <h4>Staff</h4>
-                    <p class="role-desc">Building operations access for concierge, maintenance, and facility teams</p>
-                    <span class="role-tier-badge" style="background: #ede9fe; color: #6d28d9;">Management Suite</span>
-                </div>
-                <div class="role-card">
-                    <div class="role-icon" style="background: #ede9fe;">&#128188;</div>
-                    <h4>Property Manager</h4>
-                    <p class="role-desc">Professional PM tools including work orders, invoices, and vendor management</p>
-                    <span class="role-tier-badge" style="background: #ede9fe; color: #6d28d9;">Management Suite</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- ADD-ONS -->
-        <div style="max-width: 600px; margin: 3rem auto 0;">
-            <div style="text-align: center; margin-bottom: 1.5rem;">
-                <h3 class="display" style="font-size: 1.5rem; font-weight: 700;">Add-Ons</h3>
-                <p style="font-size: 0.9rem; color: var(--muted);">Available with any plan</p>
-            </div>
-            <div style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border);">
-                    <div>
-                        <div style="font-weight: 600; font-size: 0.95rem;">One-Time Setup & Onboarding</div>
-                        <div style="font-size: 0.82rem; color: var(--muted);">Guided configuration, data migration, and board training</div>
-                    </div>
-                    <div style="font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.15rem; white-space: nowrap; margin-left: 1.5rem;">$299</div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
 </section>
 
-<!-- CTA -->
-<section id="cta" class="cta-section">
-    <div class="section-label">🚀 Get Started</div>
-    <h2 class="section-title display" style="margin: 0 auto 1rem;">Stop guessing. Start governing.</h2>
-    <p class="section-desc">
-        Join the waitlist for early access when we launch in Washington, DC. Start with Compliance Pro at $179/mo — full governance, fiduciary tracking, and double-entry accounting from day one.
-    </p>
-    <div class="cta-actions">
-        <a href="#" onclick="openWaitlist();return false" class="btn btn-primary" style="padding: 0.9rem 2rem; font-size: 1rem;">Join the Waitlist →</a>
-        <a href="/login?demo=1" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Try the Demo</a>
-        <a href="/demo" class="btn btn-outline" style="padding: 0.9rem 2rem; font-size: 1rem;">Chat with us!</a>
+<!-- THE FIVE JOBS + THE SCORE, one interactive section -->
+<section id="score" style="padding:96px 0;background:#0D1B2E;color:#ffffff;overflow:hidden">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:36px">
+    <div style="max-width:760px;display:flex;flex-direction:column;gap:14px">
+      <span class="line light">THE JOBS, AND WHAT THEY DO TO THE SCORE</span>
+      <h2 style="font-size:40px;line-height:1.12;color:#ffffff">Many jobs. One health score. Watch it move.</h2>
+      <p style="font-size:17px;line-height:1.6;color:#c7d2de">Every building in ONE two gets a Board Health score: how well the board is doing the six jobs a management company is paid for. A score in the 60s means filings are late and the books are behind. In the 90s, nothing is overdue and every obligation has proof attached. Pick a job and see what it does to the score, or let it play.</p>
     </div>
+
+    <div class="two" style="gap:40px;align-items:stretch">
+      <!-- left: job tabs (rendered by JS into #jobs) -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div id="jobs" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="row" style="padding:6px 4px 0">
+          <span id="autoLabel" style="font-size:12px;color:#8fa0b3"></span>
+          <button type="button" id="autoBtn" class="seg" style="color:#A5F3FC;min-height:36px"></button>
+        </div>
+      </div>
+
+      <!-- right: the scene + the dial -->
+      <div style="background:#13263d;border:1px solid #243b53;border-radius:18px;padding:22px;display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:20px;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:220px">
+          <span id="sceneLabel" style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8fa0b3"></span>
+          <span id="sceneTitle" style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;color:#ffffff"></span>
+          <div id="sceneRows" style="display:flex;flex-direction:column;gap:12px"></div>
+          <span id="sceneEffect" style="font-size:13px;color:#A5F3FC;font-weight:600"></span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <svg width="160" height="160" viewBox="0 0 120 120" role="img" aria-label="Board Health score">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#243b53" stroke-width="10"></circle>
+            <circle id="scoreDial" cx="60" cy="60" r="54" fill="none" stroke="#A5F3FC" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="132" style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 1.2s ease"></circle>
+            <text id="scoreNum" x="60" y="58" text-anchor="middle" font-family="Fraunces,Georgia,serif" font-size="38" font-weight="700" fill="#ffffff">61</text>
+            <text x="60" y="76" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="700" fill="#8fa0b3" letter-spacing="1">BOARD HEALTH</text>
+          </svg>
+          <div id="areas" style="display:flex;flex-direction:column;gap:4px;width:100%;font-size:12px"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Nothing scores on a bare checkbox</span>
+      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Streaks for the boring consistency</span>
+      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Badges that can be lost</span>
+      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Owners see the result, not the game</span>
+    </div>
+  </div>
 </section>
 
-<!-- FOOTER -->
-<footer>
-    <p>© 2026 <strong>ONE two</strong>, LLC. All rights reserved.</p>
-    <div class="footer-links">
-        <a href="#">Privacy</a>
-        <a href="#">Terms</a>
-        <a href="#">Contact</a>
+<!-- PRICING, interactive -->
+<section id="pricing" style="padding:96px 0;background:#f4f6f9">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:32px">
+    <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:20px">
+      <div style="max-width:620px;display:flex;flex-direction:column;gap:14px">
+        <span class="line">Pricing</span>
+        <h2 style="font-size:40px;line-height:1.12">Two plans. Everything included in both.</h2>
+        <p class="muted" style="font-size:17px;line-height:1.6">Pick by what your building has. Add-ons attach to either plan after the trial. Postage and card fees at cost.</p>
+      </div>
+      <div style="display:inline-flex;border:1px solid #c9d2dc;border-radius:999px;padding:4px;background:#ffffff" role="group" aria-label="Billing interval">
+        <button type="button" id="segMonthly" class="seg on" data-interval="monthly">Monthly</button>
+        <button type="button" id="segAnnual" class="seg" data-interval="annual">Annual, two months free</button>
+      </div>
     </div>
-</footer>
 
-<!-- WAITLIST MODAL -->
-<div class="wl-overlay" id="wl-overlay">
-    <div class="wl-modal">
-        <button class="wl-close" onclick="closeWaitlist()" aria-label="Close">&times;</button>
-
-        <!-- FORM STATE -->
-        <div id="wl-form-state">
-            <h2 class="display">Join the Waitlist</h2>
-            <p class="wl-sub">Secure one of 20 early-adopter spots for your community.</p>
-
-            <div class="wl-error" id="wl-error"></div>
-
-            <form onsubmit="submitWaitlist(event)">
-                <div class="wl-field">
-                    <label for="wl-name">Your Name</label>
-                    <input type="text" id="wl-name" placeholder="Jane Smith" required>
-                </div>
-                <div class="wl-field">
-                    <label for="wl-email">Email</label>
-                    <input type="email" id="wl-email" placeholder="jane@example.com" required>
-                </div>
-                <div class="wl-field">
-                    <label for="wl-community">Community / Building Name</label>
-                    <input type="text" id="wl-community" placeholder="The Wardman Residences" required>
-                </div>
-                <div class="wl-row">
-                    <div class="wl-field">
-                        <label for="wl-units">Unit Count</label>
-                        <input type="number" id="wl-units" placeholder="24" min="1" required>
-                    </div>
-                    <div class="wl-field">
-                        <label for="wl-role">Board Role</label>
-                        <select id="wl-role" required>
-                            <option value="">Select…</option>
-                            <option value="president">President</option>
-                            <option value="treasurer">Treasurer</option>
-                            <option value="secretary">Secretary</option>
-                            <option value="member">Member</option>
-                        </select>
-                    </div>
-                </div>
-                <button type="submit" class="wl-submit" id="wl-submit-btn">Join the Waitlist →</button>
-            </form>
-        </div>
-
-        <!-- SUCCESS STATE -->
-        <div id="wl-success-state" class="wl-success" style="display:none;">
-            <h2 class="display">You're in!</h2>
-            <div class="wl-spot-badge">
-                <span class="wl-spot-num" id="wl-spot-num">#1</span>
-            </div>
-            <p class="wl-spot-of">of 20 early-adopter communities</p>
-            <p class="wl-confirm-msg">A confirmation email is on its way. We'll reach out soon with next steps as we prepare to launch in Washington, DC.</p>
-            <button class="wl-gotit" onclick="closeWaitlist()">Got it</button>
-        </div>
+    <div class="two" style="gap:20px;align-items:stretch">
+      <button type="button" id="planSm" class="plancard on" data-plan="sm">
+        <div class="row"><span style="font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600">Self-Managed</span><span class="pill plan-selected" style="background:#0D1B2E;color:#A5F3FC">Selected</span></div>
+        <p class="muted" style="font-size:15px;line-height:1.5">The board runs the building. ONE two keeps it compliant. Walk-ups and small buildings.</p>
+        <div style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:700;line-height:1">$<span data-price="sm">179</span></span><span class="muted" style="font-size:15px" data-per>a month</span></div>
+        <p class="muted" style="font-size:13px">Everything: runbook, meetings, Fiscal Lens, playbooks, documents, portal, letters, 1099s.</p>
+        <a class="btn btn-navy plan-cta" href="/login?create=1&plan=self_managed&interval=monthly" style="min-height:44px;font-size:15px;align-self:flex-start" data-cta="plan-sm">Start free on Self-Managed</a>
+      </button>
+      <button type="button" id="planFa" class="plancard" data-plan="fa">
+        <div class="row"><span style="font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600">Plus Facilities</span><span class="pill plan-selected" style="background:#0D1B2E;color:#A5F3FC">Selected</span><span class="pill plan-hint" style="background:#fff0f1;color:#D62839">If an inspector visits</span></div>
+        <p class="muted" style="font-size:15px;line-height:1.5">Everything in Self-Managed, for buildings with inspected equipment or staff.</p>
+        <div style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:700;line-height:1">$<span data-price="fa">279</span></span><span class="muted" style="font-size:15px" data-per>a month</span></div>
+        <p class="muted" style="font-size:13px">Adds the inspection calendar, reserve study tools, bids, claims, amenities and a staff role.</p>
+        <a class="btn btn-navy plan-cta" href="/login?create=1&plan=facilities&interval=monthly" style="min-height:44px;font-size:15px;align-self:flex-start" data-cta="plan-fa">Start free on Plus Facilities</a>
+      </button>
     </div>
-</div>
 
-<!-- Scroll animation observer -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span class="muted" style="font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Add-ons for <span id="planName">Self-Managed</span>, any time after your trial</span>
+      <div class="grid3">
+        <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px;background:#0D1B2E;color:#ffffff;border-color:#0D1B2E">
+          <div class="row"><h3 style="font-size:20px;color:#ffffff">On Call</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700;color:#A5F3FC">$<span data-price="oncall">249</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#c7d2de" data-per> a month</span></span></div>
+          <p style="font-size:14px;line-height:1.5;color:#c7d2de">A named advisor who knows your building. Monthly call, replies within a business day, budget and year-end reviewed, a seat at the annual meeting. Up to <span id="onCallHours">2</span> hours a month.</p>
+        </div>
+        <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px">
+          <div class="row"><h3 style="font-size:20px">Property manager seat</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="pm">79</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b" data-per> a month</span></span></div>
+          <p class="muted" style="font-size:14px;line-height:1.5">Keeping a manager for operations? Give them a seat so they work inside your records instead of theirs.</p>
+        </div>
+        <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px">
+          <div class="row"><h3 style="font-size:20px">Setup with us</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="setup">299</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b"> once</span></span></div>
+          <p class="muted" style="font-size:14px;line-height:1.5">Guided onboarding and your first month closed with us, on a call.</p>
+        </div>
+      </div>
+      <div class="row" style="flex-wrap:wrap;gap:12px">
+        <p class="muted" style="font-size:13px">Postage and card processing fees pass through at cost. No markups. Cancel any time; your records export with you.</p>
+        <button type="button" class="btn btn-outline" id="compareToggle" aria-expanded="false" aria-controls="compare" style="min-height:42px;font-size:14px">See every feature <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path id="compareChevron" d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+    </div>
+
+    <div id="compare" class="card" hidden style="padding:8px 24px 16px;overflow-x:auto">
+      <table class="compare" style="width:100%;border-collapse:collapse;font-size:14px;min-width:640px">
+        <thead><tr><th style="text-align:left;padding:14px 8px;color:#4b5a6b;font-weight:600">Feature</th><th style="text-align:center;padding:14px 8px;width:150px">Self-Managed</th><th style="text-align:center;padding:14px 8px;width:150px">Plus Facilities</th></tr></thead>
+        <tbody id="compareBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ONE WAY IN -->
+<section id="owners" style="padding:96px 0">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:32px">
+    <div style="max-width:760px;display:flex;flex-direction:column;gap:14px">
+      <span class="line">Anyone can start the building</span>
+      <h2 style="font-size:40px;line-height:1.12">On the board? Unit owner? Same door.</h2>
+    </div>
+    <div class="doors">
+      <div class="door" style="background:#0D1B2E;color:#ffffff">
+        <h3 style="font-size:26px;line-height:1.15;color:#ffffff">Twenty-one days, your own building, every feature, no card.</h3>
+        <p style="font-size:15px;line-height:1.6;color:#c7d2de">Add your units and bylaws facts, or load a sample building to look around first. Invite the rest of the board from inside; each invite arrives with the role already set. Most buildings finish Setup Season in an afternoon.</p>
+      </div>
+      <div class="door" style="background:#f4f6f9;border:1px solid #e3e8ee;border-left:0">
+        <h3 style="font-size:26px;line-height:1.15">You pay the assessment. You are allowed to see where it goes.</h3>
+        <p class="muted" style="font-size:15px;line-height:1.6">Start the building and you get the five questions every board should be able to answer, a records request letter citing DC Code 42-1903.14, and a link for your neighbors. When the board joins, the work is already half done.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <a class="btn btn-red" href="/login?create=1" style="min-height:54px;padding:0 26px;font-size:17px" data-cta="start">Start your building, free for 21 days</a>
+      <span class="muted" style="font-size:14px">No card. No board vote needed to begin.</span>
+    </div>
+  </div>
+</section>
+
+<footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
 <script>
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.animationPlayState = 'running';
-            }
-        });
-    }, { threshold: 0.1 });
+(function () {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    document.querySelectorAll('.animate').forEach(el => {
-        el.style.animationPlayState = 'paused';
-        observer.observe(el);
+  /* ---------- The score block ---------- */
+  var JOBS = [
+    { title: 'Knows what is due', sub: '45 obligations in four seasons, assigned to seats', area: 'Compliance', score: 69, moved: ['Compliance'],
+      scene: { label: 'Filing Season · Jan to Mar', title: 'Three milestones done, one due', effect: 'Compliance moves. 61 to 69.',
+        rows: [ { tag: 'Done', k: 'dark', text: 'Year-end close and 1099s filed', who: 'Treasurer · Jan 31' }, { tag: 'Done', k: 'dark', text: 'Master insurance certificate on file', who: 'President · Feb 15' }, { tag: 'Due', k: 'red', text: 'DLCP biennial report, DC Code 29-102.11', who: 'Secretary · Apr 1' } ] } },
+    { title: 'Runs the meeting', sub: 'Notice in the legal window, quorum, minutes in 7 days', area: 'Governance', score: 74, moved: ['Governance'],
+      scene: { label: 'Annual Meeting Season · Apr to Jun', title: 'From notice to minutes, one process', effect: 'Governance moves. 69 to 74.',
+        rows: [ { tag: 'Sent', k: 'dark', text: 'Notice to 12 owners, 31 days before', who: 'Apr 3' }, { tag: 'Quorum', k: 'dark', text: '8 of 12 units present or by proxy', who: 'May 4' }, { tag: 'Elected', k: 'cyan', text: 'Treasurer: Priya N., 7 votes. Minutes due May 11', who: 'May 4' } ] } },
+    { title: 'Handles the problem', sub: '32 playbooks: the leak, the late owner, the claim', area: 'Governance', score: 78, moved: ['Governance', 'Records'],
+      scene: { label: 'Playbook · Common area repair', title: 'Water intrusion, unit 2B ceiling', effect: 'Governance and Records move. 74 to 78.',
+        rows: [ { tag: 'Step 1', k: 'dark', text: 'Owner notified, access arranged', who: 'Jul 14' }, { tag: 'Step 2', k: 'dark', text: 'Plumber booked via TaskRabbit, $240, no 1099', who: 'Jul 15' }, { tag: 'Step 3', k: 'red', text: 'Decide responsibility with the bylaws clause attached', who: 'President' } ] } },
+    { title: 'Keeps the books', sub: 'Ledger, monthly close, statements owners can read', area: 'Financial', score: 84, moved: ['Financial'],
+      scene: { label: 'Fiscal Lens · October', title: 'Closed Nov 8. Statement published.', effect: 'Financial moves. 78 to 84.',
+        rows: [ { tag: 'In', k: 'dark', text: 'Assessments $9,840, 12 of 12 units', who: 'online' }, { tag: 'Out', k: 'dark', text: '$6,215 across 14 approved invoices', who: 'ledger' }, { tag: 'Reserves', k: 'cyan', text: '$112,400, 71% of target', who: 'checked monthly' } ] } },
+    { title: 'Plans for the future', sub: 'Replacement years, reserve targets, a budget adopted on time', area: 'Financial', score: 89, moved: ['Financial'],
+      scene: { label: 'The Building · Assets and reserves', title: 'The roof is 2031. The reserve knows.', effect: 'Financial moves. 84 to 89. No special assessment in 2031.',
+        rows: [ { tag: 'Roof', k: 'dark', text: 'Replace 2031, est. $48,000, funded 71%', who: 'registry' }, { tag: 'Boiler', k: 'dark', text: 'Replace 2028, est. $22,000, funded 90%', who: 'registry' }, { tag: 'Budget', k: 'cyan', text: 'Reserve contribution raised $150 a month, adopted Dec 2', who: 'Budget Season' } ] } },
+    { title: 'Proves it', sub: 'Seven years of minutes, notices, letters, filings', area: 'Records', score: 93, moved: ['Records'],
+      scene: { label: 'The Archives', title: 'Every obligation, proof attached', effect: 'Records move. 89 to 93. Owners see the same number.',
+        rows: [ { tag: 'Filed', k: 'dark', text: 'DLCP receipt attached to the runbook item', who: 'Apr 1' }, { tag: 'Mailed', k: 'dark', text: 'Budget notice, 3 paper copies, tracking saved', who: 'Nov 2' }, { tag: 'Minutes', k: 'dark', text: 'Approved and published within 7 days', who: 'May 11' } ] } }
+  ];
+  var TAG = { dark: 'background:#13263d;color:#A5F3FC', red: 'background:#fff0f1;color:#D62839', cyan: 'background:#A5F3FC;color:#0D1B2E' };
+  var AREAS = ['Compliance', 'Financial', 'Governance', 'Records'];
+  var job = 0, auto = !reduce, inView = true, timer = null;
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function renderJobs() {
+    el('jobs').innerHTML = JOBS.map(function (j, i) {
+      return '<button type="button" class="job' + (i === job ? ' on' : '') + '" data-job="' + i + '" aria-pressed="' + (i === job) + '">' +
+        '<span style="font-family:\'Fraunces\',Georgia,serif;font-size:22px;font-weight:700;color:#D62839;width:28px;flex:none">' + (i + 1) + '</span>' +
+        '<span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0"><span style="font-weight:600;font-size:16px">' + esc(j.title) + '</span><span style="font-size:13px;color:#c7d2de">' + esc(j.sub) + '</span></span>' +
+        '<span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53">' + esc(j.area) + '</span></button>';
+    }).join('');
+    el('autoLabel').textContent = auto ? 'Playing, 4 seconds a job, six jobs' : 'Paused';
+    el('autoBtn').textContent = auto ? 'Pause' : 'Play';
+  }
+  function renderScene() {
+    var j = JOBS[job], s = j.scene;
+    el('sceneLabel').textContent = s.label;
+    el('sceneTitle').textContent = s.title;
+    el('sceneRows').innerHTML = s.rows.map(function (r) {
+      return '<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:#0D1B2E;font-size:14px">' +
+        '<span class="pill" style="' + TAG[r.k] + '">' + esc(r.tag) + '</span><span style="flex:1;min-width:0">' + esc(r.text) + '</span>' +
+        '<span style="font-size:12px;color:#8fa0b3;white-space:nowrap">' + esc(r.who) + '</span></div>';
+    }).join('');
+    el('sceneEffect').textContent = s.effect;
+    el('scoreNum').textContent = j.score;
+    el('scoreDial').setAttribute('stroke-dashoffset', Math.round(339 * (1 - j.score / 100)));
+    el('areas').innerHTML = AREAS.map(function (name) {
+      var hot = j.moved.indexOf(name) >= 0;
+      var bg = hot ? '#A5F3FC' : 'transparent', fg = hot ? '#0D1B2E' : '#c7d2de';
+      return '<div class="row" style="padding:4px 8px;border-radius:6px;background:' + bg + '"><span style="color:' + fg + '">' + name + '</span><span style="color:' + fg + ';font-weight:700">' + (hot ? 'moving' : 'on track') + '</span></div>';
+    }).join('');
+  }
+  function setJob(i, fromUser) { job = i; if (fromUser) auto = false; renderJobs(); renderScene(); }
+  el('jobs').addEventListener('click', function (e) { var b = e.target.closest('[data-job]'); if (b) setJob(+b.getAttribute('data-job'), true); });
+  el('autoBtn').addEventListener('click', function () { auto = !auto; renderJobs(); });
+  timer = setInterval(function () { if (auto && inView) setJob((job + 1) % JOBS.length, false); }, 4000);
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (en) { inView = en[0].isIntersecting; }, { threshold: 0.2 }).observe(el('score'));
+  }
+  renderJobs(); renderScene();
+
+  /* ---------- Pricing ---------- */
+  var PRICE = { sm: [179, 1790], fa: [279, 2790], oncallSm: [249, 2490], oncallFa: [499, 4990], pm: [79, 790], setupSm: 299, setupFa: 599 };
+  var plan = 'sm', interval = 'monthly';
+  try { plan = sessionStorage.getItem('ot_plan') || plan; interval = sessionStorage.getItem('ot_interval') || interval; } catch (e) {}
+  function money(n) { return n.toLocaleString('en-US'); }
+  function renderPricing() {
+    var ann = interval === 'annual', i = ann ? 1 : 0, fa = plan === 'fa';
+    el('segMonthly').className = 'seg' + (ann ? '' : ' on');
+    el('segAnnual').className = 'seg' + (ann ? ' on' : '');
+    el('planSm').className = 'plancard' + (fa ? '' : ' on');
+    el('planFa').className = 'plancard' + (fa ? ' on' : '');
+    el('planSm').querySelector('.plan-selected').hidden = fa;
+    el('planFa').querySelector('.plan-selected').hidden = !fa;
+    el('planFa').querySelector('.plan-hint').hidden = fa;
+    document.querySelector('[data-price="sm"]').textContent = money(PRICE.sm[i]);
+    document.querySelector('[data-price="fa"]').textContent = money(PRICE.fa[i]);
+    document.querySelector('[data-price="oncall"]').textContent = money((fa ? PRICE.oncallFa : PRICE.oncallSm)[i]);
+    document.querySelector('[data-price="pm"]').textContent = money(PRICE.pm[i]);
+    document.querySelector('[data-price="setup"]').textContent = money(fa ? PRICE.setupFa : PRICE.setupSm);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-per]'), function (n) { n.textContent = ann ? ' a year' : ' a month'; });
+    el('planName').textContent = fa ? 'Plus Facilities' : 'Self-Managed';
+    el('onCallHours').textContent = fa ? '5' : '2';
+    Array.prototype.forEach.call(document.querySelectorAll('.plan-cta'), function (a) {
+      a.href = a.href.replace(/interval=\w+/, 'interval=' + interval);
     });
+    try { sessionStorage.setItem('ot_plan', plan); sessionStorage.setItem('ot_interval', interval); } catch (e) {}
+  }
+  el('segMonthly').addEventListener('click', function () { interval = 'monthly'; renderPricing(); });
+  el('segAnnual').addEventListener('click', function () { interval = 'annual'; renderPricing(); });
+  el('planSm').addEventListener('click', function (e) { if (e.target.closest('a')) return; plan = 'sm'; renderPricing(); });
+  el('planFa').addEventListener('click', function (e) { if (e.target.closest('a')) return; plan = 'fa'; renderPricing(); });
+  renderPricing();
 
-    // Unstick hero animations immediately
-    document.querySelectorAll('.hero .animate').forEach(el => {
-        el.style.animationPlayState = 'running';
-    });
-    // Billing toggle
-    let isYearly = false;
+  /* ---------- Compare table ---------- */
+  var CHECK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#155E75" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M20 6 9 17l-5-5"/></svg>';
+  var ROWS = [
+    ['Core governance'],
+    ['Runbook of 45 DC obligations with due dates, owners and how-tos', 1], ['Board Season calendar and Board Health score', 1], ['Meetings from notice to minutes, quorum, agendas', 1], ['Elections, votes and resolutions online', 1], ['Board roles, responsibilities and the Role Charter owners can see', 1], ['AI advisor trained on the DC Condominium Act', 1],
+    ['Money and playbooks'],
+    ['Fiscal Lens: general ledger, monthly close, financial statements', 1], ['Online assessment payments and owner balances', 1], ['Invoice-first money out, work orders, vendor contracts', 1], ['1099s prepared and e-filed', 1], ['32 playbooks: late owners, repairs, records requests, special assessments and more', 1], ['Book cleaners and handypeople through TaskRabbit, no 1099', 1],
+    ['Building and records'],
+    ['Units, owners, documents, insurance policies', 1], ['Asset registry with replacement year, cost and reserve balance against target', 1], ['The Archives: seven years of minutes, notices, letters and proof', 1], ['Inspection and permit calendar: elevator, pool, fire systems, boiler', 0], ['Reserve study tools, component schedules and funding scenarios', 0], ['Bids workflow and insurance claims workflow', 0],
+    ['Community and communication'],
+    ['Owner portal with statements, documents and requests', 1], ['Letters and notices mailed from the app, postage at cost', 1], ['Amenity reservations and rules', 0],
+    ['People and roles'],
+    ['Board members and owners, unlimited', 1], ['Staff role for your porter, super or concierge', 0]
+  ];
+  el('compareBody').innerHTML = ROWS.map(function (r) {
+    if (r.length === 1) return '<tr><td colspan="3" style="padding:18px 8px 6px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#155E75">' + esc(r[0]) + '</td></tr>';
+    return '<tr><td style="padding:10px 8px;border-top:1px solid #eef1f5">' + esc(r[0]) + '</td><td style="text-align:center;padding:10px 8px;border-top:1px solid #eef1f5">' + (r[1] ? CHECK : '<span style="color:#c9d2dc">·</span>') + '</td><td style="text-align:center;padding:10px 8px;border-top:1px solid #eef1f5">' + CHECK + '</td></tr>';
+  }).join('');
+  el('compareToggle').addEventListener('click', function () {
+    var open = el('compare').hidden;
+    el('compare').hidden = !open;
+    this.setAttribute('aria-expanded', open);
+    this.firstChild.textContent = open ? 'Hide the full list ' : 'See every feature ';
+    el('compareChevron').setAttribute('d', open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6');
+  });
 
-    // Demo tab switching
-    const demoUrls = {
-        dashboard: 'getonetwo.com/dashboard',
-        boardroom: 'getonetwo.com/boardroom',
-        building: 'getonetwo.com/building',
-        fiscal: 'getonetwo.com/financial',
-        cases: 'getonetwo.com/cases',
-        archives: 'getonetwo.com/archives'
-    };
-    function showDemo(id) {
-        // Kill any running animation timers
-        (window._demoTimers || []).forEach(t => clearTimeout(t));
-        window._demoTimers = [];
-
-        document.querySelectorAll('.demo-screen').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.demo-desc').forEach(d => d.classList.remove('active'));
-        document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
-
-        const screen = document.getElementById('screen-' + id);
-
-        // Reset count-up elements to placeholder
-        screen.querySelectorAll('.count-up').forEach(el => { el.textContent = '—'; });
-        // Reset step tracks
-        screen.querySelectorAll('.case-steps').forEach(el => { el.innerHTML = ''; });
-
-        screen.offsetHeight; // force reflow
-        screen.classList.add('active');
-        document.getElementById('desc-' + id).classList.add('active');
-        document.getElementById('demo-url').textContent = demoUrls[id];
-        event.currentTarget.classList.add('active');
-
-        // Run JS-driven animations for this screen
-        runScreenAnimations(screen);
-    }
-
-    /* === COUNT-UP ENGINE === */
-    function animateCountUp(el) {
-        const target = parseInt(el.dataset.target);
-        const suffix = el.dataset.suffix || '';
-        const prefix = el.dataset.prefix || '';
-        const delay = parseInt(el.dataset.delay) || 200;
-        const fmt = el.dataset.format;
-        const duration = 800;
-        const steps = 20;
-        const stepTime = duration / steps;
-
-        window._demoTimers.push(setTimeout(() => {
-            let step = 0;
-            const interval = setInterval(() => {
-                step++;
-                const progress = step / steps;
-                const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-                const current = Math.round(target * eased);
-                let display = current;
-                if (fmt === 'dollar') display = current.toLocaleString();
-                el.textContent = prefix + display + suffix;
-                if (step >= steps) {
-                    clearInterval(interval);
-                    if (fmt === 'dollar') el.textContent = prefix + target.toLocaleString() + suffix;
-                    else el.textContent = prefix + target + suffix;
-                }
-            }, stepTime);
-        }, delay));
-    }
-
-    /* === STEP TRACK BUILDER === */
-    function buildStepTrack(container) {
-        const lit = parseInt(container.dataset.lit);
-        const total = parseInt(container.dataset.total);
-        container.innerHTML = '';
-        for (let i = 1; i <= total; i++) {
-            if (i > 1) {
-                const conn = document.createElement('span');
-                conn.className = 'step-connector';
-                container.appendChild(conn);
-            }
-            const dot = document.createElement('span');
-            dot.className = 'step-dot';
-            dot.textContent = i;
-            container.appendChild(dot);
-        }
-        // Animate dots lighting up sequentially
-        const dots = container.querySelectorAll('.step-dot');
-        const conns = container.querySelectorAll('.step-connector');
-        dots.forEach((dot, idx) => {
-            const delay = 400 + idx * 80;
-            window._demoTimers.push(setTimeout(() => {
-                if (idx < lit - 1) {
-                    dot.classList.add('lit');
-                    if (conns[idx]) conns[idx].classList.add('done');
-                } else if (idx === lit - 1) {
-                    dot.classList.add('current');
-                    if (idx > 0 && conns[idx - 1]) conns[idx - 1].classList.add('done');
-                }
-            }, delay));
-        });
-    }
-
-    /* === RUN ALL ANIMATIONS FOR A SCREEN === */
-    function runScreenAnimations(screen) {
-        // Count-ups
-        screen.querySelectorAll('.count-up').forEach(el => animateCountUp(el));
-        // Step tracks
-        screen.querySelectorAll('.case-steps').forEach(el => buildStepTrack(el));
-    }
-
-    // Initialize dashboard on load
-    document.addEventListener('DOMContentLoaded', () => {
-        window._demoTimers = [];
-        const dash = document.getElementById('screen-dashboard');
-        if (dash) runScreenAnimations(dash);
-    });
-    const prices = {
-        compliance: { monthly: '$179', yearly: '$1,800' },
-        community: { monthly: '$279', yearly: '$2,850' },
-        management: { monthly: '$399', yearly: '$4,250' }
-    };
-    const periods = { monthly: '/mo', yearly: '/yr' };
-
-    function toggleBilling() {
-        isYearly = !isYearly;
-        const btn = document.getElementById('toggle-btn');
-        const labelM = document.getElementById('label-monthly');
-        const labelY = document.getElementById('label-yearly');
-
-        btn.classList.toggle('active', isYearly);
-        labelM.classList.toggle('active', !isYearly);
-        labelY.classList.toggle('active', isYearly);
-
-        const mode = isYearly ? 'yearly' : 'monthly';
-        ['compliance', 'community', 'management'].forEach(plan => {
-            document.getElementById('price-' + plan).textContent = prices[plan][mode];
-            document.getElementById('period-' + plan).textContent = periods[mode];
-        });
-    }
+  /* ---------- Reveal on scroll (stamp) ---------- */
+  if ('IntersectionObserver' in window && !reduce) {
+    var stamp = document.querySelector('.stamp');
+    stamp.style.animationPlayState = 'paused';
+    new IntersectionObserver(function (en, io) { if (en[0].isIntersecting) { stamp.style.animationPlayState = 'running'; io.disconnect(); } }, { threshold: 0.4 }).observe(stamp);
+  }
+})();
 </script>
-
-<!-- Supabase client (CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- Waitlist modal logic -->
 <script>
-    const SB_URL = 'https://eaalfhrrytnmtzqjruxg.supabase.co';
-    const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhYWxmaHJyeXRubXR6cWpydXhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2Mjc5NzAsImV4cCI6MjA4NzIwMzk3MH0.4hxmkKKnKJQtskc6lFN5ltaJl2Ss-W7vjk5myJv8d3o';
-    const sbClient = supabase.createClient(SB_URL, SB_ANON);
-
-    function toggleMobileMenu() {
-        const menu = document.getElementById('mobileMenu');
-        const btn = document.querySelector('.hamburger');
-        const isOpen = menu.classList.toggle('open');
-        btn.classList.toggle('active', isOpen);
-        document.body.style.overflow = isOpen ? 'hidden' : '';
-    }
-
-    function openWaitlist() {
-        const overlay = document.getElementById('wl-overlay');
-        // Reset to form state
-        document.getElementById('wl-form-state').style.display = '';
-        document.getElementById('wl-success-state').style.display = 'none';
-        document.getElementById('wl-error').className = 'wl-error';
-        document.getElementById('wl-submit-btn').disabled = false;
-        document.getElementById('wl-submit-btn').textContent = 'Join the Waitlist →';
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeWaitlist() {
-        document.getElementById('wl-overlay').classList.remove('active');
-        document.body.style.overflow = '';
-    }
-
-    // Close on overlay click
-    document.getElementById('wl-overlay').addEventListener('click', function(e) {
-        if (e.target === this) closeWaitlist();
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeWaitlist();
-    });
-
-    async function submitWaitlist(e) {
-        e.preventDefault();
-        const errEl = document.getElementById('wl-error');
-        const btn = document.getElementById('wl-submit-btn');
-        errEl.className = 'wl-error';
-
-        const name = document.getElementById('wl-name').value.trim();
-        const email = document.getElementById('wl-email').value.trim();
-        const community_name = document.getElementById('wl-community').value.trim();
-        const unit_count = parseInt(document.getElementById('wl-units').value);
-        const board_role = document.getElementById('wl-role').value;
-
-        // Client-side validation
-        if (!name || !email || !community_name || !unit_count || !board_role) {
-            errEl.textContent = 'Please fill in all fields.';
-            errEl.className = 'wl-error visible';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'Submitting…';
-
-        try {
-            const { data, error } = await sbClient.rpc('join_waitlist', {
-                p_name: name,
-                p_email: email,
-                p_community_name: community_name,
-                p_unit_count: unit_count,
-                p_board_role: board_role
-            });
-
-            if (error) {
-                errEl.textContent = error.message || 'Something went wrong. Please try again.';
-                errEl.className = 'wl-error visible';
-                btn.disabled = false;
-                btn.textContent = 'Join the Waitlist →';
-                return;
-            }
-
-            if (data && data.success === false) {
-                errEl.textContent = data.error || 'Something went wrong. Please try again.';
-                errEl.className = 'wl-error visible';
-                btn.disabled = false;
-                btn.textContent = 'Join the Waitlist →';
-                return;
-            }
-
-            // Success — show spot number
-            const spot = data.spot_number;
-            document.getElementById('wl-spot-num').textContent = '#' + spot;
-            document.getElementById('wl-form-state').style.display = 'none';
-            document.getElementById('wl-success-state').style.display = '';
-
-            // Fire-and-forget: send confirmation email via edge function
-            fetch(SB_URL + '/functions/v1/waitlist-confirm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON },
-                body: JSON.stringify({ name: data.name, email: data.email, community_name: community_name, spot_number: spot })
-            }).catch(function() { /* non-critical */ });
-
-            // Fire-and-forget: notify alyssa@getonetwo.com
-            fetch(SB_URL + '/functions/v1/notify-signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON },
-                body: JSON.stringify({ type: 'waitlist', name: data.name, email: data.email, community_name: community_name, unit_count: unit_count, board_role: board_role, spot_number: spot })
-            }).catch(function() { /* non-critical */ });
-
-        } catch (err) {
-            errEl.textContent = 'Something went wrong. Please try again.';
-            errEl.className = 'wl-error visible';
-            btn.disabled = false;
-            btn.textContent = 'Join the Waitlist →';
-        }
-    }
+(function(){
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-cta]');
+    if (!btn || typeof mixpanel === 'undefined') return;
+    var loc = btn.getAttribute('data-cta') || 'unknown';
+    var plan = ''; try { plan = sessionStorage.getItem('ot_plan') || ''; } catch(e) {}
+    var interval = ''; try { interval = sessionStorage.getItem('ot_interval') || ''; } catch(e) {}
+    mixpanel.track('cta_click', { location: loc, plan: plan, interval: interval });
+  });
+})();
 </script>
-
+</div>
 </body>
 </html>
