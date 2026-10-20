@@ -60,7 +60,9 @@
     { "source": "/association-team/:path*", "destination": "/app.html" },
     { "source": "/cases/:path*", "destination": "/app.html" },
     { "source": "/board-ops/:path*", "destination": "/app.html" },
-    { "source": "/property-log", "destination": "/app.html" }
+    { "source": "/property-log", "destination": "/app.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" }
   ],
   "redirects": [
     { "source": "/demo", "destination": "/", "statusCode": 301 }
