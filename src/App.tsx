@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -158,6 +158,41 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Shown when a trial has expired with no active subscription */
+function TrialEndedPage() {
+  const { signOut } = useAuthStore();
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-mist-50 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 max-w-md w-full p-8 text-center">
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <h1 className="font-display text-xl font-bold text-ink-900 mb-2">Trial Ended</h1>
+        <p className="text-sm text-ink-600 mb-6">
+          Your free trial has ended. Add a payment method to continue using ONE two.
+        </p>
+        <div className="space-y-3">
+          <button
+            onClick={() => navigate('/subscription')}
+            className="w-full py-3 bg-accent-600 text-white rounded-lg font-semibold text-sm hover:bg-accent-700 transition-colors"
+          >
+            Add a card
+          </button>
+          <button
+            onClick={() => signOut()}
+            className="w-full py-3 border border-ink-200 text-ink-600 rounded-lg font-semibold text-sm hover:bg-ink-50 transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginRoute() {
   const { isAuthenticated, currentRole, signOut } = useAuthStore();
   const location = useLocation();
@@ -247,6 +282,7 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/trial-ended" element={<RequireAuth><TenantProvider><TrialEndedPage /></TenantProvider></RequireAuth>} />
 
         {/* Admin console -- own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />

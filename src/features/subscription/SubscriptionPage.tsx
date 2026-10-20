@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { isOwner as checkIsOwner, canSetup } from '@/lib/ownership';
 import {
   PLANS,
   normalizePlan,
@@ -29,6 +30,8 @@ import {
   Wrench,
   ToggleLeft,
   ToggleRight,
+  Crown,
+  Trash2,
 } from 'lucide-react';
 
 // ── Types ──
@@ -196,6 +199,17 @@ export default function SubscriptionPage() {
   // PM seat disable check
   const [hasPmUser, setHasPmUser] = useState(false);
 
+  // Ownership
+  const [ownerInfo, setOwnerInfo] = useState<{ name: string; email: string } | null>(null);
+  const [boardMembersForTransfer, setBoardMembersForTransfer] = useState<Array<{ user_id: string; name: string; email: string }>>([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTarget, setTransferTarget] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const meIsOwner = checkIsOwner(tenant.me);
+  const meCanSetup = canSetup(tenant.me);
+
   // Polling state for post-checkout
   const pollingRef = useRef(false);
 
@@ -232,6 +246,43 @@ export default function SubscriptionPage() {
   useEffect(() => {
     loadSubscription();
   }, [loadSubscription]);
+
+  // Load ownership info
+  useEffect(() => {
+    if (!isBackendEnabled || !supabase || tenant.isDemo) return;
+    (async () => {
+      try {
+        // Get owner
+        const { data: owner } = await supabase
+          .from('tenant_users')
+          .select('user_id, email, role')
+          .eq('tenant_id', tenant.id)
+          .eq('is_account_owner', true)
+          .maybeSingle();
+        if (owner) {
+          const { data: profile } = await supabase.auth.admin?.getUserById?.(owner.user_id) || { data: null };
+          setOwnerInfo({
+            name: profile?.user?.user_metadata?.name || owner.email?.split('@')[0] || 'Owner',
+            email: owner.email || '',
+          });
+        }
+        // Get board members for transfer picker
+        const { data: members } = await supabase
+          .from('tenant_users')
+          .select('user_id, email, role')
+          .eq('tenant_id', tenant.id)
+          .eq('role', 'board_member')
+          .eq('is_account_owner', false);
+        if (members) {
+          setBoardMembersForTransfer(
+            members.map((m: any) => ({ user_id: m.user_id, name: m.email?.split('@')[0] || 'Member', email: m.email || '' }))
+          );
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [tenant.id, tenant.isDemo]);
 
   // Check for existing property_manager users (disables PM seat toggle)
   useEffect(() => {
@@ -461,15 +512,55 @@ export default function SubscriptionPage() {
     }
   };
 
+  // ── Ownership actions ──
+
+  const handleTransferOwnership = async () => {
+    if (!supabase || !transferTarget) return;
+    setActionLoading('transfer');
+    try {
+      const { error: rpcErr } = await supabase.rpc('transfer_ownership', {
+        p_tenant_id: tenant.id,
+        p_to_user_id: transferTarget,
+      });
+      if (rpcErr) throw rpcErr;
+      setSuccessMsg('Ownership transfer initiated.');
+      setShowTransferModal(false);
+      setTransferTarget('');
+    } catch (err: any) {
+      setError(err.message || 'Transfer failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteBuilding = async () => {
+    if (!supabase || deleteConfirmText !== tenant.name) return;
+    setActionLoading('delete');
+    try {
+      // Delete tenant and all associated data
+      const { error: delErr } = await supabase
+        .from('tenants')
+        .delete()
+        .eq('id', tenant.id);
+      if (delErr) throw delErr;
+      // Sign out after deletion
+      const { signOut } = useAuthStore.getState();
+      signOut();
+    } catch (err: any) {
+      setError(err.message || 'Delete failed');
+      setActionLoading(null);
+    }
+  };
+
   // ── Guards ──
 
-  if (currentRole !== 'BOARD_MEMBER') {
+  if (!meCanSetup && currentRole !== 'BOARD_MEMBER') {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-8 text-center">
           <Shield className="w-10 h-10 text-ink-300 mx-auto mb-3" />
           <h2 className="font-display text-lg font-bold text-ink-900 mb-1">Access Restricted</h2>
-          <p className="text-sm text-ink-500">Only board members can manage the subscription.</p>
+          <p className="text-sm text-ink-500">Only board members or the account owner can manage the subscription.</p>
         </div>
       </div>
     );
@@ -948,6 +1039,114 @@ export default function SubscriptionPage() {
           </button>
         </div>
       </div>
+
+      {/* 6. Ownership Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+            <Crown className="w-4.5 h-4.5 text-amber-600" />
+          </div>
+          <div>
+            <h2 className="font-display text-base font-bold text-ink-900">Ownership</h2>
+            <p className="text-xs text-ink-400">Account owner and building management</p>
+          </div>
+        </div>
+
+        {ownerInfo && (
+          <div className="text-sm mb-4">
+            <p className="text-ink-400 text-xs mb-0.5">Account owner</p>
+            <p className="font-semibold text-ink-900">{ownerInfo.name}</p>
+            <p className="text-ink-500 text-xs">{ownerInfo.email}</p>
+          </div>
+        )}
+
+        {meIsOwner && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowTransferModal(true)}
+              disabled={boardMembersForTransfer.length === 0}
+              className="px-4 py-2 border-2 border-amber-300 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-50 transition-colors disabled:opacity-50"
+            >
+              Transfer ownership
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 border-2 border-red-300 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5 inline mr-1" />
+              Delete building
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Transfer ownership modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4" onClick={() => setShowTransferModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-display text-lg font-bold text-ink-900 mb-2">Transfer Ownership</h2>
+            <p className="text-sm text-ink-600 mb-4">Select a board member to transfer account ownership to.</p>
+            <div className="space-y-2 mb-4">
+              {boardMembersForTransfer.map((m) => (
+                <label key={m.user_id} className="flex items-center gap-3 p-3 rounded-lg border border-ink-200 cursor-pointer hover:bg-mist-50">
+                  <input
+                    type="radio"
+                    name="transferTarget"
+                    value={m.user_id}
+                    checked={transferTarget === m.user_id}
+                    onChange={() => setTransferTarget(m.user_id)}
+                    className="w-4 h-4 text-accent-600"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-ink-900">{m.name}</p>
+                    <p className="text-xs text-ink-500">{m.email}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowTransferModal(false)} className="px-4 py-2 text-sm text-ink-600 hover:bg-ink-50 rounded-lg">Cancel</button>
+              <button
+                onClick={handleTransferOwnership}
+                disabled={!transferTarget || actionLoading === 'transfer'}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+              >
+                {actionLoading === 'transfer' ? 'Transferring...' : 'Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete building confirm */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-display text-lg font-bold text-red-600 mb-2">Delete Building</h2>
+            <p className="text-sm text-ink-600 mb-4">
+              This will permanently delete <strong>{tenant.name}</strong> and all associated data. This action cannot be undone.
+            </p>
+            <p className="text-sm text-ink-600 mb-2">Type <strong>{tenant.name}</strong> to confirm:</p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm mb-4"
+              placeholder={tenant.name}
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }} className="px-4 py-2 text-sm text-ink-600 hover:bg-ink-50 rounded-lg">Cancel</button>
+              <button
+                onClick={handleDeleteBuilding}
+                disabled={deleteConfirmText !== tenant.name || actionLoading === 'delete'}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {actionLoading === 'delete' ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

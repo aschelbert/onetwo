@@ -491,6 +491,20 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     );
   }
 
+  // Redirect to /trial-ended when trial has expired and subscription is not active
+  const pathname = window.location.pathname;
+  if (
+    tenant.billing.trialExpiredAt &&
+    tenant.billing.status !== 'active' &&
+    !tenant.isDemo &&
+    currentUser?.role !== 'PLATFORM_ADMIN' &&
+    pathname !== '/trial-ended' &&
+    pathname !== '/subscription'
+  ) {
+    window.location.replace('/trial-ended');
+    return null;
+  }
+
   // Block access for churned tenants
   if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
     return (

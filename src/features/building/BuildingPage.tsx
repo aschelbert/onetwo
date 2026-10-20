@@ -233,7 +233,7 @@ export default function BuildingPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl font-bold text-ink-900">Invitations</h3>
-                  <button onClick={() => { setInviteForm({ email: '', role: 'resident', unit: '' }); setModal('invite'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Invite User</button>
+                  <button onClick={() => { setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' }); setModal('invite'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Invite User</button>
                 </div>
 
                 {/* Pending invites */}

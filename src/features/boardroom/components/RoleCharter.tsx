@@ -5,7 +5,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Printer, ChevronRight, Send, Circle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Printer, ChevronRight, Send, Circle, CheckCircle2, AlertCircle, ArrowRightLeft, UserCog } from 'lucide-react';
 import { useRunbook } from '@/features/compliance/useRunbook';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -16,6 +16,14 @@ interface RoleCharterProps {
   roleKey: BoardRoleKey;
   readOnly?: boolean;
   onCompose?: (recipientName: string) => void;
+  /** Current user's role key */
+  myRoleKey?: BoardRoleKey | null;
+  /** Whether the current user is the president */
+  isPresident?: boolean;
+  /** Called when the user clicks "Change my seat" */
+  onChangeSeat?: () => void;
+  /** Called when the president clicks "Reassign" */
+  onReassign?: () => void;
 }
 
 const FREQ_ORDER: Record<string, number> = {
@@ -29,7 +37,7 @@ const FREQ_ORDER: Record<string, number> = {
   Ongoing: 7,
 };
 
-export default function RoleCharter({ roleKey, readOnly, onCompose }: RoleCharterProps) {
+export default function RoleCharter({ roleKey, readOnly, onCompose, myRoleKey, isPresident, onChangeSeat, onReassign }: RoleCharterProps) {
   const { allItems } = useRunbook();
   const { completions } = useComplianceStore();
   const { board } = useBuildingStore();
@@ -98,6 +106,26 @@ export default function RoleCharter({ roleKey, readOnly, onCompose }: RoleCharte
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* "Change my seat" — shown when viewing your own role */}
+          {!readOnly && myRoleKey === roleKey && onChangeSeat && (
+            <button
+              onClick={onChangeSeat}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-navy border border-ink-200 rounded-lg hover:bg-mist-50 transition-colors"
+            >
+              <ArrowRightLeft size={14} />
+              Change my seat
+            </button>
+          )}
+          {/* "Reassign" — shown for president on other roles */}
+          {!readOnly && isPresident && myRoleKey !== roleKey && onReassign && (
+            <button
+              onClick={onReassign}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-navy border border-ink-200 rounded-lg hover:bg-mist-50 transition-colors"
+            >
+              <UserCog size={14} />
+              Reassign
+            </button>
+          )}
           {!readOnly && assignee && onCompose && (
             <button
               onClick={() => onCompose(assignee.name)}
