@@ -1,4 +1,5 @@
 // Step 1: Building name, address typeahead, units, amenity chips
+// Matches signup-reference.html step 1
 
 import { useState, useEffect, useRef } from 'react';
 import type { BuildingAmenity } from '@/lib/tiers';
@@ -9,9 +10,9 @@ const AMENITY_OPTIONS: { id: BuildingAmenity; label: string }[] = [
   { id: 'elevator', label: 'Elevator' },
   { id: 'pool', label: 'Pool' },
   { id: 'gym', label: 'Gym' },
-  { id: 'sport_court', label: 'Tennis / Sport Court' },
-  { id: 'parking_garage', label: 'Parking Garage' },
-  { id: 'roof_deck', label: 'Roof Deck' },
+  { id: 'parking_garage', label: 'Parking garage' },
+  { id: 'roof_deck', label: 'Roof deck' },
+  { id: 'staff_on_payroll', label: 'Staff on payroll' },
 ];
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
 export default function SignupBuildingStep({ state, set, setAmenities, canAdvance, onNext }: Props) {
   const [addressClaimed, setAddressClaimed] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hasNone = state.amenities.length === 0;
 
   // Verify address when query changes (debounced)
   useEffect(() => {
@@ -90,30 +92,69 @@ export default function SignupBuildingStep({ state, set, setAmenities, canAdvanc
     setAmenities(next);
   };
 
+  const handleNone = () => {
+    setAmenities([]);
+  };
+
+  const chipStyle = (on: boolean): React.CSSProperties => ({
+    minHeight: 44,
+    padding: '0 16px',
+    borderRadius: 999,
+    border: '1.5px solid',
+    borderColor: on ? '#0D1B2E' : '#c9d2dc',
+    background: on ? '#0D1B2E' : '#ffffff',
+    color: on ? '#ffffff' : '#0D1B2E',
+    fontFamily: 'inherit',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  });
+
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-ink-700 mb-1">Building / Association Name</label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Title */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 32, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>
+          Tell us about your building
+        </h1>
+        <p style={{ fontSize: 15, lineHeight: 1.5, color: '#4b5a6b', margin: 0 }}>
+          Twenty-one days free. No card. Anyone can start a building: a board member, an owner, a manager.
+        </p>
+      </div>
+
+      {/* Building name */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>Building or association name</label>
         <input
           value={state.buildingName}
           onChange={e => set('buildingName', e.target.value)}
-          className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm"
-          placeholder="e.g., Sunny Acres Condominium"
+          placeholder="1302 R Street Condominium"
           autoFocus
+          style={{
+            fontFamily: 'inherit', fontSize: 16, padding: '12px 14px',
+            border: '1.5px solid #c9d2dc', borderRadius: 10, background: '#ffffff',
+            color: '#0D1B2E', width: '100%', boxSizing: 'border-box', minHeight: 48,
+          }}
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-ink-700 mb-1">Street Address</label>
-        <div className="relative">
+      {/* Street address */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>Street address</label>
+        <div style={{ position: 'relative' }}>
           <input
             value={state.addressQuery}
             onChange={e => set('addressQuery', e.target.value)}
-            className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm"
-            placeholder="e.g., 1234 16th St NW"
+            placeholder="1302 R St NW, Washington, DC 20009"
+            autoComplete="street-address"
+            style={{
+              fontFamily: 'inherit', fontSize: 16, padding: '12px 14px',
+              border: '1.5px solid #c9d2dc', borderRadius: 10, background: '#ffffff',
+              color: '#0D1B2E', width: '100%', boxSizing: 'border-box', minHeight: 48,
+            }}
           />
           {state.addressLoading && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>
               <div className="w-4 h-4 border-2 border-ink-200 border-t-ink-600 rounded-full animate-spin" />
             </div>
           )}
@@ -121,89 +162,127 @@ export default function SignupBuildingStep({ state, set, setAmenities, canAdvanc
 
         {/* Address verification feedback */}
         {state.addressResult && !state.addressLoading && (
-          <div className="mt-2">
-            {state.addressResult.status === 'verified' && (
-              <div className="flex items-start gap-2 text-xs">
-                <span className="text-sage-600 mt-0.5">&#10003;</span>
-                <div>
-                  <span className="text-sage-700 font-medium">{state.addressResult.fullAddress}</span>
-                  {addressClaimed && (
-                    <p className="text-amber-600 mt-0.5">
-                      This address is already registered by &quot;{addressClaimed}&quot;.
-                      You can still proceed if this is a different association.
-                    </p>
-                  )}
-                </div>
+          <>
+            {state.addressResult.status === 'verified' && !addressClaimed && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                borderRadius: 10, padding: '8px 12px', marginTop: 2,
+                color: '#155E75', background: '#ecfeff', border: '1px solid #a5f3fc',
+              }}>
+                <span style={{ fontWeight: 700 }}>Verified</span>
+                <span>
+                  {state.addressResult.fullAddress}
+                  {state.addressResult.ward && `, Ward ${state.addressResult.ward}`}
+                  {state.addressResult.ssl && `. ${state.addressResult.ssl}`}
+                </span>
+              </div>
+            )}
+            {state.addressResult.status === 'verified' && addressClaimed && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                borderRadius: 10, padding: '8px 12px', marginTop: 2,
+                color: '#D62839', background: '#fff0f1', border: '1px solid #fecdd3',
+              }}>
+                <span style={{ fontWeight: 700 }}>Already on ONE two</span>
+                <span>
+                  {addressClaimed} already uses ONE two.{' '}
+                  <a href="/login?invite=1" style={{ color: '#D62839' }}>Ask your board for an invite.</a>
+                </span>
               </div>
             )}
             {state.addressResult.status === 'not_condo' && (
-              <p className="text-xs text-amber-600">
-                {state.addressResult.fullAddress} was found but doesn&apos;t appear to be a condominium.
-                You can still continue if this is correct.
-              </p>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                borderRadius: 10, padding: '8px 12px', marginTop: 2,
+                color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa',
+              }}>
+                <span style={{ fontWeight: 700 }}>On record, not as a condominium</span>
+                <span>You can continue; we will check it with you.</span>
+              </div>
             )}
             {state.addressResult.status === 'not_found' && (
-              <p className="text-xs text-ink-400">
-                Address not found in the DC address database. You can still enter it manually.
-              </p>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                borderRadius: 10, padding: '8px 12px', marginTop: 2,
+                color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa',
+              }}>
+                <span style={{ fontWeight: 700 }}>Not found</span>
+                <span>We could not find this address in the DC address registry. Check the spelling, or continue and we will verify it by hand.</span>
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-ink-700 mb-1">How many units?</label>
-        <input
-          type="number"
-          min={1}
-          value={state.totalUnits}
-          onChange={e => {
-            const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-            set('totalUnits', v as any);
-          }}
-          className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm"
-          placeholder="e.g., 12"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-ink-700 mb-1">Which of these does your building have?</label>
-        <div className="flex flex-wrap gap-2 mt-1">
-          {AMENITY_OPTIONS.map(a => (
+      {/* Two-column: units + amenities */}
+      <div
+        style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', gap: 20 }}
+        className="signup-units-grid"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>How many units?</label>
+          <input
+            inputMode="numeric"
+            value={state.totalUnits}
+            onChange={e => {
+              const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+              set('totalUnits', v as any);
+            }}
+            placeholder="12"
+            style={{
+              fontFamily: 'inherit', fontSize: 16, padding: '12px 14px',
+              border: '1.5px solid #c9d2dc', borderRadius: 10, background: '#ffffff',
+              color: '#0D1B2E', width: '100%', boxSizing: 'border-box', minHeight: 48,
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>Which of these does your building have?</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {AMENITY_OPTIONS.map(a => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => toggleAmenity(a.id)}
+                style={chipStyle(state.amenities.includes(a.id))}
+              >
+                {a.label}
+              </button>
+            ))}
             <button
-              key={a.id}
               type="button"
-              onClick={() => toggleAmenity(a.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                state.amenities.includes(a.id)
-                  ? 'bg-accent-50 border-accent-400 text-accent-700'
-                  : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
-              }`}
+              onClick={handleNone}
+              style={chipStyle(hasNone)}
             >
-              {a.label}
+              None of these
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setAmenities([])}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              state.amenities.length === 0
-                ? 'bg-ink-100 border-ink-300 text-ink-700'
-                : 'bg-white border-ink-200 text-ink-600 hover:border-ink-300'
-            }`}
-          >
-            None
-          </button>
+          </div>
         </div>
       </div>
 
-      <button
-        onClick={onNext}
-        disabled={!canAdvance}
-        className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 disabled:opacity-50"
-      >
-        Continue
-      </button>
+      {/* Continue */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canAdvance}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            minHeight: 48, padding: '0 22px', borderRadius: 10, fontWeight: 600, fontSize: 16,
+            border: 0, cursor: canAdvance ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+            background: canAdvance ? '#D62839' : '#e3e8ee',
+            color: canAdvance ? '#ffffff' : '#8fa0b3',
+          }}
+        >
+          Continue
+        </button>
+      </div>
+
+      <style>{`
+        @media (max-width: 760px) {
+          .signup-units-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

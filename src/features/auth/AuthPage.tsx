@@ -6,10 +6,10 @@ import { BOARD_ROLE_LABELS } from '@/types/auth';
 import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
 import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
 import { useSignupState } from './signup/useSignupState';
+import SignupLayout from './signup/SignupLayout';
 import SignupBuildingStep from './signup/SignupBuildingStep';
 import SignupPlanStep from './signup/SignupPlanStep';
 import SignupAccountStep from './signup/SignupAccountStep';
-import SignupSummary from './signup/SignupSummary';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -379,7 +379,7 @@ export default function AuthPage() {
   // ── Signup handler (Screen 1: validates invite or goes to wizard) ──
   const handleSignup = async () => {
     if (!email) return;
-    if (!password || password.length < 6) return;
+    if (!password || password.length < 8) return;
 
     if (inviteCode.trim()) {
       const valid = await handleInviteCode();
@@ -397,7 +397,7 @@ export default function AuthPage() {
   // ── Complete join for invite code users ──
   const handleCompleteJoin = async () => {
     if (!firstName || !lastName) return;
-    if (!password || password.length < 6) return;
+    if (!password || password.length < 8) return;
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = email;
 
@@ -467,7 +467,7 @@ export default function AuthPage() {
   // ── 3-step wizard: Start (creates auth user + calls chargebee-checkout) ──
   const handleStart = async () => {
     const s = signup.state;
-    if (!s.email || !s.password || s.password.length < 6) return;
+    if (!s.email || !s.password || s.password.length < 8) return;
 
     if (!isBackendEnabled || !supabase) {
       // Demo fallback
@@ -518,7 +518,7 @@ export default function AuthPage() {
       }
 
       // Derive role/roleKey for the building payload
-      const role = s.iAmRole;
+      const role = s.iAmRole === 'other' ? null : s.iAmRole;
       const roleKey = role === 'board_member' ? (s.roleKey || 'president') : null;
       const addressFlag = s.addressResult?.status || 'skip';
 
@@ -605,6 +605,57 @@ export default function AuthPage() {
 
   const isInviteFlow = !!(inviteData?.valid || inviteMatch);
 
+  // ── 3-step wizard gets its own full-screen layout ──
+  if (authStep === 'building') {
+    return (
+      <>
+        <SignupLayout state={signup.state} trialDays={trialDays}>
+          {signup.state.step === 'building' && (
+            <SignupBuildingStep
+              state={signup.state}
+              set={signup.set}
+              setAmenities={signup.setAmenities}
+              canAdvance={signup.canAdvanceFromBuilding}
+              onNext={signup.goNext}
+            />
+          )}
+
+          {signup.state.step === 'plan' && (
+            <SignupPlanStep
+              state={signup.state}
+              setPlanPicker={signup.setPlanPicker}
+              trialDays={trialDays}
+              canAdvance={signup.canAdvanceFromPlan}
+              onNext={signup.goNext}
+              onBack={signup.goBack}
+            />
+          )}
+
+          {signup.state.step === 'account' && (
+            <SignupAccountStep
+              state={signup.state}
+              set={signup.set}
+              setPlanPicker={signup.setPlanPicker}
+              canSubmit={signup.canSubmit}
+              submitting={checkoutLoading}
+              onSubmit={handleStart}
+              onBack={signup.goBack}
+            />
+          )}
+        </SignupLayout>
+
+        {showLeadModal && (
+          <DemoLeadModal
+            onClose={(capturedEmail) => {
+              setShowLeadModal(false);
+              if (capturedEmail) setEmail(capturedEmail);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
       <div className="w-full max-w-md mx-4">
@@ -659,7 +710,7 @@ export default function AuthPage() {
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="At least 6 characters"
+                  className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="At least 8 characters"
                   onKeyDown={e => e.key === 'Enter' && !showInviteField && handleSignup()} />
               </div>
 
@@ -687,66 +738,6 @@ export default function AuthPage() {
               </div>
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
-          </div>
-        )}
-
-        {/* ══════ 3-STEP WIZARD: BUILDING → PLAN → ACCOUNT ══════ */}
-        {authStep === 'building' && (
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Summary sidebar (hidden on mobile) */}
-            <div className="hidden lg:block w-72 flex-shrink-0">
-              <SignupSummary state={signup.state} trialDays={trialDays} />
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8 flex-1">
-              <Logo />
-              <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">
-                {signup.state.step === 'building' && 'Name Your Building'}
-                {signup.state.step === 'plan' && 'Choose Your Plan'}
-                {signup.state.step === 'account' && 'Create Your Account'}
-              </h2>
-              <p className="text-sm text-ink-400 text-center mb-6">
-                {signup.state.step === 'building' && 'Tell us about your building'}
-                {signup.state.step === 'plan' && `${trialDays}-day free trial on every plan`}
-                {signup.state.step === 'account' && 'Almost there — just a few details'}
-              </p>
-
-              {signup.state.step === 'building' && (
-                <SignupBuildingStep
-                  state={signup.state}
-                  set={signup.set}
-                  setAmenities={signup.setAmenities}
-                  canAdvance={signup.canAdvanceFromBuilding}
-                  onNext={signup.goNext}
-                />
-              )}
-
-              {signup.state.step === 'plan' && (
-                <SignupPlanStep
-                  state={signup.state}
-                  setPlanPicker={signup.setPlanPicker}
-                  trialDays={trialDays}
-                  canAdvance={signup.canAdvanceFromPlan}
-                  onNext={signup.goNext}
-                  onBack={signup.goBack}
-                />
-              )}
-
-              {signup.state.step === 'account' && (
-                <SignupAccountStep
-                  state={signup.state}
-                  set={signup.set}
-                  canSubmit={signup.canSubmit}
-                  submitting={checkoutLoading}
-                  onSubmit={handleStart}
-                  onBack={signup.goBack}
-                />
-              )}
-
-              <div className="mt-4 text-center">
-                <a onClick={() => setAuthStep('signup')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Get Started</a>
-              </div>
-            </div>
           </div>
         )}
 

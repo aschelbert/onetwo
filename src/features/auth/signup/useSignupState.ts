@@ -40,9 +40,20 @@ export interface SignupState {
   lastName: string;
   email: string;
   password: string;
-  iAmRole: 'board_member' | 'resident' | 'property_manager';
+  iAmRole: 'board_member' | 'resident' | 'property_manager' | 'other' | null;
   roleKey: BoardRoleKey | null;
 }
+
+function readUrlParams(): { plan: PlanId | null; interval: BillingInterval } {
+  const params = new URLSearchParams(window.location.search);
+  let plan: PlanId | null = null;
+  if (params.get('plan') === 'facilities') plan = 'facilities';
+  else if (params.get('plan') === 'self_managed') plan = 'self_managed';
+  const interval: BillingInterval = params.get('interval') === 'annual' ? 'annual' : 'monthly';
+  return { plan, interval };
+}
+
+const urlParams = readUrlParams();
 
 const INITIAL_STATE: SignupState = {
   step: 'building',
@@ -53,8 +64,8 @@ const INITIAL_STATE: SignupState = {
   totalUnits: '',
   amenities: [],
   planPicker: {
-    plan: 'self_managed',
-    interval: 'monthly',
+    plan: urlParams.plan,
+    interval: urlParams.interval,
     onCall: false,
     pmSeat: false,
     setup: false,
@@ -63,8 +74,8 @@ const INITIAL_STATE: SignupState = {
   lastName: '',
   email: '',
   password: '',
-  iAmRole: 'board_member',
-  roleKey: 'president',
+  iAmRole: null,
+  roleKey: null,
 };
 
 export function useSignupState() {
@@ -84,7 +95,7 @@ export function useSignupState() {
       amenities,
       planPicker: {
         ...prev.planPicker,
-        plan: recommendPlan(amenities),
+        plan: prev.planPicker.plan ?? (amenities.length > 0 ? recommendPlan(amenities) : null),
       },
     }));
   }, []);
@@ -104,7 +115,7 @@ export function useSignupState() {
     state.firstName.trim() &&
     state.lastName.trim() &&
     state.email.trim() &&
-    state.password.length >= 6
+    state.password.length >= 8
   );
 
   const goNext = useCallback(() => {

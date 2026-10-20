@@ -19,7 +19,7 @@ export const DEFAULT_TRIAL_DAYS = 21;
 export const DEFAULT_BILLING_INTERVAL: BillingInterval = 'monthly';
 
 // Kept for AuthPage amenity chip logic
-export type BuildingAmenity = 'elevator' | 'pool' | 'gym' | 'sport_court' | 'parking_garage' | 'roof_deck';
+export type BuildingAmenity = 'elevator' | 'pool' | 'gym' | 'sport_court' | 'parking_garage' | 'roof_deck' | 'staff_on_payroll';
 
 // ── Plans ──
 

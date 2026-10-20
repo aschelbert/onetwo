@@ -1,4 +1,5 @@
 // Trial countdown bar — renders above TopNav when tenant is in trial.
+// Matches day-one-reference.html: teal bg, white text, "Add a card" link.
 
 import { useTenantContext } from '@/components/TenantProvider';
 
@@ -15,18 +16,30 @@ export default function TrialBar() {
   const totalTrialDays = 21; // DEFAULT_TRIAL_DAYS
   const dayNumber = Math.max(1, totalTrialDays - daysLeft + 1);
 
+  const endStr = endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
   return (
-    <div className="bg-brand-cyan/10 border-b border-brand-cyan/20 px-4 py-1.5 flex items-center justify-center gap-3 text-sm">
-      <span className="font-medium text-ink-700">
-        Day {dayNumber} of your {totalTrialDays}-day trial
-      </span>
-      <span className="text-ink-400">·</span>
-      <span className="text-ink-500">
-        {daysLeft} day{daysLeft !== 1 ? 's' : ''} remaining
+    <div
+      style={{
+        background: '#155E75',
+        color: '#ffffff',
+        minHeight: 40,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '0 24px',
+        fontSize: 13,
+        flexWrap: 'wrap',
+      }}
+    >
+      <span>
+        <strong>Day {dayNumber} of your {totalTrialDays} day trial.</strong>{' '}
+        Everything is on. Nothing is billed until {endStr}.
       </span>
       <a
         href="/subscription"
-        className="ml-2 text-xs font-semibold text-accent-600 hover:text-accent-700 underline"
+        style={{ color: '#A5F3FC', fontWeight: 600, textDecoration: 'none' }}
       >
         Add a card
       </a>

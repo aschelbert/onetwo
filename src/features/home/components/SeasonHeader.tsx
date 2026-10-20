@@ -130,11 +130,27 @@ export default function SeasonHeader({ season, firstName, urgentCount, health }:
           )}
         </div>
 
-        {/* Right side: Health ring */}
+        {/* Right side: Health ring or setup placeholder */}
         <div className="relative shrink-0 flex items-start justify-center" ref={popoverRef}>
-          <HealthRing score={health.score} onInfoClick={() => setHealthOpen(!healthOpen)} />
-          {healthOpen && (
-            <HealthBreakdownPopover health={health} onClose={() => setHealthOpen(false)} />
+          {isSetup ? (
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-4" style={{ padding: '14px 18px', background: '#ffffff', borderRadius: 14, border: '1px solid #e3e8ee' }}>
+                <div className="flex flex-col items-end">
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#4b5a6b' }}>Board Health</span>
+                  <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 34, fontWeight: 700, lineHeight: 1, color: '#8fa0b3' }}>&ndash;&ndash;</span>
+                </div>
+                <p style={{ fontSize: 12, maxWidth: 160, lineHeight: 1.4, color: '#4b5a6b', margin: 0 }}>
+                  Scores once the units and the first close are in.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <HealthRing score={health.score} onInfoClick={() => setHealthOpen(!healthOpen)} />
+              {healthOpen && (
+                <HealthBreakdownPopover health={health} onClose={() => setHealthOpen(false)} />
+              )}
+            </>
           )}
         </div>
       </div>
