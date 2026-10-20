@@ -194,21 +194,23 @@ function TrialEndedPage() {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, currentRole, signOut } = useAuthStore();
+  const { isAuthenticated, currentRole, currentUser, signOut } = useAuthStore();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const fromDemo = params.get('from') === 'demo';
+  const wantsCreate = params.get('create') === '1';
+  const isDemoUser = currentUser.id === 'user1' || currentUser.id.startsWith('user-');
 
-  // Demo exit: user is still authenticated but navigated here with ?from=demo.
-  // Sign out in an effect so the auth page can render with the query params intact.
+  // Sign out demo users when they arrive at the signup flow (?create=1)
+  // or when explicitly leaving the demo (?from=demo).
   useEffect(() => {
-    if (isAuthenticated && fromDemo) {
+    if (isAuthenticated && isDemoUser && (fromDemo || wantsCreate)) {
       signOut();
     }
-  }, [isAuthenticated, fromDemo, signOut]);
+  }, [isAuthenticated, isDemoUser, fromDemo, wantsCreate, signOut]);
 
-  if (isAuthenticated && !fromDemo) {
-    // On tenant subdomains, platform admins should see the tenant dashboard
+  if (isAuthenticated && !isDemoUser && !fromDemo) {
+    // Real authenticated user — redirect to their dashboard
     const host = window.location.hostname;
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
