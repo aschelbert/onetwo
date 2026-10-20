@@ -4,17 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ONE two: everything a property manager does for your building, without the property manager</title>
-<meta name="description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial, no card.">
+<meta name="description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial.">
 <link rel="canonical" href="https://getonetwo.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://getonetwo.com/">
 <meta property="og:title" content="ONE two: everything a property manager does for your building, without the property manager">
-<meta property="og:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial, no card.">
+<meta property="og:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial.">
 <meta property="og:image" content="https://getonetwo.com/og.png">
 <meta property="og:site_name" content="ONE two">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ONE two: everything a property manager does for your building, without the property manager">
-<meta name="twitter:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners.">
+<meta name="twitter:description" content="ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. 21 day free trial.">
 <meta name="twitter:image" content="https://getonetwo.com/og.png">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -39,7 +39,7 @@
   "url": "https://getonetwo.com",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web",
-  "description": "ONE two does the manager's job for Washington, DC condo buildings: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners.",
+  "description": "ONE two does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.",
   "offers": [
     {
       "@type": "Offer",
@@ -127,14 +127,187 @@ p{margin:0}
 .job{display:flex;gap:14px;align-items:center;text-align:left;font-family:inherit;color:#ffffff;background:transparent;border:1px solid #243b53;border-radius:14px;padding:14px 16px;cursor:pointer;width:100%;box-sizing:border-box;transition:background .3s,border-color .3s}
 .job:hover{border-color:#A5F3FC}
 .job.on{background:#13263d;border-color:#A5F3FC}
-@media (max-width:960px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.two,.doors{grid-template-columns:1fr}.navlinks{display:none !important}}
-@media (max-width:640px){.grid3,.grid4{grid-template-columns:1fr}.wrap{padding:0 16px}.door{padding:28px 22px}}
+@media (max-width:960px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}.navlinks{display:none !important}.door{padding:32px 26px}}
+@media (max-width:640px){.doors{grid-template-columns:1fr}.grid3,.grid4{grid-template-columns:1fr}.wrap{padding:0 16px}.door{padding:28px 22px}}
 @keyframes dial{from{stroke-dashoffset:339}to{stroke-dashoffset:61}}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes stamp{0%{opacity:0;transform:scale(1.4) rotate(-8deg)}60%{opacity:1;transform:scale(.96) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(-8deg)}}
 .dial{animation:dial 1.8s ease both .3s}
 .f1{animation:rise .6s ease both .3s}.f2{animation:rise .6s ease both .6s}.f3{animation:rise .6s ease both .9s}.f4{animation:rise .6s ease both 1.2s}
 .stamp{animation:stamp .7s ease both 1s}
+.browser{border:1px solid #e3e8ee;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(13,27,46,.14);background:#f4f6f9;display:flex;flex-direction:column;flex:1}
+.chrome{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#e9edf2}
+.dot{width:10px;height:10px;border-radius:50%;background:#c9d2dc}
+.url{margin-left:10px;flex:1;background:#ffffff;border-radius:6px;padding:4px 10px;font-size:12px;color:#4b5a6b}
+.appnav{display:flex;align-items:center;gap:14px;padding:0 18px;height:52px;background:#0D1B2E}
+.appnavlinks{display:flex;gap:2px;font-size:13px;color:rgba(255,255,255,.7);height:100%;margin-left:24px}
+.appnavlinks span{display:flex;align-items:center;padding:0 10px;position:relative;white-space:nowrap}
+.appnavlinks .on{color:#ffffff;font-weight:500}
+.appnavlinks .on::after{content:"";position:absolute;left:10px;right:10px;bottom:12px;height:2px;background:#A5F3FC;border-radius:2px}
+.appwho{display:flex;align-items:center;gap:10px;margin-left:auto}
+.appwho .role{border:1.5px solid #A5F3FC;color:#A5F3FC;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap}
+.appwho .av{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.2);color:#ffffff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.appbody{padding:14px;display:flex;flex-direction:column;gap:12px;flex:1;animation:rise .45s ease both;background:#f4f6f9}
+/* home layout */
+.season{background:#0D1B2E;color:#ffffff;border-radius:12px;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center}
+.season .k{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8fa0b3}
+.season h5{margin:4px 0 8px;font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:600;color:#ffffff}
+.mpill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:#13263d;border:1px solid #243b53;font-size:11px;font-weight:600;color:#c7d2de;margin:0 6px 0 0}
+.mpill::before{content:"";width:5px;height:5px;border-radius:50%;background:#A5F3FC}
+.homegrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;flex:1}
+.panelw{background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;padding:12px}
+.panelw h6{margin:0 0 8px;font-family:'Fraunces',Georgia,serif;font-size:13px;font-weight:600;color:#2b3a4b}
+.qcard{background:#ffffff;border:1.5px solid #155E75;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+.qcard .top{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8fa0b3}
+.rolechip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1.5px solid #155E75;color:#155E75;background:#ffffff}
+.qcard .ttl{font-family:'Fraunces',Georgia,serif;font-size:14px;font-weight:600;color:#0D1B2E}
+.qcard .why{font-size:12px;color:#8fa0b3}
+.qcard .bot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.qcard .due{font-size:12px;color:#8fa0b3}.qcard .due.soon{color:#D62839}.qcard .due.overdue{color:#D62839;font-weight:600}
+.qcard .act{font-size:12px;font-weight:600;color:#ffffff;background:#0D1B2E;border-radius:7px;padding:6px 10px}
+.brow{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+.brow .n{font-size:12px;color:#0D1B2E}.brow .n small{color:#8fa0b3;margin-left:6px;font-size:11px}
+.bar{height:5px;border-radius:3px;background:#e3e8ee;overflow:hidden}.bar i{display:block;height:100%;background:#D62839}
+.brow .m{font-size:10px;color:#8fa0b3}.brow .m b{color:#D62839;font-weight:600}
+/* hub layout */
+.hub{border-radius:12px;padding:14px 16px;background:linear-gradient(100deg,#155E75 0%,#0D1B2E 45%,#6b1a26 100%);color:#ffffff}
+.hub h5{margin:0 0 10px;font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:600;color:#ffffff}
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.tiles.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.tile{background:rgba(255,255,255,.12);border-radius:8px;padding:8px 8px;text-align:center;display:flex;flex-direction:column;gap:1px}
+.tile .v{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:700;color:#ffffff}
+.tile .v.good{color:#86efac}.tile .v.warn{color:#fde68a}.tile .v.bad{color:#fca5a5}
+.tile .m{font-size:10px;color:#e5e7eb}.tile .l{font-size:9px;color:#9ca3af}
+.pagetabs{display:flex;gap:0;border-bottom:1px solid #e3e8ee;background:#ffffff;border-radius:12px 12px 0 0;padding:0 8px;overflow:hidden;white-space:nowrap}
+.pagetabs span{padding:10px 12px;font-size:12.5px;font-weight:500;color:#8fa0b3;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px}
+.pagetabs .on{color:#0D1B2E;border-bottom-color:#0D1B2E}
+.pagetabs i{font-style:normal;background:#D62839;color:#ffffff;border-radius:999px;font-size:9px;font-weight:700;padding:1px 6px}
+.hubwrap{background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;overflow:hidden;flex:1;display:flex;flex-direction:column}
+.hubbody{padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.hubbody h6{margin:0;font-family:'Fraunces',Georgia,serif;font-size:15px;font-weight:600;color:#0D1B2E}
+.hubbody .ps{font-size:12px;color:#8fa0b3;margin-top:-6px}
+.ccard{border:1px solid #f3c7cb;border-radius:10px;background:linear-gradient(180deg,#fff5f5,#ffffff 40px);padding:12px;display:flex;flex-direction:column;gap:8px}
+.ccard .cl{display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#D62839}
+.ccard .cl small{color:#8fa0b3;font-weight:500;letter-spacing:0;text-transform:none;font-size:11px}
+.crow{display:flex;align-items:center;gap:10px;border:1px solid #e3e8ee;border-radius:8px;padding:8px 10px;background:#ffffff;font-size:13px}
+.crow .st{width:16px;height:16px;border-radius:50%;border:1.5px solid #c9d2dc;flex:none;display:flex;align-items:center;justify-content:center}
+.crow .st.done{border-color:#155E75;background:#155E75}.crow .st.next{border-color:#D62839}
+.crow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.crow .tx b{font-weight:500;color:#0D1B2E}.crow .tx span{font-size:11px;color:#8fa0b3}
+.crow .rt{font-size:11px;font-weight:600;color:#155E75;border:1.5px solid #155E75;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.crow .rt.text{border:0;color:#4b5a6b;font-weight:500;padding:0}
+.scorestrip{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid #d9e8ec;border-radius:14px;background:#f4fbfc}
+.job{color:#0D1B2E;background:#ffffff;border:1px solid #e3e8ee;padding:16px 16px}
+.job:hover{border-color:#0D1B2E}
+.job.on{background:#f4f6f9;border-color:#0D1B2E;box-shadow:0 0 0 3px rgba(13,27,46,.10)}
+#inside .two > div{min-width:0}
+.browser{min-width:0;max-width:100%}
+.chrome{overflow:hidden}.url{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appnav{overflow:hidden}
+.season > div{min-width:0}.season > div > div:last-child{display:flex;flex-wrap:wrap;gap:6px}
+.mpill{margin:0}
+.hubbody{min-width:0}.crow .tx b{overflow-wrap:anywhere}
+/* responsive */
+.menubtn{display:none;min-height:42px;padding:0 14px;border-radius:10px;border:1.5px solid #c9d2dc;background:#ffffff;font-family:inherit;font-weight:600;font-size:15px;color:#0D1B2E;cursor:pointer}
+.mobilemenu{display:none;flex-direction:column;border-top:1px solid #e9edf2;background:#ffffff}
+.mobilemenu a{padding:14px 24px;text-decoration:none;color:#0D1B2E;font-weight:500;border-bottom:1px solid #f1f4f7}
+.mobilemenu.open{display:flex}
+@media (max-width:960px){
+  .wrap h1,.wrap h2,.wrap p{width:auto !important;max-width:100%}
+  section{padding:64px 0 !important}
+  h2{font-size:34px !important}
+  #top h1{font-size:46px !important}
+  #top{padding:64px 0 56px !important}
+  .menubtn{display:inline-flex;align-items:center}
+  header .btn,header a span{white-space:nowrap}
+  header .btn-red{padding:0 14px !important;font-size:14px !important}
+  .hero-actions .btn-outline{display:none}
+  .appnavlinks{margin-left:12px}
+  .homegrid{grid-template-columns:1fr}
+  #inside .two{grid-template-columns:1fr !important}
+  .proofstrip{display:none}
+  #pricing .two{grid-template-columns:1fr 1fr !important;gap:16px}
+  #pricing .grid3{grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:12px}
+  #pricing .grid3 .card{padding:16px !important}
+  #pricing .grid3 .card h3{font-size:17px !important}
+  #pricing .grid3 .card .row > span{font-size:18px !important;width:auto !important;white-space:nowrap}
+  #pricing .grid3 .card p{font-size:13px !important}
+  #pricing .plancard{padding:20px !important}
+  #pricing .plancard span[style*="font-size:46px"]{font-size:38px !important}
+}
+@media (max-width:640px){
+  section{padding:48px 0 !important}
+  h2{font-size:28px !important}
+  h3{font-size:20px !important}
+  #top h1{font-size:36px !important}
+  #top .btn{width:100%}
+  .herocard{grid-template-columns:1fr !important;justify-items:center;text-align:center}
+  .herocard .row{width:100%;text-align:left}
+  .herocard .f4[style*="grid-column"]{text-align:left}
+  .invoices{grid-template-columns:1fr !important}
+  .appnavlinks{display:none}
+  #inside .two > div:first-child{display:grid !important;grid-template-columns:1fr 1fr;gap:8px !important}
+  #inside .two > div:first-child > div:last-child{grid-column:1 / -1}
+  #inside #jobs{display:contents !important}
+  .job{padding:10px 12px !important;gap:10px}
+  .job > span:first-child{font-size:18px;width:20px}
+  .job span[style*="font-size:16px"]{font-size:14px !important;line-height:1.2}
+  .job .sub,.job .pill{display:none}
+  .tiles,.tiles.five{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .scorestrip{padding:16px !important}
+  .scorestrip > div:last-child{width:100%;justify-content:space-between}
+  .seg{padding:0 12px;font-size:13px}
+  .plancard{padding:20px}
+  .plancard span[style*="font-size:46px"]{font-size:36px !important}
+  .door{padding:24px 18px !important}
+  .doors > .door:last-child{border-left:1px solid #e3e8ee !important;border-top:0}
+  .btn{min-height:46px}
+  #pricing .card .row > span{width:auto !important;white-space:nowrap}
+  #pricing .wrap > .row > div > p.muted{display:none}
+  #pricing .plancard{padding:16px !important;gap:8px !important}
+  #pricing .plancard ul{display:none}
+  #pricing .plancard > p.muted{font-size:13px !important;line-height:1.4 !important}
+  #pricing .plancard span[style*="font-size:46px"]{font-size:30px !important}
+  #pricing .plancard .plan-cta,#pricing .plancard .btn{min-height:40px !important;font-size:14px !important;align-self:stretch !important}
+  #pricing .two{grid-template-columns:1fr !important;gap:10px !important}
+  #pricing .grid3{grid-template-columns:1fr !important;gap:10px}
+  #pricing .grid3 .card{padding:14px !important;gap:4px !important}
+  #pricing .grid3 .card h3{font-size:16px !important}
+  #pricing .grid3 .card p{font-size:12.5px !important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #pricing .wrap{gap:18px !important}
+}
+/* mobile: stacked job cards */
+.mstack{display:none}
+.mobonly{display:none}
+@media (max-width:960px){.deskonly{display:none}.mobonly{display:inline}
+  #inside .two{display:none !important}
+  .mstack{display:flex;flex-direction:column;gap:14px}
+  .mcard{position:sticky;top:72px;background:#ffffff;border:1px solid #e3e8ee;border-radius:16px;box-shadow:0 -8px 30px rgba(13,27,46,.12);padding:14px;display:flex;flex-direction:column;gap:12px}
+  .mcard .mh{display:flex;gap:14px;align-items:center;margin:-14px -14px 0;padding:14px 16px;background:#9f1c2a;border-bottom:0;border-radius:16px 16px 0 0}
+  .mcard .browser{box-shadow:none}
+  .mcard .mf{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:#155E75;font-weight:700}
+  .mcard .mf .sc{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700;color:#0D1B2E;background:#f4fbfc;border:1px solid #d9e8ec;border-radius:999px;padding:4px 12px;white-space:nowrap}
+  .mcard{height:80vh;max-height:900px;overflow:hidden;box-sizing:border-box}
+  .mcard .mh span.n{color:#ffffff !important;background:#D62839;border:0;box-sizing:border-box;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px !important;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+  .mcard .mh .jt{display:block;color:#ffffff;font-size:20px !important;font-weight:600;font-family:'Fraunces',Georgia,serif;line-height:1.15}
+  .mcard .mh .js{display:block;color:#ffffff;font-size:15px !important;margin-top:2px}}
+@media (max-width:640px){
+  .mcard{max-height:700px}
+  .mcard .browser{flex:1;min-height:0;overflow:hidden}
+  .mcard .chrome{display:none}
+  .mcard .appbody{overflow:hidden;padding:10px}
+  .mcard .homegrid > .panelw:last-child{display:none}
+  .mcard .qcard:nth-child(n+3){display:none}
+  .mcard .crow:nth-child(n+5){display:none}
+  .mcard .season{padding:12px 14px}
+  .mcard .hub{padding:12px 14px}
+  .mcard .tile:nth-child(n+4){display:none}
+  .mcard .pagetabs{display:none}
+  .mcard .hubbody{padding:10px 12px;gap:8px}
+  .mcard .ccard{padding:10px;gap:6px}
+  .mcard .crow{padding:7px 9px;font-size:12.5px}
+  .mcard .crow .rt{display:none}
+  .mcard .hub h5{margin-bottom:8px;font-size:17px}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
 </style>
 <style>
@@ -157,9 +330,11 @@ p{margin:0}
 <header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
   <div class="wrap row" style="min-height:72px">
     <a href="#top" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0D1B2E"><img src="/onetwo-nav-logo.jpg" alt="ONE two" style="width:36px;height:34px;object-fit:cover;border-radius:6px"><span style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px">ONE <span style="font-weight:500">two</span></span></a>
-    <nav class="navlinks" style="display:flex;gap:28px" aria-label="Main"><a href="#replace" style="color:#0D1B2E;text-decoration:none;font-weight:500">Why no manager</a><a href="#score" style="color:#0D1B2E;text-decoration:none;font-weight:500">The score</a><a href="#pricing" style="color:#0D1B2E;text-decoration:none;font-weight:500">Pricing</a><a href="#owners" style="color:#0D1B2E;text-decoration:none;font-weight:500">Who can start</a></nav>
-    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="nav">Start free trial</a></div>
+    <nav class="navlinks" style="display:flex;gap:28px" aria-label="Main"><a href="#inside" style="color:#0D1B2E;text-decoration:none;font-weight:500">What's inside</a><a href="#replace" style="color:#0D1B2E;text-decoration:none;font-weight:500">Why Us</a><a href="#pricing" style="color:#0D1B2E;text-decoration:none;font-weight:500">Pricing</a><a href="#owners" style="color:#0D1B2E;text-decoration:none;font-weight:500">Get Started</a></nav>
+    <div class="hero-actions" style="display:flex;gap:10px;align-items:center"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="nav">Start free trial</a><button type="button" class="menubtn" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menu</button></div>
   </div>
+
+  <nav class="mobilemenu" id="mobileMenu" aria-label="Mobile"><a href="#inside">What's inside</a><a href="#replace">Why Us</a><a href="#pricing">Pricing</a><a href="#owners">Get Started</a><a href="/login">Log in</a></nav>
 </header>
 
 <!-- HERO: ownership (D) + replacement (A) + score (B) -->
@@ -168,12 +343,12 @@ p{margin:0}
     <div style="display:flex;flex-direction:column;gap:24px">
       <span class="eyebrow f1" style="color:#A5F3FC">For Washington, DC condo buildings</span>
       <h1 class="f2" style="font-size:58px;line-height:1.04;color:#ffffff">Everything a property manager does for your building.<br><span style="color:#A5F3FC">Without the property manager.</span></h1>
-      <p class="f3" style="font-size:19px;line-height:1.55;color:#c7d2de;max-width:580px">ONE two does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.</p>
+      <p class="f3" style="font-size:19px;line-height:1.55;color:#c7d2de;max-width:580px"><strong>ONE two</strong> does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.</p>
       <div class="f3" style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-red" href="/login?create=1" style="min-height:54px;padding:0 26px;font-size:17px" data-cta="hero">Start your free 21 day trial</a><a class="btn btn-ghost" href="#pricing" style="min-height:54px;font-size:17px" data-cta="hero-pricing">See pricing</a></div>
-      <p class="f4" style="font-size:14px;color:#8fa0b3">No card to start. $179 a month after the trial, everything included.</p>
+      <p class="f4" style="font-size:14px;color:#8fa0b3">$179 a month after the trial, everything included.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:24px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center">
+      <div class="herocard" style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:24px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center">
         <svg width="150" height="150" viewBox="0 0 120 120" role="img" aria-label="Board Health 82 of 100">
           <circle cx="60" cy="60" r="54" fill="none" stroke="#e3e8ee" stroke-width="10"></circle>
           <circle class="dial" cx="60" cy="60" r="54" fill="none" stroke="#155E75" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="61" style="transform:rotate(-90deg);transform-origin:60px 60px"></circle>
@@ -195,7 +370,7 @@ p{margin:0}
 </section>
 
 <!-- PROOF STRIP -->
-<section style="background:#f4f6f9;border-bottom:1px solid #e9edf2;padding:28px 0">
+<section class="proofstrip" style="background:#f4f6f9;border-bottom:1px solid #e9edf2;padding:28px 0">
   <div class="wrap grid3" style="gap:32px">
     <div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;line-height:1;color:#D62839">45</span><p style="font-size:15px;line-height:1.45;color:#2b3a4b">obligations from the DC Condominium Act and DLCP, each with a due date, an owner and a how-to</p></div>
     <div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:'Fraunces',Georgia,serif;font-size:34px;font-weight:700;line-height:1;color:#D62839">1</span><p style="font-size:15px;line-height:1.45;color:#2b3a4b">statement a month that every owner can read, from a ledger your accountant will respect</p></div>
@@ -203,17 +378,71 @@ p{margin:0}
   </div>
 </section>
 
+
+<!-- WHAT'S INSIDE: six jobs, six screens, one score -->
+<section id="inside" style="padding:88px 0;background:#ffffff;border-bottom:1px solid #e9edf2">
+  <div class="wrap" style="display:flex;flex-direction:column;gap:32px">
+    <div style="max-width:800px;display:flex;flex-direction:column;gap:14px">
+      <span class="line">What's inside</span>
+      <h2 style="font-size:40px;line-height:1.12">Every job the building needs, in one place.</h2>
+      <p class="muted" style="font-size:17px;line-height:1.6">The jobs a management company is paid for, each with its own screen. <span class="deskonly">Pick one, or watch them go by.</span><span class="mobonly">Scroll through them.</span></p>
+    </div>
+    <div class="two" style="grid-template-columns:360px minmax(0,1fr);gap:32px;align-items:stretch">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div id="jobs" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="row" style="padding:6px 4px 0"><span id="autoLabel" style="font-size:12px;color:#8fa0b3"></span><button type="button" id="autoBtn" class="seg" style="min-height:36px;color:#155E75"></button></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="browser">
+          <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">app.getonetwo.com/1302rstreet</span></div>
+          <div class="appnav"><img src="/onetwo-logo-mark.jpg" alt="" style="width:26px;height:26px;border-radius:5px;object-fit:cover"><span class="appnavlinks"><span data-nav="Home">Home</span><span data-nav="The Building">The Building</span><span data-nav="Fiscal Lens">Fiscal Lens</span><span data-nav="Board Room">Board Room</span><span data-nav="The Archives">The Archives</span></span><span class="appwho"><span class="role">President</span><span class="av">AS</span></span></div>
+          <div class="appbody">
+            <div id="shotBody" style="display:contents"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mstack" id="mstack"></div>
+    <div class="scorestrip" style="padding:24px 28px;gap:32px">
+      <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:280px">
+        <span class="line">Keeping score</span>
+        <h3 style="font-size:28px;line-height:1.15">Many jobs. One health score. Watch it move.</h3>
+        <p class="muted" style="font-size:15px;line-height:1.6">Board Health moves as the jobs get done. In the 60s, filings are late and the books are behind. In the 90s, nothing is overdue and every obligation has proof attached. The number the board sees is the one the owners see.</p>
+        <div style="display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid #e3e8ee"><span id="shotTitle" style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600"></span><span id="shotSub" class="muted" style="font-size:14px;line-height:1.5"></span></div>
+      </div>
+          <div style="display:flex;align-items:center;gap:14px;flex:none">
+          <div style="position:relative;width:150px;height:150px;flex:none">
+          <svg width="150" height="150" viewBox="0 0 120 120" role="img" aria-label="Board Health score">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#e3e8ee" stroke-width="10"></circle>
+            <circle cx="60" cy="60" r="54" fill="none" stroke="#155E75" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" id="scoreDial" stroke-dashoffset="132" style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 1.2s ease"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;pointer-events:none"><span style="font-family:'Fraunces',Georgia,serif;font-size:42px;font-weight:700;line-height:1;color:#0D1B2E" id="scoreNum">61</span><span style="font-size:9px;font-weight:700;letter-spacing:.1em;color:#4b5a6b;margin-top:4px">BOARD HEALTH</span></div>
+          </div>
+            <div style="display:flex;flex-direction:column;gap:6px;max-width:260px"><span style="font-size:13px;color:#155E75;font-weight:700"><span id="sceneEffect"></span></span><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11px">
+            <span id="areas" style="display:contents"></span>
+            </div></div>
+          </div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <span class="pill" style="background:#f4f6f9;color:#155E75;border:1px solid #e3e8ee;padding:8px 14px;font-size:13px">Nothing scores on a bare checkbox</span>
+      <span class="pill" style="background:#f4f6f9;color:#155E75;border:1px solid #e3e8ee;padding:8px 14px;font-size:13px">Streaks for the boring consistency</span>
+      <span class="pill" style="background:#f4f6f9;color:#155E75;border:1px solid #e3e8ee;padding:8px 14px;font-size:13px">Badges that can be lost</span>
+      <span class="pill" style="background:#f4f6f9;color:#155E75;border:1px solid #e3e8ee;padding:8px 14px;font-size:13px">Owners see the result, not the game</span>
+    </div>
+  </div>
+</section>
+
 <!-- WHY NO MANAGER (A) -->
-<section id="replace" style="padding:96px 0">
+<section id="replace" style="padding:96px 0;background:#0D1B2E;color:#ffffff">
   <div class="wrap two">
     <div style="display:flex;flex-direction:column;gap:16px">
-      <span class="line">Why no manager</span>
-      <h2 style="font-size:40px;line-height:1.12">A management company sells a checklist and a phone number. Keep the phone number if you like.</h2>
-      <p class="muted" style="font-size:17px;line-height:1.6"><strong style="color:#0D1B2E">Keeping the building's long-term health on track is the real job.</strong> That means knowing what is due, running the meeting, handling the problems, keeping the books, planning for the roof and holding the records. A management company charges per unit, every month, plus fees on top, and the checklist is as far as most of them get. ONE two does all of it and your vendors get paid at their price, not a marked-up one.</p>
-      <p class="muted" style="font-size:17px;line-height:1.6"><strong style="color:#0D1B2E">The phone number is a person.</strong> Most boards find they do not need one once the checklist runs itself. If you do, add-on the <b>On Call</b> service to have a named advisor who knows your building and sits on your side of the table, not the manager's.</p>
+      <span class="line light">Why no manager</span>
+      <h2 style="font-size:40px;line-height:1.12;color:#ffffff">A management company sells a checklist and a phone number. Keep the phone number if you like.</h2>
+      <p style="font-size:17px;line-height:1.6;color:#c7d2de"><strong style="color:#ffffff">Keeping the building's long-term health on track is the real job.</strong> That means knowing what is due, running the meeting, handling the problems, keeping the books, planning for the roof and holding the records. A management company charges per unit, every month, plus fees on top, and the checklist is as far as most of them get. <strong>ONE two</strong> does all of it and your vendors get paid at their price, not a marked-up one.</p>
+      <p style="font-size:17px;line-height:1.6;color:#c7d2de"><strong style="color:#ffffff">The phone number is a person.</strong> Most boards find they do not need one once the checklist runs itself. If you do, add-on the <b>On Call</b> service to have a named advisor who knows your building and sits on your side of the table, not the manager's.</p>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;background:#f4f6f9;position:relative;overflow:hidden">
+    <div class="invoices" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;background:#f4f6f9;position:relative;overflow:hidden;color:#0D1B2E">
         <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8fa0b3">Year in review · management company · 12 units</span>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:#4b5a6b">
           <div class="row"><span>Management fee, $45 a unit a month</span><span>$6,480</span></div>
@@ -224,7 +453,7 @@ p{margin:0}
         </div>
         <span class="stamp" style="position:absolute;right:16px;top:40px;padding:6px 12px;border:3px solid #D62839;color:#D62839;font-weight:800;font-size:16px;letter-spacing:.1em;text-transform:uppercase;border-radius:6px;background:rgba(255,255,255,.7)">Cancelled</span>
       </div>
-      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;border-color:#0D1B2E">
+      <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:12px;border-color:#A5F3FC;color:#0D1B2E">
         <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#155E75">ONE two · Self-Managed · a year</span>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:#2b3a4b">
           <div class="row"><span>Plan, everything included, 12 months</span><span>$2,148</span></div>
@@ -238,52 +467,6 @@ p{margin:0}
   </div>
 </section>
 
-<!-- THE FIVE JOBS + THE SCORE, one interactive section -->
-<section id="score" style="padding:96px 0;background:#0D1B2E;color:#ffffff;overflow:hidden">
-  <div class="wrap" style="display:flex;flex-direction:column;gap:36px">
-    <div style="max-width:760px;display:flex;flex-direction:column;gap:14px">
-      <span class="line light">THE JOBS, AND WHAT THEY DO TO THE SCORE</span>
-      <h2 style="font-size:40px;line-height:1.12;color:#ffffff">Many jobs. One health score. Watch it move.</h2>
-      <p style="font-size:17px;line-height:1.6;color:#c7d2de">Every building in ONE two gets a Board Health score: how well the board is doing the six jobs a management company is paid for. A score in the 60s means filings are late and the books are behind. In the 90s, nothing is overdue and every obligation has proof attached. Pick a job and see what it does to the score, or let it play.</p>
-    </div>
-
-    <div class="two" style="gap:40px;align-items:stretch">
-      <!-- left: job tabs (rendered by JS into #jobs) -->
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div id="jobs" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div class="row" style="padding:6px 4px 0">
-          <span id="autoLabel" style="font-size:12px;color:#8fa0b3"></span>
-          <button type="button" id="autoBtn" class="seg" style="color:#A5F3FC;min-height:36px"></button>
-        </div>
-      </div>
-
-      <!-- right: the scene + the dial -->
-      <div style="background:#13263d;border:1px solid #243b53;border-radius:18px;padding:22px;display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:20px;align-items:center">
-        <div style="display:flex;flex-direction:column;gap:12px;min-height:220px">
-          <span id="sceneLabel" style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8fa0b3"></span>
-          <span id="sceneTitle" style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;color:#ffffff"></span>
-          <div id="sceneRows" style="display:flex;flex-direction:column;gap:12px"></div>
-          <span id="sceneEffect" style="font-size:13px;color:#A5F3FC;font-weight:600"></span>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
-          <svg width="160" height="160" viewBox="0 0 120 120" role="img" aria-label="Board Health score">
-            <circle cx="60" cy="60" r="54" fill="none" stroke="#243b53" stroke-width="10"></circle>
-            <circle id="scoreDial" cx="60" cy="60" r="54" fill="none" stroke="#A5F3FC" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="132" style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 1.2s ease"></circle>
-            <text id="scoreNum" x="60" y="58" text-anchor="middle" font-family="Fraunces,Georgia,serif" font-size="38" font-weight="700" fill="#ffffff">61</text>
-            <text x="60" y="76" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="700" fill="#8fa0b3" letter-spacing="1">BOARD HEALTH</text>
-          </svg>
-          <div id="areas" style="display:flex;flex-direction:column;gap:4px;width:100%;font-size:12px"></div>
-        </div>
-      </div>
-    </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Nothing scores on a bare checkbox</span>
-      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Streaks for the boring consistency</span>
-      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Badges that can be lost</span>
-      <span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53;padding:8px 14px;font-size:13px">Owners see the result, not the game</span>
-    </div>
-  </div>
-</section>
 
 <!-- PRICING, interactive -->
 <section id="pricing" style="padding:96px 0;background:#f4f6f9">
@@ -291,8 +474,8 @@ p{margin:0}
     <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:20px">
       <div style="max-width:620px;display:flex;flex-direction:column;gap:14px">
         <span class="line">Pricing</span>
-        <h2 style="font-size:40px;line-height:1.12">Two plans. Everything included in both.</h2>
-        <p class="muted" style="font-size:17px;line-height:1.6">Pick by what your building has. Add-ons attach to either plan after the trial. Postage and card fees at cost.</p>
+        <h2 style="font-size:40px;line-height:1.12">Two plans. Pick by what your building has.</h2>
+        <p class="muted" style="font-size:17px;line-height:1.6">Self-Managed is the whole job for a building with no inspected equipment and nobody on payroll. Plus Facilities is everything in Self-Managed plus the things an inspector or an employee brings with them. Add-ons attach to either plan. Postage and card fees at cost, included in both plans.</p>
       </div>
       <div style="display:inline-flex;border:1px solid #c9d2dc;border-radius:999px;padding:4px;background:#ffffff" role="group" aria-label="Billing interval">
         <button type="button" id="segMonthly" class="seg on" data-interval="monthly">Monthly</button>
@@ -303,16 +486,16 @@ p{margin:0}
     <div class="two" style="gap:20px;align-items:stretch">
       <button type="button" id="planSm" class="plancard on" data-plan="sm">
         <div class="row"><span style="font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600">Self-Managed</span><span class="pill plan-selected" style="background:#0D1B2E;color:#A5F3FC">Selected</span></div>
-        <p class="muted" style="font-size:15px;line-height:1.5">The board runs the building. ONE two keeps it compliant. Walk-ups and small buildings.</p>
+        <p class="muted" style="font-size:15px;line-height:1.5">The board runs the building. <strong>ONE two</strong> keeps it compliant. Walk-ups and small buildings with no elevator, pool or staff.</p>
         <div style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:700;line-height:1">$<span data-price="sm">179</span></span><span class="muted" style="font-size:15px" data-per>a month</span></div>
-        <p class="muted" style="font-size:13px">Everything: runbook, meetings, Fiscal Lens, playbooks, documents, portal, letters, 1099s.</p>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#4b5a6b"><li>Runbook of 45 DC obligations, Board Health score</li><li>Meetings, elections, votes and minutes</li><li>Fiscal Lens: ledger, monthly close, owner statements, online payments</li><li>32 playbooks, work orders, vendors, 1099s</li><li>Asset registry with replacement years and reserve balance</li><li>Owner portal, letters and notices, The Archives</li></ul>
         <a class="btn btn-navy plan-cta" href="/login?create=1&plan=self_managed&interval=monthly" style="min-height:44px;font-size:15px;align-self:flex-start" data-cta="plan-sm">Start free on Self-Managed</a>
       </button>
       <button type="button" id="planFa" class="plancard" data-plan="fa">
         <div class="row"><span style="font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600">Plus Facilities</span><span class="pill plan-selected" style="background:#0D1B2E;color:#A5F3FC">Selected</span><span class="pill plan-hint" style="background:#fff0f1;color:#D62839">If an inspector visits</span></div>
-        <p class="muted" style="font-size:15px;line-height:1.5">Everything in Self-Managed, for buildings with inspected equipment or staff.</p>
+        <p class="muted" style="font-size:15px;line-height:1.5">Everything in Self-Managed, plus what a building with an elevator, a pool, a boiler or staff has to manage.</p>
         <div style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:700;line-height:1">$<span data-price="fa">279</span></span><span class="muted" style="font-size:15px" data-per>a month</span></div>
-        <p class="muted" style="font-size:13px">Adds the inspection calendar, reserve study tools, bids, claims, amenities and a staff role.</p>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#4b5a6b"><li>Inspection and permit calendar: elevator, pool, fire systems, boiler</li><li>Reserve study tools, component schedules, funding scenarios</li><li>Bids workflow and insurance claims workflow</li><li>Amenity reservations and rules</li><li>Staff role for your porter, super or concierge</li></ul>
         <a class="btn btn-navy plan-cta" href="/login?create=1&plan=facilities&interval=monthly" style="min-height:44px;font-size:15px;align-self:flex-start" data-cta="plan-fa">Start free on Plus Facilities</a>
       </button>
     </div>
@@ -325,7 +508,7 @@ p{margin:0}
           <p style="font-size:14px;line-height:1.5;color:#c7d2de">A named advisor who knows your building. Monthly call, replies within a business day, budget and year-end reviewed, a seat at the annual meeting. Up to <span id="onCallHours">2</span> hours a month.</p>
         </div>
         <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px">
-          <div class="row"><h3 style="font-size:20px">Property manager seat</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="pm">79</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b" data-per> a month</span></span></div>
+          <div class="row"><h3 style="font-size:20px">Property Manager Seat</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="pm">79</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b" data-per> a month</span></span></div>
           <p class="muted" style="font-size:14px;line-height:1.5">Keeping a manager for operations? Give them a seat so they work inside your records instead of theirs.</p>
         </div>
         <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px">
@@ -357,7 +540,7 @@ p{margin:0}
     </div>
     <div class="doors">
       <div class="door" style="background:#0D1B2E;color:#ffffff">
-        <h3 style="font-size:26px;line-height:1.15;color:#ffffff">Twenty-one days, your own building, every feature, no card.</h3>
+        <h3 style="font-size:26px;line-height:1.15;color:#ffffff">Your own building, every feature, from day one.</h3>
         <p style="font-size:15px;line-height:1.6;color:#c7d2de">Add your units and bylaws facts, or load a sample building to look around first. Invite the rest of the board from inside; each invite arrives with the role already set. Most buildings finish Setup Season in an afternoon.</p>
       </div>
       <div class="door" style="background:#f4f6f9;border:1px solid #e3e8ee;border-left:0">
@@ -367,7 +550,7 @@ p{margin:0}
     </div>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
       <a class="btn btn-red" href="/login?create=1" style="min-height:54px;padding:0 26px;font-size:17px" data-cta="start">Start your building, free for 21 days</a>
-      <span class="muted" style="font-size:14px">No card. No board vote needed to begin.</span>
+      <span class="muted" style="font-size:14px">No board vote needed to begin.</span>
     </div>
   </div>
 </section>
@@ -376,71 +559,77 @@ p{margin:0}
 <script>
 (function () {
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* ---------- The score block ---------- */
-  var JOBS = [
-    { title: 'Knows what is due', sub: '45 obligations in four seasons, assigned to seats', area: 'Compliance', score: 69, moved: ['Compliance'],
-      scene: { label: 'Filing Season · Jan to Mar', title: 'Three milestones done, one due', effect: 'Compliance moves. 61 to 69.',
-        rows: [ { tag: 'Done', k: 'dark', text: 'Year-end close and 1099s filed', who: 'Treasurer · Jan 31' }, { tag: 'Done', k: 'dark', text: 'Master insurance certificate on file', who: 'President · Feb 15' }, { tag: 'Due', k: 'red', text: 'DLCP biennial report, DC Code 29-102.11', who: 'Secretary · Apr 1' } ] } },
-    { title: 'Runs the meeting', sub: 'Notice in the legal window, quorum, minutes in 7 days', area: 'Governance', score: 74, moved: ['Governance'],
-      scene: { label: 'Annual Meeting Season · Apr to Jun', title: 'From notice to minutes, one process', effect: 'Governance moves. 69 to 74.',
-        rows: [ { tag: 'Sent', k: 'dark', text: 'Notice to 12 owners, 31 days before', who: 'Apr 3' }, { tag: 'Quorum', k: 'dark', text: '8 of 12 units present or by proxy', who: 'May 4' }, { tag: 'Elected', k: 'cyan', text: 'Treasurer: Priya N., 7 votes. Minutes due May 11', who: 'May 4' } ] } },
-    { title: 'Handles the problem', sub: '32 playbooks: the leak, the late owner, the claim', area: 'Governance', score: 78, moved: ['Governance', 'Records'],
-      scene: { label: 'Playbook · Common area repair', title: 'Water intrusion, unit 2B ceiling', effect: 'Governance and Records move. 74 to 78.',
-        rows: [ { tag: 'Step 1', k: 'dark', text: 'Owner notified, access arranged', who: 'Jul 14' }, { tag: 'Step 2', k: 'dark', text: 'Plumber booked via TaskRabbit, $240, no 1099', who: 'Jul 15' }, { tag: 'Step 3', k: 'red', text: 'Decide responsibility with the bylaws clause attached', who: 'President' } ] } },
-    { title: 'Keeps the books', sub: 'Ledger, monthly close, statements owners can read', area: 'Financial', score: 84, moved: ['Financial'],
-      scene: { label: 'Fiscal Lens · October', title: 'Closed Nov 8. Statement published.', effect: 'Financial moves. 78 to 84.',
-        rows: [ { tag: 'In', k: 'dark', text: 'Assessments $9,840, 12 of 12 units', who: 'online' }, { tag: 'Out', k: 'dark', text: '$6,215 across 14 approved invoices', who: 'ledger' }, { tag: 'Reserves', k: 'cyan', text: '$112,400, 71% of target', who: 'checked monthly' } ] } },
-    { title: 'Plans for the future', sub: 'Replacement years, reserve targets, a budget adopted on time', area: 'Financial', score: 89, moved: ['Financial'],
-      scene: { label: 'The Building · Assets and reserves', title: 'The roof is 2031. The reserve knows.', effect: 'Financial moves. 84 to 89. No special assessment in 2031.',
-        rows: [ { tag: 'Roof', k: 'dark', text: 'Replace 2031, est. $48,000, funded 71%', who: 'registry' }, { tag: 'Boiler', k: 'dark', text: 'Replace 2028, est. $22,000, funded 90%', who: 'registry' }, { tag: 'Budget', k: 'cyan', text: 'Reserve contribution raised $150 a month, adopted Dec 2', who: 'Budget Season' } ] } },
-    { title: 'Proves it', sub: 'Seven years of minutes, notices, letters, filings', area: 'Records', score: 93, moved: ['Records'],
-      scene: { label: 'The Archives', title: 'Every obligation, proof attached', effect: 'Records move. 89 to 93. Owners see the same number.',
-        rows: [ { tag: 'Filed', k: 'dark', text: 'DLCP receipt attached to the runbook item', who: 'Apr 1' }, { tag: 'Mailed', k: 'dark', text: 'Budget notice, 3 paper copies, tracking saved', who: 'Nov 2' }, { tag: 'Minutes', k: 'dark', text: 'Approved and published within 7 days', who: 'May 11' } ] } }
-  ];
-  var TAG = { dark: 'background:#13263d;color:#A5F3FC', red: 'background:#fff0f1;color:#D62839', cyan: 'background:#A5F3FC;color:#0D1B2E' };
-  var AREAS = ['Compliance', 'Financial', 'Governance', 'Records'];
-  var job = 0, auto = !reduce, inView = true, timer = null;
-
   function el(id) { return document.getElementById(id); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
+
+  /* ---------- What's inside: six jobs, six screens, one score ---------- */
+  var JOBS = [{"title": "Knows what is due", "sub": "45 obligations in four seasons, assigned to seats", "area": "Compliance", "score": 69, "moved": ["Compliance"], "effect": "Compliance moves. 61 to 69."}, {"title": "Runs the meeting", "sub": "Notice in the legal window, quorum, minutes in 7 days", "area": "Governance", "score": 74, "moved": ["Governance"], "effect": "Governance moves. 69 to 74."}, {"title": "Handles the problem", "sub": "32 playbooks: the leak, the late owner, the claim", "area": "Governance", "score": 78, "moved": ["Governance", "Records"], "effect": "Governance and Records move. 74 to 78."}, {"title": "Keeps the books", "sub": "Ledger, monthly close, statements owners can read", "area": "Financial", "score": 84, "moved": ["Financial"], "effect": "Financial moves. 78 to 84."}, {"title": "Plans for the future", "sub": "Replacement years, reserve targets, a budget adopted on time", "area": "Financial", "score": 89, "moved": ["Financial"], "effect": "Financial moves. 84 to 89. No special assessment in 2031."}, {"title": "Proves it", "sub": "Seven years of minutes, notices, letters, filings", "area": "Records", "score": 93, "moved": ["Records"], "effect": "Records move. 89 to 93. Owners see the same number."}];
+  var SCREENS = [{"kind": "home", "nav": "Home", "tab": "Runbook", "title": "What is due, all year", "sub": "The 45 obligations the DC Condominium Act and DLCP put on every board, each with a date, a seat and a how-to.", "kicker": "Filing Season · Jan to Mar · 38 days left", "greeting": "Good morning, Alyssa. 3 things this week.", "pills": ["Year-End Close", "DLCP Biennial Report", "Insurance Renewal"], "cards": [["Secretary", "Regulatory filings", "DLCP Biennial Report", "DC Code 29-102.11 · $300 fee · about 20 minutes", "Due: 2026-04-01", "soon", "Open filing"], ["President", "Insurance", "Master insurance certificate", "Renewed 2026-02-15 · proof attached", "Done", "normal", "View proof"], ["Treasurer", "Year-end", "1099-NEC forms e-filed", "4 vendors · 2026-01-31", "Done", "normal", "View filing"]], "board": [["Alyssa S.", "President", 16, 2], ["Priya N.", "Treasurer", 7, 1], ["Marcus L.", "Secretary", 8, 3], ["Dana K.", "Vice President", 5, 0]]}, {"kind": "hub", "nav": "Board Room", "tab": "Board Room", "title": "The meeting, from notice to minutes", "sub": "Notice in the legal window, quorum counted, minutes drafted the same night.", "page": "Board Room", "tiles": [["A", "94%", "Compliance", "good"], ["May 4", "Annual Meeting", "Next Meeting", ""], ["2", "1 needs you", "Open Playbooks", "warn"], ["1", "Treasurer seat", "Elections", ""], ["0", "None pending", "Pending Notices", "good"], ["26", "templates", "Letters Sent", ""]], "tabs": ["Before the Meeting", "Meeting Day", "After", "Outbox", "Playbooks", "Roles"], "active": "After", "badge": {"Playbooks": "2"}, "panel": "After the Meeting", "panelSub": "Minutes, seating and follow-ups from the annual meeting.", "cardLabel": "Annual meeting · May 4", "progress": "2 of 4 complete", "rows": [["done", "Quorum recorded: 8 of 12 units present or by proxy", "May 4, 7:02 pm", "Secretary"], ["done", "Treasurer elected: Priya N., 7 votes", "Term to May 2028", "President"], ["next", "Approve and publish the minutes", "Draft generated from the meeting record", "Secretary"], ["open", "Mail the election results to owners", "12 owners, 3 want paper", "Secretary"]]}, {"kind": "hub", "nav": "Board Room", "tab": "Playbooks", "title": "What to do when", "sub": "32 situations with no date attached: the leak, the late owner, the claim, the records request. Steps, letters and the bylaws clause.", "page": "Board Room", "tiles": [["A", "94%", "Compliance", "good"], ["May 4", "Annual Meeting", "Next Meeting", ""], ["2", "1 needs you", "Open Playbooks", "warn"], ["1", "Treasurer seat", "Elections", ""], ["0", "None pending", "Pending Notices", "good"], ["26", "templates", "Letters Sent", ""]], "tabs": ["Before the Meeting", "Meeting Day", "After", "Outbox", "Playbooks", "Roles"], "active": "Playbooks", "badge": {"Playbooks": "2"}, "panel": "Water intrusion, unit 2B", "panelSub": "Playbook · Common area repair · opened Jul 14", "cardLabel": "Steps", "progress": "2 of 5 complete", "rows": [["done", "Owner notified, access arranged", "Jul 14", "Secretary"], ["done", "Plumber booked via TaskRabbit, $240, no 1099", "Jul 15 · invoice attached", "Treasurer"], ["next", "Decide responsibility", "Bylaws 7.2 attached: common element above the ceiling", "President"], ["open", "Letter to the owner of 2B", "From the template, decision and repair date filled in", "Secretary"], ["open", "Close and file", "Playbook record to The Archives", "Secretary"]]}, {"kind": "hub", "nav": "Fiscal Lens", "tab": "Fiscal Lens", "title": "Books that close every month", "sub": "A ledger your accountant will respect and a statement every owner can read.", "page": "Fiscal Lens", "tiles": [["92%", "Healthy", "Financial Health", "good"], ["$31,420", "Current balance", "Operating Cash", ""], ["100%", "$9,840/mo", "Collection Rate", "good"], ["78%", "$98,500", "Budget Used", ""], ["71%", "$112,400", "Reserve Funded", "good"], ["$0", "Outstanding", "Receivables", "good"]], "tabs": ["This month", "Money in", "Money out", "Plan", "Books"], "active": "This month", "badge": {}, "panel": "October 2026 is closed.", "panelSub": "Operating cash $31,420. Statement sent Nov 8.", "cardLabel": "Close checklist", "progress": "4 of 4 complete", "rows": [["done", "1. Assessments posted", "12 of 12 units billed", ""], ["done", "2. Payments recorded", "12 paid, 0 late", ""], ["done", "3. Bills paid", "14 approved invoices, $6,215", ""], ["done", "4. Statement sent", "Nov 8 · portal and 3 paper copies", ""]]}, {"kind": "hub", "nav": "The Building", "tab": "Plan ahead", "title": "The roof is 2031. The reserve knows.", "sub": "Every asset with a replacement year and cost, a reserve target to match, and a budget adopted on time.", "page": "1302 R Street Condominium", "tiles": [["100%", "11/11", "Legal & Bylaws", "good"], ["100%", "6/6", "Insurance", "good"], ["100%", "Board 5", "Governance", "good"], ["0%", "0/12 units", "Delinquency Rate", "good"], ["71%", "$112,400", "Reserves Funded", ""]], "tabs": ["People & Units", "Documents & Insurance", "Vendors & Assets", "Settings"], "active": "Vendors & Assets", "badge": {}, "panel": "Assets and reserves", "panelSub": "Six assets with a replacement year, a cost and a funded share of the reserve target.", "cardLabel": "Asset registry", "progress": "71% funded overall", "rows": [["open", "Roof", "Replace 2031 · est. $48,000 · last inspected Jun 2026", "71% funded"], ["open", "Boiler", "Replace 2028 · est. $22,000 · DCRA certificate to 2027", "90% funded"], ["open", "Elevator", "Modernize 2034 · est. $95,000", "38% funded"], ["done", "Budget adopted Dec 2", "Reserve contribution raised $150 a month", "No special assessment in 2031"]]}, {"kind": "hub", "nav": "The Archives", "tab": "The Archives", "title": "Seven years of proof", "sub": "Minutes, notices, filings and letters, filed as they happen. A records request takes minutes.", "page": "Archives", "tiles": [], "tabs": ["Reports", "Governance Archives"], "active": "Governance Archives", "badge": {"Governance Archives": "312"}, "panel": "Governance Archives", "panelSub": "312 documents, 2019 to 2026, filed as they happened.", "cardLabel": "Recent", "progress": "7 years on file", "rows": [["done", "Annual meeting minutes, May 4", "Approved May 11 · published to owners", "Minutes"], ["done", "DLCP biennial report, receipt", "Filed Apr 1 · linked to the runbook item", "Filing"], ["done", "Budget notice, 3 paper copies", "Mailed Nov 2 · USPS tracking saved", "Notice"], ["done", "Records request, unit 4A", "Answered in 3 days · DC Code 42-1903.14", "Request"]]}];
+  var TAG = {"dark": "background:#13263d;color:#A5F3FC", "red": "background:#fff0f1;color:#D62839", "cyan": "background:#A5F3FC;color:#0D1B2E"};
+  var AREAS = ['Compliance', 'Financial', 'Governance', 'Records'];
+  var job = 0, auto = !reduce, inView = true;
+  function screenHtml(j, t) {
+    var CHECK = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    var html = '';
+    if (t.kind === 'home') {
+      html += '<div class="season"><div><div class="k">' + esc(t.kicker) + '</div><h5>' + esc(t.greeting) + '</h5><div>' + t.pills.map(function (x) { return '<span class="mpill">' + esc(x) + '</span>'; }).join('') + '</div></div>' +
+        '<div style="position:relative;width:64px;height:64px;flex:none"><svg width="64" height="64" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#243b53" stroke-width="9"></circle><circle cx="60" cy="60" r="50" fill="none" stroke="#D62839" stroke-width="9" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="' + Math.round(314 * (1 - j.score / 100)) + '" style="transform:rotate(-90deg);transform-origin:60px 60px"></circle></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffffff"><span style="font-size:17px;font-weight:700;line-height:1">' + j.score + '</span><span style="font-size:7px;color:#8fa0b3">Health</span></div></div></div>';
+      html += '<div class="homegrid"><div class="panelw"><h6>Your week</h6>' + t.cards.map(function (c) {
+        return '<div class="qcard"><div class="top"><span class="rolechip">' + esc(c[0]) + '</span><span>' + esc(c[1]) + '</span></div><div class="ttl">' + esc(c[2]) + '</div><div class="why">' + esc(c[3]) + '</div><div class="bot"><span class="due ' + c[5] + '">' + esc(c[4]) + '</span><span class="act">' + esc(c[6]) + '</span></div></div>';
+      }).join('') + '</div><div class="panelw"><h6>Board this season</h6>' + t.board.map(function (b) {
+        var pct = Math.round(100 * b[2] / ((b[2] + b[3]) || 1));
+        return '<div class="brow"><div class="n">' + esc(b[0]) + '<small>' + esc(b[1]) + '</small></div><div class="bar"><i style="width:' + pct + '%"></i></div><div class="m">' + b[2] + ' done / <b>' + b[3] + ' open</b></div></div>';
+      }).join('') + '</div></div>';
+    } else {
+      html += '<div class="hub"><h5>' + esc(t.page) + '</h5>' + (t.tiles.length ? '<div class="tiles' + (t.tiles.length === 5 ? ' five' : '') + '">' + t.tiles.map(function (x) { return '<div class="tile"><span class="v ' + x[3] + '">' + esc(x[0]) + '</span><span class="m">' + esc(x[1]) + '</span><span class="l">' + esc(x[2]) + '</span></div>'; }).join('') + '</div>' : '') + '</div>';
+      html += '<div class="hubwrap"><div class="pagetabs">' + t.tabs.map(function (x) { return '<span class="' + (x === t.active ? 'on' : '') + '">' + esc(x) + (t.badge[x] ? '<i>' + esc(t.badge[x]) + '</i>' : '') + '</span>'; }).join('') + '</div>' +
+        '<div class="hubbody"><h6>' + esc(t.panel) + '</h6><div class="ps">' + esc(t.panelSub) + '</div><div class="ccard"><div class="cl"><span>' + esc(t.cardLabel) + '</span><small>' + esc(t.progress) + '</small></div>' +
+        t.rows.map(function (r) { var textRight = /funded|assessment/.test(r[3]); return '<div class="crow"><span class="st ' + r[0] + '">' + (r[0] === 'done' ? CHECK : '') + '</span><span class="tx"><b>' + esc(r[1]) + '</b><span>' + esc(r[2]) + '</span></span>' + (r[3] ? '<span class="rt' + (textRight ? ' text' : '') + '">' + esc(r[3]) + '</span>' : '') + '</div>'; }).join('') +
+        '</div></div></div>';
+    }
+    return html;
+  }
   function renderJobs() {
     el('jobs').innerHTML = JOBS.map(function (j, i) {
       return '<button type="button" class="job' + (i === job ? ' on' : '') + '" data-job="' + i + '" aria-pressed="' + (i === job) + '">' +
         '<span style="font-family:\'Fraunces\',Georgia,serif;font-size:22px;font-weight:700;color:#D62839;width:28px;flex:none">' + (i + 1) + '</span>' +
-        '<span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0"><span style="font-weight:600;font-size:16px">' + esc(j.title) + '</span><span style="font-size:13px;color:#c7d2de">' + esc(j.sub) + '</span></span>' +
-        '<span class="pill" style="background:#13263d;color:#A5F3FC;border:1px solid #243b53">' + esc(j.area) + '</span></button>';
+        '<span style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0"><span style="font-weight:600;font-size:16px">' + esc(j.title) + '</span><span class="sub" style="font-size:13px;color:#4b5a6b">' + esc(j.sub) + '</span></span>' +
+        '<span class="pill" style="background:#f4f6f9;color:#155E75;border:1px solid #e3e8ee">' + esc(j.area) + '</span></button>';
     }).join('');
     el('autoLabel').textContent = auto ? 'Playing, 4 seconds a job, six jobs' : 'Paused';
     el('autoBtn').textContent = auto ? 'Pause' : 'Play';
   }
   function renderScene() {
-    var j = JOBS[job], s = j.scene;
-    el('sceneLabel').textContent = s.label;
-    el('sceneTitle').textContent = s.title;
-    el('sceneRows').innerHTML = s.rows.map(function (r) {
-      return '<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;background:#0D1B2E;font-size:14px">' +
-        '<span class="pill" style="' + TAG[r.k] + '">' + esc(r.tag) + '</span><span style="flex:1;min-width:0">' + esc(r.text) + '</span>' +
-        '<span style="font-size:12px;color:#8fa0b3;white-space:nowrap">' + esc(r.who) + '</span></div>';
-    }).join('');
-    el('sceneEffect').textContent = s.effect;
+    var j = JOBS[job], t = SCREENS[job];
+    Array.prototype.forEach.call(document.querySelectorAll('.appnavlinks [data-nav]'), function (n) { n.className = n.getAttribute('data-nav') === t.nav ? 'on' : ''; });
+        el('shotBody').innerHTML = screenHtml(j, t);
+    el('shotTitle').textContent = t.title; el('shotSub').textContent = t.sub;
+    el('sceneEffect').textContent = j.effect;
     el('scoreNum').textContent = j.score;
     el('scoreDial').setAttribute('stroke-dashoffset', Math.round(339 * (1 - j.score / 100)));
     el('areas').innerHTML = AREAS.map(function (name) {
       var hot = j.moved.indexOf(name) >= 0;
-      var bg = hot ? '#A5F3FC' : 'transparent', fg = hot ? '#0D1B2E' : '#c7d2de';
-      return '<div class="row" style="padding:4px 8px;border-radius:6px;background:' + bg + '"><span style="color:' + fg + '">' + name + '</span><span style="color:' + fg + ';font-weight:700">' + (hot ? 'moving' : 'on track') + '</span></div>';
+      return '<span class="pill" style="background:' + (hot ? '#A5F3FC' : '#ffffff') + ';color:' + (hot ? '#0D1B2E' : '#4b5a6b') + ';border:1px solid #e3e8ee">' + name + ' · ' + (hot ? 'moving' : 'on track') + '</span>';
     }).join('');
+    var body = document.querySelector('.appbody'); body.style.animation = 'none'; void body.offsetWidth; body.style.animation = '';
   }
   function setJob(i, fromUser) { job = i; if (fromUser) auto = false; renderJobs(); renderScene(); }
   el('jobs').addEventListener('click', function (e) { var b = e.target.closest('[data-job]'); if (b) setJob(+b.getAttribute('data-job'), true); });
   el('autoBtn').addEventListener('click', function () { auto = !auto; renderJobs(); });
-  timer = setInterval(function () { if (auto && inView) setJob((job + 1) % JOBS.length, false); }, 4000);
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver(function (en) { inView = en[0].isIntersecting; }, { threshold: 0.2 }).observe(el('score'));
-  }
+  setInterval(function () { if (auto && inView) setJob((job + 1) % JOBS.length, false); }, 4000);
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (en) { inView = en[0].isIntersecting; }, { threshold: 0.2 }).observe(el('inside'));
   renderJobs(); renderScene();
+  var NAVS = ["Home", "The Building", "Fiscal Lens", "Board Room", "The Archives"];
+  el('mstack').innerHTML = JOBS.map(function (j, i) {
+    var t = SCREENS[i];
+    return '<div class="mcard" style="z-index:' + (i + 1) + '"><div class="mh"><span class="n">' + (i + 1) + '</span><span style="min-width:0"><span class="jt">' + esc(j.title) + '</span><span class="js">' + esc(j.sub) + '</span></span></div>' +
+      '<div class="browser"><div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">app.getonetwo.com/1302rstreet</span></div>' + '<div class="appnav"><img src="/onetwo-logo-mark.jpg" alt="" style="width:26px;height:26px;border-radius:5px;object-fit:cover"><span class="appnavlinks">' + NAVS.map(function (n) { return '<span class="' + (n === t.nav ? 'on' : '') + '">' + n + '</span>'; }).join('') + '</span><span class="appwho"><span class="role">President</span><span class="av">AS</span></span></div>' + '<div class="appbody">' + screenHtml(j, t) + '</div></div>' +
+      '<div class="mf"><span>' + esc(j.effect) + '</span><span class="sc">' + j.score + '</span></div></div>';
+  }).join('');
+
+  el('menuBtn').addEventListener('click', function () { var m = el('mobileMenu'); var open = !m.classList.contains('open'); m.classList.toggle('open', open); this.setAttribute('aria-expanded', open); });
+  el('mobileMenu').addEventListener('click', function (e) { if (e.target.tagName === 'A') { el('mobileMenu').classList.remove('open'); } });
 
   /* ---------- Pricing ---------- */
   var PRICE = { sm: [179, 1790], fa: [279, 2790], oncallSm: [249, 2490], oncallFa: [499, 4990], pm: [79, 790], setupSm: 299, setupFa: 599 };
