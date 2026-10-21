@@ -98,7 +98,7 @@ supabase secrets set \
   STRIPE_SECRET_KEY=sk_test_YOUR_KEY \
   STRIPE_WEBHOOK_SECRET=whsec_YOUR_SECRET \
   SITE_URL=https://app.getonetwo.com \
-  GOVOPS_SUPABASE_URL=https://kodfghtwmvadpeyimuvk.supabase.co \
+  GOVOPS_SUPABASE_URL=https://YOUR_GOVOPS_PROJECT_REF.supabase.co \
   GOVOPS_SUPABASE_SERVICE_ROLE_KEY=YOUR_GOVOPS_SERVICE_KEY
 
 # Deploy Edge Functions

@@ -18,7 +18,7 @@ You are implementing the redesigned Step 2 "Review Reserve Study" screen for the
 - Components: `src/components/`
 - Types: `src/types/`
 - Supabase server client: `createServerSupabase()` from `@/lib/supabase/server` (async)
-- Supabase project: HOA (`eaalfhrrytnmtzqjruxg`)
+- Supabase project: HOA
 
 ## Implementation order — follow exactly
 

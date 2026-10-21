@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Service role client for the TENANT Supabase project (eaalfhrrytnmtzqjruxg).
+// Service role client for the TENANT Supabase project.
 // Bypasses RLS. Server-only! Lazy-initialized.
 let _tenantAdmin: SupabaseClient | null = null
 
