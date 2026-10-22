@@ -571,16 +571,24 @@ export default function AuthPage() {
         if (fromDemo && supabase) {
           supabase.rpc('link_demo_lead', { p_email: s.email.trim().toLowerCase() }).then(() => {}, () => {});
         }
-        // Redirect directly to the tenant subdomain with auth tokens
-        if (data.subdomain) {
-          window.location.href = `https://${data.subdomain}.getonetwo.com/login?sb_access=${session.access_token}&sb_refresh=${session.refresh_token}`;
-        } else {
-          // Fallback: go through the provisioned polling flow
-          sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-            access_token: session.access_token, refresh_token: session.refresh_token,
-          }));
-          window.location.href = '/login?provisioned=1';
-        }
+        // Log in directly — session is already active, tenant_users row exists
+        const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+        const memberRole = roleMap[role || 'board_member'] || ('BOARD_MEMBER' as Role);
+        const m = {
+          id: session.user.id,
+          name: fullName || session.user.email?.split('@')[0] || 'User',
+          email: s.email,
+          phone: '',
+          role: memberRole,
+          unit: '',
+          status: 'active' as const,
+          joined: new Date().toISOString().split('T')[0],
+          boardTitle: roleKey ? BOARD_ROLE_LABELS[roleKey] : 'President',
+        };
+        addMember(m);
+        login(m);
+        // LoginRoute will detect isAuthenticated and redirect to /dashboard
+        setCheckoutLoading(false);
         return;
       }
 
