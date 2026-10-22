@@ -487,22 +487,28 @@ export default function AuthPage() {
     try {
       const fullName = `${s.firstName.trim()} ${s.lastName.trim()}`.trim();
 
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: signUpData, error: authError } = await supabase.auth.signUp({
         email: s.email, password: s.password, options: { data: { full_name: fullName } },
       });
 
+      let session = signUpData?.session ?? null;
+
       if (authError) {
         if (authError.message.includes('already registered')) {
-          const { error: signInError } = await supabase.auth.signInWithPassword({ email: s.email, password: s.password });
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: s.email, password: s.password });
           if (signInError) {
             console.error('An account with this email already exists. Please sign in.');
             setCheckoutLoading(false);
             return;
           }
+          session = signInData.session;
         } else { console.error(authError.message); setCheckoutLoading(false); return; }
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Fallback: read from local cache in case signUp set it asynchronously
+        session = (await supabase.auth.getSession()).data.session;
+      }
       if (!session) { console.error('Authentication failed.'); setCheckoutLoading(false); return; }
 
       const { data: existingTenant } = await supabase
@@ -565,10 +571,24 @@ export default function AuthPage() {
         if (fromDemo && supabase) {
           supabase.rpc('link_demo_lead', { p_email: s.email.trim().toLowerCase() }).then(() => {}, () => {});
         }
-        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token, refresh_token: session.refresh_token,
-        }));
-        window.location.href = '/login?provisioned=1';
+        // Log in directly — session is already active, tenant_users row exists
+        const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+        const memberRole = roleMap[role || 'board_member'] || ('BOARD_MEMBER' as Role);
+        const m = {
+          id: session.user.id,
+          name: fullName || session.user.email?.split('@')[0] || 'User',
+          email: s.email,
+          phone: '',
+          role: memberRole,
+          unit: '',
+          status: 'active' as const,
+          joined: new Date().toISOString().split('T')[0],
+          boardTitle: roleKey ? BOARD_ROLE_LABELS[roleKey] : 'President',
+        };
+        addMember(m);
+        login(m);
+        // LoginRoute will detect isAuthenticated and redirect to /dashboard
+        setCheckoutLoading(false);
         return;
       }
 
