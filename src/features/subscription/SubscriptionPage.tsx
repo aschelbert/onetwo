@@ -421,6 +421,7 @@ export default function SubscriptionPage() {
             onCall: onCallChecked,
             pmSeat: pmSeatChecked,
             setup: setupChecked,
+            origin: window.location.origin,
           }),
         },
       );

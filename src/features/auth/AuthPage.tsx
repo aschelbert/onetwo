@@ -557,6 +557,7 @@ export default function AuthPage() {
             onCall: s.planPicker.onCall,
             pmSeat: s.planPicker.pmSeat,
             setup: s.planPicker.setup,
+            origin: window.location.origin,
             building: {
               name: s.buildingName,
               address: { street: s.addressResult?.fullAddress || s.addressQuery, city: '', state: 'DC', zip: '' },

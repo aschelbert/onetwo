@@ -17,14 +17,16 @@ const cors = {
 };
 
 // ── Chargebee item-price IDs ──
+// Production site uses "Compliance-Pro" for self-managed; test site uses "Self-Managed"
+const SM_PREFIX = CHARGEBEE_SITE.includes("test") ? "Self-Managed" : "Compliance-Pro";
 
 type PlanId = "self_managed" | "facilities";
 type Interval = "monthly" | "annual";
 
 function planPriceId(plan: PlanId, interval: Interval): string {
   const map: Record<string, string> = {
-    self_managed_monthly: "Compliance-Pro-USD-Monthly",
-    self_managed_annual: "Compliance-Pro-USD-Yearly",
+    self_managed_monthly: `${SM_PREFIX}-USD-Monthly`,
+    self_managed_annual: `${SM_PREFIX}-USD-Yearly`,
     facilities_monthly: "Plus-Facilities-USD-Monthly",
     facilities_annual: "Plus-Facilities-USD-Yearly",
   };
@@ -202,10 +204,8 @@ Deno.serve(async (req) => {
 
       // Setup charge
       if (setup) {
-        let chargeIdx = 0;
-        p.append(`charges[item_price_id][${chargeIdx}]`, setupPriceId(plan));
-        chargeIdx++;
-        void chargeIdx; // suppress unused warning
+        p.append("charges[item_price_id][0]", setupPriceId(plan));
+        p.append("charges[quantity][0]", "1");
       }
 
       // Customer
@@ -324,12 +324,8 @@ Deno.serve(async (req) => {
       }
 
       // Setup charge
-      {
-        let chargeIdx = 0;
-        p.append(`charges[item_price_id][${chargeIdx}]`, setupPriceId(plan));
-        chargeIdx++;
-        void chargeIdx;
-      }
+      p.append("charges[item_price_id][0]", setupPriceId(plan));
+      p.append("charges[quantity][0]", "1");
 
       // Customer
       p.append("customer[id]", `cb_${user.id}`);

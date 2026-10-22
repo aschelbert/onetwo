@@ -88,7 +88,8 @@ function parseSubscriptionItems(
     const priceId: string = item.item_price_id || "";
 
     // Plan detection (Chargebee PC 2.0 item price IDs)
-    if (priceId.startsWith("Compliance-Pro")) {
+    // Production uses "Compliance-Pro", test site uses "Self-Managed"
+    if (priceId.startsWith("Compliance-Pro") || priceId.startsWith("Self-Managed")) {
       plan = "self_managed";
       interval = priceId.includes("Yearly") ? "annual" : "monthly";
     } else if (priceId.startsWith("Plus-Facilities")) {
