@@ -23,30 +23,24 @@ type Interval = "monthly" | "annual";
 
 function planPriceId(plan: PlanId, interval: Interval): string {
   const map: Record<string, string> = {
-    self_managed_monthly: "Self-Managed-USD-Monthly",
-    self_managed_annual: "Self-Managed-USD-Annual",
-    facilities_monthly: "Facilities-USD-Monthly",
-    facilities_annual: "Facilities-USD-Annual",
+    self_managed_monthly: "Compliance-Pro-USD-Monthly",
+    self_managed_annual: "Compliance-Pro-USD-Yearly",
+    facilities_monthly: "Plus-Facilities-USD-Monthly",
+    facilities_annual: "Plus-Facilities-USD-Yearly",
   };
   return map[`${plan}_${interval}`];
 }
 
-function onCallPriceId(plan: PlanId, interval: Interval): string {
-  const map: Record<string, string> = {
-    self_managed_monthly: "OnCall-SM-USD-Monthly",
-    self_managed_annual: "OnCall-SM-USD-Annual",
-    facilities_monthly: "OnCall-Fac-USD-Monthly",
-    facilities_annual: "OnCall-Fac-USD-Annual",
-  };
-  return map[`${plan}_${interval}`];
+function onCallPriceId(_plan: PlanId, interval: Interval): string {
+  return interval === "annual" ? "On-Call-USD-Yearly" : "On-Call-USD-Monthly";
 }
 
 function pmSeatPriceId(interval: Interval): string {
-  return interval === "annual" ? "PM-Seat-USD-Annual" : "PM-Seat-USD-Monthly";
+  return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
-function setupPriceId(plan: PlanId): string {
-  return plan === "facilities" ? "Setup-Fac-USD" : "Setup-SM-USD";
+function setupPriceId(_plan: PlanId): string {
+  return "Setup-USD";
 }
 
 // ── Supabase helpers ──
