@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
 
-        const subResult = await chargebeeRequest('subscriptions/create_with_items', sp);
+        const subResult = await chargebeeRequest('subscriptions/create_for_items', sp);
         const cbSub = subResult.subscription;
 
         // Provision tenant directly
