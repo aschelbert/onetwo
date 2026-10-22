@@ -487,22 +487,28 @@ export default function AuthPage() {
     try {
       const fullName = `${s.firstName.trim()} ${s.lastName.trim()}`.trim();
 
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: signUpData, error: authError } = await supabase.auth.signUp({
         email: s.email, password: s.password, options: { data: { full_name: fullName } },
       });
 
+      let session = signUpData?.session ?? null;
+
       if (authError) {
         if (authError.message.includes('already registered')) {
-          const { error: signInError } = await supabase.auth.signInWithPassword({ email: s.email, password: s.password });
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: s.email, password: s.password });
           if (signInError) {
             console.error('An account with this email already exists. Please sign in.');
             setCheckoutLoading(false);
             return;
           }
+          session = signInData.session;
         } else { console.error(authError.message); setCheckoutLoading(false); return; }
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Fallback: read from local cache in case signUp set it asynchronously
+        session = (await supabase.auth.getSession()).data.session;
+      }
       if (!session) { console.error('Authentication failed.'); setCheckoutLoading(false); return; }
 
       const { data: existingTenant } = await supabase
