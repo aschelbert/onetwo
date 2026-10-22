@@ -270,16 +270,14 @@ Deno.serve(async (req) => {
           sIdx++;
         }
 
-        // Link subscription to the customer created above
-        sp.append('customer_id', customerId);
-
         // Set trial period — no card is collected in this path
         const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
         const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
 
-        const subResult = await chargebeeRequest('subscriptions/create_for_items', sp);
+        // PC 2.0: subscription created under the customer resource
+        const subResult = await chargebeeRequest(`customers/${customerId}/subscription_for_items`, sp);
         const cbSub = subResult.subscription;
 
         // Provision tenant directly
