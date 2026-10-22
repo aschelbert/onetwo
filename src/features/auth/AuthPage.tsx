@@ -571,10 +571,16 @@ export default function AuthPage() {
         if (fromDemo && supabase) {
           supabase.rpc('link_demo_lead', { p_email: s.email.trim().toLowerCase() }).then(() => {}, () => {});
         }
-        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token, refresh_token: session.refresh_token,
-        }));
-        window.location.href = '/login?provisioned=1';
+        // Redirect directly to the tenant subdomain with auth tokens
+        if (data.subdomain) {
+          window.location.href = `https://${data.subdomain}.getonetwo.com/login?sb_access=${session.access_token}&sb_refresh=${session.refresh_token}`;
+        } else {
+          // Fallback: go through the provisioned polling flow
+          sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+            access_token: session.access_token, refresh_token: session.refresh_token,
+          }));
+          window.location.href = '/login?provisioned=1';
+        }
         return;
       }
 
