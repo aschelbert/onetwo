@@ -183,7 +183,21 @@ export default function AuthPage() {
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
                   sessionStorage.removeItem('onetwo_checkout_tokens');
-                  await loginWithTenantUser(user, tu);
+                  // Log in directly instead of cross-domain subdomain redirect
+                  const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+                  const m = {
+                    id: user.id,
+                    name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                    email: user.email || '',
+                    phone: '',
+                    role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+                    unit: tu.unit || '',
+                    status: 'active' as const,
+                    joined: new Date().toISOString().split('T')[0],
+                    boardTitle: tu.board_title || null,
+                  };
+                  addMember(m);
+                  login(m);
                   clearTimeout(timeout);
                   setSessionChecking(false);
                   setLoginLoading(false);
