@@ -332,8 +332,9 @@ Deno.serve(async (req) => {
       p.append("customer[email]", user.email || "");
       p.append("customer[first_name]", building.contactName || user.user_metadata?.full_name || "");
 
-      // Pack building info into a custom field for the webhook to parse
-      const pendingPayload = JSON.stringify({
+      // Store pending building data in Supabase for the webhook to read
+      const customerId = `cb_${user.id}`;
+      const pendingData = {
         name: building.name,
         subdomain: building.subdomain || "",
         address: building.address || {},
@@ -349,14 +350,27 @@ Deno.serve(async (req) => {
         marAddressId: building.marAddressId || "",
         ssl: building.ssl || "",
         ward: building.ward || "",
-        // HO-18 extended fields
         role: building.role || "board_member",
         roleKey: building.roleKey || "",
         firstName: building.firstName || "",
         lastName: building.lastName || "",
         addressFlag: building.addressFlag || "",
+      };
+      await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
+        method: "POST",
+        headers: {
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          chargebee_customer_id: customerId,
+          user_id: user.id,
+          payload: pendingData,
+        }),
       });
-      p.append("subscription[cf_tenant_pending]", pendingPayload);
+      p.append("subscription[cf_tenant_id]", "pending");
 
       // Redirect -- include hosted page id so frontend can correlate
       p.append("redirect_url", `${returnBase}/login?provisioned=1&hp={hosted_page.id}`);
