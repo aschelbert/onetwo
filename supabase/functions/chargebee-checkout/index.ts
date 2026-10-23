@@ -41,8 +41,8 @@ function pmSeatPriceId(interval: Interval): string {
   return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
-function setupPriceId(plan: PlanId): string {
-  return plan === "facilities" ? "Setup-Fac-USD" : "Setup-SM-USD";
+function setupPriceId(_plan: PlanId): string {
+  return "Setup-USD";
 }
 
 // ── Supabase helpers ──
