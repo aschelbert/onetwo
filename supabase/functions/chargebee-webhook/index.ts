@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
     const subscription = content.subscription || {};
     const customer = content.customer || {};
     const subscriptionItems = subscription.subscription_items || [];
-    const cfTenantId: string | undefined = subscription.cf_tenant_id;
+    const cfTenantId: string | undefined = subscription.cf_tenent_id;
     const cfTenantPending: string | undefined = subscription.cf_tenant_pending;
 
     switch (eventType) {

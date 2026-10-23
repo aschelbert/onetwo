@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       p.append("customer[email]", user.email || "");
 
       // Custom field: link to tenant
-      p.append("subscription[cf_tenant_id]", tenantId);
+      p.append("subscription[cf_tenent_id]", tenantId);
 
       // Redirect
       p.append("redirect_url", `${returnBase}/subscription?billing=1`);
@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
           payload: pendingData,
         }),
       });
-      p.append("subscription[cf_tenant_id]", "pending");
+      p.append("subscription[cf_tenent_id]", "pending");
 
       // Trial period — so Chargebee shows "X day free trial" on the hosted page
       p.append('subscription[trial_period]', String(trialDays));
