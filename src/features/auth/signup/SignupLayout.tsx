@@ -145,7 +145,10 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
               <span>
                 {planName ? `${planName}, $${recurring.toLocaleString('en-US')}${per}` : 'Plan: not chosen yet'}
               </span>
-              <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
+              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
+                <span style={{ fontSize: 10, color: '#8fa0b3' }}>before taxes</span>
+              </span>
             </div>
 
             {children}
