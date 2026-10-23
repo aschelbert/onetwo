@@ -278,6 +278,9 @@ Deno.serve(async (req) => {
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
 
+        // Custom field required by Chargebee — set to "pending", updated after provisioning
+        sp.append('subscription[cf_tenent_id]', 'pending');
+
         // PC 2.0: subscription created under the customer resource
         const subResult = await chargebeeRequest(`customers/${customerId}/subscription_for_items`, sp);
         const cbSub = subResult.subscription;
