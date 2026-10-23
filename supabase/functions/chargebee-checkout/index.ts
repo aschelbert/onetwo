@@ -204,9 +204,8 @@ Deno.serve(async (req) => {
 
       // Setup charge
       if (setup) {
-        p.append(`subscription_items[item_price_id][${itemIdx}]`, setupPriceId(plan));
-        p.append(`subscription_items[quantity][${itemIdx}]`, "1");
-        itemIdx++;
+        p.append("charges[item_price_id][0]", setupPriceId(plan));
+        p.append("charges[quantity][0]", "1");
       }
 
       // Customer
@@ -329,10 +328,9 @@ Deno.serve(async (req) => {
         itemIdx++;
       }
 
-      // Setup charge (passed as charge-type item so it appears on checkout page)
-      p.append(`subscription_items[item_price_id][${itemIdx}]`, setupPriceId(plan));
-      p.append(`subscription_items[quantity][${itemIdx}]`, "1");
-      itemIdx++;
+      // Setup charge (one-time, invoiced immediately even during trial)
+      p.append("charges[item_price_id][0]", setupPriceId(plan));
+      p.append("charges[quantity][0]", "1");
 
       // Customer
       p.append("customer[id]", `cb_${user.id}`);
