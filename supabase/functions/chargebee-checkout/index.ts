@@ -378,9 +378,8 @@ Deno.serve(async (req) => {
       });
       p.append("subscription[cf_tenent_id]", "pending");
 
-      // Trial period — so Chargebee shows "X day free trial" on the hosted page
-      p.append('subscription[trial_period]', String(trialDays));
-      p.append('subscription[trial_period_unit]', 'day');
+      // No trial on the setup path — the setup fee is due today, and the
+      // subscription starts immediately.  Trial is only for the no-setup path.
 
       // Billing address for tax calculation
       if (building.address) {
