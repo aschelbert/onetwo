@@ -8,9 +8,8 @@ import { isStrongPassword } from '@/lib/validation';
 import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
 import { useSignupState } from './signup/useSignupState';
 import SignupLayout from './signup/SignupLayout';
-import SignupBuildingStep from './signup/SignupBuildingStep';
 import SignupPlanStep from './signup/SignupPlanStep';
-import SignupAccountStep from './signup/SignupAccountStep';
+import SignupDetailsStep from './signup/SignupDetailsStep';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -38,7 +37,7 @@ export default function AuthPage() {
   const [inviteData, setInviteData] = useState<any>(null);
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
 
-  // ── Signup wizard state (3-step) ──
+  // ── Signup wizard state (2-step) ──
   const signup = useSignupState();
 
   // ── UI state ──
@@ -667,17 +666,8 @@ export default function AuthPage() {
             />
           )}
 
-          {signup.state.step === 'building' && (
-            <SignupBuildingStep
-              state={signup.state}
-              set={signup.set}
-              canAdvance={signup.canAdvanceFromBuilding}
-              onNext={signup.goNext}
-            />
-          )}
-
-          {signup.state.step === 'account' && (
-            <SignupAccountStep
+          {signup.state.step === 'details' && (
+            <SignupDetailsStep
               state={signup.state}
               set={signup.set}
               setPlanPicker={signup.setPlanPicker}

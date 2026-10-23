@@ -242,11 +242,14 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "building.name is required" }, 400);
       }
 
+      // Shared: create supabaseAdmin and fetch trial days for both setup and no-setup paths
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
+      const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
+      const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
+
       if (!setup) {
         // No setup = no card needed. Create customer + subscription via API, provision directly.
-        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-        const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
-
         const cp = new URLSearchParams();
         cp.append('id', `cb_${user.id}`);
         cp.append('email', user.email || '');
@@ -272,8 +275,6 @@ Deno.serve(async (req) => {
         }
 
         // Set trial period — no card is collected in this path
-        const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
-        const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
 
@@ -373,6 +374,19 @@ Deno.serve(async (req) => {
         }),
       });
       p.append("subscription[cf_tenant_id]", "pending");
+
+      // Trial period — so Chargebee shows "X day free trial" on the hosted page
+      p.append('subscription[trial_period]', String(trialDays));
+      p.append('subscription[trial_period_unit]', 'day');
+
+      // Billing address for tax calculation
+      if (building.address) {
+        p.append("billing_address[line1]", building.address.street || "");
+        p.append("billing_address[city]", building.address.city || "");
+        p.append("billing_address[state_code]", building.address.state || "DC");
+        p.append("billing_address[zip]", building.address.zip || "");
+        p.append("billing_address[country]", "US");
+      }
 
       // Redirect -- include hosted page id so frontend can correlate
       p.append("redirect_url", `${returnBase}/login?provisioned=1&hp={hosted_page.id}`);
