@@ -42,7 +42,7 @@ function pmSeatPriceId(interval: Interval): string {
 }
 
 function setupPriceId(_plan: PlanId): string {
-  return "Setup-USD";
+  return "Setup-Fee-USD";
 }
 
 // ── Supabase helpers ──
@@ -202,10 +202,11 @@ Deno.serve(async (req) => {
         itemIdx++;
       }
 
-      // Setup charge
+      // Setup fee (addon with billing_cycles=1, charges once)
       if (setup) {
-        p.append("charges[item_price_id][0]", setupPriceId(plan));
-        p.append("charges[quantity][0]", "1");
+        p.append(`subscription_items[item_price_id][${itemIdx}]`, setupPriceId(plan));
+        p.append(`subscription_items[quantity][${itemIdx}]`, "1");
+        itemIdx++;
       }
 
       // Customer
@@ -328,9 +329,10 @@ Deno.serve(async (req) => {
         itemIdx++;
       }
 
-      // Setup charge (one-time, invoiced immediately even during trial)
-      p.append("charges[item_price_id][0]", setupPriceId(plan));
-      p.append("charges[quantity][0]", "1");
+      // Setup fee (addon with billing_cycles=1, charges once)
+      p.append(`subscription_items[item_price_id][${itemIdx}]`, setupPriceId(plan));
+      p.append(`subscription_items[quantity][${itemIdx}]`, "1");
+      itemIdx++;
 
       // Customer
       p.append("customer[id]", `cb_${user.id}`);
@@ -378,8 +380,10 @@ Deno.serve(async (req) => {
       });
       p.append("subscription[cf_tenent_id]", "pending");
 
-      // No trial on the setup path — the setup fee is due today, and the
-      // subscription starts immediately.  Trial is only for the no-setup path.
+      // Trial period — setup fee is charged immediately (billing_cycles=1 addon),
+      // while the recurring subscription starts after the trial ends.
+      p.append('subscription[trial_period]', String(trialDays));
+      p.append('subscription[trial_period_unit]', 'day');
 
       // Billing address for tax calculation
       if (building.address) {
