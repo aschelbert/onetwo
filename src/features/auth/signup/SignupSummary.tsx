@@ -93,8 +93,7 @@ export default function SignupSummary({ state, trialDays }: Props) {
         {/* After trial */}
         <p style={{ fontSize: 13, lineHeight: 1.5, color: '#c7d2de', margin: 0 }}>
           After {trialDays} days:{' '}
-          {plan ? `${money(recurring)}${perLong}` : 'the plan you choose'}.
-          {' '}Add a card any time from Settings. We remind you on day 14.
+          {plan ? `${money(recurring)}${perLong}, before tax` : 'the plan you choose'}.
         </p>
       </div>
 
