@@ -4,6 +4,7 @@ import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { BOARD_ROLE_LABELS } from '@/types/auth';
 import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+import { isStrongPassword } from '@/lib/validation';
 import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
 import { useSignupState } from './signup/useSignupState';
 import SignupLayout from './signup/SignupLayout';
@@ -72,9 +73,16 @@ export default function AuthPage() {
       }
     }
 
-    // ?create=1 → show signup wizard
+    // /signup → go directly to wizard (plan step)
+    if (window.location.pathname === '/signup') {
+      setAuthStep('building');
+      setSessionChecking(false);
+      return;
+    }
+
+    // ?create=1 → go directly to wizard (plan step)
     if (params.get('create') === '1') {
-      setAuthStep('signup');
+      setAuthStep('building');
       if (params.get('from') === 'demo' && !wasAlreadyShown()) {
         setShowLeadModal(true);
       }
@@ -485,7 +493,7 @@ export default function AuthPage() {
   // ── 3-step wizard: Start (creates auth user + calls chargebee-checkout) ──
   const handleStart = async () => {
     const s = signup.state;
-    if (!s.email || !s.password || s.password.length < 8) return;
+    if (!s.email || !s.password || !isStrongPassword(s.password)) return;
 
     if (!isBackendEnabled || !supabase) {
       // Demo fallback
@@ -649,16 +657,6 @@ export default function AuthPage() {
     return (
       <>
         <SignupLayout state={signup.state} trialDays={trialDays}>
-          {signup.state.step === 'building' && (
-            <SignupBuildingStep
-              state={signup.state}
-              set={signup.set}
-              setAmenities={signup.setAmenities}
-              canAdvance={signup.canAdvanceFromBuilding}
-              onNext={signup.goNext}
-            />
-          )}
-
           {signup.state.step === 'plan' && (
             <SignupPlanStep
               state={signup.state}
@@ -666,7 +664,15 @@ export default function AuthPage() {
               trialDays={trialDays}
               canAdvance={signup.canAdvanceFromPlan}
               onNext={signup.goNext}
-              onBack={signup.goBack}
+            />
+          )}
+
+          {signup.state.step === 'building' && (
+            <SignupBuildingStep
+              state={signup.state}
+              set={signup.set}
+              canAdvance={signup.canAdvanceFromBuilding}
+              onNext={signup.goNext}
             />
           )}
 

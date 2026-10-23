@@ -1,32 +1,20 @@
-// Step 1: Building name, address typeahead, units, amenity chips
-// Matches signup-reference.html step 1
+// Step 2: Building name, address typeahead, units
+// Matches signup-reference.html step 2
 
 import { useState, useEffect, useRef } from 'react';
-import type { BuildingAmenity } from '@/lib/tiers';
 import type { SignupState, AddressResult } from './useSignupState';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
-
-const AMENITY_OPTIONS: { id: BuildingAmenity; label: string }[] = [
-  { id: 'elevator', label: 'Elevator' },
-  { id: 'pool', label: 'Pool' },
-  { id: 'gym', label: 'Gym' },
-  { id: 'parking_garage', label: 'Parking garage' },
-  { id: 'roof_deck', label: 'Roof deck' },
-  { id: 'staff_on_payroll', label: 'Staff on payroll' },
-];
 
 interface Props {
   state: SignupState;
   set: <K extends keyof SignupState>(key: K, value: SignupState[K]) => void;
-  setAmenities: (amenities: BuildingAmenity[]) => void;
   canAdvance: boolean;
   onNext: () => void;
 }
 
-export default function SignupBuildingStep({ state, set, setAmenities, canAdvance, onNext }: Props) {
+export default function SignupBuildingStep({ state, set, canAdvance, onNext }: Props) {
   const [addressClaimed, setAddressClaimed] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const hasNone = state.amenities.length === 0;
 
   // Verify address when query changes (debounced)
   useEffect(() => {
@@ -84,31 +72,6 @@ export default function SignupBuildingStep({ state, set, setAmenities, canAdvanc
 
     return () => clearTimeout(debounceRef.current);
   }, [state.addressQuery]);
-
-  const toggleAmenity = (id: BuildingAmenity) => {
-    const next = state.amenities.includes(id)
-      ? state.amenities.filter(a => a !== id)
-      : [...state.amenities, id];
-    setAmenities(next);
-  };
-
-  const handleNone = () => {
-    setAmenities([]);
-  };
-
-  const chipStyle = (on: boolean): React.CSSProperties => ({
-    minHeight: 44,
-    padding: '0 16px',
-    borderRadius: 999,
-    border: '1.5px solid',
-    borderColor: on ? '#0D1B2E' : '#c9d2dc',
-    background: on ? '#0D1B2E' : '#ffffff',
-    color: on ? '#ffffff' : '#0D1B2E',
-    fontFamily: 'inherit',
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
-  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -214,50 +177,23 @@ export default function SignupBuildingStep({ state, set, setAmenities, canAdvanc
         )}
       </div>
 
-      {/* Two-column: units + amenities */}
-      <div
-        style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', gap: 20 }}
-        className="signup-units-grid"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>How many units?</label>
-          <input
-            inputMode="numeric"
-            value={state.totalUnits}
-            onChange={e => {
-              const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
-              set('totalUnits', v as any);
-            }}
-            placeholder="12"
-            style={{
-              fontFamily: 'inherit', fontSize: 16, padding: '12px 14px',
-              border: '1.5px solid #c9d2dc', borderRadius: 10, background: '#ffffff',
-              color: '#0D1B2E', width: '100%', boxSizing: 'border-box', minHeight: 48,
-            }}
-          />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>Which of these does your building have?</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {AMENITY_OPTIONS.map(a => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => toggleAmenity(a.id)}
-                style={chipStyle(state.amenities.includes(a.id))}
-              >
-                {a.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleNone}
-              style={chipStyle(hasNone)}
-            >
-              None of these
-            </button>
-          </div>
-        </div>
+      {/* Units */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 200 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>How many units?</label>
+        <input
+          inputMode="numeric"
+          value={state.totalUnits}
+          onChange={e => {
+            const v = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+            set('totalUnits', v as any);
+          }}
+          placeholder="12"
+          style={{
+            fontFamily: 'inherit', fontSize: 16, padding: '12px 14px',
+            border: '1.5px solid #c9d2dc', borderRadius: 10, background: '#ffffff',
+            color: '#0D1B2E', width: '100%', boxSizing: 'border-box', minHeight: 48,
+          }}
+        />
       </div>
 
       {/* Continue */}
@@ -277,12 +213,6 @@ export default function SignupBuildingStep({ state, set, setAmenities, canAdvanc
           Continue
         </button>
       </div>
-
-      <style>{`
-        @media (max-width: 760px) {
-          .signup-units-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   );
 }

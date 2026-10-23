@@ -13,12 +13,12 @@ interface Props {
 }
 
 const STEPS = [
-  { key: 'building', label: '1 Your building' },
-  { key: 'plan', label: '2 Your plan' },
+  { key: 'plan', label: '1 Your plan' },
+  { key: 'building', label: '2 Your building' },
   { key: 'account', label: '3 Your account' },
 ] as const;
 
-const STEP_ORDER = ['building', 'plan', 'account'] as const;
+const STEP_ORDER = ['plan', 'building', 'account'] as const;
 
 export default function SignupLayout({ state, trialDays, children }: Props) {
   const currentIdx = STEP_ORDER.indexOf(state.step);

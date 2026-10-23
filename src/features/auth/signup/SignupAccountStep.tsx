@@ -1,8 +1,9 @@
 // Step 3: Account creation — matches signup-reference.html step 3
-// Name, email, password (min 8), role chips, PM seat auto-enable, legal footer.
+// Name, email, password (min 16, strong), role chips, PM seat auto-enable, legal footer.
 
 import type { SignupState } from './useSignupState';
 import type { PlanPickerValue } from '@/features/subscription/PlanPicker';
+import { isValidName, isValidEmail, passwordErrors } from '@/lib/validation';
 
 interface Props {
   state: SignupState;
@@ -76,6 +77,11 @@ export default function SignupAccountStep({ state, set, setPlanPicker, canSubmit
     ? 'Setup is billed today, so the next screen asks for a card.'
     : 'No card is needed today.';
 
+  const firstNameTouched = state.firstName.length > 0;
+  const lastNameTouched = state.lastName.length > 0;
+  const emailTouched = state.email.length > 0;
+  const pwErrors = passwordErrors(state.password);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Title */}
@@ -99,6 +105,9 @@ export default function SignupAccountStep({ state, set, setPlanPicker, canSubmit
             autoFocus
             style={inputStyle}
           />
+          {firstNameTouched && !isValidName(state.firstName) && (
+            <span style={{ fontSize: 12, color: '#D62839' }}>Letters only</span>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ fontSize: 13, fontWeight: 600, color: '#2b3a4b' }}>Last name</label>
@@ -108,6 +117,9 @@ export default function SignupAccountStep({ state, set, setPlanPicker, canSubmit
             autoComplete="family-name"
             style={inputStyle}
           />
+          {lastNameTouched && !isValidName(state.lastName) && (
+            <span style={{ fontSize: 12, color: '#D62839' }}>Letters only</span>
+          )}
         </div>
       </div>
 
@@ -122,6 +134,9 @@ export default function SignupAccountStep({ state, set, setPlanPicker, canSubmit
           autoComplete="email"
           style={inputStyle}
         />
+        {emailTouched && !isValidEmail(state.email) && (
+          <span style={{ fontSize: 12, color: '#D62839' }}>Enter a valid email</span>
+        )}
       </div>
 
       {/* Password */}
@@ -131,10 +146,22 @@ export default function SignupAccountStep({ state, set, setPlanPicker, canSubmit
           type="password"
           value={state.password}
           onChange={e => set('password', e.target.value)}
-          placeholder="At least 8 characters"
+          placeholder="16+ chars, upper, lower, number, special"
           autoComplete="new-password"
           style={inputStyle}
         />
+        {state.password.length > 0 && (
+          <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 12, lineHeight: 1.8 }}>
+            {['At least 16 characters', 'One uppercase letter', 'One lowercase letter', 'One number', 'One special character'].map(req => {
+              const met = !pwErrors.includes(req);
+              return (
+                <li key={req} style={{ color: met ? '#16a34a' : '#D62839' }}>
+                  {req}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       {/* I am (optional) */}

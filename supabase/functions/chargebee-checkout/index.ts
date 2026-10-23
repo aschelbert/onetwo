@@ -41,8 +41,8 @@ function pmSeatPriceId(interval: Interval): string {
   return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
-function setupPriceId(_plan: PlanId): string {
-  return "Setup-USD";
+function setupPriceId(plan: PlanId): string {
+  return plan === "facilities" ? "Setup-Fac-USD" : "Setup-SM-USD";
 }
 
 // ── Supabase helpers ──
@@ -250,7 +250,8 @@ Deno.serve(async (req) => {
         const cp = new URLSearchParams();
         cp.append('id', `cb_${user.id}`);
         cp.append('email', user.email || '');
-        if (building.contactName) cp.append('first_name', building.contactName);
+        cp.append('first_name', building.firstName || building.contactName || '');
+      cp.append('last_name', building.lastName || '');
         const custResult = await chargebeeRequest('customers', cp);
         const customerId = custResult.customer.id;
 
@@ -330,7 +331,8 @@ Deno.serve(async (req) => {
       // Customer
       p.append("customer[id]", `cb_${user.id}`);
       p.append("customer[email]", user.email || "");
-      p.append("customer[first_name]", building.contactName || user.user_metadata?.full_name || "");
+      p.append("customer[first_name]", building.firstName || building.contactName || "");
+      p.append("customer[last_name]", building.lastName || "");
 
       // Store pending building data in Supabase for the webhook to read
       const customerId = `cb_${user.id}`;
