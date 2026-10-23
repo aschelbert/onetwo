@@ -1,5 +1,5 @@
-// State machine for the 2-step signup wizard.
-// Steps: plan → details
+// State machine for the 3-step signup wizard.
+// Steps: plan → building → account
 
 import { useState, useCallback } from 'react';
 import type { PlanId, BillingInterval } from '@/lib/tiers';
@@ -7,7 +7,7 @@ import type { PlanPickerValue } from '@/features/subscription/PlanPicker';
 import type { BoardRoleKey } from '@/types/auth';
 import { isValidName, isValidEmail, isStrongPassword } from '@/lib/validation';
 
-export type SignupStep = 'plan' | 'details';
+export type SignupStep = 'plan' | 'building' | 'account';
 
 export interface AddressResult {
   status: 'verified' | 'not_condo' | 'not_found';
@@ -27,13 +27,14 @@ export interface SignupState {
   // Step 1: Plan
   planPicker: PlanPickerValue;
 
-  // Step 2: Details (building + account)
+  // Step 2: Building
   buildingName: string;
   addressQuery: string;
   addressResult: AddressResult | null;
   addressLoading: boolean;
   totalUnits: number | '';
 
+  // Step 3: Account
   firstName: string;
   lastName: string;
   email: string;
@@ -92,10 +93,13 @@ export function useSignupState() {
 
   const canAdvanceFromPlan = state.planPicker.plan !== null;
 
-  const canSubmit = !!(
+  const canAdvanceFromBuilding = !!(
     state.buildingName.trim().length >= 3 &&
     state.addressQuery.trim() &&
-    !state.addressLoading &&
+    !state.addressLoading
+  );
+
+  const canSubmit = !!(
     state.firstName.trim() &&
     state.lastName.trim() &&
     isValidName(state.firstName) &&
@@ -107,14 +111,16 @@ export function useSignupState() {
 
   const goNext = useCallback(() => {
     setState(prev => {
-      if (prev.step === 'plan' && canAdvanceFromPlan) return { ...prev, step: 'details' };
+      if (prev.step === 'plan' && canAdvanceFromPlan) return { ...prev, step: 'building' };
+      if (prev.step === 'building' && canAdvanceFromBuilding) return { ...prev, step: 'account' };
       return prev;
     });
-  }, [canAdvanceFromPlan]);
+  }, [canAdvanceFromPlan, canAdvanceFromBuilding]);
 
   const goBack = useCallback(() => {
     setState(prev => {
-      if (prev.step === 'details') return { ...prev, step: 'plan' };
+      if (prev.step === 'account') return { ...prev, step: 'building' };
+      if (prev.step === 'building') return { ...prev, step: 'plan' };
       return prev;
     });
   }, []);
@@ -124,6 +130,7 @@ export function useSignupState() {
     set,
     setStep,
     setPlanPicker,
+    canAdvanceFromBuilding,
     canAdvanceFromPlan,
     canSubmit,
     goNext,

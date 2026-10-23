@@ -1,4 +1,4 @@
-// Two-column layout shell for the 2-step signup wizard.
+// Two-column layout shell for the 3-step signup wizard.
 // Dark header with step indicator, white card left, dark summary sidebar right.
 
 import type { ReactNode } from 'react';
@@ -14,10 +14,11 @@ interface Props {
 
 const STEPS = [
   { key: 'plan', label: '1 Your plan' },
-  { key: 'details', label: '2 Your details' },
+  { key: 'building', label: '2 Your building' },
+  { key: 'account', label: '3 Your account' },
 ] as const;
 
-const STEP_ORDER = ['plan', 'details'] as const;
+const STEP_ORDER = ['plan', 'building', 'account'] as const;
 
 export default function SignupLayout({ state, trialDays, children }: Props) {
   const currentIdx = STEP_ORDER.indexOf(state.step);
