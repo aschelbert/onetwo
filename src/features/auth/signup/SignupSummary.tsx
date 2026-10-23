@@ -3,7 +3,7 @@
 
 import type { SignupState } from './useSignupState';
 import type { PlanId } from '@/lib/tiers';
-import { PLANS, planPrice, onCallPrice, pmSeatPrice, SETUP } from '@/lib/tiers';
+import { PLANS, planPrice, onCallPrice, pmSeatPrice } from '@/lib/tiers';
 import { trialEndDate } from '@/lib/signup';
 
 interface Props {
@@ -25,13 +25,10 @@ export default function SignupSummary({ state, trialDays }: Props) {
   const pricePlan = plan ? planPrice(plan, interval) : 0;
   const priceOnCall = plan ? onCallPrice(plan, interval) : 0;
   const pricePm = pmSeatPrice(interval);
-  const priceSetup = plan ? SETUP[plan] : 0;
 
   const recurring = pricePlan
     + (state.planPicker.onCall ? priceOnCall : 0)
     + (state.planPicker.pmSeat ? pricePm : 0);
-
-  const dueToday = state.planPicker.setup && plan ? priceSetup : 0;
 
   const buildingName = state.buildingName.trim();
   const units = state.totalUnits;
@@ -78,12 +75,6 @@ export default function SignupSummary({ state, trialDays }: Props) {
               <span>{money(pricePm)}{per}</span>
             </div>
           )}
-          {state.planPicker.setup && plan && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Setup</span>
-              <span>{money(priceSetup)} once</span>
-            </div>
-          )}
         </div>
 
         {/* Due today */}
@@ -91,14 +82,11 @@ export default function SignupSummary({ state, trialDays }: Props) {
           borderTop: '1px solid #243b53', paddingTop: 12,
           display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: 600 }}>Due today</span>
-            <span style={{ fontSize: 11, color: '#8fa0b3' }}>before taxes</span>
-          </div>
+          <span style={{ fontWeight: 600 }}>Due today</span>
           <span style={{
             fontFamily: "'Fraunces', Georgia, serif", fontSize: 28, fontWeight: 700, color: '#A5F3FC',
           }}>
-            {money(dueToday)}
+            {money(0)}
           </span>
         </div>
 

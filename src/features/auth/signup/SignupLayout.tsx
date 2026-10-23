@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import type { SignupState } from './useSignupState';
 import SignupSummary from './SignupSummary';
-import { PLANS, planPrice, onCallPrice, pmSeatPrice, SETUP } from '@/lib/tiers';
+import { PLANS, planPrice, onCallPrice, pmSeatPrice } from '@/lib/tiers';
 
 interface Props {
   state: SignupState;
@@ -32,7 +32,6 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
       + (state.planPicker.pmSeat ? pmSeatPrice(interval) : 0)
     : 0;
   const per = interval === 'annual' ? ' a year' : ' a month';
-  const dueToday = plan && state.planPicker.setup ? SETUP[plan] : 0;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#e4e6eb' }}>
@@ -145,10 +144,7 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
               <span>
                 {planName ? `${planName}, $${recurring.toLocaleString('en-US')}${per}` : 'Plan: not chosen yet'}
               </span>
-              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
-                <span style={{ fontSize: 10, color: '#8fa0b3' }}>before taxes</span>
-              </span>
+              <span>Due today <b>$0</b></span>
             </div>
 
             {children}

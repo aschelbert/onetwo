@@ -567,7 +567,7 @@ export default function AuthPage() {
             interval: s.planPicker.interval,
             onCall: s.planPicker.onCall,
             pmSeat: s.planPicker.pmSeat,
-            setup: s.planPicker.setup,
+            setup: false,
             origin: window.location.origin,
             building: {
               name: s.buildingName,

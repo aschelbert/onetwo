@@ -4,7 +4,7 @@
 import type { SignupState } from './useSignupState';
 import type { PlanPickerValue } from '@/features/subscription/PlanPicker';
 import type { PlanId, BillingInterval } from '@/lib/tiers';
-import { PLANS, planPrice, onCallPrice, pmSeatPrice, SETUP } from '@/lib/tiers';
+import { PLANS, planPrice, onCallPrice, pmSeatPrice } from '@/lib/tiers';
 
 interface Props {
   state: SignupState;
@@ -36,8 +36,6 @@ export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdv
   const faPrice = ann ? PLANS.facilities.annual : PLANS.facilities.monthly;
   const oncallPrice = plan ? onCallPrice(plan as PlanId, interval) : onCallPrice('self_managed', interval);
   const pmPrice = pmSeatPrice(interval);
-  const setupFee = plan ? SETUP[plan as PlanId] : SETUP.self_managed;
-
   const update = (patch: Partial<PlanPickerValue>) => {
     setPlanPicker({ ...pp, ...patch });
   };
@@ -49,8 +47,6 @@ export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdv
     if (state.iAmRole === 'property_manager') return;
     update({ pmSeat: !pp.pmSeat });
   };
-  const toggleSetup = () => update({ setup: !pp.setup });
-
   const planCardStyle = (selected: boolean): React.CSSProperties => ({
     border: `1.5px solid ${selected ? '#0D1B2E' : '#c9d2dc'}`,
     borderRadius: 16,
@@ -219,18 +215,6 @@ export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdv
             </span>
           </button>
 
-          {/* Setup */}
-          <button type="button" style={optStyle(pp.setup)} onClick={toggleSetup}>
-            <span style={boxStyle(pp.setup)}>{CHECK_SVG}</span>
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontWeight: 600 }}>
-                Setup with us, {money(setupFee)} one-time, billed today
-              </span>
-              <span style={{ fontSize: 14, color: '#4b5a6b' }}>
-                Guided onboarding and your first month closed with us, on a call. The one thing that is charged now, not after the trial.
-              </span>
-            </span>
-          </button>
         </div>
       )}
 

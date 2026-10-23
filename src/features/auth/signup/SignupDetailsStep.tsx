@@ -131,9 +131,7 @@ export default function SignupDetailsStep({ state, set, setPlanPicker, canSubmit
     }
   };
 
-  const cardNote = state.planPicker.setup
-    ? 'Setup is billed today, so the next screen asks for a card.'
-    : 'No card is needed today.';
+  const cardNote = 'No card is needed today.';
 
   const firstNameTouched = state.firstName.length > 0;
   const lastNameTouched = state.lastName.length > 0;
