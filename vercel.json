@@ -39,6 +39,7 @@
   ],
   "rewrites": [
     { "source": "/login", "destination": "/app.html" },
+    { "source": "/signup", "destination": "/app.html" },
     { "source": "/reset-password", "destination": "/app.html" },
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/financial", "destination": "/app.html" },
