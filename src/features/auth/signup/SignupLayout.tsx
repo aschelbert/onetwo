@@ -1,10 +1,10 @@
-// Two-column layout shell for the 2-step signup wizard.
+// Two-column layout shell for the 3-step signup wizard.
 // Dark header with step indicator, white card left, dark summary sidebar right.
 
 import type { ReactNode } from 'react';
 import type { SignupState } from './useSignupState';
 import SignupSummary from './SignupSummary';
-import { PLANS, planPrice, onCallPrice, pmSeatPrice, SETUP } from '@/lib/tiers';
+import { PLANS, planPrice, onCallPrice, pmSeatPrice } from '@/lib/tiers';
 
 interface Props {
   state: SignupState;
@@ -14,10 +14,11 @@ interface Props {
 
 const STEPS = [
   { key: 'plan', label: '1 Your plan' },
-  { key: 'details', label: '2 Your details' },
+  { key: 'building', label: '2 Your building' },
+  { key: 'account', label: '3 Your account' },
 ] as const;
 
-const STEP_ORDER = ['plan', 'details'] as const;
+const STEP_ORDER = ['plan', 'building', 'account'] as const;
 
 export default function SignupLayout({ state, trialDays, children }: Props) {
   const currentIdx = STEP_ORDER.indexOf(state.step);
@@ -32,7 +33,6 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
       + (state.planPicker.pmSeat ? pmSeatPrice(interval) : 0)
     : 0;
   const per = interval === 'annual' ? ' a year' : ' a month';
-  const dueToday = plan && state.planPicker.setup ? SETUP[plan] : 0;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#e4e6eb' }}>
@@ -145,10 +145,7 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
               <span>
                 {planName ? `${planName}, $${recurring.toLocaleString('en-US')}${per}` : 'Plan: not chosen yet'}
               </span>
-              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
-                <span style={{ fontSize: 10, color: '#8fa0b3' }}>before taxes</span>
-              </span>
+              <span>Due today <b>$0</b></span>
             </div>
 
             {children}

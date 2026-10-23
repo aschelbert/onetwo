@@ -41,9 +41,6 @@ function pmSeatPriceId(interval: Interval): string {
   return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
-function setupPriceId(plan: PlanId): string {
-  return plan === "facilities" ? "Setup-Fac-USD" : "Setup-SM-USD";
-}
 
 // ── Supabase helpers ──
 
@@ -202,10 +199,11 @@ Deno.serve(async (req) => {
         itemIdx++;
       }
 
-      // Setup charge
+      // Setup fee (addon with billing_cycles=1, charges once)
       if (setup) {
-        p.append("charges[item_price_id][0]", setupPriceId(plan));
-        p.append("charges[quantity][0]", "1");
+        p.append(`subscription_items[item_price_id][${itemIdx}]`, setupPriceId(plan));
+        p.append(`subscription_items[quantity][${itemIdx}]`, "1");
+        itemIdx++;
       }
 
       // Customer
@@ -213,7 +211,7 @@ Deno.serve(async (req) => {
       p.append("customer[email]", user.email || "");
 
       // Custom field: link to tenant
-      p.append("subscription[cf_tenant_id]", tenantId);
+      p.append("subscription[cf_tenent_id]", tenantId);
 
       // Redirect
       p.append("redirect_url", `${returnBase}/subscription?billing=1`);
@@ -248,8 +246,8 @@ Deno.serve(async (req) => {
       const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
       const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
 
-      if (!setup) {
-        // No setup = no card needed. Create customer + subscription via API, provision directly.
+      {
+        // New building: no card needed. Create customer + subscription via API, provision directly.
         const cp = new URLSearchParams();
         cp.append('id', `cb_${user.id}`);
         cp.append('email', user.email || '');
@@ -277,6 +275,9 @@ Deno.serve(async (req) => {
         // Set trial period — no card is collected in this path
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
+
+        // Custom field required by Chargebee — set to "pending", updated after provisioning
+        sp.append('subscription[cf_tenent_id]', 'pending');
 
         // PC 2.0: subscription created under the customer resource
         const subResult = await chargebeeRequest(`customers/${customerId}/subscription_for_items`, sp);
@@ -317,80 +318,6 @@ Deno.serve(async (req) => {
 
         return new Response(JSON.stringify({ provisioned: true, tenantId: provResult.tenant_id, subdomain: provResult.subdomain }), { headers: cors });
       }
-
-      // PM Seat addon
-      if (pmSeat) {
-        p.append(`subscription_items[item_price_id][${itemIdx}]`, pmSeatPriceId(interval));
-        p.append(`subscription_items[quantity][${itemIdx}]`, "1");
-        itemIdx++;
-      }
-
-      // Setup charge
-      p.append("charges[item_price_id][0]", setupPriceId(plan));
-      p.append("charges[quantity][0]", "1");
-
-      // Customer
-      p.append("customer[id]", `cb_${user.id}`);
-      p.append("customer[email]", user.email || "");
-      p.append("customer[first_name]", building.firstName || building.contactName || "");
-      p.append("customer[last_name]", building.lastName || "");
-
-      // Store pending building data in Supabase for the webhook to read
-      const customerId = `cb_${user.id}`;
-      const pendingData = {
-        name: building.name,
-        subdomain: building.subdomain || "",
-        address: building.address || {},
-        totalUnits: building.totalUnits || 0,
-        contactName: building.contactName || "",
-        contactEmail: user.email || "",
-        boardTitle: building.boardTitle || "President",
-        userId: user.id,
-        plan,
-        onCall: !!onCall,
-        pmSeat: !!pmSeat,
-        interval,
-        marAddressId: building.marAddressId || "",
-        ssl: building.ssl || "",
-        ward: building.ward || "",
-        role: building.role || "board_member",
-        roleKey: building.roleKey || "",
-        firstName: building.firstName || "",
-        lastName: building.lastName || "",
-        addressFlag: building.addressFlag || "",
-      };
-      await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
-        method: "POST",
-        headers: {
-          apikey: SB_SERVICE_KEY,
-          Authorization: `Bearer ${SB_SERVICE_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify({
-          chargebee_customer_id: customerId,
-          user_id: user.id,
-          payload: pendingData,
-        }),
-      });
-      p.append("subscription[cf_tenant_id]", "pending");
-
-      // Trial period — so Chargebee shows "X day free trial" on the hosted page
-      p.append('subscription[trial_period]', String(trialDays));
-      p.append('subscription[trial_period_unit]', 'day');
-
-      // Billing address for tax calculation
-      if (building.address) {
-        p.append("billing_address[line1]", building.address.street || "");
-        p.append("billing_address[city]", building.address.city || "");
-        p.append("billing_address[state_code]", building.address.state || "DC");
-        p.append("billing_address[zip]", building.address.zip || "");
-        p.append("billing_address[country]", "US");
-      }
-
-      // Redirect -- include hosted page id so frontend can correlate
-      p.append("redirect_url", `${returnBase}/login?provisioned=1&hp={hosted_page.id}`);
-      p.append("cancel_url", `${returnBase}/login?canceled=1`);
     } else {
       return jsonResponse(
         { error: "Either building (new) or tenantId (existing) must be provided" },

@@ -511,10 +511,6 @@ p{margin:0}
           <div class="row"><h3 style="font-size:20px">Property Manager Seat</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="pm">79</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b" data-per> a month</span></span></div>
           <p class="muted" style="font-size:14px;line-height:1.5">Keeping a manager for operations? Give them a seat so they work inside your records instead of theirs.</p>
         </div>
-        <div class="card" style="padding:22px;display:flex;flex-direction:column;gap:8px">
-          <div class="row"><h3 style="font-size:20px">Setup with us</h3><span style="font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700">$<span data-price="setup">299</span><span style="font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:#4b5a6b"> once</span></span></div>
-          <p class="muted" style="font-size:14px;line-height:1.5">Guided onboarding and your first month closed with us, on a call.</p>
-        </div>
       </div>
       <div class="row" style="flex-wrap:wrap;gap:12px">
         <p class="muted" style="font-size:13px">Postage and card processing fees pass through at cost. No markups. Cancel any time; your records export with you.</p>
@@ -632,7 +628,7 @@ p{margin:0}
   el('mobileMenu').addEventListener('click', function (e) { if (e.target.tagName === 'A') { el('mobileMenu').classList.remove('open'); } });
 
   /* ---------- Pricing ---------- */
-  var PRICE = { sm: [179, 1790], fa: [279, 2790], oncallSm: [249, 2490], oncallFa: [499, 4990], pm: [79, 790], setupSm: 299, setupFa: 599 };
+  var PRICE = { sm: [179, 1790], fa: [279, 2790], oncallSm: [249, 2490], oncallFa: [499, 4990], pm: [79, 790] };
   var plan = 'sm', interval = 'monthly';
   try { plan = sessionStorage.getItem('ot_plan') || plan; interval = sessionStorage.getItem('ot_interval') || interval; } catch (e) {}
   function money(n) { return n.toLocaleString('en-US'); }
@@ -649,7 +645,6 @@ p{margin:0}
     document.querySelector('[data-price="fa"]').textContent = money(PRICE.fa[i]);
     document.querySelector('[data-price="oncall"]').textContent = money((fa ? PRICE.oncallFa : PRICE.oncallSm)[i]);
     document.querySelector('[data-price="pm"]').textContent = money(PRICE.pm[i]);
-    document.querySelector('[data-price="setup"]').textContent = money(fa ? PRICE.setupFa : PRICE.setupSm);
     Array.prototype.forEach.call(document.querySelectorAll('[data-per]'), function (n) { n.textContent = ann ? ' a year' : ' a month'; });
     el('planName').textContent = fa ? 'Plus Facilities' : 'Self-Managed';
     el('onCallHours').textContent = fa ? '5' : '2';
