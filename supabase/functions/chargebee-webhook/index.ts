@@ -88,7 +88,8 @@ function parseSubscriptionItems(
     const priceId: string = item.item_price_id || "";
 
     // Plan detection (Chargebee PC 2.0 item price IDs)
-    if (priceId.startsWith("Compliance-Pro")) {
+    // Production uses "Compliance-Pro", test site uses "Self-Managed"
+    if (priceId.startsWith("Compliance-Pro") || priceId.startsWith("Self-Managed")) {
       plan = "self_managed";
       interval = priceId.includes("Yearly") ? "annual" : "monthly";
     } else if (priceId.startsWith("Plus-Facilities")) {
@@ -199,10 +200,42 @@ Deno.serve(async (req) => {
   });
 
   if (insertRes.status === 409) {
-    console.log(`Event ${eventId} already processed, skipping`);
-    return new Response(JSON.stringify({ received: true, duplicate: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    // Check if the previous attempt succeeded — only skip if so
+    const prev = await sbQuery("GET", "chargebee_webhook_events", {
+      event_id: `eq.${eventId}`,
+      select: "status",
+    });
+    if (prev?.status === "success") {
+      console.log(`Event ${eventId} already processed successfully, skipping`);
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Previous attempt failed — delete old record and re-process
+    console.log(`Event ${eventId} previously failed, retrying`);
+    await fetch(`${SB_URL}/rest/v1/chargebee_webhook_events?event_id=eq.${eventId}`, {
+      method: "DELETE",
+      headers: {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+      },
+    });
+    // Re-insert as processing
+    await fetch(`${SB_URL}/rest/v1/chargebee_webhook_events`, {
+      method: "POST",
+      headers: {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        event_id: eventId,
+        event_type: eventType,
+        status: "processing",
+        payload: event,
+      }),
     });
   }
   if (!insertRes.ok) {
@@ -223,7 +256,7 @@ Deno.serve(async (req) => {
       case "subscription_created": {
         const parsed = parseSubscriptionItems(subscriptionItems);
 
-        if (cfTenantId) {
+        if (cfTenantId && cfTenantId !== "pending") {
           // ── Existing tenant: link subscription ──
           console.log(`Linking subscription to tenant ${cfTenantId}`);
 
@@ -258,13 +291,41 @@ Deno.serve(async (req) => {
           await syncGovopsStatus(cfTenantId, {
             status: subscription.status === "in_trial" ? "trial" : "active",
           });
-        } else if (cfTenantPending) {
-          // ── New building: provision tenant ──
-          let pending;
-          try {
-            pending = JSON.parse(cfTenantPending);
-          } catch {
-            throw new Error("Invalid cf_tenant_pending JSON");
+        } else {
+          // ── New building: look up pending checkout data from Supabase ──
+          const customerId = customer.id || "";
+          const pendingRow = customerId
+            ? await sbQuery("GET", "pending_checkouts", {
+                chargebee_customer_id: `eq.${customerId}`,
+                select: "id,payload",
+                order: "created_at.desc",
+              })
+            : null;
+
+          // Also check cf_tenant_pending as fallback
+          let pending = pendingRow?.payload || null;
+          if (!pending && cfTenantPending) {
+            try {
+              pending = JSON.parse(cfTenantPending);
+            } catch {
+              // ignore parse errors
+            }
+          }
+
+          if (!pending) {
+            console.log(`subscription_created: no pending checkout data for customer ${customerId}, skipping`);
+            break;
+          }
+
+          // Clean up the pending_checkouts row
+          if (pendingRow?.id) {
+            await fetch(`${SB_URL}/rest/v1/pending_checkouts?id=eq.${pendingRow.id}`, {
+              method: "DELETE",
+              headers: {
+                apikey: SB_SERVICE_KEY,
+                Authorization: `Bearer ${SB_SERVICE_KEY}`,
+              },
+            });
           }
 
           console.log(`Provisioning new tenant: ${pending.name}`);
@@ -311,8 +372,6 @@ Deno.serve(async (req) => {
             // Sync to admin console
             await syncGovopsStatus(result.tenant_id, { status: "trial" });
           }
-        } else {
-          console.log("subscription_created without cf_tenant_id or cf_tenant_pending, skipping");
         }
         break;
       }

@@ -4,12 +4,12 @@ import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { BOARD_ROLE_LABELS } from '@/types/auth';
 import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+import { isStrongPassword } from '@/lib/validation';
 import DemoLeadModal, { wasAlreadyShown } from './DemoLeadModal';
 import { useSignupState } from './signup/useSignupState';
 import SignupLayout from './signup/SignupLayout';
-import SignupBuildingStep from './signup/SignupBuildingStep';
 import SignupPlanStep from './signup/SignupPlanStep';
-import SignupAccountStep from './signup/SignupAccountStep';
+import SignupDetailsStep from './signup/SignupDetailsStep';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -37,7 +37,7 @@ export default function AuthPage() {
   const [inviteData, setInviteData] = useState<any>(null);
   const [inviteMatch, setInviteMatch] = useState<typeof buildingInvites[0] | null>(null);
 
-  // ── Signup wizard state (3-step) ──
+  // ── Signup wizard state (2-step) ──
   const signup = useSignupState();
 
   // ── UI state ──
@@ -62,15 +62,26 @@ export default function AuthPage() {
     const params = new URLSearchParams(window.location.search);
 
     // Clear stale demo session — demo users shouldn't persist on the login page.
-    // This must run before setAuthStep so signOut's reset doesn't overwrite it.
-    const { currentUser: cu } = useAuthStore.getState();
-    if (cu.id === 'user1' || cu.id.startsWith('user-')) {
-      useAuthStore.getState().signOut();
+    // Skip when returning from Chargebee checkout (?provisioned=1) to preserve
+    // the Supabase session needed for token restoration.
+    const isReturningFromCheckout = params.get('provisioned') === '1';
+    if (!isReturningFromCheckout) {
+      const { currentUser: cu } = useAuthStore.getState();
+      if (cu.id === 'user1' || cu.id.startsWith('user-')) {
+        useAuthStore.getState().signOut();
+      }
     }
 
-    // ?create=1 → show signup wizard
+    // /signup → go directly to wizard (plan step)
+    if (window.location.pathname === '/signup') {
+      setAuthStep('building');
+      setSessionChecking(false);
+      return;
+    }
+
+    // ?create=1 → go directly to wizard (plan step)
     if (params.get('create') === '1') {
-      setAuthStep('signup');
+      setAuthStep('building');
       if (params.get('from') === 'demo' && !wasAlreadyShown()) {
         setShowLeadModal(true);
       }
@@ -481,7 +492,7 @@ export default function AuthPage() {
   // ── 3-step wizard: Start (creates auth user + calls chargebee-checkout) ──
   const handleStart = async () => {
     const s = signup.state;
-    if (!s.email || !s.password || s.password.length < 8) return;
+    if (!s.email || !s.password || !isStrongPassword(s.password)) return;
 
     if (!isBackendEnabled || !supabase) {
       // Demo fallback
@@ -557,6 +568,7 @@ export default function AuthPage() {
             onCall: s.planPicker.onCall,
             pmSeat: s.planPicker.pmSeat,
             setup: s.planPicker.setup,
+            origin: window.location.origin,
             building: {
               name: s.buildingName,
               address: { street: s.addressResult?.fullAddress || s.addressQuery, city: '', state: 'DC', zip: '' },
@@ -644,16 +656,6 @@ export default function AuthPage() {
     return (
       <>
         <SignupLayout state={signup.state} trialDays={trialDays}>
-          {signup.state.step === 'building' && (
-            <SignupBuildingStep
-              state={signup.state}
-              set={signup.set}
-              setAmenities={signup.setAmenities}
-              canAdvance={signup.canAdvanceFromBuilding}
-              onNext={signup.goNext}
-            />
-          )}
-
           {signup.state.step === 'plan' && (
             <SignupPlanStep
               state={signup.state}
@@ -661,12 +663,11 @@ export default function AuthPage() {
               trialDays={trialDays}
               canAdvance={signup.canAdvanceFromPlan}
               onNext={signup.goNext}
-              onBack={signup.goBack}
             />
           )}
 
-          {signup.state.step === 'account' && (
-            <SignupAccountStep
+          {signup.state.step === 'details' && (
+            <SignupDetailsStep
               state={signup.state}
               set={signup.set}
               setPlanPicker={signup.setPlanPicker}

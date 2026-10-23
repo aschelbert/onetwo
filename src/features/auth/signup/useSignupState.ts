@@ -1,13 +1,13 @@
-// State machine for the 3-step signup wizard.
-// Steps: building → plan → account
+// State machine for the 2-step signup wizard.
+// Steps: plan → details
 
 import { useState, useCallback } from 'react';
-import type { PlanId, BillingInterval, BuildingAmenity } from '@/lib/tiers';
+import type { PlanId, BillingInterval } from '@/lib/tiers';
 import type { PlanPickerValue } from '@/features/subscription/PlanPicker';
-import { recommendPlan } from '@/lib/signup';
 import type { BoardRoleKey } from '@/types/auth';
+import { isValidName, isValidEmail, isStrongPassword } from '@/lib/validation';
 
-export type SignupStep = 'building' | 'plan' | 'account';
+export type SignupStep = 'plan' | 'details';
 
 export interface AddressResult {
   status: 'verified' | 'not_condo' | 'not_found';
@@ -24,18 +24,16 @@ export interface AddressResult {
 export interface SignupState {
   step: SignupStep;
 
-  // Step 1: Building
+  // Step 1: Plan
+  planPicker: PlanPickerValue;
+
+  // Step 2: Details (building + account)
   buildingName: string;
   addressQuery: string;
   addressResult: AddressResult | null;
   addressLoading: boolean;
   totalUnits: number | '';
-  amenities: BuildingAmenity[];
 
-  // Step 2: Plan
-  planPicker: PlanPickerValue;
-
-  // Step 3: Account
   firstName: string;
   lastName: string;
   email: string;
@@ -56,13 +54,7 @@ function readUrlParams(): { plan: PlanId | null; interval: BillingInterval } {
 const urlParams = readUrlParams();
 
 const INITIAL_STATE: SignupState = {
-  step: 'building',
-  buildingName: '',
-  addressQuery: '',
-  addressResult: null,
-  addressLoading: false,
-  totalUnits: '',
-  amenities: [],
+  step: 'plan',
   planPicker: {
     plan: urlParams.plan,
     interval: urlParams.interval,
@@ -70,6 +62,11 @@ const INITIAL_STATE: SignupState = {
     pmSeat: false,
     setup: false,
   },
+  buildingName: '',
+  addressQuery: '',
+  addressResult: null,
+  addressLoading: false,
+  totalUnits: '',
   firstName: '',
   lastName: '',
   email: '',
@@ -89,47 +86,35 @@ export function useSignupState() {
     setState(prev => ({ ...prev, step }));
   }, []);
 
-  const setAmenities = useCallback((amenities: BuildingAmenity[]) => {
-    setState(prev => ({
-      ...prev,
-      amenities,
-      planPicker: {
-        ...prev.planPicker,
-        plan: prev.planPicker.plan ?? (amenities.length > 0 ? recommendPlan(amenities) : null),
-      },
-    }));
-  }, []);
-
   const setPlanPicker = useCallback((planPicker: PlanPickerValue) => {
     setState(prev => ({ ...prev, planPicker }));
   }, []);
 
-  const canAdvanceFromBuilding = !!(
-    state.buildingName.trim() &&
-    state.addressQuery.trim()
-  );
-
   const canAdvanceFromPlan = state.planPicker.plan !== null;
 
   const canSubmit = !!(
+    state.buildingName.trim().length >= 3 &&
+    state.addressQuery.trim() &&
+    !state.addressLoading &&
     state.firstName.trim() &&
     state.lastName.trim() &&
+    isValidName(state.firstName) &&
+    isValidName(state.lastName) &&
     state.email.trim() &&
-    state.password.length >= 8
+    isValidEmail(state.email) &&
+    isStrongPassword(state.password)
   );
 
   const goNext = useCallback(() => {
     setState(prev => {
-      if (prev.step === 'building' && canAdvanceFromBuilding) return { ...prev, step: 'plan' };
-      if (prev.step === 'plan' && canAdvanceFromPlan) return { ...prev, step: 'account' };
+      if (prev.step === 'plan' && canAdvanceFromPlan) return { ...prev, step: 'details' };
       return prev;
     });
-  }, [canAdvanceFromBuilding, canAdvanceFromPlan]);
+  }, [canAdvanceFromPlan]);
 
   const goBack = useCallback(() => {
     setState(prev => {
-      if (prev.step === 'account') return { ...prev, step: 'plan' };
-      if (prev.step === 'plan') return { ...prev, step: 'building' };
+      if (prev.step === 'details') return { ...prev, step: 'plan' };
       return prev;
     });
   }, []);
@@ -138,9 +123,7 @@ export function useSignupState() {
     state,
     set,
     setStep,
-    setAmenities,
     setPlanPicker,
-    canAdvanceFromBuilding,
     canAdvanceFromPlan,
     canSubmit,
     goNext,

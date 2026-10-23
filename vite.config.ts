@@ -7,7 +7,7 @@ import fs from 'fs'
 
 // Routes that should serve app.html instead of index.html (marketing)
 const APP_ROUTES = [
-  '/login', '/reset-password', '/dashboard', '/financial', '/issues',
+  '/login', '/signup', '/reset-password', '/dashboard', '/financial', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
   '/admin', '/portfolio',

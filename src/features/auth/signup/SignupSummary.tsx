@@ -91,7 +91,10 @@ export default function SignupSummary({ state, trialDays }: Props) {
           borderTop: '1px solid #243b53', paddingTop: 12,
           display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
         }}>
-          <span style={{ fontWeight: 600 }}>Due today</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 600 }}>Due today</span>
+            <span style={{ fontSize: 11, color: '#8fa0b3' }}>before taxes</span>
+          </div>
           <span style={{
             fontFamily: "'Fraunces', Georgia, serif", fontSize: 28, fontWeight: 700, color: '#A5F3FC',
           }}>

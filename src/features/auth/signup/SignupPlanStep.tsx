@@ -1,11 +1,10 @@
-// Step 2: Plan selection — custom UI matching signup-reference.html
+// Step 1: Plan selection — custom UI matching signup-reference.html
 // Does NOT use the PlanPicker component (still used by SubscriptionPage).
 
 import type { SignupState } from './useSignupState';
 import type { PlanPickerValue } from '@/features/subscription/PlanPicker';
 import type { PlanId, BillingInterval } from '@/lib/tiers';
 import { PLANS, planPrice, onCallPrice, pmSeatPrice, SETUP } from '@/lib/tiers';
-import { recommendPlan } from '@/lib/signup';
 
 interface Props {
   state: SignupState;
@@ -13,7 +12,6 @@ interface Props {
   trialDays: number;
   canAdvance: boolean;
   onNext: () => void;
-  onBack: () => void;
 }
 
 const CHECK_SVG = (
@@ -26,17 +24,12 @@ function money(n: number) {
   return '$' + n.toLocaleString('en-US');
 }
 
-export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdvance, onNext, onBack }: Props) {
+export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdvance, onNext }: Props) {
   const pp = state.planPicker;
   const plan = pp.plan;
   const interval = pp.interval;
   const ann = interval === 'annual';
   const per = ann ? ' a year' : ' a month';
-  const fa = plan === 'facilities';
-
-  const recommendFa = state.amenities.some(a =>
-    ['elevator', 'pool', 'staff_on_payroll'].includes(a),
-  );
 
   // Prices
   const smPrice = ann ? PLANS.self_managed.annual : PLANS.self_managed.monthly;
@@ -182,14 +175,6 @@ export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdv
           <p style={{ fontSize: 14, lineHeight: 1.45, color: '#4b5a6b', margin: 0 }}>
             Everything in Self-Managed, plus the inspection calendar, reserve study tools, bids, claims, amenities and a staff role.
           </p>
-          {recommendFa && (
-            <span style={{
-              alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 999,
-              background: '#fff0f1', color: '#D62839', fontSize: 12, fontWeight: 700,
-            }}>
-              Recommended for your building
-            </span>
-          )}
         </button>
       </div>
 
@@ -250,19 +235,7 @@ export default function SignupPlanStep({ state, setPlanPicker, trialDays, canAdv
       )}
 
       {/* Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            minHeight: 48, padding: '0 22px', borderRadius: 10, fontWeight: 600, fontSize: 16,
-            border: '1.5px solid #c9d2dc', cursor: 'pointer', fontFamily: 'inherit',
-            background: '#ffffff', color: '#0D1B2E',
-          }}
-        >
-          Back
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={onNext}

@@ -17,14 +17,16 @@ const cors = {
 };
 
 // ── Chargebee item-price IDs ──
+// Production site uses "Compliance-Pro" for self-managed; test site uses "Self-Managed"
+const SM_PREFIX = CHARGEBEE_SITE.includes("test") ? "Self-Managed" : "Compliance-Pro";
 
 type PlanId = "self_managed" | "facilities";
 type Interval = "monthly" | "annual";
 
 function planPriceId(plan: PlanId, interval: Interval): string {
   const map: Record<string, string> = {
-    self_managed_monthly: "Compliance-Pro-USD-Monthly",
-    self_managed_annual: "Compliance-Pro-USD-Yearly",
+    self_managed_monthly: `${SM_PREFIX}-USD-Monthly`,
+    self_managed_annual: `${SM_PREFIX}-USD-Yearly`,
     facilities_monthly: "Plus-Facilities-USD-Monthly",
     facilities_annual: "Plus-Facilities-USD-Yearly",
   };
@@ -39,8 +41,8 @@ function pmSeatPriceId(interval: Interval): string {
   return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
-function setupPriceId(_plan: PlanId): string {
-  return "Setup-USD";
+function setupPriceId(plan: PlanId): string {
+  return plan === "facilities" ? "Setup-Fac-USD" : "Setup-SM-USD";
 }
 
 // ── Supabase helpers ──
@@ -202,10 +204,8 @@ Deno.serve(async (req) => {
 
       // Setup charge
       if (setup) {
-        let chargeIdx = 0;
-        p.append(`charges[item_price_id][${chargeIdx}]`, setupPriceId(plan));
-        chargeIdx++;
-        void chargeIdx; // suppress unused warning
+        p.append("charges[item_price_id][0]", setupPriceId(plan));
+        p.append("charges[quantity][0]", "1");
       }
 
       // Customer
@@ -242,15 +242,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "building.name is required" }, 400);
       }
 
+      // Shared: create supabaseAdmin and fetch trial days for both setup and no-setup paths
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
+      const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
+      const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
+
       if (!setup) {
         // No setup = no card needed. Create customer + subscription via API, provision directly.
-        const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-        const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
-
         const cp = new URLSearchParams();
         cp.append('id', `cb_${user.id}`);
         cp.append('email', user.email || '');
-        if (building.contactName) cp.append('first_name', building.contactName);
+        cp.append('first_name', building.firstName || building.contactName || '');
+      cp.append('last_name', building.lastName || '');
         const custResult = await chargebeeRequest('customers', cp);
         const customerId = custResult.customer.id;
 
@@ -271,8 +275,6 @@ Deno.serve(async (req) => {
         }
 
         // Set trial period — no card is collected in this path
-        const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
-        const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
         sp.append('subscription[trial_period]', String(trialDays));
         sp.append('subscription[trial_period_unit]', 'day');
 
@@ -324,20 +326,18 @@ Deno.serve(async (req) => {
       }
 
       // Setup charge
-      {
-        let chargeIdx = 0;
-        p.append(`charges[item_price_id][${chargeIdx}]`, setupPriceId(plan));
-        chargeIdx++;
-        void chargeIdx;
-      }
+      p.append("charges[item_price_id][0]", setupPriceId(plan));
+      p.append("charges[quantity][0]", "1");
 
       // Customer
       p.append("customer[id]", `cb_${user.id}`);
       p.append("customer[email]", user.email || "");
-      p.append("customer[first_name]", building.contactName || user.user_metadata?.full_name || "");
+      p.append("customer[first_name]", building.firstName || building.contactName || "");
+      p.append("customer[last_name]", building.lastName || "");
 
-      // Pack building info into a custom field for the webhook to parse
-      const pendingPayload = JSON.stringify({
+      // Store pending building data in Supabase for the webhook to read
+      const customerId = `cb_${user.id}`;
+      const pendingData = {
         name: building.name,
         subdomain: building.subdomain || "",
         address: building.address || {},
@@ -353,14 +353,40 @@ Deno.serve(async (req) => {
         marAddressId: building.marAddressId || "",
         ssl: building.ssl || "",
         ward: building.ward || "",
-        // HO-18 extended fields
         role: building.role || "board_member",
         roleKey: building.roleKey || "",
         firstName: building.firstName || "",
         lastName: building.lastName || "",
         addressFlag: building.addressFlag || "",
+      };
+      await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
+        method: "POST",
+        headers: {
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          chargebee_customer_id: customerId,
+          user_id: user.id,
+          payload: pendingData,
+        }),
       });
-      p.append("subscription[cf_tenant_pending]", pendingPayload);
+      p.append("subscription[cf_tenant_id]", "pending");
+
+      // Trial period — so Chargebee shows "X day free trial" on the hosted page
+      p.append('subscription[trial_period]', String(trialDays));
+      p.append('subscription[trial_period_unit]', 'day');
+
+      // Billing address for tax calculation
+      if (building.address) {
+        p.append("billing_address[line1]", building.address.street || "");
+        p.append("billing_address[city]", building.address.city || "");
+        p.append("billing_address[state_code]", building.address.state || "DC");
+        p.append("billing_address[zip]", building.address.zip || "");
+        p.append("billing_address[country]", "US");
+      }
 
       // Redirect -- include hosted page id so frontend can correlate
       p.append("redirect_url", `${returnBase}/login?provisioned=1&hp={hosted_page.id}`);

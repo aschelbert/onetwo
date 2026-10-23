@@ -1,4 +1,4 @@
-// Two-column layout shell for the 3-step signup wizard.
+// Two-column layout shell for the 2-step signup wizard.
 // Dark header with step indicator, white card left, dark summary sidebar right.
 
 import type { ReactNode } from 'react';
@@ -13,12 +13,11 @@ interface Props {
 }
 
 const STEPS = [
-  { key: 'building', label: '1 Your building' },
-  { key: 'plan', label: '2 Your plan' },
-  { key: 'account', label: '3 Your account' },
+  { key: 'plan', label: '1 Your plan' },
+  { key: 'details', label: '2 Your details' },
 ] as const;
 
-const STEP_ORDER = ['building', 'plan', 'account'] as const;
+const STEP_ORDER = ['plan', 'details'] as const;
 
 export default function SignupLayout({ state, trialDays, children }: Props) {
   const currentIdx = STEP_ORDER.indexOf(state.step);
@@ -146,7 +145,10 @@ export default function SignupLayout({ state, trialDays, children }: Props) {
               <span>
                 {planName ? `${planName}, $${recurring.toLocaleString('en-US')}${per}` : 'Plan: not chosen yet'}
               </span>
-              <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
+              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <span>Due today <b>${dueToday.toLocaleString('en-US')}</b></span>
+                <span style={{ fontSize: 10, color: '#8fa0b3' }}>before taxes</span>
+              </span>
             </div>
 
             {children}

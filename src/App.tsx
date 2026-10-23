@@ -272,6 +272,7 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/signup" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/trial-ended" element={<RequireAuth><TenantProvider><TrialEndedPage /></TenantProvider></RequireAuth>} />
 
