@@ -19,6 +19,8 @@ const cors = {
 // ── Chargebee item-price IDs ──
 // Production site uses "Compliance-Pro" for self-managed; test site uses "Self-Managed"
 const SM_PREFIX = CHARGEBEE_SITE.includes("test") ? "Self-Managed" : "Compliance-Pro";
+// Production Chargebee has a typo in the custom field name; test site uses the correct spelling.
+const CF_TENANT_ID = CHARGEBEE_SITE.includes("test") ? "cf_tenant_id" : "cf_tenent_id";
 
 type PlanId = "self_managed" | "facilities";
 type Interval = "monthly" | "annual";
@@ -211,7 +213,7 @@ Deno.serve(async (req) => {
       p.append("customer[email]", user.email || "");
 
       // Custom field: link to tenant
-      p.append("subscription[cf_tenent_id]", tenantId);
+      p.append(`subscription[${CF_TENANT_ID}]`, tenantId);
 
       // Redirect
       p.append("redirect_url", `${returnBase}/subscription?billing=1`);
@@ -277,7 +279,7 @@ Deno.serve(async (req) => {
         sp.append('subscription[trial_period_unit]', 'day');
 
         // Custom field required by Chargebee — set to "pending", updated after provisioning
-        sp.append('subscription[cf_tenent_id]', 'pending');
+        sp.append(`subscription[${CF_TENANT_ID}]`, 'pending');
 
         // PC 2.0: subscription created under the customer resource
         const subResult = await chargebeeRequest(`customers/${customerId}/subscription_for_items`, sp);
