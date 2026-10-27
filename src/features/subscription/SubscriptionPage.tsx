@@ -25,8 +25,6 @@ import {
   CreditCard,
   ExternalLink,
   Loader2,
-  Phone,
-  UserCog,
   Wrench,
   ToggleLeft,
   ToggleRight,
@@ -846,137 +844,160 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {/* 1. Current Plan Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold text-ink-900">Current Plan</h2>
-          <StatusBadge status={sub!.status} cancelPending={sub!.cancel_at_period_end} />
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-ink-400 text-xs mb-0.5">Plan</p>
-            <p className="font-semibold text-ink-900">{PLANS[currentPlan].name}</p>
-          </div>
-          <div>
-            <p className="text-ink-400 text-xs mb-0.5">Interval</p>
-            <p className="font-semibold text-ink-900 capitalize">{currentInterval}</p>
-          </div>
-          <div>
-            <p className="text-ink-400 text-xs mb-0.5">Next billing date</p>
-            <p className="text-ink-700">
-              {sub!.cancel_at_period_end ? 'N/A' : formatDate(sub!.current_period_end)}
+      {/* Trial countdown banner */}
+      {sub!.status === 'trialing' && sub!.trial_ends_at && (() => {
+        const now = new Date();
+        const trialEnd = new Date(sub!.trial_ends_at!);
+        const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000));
+        const trialStart = sub!.created_at ? new Date(sub!.created_at) : now;
+        const totalDays = Math.max(1, Math.ceil((trialEnd.getTime() - trialStart.getTime()) / 86400000));
+        const progress = Math.min(100, Math.round(((totalDays - daysLeft) / totalDays) * 100));
+        const isUrgent = daysLeft <= 7;
+
+        return (
+          <div className={`rounded-xl p-5 border ${isUrgent ? 'bg-amber-50 border-amber-200' : 'bg-accent-50 border-accent-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-display text-base font-bold text-ink-900">
+                {daysLeft} day{daysLeft !== 1 ? 's' : ''} left in your free trial
+              </h2>
+              <span className={`text-xs font-semibold ${isUrgent ? 'text-amber-600' : 'text-accent-600'}`}>
+                {progress}% elapsed
+              </span>
+            </div>
+            <div className="w-full h-1.5 bg-ink-100 rounded-full mb-3">
+              <div
+                className={`h-full rounded-full ${isUrgent ? 'bg-amber-500' : 'bg-accent-500'}`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-sm text-ink-600">
+              Billing starts <strong>{formatDate(sub!.trial_ends_at)}</strong>.
+              All features are unlocked during your trial.
             </p>
           </div>
-          {sub!.status === 'trialing' && sub!.trial_ends_at && (
-            <div>
-              <p className="text-ink-400 text-xs mb-0.5">Trial ends</p>
-              <p className="text-ink-700">{formatDate(sub!.trial_ends_at)}</p>
-            </div>
-          )}
-        </div>
+        );
+      })()}
 
-        {!sub!.cancel_at_period_end && sub!.status !== 'canceled' && (
-          <button
-            onClick={handleChangePlan}
-            disabled={actionLoading === 'change-plan'}
-            className="mt-4 px-4 py-2 border-2 border-accent-300 text-accent-600 rounded-lg text-sm font-semibold hover:bg-accent-50 transition-colors disabled:opacity-50"
-          >
-            {actionLoading === 'change-plan'
-              ? 'Updating...'
-              : `Move to ${PLANS[alternatePlan].name}`}
-          </button>
-        )}
-        {sub!.billing_interval === 'monthly' && sub!.status === 'active' && !sub!.cancel_at_period_end && (
-          <button
-            onClick={async () => {
-              const result = await callManageSubscription('set-interval', { interval: 'annual' });
-              if (result?.success) {
-                await loadSubscription();
-                setSuccessMsg('Switched to annual billing.');
-              }
-            }}
-            disabled={actionLoading === 'set-interval'}
-            className="mt-2 px-4 py-2 border-2 border-accent-300 text-accent-600 rounded-lg text-sm font-semibold hover:bg-accent-50 transition-colors"
-          >
-            {actionLoading === 'set-interval' ? 'Updating...' : 'Switch to annual'}
-          </button>
-        )}
-      </div>
+      {/* Unified subscription card */}
+      {(() => {
+        const planPrice = currentInterval === 'annual' ? Math.round(PLANS[currentPlan].annual / 10) : PLANS[currentPlan].monthly;
+        const ocPrice = currentInterval === 'annual' ? Math.round(ON_CALL[currentPlan].annual / 10) : ON_CALL[currentPlan].monthly;
+        const pmPrice = currentInterval === 'annual' ? Math.round(PM_SEAT.annual / 10) : PM_SEAT.monthly;
+        const monthlyTotal = periodTotal({ plan: currentPlan, onCall: sub!.addon_on_call, pmSeat: sub!.pm_addon, interval: currentInterval });
 
-      {/* 2. On Call Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
-              <Phone className="w-4.5 h-4.5 text-accent-600" />
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-lg font-bold text-ink-900">Your subscription</h2>
+              <StatusBadge status={sub!.status} cancelPending={sub!.cancel_at_period_end} />
             </div>
-            <div>
-              <h2 className="font-display text-base font-bold text-ink-900">On Call</h2>
-              <p className="text-xs text-ink-400">
-                {ON_CALL[currentPlan].hours} hours/mo of expert support
+
+            <div className="space-y-3">
+              {/* Plan line item */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-ink-900 font-medium">{PLANS[currentPlan].name} ({currentInterval})</span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-sm font-semibold text-ink-900">${planPrice}/mo</span>
+                  {!sub!.cancel_at_period_end && sub!.status !== 'canceled' && (
+                    <button
+                      onClick={handleChangePlan}
+                      disabled={actionLoading === 'change-plan'}
+                      className="px-3 py-1 text-xs font-semibold rounded-lg border border-accent-300 text-accent-600 hover:bg-accent-50 transition-colors disabled:opacity-50"
+                    >
+                      {actionLoading === 'change-plan' ? 'Updating...' : 'Change'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* On Call line item */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-ink-900 font-medium">On Call</span>
+                  <span className="text-xs text-ink-400">({ON_CALL[currentPlan].hours} hrs/mo)</span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-sm font-semibold text-ink-900">${ocPrice}/mo</span>
+                  <button
+                    onClick={handleToggleOnCall}
+                    disabled={actionLoading === 'set-on-call'}
+                    className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
+                    title={sub!.addon_on_call ? 'Disable On Call' : 'Enable On Call'}
+                  >
+                    {sub!.addon_on_call ? (
+                      <ToggleRight className="w-7 h-7 text-accent-600" />
+                    ) : (
+                      <ToggleLeft className="w-7 h-7" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* PM Seat line item */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-ink-900 font-medium">Property manager seat</span>
+                  {hasPmUser && <span className="text-xs text-amber-600">(active PM user)</span>}
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-sm font-semibold text-ink-900">${pmPrice}/mo</span>
+                  <button
+                    onClick={handleTogglePmSeat}
+                    disabled={actionLoading === 'set-pm-seat' || hasPmUser}
+                    className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
+                    title={
+                      hasPmUser
+                        ? 'Cannot disable while a property manager user exists'
+                        : sub!.pm_addon
+                          ? 'Disable property manager seat'
+                          : 'Enable property manager seat'
+                    }
+                  >
+                    {sub!.pm_addon ? (
+                      <ToggleRight className="w-7 h-7 text-accent-600" />
+                    ) : (
+                      <ToggleLeft className="w-7 h-7" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Divider + total */}
+              <div className="border-t border-ink-100 pt-3 flex items-center justify-between">
+                <span className="text-sm font-bold text-ink-900">Monthly total</span>
+                <span className="text-base font-bold text-accent-600">${monthlyTotal}/mo</span>
+              </div>
+            </div>
+
+            {/* Footer: billing info + switch interval */}
+            <div className="mt-4 pt-4 border-t border-ink-50 text-sm text-ink-500 space-y-2">
+              <p>
+                Billed {currentInterval}
+                {!sub!.cancel_at_period_end && sub!.current_period_end && (
+                  <> · Next billing: <strong className="text-ink-700">{formatDate(sub!.current_period_end)}</strong></>
+                )}
               </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-ink-600">
-              ${currentInterval === 'annual'
-                ? Math.round(ON_CALL[currentPlan].annual / 10)
-                : ON_CALL[currentPlan].monthly}/mo
-            </span>
-            <button
-              onClick={handleToggleOnCall}
-              disabled={actionLoading === 'set-on-call'}
-              className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
-              title={sub!.addon_on_call ? 'Disable On Call' : 'Enable On Call'}
-            >
-              {sub!.addon_on_call ? (
-                <ToggleRight className="w-8 h-8 text-accent-600" />
-              ) : (
-                <ToggleLeft className="w-8 h-8" />
+              {sub!.billing_interval === 'monthly' && sub!.status !== 'canceled' && !sub!.cancel_at_period_end && (
+                <button
+                  onClick={async () => {
+                    const result = await callManageSubscription('set-interval', { interval: 'annual' });
+                    if (result?.success) {
+                      await loadSubscription();
+                      setSuccessMsg('Switched to annual billing.');
+                    }
+                  }}
+                  disabled={actionLoading === 'set-interval'}
+                  className="text-accent-600 font-semibold hover:text-accent-700 transition-colors disabled:opacity-50"
+                >
+                  {actionLoading === 'set-interval' ? 'Updating...' : 'Switch to annual (save ~17%)'}
+                </button>
               )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. PM Seat Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-accent-50 flex items-center justify-center">
-              <UserCog className="w-4.5 h-4.5 text-accent-600" />
-            </div>
-            <div>
-              <h2 className="font-display text-base font-bold text-ink-900">Property manager seat</h2>
-              <p className="text-xs text-ink-400">
-                Property manager access
-                {hasPmUser && <span className="text-amber-600 ml-1">(active PM user exists)</span>}
-              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-ink-600">$79/mo</span>
-            <button
-              onClick={handleTogglePmSeat}
-              disabled={actionLoading === 'set-pm-seat' || hasPmUser}
-              className="text-ink-400 hover:text-accent-600 transition-colors disabled:opacity-50"
-              title={
-                hasPmUser
-                  ? 'Cannot disable while a property manager user exists'
-                  : sub!.pm_addon
-                    ? 'Disable property manager seat'
-                    : 'Enable property manager seat'
-              }
-            >
-              {sub!.pm_addon ? (
-                <ToggleRight className="w-8 h-8 text-accent-600" />
-              ) : (
-                <ToggleLeft className="w-8 h-8" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 4. Setup Section */}
       <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
