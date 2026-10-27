@@ -208,18 +208,15 @@ export function normalizePlan(tier: string): PlanId {
 const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : ({} as Record<string, string>);
 
 export const CB_PRICE = {
-  selfManagedMonthly:  env.VITE_CB_PRICE_SELF_MANAGED_MONTHLY  || 'Self-Managed-USD-Monthly',
-  selfManagedAnnual:   env.VITE_CB_PRICE_SELF_MANAGED_ANNUAL   || 'Self-Managed-USD-Annual',
-  facilitiesMonthly:   env.VITE_CB_PRICE_FACILITIES_MONTHLY    || 'Facilities-USD-Monthly',
-  facilitiesAnnual:    env.VITE_CB_PRICE_FACILITIES_ANNUAL     || 'Facilities-USD-Annual',
-  onCallSmMonthly:     env.VITE_CB_PRICE_ON_CALL_SM_MONTHLY    || 'OnCall-SM-USD-Monthly',
-  onCallSmAnnual:      env.VITE_CB_PRICE_ON_CALL_SM_ANNUAL     || 'OnCall-SM-USD-Annual',
-  onCallFacMonthly:    env.VITE_CB_PRICE_ON_CALL_FAC_MONTHLY   || 'OnCall-Fac-USD-Monthly',
-  onCallFacAnnual:     env.VITE_CB_PRICE_ON_CALL_FAC_ANNUAL    || 'OnCall-Fac-USD-Annual',
+  selfManagedMonthly:  env.VITE_CB_PRICE_SELF_MANAGED_MONTHLY  || 'Compliance-Pro-USD-Monthly',
+  selfManagedAnnual:   env.VITE_CB_PRICE_SELF_MANAGED_ANNUAL   || 'Compliance-Pro-USD-Yearly',
+  facilitiesMonthly:   env.VITE_CB_PRICE_FACILITIES_MONTHLY    || 'Plus-Facilities-USD-Monthly',
+  facilitiesAnnual:    env.VITE_CB_PRICE_FACILITIES_ANNUAL     || 'Plus-Facilities-USD-Yearly',
+  onCallMonthly:       env.VITE_CB_PRICE_ON_CALL_MONTHLY       || 'On-Call-USD-Monthly',
+  onCallAnnual:        env.VITE_CB_PRICE_ON_CALL_ANNUAL        || 'On-Call-USD-Yearly',
   pmSeatMonthly:       env.VITE_CB_PRICE_PM_SEAT_MONTHLY       || 'PM-Seat-USD-Monthly',
-  pmSeatAnnual:        env.VITE_CB_PRICE_PM_SEAT_ANNUAL        || 'PM-Seat-USD-Annual',
-  setupSm:             env.VITE_CB_PRICE_SETUP_SM              || 'Setup-SM-USD',
-  setupFac:            env.VITE_CB_PRICE_SETUP_FAC             || 'Setup-Fac-USD',
+  pmSeatAnnual:        env.VITE_CB_PRICE_PM_SEAT_ANNUAL        || 'PM-Seat-USD-Yearly',
+  setup:               env.VITE_CB_PRICE_SETUP                 || 'Setup-Fee-USD',
 } as const;
 
 export function planPriceId(plan: PlanId, interval: BillingInterval): string {
@@ -229,17 +226,14 @@ export function planPriceId(plan: PlanId, interval: BillingInterval): string {
   return interval === 'annual' ? CB_PRICE.selfManagedAnnual : CB_PRICE.selfManagedMonthly;
 }
 
-export function onCallPriceId(plan: PlanId, interval: BillingInterval): string {
-  if (plan === 'facilities') {
-    return interval === 'annual' ? CB_PRICE.onCallFacAnnual : CB_PRICE.onCallFacMonthly;
-  }
-  return interval === 'annual' ? CB_PRICE.onCallSmAnnual : CB_PRICE.onCallSmMonthly;
+export function onCallPriceId(_plan: PlanId, interval: BillingInterval): string {
+  return interval === 'annual' ? CB_PRICE.onCallAnnual : CB_PRICE.onCallMonthly;
 }
 
 export function pmSeatPriceId(interval: BillingInterval): string {
   return interval === 'annual' ? CB_PRICE.pmSeatAnnual : CB_PRICE.pmSeatMonthly;
 }
 
-export function setupPriceId(plan: PlanId): string {
-  return plan === 'facilities' ? CB_PRICE.setupFac : CB_PRICE.setupSm;
+export function setupPriceId(_plan: PlanId): string {
+  return CB_PRICE.setup;
 }

@@ -45,14 +45,11 @@ const CB_ITEM_PRICES: { label: string; value: string }[] = [
   { label: 'Self-Managed Annual', value: CB_PRICE.selfManagedAnnual },
   { label: 'Facilities Monthly', value: CB_PRICE.facilitiesMonthly },
   { label: 'Facilities Annual', value: CB_PRICE.facilitiesAnnual },
-  { label: 'On Call SM Monthly', value: CB_PRICE.onCallSmMonthly },
-  { label: 'On Call SM Annual', value: CB_PRICE.onCallSmAnnual },
-  { label: 'On Call Fac Monthly', value: CB_PRICE.onCallFacMonthly },
-  { label: 'On Call Fac Annual', value: CB_PRICE.onCallFacAnnual },
+  { label: 'On Call Monthly', value: CB_PRICE.onCallMonthly },
+  { label: 'On Call Annual', value: CB_PRICE.onCallAnnual },
   { label: 'PM Seat Monthly', value: CB_PRICE.pmSeatMonthly },
   { label: 'PM Seat Annual', value: CB_PRICE.pmSeatAnnual },
-  { label: 'Setup SM', value: CB_PRICE.setupSm },
-  { label: 'Setup Fac', value: CB_PRICE.setupFac },
+  { label: 'Setup', value: CB_PRICE.setup },
 ];
 
 export default function BillingTab() {
