@@ -482,6 +482,9 @@ export default function SubscriptionPage() {
 
   const handleOpenPortal = async () => {
     if (!supabase) return;
+    // Open a blank window synchronously (within the click handler) so the
+    // browser doesn't block it as a popup. We'll set the URL after the fetch.
+    const portalWindow = window.open('about:blank', '_blank');
     setActionLoading('portal');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -502,9 +505,17 @@ export default function SubscriptionPage() {
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Failed to open billing portal');
       if (data.url) {
-        window.open(data.url, '_blank');
+        if (portalWindow) {
+          portalWindow.location.href = data.url;
+        } else {
+          // Fallback if popup was still blocked
+          window.location.href = data.url;
+        }
+      } else {
+        portalWindow?.close();
       }
     } catch (err: any) {
+      portalWindow?.close();
       setError(err.message || 'Something went wrong');
     } finally {
       setActionLoading(null);
