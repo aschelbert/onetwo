@@ -18,7 +18,7 @@ import FeeScheduleTab from './tabs/FeeScheduleTab';
 import RoleCharter from '@/features/boardroom/components/RoleCharter';
 import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
 
-const TABS = ['people', 'docs', 'vendors', 'guidelines', 'settings'] as const;
+const TABS = ['settings', 'guidelines', 'people', 'docs', 'vendors'] as const;
 type TabId = typeof TABS[number];
 const TAB_LABELS: Record<TabId, string> = {
   people: 'People & Units',
@@ -302,9 +302,9 @@ export default function BuildingPage() {
           <div className="space-y-4">
             <div className="flex gap-2 flex-wrap mb-2">
               {([
+                ['roles', 'Who Does What'],
                 ['bylaws', 'Bylaws & Governance'],
                 ['fees', 'Fee Schedule'],
-                ['roles', 'Who Does What'],
               ] as [GuidelinesSubTab, string][]).map(([id, label]) => (
                 <button key={id} onClick={() => setGuidelinesSubTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${guidelinesSubTab === id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>{label}</button>
               ))}
