@@ -599,21 +599,21 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
         <p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Add one or more units. You can edit additional details (email, phone, sqft, etc.) after creation.</p>
         <table className="w-full text-sm">
           <thead><tr className="border-b border-ink-200 text-left">
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Unit # *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Monthly Fee *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Voting % *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Owner</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Status</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[80px]">Unit # *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[110px]">Monthly Fee *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[80px]">Voting % *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500 min-w-[240px]">Owner</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[140px]">Status</th>
             <th className="py-2 px-2 w-8"></th>
           </tr></thead>
           <tbody>
             {unitRows.map((row, i) => (
               <tr key={i} className="border-b border-ink-50">
-                <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="601" /></td>
-                <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="450" /></td>
-                <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="2.1" /></td>
+                <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="601" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="450" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="2.1" /></td>
                 <td className="py-1.5 px-2"><MemberPicker members={buildingMembers} selected={row.owners} onChange={names => { const rows = [...unitRows]; rows[i] = { ...rows[i], owners: names }; setUnitRows(rows); }} onInvite={() => setShowInviteModal(true)} placeholder="Select owner(s)…" /></td>
-                <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
+                <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
                 <td className="py-1.5 px-2">{unitRows.length > 1 && <button type="button" onClick={() => setUnitRows(unitRows.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>}</td>
               </tr>
             ))}

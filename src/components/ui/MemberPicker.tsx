@@ -56,7 +56,7 @@ export default function MemberPicker({ members, selected, onChange, onInvite, pl
       {/* Trigger */}
       <div
         onClick={() => setOpen(!open)}
-        className="w-full min-h-[38px] px-2 py-1.5 border border-ink-200 rounded-lg text-sm cursor-pointer flex flex-wrap items-center gap-1"
+        className="w-full min-h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white cursor-pointer flex flex-wrap items-center gap-1"
       >
         {selected.length === 0 && (
           <span className="text-ink-400 px-1">{placeholder}</span>
@@ -80,7 +80,7 @@ export default function MemberPicker({ members, selected, onChange, onInvite, pl
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-ink-200 rounded-lg shadow-lg">
+        <div className="absolute left-0 top-full mt-1 z-40 bg-white border border-ink-200 rounded-lg shadow-lg min-w-[320px]">
           {/* Search */}
           <div className="p-2 border-b border-ink-100">
             <input
