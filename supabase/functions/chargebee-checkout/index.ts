@@ -43,6 +43,9 @@ function pmSeatPriceId(interval: Interval): string {
   return interval === "annual" ? "PM-Seat-USD-Yearly" : "PM-Seat-USD-Monthly";
 }
 
+function setupPriceId(_plan: PlanId): string {
+  return "Setup-Fee-USD";
+}
 
 // ── Supabase helpers ──
 
@@ -220,6 +223,9 @@ Deno.serve(async (req) => {
       p.append("cancel_url", `${returnBase}/subscription?canceled=1`);
     } else if (body.building) {
       // ═══ NEW BUILDING MODE ═══
+      // Collect credit card via Chargebee hosted checkout page.
+      // Building data is saved to pending_checkouts; the chargebee-webhook
+      // handler provisions the tenant after checkout completes.
       const building = body.building as {
         name: string;
         subdomain?: string;
@@ -242,85 +248,78 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "building.name is required" }, 400);
       }
 
-      // Shared: create supabaseAdmin and fetch trial days for both setup and no-setup paths
+      // Fetch trial days for the hosted checkout page
       const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
       const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
       const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
 
-      {
-        // New building: no card needed. Create customer + subscription via API, provision directly.
-        const cp = new URLSearchParams();
-        cp.append('id', `cb_${user.id}`);
-        cp.append('email', user.email || '');
-        cp.append('first_name', building.firstName || building.contactName || '');
+      // Create Chargebee customer first so we can link pending_checkouts
+      const cp = new URLSearchParams();
+      cp.append('id', `cb_${user.id}`);
+      cp.append('email', user.email || '');
+      cp.append('first_name', building.firstName || building.contactName || '');
       cp.append('last_name', building.lastName || '');
-        const custResult = await chargebeeRequest('customers', cp);
-        const customerId = custResult.customer.id;
+      const custResult = await chargebeeRequest('customers', cp);
+      const customerId = custResult.customer.id;
 
-        const sp = new URLSearchParams();
-        let sIdx = 0;
-        sp.append(`subscription_items[item_price_id][${sIdx}]`, planPriceId(plan, interval));
-        sp.append(`subscription_items[quantity][${sIdx}]`, '1');
-        sIdx++;
-        if (onCall) {
-          sp.append(`subscription_items[item_price_id][${sIdx}]`, onCallPriceId(plan, interval));
-          sp.append(`subscription_items[quantity][${sIdx}]`, '1');
-          sIdx++;
-        }
-        if (pmSeat) {
-          sp.append(`subscription_items[item_price_id][${sIdx}]`, pmSeatPriceId(interval));
-          sp.append(`subscription_items[quantity][${sIdx}]`, '1');
-          sIdx++;
-        }
-
-        // Set trial period — no card is collected in this path
-        sp.append('subscription[trial_period]', String(trialDays));
-        sp.append('subscription[trial_period_unit]', 'day');
-
-        // Custom field required by Chargebee — set to "pending", updated after provisioning
-        // Note: subscription_for_items under customer takes cf_ fields at top level, not under subscription[]
-        sp.append(CF_TENANT_ID, 'pending');
-
-        // PC 2.0: subscription created under the customer resource
-        const subResult = await chargebeeRequest(`customers/${customerId}/subscription_for_items`, sp);
-        const cbSub = subResult.subscription;
-
-        // Provision tenant directly
-        const { data: provResult, error: provError } = await supabaseAdmin.rpc('provision_tenant', {
-          p_name: building.name,
-          p_address: building.address || {},
-          p_total_units: building.totalUnits || 0,
-          p_year_built: null,
-          p_plan: plan,
-          p_contact_name: building.contactName || '',
-          p_contact_email: user.email || '',
-          p_contact_phone: '',
-          p_user_id: user.id,
-          p_on_call: !!onCall,
-          p_pm_seat: !!pmSeat,
-          p_billing_interval: interval,
-          p_chargebee_customer_id: customerId,
-          p_chargebee_subscription_id: cbSub.id,
-          p_board_title: building.boardTitle || 'President',
-          p_subdomain: building.subdomain || null,
+      // Save building data for the webhook to provision after checkout
+      await sbQuery("POST", "pending_checkouts", {}, {
+        chargebee_customer_id: customerId,
+        user_id: user.id,
+        payload: {
+          name: building.name,
+          subdomain: building.subdomain || null,
+          address: building.address || {},
+          totalUnits: building.totalUnits || 0,
+          contactName: building.contactName || '',
+          contactEmail: user.email || '',
+          boardTitle: building.boardTitle || 'President',
+          plan,
+          userId: user.id,
           // HO-18 extended fields
-          p_role: building.role || 'board_member',
-          p_role_key: building.roleKey || null,
-          p_first_name: building.firstName || null,
-          p_last_name: building.lastName || null,
-          p_mar_address_id: building.marAddressId || null,
-          p_ssl: building.ssl || null,
-          p_ward: building.ward || null,
-          p_address_flag: building.addressFlag || null,
-        });
+          role: building.role || 'board_member',
+          roleKey: building.roleKey || null,
+          firstName: building.firstName || null,
+          lastName: building.lastName || null,
+          marAddressId: building.marAddressId || null,
+          ssl: building.ssl || null,
+          ward: building.ward || null,
+          addressFlag: building.addressFlag || null,
+        },
+      });
 
-        if (provError) {
-          return new Response(JSON.stringify({ error: provError.message }), { status: 500, headers: cors });
-        }
-
-        return new Response(JSON.stringify({ provisioned: true, tenantId: provResult.tenant_id, subdomain: provResult.subdomain }), { headers: cors });
+      // PM Seat addon
+      if (pmSeat) {
+        p.append(`subscription_items[item_price_id][${itemIdx}]`, pmSeatPriceId(interval));
+        p.append(`subscription_items[quantity][${itemIdx}]`, "1");
+        itemIdx++;
       }
+
+      // Trial period shown on the hosted checkout page
+      p.append("subscription[trial_period]", String(trialDays));
+      p.append("subscription[trial_period_unit]", "day");
+
+      // Customer (pre-created above)
+      p.append("customer[id]", customerId);
+      p.append("customer[email]", user.email || "");
+
+      // Custom field: set to "pending" — the webhook will update after provisioning
+      p.append(`subscription[${CF_TENANT_ID}]`, "pending");
+
+      // Billing address for tax calculation
+      if (building.address) {
+        if (building.address.street) p.append("billing_address[line1]", building.address.street);
+        if (building.address.city) p.append("billing_address[city]", building.address.city);
+        if (building.address.state) p.append("billing_address[state_code]", building.address.state);
+        if (building.address.zip) p.append("billing_address[zip]", building.address.zip);
+        p.append("billing_address[country]", "US");
+      }
+
+      // Redirect URLs — ?provisioned=1 triggers the AuthPage polling flow
+      // that waits for the webhook to provision the tenant, then auto-logs in
+      p.append("redirect_url", `${returnBase}/login?provisioned=1`);
+      p.append("cancel_url", `${returnBase}/login?checkout=canceled`);
     } else {
       return jsonResponse(
         { error: "Either building (new) or tenantId (existing) must be provided" },
