@@ -336,11 +336,39 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
     // Load tenant from Supabase (only once per session — prevents re-runs
     // from wiping in-flight store data via resetStoresForRealTenant)
-    if (hasLoadedDataRef.current) return;
+    if (hasLoadedDataRef.current) {
+      return;
+    }
     hasLoadedDataRef.current = true;
 
     (async () => {
       try {
+        // Wait for Supabase to restore its auth session before querying
+        // RLS-protected tables. On page refresh, Zustand rehydrates
+        // isAuthenticated from localStorage instantly, but the Supabase
+        // client restores its JWT asynchronously. Querying before the
+        // session is ready returns empty results (auth.uid() is null).
+        let { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          // Session not yet restored — wait for the INITIAL_SESSION event
+          session = await new Promise<any>((resolve) => {
+            const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+              (event, sess) => {
+                if (sess) { sub.unsubscribe(); resolve(sess); }
+                if (event === 'SIGNED_OUT') { sub.unsubscribe(); resolve(null); }
+              }
+            );
+            // Timeout: if no session arrives within 5s, give up
+            setTimeout(() => { sub.unsubscribe(); resolve(null); }, 5000);
+          });
+        }
+        if (!session) {
+          // No valid session — let AuthListener handle sign-out
+          hasLoadedDataRef.current = false; // allow retry after re-auth
+          setLoaded(true);
+          return;
+        }
+
         // Get user's tenant membership
         const { data: tu } = await supabase
           .from('tenant_users')
