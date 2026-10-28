@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import type { FeeScheduleItem } from '@/store/useFeeScheduleStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt } from '@/lib/formatters';
@@ -38,6 +39,9 @@ export default function FeeScheduleTab() {
   const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const { fees, addFee, updateFee, removeFee, toggleFee } = useFeeScheduleStore();
+  const finStore = useFinancialStore();
+  const [dueDayModal, setDueDayModal] = useState(false);
+  const [dueDay, setDueDay] = useState(String(finStore.hoaDueDay));
 
   const [catFilter, setCatFilter] = useState<string>('all');
   const [modal, setModal] = useState<null | 'add' | 'edit'>(null);
@@ -153,6 +157,15 @@ export default function FeeScheduleTab() {
   // ── Board / PM Management View ──
   return (
     <div className="space-y-4">
+      {/* Assessment Due Day */}
+      <div className="bg-mist-50 rounded-xl p-5 border border-mist-200 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-ink-500 mb-1">Assessment Due Day</p>
+          <p className="text-lg font-bold text-ink-900">{finStore.hoaDueDay}{finStore.hoaDueDay === 1 ? 'st' : finStore.hoaDueDay === 2 ? 'nd' : finStore.hoaDueDay === 3 ? 'rd' : 'th'} of each month</p>
+        </div>
+        <button onClick={() => { setDueDay(String(finStore.hoaDueDay)); setDueDayModal(true); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
+      </div>
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="font-display text-xl font-bold text-ink-900">Fee Schedule</h3>
         <button onClick={() => { resetForm(); sf('category', 'assessment'); sf('amountType', 'flat'); sf('frequency', 'per-occurrence'); setModal('add'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">
@@ -226,6 +239,19 @@ export default function FeeScheduleTab() {
           </tbody>
         </table>
       </div>
+
+      {/* Due Day Modal */}
+      {dueDayModal && (
+        <Modal title="Assessment Due Day" onClose={() => setDueDayModal(false)} onSave={() => { finStore.setHoaDueDay(parseInt(dueDay) || 1); setDueDayModal(false); }}>
+          <div className="space-y-3">
+            <p className="text-xs text-ink-500">Set the day of the month when monthly assessments are due.</p>
+            <div>
+              <label className="block text-xs font-medium text-ink-700 mb-1">Due Day (1-28)</label>
+              <input type="number" min="1" max="28" value={dueDay} onChange={e => setDueDay(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Add / Edit Modal */}
       {modal && (

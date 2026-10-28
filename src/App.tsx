@@ -27,6 +27,7 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import UiKitPage from '@/features/dev/UiKitPage';
+import UserManagementPage from '@/features/admin/UserManagementPage';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -302,11 +303,11 @@ export default function App() {
           {/* Redirects for removed routes */}
           <Route path="/issues" element={<Navigate to="/cases" replace />} />
           <Route path="/association-team" element={<Navigate to="/building?tab=people" replace />} />
-          <Route path="/admin/users" element={<Navigate to="/building?tab=people" replace />} />
+          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/property-log" element={<Navigate to="/building?tab=people" replace />} />
+          <Route path="/property-log" element={<Navigate to="/boardroom?tab=property_log" replace />} />
         </Route>
 
         {/* Dev-only UI kit route */}

@@ -31,6 +31,7 @@ import AfterTab from './tabs/AfterTab';
 import CasesTab from './tabs/CasesTab';
 import { DEFAULT_SETTINGS } from '@/lib/buildingSettings';
 import { ChevronRight } from 'lucide-react';
+import PropertyLogPage from '@/features/property-log/PropertyLogPage';
 
 const ROLE_COLORS: Record<string, string> = { President:'accent', 'Vice President':'mist', Treasurer:'sage', Secretary:'yellow', 'Member at Large':'purple' };
 const DUTY_LABELS: Record<string, string> = { care:'Duty of Care', loyalty:'Duty of Loyalty', obedience:'Duty of Obedience' };
@@ -39,7 +40,7 @@ const COMM_TYPES: Record<string, string> = { notice:'bg-accent-100 text-accent-7
 const TYPE_BADGE: Record<string, string> = { BOARD:'bg-accent-100 text-accent-700', ANNUAL:'bg-sage-100 text-sage-700', QUARTERLY:'bg-mist-100 text-ink-600', SPECIAL:'bg-yellow-100 text-yellow-700', EMERGENCY:'bg-red-100 text-red-700' };
 const STATUS_BADGE: Record<string, string> = { SCHEDULED:'bg-accent-100 text-accent-700', COMPLETED:'bg-sage-100 text-sage-700', CANCELLED:'bg-red-100 text-red-700', RESCHEDULED:'bg-yellow-100 text-yellow-700' };
 
-type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops' | 'before' | 'meeting_day' | 'after' | 'outbox' | 'cases' | 'roles';
+type TabId = 'duties' | 'runbook' | 'meetings' | 'votes' | 'communications' | 'dailyops' | 'before' | 'meeting_day' | 'after' | 'outbox' | 'cases' | 'roles' | 'property_log';
 type ModalType = null | 'addFiling' | 'markFiled' | 'addComm' | 'addMeeting' | 'editMeeting' | 'attendees' | 'minutes' | 'addFilingAtt' | 'linkCaseToMeeting' | 'createCaseForMeeting' | 'addRunbookAtt' | 'runbookLinkOrCreate' | 'addDocument' | 'addAnnouncement';
 
 function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeting }: {
@@ -87,7 +88,7 @@ export default function BoardRoomPage() {
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const validTabs: TabId[] = ['before', 'meeting_day', 'after', 'outbox', 'cases', 'roles'];
+  const validTabs: TabId[] = ['before', 'meeting_day', 'after', 'outbox', 'cases', 'roles', 'property_log'];
   const [tab, setTab] = useTabParam<TabId>('tab', 'before', validTabs);
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
@@ -385,6 +386,7 @@ export default function BoardRoomPage() {
     { id: 'outbox', label: 'Outbox', badge: pendingCommsCount || undefined },
     { id: 'cases', label: 'Cases', badge: openCasesCount || undefined },
     { id: 'roles', label: 'Roles' },
+    { id: 'property_log', label: 'Property Log' },
   ];
 
   return (
@@ -1115,6 +1117,9 @@ export default function BoardRoomPage() {
 
         {/* Roles tab — combined Role Charters + Calendar */}
         {tab === 'roles' && <RolesCalendarTab />}
+
+        {/* Property Log tab */}
+        {tab === 'property_log' && <PropertyLogPage />}
 
       </div>
 

@@ -12,7 +12,7 @@ import type { Unit } from '@/types/financial';
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 type ModalKind = null | 'addUnit' | 'editUnit' | 'pay' | 'fee' | 'special' | 'detail' | 'stripe'
-  | 'editMonthly' | 'bulkAssessment' | 'sendInvoice' | 'editDueDay';
+  | 'editMonthly' | 'bulkAssessment' | 'sendInvoice';
 type SortKey = 'number' | 'owner' | 'balance' | 'accountStatus';
 type AccountFilter = 'all' | 'current' | 'behind' | 'delinquent' | 'for_sale';
 
@@ -381,7 +381,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       {/* Action Bar */}
       {isBoard && (
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Manage Monthly Due Day</button>
           {!isBuildingView && <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>}
           {!isBuildingView && <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>}
           {!isBuildingView && stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
@@ -596,8 +595,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       {modal === 'fee' && <Modal title={`Impose Fee — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleFee} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A fee invoice will be created, recorded in the GL, and emailed to the unit owner.</p>{field('Amount *', 'amount', 'number', '25')}{field('Reason *', 'reason', 'text', 'e.g., Late payment — Feb 2026')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
       {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p>{field('Amount *', 'amount', 'number', '500')}{field('Reason *', 'reason', 'text', 'e.g., Roof emergency repair assessment')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
-
-      {modal === 'editDueDay' && <Modal title="Assessment Due Day" onClose={() => { setModal(null); resetForm(); }} onSave={() => { store.setHoaDueDay(parseInt(f('dueDay')) || 1); setModal(null); resetForm(); }}><div className="space-y-3"><p className="text-xs text-ink-500">Set the day of the month when monthly assessments are due.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Day (1-28)</label><input type="number" min="1" max="28" value={f('dueDay')} onChange={e => sf('dueDay', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
       {modal === 'editMonthly' && <Modal title="Edit Unit Monthly Fee" onClose={() => { setModal(null); resetForm(); }} onSave={handleUpdateMonthly}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Select Unit</label><select value={f('unitNum')} onChange={e => { sf('unitNum', e.target.value); const u = store.units.find(x => x.number === e.target.value); if (u) sf('monthlyFee', String(u.monthlyFee)); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner} ({fmt(u.monthlyFee)})</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">New Monthly Fee</label><input type="number" value={f('monthlyFee')} onChange={e => sf('monthlyFee', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 

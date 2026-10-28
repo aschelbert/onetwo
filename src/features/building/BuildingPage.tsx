@@ -3,13 +3,9 @@ import { useTabParam } from '@/hooks/useTabParam';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { useTenantContext } from '@/components/TenantProvider';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { getInitials, fmt } from '@/lib/formatters';
 import { Building2 } from 'lucide-react';
-import type { Role, BoardRoleKey } from '@/types/auth';
-import { BOARD_ROLE_LABELS } from '@/types/auth';
-import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 import TheUnitsTab from './tabs/TheUnitsTab';
 import UnitsManager from './tabs/UnitsManager';
@@ -19,26 +15,29 @@ import VendorsTab from './tabs/VendorsTab';
 import AssetsTab from './tabs/AssetsTab';
 import MailingSettingsTab from './tabs/MailingSettingsTab';
 import FeeScheduleTab from './tabs/FeeScheduleTab';
-import PMScorecardTab from './tabs/PMScorecardTab';
-import PropertyLogPage from '@/features/property-log/PropertyLogPage';
+import RoleCharter from '@/features/boardroom/components/RoleCharter';
+import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
 
-const TABS = ['people', 'docs', 'vendors', 'settings'] as const;
+const TABS = ['people', 'docs', 'vendors', 'guidelines', 'settings'] as const;
 type TabId = typeof TABS[number];
 const TAB_LABELS: Record<TabId, string> = {
   people: 'People & Units',
   docs: 'Documents & Insurance',
   vendors: 'Vendors & Assets',
-  settings: 'Settings',
+  guidelines: 'Association Guidelines',
+  settings: 'Building Profile',
 };
 
 // Sub-tabs within People & Units
-type PeopleSubTab = 'units' | 'board' | 'invites' | 'log';
+type PeopleSubTab = 'units' | 'board';
 // Sub-tabs within Docs & Insurance
 type DocsSubTab = 'legal' | 'insurance';
 // Sub-tabs within Vendors & Assets
 type VendorsSubTab = 'vendors' | 'assets';
+// Sub-tabs within Association Guidelines
+type GuidelinesSubTab = 'bylaws' | 'fees' | 'roles';
 // Sub-tabs within Settings
-type SettingsSubTab = 'address' | 'details' | 'management' | 'mailing' | 'fees' | 'bylaws' | 'pm_scorecard';
+type SettingsSubTab = 'details' | 'mailing';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (val: string) => void; type?: string; placeholder?: string }) {
   return (
@@ -46,16 +45,14 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: { la
   );
 }
 
-type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint' | 'addAsset' | 'editAsset' | 'autoMaintVendor' | 'invite';
+type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint' | 'addAsset' | 'editAsset' | 'autoMaintVendor';
 
 export default function BuildingPage() {
   const store = useBuildingStore();
-  const { currentRole, buildingMembers, buildingInvites, revokeInvite } = useAuthStore();
+  const { currentRole } = useAuthStore();
   const finStore = useFinancialStore();
-  const tenant = useTenantContext();
   const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-  const isPMAddon = tenant.addons?.pmSeat ?? false;
 
   const [tab, setTab] = useTabParam<TabId>('tab', 'people', [...TABS]);
   const [modal, setModal] = useState<ModalState>(null);
@@ -73,11 +70,9 @@ export default function BuildingPage() {
   const [peopleSubTab, setPeopleSubTab] = useState<PeopleSubTab>('units');
   const [docsSubTab, setDocsSubTab] = useState<DocsSubTab>('legal');
   const [vendorsSubTab, setVendorsSubTab] = useState<VendorsSubTab>('vendors');
-  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('address');
-
-  // Invite form
-  const [inviteForm, setInviteForm] = useState({ email: '', role: 'resident', unit: '', roleKey: '' });
-  const [inviteSending, setInviteSending] = useState(false);
+  const [guidelinesSubTab, setGuidelinesSubTab] = useState<GuidelinesSubTab>('bylaws');
+  const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('details');
+  const [whoDoesWhatRole, setWhoDoesWhatRole] = useState<BoardRoleKey>('president');
 
   // ─── Building Compliance Health ───
   const totalDocs = store.legalDocuments.length;
@@ -131,7 +126,7 @@ export default function BuildingPage() {
               <p className="text-[10px] text-accent-300">{m.detail}</p>
             </div>
           ))}
-          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => setTab('people')}>
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-3 text-center cursor-pointer hover:bg-opacity-20" onClick={() => { setTab('guidelines'); setGuidelinesSubTab('fees'); }}>
             <p className="text-[11px] text-accent-100 leading-tight">Monthly Due Day</p>
             <p className="text-sm font-bold mt-1 text-white">{finStore.hoaDueDay}{finStore.hoaDueDay === 1 ? 'st' : finStore.hoaDueDay === 2 ? 'nd' : finStore.hoaDueDay === 3 ? 'rd' : 'th'}</p>
             <p className="text-[10px] text-accent-300">of each month</p>
@@ -160,8 +155,6 @@ export default function BuildingPage() {
                 {([
                   ['units', 'Units'],
                   ['board', 'Board & Contacts'],
-                  ['invites', 'Invitations'],
-                  ['log', 'Property Log'],
                 ] as [PeopleSubTab, string][]).map(([id, label]) => (
                   <button key={id} onClick={() => setPeopleSubTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${peopleSubTab === id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>{label}</button>
                 ))}
@@ -228,56 +221,6 @@ export default function BuildingPage() {
                 </div>
               </div>
             )}
-
-            {peopleSubTab === 'invites' && isBoard && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xl font-bold text-ink-900">Invitations</h3>
-                  <button onClick={() => { setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' }); setModal('invite'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium">+ Invite User</button>
-                </div>
-
-                {/* Pending invites */}
-                {buildingInvites.filter(inv => inv.status === 'pending').length > 0 ? (
-                  <div className="space-y-2">
-                    {buildingInvites.filter(inv => inv.status === 'pending').map(inv => (
-                      <div key={inv.id} className="flex items-center justify-between bg-mist-50 border border-mist-200 rounded-lg p-4">
-                        <div>
-                          <p className="text-sm font-medium text-ink-900">{inv.email}</p>
-                          <p className="text-xs text-ink-500">{inv.role}{inv.unit ? ` -- Unit ${inv.unit}` : ''} -- Code: {inv.code}</p>
-                        </div>
-                        <button onClick={() => {
-                          revokeInvite(inv.id);
-                          runUndoable({ label: `Revoked invite for ${inv.email}`, undo: () => {}, commit: () => {} });
-                        }} className="text-xs text-red-400 hover:text-red-600">Revoke</button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-ink-400">No pending invitations.</p>
-                )}
-
-                {/* Building members */}
-                <div>
-                  <h4 className="text-sm font-bold text-ink-700 mb-2 mt-4">Current Members ({buildingMembers.length})</h4>
-                  <div className="space-y-2">
-                    {buildingMembers.map(m => (
-                      <div key={m.id} className="flex items-center justify-between bg-white border border-ink-100 rounded-lg p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-ink-900 flex items-center justify-center shrink-0"><span className="text-white font-bold text-xs">{getInitials(m.name)}</span></div>
-                          <div>
-                            <p className="text-sm font-medium text-ink-900">{m.name}</p>
-                            <p className="text-xs text-ink-500">{m.email} {m.unit ? `-- Unit ${m.unit}` : ''}</p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-lg font-semibold bg-ink-100 text-ink-600">{m.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {peopleSubTab === 'log' && isBoard && <PropertyLogPage />}
 
             {/* Residents see board contacts only */}
             {!isBoard && (
@@ -354,62 +297,20 @@ export default function BuildingPage() {
           </div>
         )}
 
-        {/* ─── SETTINGS ─── */}
-        {tab === 'settings' && (
+        {/* ─── ASSOCIATION GUIDELINES ─── */}
+        {tab === 'guidelines' && (
           <div className="space-y-4">
             <div className="flex gap-2 flex-wrap mb-2">
               {([
-                ['address', 'Address'],
-                ['details', 'Building Details'],
-                ['management', 'Property Management'],
-                ['mailing', 'Mailing'],
-                ['fees', 'Fee Schedule'],
                 ['bylaws', 'Bylaws & Governance'],
-                ...(isPMAddon ? [['pm_scorecard', 'PM Scorecard'] as [SettingsSubTab, string]] : []),
-              ] as [SettingsSubTab, string][]).map(([id, label]) => (
-                <button key={id} onClick={() => setSettingsSubTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${settingsSubTab === id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>{label}</button>
+                ['fees', 'Fee Schedule'],
+                ['roles', 'Who Does What'],
+              ] as [GuidelinesSubTab, string][]).map(([id, label]) => (
+                <button key={id} onClick={() => setGuidelinesSubTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${guidelinesSubTab === id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>{label}</button>
               ))}
             </div>
 
-            {settingsSubTab === 'address' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xl font-bold text-ink-900">Building Address</h3>
-                  <button onClick={() => { setForm({ street: store.address.street, city: store.address.city, state: store.address.state, zip: store.address.zip }); setModal('editAddress'); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                </div>
-                <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
-                  <div className="bg-white rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Address</p><p className="text-sm font-bold text-ink-900">{store.address.street}, {store.address.city}, {store.address.state} {store.address.zip}</p></div>
-                </div>
-              </div>
-            )}
-
-            {settingsSubTab === 'details' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xl font-bold text-ink-900">Building Details</h3>
-                  <button onClick={() => { setForm({ yearBuilt: store.details.yearBuilt, totalUnits: String(store.details.totalUnits), floors: String(store.details.floors), type: store.details.type, sqft: store.details.sqft, lotSize: store.details.lotSize, parking: store.details.parking, architect: store.details.architect, contractor: store.details.contractor, amenities: store.details.amenities.join(', '), entityType: store.details.entityType, fiscalYearEnd: store.details.fiscalYearEnd || '12-31' }); setModal('editDetails'); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                </div>
-                <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{([['Year Built', store.details.yearBuilt], ['Units', store.details.totalUnits], ['Floors', store.details.floors], ['Type', store.details.type], ['Sq Footage', store.details.sqft], ['Lot Size', store.details.lotSize], ['Parking', store.details.parking], ['Entity', store.details.entityType === 'incorporated' ? 'Incorporated' : 'Unincorporated'], ['Fiscal Year End', (() => { const fye = store.details.fiscalYearEnd || '12-31'; const [m, d] = fye.split('-'); const dt = new Date(2000, parseInt(m) - 1, parseInt(d)); return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); })()]] as [string, string|number][]).map(([label, val]) => (<div key={label} className="bg-white rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">{label}</p><p className="text-sm font-bold text-ink-900">{val}</p></div>))}</div>
-                </div>
-                <div><p className="text-sm font-bold text-ink-900 mb-2">Building Team</p><p className="text-sm text-ink-500"><strong>Architect:</strong> {store.details.architect}</p><p className="text-sm text-ink-500"><strong>Contractor:</strong> {store.details.contractor}</p></div>
-                <div><p className="text-sm font-bold text-ink-900 mb-2">Amenities</p><div className="flex flex-wrap gap-2">{store.details.amenities.map(a => <span key={a} className="px-3 py-1 bg-accent-100 text-accent-700 rounded-full text-xs font-medium">{a}</span>)}</div></div>
-              </div>
-            )}
-
-            {settingsSubTab === 'management' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xl font-bold text-ink-900">Property Management</h3>
-                  <button onClick={() => { setForm({ company: store.management.company, contact: store.management.contact, title: store.management.title, email: store.management.email, phone: store.management.phone, emergency: store.management.emergency, address: store.management.address, hours: store.management.hours }); setModal('editMgmt'); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                </div>
-                <div className="bg-sage-50 rounded-xl p-5 border border-sage-200"><h4 className="text-lg font-bold text-ink-900">{store.management.company}</h4><p className="text-sm text-sage-600 font-semibold">{store.management.contact} -- {store.management.title}</p><div className="grid grid-cols-2 gap-3 mt-3 text-sm"><div><span className="text-ink-400">Email:</span> <span className="text-ink-700">{store.management.email}</span></div><div><span className="text-ink-400">Phone:</span> <span className="text-ink-700">{store.management.phone}</span></div><div><span className="text-ink-400">Emergency:</span> <span className="text-red-600 font-semibold">{store.management.emergency}</span></div><div><span className="text-ink-400">Hours:</span> <span className="text-ink-700">{store.management.hours}</span></div></div></div>
-              </div>
-            )}
-
-            {settingsSubTab === 'mailing' && isBoard && <MailingSettingsTab />}
-            {settingsSubTab === 'fees' && <FeeScheduleTab />}
-            {settingsSubTab === 'bylaws' && (
+            {guidelinesSubTab === 'bylaws' && (
               <div className="space-y-4">
                 <h3 className="font-display text-xl font-bold text-ink-900">Bylaws & Governance Facts</h3>
                 <p className="text-xs text-ink-500">These values come from your bylaws and are used for meeting scheduling, spending approvals, and compliance tracking. Edit them in the Building Details or through the relevant setting screens.</p>
@@ -423,71 +324,77 @@ export default function BuildingPage() {
                 </div>
               </div>
             )}
-            {settingsSubTab === 'pm_scorecard' && isPMAddon && <PMScorecardTab />}
+            {guidelinesSubTab === 'fees' && <FeeScheduleTab />}
+            {guidelinesSubTab === 'roles' && (
+              <div>
+                <div className="mb-4">
+                  <h3 className="font-display text-lg font-bold text-ink-900">Who Does What</h3>
+                  <p className="text-xs text-ink-400 mt-0.5">Board member responsibilities and task assignments</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap mb-4">
+                  {(['president', 'vice_president', 'treasurer', 'secretary', 'member_at_large'] as BoardRoleKey[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setWhoDoesWhatRole(r)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                        whoDoesWhatRole === r
+                          ? 'bg-navy text-white'
+                          : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
+                      }`}
+                    >
+                      {BOARD_ROLE_LABELS[r]}
+                    </button>
+                  ))}
+                </div>
+                <RoleCharter roleKey={whoDoesWhatRole} readOnly />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── SETTINGS ─── */}
+        {tab === 'settings' && (
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap mb-2">
+              {([
+                ['details', 'Building Details'],
+                ['mailing', 'Mailing'],
+              ] as [SettingsSubTab, string][]).map(([id, label]) => (
+                <button key={id} onClick={() => setSettingsSubTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${settingsSubTab === id ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>{label}</button>
+              ))}
+            </div>
+
+            {settingsSubTab === 'details' && (
+              <div className="space-y-6">
+                {/* Address */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-display text-xl font-bold text-ink-900">Building Address</h3>
+                    <button onClick={() => { setForm({ street: store.address.street, city: store.address.city, state: store.address.state, zip: store.address.zip }); setModal('editAddress'); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
+                  </div>
+                  <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
+                    <div className="bg-white rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Address</p><p className="text-sm font-bold text-ink-900">{store.address.street}, {store.address.city}, {store.address.state} {store.address.zip}</p></div>
+                  </div>
+                </div>
+                {/* Building Details */}
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-xl font-bold text-ink-900">Building Details</h3>
+                  <button onClick={() => { setForm({ yearBuilt: store.details.yearBuilt, totalUnits: String(store.details.totalUnits), floors: String(store.details.floors), type: store.details.type, sqft: store.details.sqft, lotSize: store.details.lotSize, parking: store.details.parking, architect: store.details.architect, contractor: store.details.contractor, amenities: store.details.amenities.join(', '), entityType: store.details.entityType, fiscalYearEnd: store.details.fiscalYearEnd || '12-31' }); setModal('editDetails'); }} className="text-sm text-accent-600 font-medium hover:text-accent-700">Edit</button>
+                </div>
+                <div className="bg-mist-50 rounded-xl p-5 border border-mist-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{([['Year Built', store.details.yearBuilt], ['Units', store.details.totalUnits], ['Floors', store.details.floors], ['Type', store.details.type], ['Sq Footage', store.details.sqft], ['Lot Size', store.details.lotSize], ['Parking', store.details.parking], ['Entity', store.details.entityType === 'incorporated' ? 'Incorporated' : 'Unincorporated'], ['Fiscal Year End', (() => { const fye = store.details.fiscalYearEnd || '12-31'; const [m, d] = fye.split('-'); const dt = new Date(2000, parseInt(m) - 1, parseInt(d)); return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); })()]] as [string, string|number][]).map(([label, val]) => (<div key={label} className="bg-white rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">{label}</p><p className="text-sm font-bold text-ink-900">{val}</p></div>))}</div>
+                </div>
+                <div><p className="text-sm font-bold text-ink-900 mb-2">Building Team</p><p className="text-sm text-ink-500"><strong>Architect:</strong> {store.details.architect}</p><p className="text-sm text-ink-500"><strong>Contractor:</strong> {store.details.contractor}</p></div>
+                <div><p className="text-sm font-bold text-ink-900 mb-2">Amenities</p><div className="flex flex-wrap gap-2">{store.details.amenities.map(a => <span key={a} className="px-3 py-1 bg-accent-100 text-accent-700 rounded-full text-xs font-medium">{a}</span>)}</div></div>
+              </div>
+            )}
+
+            {settingsSubTab === 'mailing' && isBoard && <MailingSettingsTab />}
           </div>
         )}
       </div>
 
       {/* ─── MODALS ─── */}
-
-      {/* Invite Modal */}
-      {modal === 'invite' && (
-        <Modal title="Invite User" onClose={() => setModal(null)} onSave={async () => {
-          if (!inviteForm.email || inviteSending) return;
-          setInviteSending(true);
-          try {
-            if (supabase) {
-              const { data: { session } } = await supabase.auth.getSession();
-              await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/send-invite`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session?.access_token}`,
-                  },
-                  body: JSON.stringify({
-                    email: inviteForm.email,
-                    role: inviteForm.role,
-                    unit: inviteForm.unit || undefined,
-                    roleKey: inviteForm.role === 'board_member' && inviteForm.roleKey ? inviteForm.roleKey : undefined,
-                    senderName: store.board.find(m => m.email === useAuthStore.getState().currentUser.email)?.name || useAuthStore.getState().currentUser.name,
-                  }),
-                },
-              );
-            }
-            setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' });
-            setModal(null);
-          } finally {
-            setInviteSending(false);
-          }
-        }}>
-          <div className="space-y-3">
-            <Field label="Email *" value={inviteForm.email} onChange={v => setInviteForm(p => ({ ...p, email: v }))} type="email" placeholder="user@example.com" />
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Role *</label>
-              <select value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value, roleKey: '' }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                <option value="resident">Resident</option>
-                <option value="board_member">Board Member</option>
-                <option value="property_manager">Property Manager</option>
-                <option value="staff">Staff</option>
-              </select>
-            </div>
-            {inviteForm.role === 'board_member' && (
-              <div>
-                <label className="block text-xs font-medium text-ink-700 mb-1">Board Seat</label>
-                <select value={inviteForm.roleKey} onChange={e => setInviteForm(p => ({ ...p, roleKey: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                  <option value="">Let them pick</option>
-                  {(Object.entries(BOARD_ROLE_LABELS) as [BoardRoleKey, string][]).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <Field label="Unit (optional)" value={inviteForm.unit} onChange={v => setInviteForm(p => ({ ...p, unit: v }))} placeholder="101" />
-          </div>
-        </Modal>
-      )}
 
       {(modal === 'addBoard' || modal === 'editBoard') && (<Modal title={modal === 'addBoard' ? 'Add Board Member' : 'Edit Board Member'} onClose={() => { setModal(null); resetForm(); }} onSave={() => { if (!f('name') || !f('role')) return; const data = { name: f('name'), role: f('role'), email: f('email'), phone: f('phone'), term: f('term') }; if (modal === 'addBoard') store.addBoardMember(data); else store.updateBoardMember(editId, data); setModal(null); resetForm(); }}><div className="space-y-3"><Field label="Full Name *" value={f('name')} onChange={v => sf('name', v)} placeholder="Jane Doe" /><div><label className="block text-xs font-medium text-ink-700 mb-1">Board Role *</label><select value={f('role')} onChange={e => sf('role', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select...</option>{['President','Vice President','Treasurer','Secretary','Member at Large'].map(r => <option key={r}>{r}</option>)}</select></div><div className="grid grid-cols-2 gap-3"><Field label="Email" value={f('email')} onChange={v => sf('email', v)} type="email" /><Field label="Phone" value={f('phone')} onChange={v => sf('phone', v)} /></div><Field label="Term" value={f('term')} onChange={v => sf('term', v)} placeholder="Jan 2025 - Dec 2026" /></div></Modal>)}
 

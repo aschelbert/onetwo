@@ -10,10 +10,9 @@ import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AmenitiesTab from '@/features/community/AmenitiesTab';
-import RoleCharter from '@/features/boardroom/components/RoleCharter';
-import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
+import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
 
-type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities';
+type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities' | 'pm_scorecard';
 
 const ANN_CATS: Record<string, { icon: string; label: string; bg: string; text: string }> = {
   general: { icon: '📢', label: 'General', bg: 'bg-ink-100', text: 'text-ink-600' },
@@ -34,16 +33,18 @@ export default function CommunityRoomPage() {
   const tenant = useTenantContext();
   const hasFacilities = tenant.features.facilities || tenant.isDemo;
   // v2 flags removed -- always true
-  const [whoDoesWhatRole, setWhoDoesWhatRole] = useState<BoardRoleKey>('president');
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const amenityUnread = amenitiesStore.getUnreadCount(user.id);
   const amenityPending = amenitiesStore.getPendingApprovals().length;
-  const validTabs: TabId[] = hasFacilities
-    ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
-    : ['announcements', 'requests', 'meetings', 'votes'];
+  const isPMAddon = tenant.addons?.pmSeat ?? false;
+  const validTabs: TabId[] = [
+    'announcements', 'requests', 'meetings', 'votes',
+    ...(hasFacilities ? ['amenities' as TabId] : []),
+    ...(isPMAddon ? ['pm_scorecard' as TabId] : []),
+  ];
   const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
   const mtg = useMeetingsStore();
   const elections = useElectionStore();
@@ -90,6 +91,7 @@ export default function CommunityRoomPage() {
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
     ...(hasFacilities ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
+    ...(isPMAddon ? [{ id: 'pm_scorecard' as TabId, label: 'PM Scorecard' }] : []),
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
@@ -366,33 +368,10 @@ export default function CommunityRoomPage() {
         {/* ═══ AMENITIES ═══ */}
         {tab === 'amenities' && hasFacilities && <AmenitiesTab />}
 
-      </div>
+        {/* ═══ PM SCORECARD ═══ */}
+        {tab === 'pm_scorecard' && isPMAddon && <PMScorecardTab />}
 
-      {/* ═══ WHO DOES WHAT (true) ═══ */}
-      {true && (
-        <div className="bg-white rounded-xl border border-ink-100 p-6 mt-4">
-          <div className="mb-4">
-            <h3 className="font-display text-lg font-bold text-ink-900">Who does what</h3>
-            <p className="text-xs text-ink-400 mt-0.5">Board member responsibilities and task assignments</p>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            {(['president', 'vice_president', 'treasurer', 'secretary', 'member_at_large'] as BoardRoleKey[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setWhoDoesWhatRole(r)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                  whoDoesWhatRole === r
-                    ? 'bg-navy text-white'
-                    : 'bg-ink-100 text-ink-600 hover:bg-ink-200'
-                }`}
-              >
-                {BOARD_ROLE_LABELS[r]}
-              </button>
-            ))}
-          </div>
-          <RoleCharter roleKey={whoDoesWhatRole} readOnly />
-        </div>
-      )}
+      </div>
     </div>
   );
 }
