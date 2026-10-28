@@ -6,8 +6,11 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
+import MemberPicker from '@/components/ui/MemberPicker';
 import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import type { Unit } from '@/types/financial';
+import { BOARD_ROLE_LABELS } from '@/types/auth';
+import type { BoardRoleKey } from '@/types/auth';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -73,7 +76,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const isBuildingView = variant === 'building';
   const store = useFinancialStore();
   const building = useBuildingStore();
-  const { currentRole } = useAuthStore();
+  const { currentRole, buildingMembers } = useAuthStore();
   const tenant = useTenantContext();
   const { run: runUndoable } = useUndoableAction();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
@@ -129,25 +132,25 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const openDetail = (unitNum: string) => { setSelected(unitNum); setModal('detail'); };
   const openEdit = (unitNum: string) => {
     const u = store.units.find(x => x.number === unitNum);
-    if (u) { setSelected(unitNum); setForm({ owner: u.owner, email: u.email, phone: u.phone, monthlyFee: String(u.monthlyFee), votingPct: String(u.votingPct), status: u.status, sqft: String(u.sqft), bedrooms: String(u.bedrooms), parking: u.parking || '', moveIn: u.moveIn || '' }); setModal('editUnit'); }
+    if (u) { setSelected(unitNum); setForm({ owner: u.owner, email: u.email, phone: u.phone, monthlyFee: String(u.monthlyFee), votingPct: String(u.votingPct), status: u.status, sqft: String(u.sqft), bedrooms: String(u.bedrooms), parking: u.parking || '', moveIn: u.moveIn || '' }); setEditOwners(u.owner.split(',').map(s => s.trim()).filter(Boolean)); setModal('editUnit'); }
   };
   const openPay = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('pay'); };
   const openFee = (unitNum: string) => { setSelected(unitNum); resetForm(); sf('amount', '25'); sf('reason', 'Late payment'); setModal('fee'); };
   const openSpecial = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('special'); };
 
-  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
+  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owners: string[]; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]);
   const handleAddUnit = () => {
     for (const row of unitRows) {
       if (!row.number || !row.monthlyFee || !row.votingPct) return;
     }
     for (const row of unitRows) {
-      store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
+      store.addUnit({ number: row.number, owner: row.owners.join(', ') || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
     }
-    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
+    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]);
   };
   const handleEditUnit = () => {
     if (!selected) return;
-    store.updateUnit(selected, { owner: f('owner'), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as Unit['status'], sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
+    store.updateUnit(selected, { owner: editOwners.join(', '), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as Unit['status'], sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
     setModal(null); resetForm();
   };
   const handlePay = () => {
@@ -157,6 +160,10 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   };
   // Send invoice email via Edge Function
   const [sending, setSending] = useState(false);
+  const [editOwners, setEditOwners] = useState<string[]>([]);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', role: 'resident', unit: '', roleKey: '' });
+  const [inviteSending, setInviteSending] = useState(false);
 
   const sendInvoiceEmail = async (invoiceId: string, unitNum: string, amount: number, description: string, type: 'fee' | 'special_assessment'): Promise<{ sent: boolean; paymentUrl?: string; error?: string }> => {
     const unit = store.units.find(u => u.number === unitNum);
@@ -334,6 +341,33 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     <div><label className="block text-xs font-medium text-ink-700 mb-1">{label}</label><input type={type} value={f(k)} onChange={e => sf(k, e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder={placeholder} /></div>
   );
 
+  const handleInvite = async () => {
+    if (!inviteForm.email || inviteSending) return;
+    setInviteSending(true);
+    try {
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/send-invite`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({
+              email: inviteForm.email,
+              role: inviteForm.role,
+              unit: inviteForm.unit || undefined,
+              roleKey: inviteForm.role === 'board_member' && inviteForm.roleKey ? inviteForm.roleKey : undefined,
+            }),
+          },
+        );
+      }
+      setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' });
+      setShowInviteModal(false);
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
   // Get unit invoices for detail view
   const getUnitInvoices = (unitNum: string) => store.unitInvoices.filter(i => i.unitNumber === unitNum);
 
@@ -385,7 +419,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
           {!isBuildingView && <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>}
           {!isBuildingView && stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
           <div className="flex-1" />
-          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
+          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
         </div>
       )}
 
@@ -561,7 +595,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
         );
       })()}
 
-      {modal === 'addUnit' && <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); }} onSave={handleAddUnit}><div className="space-y-3">
+      {modal === 'addUnit' && <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]); }} onSave={handleAddUnit}><div className="space-y-3">
         <p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Add one or more units. You can edit additional details (email, phone, sqft, etc.) after creation.</p>
         <table className="w-full text-sm">
           <thead><tr className="border-b border-ink-200 text-left">
@@ -578,17 +612,17 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
                 <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="601" /></td>
                 <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="450" /></td>
                 <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="2.1" /></td>
-                <td className="py-1.5 px-2"><input value={row.owner} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], owner: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="Owner name" /></td>
+                <td className="py-1.5 px-2"><MemberPicker members={buildingMembers} selected={row.owners} onChange={names => { const rows = [...unitRows]; rows[i] = { ...rows[i], owners: names }; setUnitRows(rows); }} onInvite={() => setShowInviteModal(true)} placeholder="Select owner(s)…" /></td>
                 <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
                 <td className="py-1.5 px-2">{unitRows.length > 1 && <button type="button" onClick={() => setUnitRows(unitRows.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
+        <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
       </div></Modal>}
 
-      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { store.removeUnit(selected!); setModal(null); resetForm(); runUndoable({ label: `Deleted unit ${selected}`, undo: () => {}, commit: () => {} }); }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
+      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Owner Name</label><MemberPicker members={buildingMembers} selected={editOwners} onChange={setEditOwners} onInvite={() => setShowInviteModal(true)} /></div><div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { store.removeUnit(selected!); setModal(null); resetForm(); runUndoable({ label: `Deleted unit ${selected}`, undo: () => {}, commit: () => {} }); }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
 
       {modal === 'pay' && <Modal title={`Record Payment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handlePay}><div className="space-y-3">{field('Amount *', 'amount', 'number', selectedUnit ? String(selectedUnit.balance) : '')}<div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method') || 'ACH'} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACH">ACH / Bank Transfer</option><option value="check">Check</option>{stripeReady && <option value="stripe">Stripe (Online)</option>}<option value="cash">Cash</option><option value="wire">Wire Transfer</option></select></div></div></Modal>}
 
@@ -615,6 +649,36 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <Modal title="Invite User" onClose={() => setShowInviteModal(false)} onSave={handleInvite} saveLabel={inviteSending ? 'Sending…' : 'Send Invite'}>
+          <div className="space-y-3">
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label><input type="email" value={inviteForm.email} onChange={e => setInviteForm(p => ({ ...p, email: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="user@example.com" /></div>
+            <div>
+              <label className="block text-xs font-medium text-ink-700 mb-1">Role *</label>
+              <select value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value, roleKey: '' }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                <option value="resident">Resident</option>
+                <option value="board_member">Board Member</option>
+                <option value="property_manager">Property Manager</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            {inviteForm.role === 'board_member' && (
+              <div>
+                <label className="block text-xs font-medium text-ink-700 mb-1">Board Seat</label>
+                <select value={inviteForm.roleKey} onChange={e => setInviteForm(p => ({ ...p, roleKey: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
+                  <option value="">Let them pick</option>
+                  {(Object.entries(BOARD_ROLE_LABELS) as [BoardRoleKey, string][]).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div><label className="block text-xs font-medium text-ink-700 mb-1">Unit (optional)</label><input value={inviteForm.unit} onChange={e => setInviteForm(p => ({ ...p, unit: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="101" /></div>
+          </div>
+        </Modal>
       )}
 
       {/* v2Cases: Open a case drawer for a unit */}
