@@ -5,6 +5,8 @@ import { TopNav } from '@/components/tenant/top-nav'
 import { BottomNav } from '@/components/tenant/bottom-nav'
 import { SetupContextPillProvider } from '@/components/onboarding/context-pill/SetupContextPillProvider'
 import { SetupContextPill } from '@/components/onboarding/context-pill/SetupContextPill'
+import { DashboardSetupWidget } from '@/components/onboarding/DashboardSetupWidget'
+import type { OnboardingChecklist } from '@/types/onboarding'
 
 export default async function TenantLayout({
   children,
@@ -27,6 +29,15 @@ export default async function TenantLayout({
     .single()
 
   if (!tenancy) notFound()
+
+  // Fetch onboarding checklist to conditionally show setup widget
+  const { data: checklist } = await (supabase as any)
+    .from('onboarding_checklists')
+    .select('*')
+    .eq('tenancy_id', tenancy.id)
+    .maybeSingle() as { data: OnboardingChecklist | null }
+
+  const showSetupWidget = !!checklist && !checklist.go_live
 
   const { data: tenantUser } = await supabase
     .from('tenant_users')
@@ -83,6 +94,9 @@ export default async function TenantLayout({
           <div className="flex flex-col h-screen bg-bg-page">
             <TopNav />
             <main className="flex-1 overflow-y-auto p-6 pb-[76px] sm:pb-6">
+              {showSetupWidget && checklist && (
+                <DashboardSetupWidget checklist={checklist} tenancySlug={tenancySlug} />
+              )}
               {children}
             </main>
             <BottomNav />
@@ -129,6 +143,9 @@ export default async function TenantLayout({
         <div className="flex flex-col h-screen bg-bg-page">
           <TopNav />
           <main className="flex-1 overflow-y-auto p-6 pb-[76px] sm:pb-6">
+            {showSetupWidget && checklist && (
+              <DashboardSetupWidget checklist={checklist} tenancySlug={tenancySlug} />
+            )}
             {children}
           </main>
           <BottomNav />
