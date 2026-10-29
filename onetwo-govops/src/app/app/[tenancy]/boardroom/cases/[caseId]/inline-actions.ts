@@ -1,8 +1,14 @@
 'use server'
 
 import { createServerSupabase } from '@/lib/supabase/server'
+import { getTenantSupabaseAdmin } from '@/lib/supabase/tenant-admin'
 import { revalidatePath } from 'next/cache'
 import type { StepAttachment, CaseEvent, CaseVote, FormalNotice } from '@/types/inline-actions'
+
+// Data tables (step_attachments, case_events, case_votes, formal_notices) live in
+// the TENANT Supabase project. Use getTenantSupabaseAdmin() for data queries;
+// createServerSupabase() for auth only. Storage buckets are also on the tenant project.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ─── Attachments ────────────────────────────────────────────────────────────
 
@@ -14,6 +20,7 @@ export async function uploadStepAttachment(
 ): Promise<StepAttachment> {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
+  const db = getTenantSupabaseAdmin()
 
   const file = formData.get('file') as File
   if (!file) throw new Error('No file provided')
@@ -22,13 +29,14 @@ export async function uploadStepAttachment(
   const uid = crypto.randomUUID()
   const storagePath = `${tenantId}/${caseId}/${stepNumber}/${uid}.${ext}`
 
-  const { error: uploadErr } = await supabase.storage
+  // Storage upload uses the tenant project
+  const { error: uploadErr } = await db.storage
     .from('case-attachments')
     .upload(storagePath, file, { contentType: file.type })
 
   if (uploadErr) throw new Error(uploadErr.message)
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (db as any)
     .from('step_attachments')
     .insert({
       tenant_id: tenantId,
@@ -49,10 +57,10 @@ export async function uploadStepAttachment(
 }
 
 export async function deleteStepAttachment(attachmentId: string): Promise<void> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
   // Fetch the record to get storage_path
-  const { data: att, error: fetchErr } = await (supabase as any)
+  const { data: att, error: fetchErr } = await (db as any)
     .from('step_attachments')
     .select('storage_path, case_id')
     .eq('id', attachmentId)
@@ -61,10 +69,10 @@ export async function deleteStepAttachment(attachmentId: string): Promise<void> 
   if (fetchErr) throw new Error(fetchErr.message)
 
   // Delete from storage
-  await supabase.storage.from('case-attachments').remove([att.storage_path])
+  await db.storage.from('case-attachments').remove([att.storage_path])
 
   // Delete the row
-  const { error } = await (supabase as any)
+  const { error } = await (db as any)
     .from('step_attachments')
     .delete()
     .eq('id', attachmentId)
@@ -77,9 +85,9 @@ export async function getStepAttachments(
   caseId: string,
   stepNumber: number
 ): Promise<StepAttachment[]> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (db as any)
     .from('step_attachments')
     .select('*')
     .eq('case_id', caseId)
@@ -91,9 +99,9 @@ export async function getStepAttachments(
 }
 
 export async function getAttachmentSignedUrl(storagePath: string): Promise<string> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await db.storage
     .from('case-attachments')
     .createSignedUrl(storagePath, 60 * 60) // 1 hour expiry
 
@@ -119,8 +127,9 @@ export async function createCaseEvent(
 ): Promise<CaseEvent> {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
+  const db = getTenantSupabaseAdmin()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (db as any)
     .from('case_events')
     .insert({
       tenant_id: tenantId,
@@ -147,9 +156,9 @@ export async function getCaseEvents(
   caseId: string,
   stepNumber?: number
 ): Promise<CaseEvent[]> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  let query = (supabase as any)
+  let query = (db as any)
     .from('case_events')
     .select('*')
     .eq('case_id', caseId)
@@ -177,8 +186,9 @@ export async function createCaseVote(
 ): Promise<CaseVote> {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
+  const db = getTenantSupabaseAdmin()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (db as any)
     .from('case_votes')
     .insert({
       tenant_id: tenantId,
@@ -203,9 +213,9 @@ export async function castVote(
   voterRole: string | null,
   vote: 'yea' | 'nay' | 'abstain'
 ): Promise<void> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  const { error } = await (supabase as any)
+  const { error } = await (db as any)
     .from('case_vote_tallies')
     .insert({
       vote_id: voteId,
@@ -221,9 +231,9 @@ export async function closeVote(
   voteId: string,
   outcome: 'passed' | 'failed' | 'tabled'
 ): Promise<void> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  const { error } = await (supabase as any)
+  const { error } = await (db as any)
     .from('case_votes')
     .update({ status: outcome, closed_at: new Date().toISOString() })
     .eq('id', voteId)
@@ -235,9 +245,9 @@ export async function getCaseVotes(
   caseId: string,
   stepNumber?: number
 ): Promise<CaseVote[]> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  let query = (supabase as any)
+  let query = (db as any)
     .from('case_votes')
     .select('*, case_vote_tallies(*)')
     .eq('case_id', caseId)
@@ -273,8 +283,9 @@ export async function createFormalNotice(
 ): Promise<FormalNotice> {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
+  const db = getTenantSupabaseAdmin()
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await (db as any)
     .from('formal_notices')
     .insert({
       tenant_id: tenantId,
@@ -302,13 +313,13 @@ export async function updateNoticeStatus(
   status: 'draft' | 'sent' | 'delivered' | 'returned',
   trackingNumber?: string
 ): Promise<void> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
   const updates: Record<string, unknown> = { status }
   if (status === 'sent') updates.sent_at = new Date().toISOString()
   if (trackingNumber !== undefined) updates.tracking_number = trackingNumber
 
-  const { error } = await (supabase as any)
+  const { error } = await (db as any)
     .from('formal_notices')
     .update(updates)
     .eq('id', noticeId)
@@ -320,9 +331,9 @@ export async function getFormalNotices(
   caseId: string,
   stepNumber?: number
 ): Promise<FormalNotice[]> {
-  const supabase = await createServerSupabase()
+  const db = getTenantSupabaseAdmin()
 
-  let query = (supabase as any)
+  let query = (db as any)
     .from('formal_notices')
     .select('*')
     .eq('case_id', caseId)
@@ -335,4 +346,46 @@ export async function getFormalNotices(
   const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data ?? []) as FormalNotice[]
+}
+
+// ─── Batch-create calendar events from PM tasks ──────────────────────
+
+export async function batchCreateCaseEvents(
+  caseId: string,
+  tenantId: string,
+  events: Array<{
+    stepNumber?: number
+    eventType: 'deadline' | 'reminder' | 'meeting'
+    title: string
+    description?: string
+    startsAt: string
+    allDay: boolean
+  }>
+): Promise<CaseEvent[]> {
+  const supabase = await createServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  const db = getTenantSupabaseAdmin()
+
+  const rows = events.map((e) => ({
+    tenant_id: tenantId,
+    case_id: caseId,
+    step_number: e.stepNumber ?? null,
+    event_type: e.eventType,
+    title: e.title,
+    description: e.description ?? null,
+    location: null,
+    starts_at: e.startsAt,
+    ends_at: null,
+    all_day: e.allDay,
+    created_by: user?.id ?? null,
+  }))
+
+  const { data, error } = await (db as any)
+    .from('case_events')
+    .insert(rows)
+    .select()
+
+  if (error) throw new Error(error.message)
+  revalidatePath(`/boardroom/cases/${caseId}`)
+  return (data ?? []) as CaseEvent[]
 }

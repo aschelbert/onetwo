@@ -5,9 +5,10 @@ interface MarkCompleteCardProps {
   isComplete: boolean
   canComplete: boolean
   onComplete: () => void
+  label?: string
 }
 
-export function MarkCompleteCard({ stepNumber, isComplete, canComplete, onComplete }: MarkCompleteCardProps) {
+export function MarkCompleteCard({ stepNumber, isComplete, canComplete, onComplete, label }: MarkCompleteCardProps) {
   return (
     <div className="border-[1.5px] border-[#e6e8eb] rounded-[10px] overflow-hidden mb-4 bg-white">
       <div className="flex items-center gap-3 px-4 py-3.5">
@@ -18,7 +19,7 @@ export function MarkCompleteCard({ stepNumber, isComplete, canComplete, onComple
 
         {/* Label */}
         <span className="text-[14px] font-semibold text-[#1a1f25] flex-1">
-          {isComplete ? 'Step Complete' : 'Review Reserve Study'}
+          {isComplete ? 'Step Complete' : (label ?? 'Review Reserve Study')}
         </span>
 
         {/* Button */}
