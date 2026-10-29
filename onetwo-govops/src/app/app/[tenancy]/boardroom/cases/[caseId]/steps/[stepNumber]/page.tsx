@@ -1,9 +1,11 @@
 import { getStepResponse, getCaseById, getCaseStepDef } from '../actions'
+import { getVendors } from '../../vendor-actions'
 import { Step2ReserveStudy } from '@/components/case-ops/steps/Step2ReserveStudy'
+import { Step1PreventativeMaintenance } from '@/components/case-ops/steps/Step1PreventativeMaintenance'
 import { CaseUnitLedger } from '@/components/case-ops/steps/shared/CaseUnitLedger'
 import { StepDescriptionCard } from '@/components/case-ops/steps/shared/StepDescriptionCard'
 import { MarkCompleteCard } from '@/components/case-ops/steps/shared/MarkCompleteCard'
-import type { Step2Data } from '@/types/case-steps'
+import type { Step2Data, Step1PMData } from '@/types/case-steps'
 
 export default async function StepPage({
   params,
@@ -17,6 +19,21 @@ export default async function StepPage({
     getStepResponse(caseId, stepNum) as any,
     getCaseById(caseId),
   ])
+
+  // ── Preventative Maintenance — Step 1: Annual Maintenance Calendar ──────
+  if (caseData.sit_id === 'preventative-maintenance' && stepNum === 1) {
+    const vendors = await getVendors(caseData.tenant_id)
+    return (
+      <Step1PreventativeMaintenance
+        caseId={caseId}
+        tenantId={caseData.tenant_id}
+        initialData={(response?.step_data as Partial<Step1PMData>) ?? {}}
+        confirmedSections={(response?.confirmed_sections as string[]) ?? []}
+        isComplete={response?.is_complete ?? false}
+        initialVendors={vendors}
+      />
+    )
+  }
 
   // ── Delinquent Accounts — Step 1: Verify delinquency ────────────────────
   if (caseData.sit_id === 'delinquent-accounts' && stepNum === 1) {
