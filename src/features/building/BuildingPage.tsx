@@ -15,6 +15,7 @@ import VendorsTab from './tabs/VendorsTab';
 import AssetsTab from './tabs/AssetsTab';
 import MailingSettingsTab from './tabs/MailingSettingsTab';
 import FeeScheduleTab from './tabs/FeeScheduleTab';
+import BylawsGovernanceSection from './tabs/BylawsGovernanceSection';
 import RoleCharter from '@/features/boardroom/components/RoleCharter';
 import { BOARD_ROLE_LABELS, type BoardRoleKey } from '@/types/auth';
 
@@ -311,18 +312,11 @@ export default function BuildingPage() {
             </div>
 
             {guidelinesSubTab === 'bylaws' && (
-              <div className="space-y-4">
-                <h3 className="font-display text-xl font-bold text-ink-900">Bylaws & Governance Facts</h3>
-                <p className="text-xs text-ink-500">These values come from your bylaws and are used for meeting scheduling, spending approvals, and compliance tracking. Edit them in the Building Details or through the relevant setting screens.</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Spending Limit</p><p className="text-sm font-bold text-ink-900">$5,000</p></div>
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Quorum</p><p className="text-sm font-bold text-ink-900">25%</p></div>
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Fiscal Year Start</p><p className="text-sm font-bold text-ink-900">January</p></div>
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Annual Meeting Month</p><p className="text-sm font-bold text-ink-900">April</p></div>
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Meeting Cadence</p><p className="text-sm font-bold text-ink-900">Monthly</p></div>
-                  <div className="bg-white border border-ink-100 rounded-lg p-3"><p className="text-xs text-ink-500 mb-1">Board Notice</p><p className="text-sm font-bold text-ink-900">48 hours</p></div>
-                </div>
-              </div>
+              <BylawsGovernanceSection
+                bylawsConfig={store.bylawsConfig}
+                updateBylawsConfig={store.updateBylawsConfig}
+                isBoard={isBoard}
+              />
             )}
             {guidelinesSubTab === 'fees' && <FeeScheduleTab />}
             {guidelinesSubTab === 'roles' && (

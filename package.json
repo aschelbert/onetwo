@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.97.0",
     "lucide-react": "^0.468.0",
     "mixpanel-browser": "^2.74.0",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0",

@@ -109,6 +109,10 @@ export interface BylawsConfig {
   ownerVoteThreshold: number;
   boardSpendingLimit: number;
   quorumPct: number;
+  fiscalYearStartMonth: number;
+  annualMeetingMonth: number;
+  meetingCadence: 'monthly' | 'bimonthly' | 'quarterly' | '';
+  boardNoticeHours: number;
 }
 
 interface BuildingState {
@@ -471,7 +475,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
       warranties: [], notes: 'Generac 100kW natural gas backup generator. Monthly load testing required.', insuredValue: 65000,
     },
   ],
-  bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51 },
+  bylawsConfig: { assessmentCapPct: 15, ownerVoteThreshold: 66.7, boardSpendingLimit: 5000, quorumPct: 51, fiscalYearStartMonth: 1, annualMeetingMonth: 4, meetingCadence: 'monthly', boardNoticeHours: 48 },
 
   // ─── DB Hydration ─────────────────────────────
   loadFromDb: async (tenantId: string) => {
@@ -746,7 +750,19 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
 }), {
   name: 'onetwo-building',
-  version: 4,
+  version: 5,
+  migrate: (persisted: any, version: number) => {
+    if (version < 5) {
+      persisted.bylawsConfig = {
+        ...persisted.bylawsConfig,
+        fiscalYearStartMonth: persisted.bylawsConfig?.fiscalYearStartMonth ?? 1,
+        annualMeetingMonth: persisted.bylawsConfig?.annualMeetingMonth ?? 4,
+        meetingCadence: persisted.bylawsConfig?.meetingCadence ?? 'monthly',
+        boardNoticeHours: persisted.bylawsConfig?.boardNoticeHours ?? 48,
+      };
+    }
+    return persisted;
+  },
   partialize: (state) => ({
     name: state.name,
     address: state.address,
