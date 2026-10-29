@@ -144,6 +144,144 @@ export type Database = {
           },
         ]
       }
+      case_events: {
+        Row: {
+          all_day: boolean | null
+          case_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          location: string | null
+          starts_at: string
+          step_number: number | null
+          tenant_id: string
+          title: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          case_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          event_type: string
+          id?: string
+          location?: string | null
+          starts_at: string
+          step_number?: number | null
+          tenant_id: string
+          title: string
+        }
+        Update: {
+          all_day?: boolean | null
+          case_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          starts_at?: string
+          step_number?: number | null
+          tenant_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_events_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_vote_tallies: {
+        Row: {
+          cast_at: string | null
+          id: string
+          vote: string
+          vote_id: string
+          voter_name: string
+          voter_role: string | null
+        }
+        Insert: {
+          cast_at?: string | null
+          id?: string
+          vote: string
+          vote_id: string
+          voter_name: string
+          voter_role?: string | null
+        }
+        Update: {
+          cast_at?: string | null
+          id?: string
+          vote?: string
+          vote_id?: string
+          voter_name?: string
+          voter_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_vote_tallies_vote_id_fkey"
+            columns: ["vote_id"]
+            isOneToOne: false
+            referencedRelation: "case_votes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_votes: {
+        Row: {
+          case_id: string
+          closed_at: string | null
+          created_by: string | null
+          id: string
+          motion: string
+          opened_at: string | null
+          status: string
+          step_number: number | null
+          tenant_id: string
+          vote_type: string
+        }
+        Insert: {
+          case_id: string
+          closed_at?: string | null
+          created_by?: string | null
+          id?: string
+          motion: string
+          opened_at?: string | null
+          status?: string
+          step_number?: number | null
+          tenant_id: string
+          vote_type?: string
+        }
+        Update: {
+          case_id?: string
+          closed_at?: string | null
+          created_by?: string | null
+          id?: string
+          motion?: string
+          opened_at?: string | null
+          status?: string
+          step_number?: number | null
+          tenant_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_votes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback_assocs: {
         Row: {
           feedback_id: string
@@ -235,6 +373,65 @@ export type Database = {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formal_notices: {
+        Row: {
+          body: string
+          case_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notice_type: string
+          recipient_address: string | null
+          recipient_name: string
+          sent_at: string | null
+          status: string
+          step_number: number | null
+          subject: string
+          tenant_id: string
+          tracking_number: string | null
+        }
+        Insert: {
+          body: string
+          case_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notice_type: string
+          recipient_address?: string | null
+          recipient_name: string
+          sent_at?: string | null
+          status?: string
+          step_number?: number | null
+          subject: string
+          tenant_id: string
+          tracking_number?: string | null
+        }
+        Update: {
+          body?: string
+          case_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notice_type?: string
+          recipient_address?: string | null
+          recipient_name?: string
+          sent_at?: string | null
+          status?: string
+          step_number?: number | null
+          subject?: string
+          tenant_id?: string
+          tracking_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formal_notices_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
             referencedColumns: ["id"]
           },
         ]
@@ -736,6 +933,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      step_attachments: {
+        Row: {
+          case_id: string
+          content_type: string | null
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          id: string
+          step_number: number
+          storage_path: string
+          tenant_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          case_id: string
+          content_type?: string | null
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          id?: string
+          step_number: number
+          storage_path: string
+          tenant_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          case_id?: string
+          content_type?: string | null
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          step_number?: number
+          storage_path?: string
+          tenant_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_attachments_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenancies: {
         Row: {
