@@ -2,6 +2,8 @@
 
 import { useTenant } from '@/lib/tenant-context'
 import type { CaseMessage } from '@/types/caseChat'
+import { generateICS, downloadICS } from '@/lib/ics'
+import { CalendarDays, Download, Vote } from 'lucide-react'
 
 interface Props { message: CaseMessage }
 
@@ -12,6 +14,68 @@ export function CaseChatMessage({ message }: Props) {
 
   // System/event messages — centered timeline entries
   if (message.msg_type === 'event' || message.msg_type === 'step_complete' || message.msg_type === 'status_change') {
+    const meta = message.event_meta
+
+    // Vote result event
+    if (meta?.type === 'vote_result') {
+      return (
+        <div className="flex items-center gap-2 py-1.5 my-0.5">
+          <div className="flex-1 h-px bg-[#e6e8eb]" />
+          <div className="bg-[#f8f9fa] border border-[#e6e8eb] rounded-md px-3 py-2 max-w-[85%]">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Vote size={12} className="text-[#6e7b8a]" />
+              <span className="text-[10px] font-semibold text-[#45505a]">Board Vote</span>
+              <span className="text-[9px] text-[#929da8]">{time}</span>
+            </div>
+            <p className="text-[11px] text-[#1a1f25] font-medium">{message.body}</p>
+          </div>
+          <div className="flex-1 h-px bg-[#e6e8eb]" />
+        </div>
+      )
+    }
+
+    // Meeting event
+    if (meta?.type === 'meeting' && meta.title && meta.starts_at) {
+      const handleDownloadICS = () => {
+        const ics = generateICS({
+          title: meta.title as string,
+          description: (meta.description as string) ?? undefined,
+          location: (meta.location as string) ?? undefined,
+          startsAt: new Date(meta.starts_at as string),
+          endsAt: meta.ends_at ? new Date(meta.ends_at as string) : undefined,
+        })
+        downloadICS(ics, (meta.title as string).replace(/\s+/g, '-'))
+      }
+
+      return (
+        <div className="flex items-center gap-2 py-1.5 my-0.5">
+          <div className="flex-1 h-px bg-[#e6e8eb]" />
+          <div className="bg-[#f8f9fa] border border-[#e6e8eb] rounded-md px-3 py-2 max-w-[85%]">
+            <div className="flex items-center gap-1.5 mb-1">
+              <CalendarDays size={12} className="text-[#6e7b8a]" />
+              <span className="text-[10px] font-semibold text-[#45505a]">Meeting Scheduled</span>
+              <span className="text-[9px] text-[#929da8]">{time}</span>
+            </div>
+            <p className="text-[11px] text-[#1a1f25] font-medium">{meta.title as string}</p>
+            <p className="text-[10px] text-[#6e7b8a]">
+              {new Date(meta.starts_at as string).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+              {' at '}
+              {new Date(meta.starts_at as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <button
+              onClick={handleDownloadICS}
+              className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-[#6e7b8a] hover:text-[#45505a] transition-colors"
+            >
+              <Download size={10} />
+              Download .ics
+            </button>
+          </div>
+          <div className="flex-1 h-px bg-[#e6e8eb]" />
+        </div>
+      )
+    }
+
+    // Default event rendering
     return (
       <div className="flex items-center gap-2 py-1.5 my-0.5">
         <div className="flex-1 h-px bg-[#e6e8eb]" />

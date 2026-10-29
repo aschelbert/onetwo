@@ -2,18 +2,26 @@
 
 import { useState, useRef } from 'react'
 import type { ThreadType } from '@/types/caseChat'
+import { useTenant } from '@/lib/tenant-context'
+import { RecordVoteDialog } from './inline-actions/RecordVoteDialog'
+import { FormalNoticeDialog } from './inline-actions/FormalNoticeDialog'
+import { CertifiedMailDialog } from './inline-actions/CertifiedMailDialog'
+import { ChatAttachButton } from './inline-actions/ChatAttachButton'
 
 interface Props {
   activeThread: ThreadType
   isSending: boolean
-  onSend: (body: string, opts?: { msgType?: string }) => Promise<void>
+  onSend: (body: string, opts?: { msgType?: string; attachmentUrl?: string; attachmentName?: string; eventMeta?: Record<string, unknown> }) => Promise<void>
   caseId: string
 }
 
-export function CaseChatInput({ activeThread, isSending, onSend }: Props) {
+export function CaseChatInput({ activeThread, isSending, onSend, caseId }: Props) {
+  const { tenancy } = useTenant()
+  const tenantId = tenancy.id
   const [body, setBody] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isInternal = activeThread === 'internal'
+  const [activeDialog, setActiveDialog] = useState<'vote' | 'notice' | 'certified' | null>(null)
 
   const handleSend = async () => {
     if (!body.trim() || isSending) return
@@ -35,6 +43,20 @@ export function CaseChatInput({ activeThread, isSending, onSend }: Props) {
     setBody('')
   }
 
+  const handleAttached = async (attachmentUrl: string, attachmentName: string) => {
+    await onSend(`Attached: ${attachmentName}`, { attachmentUrl, attachmentName })
+  }
+
+  const handleVoteClosed = async (_vote: unknown, summary: string) => {
+    await onSend(summary, { msgType: 'event' })
+    setActiveDialog(null)
+  }
+
+  const handleNoticeSent = async (notice: { recipient_name: string; subject: string }) => {
+    await onSend(`Formal notice sent to ${notice.recipient_name}: "${notice.subject}"`, { msgType: 'event' })
+    setActiveDialog(null)
+  }
+
   return (
     <div className="flex-shrink-0 border-t border-[#e6e8eb] p-2.5">
       {/* Context indicator */}
@@ -50,19 +72,17 @@ export function CaseChatInput({ activeThread, isSending, onSend }: Props) {
             <button onClick={handleNote} className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
               + Note
             </button>
-            <button className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
+            <button onClick={() => setActiveDialog('vote')} className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
               Record vote
             </button>
-            <button className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
-              Attach
-            </button>
+            <ChatAttachButton caseId={caseId} tenantId={tenantId} onAttached={handleAttached} />
           </>
         ) : (
           <>
-            <button className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
+            <button onClick={() => setActiveDialog('notice')} className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
               Formal notice
             </button>
-            <button className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
+            <button onClick={() => setActiveDialog('certified')} className="text-[10px] px-2 py-1 rounded border border-[#e6e8eb] bg-[#f8f9fa] text-[#45505a] hover:border-[#929da8]">
               Certified mail
             </button>
           </>
@@ -92,6 +112,28 @@ export function CaseChatInput({ activeThread, isSending, onSend }: Props) {
           </svg>
         </button>
       </div>
+
+      {/* Dialogs */}
+      <RecordVoteDialog
+        open={activeDialog === 'vote'}
+        onClose={() => setActiveDialog(null)}
+        caseId={caseId}
+        tenantId={tenantId}
+        onVoteClosed={handleVoteClosed}
+      />
+      <FormalNoticeDialog
+        open={activeDialog === 'notice'}
+        onClose={() => setActiveDialog(null)}
+        caseId={caseId}
+        tenantId={tenantId}
+        onNoticeSent={handleNoticeSent}
+      />
+      <CertifiedMailDialog
+        open={activeDialog === 'certified'}
+        onClose={() => setActiveDialog(null)}
+        caseId={caseId}
+        tenantId={tenantId}
+      />
     </div>
   )
 }

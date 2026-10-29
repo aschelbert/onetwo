@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useCallback, useTransition } from 'react'
+import { useState, useCallback, useTransition, useEffect } from 'react'
 import { upsertStep2Data, toggleSectionConfirmed, markStep2Complete } from '@/app/app/[tenancy]/boardroom/cases/[caseId]/steps/actions'
+import { getStepAttachments } from '@/app/app/[tenancy]/boardroom/cases/[caseId]/inline-actions'
 import type { Step2Data, Step2SectionId } from '@/types/case-steps'
+import type { StepAttachment } from '@/types/inline-actions'
 
 // Sub-sections
 import { Section1StudyValidity } from './step2/Section1StudyValidity'
@@ -12,15 +14,20 @@ import { Section4DecisionFraming } from './step2/Section4DecisionFraming'
 import { QuickActionsCard } from './shared/QuickActionsCard'
 import { StepDescriptionCard } from './shared/StepDescriptionCard'
 import { MarkCompleteCard } from './shared/MarkCompleteCard'
+import { UploadDocumentDialog } from '../inline-actions/UploadDocumentDialog'
+import { StepAttachmentList } from '../inline-actions/StepAttachmentList'
+import { CreateMeetingDialog } from '../inline-actions/CreateMeetingDialog'
+import { CreateCalendarItemDialog } from '../inline-actions/CreateCalendarItemDialog'
 
 interface Props {
   caseId: string
+  tenantId: string
   initialData: Partial<Step2Data>
   confirmedSections: string[]
   isComplete: boolean
 }
 
-export function Step2ReserveStudy({ caseId, initialData, confirmedSections: initialConfirmed, isComplete: initialComplete }: Props) {
+export function Step2ReserveStudy({ caseId, tenantId, initialData, confirmedSections: initialConfirmed, isComplete: initialComplete }: Props) {
   const [data, setData] = useState<Partial<Step2Data>>(initialData)
   const [confirmed, setConfirmed] = useState<string[]>(initialConfirmed)
   const [isComplete, setIsComplete] = useState(initialComplete)
@@ -31,6 +38,17 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
     decision_framing: true,
   })
   const [, startTransition] = useTransition()
+
+  // Inline action state
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [showMeetingDialog, setShowMeetingDialog] = useState(false)
+  const [showCalendarDialog, setShowCalendarDialog] = useState(false)
+  const [attachments, setAttachments] = useState<StepAttachment[]>([])
+
+  // Load attachments on mount
+  useEffect(() => {
+    getStepAttachments(caseId, 2).then(setAttachments)
+  }, [caseId])
 
   const handleDataChange = useCallback((section: keyof Step2Data, sectionData: Partial<Step2Data[keyof Step2Data]>) => {
     setData((prev) => {
@@ -86,12 +104,17 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
           actions={[
             { label: 'Review Reserve Study', variant: 'primary', icon: '\u{1F4CA}', href: '#' },
             { label: 'Open Reserves', variant: 'secondary', icon: '\u{1F3E6}', href: '/fiscal-lens/reserves', hint: '\u2192 Fiscal Lens \u2192 Reserves' },
-            { label: 'Upload Document', variant: 'ghost', icon: '\u{1F4CE}', onClick: () => { /* TODO */ } },
+            { label: 'Upload Document', variant: 'ghost', icon: '\u{1F4CE}', onClick: () => setShowUploadDialog(true) },
+            { label: 'Schedule Meeting', variant: 'ghost', icon: '\u{1F4C5}', onClick: () => setShowMeetingDialog(true) },
+            { label: 'Add Deadline', variant: 'ghost', icon: '\u23F0', onClick: () => setShowCalendarDialog(true) },
           ]}
         />
 
+        {/* Attached files */}
+        <StepAttachmentList attachments={attachments} />
+
         {/* Section progress label */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 mt-4">
           <span className="text-[10px] font-bold text-[#929da8] uppercase tracking-[0.08em]">Review Checklist</span>
           <span className="text-[11px] font-semibold text-[#6e7b8a]">{confirmed.length} / 4 sections</span>
         </div>
@@ -136,6 +159,30 @@ export function Step2ReserveStudy({ caseId, initialData, confirmedSections: init
         <div className="mt-4 text-center text-[11px] text-[#929da8]">
           ↓ Click step 3 in the sidebar to continue
         </div>
+
+        {/* Inline action dialogs */}
+        <UploadDocumentDialog
+          open={showUploadDialog}
+          onClose={() => setShowUploadDialog(false)}
+          caseId={caseId}
+          stepNumber={2}
+          tenantId={tenantId}
+          onAttachmentsChange={setAttachments}
+        />
+        <CreateMeetingDialog
+          open={showMeetingDialog}
+          onClose={() => setShowMeetingDialog(false)}
+          caseId={caseId}
+          tenantId={tenantId}
+          stepNumber={2}
+        />
+        <CreateCalendarItemDialog
+          open={showCalendarDialog}
+          onClose={() => setShowCalendarDialog(false)}
+          caseId={caseId}
+          tenantId={tenantId}
+          stepNumber={2}
+        />
       </div>
   )
 }

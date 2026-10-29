@@ -54,6 +54,7 @@ export default async function StepPage({
     return (
       <Step2ReserveStudy
         caseId={caseId}
+        tenantId={caseData.tenant_id}
         initialData={(response?.step_data as Partial<Step2Data>) ?? {}}
         confirmedSections={(response?.confirmed_sections as string[]) ?? []}
         isComplete={response?.is_complete ?? false}
