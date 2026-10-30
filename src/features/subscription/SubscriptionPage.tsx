@@ -14,6 +14,7 @@ interface SubscriptionData {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   stripe_subscription_id: string | null;
+  chargebee_subscription_id: string | null;
   trial_ends_at: string | null;
   created_at: string | null;
 }
@@ -68,7 +69,7 @@ export default function SubscriptionPage() {
       try {
         const { data, error: fetchErr } = await supabase
           .from('subscriptions')
-          .select('tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, trial_ends_at, created_at')
+          .select('tier, status, monthly_rate, current_period_start, current_period_end, cancel_at_period_end, stripe_subscription_id, chargebee_subscription_id, trial_ends_at, created_at')
           .eq('tenant_id', tenant.id)
           .maybeSingle();
         if (fetchErr) throw fetchErr;
@@ -179,13 +180,13 @@ export default function SubscriptionPage() {
     );
   }
 
-  if (!sub || !sub.stripe_subscription_id) {
+  if (!sub || (!sub.stripe_subscription_id && !sub.chargebee_subscription_id)) {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-8 text-center">
           <CreditCard className="w-10 h-10 text-ink-300 mx-auto mb-3" />
           <h2 className="font-display text-lg font-bold text-ink-900 mb-1">No Active Subscription</h2>
-          <p className="text-sm text-ink-500">No active Stripe subscription found for this building.</p>
+          <p className="text-sm text-ink-500">No active subscription found for this building.</p>
         </div>
       </div>
     );

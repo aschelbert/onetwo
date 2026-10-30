@@ -46,7 +46,7 @@ export default function AuthPage() {
   const [demoCondoName, setDemoCondoName] = useState('');
   const [demoUnitCount, setDemoUnitCount] = useState('');
   const [demoMemberType, setDemoMemberType] = useState('board_member');
-  const [demoSubscriptionInterest, setDemoSubscriptionInterest] = useState<SubscriptionTier>('compliance_pro');
+  const [demoSubscriptionInterest, setDemoSubscriptionInterest] = useState<SubscriptionTier>('self_managed');
   const [demoSubmitting, setDemoSubmitting] = useState(false);
 
   const handleDemoLeadSubmit = async () => {
@@ -91,7 +91,7 @@ export default function AuthPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('compliance_pro');
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('self_managed');
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
 
@@ -171,9 +171,17 @@ export default function AuthPage() {
       return;
     }
 
+    // Read plan/interval from marketing page CTAs
+    const urlPlan = params.get('plan');
+    const urlInterval = params.get('interval');
+    if (urlPlan === 'self_managed' || urlPlan === 'facilities') setSelectedTier(urlPlan);
+    if (urlInterval === 'annual') setBillingInterval('annual');
+
     // Direct /login visit (e.g. "Log In" button) — go straight to login form
-    // /login?create=1 (e.g. "Get Started" button) — stay on welcome/CTA page
-    if (params.get('create') !== '1' && authStep === 'welcome') {
+    // /login?create=1 (e.g. "Get Started" button) — jump to signup-plan
+    if (params.get('create') === '1') {
+      setAuthStep('signup-plan');
+    } else if (authStep === 'welcome') {
       setAuthStep('login');
     }
     const isProvisioned = params.get('provisioned') === '1';
@@ -631,11 +639,11 @@ export default function AuthPage() {
     login(newMember);
   };
 
-  // Stripe Checkout — creates a checkout session and redirects
-  const handleStripeCheckout = async () => {
+  // Chargebee Checkout — creates a checkout session and redirects
+  const handleCheckout = async () => {
     if (!isBackendEnabled || !supabase) {
       // Demo mode fallback — skip payment
-      setAuthStep('board-building');
+      setAuthStep('signup-building');
       return;
     }
 
@@ -691,9 +699,9 @@ export default function AuthPage() {
         return;
       }
 
-      // Call create-checkout Edge Function
+      // Call chargebee-checkout Edge Function
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
         {
           method: 'POST',
           headers: {
@@ -702,17 +710,18 @@ export default function AuthPage() {
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
-            tier: selectedTier,
-            priceId: TIERS.find(t => t.id === selectedTier)?.[billingInterval === 'annual' ? 'stripePriceAnnual' : 'stripePriceMonthly'],
-            billingInterval,
-            buildingName: bldgName,
-            subdomain: bldgSubdomain,
-            address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
-            totalUnits: parseInt(bldgUnits) || 0,
-            yearBuilt: '',
-            contactName: `${firstName} ${lastName}`.trim(),
-            contactPhone: profilePhone,
-            boardTitle,
+            plan: selectedTier,
+            interval: billingInterval,
+            building: {
+              name: bldgName,
+              subdomain: bldgSubdomain,
+              address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+              totalUnits: parseInt(bldgUnits) || 0,
+              contactName: `${firstName} ${lastName}`.trim(),
+              boardTitle,
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+            },
             origin: window.location.origin,
           }),
         }
@@ -721,9 +730,9 @@ export default function AuthPage() {
       const data = await res.json();
       if (data.error) { alert(data.error); setCheckoutLoading(false); return; }
 
-      // Redirect to Stripe Checkout
+      // Redirect to Chargebee Checkout
       if (data.url) {
-        // Save session tokens so we can restore after Stripe redirect (sessionStorage = tab-scoped, cleared on close)
+        // Save session tokens so we can restore after checkout redirect (sessionStorage = tab-scoped, cleared on close)
         sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
           access_token: session.access_token,
           refresh_token: session.refresh_token,
@@ -764,7 +773,7 @@ export default function AuthPage() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
-      <div className="w-full max-w-md mx-4">
+      <div className={`w-full mx-4 ${authStep === 'signup-plan' ? 'max-w-xl' : 'max-w-md'}`}>
 
         {/* ══════ WELCOME ══════ */}
         {authStep === 'welcome' && (
@@ -773,7 +782,7 @@ export default function AuthPage() {
             <div className="space-y-3">
               <button onClick={() => setAuthStep('login')}
                 className="w-full py-3.5 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 transition-all">Sign In</button>
-              <button onClick={() => setAuthStep('join-role')}
+              <button onClick={() => setAuthStep('signup-plan')}
                 className="w-full py-3.5 border-2 border-accent-500 text-accent-700 rounded-xl font-semibold text-sm hover:bg-accent-50 transition-all">Create Account</button>
             </div>
             <div className="mt-6 bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-5 text-white">
@@ -785,7 +794,7 @@ export default function AuthPage() {
                 <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> Case Workflow with escalation paths</li>
                 <li className="flex items-center gap-2"><span className="text-sage-400">✓</span> DC jurisdiction compliance built in</li>
               </ul>
-              <button onClick={() => setAuthStep('join-role')}
+              <button onClick={() => setAuthStep('signup-plan')}
                 className="w-full mt-4 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 transition-all">Start Free Trial →</button>
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
@@ -825,7 +834,7 @@ export default function AuthPage() {
               <p className="text-center text-xs text-ink-400"><a href="/reset-password" className="text-accent-600 hover:underline cursor-pointer">Forgot password?</a></p>
             </div>
             <div className="border-t border-ink-100 mt-6 pt-4 text-center">
-              <p className="text-sm text-ink-500">Don&apos;t have an account?{' '}<a onClick={() => setAuthStep('join-role')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Create one</a></p>
+              <p className="text-sm text-ink-500">Don&apos;t have an account?{' '}<a onClick={() => setAuthStep('signup-plan')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Create one</a></p>
             </div>
           </div>
         )}
@@ -872,31 +881,6 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ ROLE SELECTION ══════ */}
-        {authStep === 'join-role' && (
-          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
-            <Logo />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
-            <p className="text-sm text-ink-400 text-center mb-6">What best describes you?</p>
-            <div className="space-y-3">
-              {[
-                { role: 'RESIDENT' as const, icon: '🏠', label: 'Resident / Unit Owner', desc: 'I live in or own a unit — I have an invite code', bg: 'bg-accent-100', next: 'join-invite' as const },
-                { role: 'BOARD_MEMBER' as const, icon: '📋', label: 'Board Member', desc: 'I serve on the board — join existing or set up new', bg: 'bg-sage-100', next: 'join-invite' as const },
-                { role: 'PROPERTY_MANAGER' as const, icon: '🔧', label: 'Property Manager', desc: 'I manage buildings professionally', bg: 'bg-mist-100', next: 'join-invite' as const },
-              ].map(({ role, icon, label, desc, bg, next }) => (
-                <button key={role} onClick={() => { setAuthJoinRole(role); setAuthStep(next); }}
-                  className="w-full p-4 border-2 border-ink-200 rounded-xl text-left hover:border-accent-400 hover:bg-accent-50 transition-all group">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center text-lg`}>{icon}</div>
-                    <div><p className="font-semibold text-ink-900 text-sm">{label}</p><p className="text-xs text-ink-400">{desc}</p></div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-6 text-center"><a onClick={() => setAuthStep('welcome')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
-          </div>
-        )}
-
         {/* ══════ JOIN INVITE CODE ══════ */}
         {authStep === 'join-invite' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
@@ -924,18 +908,18 @@ export default function AuthPage() {
               <div className="bg-accent-50 border border-accent-200 rounded-xl p-5 text-center">
                 <p className="text-sm font-semibold text-ink-900 mb-2">Starting fresh?</p>
                 <p className="text-xs text-ink-500 mb-3">Subscribe to <span className="font-bold">ONE two</span> and set up your building today.</p>
-                <button onClick={() => setAuthStep('board-subscribe')}
+                <button onClick={() => setAuthStep('signup-plan')}
                   className="px-6 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700">Subscribe & Create Building →</button>
               </div>
             ) : (
               <div className="bg-mist-50 border border-mist-200 rounded-xl p-5 text-center">
                 <p className="text-sm font-semibold text-ink-900 mb-2">Don&apos;t have a code?</p>
                 <p className="text-xs text-ink-500 mb-3">Ask your building&apos;s board or management company to invite you.</p>
-                <button onClick={() => { setAuthJoinRole('BOARD_MEMBER'); setAuthStep('board-subscribe'); }}
+                <button onClick={() => { setAuthJoinRole('BOARD_MEMBER'); setAuthStep('signup-plan'); }}
                   className="px-5 py-2 bg-ink-900 text-white rounded-lg text-xs font-semibold hover:bg-ink-800">I&apos;m a board member — subscribe today</button>
               </div>
             )}
-            <div className="mt-6 text-center"><a onClick={() => setAuthStep('join-role')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
+            <div className="mt-6 text-center"><a onClick={() => setAuthStep('login')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
         )}
 
@@ -974,68 +958,97 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ BOARD — SUBSCRIBE (Tier Selection) ══════ */}
-        {authStep === 'board-subscribe' && (
+        {/* ══════ SIGNUP — ACCOUNT & PLAN ══════ */}
+        {authStep === 'signup-plan' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={0} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Choose Your Plan</h2>
+            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={0} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
             <p className="text-sm text-ink-400 text-center mb-4">{trialDays}-day free trial on all plans. Cancel anytime.</p>
 
-            {/* Billing Interval Toggle */}
-            <div className="flex items-center justify-center mb-5">
-              <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
-                <button onClick={() => setBillingInterval('monthly')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
-                <button onClick={() => setBillingInterval('annual')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'annual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
-                  Annual <span className="text-accent-600 text-xs font-bold ml-1">Save ~16%</span>
-                </button>
-              </div>
-            </div>
-
             <div className="space-y-3">
-              {TIERS.map(tier => {
-                const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
-                const annualTotal = tier.annual;
-                return (
-                  <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
-                    className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                      selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
-                    }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="font-bold text-ink-900">{tier.name}</p>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-accent-600">${displayPrice}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+              {/* Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
+                  <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
+                  <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
+              </div>
+              {/* Email & Password */}
+              <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
+                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
+                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+              </div>
+
+              {/* Billing Interval Toggle */}
+              <div className="flex items-center justify-center pt-2">
+                <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
+                  <button onClick={() => setBillingInterval('monthly')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
+                  <button onClick={() => setBillingInterval('annual')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'annual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
+                    Annual <span className="text-accent-600 text-xs font-bold ml-1">Save ~16%</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Plan Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {TIERS.map(tier => {
+                  const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
+                  const annualTotal = tier.annual;
+                  return (
+                    <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                      }`}>
+                      <div className="mb-2">
+                        <p className="font-bold text-ink-900">{tier.name}</p>
+                        <p className="text-lg font-bold text-accent-600 mt-1">${displayPrice}<span className="text-xs font-normal text-ink-400">/mo</span></p>
                         {billingInterval === 'annual' && (
                           <p className="text-[10px] text-ink-400">Billed ${annualTotal.toLocaleString()}/yr</p>
                         )}
                       </div>
-                    </div>
-                    <ul className="space-y-1">
-                      {tier.features.map(f => (
-                        <li key={f} className="text-xs text-ink-500 flex items-center gap-1.5">
-                          <span className="text-sage-500">✓</span> {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                );
-              })}
+                      <p className="text-[11px] text-ink-400 italic mb-2">{tier.tagline}</p>
+                      <ul className="space-y-1">
+                        {tier.features.map(f => (
+                          <li key={f} className="text-xs text-ink-500 flex items-start gap-1.5">
+                            <span className="text-sage-500 mt-0.5">✓</span> {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button onClick={() => {
+                  if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
+                  if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
+                  if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                  if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                  setAuthStep('signup-building');
+                }}
+                className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">
+                Continue with {TIERS.find(t => t.id === selectedTier)?.name} →
+              </button>
             </div>
-            <button onClick={() => setAuthStep('board-building')}
-              className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-4">
-              Continue with {TIERS.find(t => t.id === selectedTier)?.name} →
-            </button>
-            <div className="mt-4 text-center"><a onClick={() => setAuthStep('join-invite')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
+            <div className="mt-4 text-center space-y-2">
+              <p className="text-sm text-ink-500">Already have an account?{' '}<a onClick={() => setAuthStep('login')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Sign in</a></p>
+              <p className="text-xs text-ink-400">Have an invite code?{' '}<a onClick={() => setAuthStep('join-invite')} className="text-accent-600 cursor-pointer hover:underline">Enter it here</a></p>
+            </div>
           </div>
         )}
 
-        {/* ══════ BOARD — BUILDING INFO ══════ */}
-        {authStep === 'board-building' && (
+        {/* ══════ SIGNUP — BUILDING INFO ══════ */}
+        {authStep === 'signup-building' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={1} />
+            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={1} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Building Information</h2>
             <div className="space-y-3">
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
@@ -1078,31 +1091,21 @@ export default function AuthPage() {
                   if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
                   if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
                   if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
-                  setAuthStep('board-profile');
+                  setAuthStep('signup-checkout');
                 }}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Continue →</button>
             </div>
-            <div className="mt-4 text-center"><a onClick={() => setAuthStep('board-subscribe')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
+            <div className="mt-4 text-center"><a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
         )}
 
-        {/* ══════ BOARD — PROFILE & CHECKOUT ══════ */}
-        {authStep === 'board-profile' && (
+        {/* ══════ SIGNUP — CHECKOUT ══════ */}
+        {authStep === 'signup-checkout' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Plan','Building','Profile & Pay']} current={2} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Your Profile</h2>
+            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={2} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Final Details</h2>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
-                  <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
-                  <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
-              </div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
                 <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
@@ -1131,7 +1134,7 @@ export default function AuthPage() {
               </div>
 
               {isBackendEnabled ? (
-                <button onClick={handleStripeCheckout} disabled={checkoutLoading}
+                <button onClick={handleCheckout} disabled={checkoutLoading}
                   className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2 disabled:opacity-50">
                   {checkoutLoading ? 'Setting up...' : `Start Free Trial → Checkout`}
                 </button>
@@ -1139,9 +1142,9 @@ export default function AuthPage() {
                 <button onClick={handleCompleteOnboarding}
                   className="w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">Create Account & Enter →</button>
               )}
-              <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to Stripe for secure payment. No charge during trial.</p>
+              <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to secure checkout. No charge during your {trialDays}-day trial.</p>
             </div>
-            <div className="mt-4 text-center"><a onClick={() => setAuthStep('board-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
+            <div className="mt-4 text-center"><a onClick={() => setAuthStep('signup-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
         )}
 

@@ -41,13 +41,11 @@ export type AuthStep =
   | 'welcome'
   | 'login'
   | 'demo-lead'
-  | 'join-role'
   | 'join-invite'
   | 'join-create'
-  | 'board-subscribe'
-  | 'board-building'
-  | 'board-profile'
-  | 'board-invite';
+  | 'signup-plan'
+  | 'signup-building'
+  | 'signup-checkout';
 
 export const ROLE_LABELS: Record<Role, string> = {
   BOARD_MEMBER: 'Board Member',
