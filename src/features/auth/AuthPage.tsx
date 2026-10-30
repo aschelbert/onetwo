@@ -173,19 +173,24 @@ export default function AuthPage() {
   // Chargebee Drop-in initialization
   const cbInstanceRef = useRef<any>(null);
 
+  const ensureChargebee = () => {
+    if (cbInstanceRef.current) return cbInstanceRef.current;
+    const cbSite = import.meta.env.VITE_CB_SITE || import.meta.env.VITE_CHARGEBEE_SITE;
+    if (!cbSite || !(window as any).Chargebee) return null;
+    try {
+      cbInstanceRef.current = (window as any).Chargebee.init({ site: cbSite });
+    } catch (e) {
+      console.warn('Chargebee init failed:', e);
+    }
+    return cbInstanceRef.current;
+  };
+
   useEffect(() => {
-    const cbSite = import.meta.env.VITE_CB_SITE;
-    if (!cbSite || !isBackendEnabled) return;
-    const initCb = () => {
-      if ((window as any).Chargebee && !cbInstanceRef.current) {
-        try { cbInstanceRef.current = (window as any).Chargebee.init({ site: cbSite }); }
-        catch (e) { console.warn('Chargebee init failed:', e); }
-      }
-    };
-    if ((window as any).Chargebee) { initCb(); }
+    if (!isBackendEnabled) return;
+    if ((window as any).Chargebee) { ensureChargebee(); }
     else {
       const timer = setInterval(() => {
-        if ((window as any).Chargebee) { clearInterval(timer); initCb(); }
+        if ((window as any).Chargebee) { clearInterval(timer); ensureChargebee(); }
       }, 200);
       setTimeout(() => clearInterval(timer), 5000);
     }
@@ -752,9 +757,9 @@ export default function AuthPage() {
         return;
       }
 
-      // Open Chargebee Drop-in checkout modal
-      if (!cbInstanceRef.current) {
-        alert('Payment system is still loading. Please try again.');
+      // Open Chargebee Drop-in checkout modal (lazy-init if needed)
+      if (!ensureChargebee()) {
+        alert('Payment system is still loading. Please try again in a moment.');
         setCheckoutLoading(false);
         return;
       }
