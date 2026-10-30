@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS, DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
-import type { SubscriptionTier, BillingInterval } from '@/lib/tiers';
+import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -93,6 +93,15 @@ export default function AuthPage() {
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('self_managed');
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
+  const [selectedAddOns, setSelectedAddOns] = useState<Set<AddOnId>>(new Set());
+
+  const toggleAddOn = (id: AddOnId) => {
+    setSelectedAddOns(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
 
   useEffect(() => {
@@ -712,6 +721,8 @@ export default function AuthPage() {
           body: JSON.stringify({
             plan: selectedTier,
             interval: billingInterval,
+            onCall: selectedAddOns.has('on_call'),
+            pmSeat: selectedAddOns.has('pm_seat'),
             building: {
               name: bldgName,
               subdomain: bldgSubdomain,
@@ -1026,6 +1037,38 @@ export default function AuthPage() {
                 })}
               </div>
 
+              {/* Add-ons */}
+              <div className="pt-2">
+                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-2">Optional Add-ons</p>
+                <div className="space-y-2">
+                  {ADDONS.map(addon => {
+                    const selected = selectedAddOns.has(addon.id);
+                    const price = billingInterval === 'annual' ? Math.round(addon.annual / 12) : addon.monthly;
+                    return (
+                      <button key={addon.id} onClick={() => toggleAddOn(addon.id)}
+                        className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                          selected ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                        }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                              selected ? 'bg-accent-500 border-accent-500' : 'border-ink-300'
+                            }`}>
+                              {selected && <span className="text-white text-[10px]">✓</span>}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-ink-900">{addon.name}</p>
+                              <p className="text-[11px] text-ink-400">{addon.description}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm font-bold text-accent-600 whitespace-nowrap ml-3">+${price}/mo</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <button onClick={() => {
                   if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                   if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
@@ -1126,6 +1169,16 @@ export default function AuthPage() {
                     <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.monthly}/mo</span>
                   )}
                 </div>
+                {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
+                  <div key={addon.id} className="flex items-center justify-between text-sm">
+                    <span className="text-ink-500">+ {addon.name}</span>
+                    {billingInterval === 'annual' ? (
+                      <span className="font-bold text-ink-900">${addon.annual.toLocaleString()}/yr</span>
+                    ) : (
+                      <span className="font-bold text-ink-900">${addon.monthly}/mo</span>
+                    )}
+                  </div>
+                ))}
                 <div className="flex items-center justify-between text-xs text-ink-400 mt-1">
                   <span>{bldgName || 'Your building'} · {billingInterval === 'annual' ? 'Annual' : 'Monthly'} billing</span>
                   <span>{trialDays}-day free trial</span>

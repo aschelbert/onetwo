@@ -48,6 +48,33 @@ export const TIERS: TierConfig[] = [
   },
 ];
 
+export type AddOnId = 'on_call' | 'pm_seat';
+
+export interface AddOnConfig {
+  id: AddOnId;
+  name: string;
+  description: string;
+  monthly: number;
+  annual: number;
+}
+
+export const ADDONS: AddOnConfig[] = [
+  {
+    id: 'on_call',
+    name: 'On Call',
+    description: 'A named advisor who knows your building. Monthly call, replies within a business day, budget and year-end reviewed, a seat at the annual meeting.',
+    monthly: 249,
+    annual: 2490,
+  },
+  {
+    id: 'pm_seat',
+    name: 'Property Manager Seat',
+    description: 'Keeping a manager for operations? Give them a seat so they work inside your records instead of theirs.',
+    monthly: 79,
+    annual: 790,
+  },
+];
+
 export function getTierById(id: string): TierConfig | undefined {
   return TIERS.find(t => t.id === id);
 }
