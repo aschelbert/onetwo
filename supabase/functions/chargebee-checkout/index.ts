@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
     const result = await chargebeeRequest("hosted_pages/checkout_new_for_items", p);
     const hostedPage = result.hosted_page;
 
-    return jsonResponse({ url: hostedPage.url, hostedPageId: hostedPage.id });
+    return jsonResponse({ hosted_page: hostedPage, url: hostedPage.url, hostedPageId: hostedPage.id });
   } catch (err) {
     console.error("chargebee-checkout error:", err);
     return jsonResponse({ error: String(err) }, 500);
