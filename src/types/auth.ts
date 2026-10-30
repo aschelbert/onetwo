@@ -44,7 +44,8 @@ export type AuthStep =
   | 'join-invite'
   | 'join-create'
   | 'signup-plan'
-  | 'signup-building';
+  | 'signup-building'
+  | 'signup-account';
 
 export const ROLE_LABELS: Record<Role, string> = {
   BOARD_MEMBER: 'Board Member',

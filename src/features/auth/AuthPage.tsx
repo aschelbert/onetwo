@@ -170,6 +170,88 @@ export default function AuthPage() {
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
+  // Chargebee Drop-in initialization
+  const cbInstanceRef = useRef<any>(null);
+
+  useEffect(() => {
+    const cbSite = import.meta.env.VITE_CB_SITE;
+    if (!cbSite || !isBackendEnabled) return;
+    const initCb = () => {
+      if ((window as any).Chargebee && !cbInstanceRef.current) {
+        try { cbInstanceRef.current = (window as any).Chargebee.init({ site: cbSite }); }
+        catch (e) { console.warn('Chargebee init failed:', e); }
+      }
+    };
+    if ((window as any).Chargebee) { initCb(); }
+    else {
+      const timer = setInterval(() => {
+        if ((window as any).Chargebee) { clearInterval(timer); initCb(); }
+      }, 200);
+      setTimeout(() => clearInterval(timer), 5000);
+    }
+  }, []);
+
+  // Helper: look up tenant_users and log the user in + redirect to subdomain
+  // Extracted to component level so both session-check and handleCheckout can use it
+  const loginWithTenantUser = async (
+    user: { id: string; email?: string | null; user_metadata?: { full_name?: string } },
+    tu: { tenant_id: string; role: string; board_title: string | null; unit: string | null },
+  ) => {
+    const { data: tenant } = await supabase!
+      .from('tenants')
+      .select('name, subdomain')
+      .eq('id', tu.tenant_id)
+      .maybeSingle();
+
+    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+    const m = {
+      id: user.id,
+      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+      email: user.email || '',
+      phone: '',
+      role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
+      unit: tu.unit || '',
+      status: 'active' as const,
+      joined: new Date().toISOString().split('T')[0],
+      boardTitle: tu.board_title || null,
+    };
+    addMember(m);
+    login(m);
+
+    // Redirect to tenant subdomain if on root domain
+    const hostname = window.location.hostname;
+    if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
+      const { data: sessionData } = await supabase!.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      const refreshToken = sessionData?.session?.refresh_token || '';
+      window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
+      return true; // redirecting
+    }
+    return false;
+  };
+
+  // Poll for tenant provisioning after checkout success
+  const pollForTenantAndRedirect = async (userId: string, user: any) => {
+    setProvisioningStatus('Setting up your building...');
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const { data: tu } = await supabase!
+        .from('tenant_users')
+        .select('tenant_id, role, board_title, unit')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (tu) {
+        setProvisioningStatus('Redirecting to your building...');
+        await loginWithTenantUser(user, tu);
+        setProvisioningStatus(null);
+        return true;
+      }
+      await new Promise(r => setTimeout(r, 1200));
+    }
+    setProvisioningStatus(null);
+    setProvisioningTimedOut(true);
+    return false;
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -203,44 +285,6 @@ export default function AuthPage() {
       setInviteCode(urlInvite.toUpperCase());
       setAuthStep('join-invite');
     }
-
-    // Helper: look up tenant_users and log the user in + redirect to subdomain
-    const loginWithTenantUser = async (
-      user: { id: string; email?: string | null; user_metadata?: { full_name?: string } },
-      tu: { tenant_id: string; role: string; board_title: string | null; unit: string | null },
-    ) => {
-      const { data: tenant } = await supabase!
-        .from('tenants')
-        .select('name, subdomain')
-        .eq('id', tu.tenant_id)
-        .maybeSingle();
-
-      const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
-      const m = {
-        id: user.id,
-        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        email: user.email || '',
-        phone: '',
-        role: roleMap[tu.role] || ('BOARD_MEMBER' as Role),
-        unit: tu.unit || '',
-        status: 'active' as const,
-        joined: new Date().toISOString().split('T')[0],
-        boardTitle: tu.board_title || null,
-      };
-      addMember(m);
-      login(m);
-
-      // Redirect to tenant subdomain if on root domain
-      const hostname = window.location.hostname;
-      if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
-        const { data: sessionData } = await supabase!.auth.getSession();
-        const accessToken = sessionData?.session?.access_token || '';
-        const refreshToken = sessionData?.session?.refresh_token || '';
-        window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
-        return true; // redirecting
-      }
-      return false;
-    };
 
     // Unified session check — always await getSession() first to avoid
     // NavigatorLockManager conflicts with Supabase's internal session recovery.
@@ -708,50 +752,55 @@ export default function AuthPage() {
         return;
       }
 
-      // Call chargebee-checkout Edge Function
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            plan: selectedTier,
-            interval: billingInterval,
-            onCall: selectedAddOns.has('on_call'),
-            pmSeat: selectedAddOns.has('pm_seat'),
-            building: {
-              name: bldgName,
-              subdomain: bldgSubdomain,
-              address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
-              totalUnits: parseInt(bldgUnits) || 0,
-              contactName: `${firstName} ${lastName}`.trim(),
-              boardTitle,
-              firstName: firstName.trim(),
-              lastName: lastName.trim(),
-            },
-            origin: window.location.origin,
-          }),
-        }
-      );
-
-      const data = await res.json();
-      if (data.error) { alert(data.error); setCheckoutLoading(false); return; }
-
-      // Redirect to Chargebee Checkout
-      if (data.url) {
-        // Save session tokens so we can restore after checkout redirect (sessionStorage = tab-scoped, cleared on close)
-        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        }));
-        window.location.href = data.url;
-      } else {
-        alert('Failed to create checkout session'); setCheckoutLoading(false);
+      // Open Chargebee Drop-in checkout modal
+      if (!cbInstanceRef.current) {
+        alert('Payment system is still loading. Please try again.');
+        setCheckoutLoading(false);
+        return;
       }
+
+      const currentSession = session;
+      cbInstanceRef.current.openCheckout({
+        hostedPage: async () => {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentSession.access_token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({
+                plan: selectedTier,
+                interval: billingInterval,
+                onCall: selectedAddOns.has('on_call'),
+                pmSeat: selectedAddOns.has('pm_seat'),
+                building: {
+                  name: bldgName,
+                  subdomain: bldgSubdomain,
+                  address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+                  totalUnits: parseInt(bldgUnits) || 0,
+                  contactName: `${firstName} ${lastName}`.trim(),
+                  boardTitle,
+                  firstName: firstName.trim(),
+                  lastName: lastName.trim(),
+                },
+                origin: window.location.origin,
+              }),
+            }
+          );
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          return data.hosted_page;
+        },
+        success: async (_hostedPageId: string) => {
+          const { data: { user } } = await supabase!.auth.getUser();
+          if (user) await pollForTenantAndRedirect(user.id, user);
+          setCheckoutLoading(false);
+        },
+        close: () => { setCheckoutLoading(false); },
+      });
     } catch (err: any) {
       alert(err.message || 'Checkout failed');
       setCheckoutLoading(false);
@@ -830,7 +879,7 @@ export default function AuthPage() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
-      <div className={`w-full mx-4 ${(authStep === 'signup-plan' || authStep === 'signup-building') ? 'max-w-3xl' : 'max-w-md'}`}>
+      <div className={`w-full mx-4 ${(authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account') ? 'max-w-3xl' : 'max-w-md'}`}>
 
         {/* ══════ WELCOME ══════ */}
         {authStep === 'welcome' && (
@@ -1015,59 +1064,19 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ SIGNUP — BUILDING & PLAN (Step 1 of 2) ══════ */}
+        {/* ══════ SIGNUP — SELECT YOUR PLAN (Step 1 of 3) ══════ */}
         {authStep === 'signup-plan' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Building & Plan', 'Your Account']} current={0} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Building & Plan</h2>
+            <StepIndicator steps={['Plan', 'Building', 'Your Account']} current={0} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Select Your Plan</h2>
             <p className="text-sm text-ink-400 text-center mb-6">{trialDays}-day free trial on all plans. Cancel anytime.</p>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* Left column — Building + Plan selection */}
+              {/* Left column — Plan selection */}
               <div className="lg:col-span-3 space-y-3">
-                {/* Building Name */}
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
-                  <input value={bldgName} onChange={e => setBldgName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" autoFocus /></div>
-                {/* Subdomain */}
-                <div>
-                  <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
-                  <div className="flex items-center gap-0">
-                    <input value={bldgSubdomain}
-                      onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
-                      className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
-                        subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
-                        subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
-                        'border-ink-200'
-                      }`}
-                      placeholder="sunnyacres" />
-                    <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
-                  </div>
-                  <div className="mt-1 h-4">
-                    {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
-                    {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">&#10003; {bldgSubdomain}.getonetwo.com is available</p>}
-                    {subdomainStatus === 'taken' && <p className="text-xs text-red-600">&#10007; Already taken — try a different name</p>}
-                    {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
-                  </div>
-                </div>
-                {/* Street Address */}
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
-                  <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" /></div>
-                {/* City/State/ZIP */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">City</label>
-                    <input value={bldgCity} onChange={e => setBldgCity(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="City" /></div>
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">State</label>
-                    <input value={bldgState} onChange={e => setBldgState(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="DC" maxLength={2} /></div>
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">ZIP</label>
-                    <input value={bldgZip} onChange={e => setBldgZip(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="20001" /></div>
-                </div>
-                {/* Total Units */}
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
-                  <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" /></div>
-
                 {/* Billing Interval Toggle */}
-                <div className="flex items-center justify-center pt-2">
+                <div className="flex items-center justify-center">
                   <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
                     <button onClick={() => setBillingInterval('monthly')}
                       className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
@@ -1139,14 +1148,7 @@ export default function AuthPage() {
                 <div className="lg:sticky lg:top-8 space-y-4">
                   <OrderSummary />
 
-                  <button onClick={() => {
-                      if (!bldgName.trim()) { alert('Please enter your building name.'); return; }
-                      if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
-                      if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
-                      if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
-                      if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
-                      setAuthStep('signup-building');
-                    }}
+                  <button onClick={() => setAuthStep('signup-building')}
                     className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
                     Continue →
                   </button>
@@ -1161,11 +1163,88 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ SIGNUP — YOUR ACCOUNT (Step 2 of 2) ══════ */}
+        {/* ══════ SIGNUP — BUILDING INFORMATION (Step 2 of 3) ══════ */}
         {authStep === 'signup-building' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Building & Plan', 'Your Account']} current={1} />
+            <StepIndicator steps={['Plan', 'Building', 'Your Account']} current={1} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Building Information</h2>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Left column — Building fields */}
+              <div className="lg:col-span-3 space-y-3">
+                {/* Building Name */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
+                  <input value={bldgName} onChange={e => setBldgName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" autoFocus /></div>
+                {/* Subdomain */}
+                <div>
+                  <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
+                  <div className="flex items-center gap-0">
+                    <input value={bldgSubdomain}
+                      onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
+                      className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
+                        subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
+                        subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
+                        'border-ink-200'
+                      }`}
+                      placeholder="sunnyacres" />
+                    <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
+                  </div>
+                  <div className="mt-1 h-4">
+                    {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
+                    {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">&#10003; {bldgSubdomain}.getonetwo.com is available</p>}
+                    {subdomainStatus === 'taken' && <p className="text-xs text-red-600">&#10007; Already taken — try a different name</p>}
+                    {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
+                  </div>
+                </div>
+                {/* Street Address */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
+                  <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" /></div>
+                {/* City/State/ZIP */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">City</label>
+                    <input value={bldgCity} onChange={e => setBldgCity(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="City" /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">State</label>
+                    <input value={bldgState} onChange={e => setBldgState(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="DC" maxLength={2} /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">ZIP</label>
+                    <input value={bldgZip} onChange={e => setBldgZip(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="20001" /></div>
+                </div>
+                {/* Total Units */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
+                  <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" /></div>
+              </div>
+
+              {/* Right column — Order Summary */}
+              <div className="lg:col-span-2">
+                <div className="lg:sticky lg:top-8 space-y-4">
+                  <OrderSummary showBuilding />
+
+                  <button onClick={() => {
+                      if (!bldgName.trim()) { alert('Please enter your building name.'); return; }
+                      if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
+                      if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
+                      if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
+                      if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
+                      setAuthStep('signup-account');
+                    }}
+                    className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
+                    Continue →
+                  </button>
+
+                  <div className="text-center">
+                    <a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Plan</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════ SIGNUP — YOUR ACCOUNT (Step 3 of 3) ══════ */}
+        {authStep === 'signup-account' && (
+          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
+            <Logo />
+            <StepIndicator steps={['Plan', 'Building', 'Your Account']} current={2} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Your Account</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -1209,7 +1288,7 @@ export default function AuthPage() {
                         handleCheckout();
                       }} disabled={checkoutLoading}
                       className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50">
-                      {checkoutLoading ? 'Setting up...' : 'Start Free Trial \u2192 Checkout'}
+                      {checkoutLoading ? 'Setting up...' : 'Start Free Trial'}
                     </button>
                   ) : (
                     <button onClick={() => {
@@ -1220,13 +1299,13 @@ export default function AuthPage() {
                         handleCompleteOnboarding();
                       }}
                       className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
-                      {'Create Account & Enter \u2192'}
+                      Create Account & Enter
                     </button>
                   )}
-                  <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to secure checkout. No charge during your {trialDays}-day trial.</p>
+                  <p className="text-center text-[10px] text-ink-400">No charge during your {trialDays}-day trial.</p>
 
                   <div className="text-center">
-                    <a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Building & Plan</a>
+                    <a onClick={() => setAuthStep('signup-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Building</a>
                   </div>
                 </div>
               </div>
