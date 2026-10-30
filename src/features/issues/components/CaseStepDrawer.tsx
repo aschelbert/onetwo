@@ -10,6 +10,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { BOARD_ROLE_LABELS } from '@/types/auth';
 import { useUndoableAction } from '@/hooks/useUndoableAction';
 import type { CaseStep } from '@/types/issues';
+import { Step1PMCalendar } from '@/features/issues/components/shell/Step1PMCalendar';
 
 interface CaseStepDrawerProps {
   open: boolean;
@@ -190,6 +191,7 @@ export default function CaseStepDrawer({
 }: CaseStepDrawerProps) {
   const caseData = useIssuesStore(s => s.cases.find(c => c.id === caseId));
   const toggleStep = useIssuesStore(s => s.toggleStep);
+  const toggleCheck = useIssuesStore(s => s.toggleCheck);
   const { run: runUndo } = useUndoableAction();
   const [activeStep, setActiveStep] = useState(initialStepIndex);
 
@@ -251,7 +253,11 @@ export default function CaseStepDrawer({
         onSecondary: onClose,
       }}
     >
-      <CompactStepContent step={step} />
+      {caseData.catId === 'maintenance' && caseData.sitId === 'preventative-maintenance' && activeStep === 0 ? (
+        <Step1PMCalendar c={caseData} step={step} onToggleCheck={(checkId) => toggleCheck(caseId, activeStep, checkId)} />
+      ) : (
+        <CompactStepContent step={step} />
+      )}
     </DrawerShell>
   );
 }
