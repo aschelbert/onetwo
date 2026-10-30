@@ -28,8 +28,6 @@ interface StepContentProps {
   onAttachFromBuilding?: (checkId: string, source: 'legal' | 'insurance') => void;
   inlineStepIdx?: number | null;
   caseId?: string;
-  /** When true, renders a denser layout for use inside drawers. */
-  compact?: boolean;
 }
 
 /**
@@ -37,7 +35,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId, compact = false }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
 
@@ -52,8 +50,8 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
   }
 
   return (
-    <div className={compact ? 'p-3' : 'p-5 md:px-7 md:py-6'}>
-      <div className={compact ? 'space-y-3' : 'space-y-5'}>
+    <div className="p-5 md:px-7 md:py-6">
+      <div className="space-y-5">
         {/* Jurisdiction guidance — only on step 0 */}
         {stNote && stepIndex === 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">

@@ -289,8 +289,4 @@ export interface CaseTrackerCase {
   financials?: BudgetFinancials;
   conflictChecks?: ConflictCheck[];
   decisionTrail?: DecisionTrailEntry[];
-  /** Runbook item id that spawned this case (step engine link) */
-  linkedRunbookItemId?: string;
-  /** Milestone id that spawned this case (step engine link) */
-  linkedMilestoneId?: string;
 }

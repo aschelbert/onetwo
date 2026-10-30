@@ -8,7 +8,7 @@ import type {
 } from '@/store/usePlatformAdminStore';
 import { TIER_FEATURES } from '@/store/usePlatformAdminStore';
 
-import { DEFAULT_TRIAL_DAYS, normalizePlan, planFeatures } from '@/lib/tiers';
+import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
 
 // ── Platform Settings ──
 
@@ -36,7 +36,7 @@ export async function updatePlatformSettings(trialDays: number): Promise<boolean
 
 // ── Tenants ──
 
-// monthlyRate is always computed from DB monthly_rate/100
+const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
 
 export async function fetchTenants(): Promise<Tenant[] | null> {
   if (!supabase) return null;
@@ -101,15 +101,15 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
   return (tenantRows || []).map((r): Tenant => {
     const id = r.id as string;
     const sub = subMap.get(id);
-    const rawTier = (sub?.tier as string) || 'self_managed';
-    const validTier = normalizePlan(rawTier) as SubscriptionTier;
+    const tier = ((sub?.tier as string) || 'compliance_pro') as SubscriptionTier;
+    const validTier = (tier in TIER_FEATURES) ? tier : 'compliance_pro' as SubscriptionTier;
     const addr = typeof r.address === 'string' ? JSON.parse(r.address) : (r.address || {});
     const subStatus = (sub?.status as string) || 'trialing';
     // Map DB subscription status to app status
     const statusMap: Record<string, string> = { trialing: 'trial', active: 'active', past_due: 'past_due', canceled: 'cancelled' };
     const appSubStatus = (statusMap[subStatus] || subStatus) as Tenant['subscription']['status'];
 
-    // Per-tenant features from DB, falling back to plan defaults
+    // Per-tenant features from DB, falling back to tier defaults
     const feat = featMap.get(id);
     const features: Tenant['features'] = feat ? {
       fiscalLens: feat.fiscal_lens as boolean,
@@ -122,9 +122,7 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
       communityPortal: feat.community_portal as boolean,
       vendorManagement: feat.vendor_management as boolean,
       reserveStudyTools: feat.reserve_study_tools as boolean,
-      facilities: (feat.facilities as boolean) ?? false,
-      onCall: (feat.on_call as boolean) ?? false,
-    } : planFeatures(normalizePlan(rawTier), !!(sub?.addon_on_call));
+    } : { ...TIER_FEATURES[validTier] };
 
     // Per-tenant onboarding from DB
     const cl = checklistMap.get(id);
@@ -160,14 +158,8 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
         status: appSubStatus,
         startDate: ((sub?.created_at as string) || '').split('T')[0],
         nextBillingDate: ((sub?.current_period_end as string) || (sub?.trial_ends_at as string) || '').split('T')[0],
-        monthlyRate: (sub?.monthly_rate as number) ? ((sub?.monthly_rate as number) / 100) : 179,
+        monthlyRate: (sub?.monthly_rate as number) ? ((sub?.monthly_rate as number) / 100) : TIER_PRICES[validTier],
         trialEndsAt: (sub?.trial_ends_at as string)?.split('T')[0] || null,
-        onCall: !!(sub?.addon_on_call),
-        pmSeat: !!(sub?.pm_addon),
-        setupPaidAt: (sub?.setup_paid_at as string) || null,
-        setupAmount: (sub?.setup_amount as number) || null,
-        billingInterval: ((sub?.billing_interval as string) || 'monthly') as 'monthly' | 'annual',
-        chargebeeSubscriptionId: (sub?.chargebee_subscription_id as string) || null,
       },
       stats: {
         activeUsers: userCounts.get(id) || 0,
@@ -396,7 +388,7 @@ export async function bulkUpdatePermissions(roleId: string, mode: string, featur
 
 export async function syncTenantFeatures(tenantId: string, features: Tenant['features']): Promise<boolean> {
   if (!supabase) return false;
-  const row: Record<string, unknown> = {
+  const row = {
     tenant_id: tenantId,
     fiscal_lens: features.fiscalLens,
     case_ops: features.caseOps,
@@ -408,8 +400,6 @@ export async function syncTenantFeatures(tenantId: string, features: Tenant['fea
     community_portal: features.communityPortal,
     vendor_management: features.vendorManagement,
     reserve_study_tools: features.reserveStudyTools,
-    facilities: features.facilities ?? false,
-    on_call: features.onCall ?? false,
   };
   const { error } = await supabase
     .from('tenant_features')

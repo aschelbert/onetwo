@@ -123,14 +123,14 @@ export default function PayrollTab() {
         body: { action: 'create_staff_account', staffName: s.name },
       });
       if (error || !data?.stripeAccountId) {
-        console.error('Failed to create Stripe account');
+        alert('Failed to create Stripe account');
         setStripeLoading(null);
         return;
       }
       updateStaffStripe(s.id, data.stripeAccountId, false);
       if (data.onboardingUrl) window.open(data.onboardingUrl, '_blank');
     } catch {
-      console.error('Failed to connect Stripe');
+      alert('Failed to connect Stripe');
     }
     setStripeLoading(null);
   };
@@ -143,7 +143,7 @@ export default function PayrollTab() {
         body: { action: 'check_staff_status', stripeAccountId: s.stripeAccountId },
       });
       if (error) {
-        console.error('Failed to check status');
+        alert('Failed to check status');
         setStripeLoading(null);
         return;
       }
@@ -153,7 +153,7 @@ export default function PayrollTab() {
         window.open(data.onboardingUrl, '_blank');
       }
     } catch {
-      console.error('Failed to check Stripe status');
+      alert('Failed to check Stripe status');
     }
     setStripeLoading(null);
   };

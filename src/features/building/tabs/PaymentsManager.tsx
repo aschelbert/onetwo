@@ -29,7 +29,7 @@ export default function PaymentsManager() {
 
   const handleStripeConnect = async () => {
     if (!supabase) {
-      console.error('Backend not connected. Please configure Supabase.');
+      alert('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -49,13 +49,13 @@ export default function PaymentsManager() {
       }
     } catch (err) {
       console.error('Stripe Connect error:', err);
-      console.error('Failed to create Stripe account. Please try again.');
+      alert('Failed to create Stripe account. Please try again.');
     }
   };
 
   const handleStripeOnboard = async () => {
     if (!supabase) {
-      console.error('Backend not connected. Please configure Supabase.');
+      alert('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -79,14 +79,14 @@ export default function PaymentsManager() {
   };
 
   const handleBulkAssessment = () => {
-    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return;
+    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return alert('Select units, enter amount and reason.');
     const amount = parseFloat(f('amount'));
     selectedUnits.forEach(unitNum => store.addSpecialAssessment(unitNum, amount, f('reason')));
     setModal(null); resetForm();
   };
 
   const handleSendInvoice = async () => {
-    if (!f('unitNum') || !f('amount') || !f('description')) return;
+    if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
     const amount = parseFloat(f('amount'));
     const unit = store.units.find(u => u.number === f('unitNum'));
     if (!unit) return;

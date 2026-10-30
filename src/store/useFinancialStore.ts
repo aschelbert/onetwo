@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
-import type { PeriodCloseRow } from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } from '@/lib/financial-logic';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
@@ -10,17 +9,6 @@ import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits,
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { generateLocalId } from '@/lib/generateId';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { toPeriod } from '@/lib/monthClose';
-
-// ── PeriodClosedError ─────────────────────────────────────────────
-export class PeriodClosedError extends Error {
-  period: string;
-  constructor(period: string) {
-    super(`Period ${period} is closed. Post a correction in the current month instead.`);
-    this.name = 'PeriodClosedError';
-    this.period = period;
-  }
-}
 
 // ─── GL Filter state ─────────────────────────────────
 interface GLFilter {
@@ -117,16 +105,9 @@ interface FinancialState {
   updateCoAAccount: (num: string, name: string, active: boolean) => void;
   deleteCoAAccount: (num: string) => void;
 
-  // Period closes
-  periodCloses: PeriodCloseRow[];
-  closeMonth: (month: string, opts: { lock?: boolean; statementDoc?: PeriodCloseRow['statementDoc']; closedBy: string; checklist?: Record<string, boolean> }) => PeriodCloseRow;
-  reopenMonth: (month: string) => void;
-  isMonthLocked: (period: string) => boolean;
-
   // Manual GL
-  postManualEntry: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number, reason?: string) => void;
+  postManualEntry: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number) => void;
   postTransfer: (date: string, memo: string, fromAcct: string, toAcct: string, amount: number) => void;
-  postReversal: (originalEntry: GLEntry, memo?: string) => GLEntry;
 
   // Unit payment mutations
   recordUnitPayment: (unitNum: string, amount: number, method: string) => void;
@@ -134,14 +115,6 @@ interface FinancialState {
   imposeLateFee: (unitNum: string, amount: number, reason: string) => void;
   addSpecialAssessment: (unitNum: string, amount: number, reason: string) => void;
   markSpecialAssessmentPaid: (unitNum: string, assessmentId: string) => void;
-
-  // ── v2 Fiscal Lens thin wrappers (handoff 12) ──
-  recordPayment: (unitNum: string, amount: number, method: string, date?: string) => void;
-  imposeFee: (unitNum: string, amount: number, reason: string) => void;
-  waiveFee: (unitNum: string, feeIndex: number) => void;
-  invoiceUnit: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string) => void;
-  recordBill: (vendor: string, invoiceNum: string, amount: number, glAccount: string, date?: string) => void;
-  payBill: (workOrderId: string) => void;
 
   // Stripe
   stripeConnectId: string | null;
@@ -230,7 +203,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   unitInvoices: [],
   unitDocuments: [],
   moveEvents: [],
-  periodCloses: [],
   glAccountMapping: { ...DEFAULT_GL_MAPPING },
 
   setGlAccountMapping: (partial) => {
@@ -265,7 +237,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     }
     if (data.workOrders) updates.workOrders = data.workOrders;
     if (data.unitInvoices) updates.unitInvoices = data.unitInvoices;
-    if (data.periodCloses) updates.periodCloses = data.periodCloses;
     // Fetch unit documents and move events
     const [unitDocs, moveEvts] = await Promise.all([
       unitMgrSvc.fetchUnitDocuments(tenantId),
@@ -292,19 +263,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   setGlFilter: (filter) => set((s) => ({ glFilter: { ...s.glFilter, ...filter }, glPage: 0 })),
   setGlPage: (page) => set({ glPage: page }),
 
-  // ─── Period lock helper ──────────────────────────────
-  isMonthLocked: (period) => {
-    return get().periodCloses.some(pc => pc.period === period && pc.locked);
-  },
-
   // ─── GL Engine ─────────────────────────────────────
   glPost: (date, memo, debitAcct, creditAcct, amount, source, sourceId) => {
     const state = get();
-    // Period lock guard
-    const period = toPeriod(date);
-    if (state.periodCloses.some(pc => pc.period === period && pc.locked)) {
-      throw new PeriodClosedError(period);
-    }
     const entry: GLEntry = {
       id: 'GL' + state.glNextId,
       date,
@@ -748,77 +709,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       return { chartOfAccounts: s.chartOfAccounts.filter((a) => a.num !== num) };
     }),
 
-  postManualEntry: (date, memo, debitAcct, creditAcct, amount, reason?) => {
-    const entry = get().glPost(date, memo, debitAcct, creditAcct, amount, 'manual', null);
-    // Patch postedBy and reason onto the entry in state
-    if (entry) {
-      set(s => ({
-        generalLedger: s.generalLedger.map(e =>
-          e.id === entry.id
-            ? { ...e, postedBy: { flow: 'manual' as const }, reason: reason || null }
-            : e,
-        ),
-      }));
-    }
+  postManualEntry: (date, memo, debitAcct, creditAcct, amount) => {
+    get().glPost(date, memo, debitAcct, creditAcct, amount, 'manual', null);
   },
 
   postTransfer: (date, memo, fromAcct, toAcct, amount) => {
     get().glPost(date, memo, toAcct, fromAcct, amount, 'transfer', null);
-  },
-
-  postReversal: (originalEntry, memo) => {
-    const today = new Date().toISOString().split('T')[0];
-    const reversalMemo = memo || `Reversal of ${originalEntry.id}: ${originalEntry.memo}`;
-    // Swap debit and credit to reverse the original entry
-    return get().glPost(
-      today,
-      reversalMemo,
-      originalEntry.creditAcct,
-      originalEntry.debitAcct,
-      originalEntry.amount,
-      'manual',
-      originalEntry.id,
-    );
-  },
-
-  // ─── Period Close ───────────────────────────────────
-  closeMonth: (month, opts) => {
-    const state = get();
-    const id = generateLocalId('pc-');
-    const now = new Date().toISOString();
-    const close: PeriodCloseRow = {
-      id,
-      tenantId: state.tenantId || '',
-      period: month,
-      closedAt: now,
-      closedBy: opts.closedBy,
-      statementDoc: opts.statementDoc || null,
-      locked: opts.lock ?? false,
-      checklist: opts.checklist || {},
-    };
-    set(s => ({ periodCloses: [close, ...s.periodCloses.filter(pc => pc.period !== month)] }));
-    if (isBackendEnabled && state.tenantId) {
-      financialSvc.upsertPeriodClose(state.tenantId, close).then(dbRow => {
-        if (dbRow) {
-          set(s => ({
-            periodCloses: s.periodCloses.map(pc => pc.id === id ? { ...pc, id: dbRow.id } : pc),
-          }));
-        }
-      }).catch(err => console.error('[syncWrite] upsertPeriodClose failed:', err));
-    }
-    return close;
-  },
-
-  reopenMonth: (month) => {
-    const state = get();
-    const existing = state.periodCloses.find(pc => pc.period === month);
-    if (!existing) return;
-    set(s => ({ periodCloses: s.periodCloses.filter(pc => pc.period !== month) }));
-    if (isBackendEnabled && existing.id) {
-      financialSvc.deletePeriodClose(existing.id).catch(err =>
-        console.error('[syncWrite] deletePeriodClose failed:', err),
-      );
-    }
   },
 
   recordUnitPayment: (unitNum, amount, method) => {
@@ -1066,28 +962,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       syncUnit(inv.unitNumber);
     }
   },
-
-  // ── v2 Fiscal Lens thin wrappers (handoff 12) ──────────────────────
-  recordPayment: (unitNum, amount, method, _date?) => {
-    get().recordUnitPayment(unitNum, amount, method);
-  },
-  imposeFee: (unitNum, amount, reason) => {
-    get().imposeLateFee(unitNum, amount, reason);
-  },
-  waiveFee: (unitNum, feeIndex) => {
-    get().waiveLateFee(unitNum, feeIndex);
-  },
-  invoiceUnit: (unitNum, type, amount, description) => {
-    get().createUnitInvoice(unitNum, type, amount, description);
-  },
-  recordBill: (vendor, invoiceNum, amount, glAccount, date?) => {
-    const today = date || new Date().toISOString().split('T')[0];
-    const m = get().glAccountMapping;
-    get().glPost(today, `${vendor} — ${invoiceNum}`, glAccount, m.bankAccount, amount, 'expense', invoiceNum);
-  },
-  payBill: (workOrderId) => {
-    get().payWorkOrder(workOrderId);
-  },
 }), {
   name: 'onetwo-financial',
   version: 2,
@@ -1105,7 +979,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     unitInvoices: state.unitInvoices,
     unitDocuments: state.unitDocuments,
     moveEvents: state.moveEvents,
-    periodCloses: state.periodCloses,
     stripeConnectId: state.stripeConnectId,
     stripeOnboardingComplete: state.stripeOnboardingComplete,
     autoBillingEnabled: state.autoBillingEnabled,

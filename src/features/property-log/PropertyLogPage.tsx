@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { usePropertyLogStore, type PropertyLogEntry } from '@/store/usePropertyLogStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { getActiveTenantId } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
 
@@ -89,7 +88,6 @@ export default function PropertyLogPage() {
   const { logs, addLog, updateLog, deleteLog } = usePropertyLogStore();
   const { addTask, moveTask } = useTaskTrackingStore();
   const { currentUser } = useAuthStore();
-  const { run: undoable } = useUndoableAction();
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -129,7 +127,10 @@ export default function PropertyLogPage() {
   };
 
   const handleSave = () => {
-    if (!form.title || !form.date || !form.conductedBy) return;
+    if (!form.title || !form.date || !form.conductedBy) {
+      alert('Title, date, and conducted by are required.');
+      return;
+    }
 
     const cleanFindings = form.findings.filter(f => f.area.trim() !== '');
     const cleanActions = form.actionItems.filter(a => a.description.trim() !== '');
@@ -200,9 +201,10 @@ export default function PropertyLogPage() {
   };
 
   const handleDelete = (id: string) => {
-    deleteLog(id);
-    if (expanded === id) setExpanded(null);
-    undoable({ label: 'Log entry deleted', commit: () => {}, undo: () => {} });
+    if (confirm('Delete this log entry? This cannot be undone.')) {
+      deleteLog(id);
+      if (expanded === id) setExpanded(null);
+    }
   };
 
   // Form helpers for dynamic lists

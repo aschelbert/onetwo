@@ -5,7 +5,7 @@ import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { getNavigationForRole, navigation } from '@/lib/rolePermissions';
 import { getInitials } from '@/lib/formatters';
-import { ROLE_LABELS, BOARD_ROLE_LABELS, toBoardRoleKey, type Role } from '@/types/auth';
+import { ROLE_LABELS, type Role } from '@/types/auth';
 import {
   ChevronDown,
   User,
@@ -18,10 +18,6 @@ import {
   X,
 } from 'lucide-react';
 import SyncIndicator from '@/components/shared/SyncIndicator';
-import RoleChip from '@/components/ui/RoleChip';
-import { useBuildingStore } from '@/store/useBuildingStore';
-import TrialBar from '@/features/home/components/TrialBar';
-import { canSetup as canSetupFn } from '@/lib/ownership';
 
 export default function TopNav() {
   const { currentUser, currentRole, switchRole, isAdminPreview, signOut } = useAuthStore();
@@ -30,16 +26,9 @@ export default function TopNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const board = useBuildingStore((s) => s.board);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
-
-  // Determine the current user's board role key for the role chip
-  const myBoardMember = board.find(
-    (m) => m.name === currentUser.name || m.email === currentUser.email,
-  );
-  const myRoleKey = myBoardMember?.roleKey ?? (currentRole === 'BOARD_MEMBER' ? toBoardRoleKey(myBoardMember?.role) : null);
 
   // Build nav items (same logic as old Sidebar)
   const navItems = permissions.length > 0
@@ -70,8 +59,6 @@ export default function TopNav() {
   };
 
   return (
-    <>
-    <TrialBar />
     <nav className="bg-navy sticky top-0 z-50" style={{ height: 58 }}>
       <div className="h-full px-4 sm:px-6 flex items-center justify-between">
         {/* Left: Logo + hamburger (mobile) */}
@@ -113,15 +100,6 @@ export default function TopNav() {
         {/* Right side */}
         <div className="flex items-center gap-3 shrink-0">
           <SyncIndicator />
-          {/* Board role chip — links to boardroom roles tab */}
-          {myRoleKey && (
-            <button
-              onClick={() => goTo('/boardroom?tab=roles')}
-              className="hidden sm:block"
-            >
-              <RoleChip label={BOARD_ROLE_LABELS[myRoleKey]} tone="teal" />
-            </button>
-          )}
           {/* Tenant name + role (hidden on small) */}
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium text-white leading-tight">{tenant.name}</p>
@@ -179,7 +157,7 @@ export default function TopNav() {
                     <Users className="w-4 h-4 text-ink-400" /> User Management
                   </button>
                 )}
-                {(currentRole === 'BOARD_MEMBER' || canSetupFn(tenant.me)) && (
+                {currentRole === 'BOARD_MEMBER' && !tenant.isDemo && (
                   <button onClick={() => goTo('/subscription')} className="w-full text-left px-4 py-2.5 text-sm text-ink-700 hover:bg-mist-50 flex items-center gap-3">
                     <CreditCard className="w-4 h-4 text-ink-400" /> Subscription
                   </button>
@@ -246,6 +224,5 @@ export default function TopNav() {
         </div>
       )}
     </nav>
-    </>
   );
 }

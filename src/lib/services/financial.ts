@@ -227,9 +227,6 @@ export function rowToGLEntry(r: Record<string, unknown>): GLEntry {
     sourceId: (r.source_id as string) || null,
     posted: r.posted as string,
     status: r.status as 'posted' | 'void',
-    postedBy: (r.posted_by as GLEntry['postedBy']) || null,
-    proof: (r.proof as GLEntry['proof']) || null,
-    reason: (r.reason as string) || null,
   };
 }
 
@@ -250,7 +247,6 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
     tenant_id: tenantId, local_id: entry.id, date: entry.date, memo: entry.memo,
     debit_acct: entry.debitAcct, credit_acct: entry.creditAcct, amount: entry.amount,
     source: entry.source, source_id: entry.sourceId, posted: entry.posted, status: entry.status,
-    posted_by: entry.postedBy || null, proof: entry.proof || null, reason: entry.reason || null,
   });
   if (error) { logDbError('createGLEntry error:', error); return false; }
   return true;
@@ -459,74 +455,10 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   return true;
 }
 
-// ── Period Closes ──
-
-export interface PeriodCloseRow {
-  id: string;
-  tenantId: string;
-  period: string;
-  closedAt: string | null;
-  closedBy: string | null;
-  statementDoc: { html: string; text: string; archiveId?: string } | null;
-  locked: boolean;
-  checklist: Record<string, boolean>;
-}
-
-export function rowToPeriodClose(r: Record<string, unknown>): PeriodCloseRow {
-  return {
-    id: r.id as string,
-    tenantId: r.tenant_id as string,
-    period: r.period as string,
-    closedAt: (r.closed_at as string) || null,
-    closedBy: (r.closed_by as string) || null,
-    statementDoc: (r.statement_doc as PeriodCloseRow['statementDoc']) || null,
-    locked: r.locked as boolean,
-    checklist: (r.checklist || {}) as Record<string, boolean>,
-  };
-}
-
-export async function fetchPeriodCloses(tenantId: string): Promise<PeriodCloseRow[] | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('period_closes')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .order('period', { ascending: false });
-  if (error) { logDbError('fetchPeriodCloses error:', error); return null; }
-  return (data || []).map(rowToPeriodClose);
-}
-
-export async function upsertPeriodClose(tenantId: string, close: Omit<PeriodCloseRow, 'tenantId'>): Promise<PeriodCloseRow | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('period_closes')
-    .upsert({
-      id: close.id,
-      tenant_id: tenantId,
-      period: close.period,
-      closed_at: close.closedAt,
-      closed_by: close.closedBy,
-      statement_doc: close.statementDoc,
-      locked: close.locked,
-      checklist: close.checklist,
-    }, { onConflict: 'tenant_id,period' })
-    .select()
-    .single();
-  if (error) { logDbError('upsertPeriodClose error:', error); return null; }
-  return rowToPeriodClose(data);
-}
-
-export async function deletePeriodClose(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase.from('period_closes').delete().eq('id', id);
-  if (error) { logDbError('deletePeriodClose error:', error); return false; }
-  return true;
-}
-
 // ── Bulk fetch for loadFromDb ──
 
 export async function fetchAllFinancialData(tenantId: string) {
-  const [units, budgetCategories, reserveItems, chartOfAccounts, generalLedger, workOrders, unitInvoices, settings, periodCloses] = await Promise.all([
+  const [units, budgetCategories, reserveItems, chartOfAccounts, generalLedger, workOrders, unitInvoices, settings] = await Promise.all([
     fetchUnits(tenantId),
     fetchBudgetCategories(tenantId),
     fetchReserveItems(tenantId),
@@ -535,7 +467,6 @@ export async function fetchAllFinancialData(tenantId: string) {
     fetchWorkOrders(tenantId),
     fetchUnitInvoices(tenantId),
     fetchFinancialSettings(tenantId),
-    fetchPeriodCloses(tenantId),
   ]);
-  return { units, budgetCategories, reserveItems, chartOfAccounts, generalLedger, workOrders, unitInvoices, settings, periodCloses };
+  return { units, budgetCategories, reserveItems, chartOfAccounts, generalLedger, workOrders, unitInvoices, settings };
 }

@@ -3,11 +3,8 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import type { VendorBid, VendorReview, VendorContract } from '@/store/useVendorTrackerStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useTenantContext } from '@/components/TenantProvider';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt, formatDate } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
-import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 
 type SubTab = 'directory' | 'bids' | 'contracts';
 type ModalKind = null | 'addVendor' | 'editVendor' | 'addBid' | 'addReview' | 'addContract' | 'editContract';
@@ -51,12 +48,9 @@ export default function VendorsTab() {
   const { vendors, addVendor, updateVendor, removeVendor, toggleVendorStatus } = useBuildingStore();
   const { bids, reviews, contracts, addBid, updateBid, deleteBid, addReview, deleteReview, addContract, updateContract, deleteContract } = useVendorTrackerStore();
   const { currentUser } = useAuthStore();
-  const tenant = useTenantContext();
-  const { run: runUndoable } = useUndoableAction();
 
   const [subTab, setSubTab] = useState<SubTab>('directory');
   const [modal, setModal] = useState<ModalKind>(null);
-  const [caseDrawerVendor, setCaseDrawerVendor] = useState<string | null>(null);
   const [editId, setEditId] = useState('');
   const [expandedVendor, setExpandedVendor] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -202,7 +196,6 @@ export default function VendorsTab() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3" onClick={e => e.stopPropagation()}>
-                      {true && <button onClick={() => setCaseDrawerVendor(v.id)} className="text-xs text-accent-600 font-medium hover:text-accent-700">Open a case</button>}
                       <button onClick={() => toggleVendorStatus(v.id)} className={`text-xs font-medium ${v.status === 'active' ? 'text-yellow-600 hover:text-yellow-700' : 'text-sage-600 hover:text-sage-700'}`}>
                         {v.status === 'active' ? 'Deactivate' : 'Activate'}
                       </button>
@@ -210,7 +203,7 @@ export default function VendorsTab() {
                         onClick={() => { setEditId(v.id); setForm({ name: v.name, service: v.service, contact: v.contact, phone: v.phone, email: v.email, contract: v.contract }); setModal('editVendor'); }}
                         className="text-xs text-accent-600 font-medium hover:text-accent-700"
                       >Edit</button>
-                      <button onClick={() => { removeVendor(v.id); runUndoable({ label: `Removed ${v.name}`, undo: () => addVendor({ name: v.name, service: v.service, contact: v.contact, phone: v.phone, email: v.email, contract: v.contract, status: v.status }), commit: () => {} }); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                      <button onClick={() => { if (confirm(`Remove ${v.name}?`)) removeVendor(v.id); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
                       <span className={`text-ink-300 text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>&#9660;</span>
                     </div>
                   </div>
@@ -234,7 +227,7 @@ export default function VendorsTab() {
                               <span className="text-xs text-ink-500">{r.reviewer}</span>
                               <span className="text-[10px] text-ink-300">{formatDate(r.date)}</span>
                             </div>
-                            <button onClick={() => { deleteReview(r.id); runUndoable({ label: 'Deleted review', undo: () => {}, commit: () => {} }); }} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
+                            <button onClick={() => { if (confirm('Delete review?')) deleteReview(r.id); }} className="text-[10px] text-red-400 hover:text-red-600">Delete</button>
                           </div>
                           <p className="text-xs text-ink-700 mt-1">{r.review}</p>
                         </div>
@@ -415,7 +408,7 @@ export default function VendorsTab() {
                             <button onClick={() => updateBid(b.id, { status: 'rejected' })} className="text-xs text-red-400 font-medium hover:text-red-600">Reject</button>
                           </>
                         )}
-                        <button onClick={() => { deleteBid(b.id); runUndoable({ label: 'Deleted bid', undo: () => {}, commit: () => {} }); }} className="text-xs text-ink-300 hover:text-red-500">Delete</button>
+                        <button onClick={() => { if (confirm('Delete this bid?')) deleteBid(b.id); }} className="text-xs text-ink-300 hover:text-red-500">Delete</button>
                       </div>
                     </div>
                   </div>
@@ -521,7 +514,7 @@ export default function VendorsTab() {
                         }}
                         className="text-xs text-accent-600 font-medium hover:text-accent-700"
                       >Edit</button>
-                      <button onClick={() => { deleteContract(c.id); runUndoable({ label: 'Deleted contract', undo: () => {}, commit: () => {} }); }} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      <button onClick={() => { if (confirm('Delete contract?')) deleteContract(c.id); }} className="text-xs text-red-400 hover:text-red-600">Delete</button>
                     </div>
                   </div>
                 </div>
@@ -543,7 +536,7 @@ export default function VendorsTab() {
           title={modal === 'addVendor' ? 'Add Vendor' : 'Edit Vendor'}
           onClose={() => { setModal(null); resetForm(); }}
           onSave={() => {
-            if (!f('name') || !f('service')) return;
+            if (!f('name') || !f('service')) { alert('Name and service required'); return; }
             const data = { name: f('name'), service: f('service'), contact: f('contact'), phone: f('phone'), email: f('email'), contract: f('contract') };
             if (modal === 'addVendor') addVendor({ ...data, status: 'active' });
             else updateVendor(editId, data);
@@ -573,7 +566,7 @@ export default function VendorsTab() {
           title="New Bid / Proposal"
           onClose={() => { setModal(null); resetForm(); }}
           onSave={() => {
-            if (!f('project') || !f('amount')) return;
+            if (!f('project') || !f('amount')) { alert('Project and amount required'); return; }
             const vendorName = f('vendorName') || 'Unknown Vendor';
             const matchedVendor = vendors.find(v => v.name === vendorName);
             addBid({
@@ -635,7 +628,7 @@ export default function VendorsTab() {
           onClose={() => { setModal(null); resetForm(); }}
           onSave={() => {
             const vendorName = f('vendorName');
-            if (!vendorName) return;
+            if (!vendorName) { alert('Please select a vendor'); return; }
             const matchedVendor = vendors.find(v => v.name === vendorName);
             addReview({
               vendorId: matchedVendor?.id || f('vendorId') || '',
@@ -683,7 +676,7 @@ export default function VendorsTab() {
           onClose={() => { setModal(null); resetForm(); }}
           onSave={() => {
             const vendorName = f('vendorName');
-            if (!vendorName || !f('title')) return;
+            if (!vendorName || !f('title')) { alert('Vendor and title required'); return; }
             const matchedVendor = vendors.find(v => v.name === vendorName);
             const data = {
               vendorId: matchedVendor?.id || f('vendorId') || '',
@@ -752,15 +745,6 @@ export default function VendorsTab() {
             </div>
           </div>
         </Modal>
-      )}
-
-      {/* v2Cases: Open a case drawer for a vendor */}
-      {true && caseDrawerVendor && (
-        <OpenCaseDrawer
-          open={true}
-          onClose={() => setCaseDrawerVendor(null)}
-          prefill={{ vendorId: caseDrawerVendor, source: 'vendor', sourceId: caseDrawerVendor }}
-        />
       )}
     </div>
   );

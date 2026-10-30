@@ -29,7 +29,6 @@ export interface Announcement {
 
 interface ComplianceState {
   completions: Record<string, boolean>;
-  stepCompletions: Record<string, boolean[]>;
   itemAttachments: Record<string, FilingAttachment[]>;
   filings: RegulatoryFiling[];
   communications: OwnerCommunication[];
@@ -40,8 +39,6 @@ interface ComplianceState {
 
   toggleItem: (id: string, tenantId?: string) => void;
   setCompletion: (id: string, val: boolean, tenantId?: string) => void;
-  setStepCompletions: (itemId: string, steps: boolean[], tenantId?: string) => void;
-  completeAllSteps: (itemId: string, howToLength: number, tenantId?: string) => void;
 
   addItemAttachment: (itemId: string, att: FilingAttachment, tenantId?: string) => void;
   removeItemAttachment: (itemId: string, attName: string, tenantId?: string) => void;
@@ -81,7 +78,6 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     l1: true, l2: true,
   },
 
-  stepCompletions: {},
   itemAttachments: {},
 
   filings: [
@@ -112,7 +108,7 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
 
   // ── DB sync ──
   loadFromDb: async (tenantId: string) => {
-    const [announcements, communications, filings, completionsResult, itemAttachments] = await Promise.all([
+    const [announcements, communications, filings, completions, itemAttachments] = await Promise.all([
       announcementsSvc.fetchAnnouncements(tenantId),
       communicationsSvc.fetchCommunications(tenantId),
       complianceSvc.fetchFilings(tenantId),
@@ -123,10 +119,7 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     if (announcements) updates.announcements = announcements;
     if (communications) updates.communications = communications;
     if (filings) updates.filings = filings;
-    if (completionsResult) {
-      updates.completions = completionsResult.completions;
-      updates.stepCompletions = completionsResult.stepCompletions;
-    }
+    if (completions) updates.completions = completions;
     if (itemAttachments) updates.itemAttachments = itemAttachments;
     if (Object.keys(updates).length > 0) set(updates);
   },
@@ -144,28 +137,6 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       complianceSvc.upsertCompletion(tid, id, val);
-    }
-  },
-  setStepCompletions: (itemId, steps, tenantId?) => {
-    const completed = steps.length > 0 && steps.every(Boolean);
-    set(s => ({
-      stepCompletions: { ...s.stepCompletions, [itemId]: steps },
-      completions: { ...s.completions, [itemId]: completed },
-    }));
-    const tid = tenantId || getActiveTenantId();
-    if (isBackendEnabled && tid) {
-      complianceSvc.upsertCompletion(tid, itemId, completed, steps);
-    }
-  },
-  completeAllSteps: (itemId, howToLength, tenantId?) => {
-    const steps = Array(howToLength).fill(true);
-    set(s => ({
-      stepCompletions: { ...s.stepCompletions, [itemId]: steps },
-      completions: { ...s.completions, [itemId]: true },
-    }));
-    const tid = tenantId || getActiveTenantId();
-    if (isBackendEnabled && tid) {
-      complianceSvc.upsertCompletion(tid, itemId, true, steps);
     }
   },
 
@@ -272,6 +243,5 @@ export const useComplianceStore = create<ComplianceState>()(persist((set) => ({
     filings: persisted?.filings?.length ? persisted.filings : current.filings || [],
     communications: persisted?.communications?.length ? persisted.communications : current.communications || [],
     completions: persisted?.completions && Object.keys(persisted.completions).length > 0 ? persisted.completions : current.completions,
-    stepCompletions: persisted?.stepCompletions && Object.keys(persisted.stepCompletions).length > 0 ? persisted.stepCompletions : current.stepCompletions || {},
   }),
 }));

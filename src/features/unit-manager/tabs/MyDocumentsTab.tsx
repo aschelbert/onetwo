@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { getDocumentSignedUrl } from '@/lib/services/unitManager';
 import type { Unit } from '@/types/financial';
 
@@ -10,7 +9,6 @@ const DOC_TYPES = ['general', 'lease', 'insurance', 'inspection', 'correspondenc
 export default function MyDocumentsTab({ activeUnit }: { activeUnit: Unit }) {
   const { currentUser } = useAuthStore();
   const { unitDocuments, uploadDocument, deleteDocument } = useFinancialStore();
-  const { run: undoable } = useUndoableAction();
   const isBoard = currentUser?.role !== 'RESIDENT';
 
   const [uploading, setUploading] = useState(false);
@@ -44,13 +42,13 @@ export default function MyDocumentsTab({ activeUnit }: { activeUnit: Unit }) {
       a.target = '_blank';
       a.click();
     } else {
-      console.error('Could not generate download link.');
+      alert('Could not generate download link.');
     }
   };
 
   const handleDelete = async (id: string, storagePath: string) => {
+    if (!confirm('Delete this document?')) return;
     await deleteDocument(id, storagePath);
-    undoable({ label: 'Document deleted', commit: () => {}, undo: () => {} });
   };
 
   const docTypeLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);

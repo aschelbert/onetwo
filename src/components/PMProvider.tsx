@@ -60,11 +60,7 @@ export default function PMProvider({ children }: { children: React.ReactNode }) 
           setLoaded(true);
           return;
         }
-        setCompanyUser({
-          ...mcUser,
-          company_id: mcUser.management_company_id,
-          display_name: mcUser.name,
-        });
+        setCompanyUser(mcUser);
 
         // 2. Load the management company
         const { data: mc } = await sb

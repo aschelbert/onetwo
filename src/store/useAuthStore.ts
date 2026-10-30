@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Role, AuthStep, BuildingMember, BuildingInvite } from '@/types/auth';
-import { isDemoSession } from '@/lib/demoGuard';
+import { generateLocalId } from '@/lib/generateId';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -12,7 +12,6 @@ interface AuthState {
   isAdminPreview: boolean; // true when a PLATFORM_ADMIN switches to a tenant role for testing
   buildingMembers: BuildingMember[];
   buildingInvites: BuildingInvite[];
-  demoExitSource: string | null;
 
   // Actions
   setAuthStep: (step: AuthStep) => void;
@@ -21,13 +20,14 @@ interface AuthState {
   login: (member: BuildingMember) => void;
   skipToDemo: () => void;
   signOut: () => void;
-  leaveDemo: (source: 'bar' | 'subscription' | 'upsell') => void;
   updateProfile: (updates: Partial<User>) => void;
   addMember: (member: BuildingMember) => void;
   removeMember: (id: string) => void;
   updateMemberRole: (id: string, role: Role) => void;
   addInvite: (invite: BuildingInvite) => void;
   revokeInvite: (id: string) => void;
+  inviteMember: (email: string, role: Role, unit?: string) => void;
+  generateInviteCode: (role: Role) => string;
 }
 
 const defaultUser: User = {
@@ -57,18 +57,20 @@ const seedMembers: BuildingMember[] = [
   { id: 'user7', name: 'Lisa Park', email: 'lisa@example.com', phone: '202-555-0502', role: 'RESIDENT', unit: '502', status: 'active', joined: '2022-09-01', boardTitle: null },
 ];
 
-const seedInvites: BuildingInvite[] = [];
+const seedInvites: BuildingInvite[] = [
+  { id: 'inv1', email: 'thomas@example.com', role: 'BOARD_MEMBER', unit: '303', sentBy: 'John Smith', sentDate: '2026-02-15', code: 'SA-BRD-7X4K', status: 'pending' },
+  { id: 'inv2', email: 'kevin@example.com', role: 'RESIDENT', unit: '407', sentBy: 'Robert Mitchell', sentDate: '2026-02-18', code: 'SA-RES-9M2P', status: 'pending' },
+];
 
 export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   isAuthenticated: false,
-  authStep: 'login',
+  authStep: 'welcome',
   authJoinRole: 'RESIDENT',
   currentUser: defaultUser,
   currentRole: 'BOARD_MEMBER',
   isAdminPreview: false,
   buildingMembers: seedMembers,
   buildingInvites: seedInvites,
-  demoExitSource: null,
 
   setAuthStep: (step) => set({ authStep: step }),
   setAuthJoinRole: (role) => set({ authJoinRole: role }),
@@ -107,10 +109,6 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     }),
 
   signOut: () => {
-    // Clear demo localStorage before auth state so re-entry rehydrates from seed
-    if (isDemoSession()) {
-      import('@/store/resetStores').then(({ resetDemoStores }) => resetDemoStores());
-    }
     // Sign out of Supabase if available
     import('@/lib/supabase').then(({ supabase, isBackendEnabled }) => {
       if (isBackendEnabled && supabase) {
@@ -119,15 +117,12 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     });
     set({
       isAuthenticated: false,
-      authStep: 'login',
+      authStep: 'welcome',
       currentUser: defaultUser,
       currentRole: 'BOARD_MEMBER',
       isAdminPreview: false,
-      demoExitSource: null,
     });
   },
-
-  leaveDemo: (source) => set({ demoExitSource: source }),
 
   updateProfile: (updates) =>
     set((state) => ({
@@ -161,6 +156,30 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       buildingInvites: state.buildingInvites.filter((i) => i.id !== id),
     })),
 
+  inviteMember: (email, role, unit) => {
+    const code = get().generateInviteCode(role);
+    const invite: BuildingInvite = {
+      id: generateLocalId('inv-'),
+      email,
+      role,
+      unit: unit || '',
+      sentBy: get().currentUser.name,
+      sentDate: new Date().toISOString().split('T')[0],
+      code,
+      status: 'pending',
+    };
+    set((state) => ({
+      buildingInvites: [...state.buildingInvites, invite],
+    }));
+  },
+
+  generateInviteCode: (role) => {
+    const prefix = role === 'BOARD_MEMBER' ? 'BRD' : role === 'PROPERTY_MANAGER' ? 'MGR' : 'RES';
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return `SA-${prefix}-${code}`;
+  },
 }), {
   name: 'onetwo-auth',
   version: 2,
@@ -169,7 +188,6 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     currentUser: state.currentUser,
     currentRole: state.currentRole,
     isAdminPreview: state.isAdminPreview,
-    // demoExitSource intentionally excluded — transient
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

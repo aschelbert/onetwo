@@ -232,7 +232,7 @@ export default function CommunicationsTab() {
       })
       .subscribe();
 
-    return () => { supabase?.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [activeChannelId, tenantUserId, markAsRead, fetchUnreadCounts]);
 
   // ─── Auto-scroll ──────────────────────────────────────────────

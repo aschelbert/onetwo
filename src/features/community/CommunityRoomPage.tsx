@@ -10,9 +10,8 @@ import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AmenitiesTab from '@/features/community/AmenitiesTab';
-import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
 
-type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities' | 'pm_scorecard';
+type TabId = 'announcements' | 'requests' | 'meetings' | 'votes' | 'amenities';
 
 const ANN_CATS: Record<string, { icon: string; label: string; bg: string; text: string }> = {
   general: { icon: '📢', label: 'General', bg: 'bg-ink-100', text: 'text-ink-600' },
@@ -31,20 +30,16 @@ const REQ_CATS = [
 
 export default function CommunityRoomPage() {
   const tenant = useTenantContext();
-  const hasFacilities = tenant.features.facilities || tenant.isDemo;
-  // v2 flags removed -- always true
+  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
   const amenityUnread = amenitiesStore.getUnreadCount(user.id);
   const amenityPending = amenitiesStore.getPendingApprovals().length;
-  const isPMAddon = tenant.addons?.pmSeat ?? false;
-  const validTabs: TabId[] = [
-    'announcements', 'requests', 'meetings', 'votes',
-    ...(hasFacilities ? ['amenities' as TabId] : []),
-    ...(isPMAddon ? ['pm_scorecard' as TabId] : []),
-  ];
+  const validTabs: TabId[] = isManagementSuite
+    ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
+    : ['announcements', 'requests', 'meetings', 'votes'];
   const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
   const mtg = useMeetingsStore();
   const elections = useElectionStore();
@@ -90,8 +85,7 @@ export default function CommunityRoomPage() {
     { id: 'requests', label: 'Requests', badge: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length || undefined },
     { id: 'meetings', label: 'Meetings', badge: upcoming.length || undefined },
     { id: 'votes', label: 'Votes & Resolutions', badge: openElections || undefined },
-    ...(hasFacilities ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
-    ...(isPMAddon ? [{ id: 'pm_scorecard' as TabId, label: 'PM Scorecard' }] : []),
+    ...(isManagementSuite ? [{ id: 'amenities' as TabId, label: 'Amenities', badge: (amenityUnread + (isBoard ? amenityPending : 0)) || undefined }] : []),
   ];
 
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
@@ -141,13 +135,13 @@ export default function CommunityRoomPage() {
         <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div><h2 className="font-display text-2xl font-bold">🏠 Community Room</h2></div>
         </div>
-        <div className={`grid grid-cols-3 ${hasFacilities && isBoard ? 'sm:grid-cols-6' : hasFacilities ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
+        <div className={`grid grid-cols-3 ${isManagementSuite && isBoard ? 'sm:grid-cols-6' : isManagementSuite ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
           {[
             { val: announcements.filter(a => a.pinned).length, label: 'Pinned Updates', sub: 'Active', tab: 'announcements' as TabId },
             { val: myRequests.filter(r => r.status !== 'CLOSED' && r.status !== 'RESOLVED').length, label: 'My Open Requests', sub: 'Pending', tab: 'requests' as TabId },
             { val: upcoming.length, label: 'Upcoming Meetings', sub: 'Scheduled', tab: 'meetings' as TabId },
             { val: openElections, label: 'Open Votes', sub: openElections > 0 ? 'Active' : 'None active', tab: 'votes' as TabId },
-            ...(hasFacilities ? [
+            ...(isManagementSuite ? [
               { val: amenitiesStore.getReservationsForUser(user.id).length, label: 'My Reservations', sub: 'Booked', tab: 'amenities' as TabId },
               ...(isBoard ? [{ val: amenityPending, label: 'Pending Approvals', sub: amenityPending > 0 ? 'Needs attention' : 'All clear', tab: 'amenities' as TabId }] : []),
             ] : []),
@@ -366,10 +360,7 @@ export default function CommunityRoomPage() {
         {tab === 'votes' && <VotingPage />}
 
         {/* ═══ AMENITIES ═══ */}
-        {tab === 'amenities' && hasFacilities && <AmenitiesTab />}
-
-        {/* ═══ PM SCORECARD ═══ */}
-        {tab === 'pm_scorecard' && isPMAddon && <PMScorecardTab />}
+        {tab === 'amenities' && isManagementSuite && <AmenitiesTab />}
 
       </div>
     </div>

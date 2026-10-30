@@ -3,11 +3,10 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import path from 'path'
-import fs from 'fs'
 
 // Routes that should serve app.html instead of index.html (marketing)
 const APP_ROUTES = [
-  '/login', '/signup', '/reset-password', '/dashboard', '/financial', '/issues',
+  '/login', '/reset-password', '/dashboard', '/financial', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
   '/admin', '/portfolio',
@@ -66,6 +65,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/__tests__/setup.ts'],
-    include: ['src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.tsx'],
+    include: ['src/__tests__/**/*.test.ts'],
   },
 })
