@@ -151,6 +151,8 @@ Deno.serve(async (req) => {
 
     // ── Build Chargebee checkout params ──
     const p = new URLSearchParams();
+    // embed=true is required for Chargebee Drop-in (in-app) checkout
+    p.append("embed", "true");
     let itemIdx = 0;
 
     // Plan price
