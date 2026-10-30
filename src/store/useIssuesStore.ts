@@ -2475,6 +2475,9 @@ interface IssuesState {
   // Budget drafting
   saveBudgetDraft: (caseId: string, stepIdx: number, draft: NonNullable<import('@/types/issues').CaseStep['budgetDraft']>) => void;
 
+  // PM Calendar
+  savePMCalendar: (caseId: string, stepIdx: number, data: NonNullable<import('@/types/issues').CaseStep['pmCalendar']>) => void;
+
   // Shell refactor: active step in two-column layout
   shellActiveStep: number;
   shellActiveStepCaseId: string | null;
@@ -3262,6 +3265,18 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         if (c.id !== caseId || !c.steps) return c;
         const steps = [...c.steps];
         steps[stepIdx] = { ...steps[stepIdx], budgetDraft: draft };
+        return { ...c, steps };
+      })
+    }));
+  },
+
+  // ─── PM Calendar ───────────────────────────────────────
+  savePMCalendar: (caseId, stepIdx, data) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], pmCalendar: data };
         return { ...c, steps };
       })
     }));

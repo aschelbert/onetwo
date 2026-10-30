@@ -217,6 +217,15 @@ export interface CaseStep {
     perUnitMonthly: number;
     savedDate: string | null;
   };
+  pmCalendar?: {
+    tasks: Array<{
+      id: string; name: string; category: string;
+      startMonth: number; frequency: string;
+      vendorId: string | null; vendorName: string;
+      notes: string; eventCreated: boolean;
+    }>;
+    calendarYear: number;
+  };
 }
 
 export interface AdditionalApproach {
