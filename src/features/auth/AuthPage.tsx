@@ -784,7 +784,7 @@ export default function AuthPage() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
-      <div className={`w-full mx-4 ${authStep === 'signup-plan' ? 'max-w-xl' : 'max-w-md'}`}>
+      <div className={`w-full mx-4 ${authStep === 'signup-plan' ? 'max-w-3xl' : 'max-w-md'}`}>
 
         {/* ══════ WELCOME ══════ */}
         {authStep === 'welcome' && (
@@ -970,122 +970,166 @@ export default function AuthPage() {
         )}
 
         {/* ══════ SIGNUP — ACCOUNT & PLAN ══════ */}
-        {authStep === 'signup-plan' && (
+        {authStep === 'signup-plan' && (() => {
+          const currentTier = TIERS.find(t => t.id === selectedTier);
+          const tierPrice = billingInterval === 'annual' ? (currentTier?.annual ?? 0) : (currentTier?.monthly ?? 0);
+          const addOnTotal = ADDONS.filter(a => selectedAddOns.has(a.id)).reduce((sum, a) => sum + (billingInterval === 'annual' ? a.annual : a.monthly), 0);
+          const grandTotal = tierPrice + addOnTotal;
+          const interval = billingInterval === 'annual' ? '/yr' : '/mo';
+          return (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
             <StepIndicator steps={['Account & Plan','Building','Checkout']} current={0} />
             <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
-            <p className="text-sm text-ink-400 text-center mb-4">{trialDays}-day free trial on all plans. Cancel anytime.</p>
+            <p className="text-sm text-ink-400 text-center mb-6">{trialDays}-day free trial on all plans. Cancel anytime.</p>
 
-            <div className="space-y-3">
-              {/* Name */}
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
-                  <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
-                  <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
-              </div>
-              {/* Email & Password */}
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
-              </div>
-
-              {/* Billing Interval Toggle */}
-              <div className="flex items-center justify-center pt-2">
-                <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
-                  <button onClick={() => setBillingInterval('monthly')}
-                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
-                  <button onClick={() => setBillingInterval('annual')}
-                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'annual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
-                    Annual <span className="text-accent-600 text-xs font-bold ml-1">Save ~16%</span>
-                  </button>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Left column — Account + Plan selection */}
+              <div className="lg:col-span-3 space-y-3">
+                {/* Name */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
+                    <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
+                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
                 </div>
-              </div>
+                {/* Email & Password */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
+                  <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                </div>
 
-              {/* Plan Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {TIERS.map(tier => {
-                  const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
-                  const annualTotal = tier.annual;
-                  return (
-                    <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
-                      className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
-                      }`}>
-                      <div className="mb-2">
-                        <p className="font-bold text-ink-900">{tier.name}</p>
-                        <p className="text-lg font-bold text-accent-600 mt-1">${displayPrice}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                        {billingInterval === 'annual' && (
-                          <p className="text-[10px] text-ink-400">Billed ${annualTotal.toLocaleString()}/yr</p>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-ink-400 italic mb-2">{tier.tagline}</p>
-                      <ul className="space-y-1">
-                        {tier.features.map(f => (
-                          <li key={f} className="text-xs text-ink-500 flex items-start gap-1.5">
-                            <span className="text-sage-500 mt-0.5">✓</span> {f}
-                          </li>
-                        ))}
-                      </ul>
+                {/* Billing Interval Toggle */}
+                <div className="flex items-center justify-center pt-2">
+                  <div className="inline-flex bg-ink-100 rounded-lg p-0.5">
+                    <button onClick={() => setBillingInterval('monthly')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>Monthly</button>
+                    <button onClick={() => setBillingInterval('annual')}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${billingInterval === 'annual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
+                      Annual <span className="text-accent-600 text-xs font-bold ml-1">Save ~16%</span>
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
 
-              {/* Add-ons */}
-              <div className="pt-2">
-                <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-2">Optional Add-ons</p>
-                <div className="space-y-2">
-                  {ADDONS.map(addon => {
-                    const selected = selectedAddOns.has(addon.id);
-                    const price = billingInterval === 'annual' ? Math.round(addon.annual / 12) : addon.monthly;
+                {/* Plan Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {TIERS.map(tier => {
+                    const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
+                    const annualTotal = tier.annual;
                     return (
-                      <button key={addon.id} onClick={() => toggleAddOn(addon.id)}
-                        className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
-                          selected ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                      <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          selectedTier === tier.id ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
                         }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              selected ? 'bg-accent-500 border-accent-500' : 'border-ink-300'
-                            }`}>
-                              {selected && <span className="text-white text-[10px]">✓</span>}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-ink-900">{addon.name}</p>
-                              <p className="text-[11px] text-ink-400">{addon.description}</p>
-                            </div>
-                          </div>
-                          <p className="text-sm font-bold text-accent-600 whitespace-nowrap ml-3">+${price}/mo</p>
+                        <div className="mb-2">
+                          <p className="font-bold text-ink-900">{tier.name}</p>
+                          <p className="text-lg font-bold text-accent-600 mt-1">${displayPrice}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+                          {billingInterval === 'annual' && (
+                            <p className="text-[10px] text-ink-400">Billed ${annualTotal.toLocaleString()}/yr</p>
+                          )}
                         </div>
+                        <p className="text-[11px] text-ink-400 italic mb-2">{tier.tagline}</p>
+                        <ul className="space-y-1">
+                          {tier.features.map(f => (
+                            <li key={f} className="text-xs text-ink-500 flex items-start gap-1.5">
+                              <span className="text-sage-500 mt-0.5">✓</span> {f}
+                            </li>
+                          ))}
+                        </ul>
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Add-ons */}
+                <div className="pt-2">
+                  <p className="text-xs font-semibold text-ink-500 uppercase tracking-wide mb-2">Optional Add-ons</p>
+                  <div className="space-y-2">
+                    {ADDONS.map(addon => {
+                      const selected = selectedAddOns.has(addon.id);
+                      const price = billingInterval === 'annual' ? Math.round(addon.annual / 12) : addon.monthly;
+                      return (
+                        <button key={addon.id} onClick={() => toggleAddOn(addon.id)}
+                          className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                            selected ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'
+                          }`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                selected ? 'bg-accent-500 border-accent-500' : 'border-ink-300'
+                              }`}>
+                                {selected && <span className="text-white text-[10px]">✓</span>}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-ink-900">{addon.name}</p>
+                                <p className="text-[11px] text-ink-400">{addon.description}</p>
+                              </div>
+                            </div>
+                            <p className="text-sm font-bold text-accent-600 whitespace-nowrap ml-3">+${price}/mo</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <button onClick={() => {
-                  if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
-                  if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                  if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
-                  if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
-                  setAuthStep('signup-building');
-                }}
-                className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">
-                Continue with {TIERS.find(t => t.id === selectedTier)?.name} →
-              </button>
-            </div>
-            <div className="mt-4 text-center space-y-2">
-              <p className="text-sm text-ink-500">Already have an account?{' '}<a onClick={() => setAuthStep('login')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Sign in</a></p>
-              <p className="text-xs text-ink-400">Have an invite code?{' '}<a onClick={() => setAuthStep('join-invite')} className="text-accent-600 cursor-pointer hover:underline">Enter it here</a></p>
+              {/* Right column — Order Summary */}
+              <div className="lg:col-span-2">
+                <div className="lg:sticky lg:top-8 space-y-4">
+                  <div className="bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-5 text-white">
+                    <p className="text-xs font-semibold text-accent-300 uppercase tracking-wide mb-3">Order Summary</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-ink-200">{currentTier?.name}</span>
+                        <span className="text-sm font-bold">${tierPrice.toLocaleString()}{interval}</span>
+                      </div>
+                      {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
+                        <div key={addon.id} className="flex items-center justify-between">
+                          <span className="text-sm text-ink-300">+ {addon.name}</span>
+                          <span className="text-sm font-bold">${(billingInterval === 'annual' ? addon.annual : addon.monthly).toLocaleString()}{interval}</span>
+                        </div>
+                      ))}
+                      <div className="border-t border-ink-600 pt-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">Total</span>
+                          <span className="text-lg font-bold text-accent-300">${grandTotal.toLocaleString()}{interval}</span>
+                        </div>
+                        {billingInterval === 'annual' && (
+                          <p className="text-[10px] text-ink-400 text-right mt-0.5">${Math.round(grandTotal / 12)}/mo billed annually</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-ink-600">
+                      <p className="text-xs text-ink-300">{trialDays}-day free trial · Cancel anytime</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => {
+                      if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
+                      if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
+                      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                      if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                      setAuthStep('signup-building');
+                    }}
+                    className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
+                    Continue with {currentTier?.name} →
+                  </button>
+
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-ink-500">Already have an account?{' '}<a onClick={() => setAuthStep('login')} className="text-accent-600 font-semibold cursor-pointer hover:underline">Sign in</a></p>
+                    <p className="text-xs text-ink-400">Have an invite code?{' '}<a onClick={() => setAuthStep('join-invite')} className="text-accent-600 cursor-pointer hover:underline">Enter it here</a></p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ══════ SIGNUP — BUILDING INFO ══════ */}
         {authStep === 'signup-building' && (
