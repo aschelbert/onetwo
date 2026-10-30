@@ -1,7 +1,6 @@
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
 import { Step1BudgetReview } from './Step1BudgetReview';
-import { Step1PMCalendar } from './Step1PMCalendar';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
 import { StepActionList } from '../workflow/StepActionList';
 import { deriveActionsForStep } from '../workflow/stepActionMap';
@@ -45,11 +44,6 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
   // Annual-budgeting step 1 enrichment
   if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 0 && onToggleAction) {
     return <Step1BudgetReview c={c} step={step} onToggleAction={onToggleAction} />;
-  }
-
-  // Preventative Maintenance step 1 enrichment
-  if (c.catId === 'maintenance' && c.sitId === 'preventative-maintenance' && stepIndex === 0 && onToggleCheck) {
-    return <Step1PMCalendar c={c} step={step} onToggleCheck={onToggleCheck} />;
   }
 
   // Annual-budgeting step 3 enrichment
