@@ -1,9 +1,5 @@
-import { useState } from 'react';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import type { InsurancePolicy } from '@/store/useBuildingStore';
-import { useTenantContext } from '@/components/TenantProvider';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
-import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 
 /** Required and recommended insurance policies for condominiums.
  *  Based on DC Code, Fannie Mae/Freddie Mac requirements, and industry best practices. */
@@ -57,9 +53,6 @@ interface Props {
 }
 
 export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Props) {
-  const tenant = useTenantContext();
-  const { run: runUndoable } = useUndoableAction();
-  const [caseDrawerPolicy, setCaseDrawerPolicy] = useState<string | null>(null);
   const policies = store.insurance;
   const state = store.address.state;
 
@@ -164,9 +157,8 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
                         {expSoon && !exp && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-yellow-100 text-yellow-700">Expiring Soon</span>}
                         {!exp && !expSoon && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-sage-100 text-sage-700">✓ Active</span>}
                         <span className="text-[11px] text-ink-400">{pol.carrier} · {pol.coverage} · Exp {pol.expires}{pol.attachments && pol.attachments.length > 0 ? ` · 📎 ${pol.attachments.length} file${pol.attachments.length > 1 ? 's' : ''}` : ' · ⚠ No doc attached'}</span>
-                        {true && <button onClick={() => setCaseDrawerPolicy(pol.id)} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Open a case</button>}
                         <button onClick={() => openEdit(pol.id, { type: pol.type, carrier: pol.carrier, coverage: pol.coverage, premium: pol.premium, expires: pol.expires, policyNum: pol.policyNum })} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                        <button onClick={() => { const p = pol; store.removeInsurance(p.id); runUndoable({ label: `Removed ${p.type} policy`, undo: () => store.addInsurance({ type: p.type, carrier: p.carrier, coverage: p.coverage, premium: p.premium, expires: p.expires, policyNum: p.policyNum }), commit: () => {} }); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
+                        <button onClick={() => { if (confirm('Remove?')) store.removeInsurance(pol.id); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
                       </div>
                     )}
                     {!pol && (
@@ -205,7 +197,7 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
                       <div className="flex flex-wrap items-center gap-3 mt-2">
                         <span className="text-[11px] text-ink-400">{pol.carrier} · {pol.coverage} · {pol.premium} · Exp {pol.expires}{pol.attachments && pol.attachments.length > 0 ? ` · 📎 ${pol.attachments.length}` : ''}</span>
                         <button onClick={() => openEdit(pol.id, { type: pol.type, carrier: pol.carrier, coverage: pol.coverage, premium: pol.premium, expires: pol.expires, policyNum: pol.policyNum })} className="text-[11px] text-accent-600 font-medium hover:text-accent-700">Edit</button>
-                        <button onClick={() => { const p = pol; store.removeInsurance(p.id); runUndoable({ label: `Removed ${p.type} policy`, undo: () => store.addInsurance({ type: p.type, carrier: p.carrier, coverage: p.coverage, premium: p.premium, expires: p.expires, policyNum: p.policyNum }), commit: () => {} }); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
+                        <button onClick={() => { if (confirm('Remove?')) store.removeInsurance(pol.id); }} className="text-[11px] text-red-400 hover:text-red-600">Remove</button>
                       </div>
                     )}
                     {!pol && (
@@ -241,7 +233,7 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
                       {isExpired(pol.expires) && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-red-100 text-red-700">EXPIRED</span>}
                       {isExpiringSoon(pol.expires) && !isExpired(pol.expires) && <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-yellow-100 text-yellow-700">Expiring</span>}
                       <button onClick={() => openEdit(pol.id, { type: pol.type, carrier: pol.carrier, coverage: pol.coverage, premium: pol.premium, expires: pol.expires, policyNum: pol.policyNum })} className="text-xs text-accent-600 font-medium">Edit</button>
-                      <button onClick={() => { const p = pol; store.removeInsurance(p.id); runUndoable({ label: `Removed ${p.type} policy`, undo: () => store.addInsurance({ type: p.type, carrier: p.carrier, coverage: p.coverage, premium: p.premium, expires: p.expires, policyNum: p.policyNum }), commit: () => {} }); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                      <button onClick={() => { if (confirm('Remove?')) store.removeInsurance(pol.id); }} className="text-xs text-red-400 hover:text-red-600">Remove</button>
                     </div>
                   </div>
                 </div>
@@ -254,15 +246,6 @@ export default function InsuranceTab({ store, openAdd, openEdit, isBoard }: Prop
       <button onClick={openAdd} className="w-full py-3 border-2 border-dashed border-ink-200 rounded-xl text-sm text-ink-500 hover:border-accent-300 hover:text-accent-600 transition-colors font-medium">
         + Add Additional Policy
       </button>
-
-      {/* v2Cases: Open a case drawer for insurance */}
-      {true && caseDrawerPolicy && (
-        <OpenCaseDrawer
-          open={true}
-          onClose={() => setCaseDrawerPolicy(null)}
-          prefill={{ insurancePolicyId: caseDrawerPolicy, source: 'insurance', sourceId: caseDrawerPolicy }}
-        />
-      )}
     </div>
   );
 }

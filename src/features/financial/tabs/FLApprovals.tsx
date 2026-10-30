@@ -4,12 +4,9 @@ import type { SpendingApproval } from '@/store/useSpendingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { useTenantContext } from '@/components/TenantProvider';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { fmt } from '@/lib/formatters';
 import { getFinancialContext, analyzeFunding } from '@/lib/fundingAnalysis';
 import Modal from '@/components/ui/Modal';
-import SpendingDrawer from '../drawers/SpendingDrawer';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'denied';
 
@@ -53,13 +50,9 @@ export default function FLApprovals() {
   const { currentUser, currentRole } = useAuthStore();
   const { board } = useBuildingStore();
   const financialStore = useFinancialStore();
-  const tenant = useTenantContext();
-  const { run: undoable } = useUndoableAction();
-  const isV2 = true; // v2 flags removed -- always v2
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showSpendingDrawer, setShowSpendingDrawer] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -90,8 +83,8 @@ export default function FLApprovals() {
   // Handle adding a new request
   const handleAddRequest = () => {
     const amount = parseFloat(form.amount);
-    if (!form.title.trim()) return;
-    if (!amount || amount <= 0) return;
+    if (!form.title.trim()) { alert('Title is required'); return; }
+    if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
     addApproval({
       title: form.title.trim(),
       description: form.description.trim(),
@@ -175,7 +168,7 @@ export default function FLApprovals() {
         </div>
 
         <button
-          onClick={() => isV2 ? setShowSpendingDrawer(true) : setShowAddModal(true)}
+          onClick={() => setShowAddModal(true)}
           className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 text-sm font-medium"
         >
           + New Spending Request
@@ -228,7 +221,7 @@ export default function FLApprovals() {
                       )}
                     </div>
                     <button
-                      onClick={() => { deleteApproval(approval.id); undoable({ label: 'Approval deleted', commit: () => {}, undo: () => {} }); }}
+                      onClick={() => { if (confirm(`Delete "${approval.title}"?`)) deleteApproval(approval.id); }}
                       className="text-xs text-red-400 hover:text-red-600 shrink-0"
                     >
                       Delete
@@ -580,14 +573,6 @@ export default function FLApprovals() {
             </div>
           </div>
         </Modal>
-      )}
-
-      {/* v2: SpendingDrawer replaces the modal form */}
-      {isV2 && (
-        <SpendingDrawer
-          open={showSpendingDrawer}
-          onClose={() => setShowSpendingDrawer(false)}
-        />
       )}
     </div>
   );

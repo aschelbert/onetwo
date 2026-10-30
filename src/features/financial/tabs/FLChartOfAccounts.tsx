@@ -91,7 +91,7 @@ export default function FLChartOfAccounts() {
       {/* Add Section Modal */}
       {modal === 'section' && (
         <Modal title="Add Account Section" onClose={() => setModal(null)} onSave={() => {
-          if (!formData.num || !formData.name) return;
+          if (!formData.num || !formData.name) { alert('Number and name required'); return; }
           addCoASection(formData.num, formData.name, formData.type);
           setFormData({ num: '', name: '', type: 'expense', parent: '', sub: 'operating' });
           setModal(null);
@@ -118,7 +118,7 @@ export default function FLChartOfAccounts() {
       {/* Add Account Modal */}
       {modal === 'account' && (
         <Modal title="Add Account" onClose={() => setModal(null)} onSave={() => {
-          if (!formData.num || !formData.name || !formData.parent) return;
+          if (!formData.num || !formData.name || !formData.parent) { alert('All fields required'); return; }
           addCoAAccount(formData.num, formData.name, formData.parent, formData.sub);
           setFormData({ num: '', name: '', type: 'expense', parent: '', sub: 'operating' });
           setModal(null);

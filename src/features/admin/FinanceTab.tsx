@@ -84,10 +84,10 @@ export default function FinanceTab() {
 
   const handleAddGLEntry = () => {
     if (!glForm.date || !glForm.memo || !glForm.debitAcct || !glForm.creditAcct || !glForm.amount) {
-      return;
+      alert('All fields are required'); return;
     }
     if (glForm.debitAcct === glForm.creditAcct) {
-      return;
+      alert('Debit and credit accounts must differ'); return;
     }
     store.addGLEntry({
       date: glForm.date, memo: glForm.memo, debitAcct: glForm.debitAcct,
@@ -100,7 +100,7 @@ export default function FinanceTab() {
 
   const handleAddAccount = () => {
     if (!acctForm.num || !acctForm.name || !acctForm.type) {
-      return;
+      alert('Number, name, and type are required'); return;
     }
     store.addPlatformAccount({
       num: acctForm.num, name: acctForm.name, type: acctForm.type,
@@ -113,9 +113,9 @@ export default function FinanceTab() {
 
   const handleAddApproval = () => {
     const amount = parseFloat(approvalForm.amount);
-    if (!approvalForm.title.trim()) return;
-    if (!amount || amount <= 0) return;
-    if (!approvalForm.requestedBy.trim()) return;
+    if (!approvalForm.title.trim()) { alert('Title is required'); return; }
+    if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
+    if (!approvalForm.requestedBy.trim()) { alert('Requester name is required'); return; }
     store.addPlatformApproval({
       title: approvalForm.title.trim(),
       description: approvalForm.description.trim(),

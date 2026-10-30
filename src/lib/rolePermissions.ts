@@ -10,20 +10,20 @@ export interface NavItem {
   icon?: string;
 }
 
-// Maps featureId (from admin console permissions) -> sidebar nav item.
+// Maps featureId (from admin console permissions) → sidebar nav item.
 // Order here determines display order in the sidebar.
-// Labels: Home, Board Room, Fiscal Lens, The Building, The Archives for board and PM; resident unchanged.
 const FEATURE_NAV_MAP: { featureId: string; nav: NavItem }[] = [
-  { featureId: 'dashboard',        nav: { id: 'dashboard',    label: 'Home',            path: '/dashboard',     icon: 'dashboard' } },
-  { featureId: 'building',         nav: { id: 'contacts',     label: 'The Building',    path: '/building',      icon: 'contacts' } },
-  { featureId: 'fiscalLens',       nav: { id: 'financial',    label: 'Fiscal Lens',     path: '/financial',     icon: 'financial' } },
-  { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room',  path: '/community',     icon: 'community' } },
-  { featureId: 'boardRoom',        nav: { id: 'boardroom',    label: 'Board Room',      path: '/boardroom',     icon: 'boardroom' } },
-  { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',         path: '/my-unit',       icon: 'my-unit' } },
-  { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',    path: '/archives',      icon: 'archives' } },
+  { featureId: 'dashboard',        nav: { id: 'dashboard',    label: 'Dashboard',      path: '/dashboard',     icon: 'dashboard' } },
+  { featureId: 'building',         nav: { id: 'contacts',     label: 'The Building',   path: '/building',      icon: 'contacts' } },
+  { featureId: 'fiscalLens',       nav: { id: 'financial',    label: 'Fiscal Lens',    path: '/financial',     icon: 'financial' } },
+  { featureId: 'communityPortal',  nav: { id: 'community',    label: 'Community Room', path: '/community',     icon: 'community' } },
+  { featureId: 'boardRoom',        nav: { id: 'boardroom',    label: 'Board Room',     path: '/boardroom',     icon: 'boardroom' } },
+  { featureId: 'myUnit',           nav: { id: 'my-unit',      label: 'My Unit',        path: '/my-unit',       icon: 'my-unit' } },
+  { featureId: 'userManagement',   nav: { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' } },
+  { featureId: 'archives',         nav: { id: 'archives',     label: 'The Archives',   path: '/archives',      icon: 'archives' } },
 ];
 
-// Role name in auth store -> roleId used in permissions
+// Role name in auth store → roleId used in permissions
 const ROLE_TO_PERMISSION_ID: Record<string, string> = {
   BOARD_MEMBER: 'board_member',
   RESIDENT: 'resident',
@@ -60,40 +60,37 @@ export function getNavigationForRole(
   }).map(({ nav }) => nav);
 }
 
-// Legacy static navigation -- updated labels: Home, Board Room, Fiscal Lens, The Building, The Archives
-// Removed association-team nav item.
+// Legacy static navigation — kept as fallback
 export const navigation: Record<Role, NavItem[]> = {
   PLATFORM_ADMIN: [
     { id: 'admin-console', label: 'Admin Console', path: '/admin/console', icon: 'admin-console' },
   ],
   BOARD_MEMBER: [
-    { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'dashboard' },
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
+    { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   RESIDENT: [
-    { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'dashboard' },
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { id: 'community', label: 'Community Room', path: '/community', icon: 'community' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   STAFF: [
-    { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'dashboard' },
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
   PROPERTY_MANAGER: [
-    { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'dashboard' },
+    { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
     { id: 'financial', label: 'Fiscal Lens', path: '/financial', icon: 'financial' },
     { id: 'boardroom', label: 'Board Room', path: '/boardroom', icon: 'boardroom' },
+    { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
-  ],
-  PM_COMPANY: [
-    { id: 'dashboard', label: 'Home', path: '/dashboard', icon: 'dashboard' },
-    { id: 'contacts', label: 'The Building', path: '/building', icon: 'contacts' },
   ],
 };

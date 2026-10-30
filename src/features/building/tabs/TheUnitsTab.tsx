@@ -2,20 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useTenantContext } from '@/components/TenantProvider';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
-import MemberPicker from '@/components/ui/MemberPicker';
-import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import type { Unit } from '@/types/financial';
-import { BOARD_ROLE_LABELS } from '@/types/auth';
-import type { BoardRoleKey } from '@/types/auth';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 type ModalKind = null | 'addUnit' | 'editUnit' | 'pay' | 'fee' | 'special' | 'detail' | 'stripe'
-  | 'editMonthly' | 'bulkAssessment' | 'sendInvoice';
+  | 'editMonthly' | 'bulkAssessment' | 'sendInvoice' | 'editDueDay';
 type SortKey = 'number' | 'owner' | 'balance' | 'accountStatus';
 type AccountFilter = 'all' | 'current' | 'behind' | 'delinquent' | 'for_sale';
 
@@ -76,13 +70,10 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const isBuildingView = variant === 'building';
   const store = useFinancialStore();
   const building = useBuildingStore();
-  const { currentRole, buildingMembers } = useAuthStore();
-  const tenant = useTenantContext();
-  const { run: runUndoable } = useUndoableAction();
+  const { currentRole } = useAuthStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
   const [modal, setModal] = useState<ModalKind>(null);
-  const [caseDrawerUnit, setCaseDrawerUnit] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AccountFilter>('all');
@@ -132,25 +123,25 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const openDetail = (unitNum: string) => { setSelected(unitNum); setModal('detail'); };
   const openEdit = (unitNum: string) => {
     const u = store.units.find(x => x.number === unitNum);
-    if (u) { setSelected(unitNum); setForm({ owner: u.owner, email: u.email, phone: u.phone, monthlyFee: String(u.monthlyFee), votingPct: String(u.votingPct), status: u.status, sqft: String(u.sqft), bedrooms: String(u.bedrooms), parking: u.parking || '', moveIn: u.moveIn || '' }); setEditOwners(u.owner.split(',').map(s => s.trim()).filter(Boolean)); setModal('editUnit'); }
+    if (u) { setSelected(unitNum); setForm({ owner: u.owner, email: u.email, phone: u.phone, monthlyFee: String(u.monthlyFee), votingPct: String(u.votingPct), status: u.status, sqft: String(u.sqft), bedrooms: String(u.bedrooms), parking: u.parking || '', moveIn: u.moveIn || '' }); setModal('editUnit'); }
   };
   const openPay = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('pay'); };
   const openFee = (unitNum: string) => { setSelected(unitNum); resetForm(); sf('amount', '25'); sf('reason', 'Late payment'); setModal('fee'); };
   const openSpecial = (unitNum: string) => { setSelected(unitNum); resetForm(); setModal('special'); };
 
-  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owners: string[]; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]);
+  const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   const handleAddUnit = () => {
     for (const row of unitRows) {
-      if (!row.number || !row.monthlyFee || !row.votingPct) return;
+      if (!row.number || !row.monthlyFee || !row.votingPct) return alert('Unit number, monthly fee, and voting % are required for all rows.');
     }
     for (const row of unitRows) {
-      store.addUnit({ number: row.number, owner: row.owners.join(', ') || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
+      store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
     }
-    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]);
+    setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   };
   const handleEditUnit = () => {
     if (!selected) return;
-    store.updateUnit(selected, { owner: editOwners.join(', '), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as Unit['status'], sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
+    store.updateUnit(selected, { owner: f('owner'), email: f('email'), phone: f('phone'), monthlyFee: parseInt(f('monthlyFee')) || 0, votingPct: parseFloat(f('votingPct')) || 0, status: f('status') as Unit['status'], sqft: parseInt(f('sqft')) || 0, bedrooms: parseInt(f('bedrooms')) || 0, parking: f('parking') || null, moveIn: f('moveIn') || null });
     setModal(null); resetForm();
   };
   const handlePay = () => {
@@ -160,10 +151,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   };
   // Send invoice email via Edge Function
   const [sending, setSending] = useState(false);
-  const [editOwners, setEditOwners] = useState<string[]>([]);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', role: 'resident', unit: '', roleKey: '' });
-  const [inviteSending, setInviteSending] = useState(false);
 
   const sendInvoiceEmail = async (invoiceId: string, unitNum: string, amount: number, description: string, type: 'fee' | 'special_assessment'): Promise<{ sent: boolean; paymentUrl?: string; error?: string }> => {
     const unit = store.units.find(u => u.number === unitNum);
@@ -240,10 +227,15 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Late Fee: ${reason}`, 'fee');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
+    if (result.sent) {
+      alert(`✅ Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
+    } else {
+      alert(`Late fee of ${fmt(amount)} imposed on Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
   const handleSpecial = async () => {
-    if (!selected || !f('amount') || !f('reason')) return;
+    if (!selected || !f('amount') || !f('reason')) return alert('Amount and reason required.');
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
     setSending(true);
@@ -252,10 +244,15 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Special Assessment: ${reason}`, 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
+    if (result.sent) {
+      alert(`✅ Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\nEmail sent to ${unit?.email}.${result.paymentUrl ? '\n✅ Stripe payment link included.' : '\n⚠️ No Stripe payment link — ' + (result.error || 'check STRIPE_SECRET_KEY secret.')}`);
+    } else {
+      alert(`Special assessment of ${fmt(amount)} added to Unit ${selected}.\nInvoice ${invoice.id} created.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
   const handleBulkAssessment = async () => {
-    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return;
+    if (!f('amount') || !f('reason') || selectedUnits.length === 0) return alert('Select units, enter amount and reason.');
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
     setSending(true);
@@ -267,10 +264,11 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       if (result.sent) sentCount++;
     }
     setSending(false);
+    alert(`Bulk assessment of ${fmt(amount)} applied to ${selectedUnits.length} units.\n✅ ${sentCount}/${selectedUnits.length} invoice emails sent.`);
     setModal(null); resetForm();
   };
   const handleSendInvoice = async () => {
-    if (!f('unitNum') || !f('amount') || !f('description')) return;
+    if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
     const amount = parseFloat(f('amount'));
     setSending(true);
     store.addSpecialAssessment(f('unitNum'), amount, f('description'));
@@ -278,6 +276,11 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const result = await sendInvoiceEmail(invoice.id, f('unitNum'), amount, f('description'), 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === f('unitNum'));
+    if (result.sent) {
+      alert(`✅ Invoice ${invoice.id} sent to ${unit?.owner || f('unitNum')} (${unit?.email}).`);
+    } else {
+      alert(`Invoice ${invoice.id} created for ${unit?.owner || f('unitNum')}.\n⚠️ Email: ${result.error}`);
+    }
     setModal(null); resetForm();
   };
   const handleUpdateMonthly = () => {
@@ -287,7 +290,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   };
   const handleStripeConnect = async () => {
     if (!supabase) {
-      console.error('Backend not connected. Please configure Supabase.');
+      alert('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -307,12 +310,12 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       }
     } catch (err) {
       console.error('Stripe Connect error:', err);
-      console.error('Failed to create Stripe account. Please try again.');
+      alert('Failed to create Stripe account. Please try again.');
     }
   };
   const handleStripeOnboard = async () => {
     if (!supabase) {
-      console.error('Backend not connected. Please configure Supabase.');
+      alert('Backend not connected. Please configure Supabase.');
       return;
     }
     try {
@@ -340,33 +343,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   const field = (label: string, k: string, type = 'text', placeholder = '') => (
     <div><label className="block text-xs font-medium text-ink-700 mb-1">{label}</label><input type={type} value={f(k)} onChange={e => sf(k, e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder={placeholder} /></div>
   );
-
-  const handleInvite = async () => {
-    if (!inviteForm.email || inviteSending) return;
-    setInviteSending(true);
-    try {
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/send-invite`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-            body: JSON.stringify({
-              email: inviteForm.email,
-              role: inviteForm.role,
-              unit: inviteForm.unit || undefined,
-              roleKey: inviteForm.role === 'board_member' && inviteForm.roleKey ? inviteForm.roleKey : undefined,
-            }),
-          },
-        );
-      }
-      setInviteForm({ email: '', role: 'resident', unit: '', roleKey: '' });
-      setShowInviteModal(false);
-    } finally {
-      setInviteSending(false);
-    }
-  };
 
   // Get unit invoices for detail view
   const getUnitInvoices = (unitNum: string) => store.unitInvoices.filter(i => i.unitNumber === unitNum);
@@ -415,11 +391,12 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       {/* Action Bar */}
       {isBoard && (
         <div className="flex flex-wrap gap-2">
+          <button onClick={() => { resetForm(); sf('dueDay', String(store.hoaDueDay)); setModal('editDueDay'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">⚙ Manage Monthly Due Day</button>
           {!isBuildingView && <button onClick={() => { resetForm(); setModal('editMonthly'); }} className="px-3 py-2 bg-white border border-ink-200 text-ink-700 rounded-lg text-xs font-medium hover:bg-ink-50">📝 Edit Monthly Fee</button>}
           {!isBuildingView && <button onClick={() => { resetForm(); setSelectedUnits(store.units.map(u => u.number)); setModal('bulkAssessment'); }} className="px-3 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700">📋 Bulk Assessment</button>}
           {!isBuildingView && stripeReady && <button onClick={() => { resetForm(); setModal('sendInvoice'); }} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700">💳 Send Invoice</button>}
           <div className="flex-1" />
-          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
+          <button onClick={() => { resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); setModal('addUnit'); }} className="px-3 py-2 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800">+ Add Unit</button>
         </div>
       )}
 
@@ -511,7 +488,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
                   <p className="text-xs text-ink-300 mt-1">{unitAddr}</p>
                 </div>
                 <div className="flex gap-2">
-                  {isBoard && true && <button onClick={() => { setModal(null); setCaseDrawerUnit(selectedUnit.number); }} className="px-3 py-1.5 border border-accent-200 text-accent-600 rounded-lg text-xs font-medium hover:bg-accent-50">Open a case</button>}
                   {isBoard && <button onClick={() => openEdit(selectedUnit.number)} className="px-3 py-1.5 border border-ink-200 text-ink-600 rounded-lg text-xs font-medium hover:bg-ink-50">Edit</button>}
                   <button onClick={() => setModal(null)} className="text-ink-400 hover:text-ink-600 text-xl">✕</button>
                 </div>
@@ -595,40 +571,42 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
         );
       })()}
 
-      {modal === 'addUnit' && <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }]); }} onSave={handleAddUnit}><div className="space-y-3">
+      {modal === 'addUnit' && <Modal title="Add Units" wide onClose={() => { setModal(null); resetForm(); setUnitRows([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]); }} onSave={handleAddUnit}><div className="space-y-3">
         <p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">Add one or more units. You can edit additional details (email, phone, sqft, etc.) after creation.</p>
         <table className="w-full text-sm">
           <thead><tr className="border-b border-ink-200 text-left">
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[80px]">Unit # *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[110px]">Monthly Fee *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[80px]">Voting % *</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500 min-w-[240px]">Owner</th>
-            <th className="py-2 px-2 text-xs font-semibold text-ink-500 w-[140px]">Status</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Unit # *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Monthly Fee *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Voting % *</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Owner</th>
+            <th className="py-2 px-2 text-xs font-semibold text-ink-500">Status</th>
             <th className="py-2 px-2 w-8"></th>
           </tr></thead>
           <tbody>
             {unitRows.map((row, i) => (
               <tr key={i} className="border-b border-ink-50">
-                <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="601" /></td>
-                <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="450" /></td>
-                <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white" placeholder="2.1" /></td>
-                <td className="py-1.5 px-2"><MemberPicker members={buildingMembers} selected={row.owners} onChange={names => { const rows = [...unitRows]; rows[i] = { ...rows[i], owners: names }; setUnitRows(rows); }} onInvite={() => setShowInviteModal(true)} placeholder="Select owner(s)…" /></td>
-                <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full h-[34px] px-2 py-1.5 border border-ink-200 rounded text-sm bg-white"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
+                <td className="py-1.5 px-2"><input value={row.number} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], number: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="601" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.monthlyFee} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], monthlyFee: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="450" /></td>
+                <td className="py-1.5 px-2"><input type="number" value={row.votingPct} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], votingPct: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="2.1" /></td>
+                <td className="py-1.5 px-2"><input value={row.owner} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], owner: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm" placeholder="Owner name" /></td>
+                <td className="py-1.5 px-2"><select value={row.status} onChange={e => { const rows = [...unitRows]; rows[i] = { ...rows[i], status: e.target.value }; setUnitRows(rows); }} className="w-full px-2 py-1.5 border border-ink-200 rounded text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></td>
                 <td className="py-1.5 px-2">{unitRows.length > 1 && <button type="button" onClick={() => setUnitRows(unitRows.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owners: [], status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
+        <button type="button" onClick={() => setUnitRows([...unitRows, { number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }])} className="text-xs text-accent-600 font-medium hover:text-accent-700">+ Add Another Unit</button>
       </div></Modal>}
 
-      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Owner Name</label><MemberPicker members={buildingMembers} selected={editOwners} onChange={setEditOwners} onInvite={() => setShowInviteModal(true)} /></div><div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { store.removeUnit(selected!); setModal(null); resetForm(); runUndoable({ label: `Deleted unit ${selected}`, undo: () => {}, commit: () => {} }); }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
+      {modal === 'editUnit' && <Modal title={`Edit Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleEditUnit}><div className="space-y-3"><p className="text-xs text-ink-400 bg-mist-50 rounded-lg p-2">{getUnitAddress(building, selected || '')}</p>{field('Owner Name', 'owner')}<div className="grid grid-cols-2 gap-3">{field('Email', 'email', 'email')}{field('Phone', 'phone')}</div><div className="grid grid-cols-2 gap-3">{field('Monthly Fee', 'monthlyFee', 'number')}{field('Voting %', 'votingPct', 'number')}</div><div className="grid grid-cols-3 gap-3">{field('Sq Ft', 'sqft', 'number')}{field('Bedrooms', 'bedrooms', 'number')}{field('Parking', 'parking')}</div><div className="grid grid-cols-2 gap-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Status</label><select value={f('status')} onChange={e => sf('status', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACTIVE">Active</option><option value="FOR_SALE">For Sale</option><option value="UNDER_CONTRACT">Under Contract</option><option value="TRANSFER_PENDING">Transfer Pending</option></select></div>{field('Move-in Date', 'moveIn', 'date')}</div>{isBoard && <div className="pt-2 border-t"><button onClick={() => { if (confirm(`Delete unit ${selected}?`)) { store.removeUnit(selected!); setModal(null); resetForm(); } }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button></div>}</div></Modal>}
 
       {modal === 'pay' && <Modal title={`Record Payment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handlePay}><div className="space-y-3">{field('Amount *', 'amount', 'number', selectedUnit ? String(selectedUnit.balance) : '')}<div><label className="block text-xs font-medium text-ink-700 mb-1">Method</label><select value={f('method') || 'ACH'} onChange={e => sf('method', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="ACH">ACH / Bank Transfer</option><option value="check">Check</option>{stripeReady && <option value="stripe">Stripe (Online)</option>}<option value="cash">Cash</option><option value="wire">Wire Transfer</option></select></div></div></Modal>}
 
       {modal === 'fee' && <Modal title={`Impose Fee — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleFee} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A fee invoice will be created, recorded in the GL, and emailed to the unit owner.</p>{field('Amount *', 'amount', 'number', '25')}{field('Reason *', 'reason', 'text', 'e.g., Late payment — Feb 2026')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
       {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p>{field('Amount *', 'amount', 'number', '500')}{field('Reason *', 'reason', 'text', 'e.g., Roof emergency repair assessment')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
+
+      {modal === 'editDueDay' && <Modal title="Assessment Due Day" onClose={() => { setModal(null); resetForm(); }} onSave={() => { store.setHoaDueDay(parseInt(f('dueDay')) || 1); setModal(null); resetForm(); }}><div className="space-y-3"><p className="text-xs text-ink-500">Set the day of the month when monthly assessments are due.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Day (1-28)</label><input type="number" min="1" max="28" value={f('dueDay')} onChange={e => sf('dueDay', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
       {modal === 'editMonthly' && <Modal title="Edit Unit Monthly Fee" onClose={() => { setModal(null); resetForm(); }} onSave={handleUpdateMonthly}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Select Unit</label><select value={f('unitNum')} onChange={e => { sf('unitNum', e.target.value); const u = store.units.find(x => x.number === e.target.value); if (u) sf('monthlyFee', String(u.monthlyFee)); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner} ({fmt(u.monthlyFee)})</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">New Monthly Fee</label><input type="number" value={f('monthlyFee')} onChange={e => sf('monthlyFee', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
@@ -649,45 +627,6 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
             </div>
           </div>
         </div>
-      )}
-
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <Modal title="Invite User" onClose={() => setShowInviteModal(false)} onSave={handleInvite} saveLabel={inviteSending ? 'Sending…' : 'Send Invite'}>
-          <div className="space-y-3">
-            <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label><input type="email" value={inviteForm.email} onChange={e => setInviteForm(p => ({ ...p, email: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="user@example.com" /></div>
-            <div>
-              <label className="block text-xs font-medium text-ink-700 mb-1">Role *</label>
-              <select value={inviteForm.role} onChange={e => setInviteForm(p => ({ ...p, role: e.target.value, roleKey: '' }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                <option value="resident">Resident</option>
-                <option value="board_member">Board Member</option>
-                <option value="property_manager">Property Manager</option>
-                <option value="staff">Staff</option>
-              </select>
-            </div>
-            {inviteForm.role === 'board_member' && (
-              <div>
-                <label className="block text-xs font-medium text-ink-700 mb-1">Board Seat</label>
-                <select value={inviteForm.roleKey} onChange={e => setInviteForm(p => ({ ...p, roleKey: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm">
-                  <option value="">Let them pick</option>
-                  {(Object.entries(BOARD_ROLE_LABELS) as [BoardRoleKey, string][]).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div><label className="block text-xs font-medium text-ink-700 mb-1">Unit (optional)</label><input value={inviteForm.unit} onChange={e => setInviteForm(p => ({ ...p, unit: e.target.value }))} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="101" /></div>
-          </div>
-        </Modal>
-      )}
-
-      {/* v2Cases: Open a case drawer for a unit */}
-      {true && caseDrawerUnit && (
-        <OpenCaseDrawer
-          open={true}
-          onClose={() => setCaseDrawerUnit(null)}
-          prefill={{ unit: caseDrawerUnit, source: 'unit', sourceId: caseDrawerUnit }}
-        />
       )}
     </div>
   );

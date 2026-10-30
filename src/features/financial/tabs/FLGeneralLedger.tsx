@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFinancialStore, PeriodClosedError } from '@/store/useFinancialStore';
-import { periodLabel } from '@/lib/monthClose';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 
@@ -29,7 +28,7 @@ const JOURNAL_PRESETS = [
 ];
 
 export default function FLGeneralLedger() {
-  const { generalLedger, glFilter, glPage, setGlFilter, setGlPage, getAcctName, chartOfAccounts, postManualEntry, postTransfer, postReversal, workOrders, setActiveTab } = useFinancialStore();
+  const { generalLedger, glFilter, glPage, setGlFilter, setGlPage, getAcctName, chartOfAccounts, postManualEntry, postTransfer, workOrders, setActiveTab } = useFinancialStore();
   const navigate = useNavigate();
   const today = new Date().toISOString().split('T')[0];
 
@@ -44,9 +43,6 @@ export default function FLGeneralLedger() {
   // Transfer Funds modal
   const [showTransfer, setShowTransfer] = useState(false);
   const [xferForm, setXferForm] = useState({ date: today, from: '1010', to: '1020', amount: '', memo: '' });
-
-  // Period closed error state
-  const [periodError, setPeriodError] = useState<{ period: string; entryId?: string } | null>(null);
 
   // Derived lists
   const expenseHeaders = chartOfAccounts.filter(a => a.type === 'expense' && a.sub === 'header');
@@ -88,37 +84,6 @@ export default function FLGeneralLedger() {
 
   return (
     <div className="space-y-4">
-      {/* Period closed inline message */}
-      {periodError && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <p className="text-sm text-amber-800">
-            {periodLabel(periodError.period)} is closed. Post a correction in the current month instead.
-          </p>
-          <div className="flex items-center gap-3 shrink-0 ml-4">
-            {periodError.entryId && (
-              <button
-                onClick={() => {
-                  const entry = generalLedger.find(e => e.id === periodError.entryId);
-                  if (entry) {
-                    postReversal(entry);
-                    setPeriodError(null);
-                  }
-                }}
-                className="text-sm text-brand-teal font-medium hover:underline"
-              >
-                Post reversal in current month
-              </button>
-            )}
-            <button
-              onClick={() => setPeriodError(null)}
-              className="text-sm text-ink-400 hover:text-ink-600"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-start">
         <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
@@ -232,19 +197,11 @@ export default function FLGeneralLedger() {
           onClose={() => setShowExpense(false)}
           onSave={() => {
             const amt = parseFloat(expForm.amount);
-            if (!expForm.date || !expForm.category || !expForm.payFrom || !amt || amt <= 0) return;
+            if (!expForm.date || !expForm.category || !expForm.payFrom || !amt || amt <= 0) { alert('Date, category, pay from, and amount are required'); return; }
             const memo = [expForm.vendor, expForm.description].filter(Boolean).join(' \u2014 ') || 'Expense';
-            try {
-              postManualEntry(expForm.date, memo, expForm.category, expForm.payFrom, amt);
-              setShowExpense(false);
-              setExpForm({ date: today, category: '', payFrom: '1010', amount: '', vendor: '', description: '' });
-              setPeriodError(null);
-            } catch (err) {
-              if (err instanceof PeriodClosedError) {
-                setShowExpense(false);
-                setPeriodError({ period: err.period });
-              } else throw err;
-            }
+            postManualEntry(expForm.date, memo, expForm.category, expForm.payFrom, amt);
+            setShowExpense(false);
+            setExpForm({ date: today, category: '', payFrom: '1010', amount: '', vendor: '', description: '' });
           }}
           saveLabel="Record Expense"
         >
@@ -299,20 +256,12 @@ export default function FLGeneralLedger() {
           onClose={() => setShowTransfer(false)}
           onSave={() => {
             const amt = parseFloat(xferForm.amount);
-            if (!xferForm.date || !xferForm.from || !xferForm.to || !amt || amt <= 0) return;
-            if (xferForm.from === xferForm.to) return;
+            if (!xferForm.date || !xferForm.from || !xferForm.to || !amt || amt <= 0) { alert('All fields are required'); return; }
+            if (xferForm.from === xferForm.to) { alert('From and To accounts must be different'); return; }
             const memo = xferForm.memo || 'Account transfer';
-            try {
-              postTransfer(xferForm.date, `Transfer: ${memo}`, xferForm.from, xferForm.to, amt);
-              setShowTransfer(false);
-              setXferForm({ date: today, from: '1010', to: '1020', amount: '', memo: '' });
-              setPeriodError(null);
-            } catch (err) {
-              if (err instanceof PeriodClosedError) {
-                setShowTransfer(false);
-                setPeriodError({ period: err.period });
-              } else throw err;
-            }
+            postTransfer(xferForm.date, `Transfer: ${memo}`, xferForm.from, xferForm.to, amt);
+            setShowTransfer(false);
+            setXferForm({ date: today, from: '1010', to: '1020', amount: '', memo: '' });
           }}
           saveLabel="Transfer Funds"
         >
@@ -349,18 +298,10 @@ export default function FLGeneralLedger() {
       {showJournal && (
         <Modal title="Manual Journal Entry" subtitle="Double-entry: must have equal debit and credit" onClose={() => setShowJournal(false)} onSave={() => {
           const amt = parseFloat(jForm.amount);
-          if (!jForm.date || !jForm.memo || !jForm.debit || !jForm.credit || !amt || amt <= 0) return;
-          try {
-            postManualEntry(jForm.date, jForm.memo, jForm.debit, jForm.credit, amt);
-            setShowJournal(false);
-            setJForm({ date: today, memo: '', debit: '', credit: '', amount: '', preset: '' });
-            setPeriodError(null);
-          } catch (err) {
-            if (err instanceof PeriodClosedError) {
-              setShowJournal(false);
-              setPeriodError({ period: err.period });
-            } else throw err;
-          }
+          if (!jForm.date || !jForm.memo || !jForm.debit || !jForm.credit || !amt || amt <= 0) { alert('All fields required'); return; }
+          postManualEntry(jForm.date, jForm.memo, jForm.debit, jForm.credit, amt);
+          setShowJournal(false);
+          setJForm({ date: today, memo: '', debit: '', credit: '', amount: '', preset: '' });
         }} saveLabel="Post Entry">
           <div className="space-y-4">
             {/* Preset selector */}

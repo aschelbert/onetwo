@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useTenantContext } from '@/components/TenantProvider';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
-import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import type { Unit } from '@/types/financial';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -17,11 +15,9 @@ export default function UnitsManager() {
   const store = useFinancialStore();
   const building = useBuildingStore();
   const { currentRole } = useAuthStore();
-  const tenant = useTenantContext();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
 
   const [modal, setModal] = useState<ModalKind>(null);
-  const [caseDrawerUnit, setCaseDrawerUnit] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'current' | 'delinquent' | 'for_sale'>('all');
@@ -67,7 +63,7 @@ export default function UnitsManager() {
   const [unitRows, setUnitRows] = useState<Array<{ number: string; monthlyFee: string; votingPct: string; owner: string; status: string }>>([{ number: '', monthlyFee: '', votingPct: '', owner: '', status: 'ACTIVE' }]);
   const handleAddUnit = () => {
     for (const row of unitRows) {
-      if (!row.number || !row.monthlyFee || !row.votingPct) return;
+      if (!row.number || !row.monthlyFee || !row.votingPct) return alert('Unit number, monthly fee, and voting % are required for all rows.');
     }
     for (const row of unitRows) {
       store.addUnit({ number: row.number, owner: row.owner || 'Owner', email: '', phone: '', monthlyFee: parseInt(row.monthlyFee) || 0, votingPct: parseFloat(row.votingPct) || 0, status: (row.status as Unit['status']) || 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null });
@@ -100,7 +96,7 @@ export default function UnitsManager() {
   };
 
   const handleSpecial = () => {
-    if (!selected || !f('amount') || !f('reason')) return;
+    if (!selected || !f('amount') || !f('reason')) return alert('Amount and reason required.');
     store.addSpecialAssessment(selected, parseFloat(f('amount')), f('reason'));
     setModal(null); resetForm();
   };
@@ -232,9 +228,6 @@ export default function UnitsManager() {
                 <p className="text-sm text-ink-400">{selectedUnit.owner} · {selectedUnit.email}</p>
               </div>
               <div className="flex gap-2">
-                {isBoard && true && (
-                  <button onClick={() => { setModal(null); setCaseDrawerUnit(selectedUnit.number); }} className="px-3 py-1.5 border border-accent-200 text-accent-600 rounded-lg text-xs font-medium hover:bg-accent-50">Open a case</button>
-                )}
                 {isBoard && (
                   <button onClick={() => {
                     setForm({
@@ -437,7 +430,7 @@ export default function UnitsManager() {
             </div>
             {isBoard && (
               <div className="pt-2 border-t">
-                <button onClick={() => { store.removeUnit(selected!); setModal(null); resetForm(); }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button>
+                <button onClick={() => { if (confirm(`Delete unit ${selected}?`)) { store.removeUnit(selected!); setModal(null); resetForm(); } }} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete this unit</button>
               </div>
             )}
           </div>
@@ -552,7 +545,7 @@ export default function UnitsManager() {
                 {!store.stripeConnectId ? (
                   <button onClick={async () => {
                     if (!supabase) {
-                      console.error('Backend not connected. Please configure Supabase.');
+                      alert('Backend not connected. Please configure Supabase.');
                       return;
                     }
                     try {
@@ -572,7 +565,7 @@ export default function UnitsManager() {
                       }
                     } catch (err) {
                       console.error('Stripe Connect error:', err);
-                      console.error('Failed to create Stripe account. Please try again.');
+                      alert('Failed to create Stripe account. Please try again.');
                     }
                   }} className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 text-sm text-center">
                     Connect with Stripe →
@@ -580,7 +573,7 @@ export default function UnitsManager() {
                 ) : !store.stripeOnboardingComplete ? (
                   <button onClick={async () => {
                     if (!supabase) {
-                      console.error('Backend not connected. Please configure Supabase.');
+                      alert('Backend not connected. Please configure Supabase.');
                       return;
                     }
                     try {
@@ -614,15 +607,6 @@ export default function UnitsManager() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* v2Cases: Open a case drawer for a unit */}
-      {true && caseDrawerUnit && (
-        <OpenCaseDrawer
-          open={true}
-          onClose={() => setCaseDrawerUnit(null)}
-          prefill={{ unit: caseDrawerUnit, source: 'unit', sourceId: caseDrawerUnit }}
-        />
       )}
     </div>
   );

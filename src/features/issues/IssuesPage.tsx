@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import type { StepAction } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -26,13 +26,11 @@ import { StepContent } from './components/shell/StepContent';
 import Modal from '@/components/ui/Modal';
 import { useTabParam } from '@/hooks/useTabParam';
 import { DACI_MATRIX } from '@/data/daciMatrix';
-import { useTenantContext } from '@/components/TenantProvider';
 import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
-  const tenant = useTenantContext();
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useTabParam<string>('view', 'tabs');
@@ -40,11 +38,6 @@ export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
-
-  // v2 is the only path -- redirect /issues to /boardroom?tab=cases when not embedded
-  if (!embedded) {
-    return <Navigate to="/boardroom?tab=cases" replace />;
-  }
 
   if (view === 'new') return <WizardView onDone={(id) => { setWizardPrefill(undefined); setView(`case:${id}`); }} onBack={() => { setWizardPrefill(undefined); setView('tabs'); }} prefill={wizardPrefill} />;
   if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;
@@ -878,6 +871,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       if (!docName) return;
       const legalDoc = legalDocuments.find(d => d.name === docName);
       if (!legalDoc || !legalDoc.attachments || legalDoc.attachments.length === 0) {
+        alert(`"${docName}" not found in Legal & Bylaws. Please upload it in the Legal & Bylaws tab first.`);
         return;
       }
       const att = legalDoc.attachments[0];
@@ -892,6 +886,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       // Insurance: aggregate all policies into a single certificate attachment
       const policiesWithAttachments = insurance.filter(p => p.attachments && p.attachments.length > 0);
       if (policiesWithAttachments.length === 0) {
+        alert('No insurance certificates found. Please upload them in the Insurance tab first.');
         return;
       }
       const firstAtt = policiesWithAttachments[0].attachments[0];
@@ -1284,7 +1279,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       )}
       {showWOModal && (
         <Modal title="Create Work Order" onClose={() => setShowWOModal(false)} onSave={() => {
-          if (!woForm.title || !woForm.vendor || !woForm.amount) return;
+          if (!woForm.title || !woForm.vendor || !woForm.amount) { alert('Title, vendor, and amount required'); return; }
           fin.createWorkOrder({ title: woForm.title, vendor: woForm.vendor, amount: parseFloat(woForm.amount), acctNum: woForm.acctNum, caseId });
           const newWO = fin.workOrders[fin.workOrders.length - 1];
           if (newWO) store.linkWO(caseId, newWO.id);

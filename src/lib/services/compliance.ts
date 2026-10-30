@@ -75,43 +75,23 @@ export async function deleteFiling(id: string): Promise<boolean> {
 
 // ── Compliance Completions (composite PK: tenant_id + item_id) ──
 
-export async function fetchCompletions(tenantId: string): Promise<{ completions: Record<string, boolean>; stepCompletions: Record<string, boolean[]> } | null> {
+export async function fetchCompletions(tenantId: string): Promise<Record<string, boolean> | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('compliance_completions')
-    .select('item_id, completed, steps')
+    .select('item_id, completed')
     .eq('tenant_id', tenantId);
   if (error) { logDbError('fetchCompletions error:', error); return null; }
-  const completions: Record<string, boolean> = {};
-  const stepCompletions: Record<string, boolean[]> = {};
-  (data || []).forEach(r => {
-    completions[r.item_id] = r.completed;
-    if (r.steps && Array.isArray(r.steps) && r.steps.length > 0) {
-      stepCompletions[r.item_id] = r.steps as boolean[];
-    }
-  });
-  return { completions, stepCompletions };
+  const result: Record<string, boolean> = {};
+  (data || []).forEach(r => { result[r.item_id] = r.completed; });
+  return result;
 }
 
-export type ProofKind = 'attachment' | 'communication' | 'filing' | 'case' | 'meeting' | 'reason';
-export interface CompletionProof { kind: ProofKind; ref: string }
-
-export async function upsertCompletion(
-  tenantId: string,
-  itemId: string,
-  completed: boolean,
-  steps?: boolean[],
-  proof?: CompletionProof,
-): Promise<boolean> {
+export async function upsertCompletion(tenantId: string, itemId: string, completed: boolean): Promise<boolean> {
   if (!supabase) return false;
-  const row: Record<string, unknown> = {
+  const { error } = await supabase.from('compliance_completions').upsert({
     tenant_id: tenantId, item_id: itemId, completed,
-  };
-  if (steps !== undefined) row.steps = steps;
-  if (proof !== undefined) row.proof = proof;
-  const { error } = await supabase.from('compliance_completions').upsert(
-    row, { onConflict: 'tenant_id,item_id' }
-  );
+  }, { onConflict: 'tenant_id,item_id' });
   if (error) { logDbError('upsertCompletion error:', error); return false; }
   return true;
 }

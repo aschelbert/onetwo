@@ -46,7 +46,6 @@ export function resetStoresForRealTenant() {
     generalLedger: [],
     workOrders: [],
     unitInvoices: [],
-    periodCloses: [],
     hoaDueDay: 15,
     annualReserveContribution: 0,
   });
@@ -88,19 +87,4 @@ export function resetStoresForRealTenant() {
   useTaskTrackingStore.setState({ tasks: [] });
   // Note: stripeAccountId, stripeOnboardingComplete on staff, and paymentMethod,
   // stripeTransferId, withholdingGlEntryId on payRuns are cleared when arrays empty.
-}
-
-/**
- * Remove all `onetwo-*` localStorage keys.
- * Called on sign-out from a demo session so re-entering the demo
- * starts with fresh seed data (Zustand stores rehydrate from defaults).
- */
-export function resetDemoStores(): void {
-  try {
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith('onetwo-'))
-      .forEach((k) => localStorage.removeItem(k));
-  } catch {
-    // Safari private mode or storage quota — ignore
-  }
 }

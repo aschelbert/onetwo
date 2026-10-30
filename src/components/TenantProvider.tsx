@@ -13,9 +13,6 @@ import { useElectionStore } from '@/store/useElectionStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { usePlatformAdminStore, TIER_FEATURES } from '@/store/usePlatformAdminStore';
-import { normalizePlan, planFeatures } from '@/lib/tiers';
-import type { PlanId } from '@/lib/tiers';
-import type { BoardRoleKey } from '@/types/auth';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useLetterStore } from '@/store/useLetterStore';
@@ -25,8 +22,6 @@ import { useScorecardStore } from '@/store/useScorecardStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
-
-// v2 flags have been removed -- all tenants are on v2 now.
 
 export interface OnboardingState {
   accountCreated: boolean;
@@ -38,26 +33,17 @@ export interface OnboardingState {
   goLive: boolean;
 }
 
-export interface MeInfo {
-  role: string;
-  roleKey: BoardRoleKey | null;
-  isAccountOwner: boolean;
-}
-
 export interface TenantInfo {
   id: string;
   name: string;
   subdomain: string;
   status: string;
-  tier: PlanId;
+  tier: string;
   features: Record<string, boolean>;
   address: { street: string; city: string; state: string; zip: string };
   totalUnits: number;
   isDemo: boolean;
   onboarding: OnboardingState;
-  addons: { onCall: boolean; pmSeat: boolean };
-  billing: { provider: 'chargebee' | 'none'; interval: string; status: string; trialEndsAt: string | null; trialExpiredAt: string | null };
-  me: MeInfo;
 }
 
 interface TenantContextValue extends TenantInfo {
@@ -71,12 +57,9 @@ const defaultOnboarding: OnboardingState = {
 
 const defaultTenant: TenantInfo = {
   id: 'demo', name: 'Sunny Acres Condominium', subdomain: 'demo',
-  status: 'active', tier: 'facilities', features: { ...planFeatures('facilities', true) },
+  status: 'active', tier: 'management_suite', features: { ...TIER_FEATURES['management_suite'] },
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
   totalUnits: 50, isDemo: true, onboarding: defaultOnboarding,
-  addons: { onCall: true, pmSeat: true },
-  billing: { provider: 'none', interval: 'monthly', status: 'active', trialEndsAt: null, trialExpiredAt: null },
-  me: { role: 'board_member', roleKey: 'president', isAccountOwner: true },
 };
 
 const defaultContextValue: TenantContextValue = {
@@ -144,21 +127,12 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         name: adminTenant.name,
         subdomain: adminTenant.subdomain,
         status: adminTenant.status,
-        tier: normalizePlan(adminTenant.subscription.tier),
+        tier: adminTenant.subscription.tier,
         features: adminTenant.features as Record<string, boolean>,
         address: adminTenant.address,
         totalUnits: adminTenant.totalUnits,
         isDemo: false,
         onboarding: defaultOnboarding,
-        addons: { onCall: adminTenant.subscription.onCall, pmSeat: adminTenant.subscription.pmSeat },
-        billing: {
-          provider: adminTenant.subscription.chargebeeSubscriptionId ? 'chargebee' : 'none',
-          interval: adminTenant.subscription.billingInterval || 'monthly',
-          status: adminTenant.subscription.status || 'active',
-          trialEndsAt: adminTenant.subscription.trialEndsAt || null,
-          trialExpiredAt: null,
-        },
-        me: { role: 'board_member', roleKey: 'president', isAccountOwner: true },
       };
     } else if (supabase) {
       // Fallback: query DB directly
@@ -172,7 +146,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
       const { data: sub } = await supabase
         .from('subscriptions')
-        .select('tier, addon_on_call, pm_addon, billing_interval, chargebee_subscription_id, status, trial_ends_at, trial_expired_at')
+        .select('tier')
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
@@ -188,8 +162,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         name: t.name,
         subdomain: t.subdomain,
         status: t.status,
-        tier: normalizePlan(sub?.tier || 'self_managed'),
-        features: feat ? ({
+        tier: sub?.tier || 'compliance_pro',
+        features: feat ? {
           fiscalLens: feat.fiscal_lens,
           caseOps: feat.case_ops,
           complianceRunbook: feat.compliance_runbook,
@@ -200,9 +174,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           communityPortal: feat.community_portal,
           vendorManagement: feat.vendor_management,
           reserveStudyTools: feat.reserve_study_tools,
-          facilities: feat.facilities ?? false,
-          onCall: feat.on_call ?? false,
-        }) : planFeatures(normalizePlan(sub?.tier || 'self_managed'), false),
+        } : {},
         address: {
           street: addr.street || '',
           city: addr.city || '',
@@ -220,15 +192,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           financialSetupDone: onb?.financial_setup_done ?? false,
           goLive: onb?.go_live ?? false,
         },
-        addons: { onCall: sub?.addon_on_call ?? false, pmSeat: sub?.pm_addon ?? false },
-        billing: {
-          provider: sub?.chargebee_subscription_id ? 'chargebee' : 'none',
-          interval: sub?.billing_interval || 'monthly',
-          status: sub?.status || 'active',
-          trialEndsAt: sub?.trial_ends_at || null,
-          trialExpiredAt: sub?.trial_expired_at || null,
-        },
-        me: { role: 'board_member', roleKey: 'president', isAccountOwner: true },
       };
     } else {
       return;
@@ -336,43 +299,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
     // Load tenant from Supabase (only once per session — prevents re-runs
     // from wiping in-flight store data via resetStoresForRealTenant)
-    if (hasLoadedDataRef.current) {
-      return;
-    }
+    if (hasLoadedDataRef.current) return;
     hasLoadedDataRef.current = true;
 
     (async () => {
       try {
-        // Wait for Supabase to restore its auth session before querying
-        // RLS-protected tables. On page refresh, Zustand rehydrates
-        // isAuthenticated from localStorage instantly, but the Supabase
-        // client restores its JWT asynchronously. Querying before the
-        // session is ready returns empty results (auth.uid() is null).
-        let { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          // Session not yet restored — wait for the INITIAL_SESSION event
-          session = await new Promise<any>((resolve) => {
-            const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
-              (event, sess) => {
-                if (sess) { sub.unsubscribe(); resolve(sess); }
-                if (event === 'SIGNED_OUT') { sub.unsubscribe(); resolve(null); }
-              }
-            );
-            // Timeout: if no session arrives within 5s, give up
-            setTimeout(() => { sub.unsubscribe(); resolve(null); }, 5000);
-          });
-        }
-        if (!session) {
-          // No valid session — let AuthListener handle sign-out
-          hasLoadedDataRef.current = false; // allow retry after re-auth
-          setLoaded(true);
-          return;
-        }
-
         // Get user's tenant membership
         const { data: tu } = await supabase
           .from('tenant_users')
-          .select('tenant_id, role, role_key, is_account_owner')
+          .select('tenant_id')
           .eq('user_id', currentUser.id)
           .maybeSingle();
 
@@ -395,7 +330,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
         const { data: sub } = await supabase
           .from('subscriptions')
-          .select('tier, addon_on_call, pm_addon, billing_interval, chargebee_subscription_id, status, trial_ends_at, trial_expired_at')
+          .select('tier')
           .eq('tenant_id', tu.tenant_id)
           .maybeSingle();
 
@@ -411,7 +346,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           name: t.name,
           subdomain: t.subdomain,
           status: t.status,
-          tier: normalizePlan(sub?.tier || 'self_managed'),
+          tier: sub?.tier || 'compliance_pro',
           features: feat ? {
             fiscalLens: feat.fiscal_lens,
             caseOps: feat.case_ops,
@@ -423,9 +358,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
             communityPortal: feat.community_portal,
             vendorManagement: feat.vendor_management,
             reserveStudyTools: feat.reserve_study_tools,
-            facilities: feat.facilities ?? false,
-            onCall: feat.on_call ?? false,
-          } : planFeatures(normalizePlan(sub?.tier || 'self_managed'), false),
+          } : {},
           address: {
             street: addr.street || '',
             city: addr.city || '',
@@ -442,19 +375,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
             bylawsUploaded: onb?.bylaws_uploaded ?? false,
             financialSetupDone: onb?.financial_setup_done ?? false,
             goLive: onb?.go_live ?? false,
-          },
-          addons: { onCall: sub?.addon_on_call ?? false, pmSeat: sub?.pm_addon ?? false },
-          billing: {
-            provider: sub?.chargebee_subscription_id ? 'chargebee' : 'none',
-            interval: sub?.billing_interval || 'monthly',
-            status: sub?.status || 'active',
-            trialEndsAt: sub?.trial_ends_at || null,
-            trialExpiredAt: sub?.trial_expired_at || null,
-          },
-          me: {
-            role: tu.role || 'board_member',
-            roleKey: tu.role_key || null,
-            isAccountOwner: tu.is_account_owner || false,
           },
         };
 
@@ -517,20 +437,6 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         </div>
       </div>
     );
-  }
-
-  // Redirect to /trial-ended when trial has expired and subscription is not active
-  const pathname = window.location.pathname;
-  if (
-    tenant.billing.trialExpiredAt &&
-    tenant.billing.status !== 'active' &&
-    !tenant.isDemo &&
-    currentUser?.role !== 'PLATFORM_ADMIN' &&
-    pathname !== '/trial-ended' &&
-    pathname !== '/subscription'
-  ) {
-    window.location.replace('/trial-ended');
-    return null;
   }
 
   // Block access for churned tenants

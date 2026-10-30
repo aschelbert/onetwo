@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, FEATURE_GROUPS, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
-import { PLANS, planFeatures, normalizePlan, ON_CALL, PM_SEAT, SETUP } from '@/lib/tiers';
-import type { PlanId } from '@/lib/tiers';
+import { TIERS } from '@/lib/tiers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
 import PermissionsTab from './PermissionsTab';
-import BillingTab from './BillingTab';
+import StripeTab from './StripeTab';
 import FinanceTab from './FinanceTab';
 import FeedbackTab from './FeedbackTab';
 import ProblemsTab from './ProblemsTab';
@@ -22,28 +21,16 @@ const STATUS_BADGE: Record<string, string> = {
   suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500',
   trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700',
 };
-const PLAN_LABELS: Record<string, string> = { self_managed: 'Self-Managed', facilities: 'Plus Facilities' };
-const PLAN_BADGE: Record<string, string> = {
-  self_managed: 'bg-accent-100 text-accent-700', facilities: 'bg-sage-100 text-sage-700',
-  // Legacy fallbacks
-  essentials: 'bg-accent-100 text-accent-700', board: 'bg-accent-100 text-accent-700', estate: 'bg-sage-100 text-sage-700',
-  compliance_pro: 'bg-accent-100 text-accent-700', community_plus: 'bg-accent-100 text-accent-700', management_suite: 'bg-sage-100 text-sage-700',
-};
-const PLAN_PRICES: Record<string, number> = { self_managed: PLANS.self_managed.monthly, facilities: PLANS.facilities.monthly };
-const PLAN_COLORS: Record<string, string> = { self_managed: '#c42030', facilities: '#16a34a' };
-const ACTIVE_PLANS: PlanId[] = ['self_managed', 'facilities'];
+const TIER_BADGE: Record<string, string> = { compliance_pro: 'bg-accent-100 text-accent-700', community_plus: 'bg-ink-100 text-ink-600', management_suite: 'bg-sage-100 text-sage-700' };
+const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+const TIER_LABELS: Record<string, string> = { compliance_pro: 'Compliance Pro', community_plus: 'Community Plus', management_suite: 'Management Suite' };
+const TIER_COLORS: Record<string, string> = { compliance_pro: '#c42030', community_plus: '#6b7280', management_suite: '#16a34a' };
 const FEATURE_LABELS: Record<string, string> = {
   fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook',
   aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing',
   votesResolutions: 'Votes & Resolutions', communityPortal: 'Community Portal',
   vendorManagement: 'Vendor Management', reserveStudyTools: 'Reserve Study Tools',
-  facilities: 'Plus Facilities', onCall: 'On Call',
 };
-
-/** Resolve any legacy tier string to the canonical PlanId for display */
-function displayPlan(tier: SubscriptionTier): PlanId {
-  return normalizePlan(tier);
-}
 
 const NAV = [
   { section: 'Overview', items: [
@@ -63,7 +50,7 @@ const NAV = [
     { id: 'problems' as Page, label: 'Problem Statements', d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   ]},
   { section: 'Billing', items: [
-    { id: 'stripe' as Page, label: 'Billing', d: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
+    { id: 'stripe' as Page, label: 'Stripe', d: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
     { id: 'finance' as Page, label: 'Fiscal Lens', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   ]},
 ];
@@ -76,7 +63,7 @@ const PAGE_META: Record<Page, [string, string]> = {
   permissions: ['Permissions', 'Admin Console > Product > RBAC Permissions'],
   tenancies: ['Tenancies', 'Admin Console > Operations > Tenancies'],
   roles: ['User Roles', 'Admin Console > Operations > User Roles'],
-  stripe: ['Billing', 'Admin Console > Billing > Billing'],
+  stripe: ['Stripe Integration', 'Admin Console > Billing > Stripe'],
   finance: ['Fiscal Lens', 'Admin Console > Billing > Fiscal Lens'],
   support: ['Support', 'Admin Console > Operations > Support'],
   feedback: ['Feedback', 'Admin Console > Operations > Feedback'],
@@ -85,9 +72,9 @@ const PAGE_META: Record<Page, [string, string]> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: () => void; disabled?: boolean }) {
+function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
-    <button onClick={onChange} disabled={disabled} className={`w-10 h-5 rounded-full relative transition-colors ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${on ? 'bg-sage-500' : 'bg-ink-200'}`}>
+    <button onClick={onChange} className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${on ? 'bg-sage-500' : 'bg-ink-200'}`}>
       <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${on ? 'left-[22px]' : 'left-0.5'}`} />
     </button>
   );
@@ -163,7 +150,7 @@ export default function PlatformAdminPage() {
   const [page, setPage] = useState<Page>('dashboard');
   const [selectedTenancy, setSelectedTenancy] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
-  const [bldgForm, setBldgForm] = useState({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'self_managed' as PlanId });
+  const [bldgForm, setBldgForm] = useState({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' as SubscriptionTier });
   const [trialDaysInput, setTrialDaysInput] = useState(store.trialDays);
   const [trialDaysSaving, setTrialDaysSaving] = useState(false);
 
@@ -173,7 +160,7 @@ export default function PlatformAdminPage() {
   const totalRevenueYTD = store.glEntries.filter(e => e.creditAcct.startsWith('4')).reduce((s, e) => s + e.amount, 0);
 
   const handleAddTenancy = () => {
-    if (!bldgForm.name || !bldgForm.contactEmail) return;
+    if (!bldgForm.name || !bldgForm.contactEmail) { alert('Building name and contact email required'); return; }
     const id = `bld-${Date.now()}`;
     const today = new Date().toISOString().split('T')[0];
     const trialEnd = new Date(Date.now() + store.trialDays * 86400000).toISOString().split('T')[0];
@@ -182,28 +169,18 @@ export default function PlatformAdminPage() {
       id, name: bldgForm.name, subdomain,
       address: { street: bldgForm.street, city: bldgForm.city, state: bldgForm.state, zip: bldgForm.zip },
       totalUnits: parseInt(bldgForm.units) || 0, yearBuilt: bldgForm.yearBuilt, status: 'onboarding', createdAt: today,
-      subscription: { tier: bldgForm.plan, status: 'trial', startDate: today, nextBillingDate: trialEnd, monthlyRate: PLAN_PRICES[bldgForm.plan], trialEndsAt: trialEnd, onCall: false, pmSeat: false, setupPaidAt: null, setupAmount: null, billingInterval: 'monthly', chargebeeSubscriptionId: null },
+      subscription: { tier: bldgForm.tier, status: 'trial', startDate: today, nextBillingDate: trialEnd, monthlyRate: TIER_PRICES[bldgForm.tier], trialEndsAt: trialEnd },
       stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
       primaryContact: { name: bldgForm.contactName, email: bldgForm.contactEmail, phone: bldgForm.contactPhone, role: 'Primary Contact' },
-      features: { ...planFeatures(bldgForm.plan) },
+      features: { ...TIER_FEATURES[bldgForm.tier] },
       onboardingChecklist: { accountCreated: true, buildingProfileComplete: !!bldgForm.street, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
     });
     store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.create', target: bldgForm.name, details: `Onboarded: ${subdomain}.getonetwo.com`, buildingId: id });
-    setBldgForm({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'self_managed' });
+    setBldgForm({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' });
     setModal(null);
   };
 
   const [title, breadcrumb] = PAGE_META[page];
-
-  // Helper counts for dashboard
-  const planCounts = {
-    self_managed: tenants.filter(t => normalizePlan(t.subscription.tier) === 'self_managed').length,
-    facilities: tenants.filter(t => normalizePlan(t.subscription.tier) === 'facilities').length,
-    onCall: tenants.filter(t => t.subscription.onCall).length,
-    pmSeat: tenants.filter(t => t.subscription.pmSeat).length,
-    setupPaid: tenants.filter(t => t.subscription.setupPaidAt !== null).length,
-    noBilling: tenants.filter(t => t.subscription.chargebeeSubscriptionId === null).length,
-  };
 
   return (
     <div className="flex min-h-screen bg-ink-50">
@@ -290,7 +267,7 @@ export default function PlatformAdminPage() {
                   { label: 'Active Tenancies', value: String(metrics.activeBuildings), sub: `${tenants.filter(t => t.subscription.status === 'trial').length} in trial`, stripe: false },
                   { label: 'Total Users', value: String(metrics.totalUsers), sub: `across ${tenants.length} tenancies`, stripe: false },
                   { label: 'MRR', value: fmt(metrics.mrr), sub: 'monthly recurring revenue', stripe: false },
-                  { label: 'Total Revenue (YTD)', value: fmt(totalRevenueYTD), sub: 'via Chargebee', stripe: true },
+                  { label: 'Total Revenue (YTD)', value: fmt(totalRevenueYTD), sub: 'via Stripe', stripe: true },
                 ] as const).map(m => (
                   <div key={m.label} className={`bg-white rounded-[10px] border border-ink-200 p-5 ${m.stripe ? 'border-l-4 border-l-[#635bff]' : ''}`}>
                     <p className="text-xs text-ink-500 font-medium">{m.label}</p>
@@ -300,39 +277,24 @@ export default function PlatformAdminPage() {
                 ))}
               </div>
 
-              {/* 3-column: Plan Mix, Recent Stripe Events, RBAC Summary */}
+              {/* 3-column: Subscription Mix, Recent Stripe Events, RBAC Summary */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Plan Mix */}
+                {/* Subscription Mix */}
                 <div className="bg-white rounded-[10px] border border-ink-200 p-5">
-                  <h3 className="font-display text-base font-bold text-ink-900 mb-4">Plan Mix</h3>
+                  <h3 className="font-display text-base font-bold text-ink-900 mb-4">Subscription Mix</h3>
                   <div className="space-y-3">
-                    {ACTIVE_PLANS.map(plan => (
-                      <div key={plan} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS[plan] }} />
-                          <span className="text-sm text-ink-700 font-medium">{PLAN_LABELS[plan]}</span>
+                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
+                      const count = tenants.filter(t => t.subscription.tier === tier).length;
+                      return (
+                        <div key={tier} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[tier] }} />
+                            <span className="text-sm text-ink-700 font-medium">{TIER_LABELS[tier]}</span>
+                          </div>
+                          <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{count} tenancies</span>
                         </div>
-                        <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{planCounts[plan]} tenancies</span>
-                      </div>
-                    ))}
-                    <div className="border-t border-ink-100 pt-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-ink-700 font-medium">On Call add-on</span>
-                        <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{planCounts.onCall}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-ink-700 font-medium">PM Seat add-on</span>
-                        <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{planCounts.pmSeat}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-ink-700 font-medium">Setup paid</span>
-                        <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{planCounts.setupPaid}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-ink-700 font-medium">No billing</span>
-                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">{planCounts.noBilling}</span>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -392,27 +354,24 @@ export default function PlatformAdminPage() {
                   <button onClick={() => setPage('tenancies')} className="text-xs text-ink-500 font-semibold hover:text-ink-700">View All →</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-5">
-                  {tenants.map(t => {
-                    const plan = displayPlan(t.subscription.tier);
-                    return (
-                      <div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md cursor-pointer" onClick={() => { setPage('tenancies'); setSelectedTenancy(t.id); store.setImpersonating(t.id); }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-ink-900 truncate">{t.name}</h4>
-                          <div className="flex gap-1.5 shrink-0">
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span>
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${PLAN_BADGE[t.subscription.tier] || PLAN_BADGE[plan]}`}>{PLAN_LABELS[plan]}</span>
-                          </div>
-                        </div>
-                        <p className="text-xs text-accent-600 font-mono mb-1">{t.subdomain}.getonetwo.com</p>
-                        <div className="grid grid-cols-4 gap-2 text-xs">
-                          <div><p className="text-ink-400">Units</p><p className="font-bold">{t.totalUnits}</p></div>
-                          <div><p className="text-ink-400">Users</p><p className="font-bold">{t.stats.activeUsers}</p></div>
-                          <div><p className="text-ink-400">Collect.</p><p className={`font-bold ${t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}`}>{t.stats.collectionRate || '\u2014'}%</p></div>
-                          <div><p className="text-ink-400">MRR</p><p className="font-bold">{fmt(t.subscription.monthlyRate)}</p></div>
+                  {tenants.map(t => (
+                    <div key={t.id} className="bg-white border border-ink-100 rounded-xl p-4 hover:shadow-md cursor-pointer" onClick={() => { setPage('tenancies'); setSelectedTenancy(t.id); store.setImpersonating(t.id); }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-ink-900 truncate">{t.name}</h4>
+                        <div className="flex gap-1.5 shrink-0">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE[t.status]}`}>{t.status}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIER_BADGE[t.subscription.tier]}`}>{TIER_LABELS[t.subscription.tier]}</span>
                         </div>
                       </div>
-                    );
-                  })}
+                      <p className="text-xs text-accent-600 font-mono mb-1">{t.subdomain}.getonetwo.com</p>
+                      <div className="grid grid-cols-4 gap-2 text-xs">
+                        <div><p className="text-ink-400">Units</p><p className="font-bold">{t.totalUnits}</p></div>
+                        <div><p className="text-ink-400">Users</p><p className="font-bold">{t.stats.activeUsers}</p></div>
+                        <div><p className="text-ink-400">Collect.</p><p className={`font-bold ${t.stats.collectionRate >= 90 ? 'text-sage-600' : 'text-red-600'}`}>{t.stats.collectionRate || '—'}%</p></div>
+                        <div><p className="text-ink-400">MRR</p><p className="font-bold">{fmt(t.subscription.monthlyRate)}</p></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -423,31 +382,31 @@ export default function PlatformAdminPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="font-display text-lg font-bold text-ink-900">Subscription Plans</h2>
-                <p className="text-sm text-ink-500 mt-1">Manage plans, pricing, and Chargebee product links</p>
+                <p className="text-sm text-ink-500 mt-1">Manage plans, pricing, and Stripe product links</p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {ACTIVE_PLANS.map(plan => {
-                  const count = tenants.filter(t => normalizePlan(t.subscription.tier) === plan).length;
-                  const cfg = PLANS[plan];
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
+                  const count = tenants.filter(t => t.subscription.tier === tier).length;
+                  const featureCount = Object.entries(TIER_FEATURES[tier]).filter(([, v]) => v).length;
                   return (
-                    <div key={plan} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden hover:shadow-md transition-shadow" style={{ borderTop: `3px solid ${PLAN_COLORS[plan]}` }}>
+                    <div key={tier} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden hover:shadow-md transition-shadow" style={{ borderTop: `3px solid ${TIER_COLORS[tier]}` }}>
                       <div className="p-5">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-display text-lg font-bold text-ink-900">{PLAN_LABELS[plan]}</h3>
+                          <h3 className="font-display text-lg font-bold text-ink-900">{TIER_LABELS[tier]}</h3>
                           <span className="text-xs bg-sage-100 text-sage-700 px-2 py-0.5 rounded-full font-semibold">Active</span>
                         </div>
-                        <p className="text-sm text-ink-500 mb-3">{cfg.includes.length} features included</p>
+                        <p className="text-sm text-ink-500 mb-3">{featureCount} features included</p>
                         <div className="flex items-baseline gap-2 mb-3">
-                          <span className="text-2xl font-bold text-ink-900">{fmt(cfg.monthly)}</span>
+                          <span className="text-2xl font-bold text-ink-900">{fmt(TIER_PRICES[tier])}</span>
                           <span className="text-sm text-ink-400">/mo</span>
-                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(cfg.annual)}/yr</span>
+                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(TIERS.find(t => t.id === tier)?.annual ?? TIER_PRICES[tier] * 12)}/yr</span>
                         </div>
-                        <p className="text-xs text-ink-500">{count} tenancies · {cfg.tagline}</p>
+                        <p className="text-xs text-ink-500">{count} tenancies · {TENANT_ROLES.length} roles</p>
                       </div>
                       <div className="bg-ink-50 px-5 py-3 flex items-center gap-2 text-xs border-t border-ink-100">
                         <span className="w-2 h-2 rounded-full bg-sage-600" />
-                        <span className="text-ink-500">Chargebee:</span>
-                        <code className="text-ink-400 text-[0.7rem]">{plan === 'self_managed' ? 'Self-Managed-USD-Monthly' : 'Facilities-USD-Monthly'}</code>
+                        <span className="text-ink-500">Stripe:</span>
+                        <code className="text-ink-400 text-[0.7rem]">{tier === 'compliance_pro' ? 'prod_U1uEALGv7cxbG8' : tier === 'community_plus' ? 'prod_U18qLUrk51rvcH' : 'prod_U1uF4LzxGLbojg'}</code>
                         <span className="ml-auto text-sage-600 font-semibold">Synced</span>
                       </div>
                     </div>
@@ -455,48 +414,20 @@ export default function PlatformAdminPage() {
                 })}
               </div>
 
-              {/* Add-ons summary */}
-              <div>
-                <h3 className="font-display text-base font-bold text-ink-900 mb-3">Add-ons</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-[10px] border border-ink-200 p-4">
-                    <p className="text-xs font-bold uppercase mb-2 text-ink-500">On Call</p>
-                    <p className="text-sm text-ink-700">Self-Managed: {fmt(ON_CALL.self_managed.monthly)}/mo ({ON_CALL.self_managed.hours}h)</p>
-                    <p className="text-sm text-ink-700">Facilities: {fmt(ON_CALL.facilities.monthly)}/mo ({ON_CALL.facilities.hours}h)</p>
-                    <p className="text-xs text-ink-400 mt-2">{planCounts.onCall} tenancies enrolled</p>
-                  </div>
-                  <div className="bg-white rounded-[10px] border border-ink-200 p-4">
-                    <p className="text-xs font-bold uppercase mb-2 text-ink-500">PM Seat</p>
-                    <p className="text-sm text-ink-700">{fmt(PM_SEAT.monthly)}/mo</p>
-                    <p className="text-xs text-ink-400 mt-2">{planCounts.pmSeat} tenancies enrolled</p>
-                  </div>
-                  <div className="bg-white rounded-[10px] border border-ink-200 p-4">
-                    <p className="text-xs font-bold uppercase mb-2 text-ink-500">Setup Fee</p>
-                    <p className="text-sm text-ink-700">Self-Managed: {fmt(SETUP.self_managed)}</p>
-                    <p className="text-sm text-ink-700">Facilities: {fmt(SETUP.facilities)}</p>
-                    <p className="text-xs text-ink-400 mt-2">{planCounts.setupPaid} setup fees paid</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tenancies by Plan */}
+              {/* Buildings by Tier */}
               <div>
                 <h3 className="font-display text-base font-bold text-ink-900 mb-3">Tenancies by Plan</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {ACTIVE_PLANS.map(plan => (
-                    <div key={plan} className="bg-white rounded-[10px] border border-ink-200 p-4">
-                      <p className="text-xs font-bold uppercase mb-3 text-ink-500">{PLAN_LABELS[plan]}</p>
-                      {tenants.filter(t => normalizePlan(t.subscription.tier) === plan).map(t => (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                    <div key={tier} className="bg-white rounded-[10px] border border-ink-200 p-4">
+                      <p className="text-xs font-bold uppercase mb-3 text-ink-500">{TIER_LABELS[tier]}</p>
+                      {tenants.filter(t => t.subscription.tier === tier).map(t => (
                         <div key={t.id} className="flex items-center justify-between py-1.5">
                           <span className="text-sm text-ink-700">{t.name}</span>
-                          <div className="flex items-center gap-1.5">
-                            {t.subscription.onCall && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">On Call</span>}
-                            {t.subscription.pmSeat && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">PM</span>}
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[t.status]}`}>{t.status}</span>
-                          </div>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[t.status]}`}>{t.status}</span>
                         </div>
                       ))}
-                      {tenants.filter(t => normalizePlan(t.subscription.tier) === plan).length === 0 && (
+                      {tenants.filter(t => t.subscription.tier === tier).length === 0 && (
                         <p className="text-xs text-ink-400 italic">No tenancies</p>
                       )}
                     </div>
@@ -532,7 +463,7 @@ export default function PlatformAdminPage() {
                     }}
                     className="px-4 py-2 bg-ink-900 text-white text-sm font-semibold rounded-lg hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    {trialDaysSaving ? 'Saving\u2026' : 'Save'}
+                    {trialDaysSaving ? 'Saving…' : 'Save'}
                   </button>
                 </div>
                 <p className="text-xs text-ink-400 mt-2">Set to 0 to disable free trials. Maximum 365 days.</p>
@@ -570,11 +501,11 @@ export default function PlatformAdminPage() {
                             <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
                             <td className="px-3 py-3">
                               <div className="flex gap-1.5 flex-wrap">
-                                {ACTIVE_PLANS.map(plan => (
-                                  TIER_FEATURES[plan][featureId as keyof Tenant['features']] ? (
-                                    <span key={plan} className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold"
-                                      style={{ backgroundColor: `${PLAN_COLORS[plan]}20`, color: PLAN_COLORS[plan] }}>
-                                      {PLAN_LABELS[plan]}
+                                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                                  TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? (
+                                    <span key={tier} className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold"
+                                      style={{ backgroundColor: `${TIER_COLORS[tier]}20`, color: TIER_COLORS[tier] }}>
+                                      {TIER_LABELS[tier]}
                                     </span>
                                   ) : null
                                 ))}
@@ -597,74 +528,49 @@ export default function PlatformAdminPage() {
           {page === 'matrix' && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-display text-lg font-bold text-ink-900">Feature x Plan Matrix</h2>
-                <p className="text-sm text-ink-500 mt-1">Feature availability per plan. Core features are included in both plans.</p>
+                <h2 className="font-display text-lg font-bold text-ink-900">Feature x Subscription Matrix</h2>
+                <p className="text-sm text-ink-500 mt-1">Feature availability per subscription plan.</p>
               </div>
               <div className="bg-white rounded-[10px] border border-ink-200 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
                       <th className="px-5 py-3 min-w-[250px]">Feature</th>
-                      {ACTIVE_PLANS.map(plan => (
-                        <th key={plan} className="px-4 py-3 text-center">
+                      {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                        <th key={tier} className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS[plan] }} />
-                            <span>{PLAN_LABELS[plan]}</span>
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[tier] }} />
+                            <span>{TIER_LABELS[tier]}</span>
                           </div>
-                          <p className="text-lg font-bold text-ink-900 mt-1 normal-case tracking-normal">{fmt(PLAN_PRICES[plan])}/mo</p>
+                          <p className="text-lg font-bold text-ink-900 mt-1 normal-case tracking-normal">{fmt(TIER_PRICES[tier])}/mo</p>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Core features (always on for both plans) */}
-                    <tr className="bg-ink-900">
-                      <td colSpan={3} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">Core (all plans)</td>
-                    </tr>
-                    {Object.entries(FEATURE_LABELS).filter(([id]) => {
-                      // core = feature is true on both plans
-                      return TIER_FEATURES.self_managed[id as keyof Tenant['features']] && TIER_FEATURES.facilities[id as keyof Tenant['features']] && id !== 'facilities' && id !== 'onCall';
-                    }).map(([featureId, label]) => (
-                      <tr key={featureId} className="border-b border-ink-100 hover:bg-ink-50">
-                        <td className="px-5 py-3 font-medium text-ink-700">{label}</td>
-                        {ACTIVE_PLANS.map(plan => (
-                          <td key={plan} className="px-4 py-3 text-center">
-                            <span className="text-lg text-sage-600">{'\u2713'}</span>
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-
-                    {/* Facilities row */}
-                    <tr className="bg-ink-900">
-                      <td colSpan={3} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">Plan-specific</td>
-                    </tr>
-                    <tr className="border-b border-ink-100 hover:bg-ink-50">
-                      <td className="px-5 py-3 font-medium text-ink-700">Facilities (staff, amenities, inspections)</td>
-                      <td className="px-4 py-3 text-center"><span className="text-lg text-ink-200">{'\u2014'}</span></td>
-                      <td className="px-4 py-3 text-center"><span className="text-lg text-sage-600">{'\u2713'}</span></td>
-                    </tr>
-
-                    {/* Add-ons */}
-                    <tr className="bg-ink-900">
-                      <td colSpan={3} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">Add-ons</td>
-                    </tr>
-                    <tr className="border-b border-ink-100 hover:bg-ink-50">
-                      <td className="px-5 py-3 font-medium text-ink-700">
-                        <div>On Call</div>
-                        <p className="text-xs text-ink-400">SM: {fmt(ON_CALL.self_managed.monthly)}/mo &middot; Fac: {fmt(ON_CALL.facilities.monthly)}/mo</p>
-                      </td>
-                      <td className="px-4 py-3 text-center"><span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Add-on</span></td>
-                      <td className="px-4 py-3 text-center"><span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Add-on</span></td>
-                    </tr>
-                    <tr className="border-b border-ink-100 hover:bg-ink-50">
-                      <td className="px-5 py-3 font-medium text-ink-700">
-                        <div>PM Seat</div>
-                        <p className="text-xs text-ink-400">{fmt(PM_SEAT.monthly)}/mo</p>
-                      </td>
-                      <td className="px-4 py-3 text-center"><span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">Add-on</span></td>
-                      <td className="px-4 py-3 text-center"><span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">Add-on</span></td>
-                    </tr>
+                    {FEATURE_GROUPS.map(group => {
+                      const groupFeatures = group.features.filter(f => FEATURE_LABELS[f]);
+                      if (groupFeatures.length === 0) return null;
+                      return (
+                        <Fragment key={group.name}>
+                          <tr className="bg-ink-900">
+                            <td colSpan={4} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">{group.name}</td>
+                          </tr>
+                          {groupFeatures.map(featureId => (
+                            <tr key={featureId} className="border-b border-ink-100 hover:bg-ink-50">
+                              <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
+                              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                                <td key={tier} className="px-4 py-3 text-center">
+                                  <span className={`text-lg ${TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? 'text-sage-600' : 'text-ink-200'}`}>
+                                    {TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? '✓' : '—'}
+                                  </span>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -689,7 +595,6 @@ export default function PlatformAdminPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {tenants.map((t, idx) => {
                   const isLastRow = idx >= tenants.length - 2 && tenants.length > 2;
-                  const plan = displayPlan(t.subscription.tier);
                   return (
                     <div key={t.id} className="bg-white border border-ink-200 rounded-xl p-5 hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-2">
@@ -722,22 +627,16 @@ export default function PlatformAdminPage() {
                       <div className="grid grid-cols-4 gap-2 text-xs mb-3">
                         <div>
                           <p className="text-ink-400">Plan</p>
-                          <p className="font-semibold" style={{ color: PLAN_COLORS[plan] }}>{PLAN_LABELS[plan]}</p>
+                          <p className="font-semibold" style={{ color: TIER_COLORS[t.subscription.tier] }}>{TIER_LABELS[t.subscription.tier]}</p>
                         </div>
                         <div><p className="text-ink-400">Units</p><p className="font-bold text-ink-900">{t.totalUnits}</p></div>
                         <div><p className="text-ink-400">Users</p><p className="font-bold text-ink-900">{t.stats.activeUsers}</p></div>
                         <div><p className="text-ink-400">MRR</p><p className="font-bold text-ink-900">{fmt(t.subscription.monthlyRate)}</p></div>
                       </div>
-                      {(t.subscription.onCall || t.subscription.pmSeat) && (
-                        <div className="flex gap-1.5 mb-3">
-                          {t.subscription.onCall && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">On Call</span>}
-                          {t.subscription.pmSeat && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-semibold">PM Seat</span>}
-                        </div>
-                      )}
                       <div className="flex items-center justify-between pt-2 border-t border-ink-100">
                         <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${t.subscription.chargebeeSubscriptionId ? 'bg-sage-600' : 'bg-amber-500'}`} />
-                          <span className="text-xs text-ink-400">{t.subscription.chargebeeSubscriptionId ? 'Chargebee Linked' : 'No billing'}</span>
+                          <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
+                          <span className="text-xs text-ink-400">{t.status === 'active' ? 'Stripe Linked' : 'Stripe Pending'}</span>
                         </div>
                         <span className="text-xs text-ink-400">Since {t.createdAt}</span>
                       </div>
@@ -749,12 +648,9 @@ export default function PlatformAdminPage() {
           )}
 
           {/* ═══ TENANCY DETAIL ═══ */}
-          {page === 'tenancies' && selected && (() => {
-            const plan = displayPlan(selected.subscription.tier);
-            const billingDisabled = selected.subscription.chargebeeSubscriptionId === null;
-            return (
+          {page === 'tenancies' && selected && (
             <div className="space-y-6">
-              <button onClick={() => { setSelectedTenancy(null); store.setImpersonating(null); }} className="text-sm text-accent-600 font-medium hover:underline">{'\u2190'} Back to Tenancies</button>
+              <button onClick={() => { setSelectedTenancy(null); store.setImpersonating(null); }} className="text-sm text-accent-600 font-medium hover:underline">← Back to Tenancies</button>
 
               {/* Header */}
               <div className="flex items-start justify-between">
@@ -765,7 +661,7 @@ export default function PlatformAdminPage() {
                 </div>
                 <div className="flex gap-2">
                   <span className={`px-3 py-1 rounded text-sm font-semibold ${STATUS_BADGE[selected.status]}`}>{selected.status}</span>
-                  <span className={`px-3 py-1 rounded text-sm font-semibold ${PLAN_BADGE[selected.subscription.tier] || PLAN_BADGE[plan]}`}>{PLAN_LABELS[plan]}</span>
+                  <span className={`px-3 py-1 rounded text-sm font-semibold ${TIER_BADGE[selected.subscription.tier]}`}>{TIER_LABELS[selected.subscription.tier]}</span>
                 </div>
               </div>
 
@@ -801,95 +697,41 @@ export default function PlatformAdminPage() {
                       className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Suspend</button>
                   )}
                   {selected.status === 'onboarding' && (
-                    <button onClick={() => { store.updateTenantStatus(selected.id, 'active'); store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: selected.name, details: 'Onboarding complete \u2192 Go Live', buildingId: selected.id }); }}
+                    <button onClick={() => { store.updateTenantStatus(selected.id, 'active'); store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.activate', target: selected.name, details: 'Onboarding complete → Go Live', buildingId: selected.id }); }}
                       className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700">Complete Onboarding</button>
                   )}
                 </div>
               </div>
 
-              {/* 2-col: Subscription + Billing */}
+              {/* 2-col: Subscription + Stripe */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Subscription & Add-ons */}
                 <div className="bg-white border border-ink-200 rounded-[10px] p-5">
                   <h4 className="font-bold text-ink-900 mb-3">Subscription</h4>
-                  {billingDisabled && (
-                    <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-                      No Chargebee subscription linked. Plan changes are disabled until a subscription is created.
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                    <div><p className="text-xs text-ink-400">Plan</p><p className="font-bold text-ink-900">{PLAN_LABELS[plan]}</p></div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><p className="text-xs text-ink-400">Tier</p><p className="font-bold text-ink-900">{TIER_LABELS[selected.subscription.tier]}</p></div>
                     <div><p className="text-xs text-ink-400">Status</p><p className="font-bold text-ink-900 capitalize">{selected.subscription.status.replace('_', ' ')}</p></div>
                     <div><p className="text-xs text-ink-400">Rate</p><p className="font-bold text-ink-900">{fmt(selected.subscription.monthlyRate)}/mo</p></div>
                     <div><p className="text-xs text-ink-400">Next Billing</p><p className="font-bold text-ink-900">{selected.subscription.nextBillingDate}</p></div>
                   </div>
-
-                  {/* Plan switch (2 buttons) */}
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-ink-600 mb-2">Switch Plan</p>
-                    <div className="flex gap-2">
-                      {ACTIVE_PLANS.map(p => (
-                        <button key={p}
-                          disabled={billingDisabled || plan === p}
-                          onClick={() => store.changePlan(selected.id, p, ACTOR)}
-                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
-                            plan === p
-                              ? 'border-accent-500 bg-accent-50 text-accent-700'
-                              : billingDisabled
-                                ? 'border-ink-100 bg-ink-50 text-ink-300 cursor-not-allowed'
-                                : 'border-ink-200 hover:border-ink-300 text-ink-700 hover:bg-ink-50 cursor-pointer'
-                          }`}>
-                          {PLAN_LABELS[p]}
-                          <span className="block text-xs font-normal mt-0.5">{fmt(PLAN_PRICES[p])}/mo</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Add-on toggles */}
-                  <div className="space-y-3 border-t border-ink-100 pt-4">
-                    <p className="text-xs font-semibold text-ink-600 mb-1">Add-ons</p>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-medium text-ink-700">On Call</span>
-                        <span className="text-xs text-ink-400 ml-1.5">({fmt(ON_CALL[plan].monthly)}/mo)</span>
-                      </div>
-                      <Toggle on={selected.subscription.onCall} disabled={billingDisabled} onChange={() => store.setOnCall(selected.id, !selected.subscription.onCall, ACTOR)} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-medium text-ink-700">PM Seat</span>
-                        <span className="text-xs text-ink-400 ml-1.5">({fmt(PM_SEAT.monthly)}/mo)</span>
-                      </div>
-                      <Toggle on={selected.subscription.pmSeat} disabled={billingDisabled} onChange={() => store.setPmSeat(selected.id, !selected.subscription.pmSeat, ACTOR)} />
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-ink-100">
-                      <div>
-                        <span className="text-sm font-medium text-ink-700">Setup Fee</span>
-                        <span className="text-xs text-ink-400 ml-1.5">({fmt(SETUP[plan])})</span>
-                      </div>
-                      <div className="text-right">
-                        {selected.subscription.setupPaidAt ? (
-                          <span className="text-xs text-sage-700 font-semibold">Paid {selected.subscription.setupPaidAt}{selected.subscription.setupAmount ? ` \u00b7 ${fmt(selected.subscription.setupAmount)}` : ''}</span>
-                        ) : (
-                          <span className="text-xs text-ink-400">Not paid</span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="flex gap-2 mt-4 flex-wrap">
+                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).filter(t => t !== selected.subscription.tier).map(tier => (
+                      <button key={tier} onClick={() => store.changeTier(selected.id, tier, ACTOR)}
+                        className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-ink-50">
+                        → {TIER_LABELS[tier]} ({fmt(TIER_PRICES[tier])})
+                      </button>
+                    ))}
                   </div>
                 </div>
-
-                {/* Billing Integration */}
                 <div className="bg-white border border-ink-200 rounded-[10px] p-5">
-                  <h4 className="font-bold text-ink-900 mb-3">Billing Integration</h4>
+                  <h4 className="font-bold text-ink-900 mb-3">Stripe Integration</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><p className="text-xs text-ink-400">Chargebee Sub ID</p><p className="font-mono text-xs text-ink-600">{selected.subscription.chargebeeSubscriptionId || '\u2014 not linked'}</p></div>
-                    <div><p className="text-xs text-ink-400">Billing Interval</p><p className="text-sm text-ink-600 capitalize">{selected.subscription.billingInterval}</p></div>
+                    <div><p className="text-xs text-ink-400">Customer ID</p><p className="font-mono text-xs text-ink-600">cus_{selected.id.slice(-8)}...</p></div>
+                    <div><p className="text-xs text-ink-400">Subscription ID</p><p className="font-mono text-xs text-ink-600">sub_{selected.id.slice(-8)}...</p></div>
                     <div>
                       <p className="text-xs text-ink-400">Sync Status</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`w-2 h-2 rounded-full ${selected.subscription.chargebeeSubscriptionId ? 'bg-sage-600' : 'bg-amber-500'}`} />
-                        <span className="text-sm">{selected.subscription.chargebeeSubscriptionId ? 'Linked' : 'No billing'}</span>
+                        <span className={`w-2 h-2 rounded-full ${selected.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
+                        <span className="text-sm">{selected.status === 'active' ? 'Linked' : 'Pending'}</span>
                       </div>
                     </div>
                     <div>
@@ -905,8 +747,8 @@ export default function PlatformAdminPage() {
                 <h4 className="font-bold text-ink-900 mb-3">Feature Flags</h4>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {(Object.entries(selected.features) as [keyof Tenant['features'], boolean][]).map(([key, enabled]) => {
-                    const planDefault = TIER_FEATURES[plan]?.[key] ?? false;
-                    const isOverride = enabled !== planDefault;
+                    const tierDefault = TIER_FEATURES[selected.subscription.tier][key];
+                    const isOverride = enabled !== tierDefault;
                     return (
                       <div key={key} className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${isOverride ? 'bg-yellow-50 border border-yellow-200' : 'bg-ink-50'}`}>
                         <div>
@@ -915,7 +757,7 @@ export default function PlatformAdminPage() {
                         </div>
                         <Toggle on={enabled} onChange={() => {
                           store.toggleFeature(selected.id, key);
-                          store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'feature.toggle', target: selected.name, details: `${enabled ? 'Disabled' : 'Enabled'} ${FEATURE_LABELS[key] || key}`, buildingId: selected.id });
+                          store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'feature.toggle', target: selected.name, details: `${enabled ? 'Disabled' : 'Enabled'} ${FEATURE_LABELS[key]}`, buildingId: selected.id });
                         }} />
                       </div>
                     );
@@ -923,20 +765,22 @@ export default function PlatformAdminPage() {
                 </div>
               </div>
             </div>
-            );
-          })()}
+          )}
 
           {/* ═══ USER ROLES ═══ */}
           {page === 'roles' && (
             <div className="space-y-6">
               <div>
                 <h2 className="font-display text-lg font-bold text-ink-900">User Roles</h2>
-                <p className="text-sm text-ink-500 mt-1">Role definitions, plan requirements, and permission summary</p>
+                <p className="text-sm text-ink-500 mt-1">Role definitions, subscription availability, and permission summary</p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {TENANT_ROLES.map(role => {
                   const rolePerms = permissions.filter(p => p.roleId === role.id);
                   const totalPerms = rolePerms.reduce((s, p) => s + p.actions.length, 0);
+                  const availableFeatures = Object.keys(FEATURE_LABELS).filter(f =>
+                    role.tiers.some(tier => TIER_FEATURES[tier][f as keyof Tenant['features']])
+                  );
                   return (
                     <div key={role.id} className="bg-white rounded-[10px] border border-ink-200 p-5 hover:shadow-md transition-shadow">
                       <div className="text-3xl mb-3">{role.icon}</div>
@@ -945,6 +789,8 @@ export default function PlatformAdminPage() {
 
                       <div className="flex gap-2 mb-4">
                         {[
+                          { label: 'Plans', value: role.tiers.length },
+                          { label: 'Features', value: availableFeatures.length },
                           { label: 'Perms', value: totalPerms },
                         ].map(s => (
                           <div key={s.label} className="flex-1 bg-ink-100 rounded-lg p-2 text-center">
@@ -955,21 +801,20 @@ export default function PlatformAdminPage() {
                       </div>
 
                       <div className="mb-4">
-                        <p className="text-[0.72rem] font-semibold text-ink-600 mb-1.5">Requires</p>
+                        <p className="text-[0.72rem] font-semibold text-ink-600 mb-1.5">Available Plans</p>
                         <div className="flex gap-1.5 flex-wrap">
-                          {role.requires === null ? (
-                            <span className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold bg-sage-100 text-sage-700">All plans</span>
-                          ) : (
-                            <span className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold bg-accent-100 text-accent-700">
-                              {role.requires === 'facilities' ? 'Plus Facilities plan' : 'PM Seat add-on'}
+                          {role.tiers.map(tier => (
+                            <span key={tier} className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold"
+                              style={{ backgroundColor: `${TIER_COLORS[tier]}20`, color: TIER_COLORS[tier] }}>
+                              {TIER_LABELS[tier]}
                             </span>
-                          )}
+                          ))}
                         </div>
                       </div>
 
                       <button onClick={() => setPage('permissions')}
                         className="w-full px-3 py-2 bg-ink-100 text-ink-700 rounded-lg text-xs font-semibold hover:bg-ink-200 transition-colors">
-                        View Permissions {'\u2192'}
+                        View Permissions →
                       </button>
                     </div>
                   );
@@ -979,7 +824,7 @@ export default function PlatformAdminPage() {
           )}
 
           {/* ═══ STRIPE ═══ */}
-          {page === 'stripe' && <BillingTab />}
+          {page === 'stripe' && <StripeTab />}
 
           {/* ═══ FINANCE ═══ */}
           {page === 'finance' && <FinanceTab />}
@@ -989,7 +834,7 @@ export default function PlatformAdminPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="font-display text-lg font-bold text-ink-900">Support</h2>
-                <p className="text-sm text-ink-500 mt-1">Support tickets and escalations -- coming soon</p>
+                <p className="text-sm text-ink-500 mt-1">Support tickets and escalations — coming soon</p>
               </div>
               <div className="bg-white rounded-[10px] border border-ink-200 p-12 text-center">
                 <p className="text-ink-400 text-sm">Support management page is under development.</p>
@@ -1043,25 +888,25 @@ export default function PlatformAdminPage() {
             </div>
 
             <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Subscription</p></div>
-            <div className="grid grid-cols-2 gap-3">
-              {ACTIVE_PLANS.map(p => (
-                <button key={p} type="button" onClick={() => setBldgForm({ ...bldgForm, plan: p })}
-                  className={`p-3 rounded-xl border-2 text-left ${bldgForm.plan === p ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}>
-                  <p className="font-bold text-ink-900">{PLAN_LABELS[p]}</p>
-                  <p className="text-lg font-bold text-accent-600">{fmt(PLAN_PRICES[p])}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                  <p className="text-xs text-ink-400 mt-1">{PLANS[p].includes.length} features</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                <button key={tier} type="button" onClick={() => setBldgForm({ ...bldgForm, tier })}
+                  className={`p-3 rounded-xl border-2 text-left ${bldgForm.tier === tier ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}>
+                  <p className="font-bold text-ink-900">{TIER_LABELS[tier]}</p>
+                  <p className="text-lg font-bold text-accent-600">{fmt(TIER_PRICES[tier])}<span className="text-xs font-normal text-ink-400">/mo</span></p>
+                  <p className="text-xs text-ink-400 mt-1">{Object.entries(TIER_FEATURES[tier]).filter(([, v]) => v).length} features</p>
                 </button>
               ))}
             </div>
 
-            <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Chargebee Linking</p></div>
+            <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Stripe Linking</p></div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Chargebee Customer ID</label>
-                <input placeholder="cb_xxxxxxxxxxxx" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" />
+                <label className="block text-sm font-medium text-ink-700 mb-1">Stripe Customer ID</label>
+                <input placeholder="cus_xxxxxxxxxxxx" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Chargebee Subscription ID</label>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Stripe Subscription ID</label>
                 <input placeholder="sub_xxxxxxxxxxxx" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" />
               </div>
             </div>

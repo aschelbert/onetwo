@@ -4,9 +4,6 @@ import type { BuildingAsset, AssetCategory, AssetCondition, MaintenanceSchedule 
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
-import { useTenantContext } from '@/components/TenantProvider';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
-import OpenCaseDrawer from '@/features/issues/OpenCaseDrawer';
 import VendorsTab from './VendorsTab';
 
 // ── Helpers ──────────────────────────────────────
@@ -88,19 +85,16 @@ interface Props {
 }
 
 export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMaint, openEditMaint, navigateToTab }: Props) {
-  const { run: runUndoable } = useUndoableAction();
   const assets = store.assets;
   const finStore = useFinancialStore();
   const spendingStore = useSpendingStore();
   const amenitiesStore = useAmenitiesStore();
-  const tenant = useTenantContext();
 
   // ── Local state ──
   const [subView, setSubView] = useState<'registry' | 'calendar' | 'capital' | 'vendors'>('registry');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<AssetCategory | 'all'>('all');
   const [search, setSearch] = useState('');
-  const [caseDrawerAsset, setCaseDrawerAsset] = useState<string | null>(null);
 
   // ── Derived data ──
   const topLevelAssets = useMemo(() => assets.filter(a => a.parentAssetId === null), [assets]);
@@ -193,9 +187,6 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
               {selectedAsset.notes && <p className="text-xs text-ink-400 mt-1">{selectedAsset.notes}</p>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {isBoard && true && (
-                <button onClick={() => setCaseDrawerAsset(selectedAsset.id)} className="text-xs text-accent-600 font-medium hover:text-accent-700">Open a case</button>
-              )}
               {isBoard && (
                 <button
                   onClick={() => openEdit(selectedAsset.id, {
@@ -294,9 +285,8 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                 {isBoard && (
                   <button
                     onClick={() => {
-                      const prevReserveId = selectedAsset.reserveItemId;
-                      store.updateAsset(selectedAsset.id, { reserveItemId: '' });
-                      runUndoable({ label: `Unlinked reserve item`, undo: () => store.updateAsset(selectedAsset.id, { reserveItemId: prevReserveId }), commit: () => {} });
+                      if (confirm(`Unlink reserve item "${mod.reserve!.name}" from this asset?`))
+                        store.updateAsset(selectedAsset.id, { reserveItemId: '' });
                     }}
                     className="text-xs text-red-400 hover:text-red-600 font-medium"
                   >Unlink</button>
@@ -444,9 +434,10 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                           >Edit</button>
                           <button
                             onClick={() => {
-                              store.unlinkScheduleFromAsset(selectedAsset.id, m.id);
-                              store.removeMaintenanceSchedule(m.id);
-                              runUndoable({ label: `Removed ${m.task}`, undo: () => {}, commit: () => {} });
+                              if (confirm(`Remove "${m.task}"?`)) {
+                                store.unlinkScheduleFromAsset(selectedAsset.id, m.id);
+                                store.removeMaintenanceSchedule(m.id);
+                              }
                             }}
                             className="text-xs text-red-400 hover:text-red-600"
                           >Remove</button>
@@ -574,9 +565,8 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                     {isBoard && (
                       <button
                         onClick={() => {
-                          const prevVendorIds = [...selectedAsset.vendorIds];
-                          store.updateAsset(selectedAsset.id, { vendorIds: selectedAsset.vendorIds.filter(id => id !== v.id) });
-                          runUndoable({ label: `Unlinked ${v.name}`, undo: () => store.updateAsset(selectedAsset.id, { vendorIds: prevVendorIds }), commit: () => {} });
+                          if (confirm(`Unlink ${v.name} from this asset?`))
+                            store.updateAsset(selectedAsset.id, { vendorIds: selectedAsset.vendorIds.filter(id => id !== v.id) });
                         }}
                         className="text-[10px] text-red-400 hover:text-red-600"
                       >Unlink</button>
@@ -632,9 +622,8 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                       {isBoard && (
                         <button
                           onClick={() => {
-                            const prevPolicyIds = [...selectedAsset.insurancePolicyIds];
-                            store.updateAsset(selectedAsset.id, { insurancePolicyIds: selectedAsset.insurancePolicyIds.filter(id => id !== p.id) });
-                            runUndoable({ label: `Unlinked ${p.type} policy`, undo: () => store.updateAsset(selectedAsset.id, { insurancePolicyIds: prevPolicyIds }), commit: () => {} });
+                            if (confirm(`Unlink ${p.type} policy from this asset?`))
+                              store.updateAsset(selectedAsset.id, { insurancePolicyIds: selectedAsset.insurancePolicyIds.filter(id => id !== p.id) });
                           }}
                           className="text-[10px] text-red-400 hover:text-red-600"
                         >Unlink</button>
@@ -1052,15 +1041,6 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
 
       {/* ═══════ CAPITAL PLANNING VIEW ═══════ */}
       {subView === 'capital' && <CapitalPlanningView assets={assets} finStore={finStore} spendingStore={spendingStore} />}
-
-      {/* v2Cases: Open a case drawer for an asset */}
-      {true && caseDrawerAsset && (
-        <OpenCaseDrawer
-          open={true}
-          onClose={() => setCaseDrawerAsset(null)}
-          prefill={{ assetId: caseDrawerAsset, source: 'asset', sourceId: caseDrawerAsset }}
-        />
-      )}
     </div>
   );
 }
@@ -1711,7 +1691,6 @@ function MaintenanceCalendarView({
           </div>
         </div>
       )}
-
     </div>
   );
 }

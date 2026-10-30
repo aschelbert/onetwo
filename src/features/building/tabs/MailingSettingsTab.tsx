@@ -4,7 +4,6 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { PRICING, formatDeliveryMethod } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
 import { supabase } from '@/lib/supabase';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import StripeCardModal from '../components/StripeCardModal';
 
 const DELIVERY_METHODS: MailDeliveryMethod[] = ['first-class', 'certified', 'certified-return-receipt', 'certified-electronic-return-receipt'];
@@ -12,7 +11,6 @@ const DELIVERY_METHODS: MailDeliveryMethod[] = ['first-class', 'certified', 'cer
 export default function MailingSettingsTab() {
   const mailStore = useMailStore();
   const buildingStore = useBuildingStore();
-  const { run: runUndoable } = useUndoableAction();
   const settings = mailStore.mailingSettings;
 
   const [cardModalOpen, setCardModalOpen] = useState(false);
@@ -28,7 +26,7 @@ export default function MailingSettingsTab() {
 
   const handleAddOrChangeCard = async () => {
     if (!supabase) {
-      console.error('Backend not configured. Set Supabase env vars to enable.');
+      alert('Backend not configured. Set Supabase env vars to enable.');
       return;
     }
     setLoading(true);
@@ -62,7 +60,7 @@ export default function MailingSettingsTab() {
   };
 
   const handleRemoveCard = async () => {
-    // Proceed with removal and offer undo via toast
+    if (!confirm('Remove this payment method? You will not be able to send mail until a new card is added.')) return;
     if (!supabase) return;
 
     setLoading(true);

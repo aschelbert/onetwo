@@ -1,33 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AppShell from '@/components/layout/AppShell';
 import AuthPage from '@/features/auth/AuthPage';
-import ResidentDashboard from '@/features/dashboard/ResidentDashboard';
-import HomePage from '@/features/home/HomePage';
+import DashboardPage from '@/features/dashboard/DashboardPage';
 import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
-import CasePageRoute from '@/features/issues/CasePage';
 import BuildingPage from '@/features/building/BuildingPage';
 import ArchivesPage from '@/features/archives/ArchivesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
+import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
+import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
+import AssociationTeamPage from '@/features/association-team/AssociationTeamPage';
 import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
+import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
 import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
-import UiKitPage from '@/features/dev/UiKitPage';
-import UserManagementPage from '@/features/admin/UserManagementPage';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -45,7 +45,7 @@ function HydrationGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Global Supabase auth state listener -- keeps auth store in sync with session
+// Global Supabase auth state listener — keeps auth store in sync with session
 function AuthListener() {
   const ranRef = useRef(false);
   useEffect(() => {
@@ -54,16 +54,14 @@ function AuthListener() {
     const sb = supabase; // narrow for TS inside async callback
 
     const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      const { isAuthenticated, currentUser, login, signOut, addMember } = useAuthStore.getState();
+      const { isAuthenticated, login, signOut, addMember } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
-        // Don't sign out demo users — they have no real Supabase session
-        const isDemoUser = currentUser.id === 'user1' || currentUser.id.startsWith('user-');
-        if (isAuthenticated && !isDemoUser) signOut();
+        if (isAuthenticated) signOut();
         return;
       }
 
-      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED -- restore auth if not already set
+      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set
       if (session && !isAuthenticated) {
         try {
           // Check if platform admin first
@@ -139,7 +137,7 @@ function AuthListener() {
             login(m);
           }
         } catch {
-          // Session exists but lookup failed -- don't crash
+          // Session exists but lookup failed — don't crash
         }
       }
     });
@@ -159,50 +157,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** Shown when a trial has expired with no active subscription */
-function TrialEndedPage() {
-  const { signOut } = useAuthStore();
-  const navigate = useNavigate();
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-mist-50 p-4">
-      <div className="bg-white rounded-xl shadow-sm border border-ink-100 max-w-md w-full p-8 text-center">
-        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
-        <h1 className="font-display text-xl font-bold text-ink-900 mb-2">Trial Ended</h1>
-        <p className="text-sm text-ink-600 mb-6">
-          Your free trial has ended. Add a payment method to continue using ONE two.
-        </p>
-        <div className="space-y-3">
-          <button
-            onClick={() => navigate('/subscription')}
-            className="w-full py-3 bg-accent-600 text-white rounded-lg font-semibold text-sm hover:bg-accent-700 transition-colors"
-          >
-            Add a card
-          </button>
-          <button
-            onClick={() => signOut()}
-            className="w-full py-3 border border-ink-200 text-ink-600 rounded-lg font-semibold text-sm hover:bg-ink-50 transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function LoginRoute() {
-  const { isAuthenticated, currentRole, currentUser } = useAuthStore();
-  const isDemoUser = currentUser.id === 'user1' || currentUser.id.startsWith('user-');
-
-  // Real (non-demo) authenticated users redirect to their dashboard.
-  // Demo users always fall through to AuthPage, which handles sign-out.
-  if (isAuthenticated && !isDemoUser) {
+  const { isAuthenticated, currentRole } = useAuthStore();
+  if (isAuthenticated) {
+    // On tenant subdomains, platform admins should see the tenant dashboard
     const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
@@ -215,7 +175,7 @@ function CatchAll() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
     const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com' && host !== 'www.getonetwo.com';
+    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
@@ -236,31 +196,16 @@ function RequirePM({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/**
- * HomeOrDashboard -- renders HomePage for board/PM roles,
- * ResidentDashboard for residents.
- * v2 flags have been removed; Home is the only board/PM path.
- */
-function HomeOrDashboard() {
-  const { currentRole } = useAuthStore();
-  const isBoardOrPM = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-
-  if (isBoardOrPM) {
-    return <HomePage />;
-  }
-  return <ResidentDashboard />;
-}
-
 function AIAdvisorWrapper() {
   const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) return null;
   return <AIAdvisor />;
 }
 
-/** Wrapper to extract `id` param from route and pass to CasePage */
-function CasePageRouteWrapper() {
-  const { id } = useParams<{ id: string }>();
-  return <CasePageRoute caseId={id || ''} />;
+function ActiveCaseWidgetWrapper() {
+  const { isAuthenticated } = useAuthStore();
+  if (!isAuthenticated) return null;
+  return <ActiveCaseWidget />;
 }
 
 
@@ -272,12 +217,11 @@ export default function App() {
       <AuthListener />
       <Routes>
         {/* Public */}
+        {/* Landing page is served by static index.html via Vite middleware */}
         <Route path="/login" element={<LoginRoute />} />
-        <Route path="/signup" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/trial-ended" element={<RequireAuth><TenantProvider><TrialEndedPage /></TenantProvider></RequireAuth>} />
 
-        {/* Admin console -- own layout (sidebar nav), outside AppShell */}
+        {/* Admin console — own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />
 
         {/* Portfolio (PM) routes */}
@@ -288,38 +232,31 @@ export default function App() {
 
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
-          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeOrDashboard /></ErrorBoundary>} />
-          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
+          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
           <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
+          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
+          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />
-          <Route path="/cases/:id" element={<ErrorBoundary fallbackLevel="page"><CasePageRouteWrapper /></ErrorBoundary>} />
+          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
+          <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamPage /></ErrorBoundary>} />
+          <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
           <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
           <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
           <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
           <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
           <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
-
-          {/* Redirects for removed routes */}
-          <Route path="/issues" element={<Navigate to="/cases" replace />} />
-          <Route path="/association-team" element={<Navigate to="/building?tab=people" replace />} />
           <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
-          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/property-log" element={<Navigate to="/boardroom?tab=property_log" replace />} />
         </Route>
-
-        {/* Dev-only UI kit route */}
-        {import.meta.env.DEV && (
-          <Route path="/dev/ui-kit" element={<UiKitPage />} />
-        )}
 
         {/* Catch-all */}
         <Route path="*" element={<CatchAll />} />
       </Routes>
-      {/* AI Advisor hidden -- revisiting how it fits with workflow context widget */}
+      {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
+      <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
     </ErrorBoundary>

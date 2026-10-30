@@ -1,239 +1,84 @@
-// Shared plan configuration -- single source of truth for pricing, features, and Chargebee IDs.
-// Used by AuthPage (onboarding), SubscriptionPage (management), and edge functions.
+// Shared tier configuration — single source of truth for subscription tiers
+// Used by AuthPage (onboarding), SubscriptionPage (management), and edge functions
 
-export type PlanId = 'self_managed' | 'facilities';
+export const DEFAULT_TRIAL_DAYS = 30;
 
-// Legacy tier ids kept for reading old rows only
-export type LegacyPlanId =
-  | 'essentials'
-  | 'board'
-  | 'estate'
-  | 'pm_addon'
-  | 'compliance_pro'
-  | 'community_plus'
-  | 'management_suite';
-
+export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
 export type BillingInterval = 'monthly' | 'annual';
 
-export const DEFAULT_TRIAL_DAYS = 21;
-export const DEFAULT_BILLING_INTERVAL: BillingInterval = 'monthly';
-
-// Kept for AuthPage amenity chip logic
-export type BuildingAmenity = 'elevator' | 'pool' | 'gym' | 'sport_court' | 'parking_garage' | 'roof_deck' | 'staff_on_payroll';
-
-// ── Plans ──
-
-export interface PlanConfig {
-  id: PlanId;
+export interface TierConfig {
+  id: SubscriptionTier;
   name: string;
-  monthly: number;   // dollars
-  annual: number;     // dollars (total per year)
-  tagline: string;
-  includes: string[];
+  monthly: number;
+  annual: number;
+  stripePriceMonthly: string;
+  stripePriceAnnual: string;
+  features: string[];
 }
 
-export const PLANS: Record<PlanId, PlanConfig> = {
-  self_managed: {
-    id: 'self_managed',
-    name: 'Self-Managed',
+export const TIERS: TierConfig[] = [
+  {
+    id: 'compliance_pro',
+    name: 'Compliance Pro',
     monthly: 179,
-    annual: 1790,
-    tagline: 'Everything a self-managed board needs',
-    includes: [
-      'Fiscal Lens (double-entry GL, budgets, 1099s)',
-      'Case Ops workflow',
-      'Compliance Runbook',
-      'AI Advisor',
-      'Document Vault',
-      'Payment processing (fees at cost)',
-      'Votes & Resolutions',
-      'Community Portal',
-      'Vendor management & work orders',
-      'Reserve study tools',
+    annual: 1800,
+    stripePriceMonthly: 'price_1T3qQD2eQBbijDsqxvNiEs8U',
+    stripePriceAnnual: 'price_1T3qQD2eQBbijDsqbcwCMX7v',
+    features: [
+      'Dashboard with Fiduciary Alerts & compliance grades',
+      'Board Room: governance calendar, duties & roles',
+      'Fiscal Lens: double-entry GL, budgets & reserves',
+      'The Building: contacts, bylaws, insurance, vendors',
+      'Case Workflow with pre-legal escalation paths',
+      'Property Log & The Archives',
+      'DC jurisdiction compliance built in',
     ],
   },
-  facilities: {
-    id: 'facilities',
-    name: 'Plus Facilities',
+  {
+    id: 'community_plus',
+    name: 'Community Plus',
     monthly: 279,
-    annual: 2790,
-    tagline: 'For buildings with staff, amenities, and complex operations',
-    includes: [
-      'Everything in Self-Managed',
-      'Staff role & scheduling',
-      'Amenity reservations',
-      'Inspection calendar',
-      'Community room booking',
+    annual: 2850,
+    stripePriceMonthly: 'price_1T36YO2eQBbijDsqkULOdtRi',
+    stripePriceAnnual: 'price_1T3qQg2eQBbijDsqHaOVBbtA',
+    features: [
+      'Everything in Compliance Pro',
+      'Resident portal with issue reporting',
+      'Community voting & resolutions',
+      'Assessment tracking & processing',
+      'Communications & notice templates',
+      'PM Scorecard & vendor management',
     ],
   },
-};
-
-// ── Feature lists for marketing copy ──
-
-export const CORE_INCLUDES = [
-  'Fiscal Lens (double-entry GL, budgets, 1099s)',
-  'Case Ops workflow',
-  'Compliance Runbook',
-  'AI Advisor',
-  'Document Vault',
-  'Payment processing (fees at cost)',
-  'Votes & Resolutions',
-  'Community Portal',
-  'Vendor management & work orders',
-  'Reserve study tools',
+  {
+    id: 'management_suite',
+    name: 'Management Suite',
+    monthly: 399,
+    annual: 4250,
+    stripePriceMonthly: 'price_1T3qRQ2eQBbijDsq7PP4vlxh',
+    stripePriceAnnual: 'price_1T3qSR2eQBbijDsqzVEUuZD4',
+    features: [
+      'Everything in Community Plus',
+      'Property Manager role & tools',
+      'Work order & invoice generation',
+      'Email & postal distributions',
+      'Mailing list management',
+      'Priority support',
+    ],
+  },
 ];
 
-export const FACILITIES_ADDS = [
-  'Staff role & scheduling',
-  'Amenity reservations',
-  'Inspection calendar',
-  'Community room booking',
-];
-
-// ── Add-ons ──
-
-export const ON_CALL: Record<PlanId, { monthly: number; annual: number; hours: number }> = {
-  self_managed: { monthly: 249, annual: 2490, hours: 2 },
-  facilities:   { monthly: 499, annual: 4990, hours: 5 },
-};
-
-export const PM_SEAT = { monthly: 79, annual: 790 };
-
-export const SETUP: Record<PlanId, number> = {
-  self_managed: 299,
-  facilities: 599,
-};
-
-// ── Feature flags ──
-
-export interface PlanFeatureFlags {
-  fiscalLens: boolean;
-  caseOps: boolean;
-  complianceRunbook: boolean;
-  aiAdvisor: boolean;
-  documentVault: boolean;
-  paymentProcessing: boolean;
-  votesResolutions: boolean;
-  communityPortal: boolean;
-  vendorManagement: boolean;
-  reserveStudyTools: boolean;
-  facilities: boolean;
-  onCall: boolean;
+export function getTierById(id: string): TierConfig | undefined {
+  return TIERS.find(t => t.id === id);
 }
 
-export function planFeatures(plan: PlanId, onCall: boolean = false, trial: boolean = false): PlanFeatureFlags {
-  return {
-    fiscalLens: true,
-    caseOps: true,
-    complianceRunbook: true,
-    aiAdvisor: true,
-    documentVault: true,
-    paymentProcessing: true,
-    votesResolutions: true,
-    communityPortal: true,
-    vendorManagement: true,
-    reserveStudyTools: true,
-    facilities: plan === 'facilities' || trial,
-    onCall,
-  };
+export function getTierDisplayName(id: string): string {
+  return getTierById(id)?.name || id;
 }
 
-// ── Add-on labels ──
-
-export const PM_SEAT_LABEL = 'Property manager seat';
-export const SETUP_LABEL = 'Setup with us';
-
-// ── Price helpers ──
-
-export function planPrice(plan: PlanId, interval: BillingInterval): number {
-  return interval === 'annual' ? PLANS[plan].annual : PLANS[plan].monthly;
-}
-
-export function pmSeatPrice(interval: BillingInterval): number {
-  return interval === 'annual' ? PM_SEAT.annual : PM_SEAT.monthly;
-}
-
-export function onCallPrice(plan: PlanId, interval: BillingInterval): number {
-  return interval === 'annual' ? ON_CALL[plan].annual : ON_CALL[plan].monthly;
-}
-
-export function setupPrice(plan: PlanId): number {
-  return SETUP[plan];
-}
-
-/** Returns the dollar total for a billing period (month or year). */
-export function periodTotal(opts: {
-  plan: PlanId;
-  onCall: boolean;
-  pmSeat: boolean;
-  interval: BillingInterval;
-}): number {
-  const { plan, onCall, pmSeat, interval } = opts;
-  let total = planPrice(plan, interval);
-  if (onCall) total += onCallPrice(plan, interval);
-  if (pmSeat) total += pmSeatPrice(interval);
-  return total;
-}
-
-/** Returns the monthly rate in cents for DB/API use. */
-export function monthlyRateCents(plan: PlanId, onCall: boolean, pmSeat: boolean): number {
-  let rate = plan === 'facilities' ? 27900 : 17900;
-  if (onCall) rate += plan === 'facilities' ? 49900 : 24900;
-  if (pmSeat) rate += 7900;
-  return rate;
-}
-
-// ── Legacy tier mapping ──
-
-const PLAN_MAP: Record<string, PlanId> = {
-  self_managed: 'self_managed',
-  facilities: 'facilities',
-  essentials: 'self_managed',
-  board: 'self_managed',
-  estate: 'facilities',
-  compliance_pro: 'self_managed',
-  community_plus: 'self_managed',
-  management_suite: 'facilities',
-  pm_addon: 'self_managed',
-};
-
-export function normalizePlan(tier: string): PlanId {
-  return PLAN_MAP[tier] || 'self_managed';
-}
-
-// ── Chargebee item-price ID helpers ──
-// In production, these come from environment variables.
-// The helpers build the expected Chargebee item-price-id strings.
-
-const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : ({} as Record<string, string>);
-
-export const CB_PRICE = {
-  selfManagedMonthly:  env.VITE_CB_PRICE_SELF_MANAGED_MONTHLY  || 'Compliance-Pro-USD-Monthly',
-  selfManagedAnnual:   env.VITE_CB_PRICE_SELF_MANAGED_ANNUAL   || 'Compliance-Pro-USD-Yearly',
-  facilitiesMonthly:   env.VITE_CB_PRICE_FACILITIES_MONTHLY    || 'Plus-Facilities-USD-Monthly',
-  facilitiesAnnual:    env.VITE_CB_PRICE_FACILITIES_ANNUAL     || 'Plus-Facilities-USD-Yearly',
-  onCallMonthly:       env.VITE_CB_PRICE_ON_CALL_MONTHLY       || 'On-Call-USD-Monthly',
-  onCallAnnual:        env.VITE_CB_PRICE_ON_CALL_ANNUAL        || 'On-Call-USD-Yearly',
-  pmSeatMonthly:       env.VITE_CB_PRICE_PM_SEAT_MONTHLY       || 'PM-Seat-USD-Monthly',
-  pmSeatAnnual:        env.VITE_CB_PRICE_PM_SEAT_ANNUAL        || 'PM-Seat-USD-Yearly',
-  setup:               env.VITE_CB_PRICE_SETUP                 || 'Setup-Fee-USD',
-} as const;
-
-export function planPriceId(plan: PlanId, interval: BillingInterval): string {
-  if (plan === 'facilities') {
-    return interval === 'annual' ? CB_PRICE.facilitiesAnnual : CB_PRICE.facilitiesMonthly;
-  }
-  return interval === 'annual' ? CB_PRICE.selfManagedAnnual : CB_PRICE.selfManagedMonthly;
-}
-
-export function onCallPriceId(_plan: PlanId, interval: BillingInterval): string {
-  return interval === 'annual' ? CB_PRICE.onCallAnnual : CB_PRICE.onCallMonthly;
-}
-
-export function pmSeatPriceId(interval: BillingInterval): string {
-  return interval === 'annual' ? CB_PRICE.pmSeatAnnual : CB_PRICE.pmSeatMonthly;
-}
-
-export function setupPriceId(_plan: PlanId): string {
-  return CB_PRICE.setup;
+// Reverse lookup: Stripe price ID → tier ID
+export const PRICE_TO_TIER: Record<string, SubscriptionTier> = {};
+for (const tier of TIERS) {
+  PRICE_TO_TIER[tier.stripePriceMonthly] = tier.id;
+  PRICE_TO_TIER[tier.stripePriceAnnual] = tier.id;
 }

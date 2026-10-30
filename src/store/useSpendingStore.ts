@@ -37,16 +37,6 @@ export interface FundingOption {
   monthlyPerUnit?: number;         // ongoing monthly per-unit impact
 }
 
-export interface CreateFromDrawerInput {
-  title: string;
-  amount: number;
-  category: SpendingApproval['category'];
-  priority: SpendingApproval['priority'];
-  fundingSource: 'operating' | 'reserves';
-  requestedBy: string;
-  spendingLimit: number;
-}
-
 interface SpendingState {
   approvals: SpendingApproval[];
   loadFromDb: (tenantId: string) => Promise<void>;
@@ -54,8 +44,6 @@ interface SpendingState {
   updateApproval: (id: string, updates: Partial<SpendingApproval>) => void;
   castVote: (id: string, member: string, vote: 'approve' | 'deny') => void;
   deleteApproval: (id: string) => void;
-  /** Convenience method used by SpendingDrawer. Creates vote item when above limit. */
-  createFromDrawer: (input: CreateFromDrawerInput) => void;
 }
 
 export const useSpendingStore = create<SpendingState>()(persist((set) => ({
@@ -110,40 +98,6 @@ export const useSpendingStore = create<SpendingState>()(persist((set) => ({
   deleteApproval: (id) => {
     set(s => ({ approvals: s.approvals.filter(a => a.id !== id) }));
     if (isBackendEnabled) spendingSvc.deleteApproval(id);
-  },
-
-  createFromDrawer: (input) => {
-    const needsVote = input.amount > input.spendingLimit;
-    const id = generateLocalId('sa');
-    const approval: SpendingApproval = {
-      id,
-      title: input.title,
-      description: '',
-      amount: input.amount,
-      category: input.category,
-      requestedBy: input.requestedBy,
-      status: 'pending',
-      priority: input.priority,
-      vendorName: '',
-      workOrderId: '',
-      votes: [],
-      threshold: input.spendingLimit,
-      notes: needsVote ? 'Requires board vote -- created from spending drawer' : '',
-      decidedAt: '',
-      fundingSource: input.fundingSource,
-      caseId: '',
-    };
-    set(s => ({ approvals: [approval, ...s.approvals] }));
-    const tid = getActiveTenantId();
-    if (isBackendEnabled && tid) {
-      const { id: _id, ...rest } = approval;
-      spendingSvc.createApproval(tid, rest).then(dbRow => {
-        if (dbRow) set(s => ({ approvals: s.approvals.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
-      }).catch(err => {
-        console.error('[syncWrite] createFromDrawer failed:', err);
-        set(s => ({ approvals: s.approvals.filter(x => x.id !== id) }));
-      });
-    }
   },
 }), {
   name: 'onetwo-spending',

@@ -1,6 +1,5 @@
 import { useState, Fragment } from 'react';
 import { usePlatformAdminStore, TIER_FEATURES, TENANT_ROLES, PERMISSION_ACTIONS, FEATURE_GROUPS, CORE_FEATURES, type SubscriptionTier, type Tenant } from '@/store/usePlatformAdminStore';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 
 const FEATURE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard', boardRoom: 'Board Room', building: 'The Building',
@@ -22,7 +21,6 @@ const ROLE_COLORS: Record<string, string> = {
 export default function PermissionsTab() {
   const store = usePlatformAdminStore();
   const { permissions } = store;
-  const { run: undoable } = useUndoableAction();
   const [selectedRole, setSelectedRole] = useState('board_member');
 
   const role = TENANT_ROLES.find(r => r.id === selectedRole)!;
@@ -30,10 +28,7 @@ export default function PermissionsTab() {
 
   const isFeatureAvailable = (featureId: string) => {
     if ((CORE_FEATURES as readonly string[]).includes(featureId)) return true;
-    if (role.requires === 'facilities') {
-      return TIER_FEATURES.facilities?.[featureId as keyof Tenant['features']] ?? false;
-    }
-    return Object.values(TIER_FEATURES).some(features => features[featureId as keyof Tenant['features']]);
+    return role.tiers.some(tier => TIER_FEATURES[tier][featureId as keyof Tenant['features']]);
   };
 
   const getPermission = (featureId: string) => {
@@ -80,7 +75,7 @@ export default function PermissionsTab() {
             <h4 className="font-bold text-ink-900 text-lg">{role.name}</h4>
             <p className="text-sm text-ink-600 mt-1">{role.description}</p>
             <div className="flex gap-6 mt-3">
-              <div><span className="text-xs text-ink-400 uppercase font-semibold">Requires</span><p className="font-bold text-ink-900">{role.requires === null ? 'Any plan' : role.requires === 'facilities' ? 'Plus Facilities' : 'PM Seat'}</p></div>
+              <div><span className="text-xs text-ink-400 uppercase font-semibold">Plans</span><p className="font-bold text-ink-900">{role.tiers.length}</p></div>
               <div><span className="text-xs text-ink-400 uppercase font-semibold">Features</span><p className="font-bold text-ink-900">{availableFeatures.length}</p></div>
               <div><span className="text-xs text-ink-400 uppercase font-semibold">Permissions</span><p className="font-bold text-ink-900">{totalPerms}</p></div>
             </div>
@@ -94,7 +89,7 @@ export default function PermissionsTab() {
           className="px-4 py-2 bg-sage-600 text-white rounded-lg text-sm font-medium hover:bg-sage-700">Grant All</button>
         <button onClick={() => store.bulkUpdatePermissions(selectedRole, 'viewonly')}
           className="px-4 py-2 bg-ink-100 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-200">Set View-Only</button>
-        <button onClick={() => { store.bulkUpdatePermissions(selectedRole, 'revoke'); undoable({ label: 'All permissions revoked', commit: () => {}, undo: () => store.bulkUpdatePermissions(selectedRole, 'grant') }); }}
+        <button onClick={() => { if (confirm('Revoke all permissions for this role?')) store.bulkUpdatePermissions(selectedRole, 'revoke'); }}
           className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">Revoke All</button>
       </div>
 

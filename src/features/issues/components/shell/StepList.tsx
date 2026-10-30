@@ -16,8 +16,6 @@ interface StepListProps {
   onToggleAdditionalStep?: (approachIdx: number, stepIdx: number) => void;
   onSelectAdditionalStep?: (approachIdx: number, stepIdx: number) => void;
   activeApproachIdx?: number | null;
-  /** When true, renders a denser layout for use inside drawers. */
-  compact?: boolean;
 }
 
 /**
@@ -27,7 +25,7 @@ interface StepListProps {
  * Done steps show green checkmark badge, pending steps show numbered badge.
  * Additional approaches are shown below the primary steps.
  */
-export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditionalStep, onSelectAdditionalStep, activeApproachIdx, compact = false }: StepListProps) {
+export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditionalStep, onSelectAdditionalStep, activeApproachIdx }: StepListProps) {
   const [collapsedApproaches, setCollapsedApproaches] = useState<Set<number>>(new Set());
 
   if (!steps || steps.length === 0) {
@@ -46,15 +44,10 @@ export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditiona
     });
   };
 
-  const badgeSize = compact ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-[11px]';
-  const itemPad = compact ? 'px-2 py-1.5' : 'px-2.5 py-2';
-  const textSize = compact ? 'text-[11px]' : 'text-[13px]';
-  const headerSize = compact ? 'text-[9px]' : 'text-[10px]';
-
   return (
-    <div className={compact ? 'px-2 pt-2 pb-1' : 'px-3 pt-3 pb-1.5'}>
+    <div className="px-3 pt-3 pb-1.5">
       {/* Primary approach header */}
-      <h3 className={`${headerSize} font-bold text-ink-400 uppercase tracking-wider mb-2 ml-1`}>
+      <h3 className="text-[10px] font-bold text-ink-400 uppercase tracking-wider mb-2 ml-1">
         {APPR_LABELS[c.approach]} Steps
         <span className="font-normal normal-case tracking-normal ml-1.5">
           {doneCount}/{steps.length}
@@ -71,27 +64,27 @@ export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditiona
             <button
               key={st.id || i}
               onClick={() => onSelectStep(i)}
-              className={`flex items-center gap-2.5 ${itemPad} rounded-lg text-left transition-all ${
+              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all ${
                 isActive
                   ? 'bg-ink-50 border border-ink-200 border-l-[3px] border-l-accent-500'
                   : 'border border-transparent hover:bg-ink-50'
               }`}
             >
               {/* Step badge */}
-              <span className={`${badgeSize} rounded-md flex items-center justify-center font-bold shrink-0 ${
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0 ${
                 isDone
                   ? 'bg-sage-500 text-white'
                   : isActive
                   ? 'bg-accent-50 text-accent-600 border border-accent-200'
                   : 'bg-ink-50 text-ink-400 border border-ink-200'
               }`}>
-                {isDone ? '\u2713' : i + 1}
+                {isDone ? '✓' : i + 1}
               </span>
 
               {/* Step text */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className={`${textSize} leading-tight truncate ${
+                  <p className={`text-[13px] leading-tight truncate ${
                     isDone
                       ? 'text-ink-400 line-through'
                       : isActive
@@ -199,12 +192,4 @@ export function StepList({ c, steps, activeStep, onSelectStep, onToggleAdditiona
       })}
     </div>
   );
-}
-
-/**
- * Return the index of the first incomplete step, or 0 if all are done.
- */
-export function currentStepIndex(steps: CaseStep[]): number {
-  const idx = steps.findIndex(s => !s.done);
-  return idx === -1 ? 0 : idx;
 }

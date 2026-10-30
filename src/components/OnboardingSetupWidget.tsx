@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTenantContext } from './TenantProvider';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { useAuthStore } from '@/store/useAuthStore';
 import { SETUP_STEPS, type CompletionContext, type StepConfig, type SubTaskConfig } from '@/features/setup/setup-steps';
 
 const DISMISS_KEY = 'onetwo_onboarding_dismissed';
@@ -21,7 +20,6 @@ export default function OnboardingSetupWidget() {
   const tenant = useTenantContext();
   const building = useBuildingStore();
   const financial = useFinancialStore();
-  const { currentUser, buildingMembers } = useAuthStore();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === 'true');
   const [expanded, setExpanded] = useState(false);
@@ -45,11 +43,7 @@ export default function OnboardingSetupWidget() {
     hasDetails: !!(building.details?.yearBuilt && building.details?.totalUnits),
     insuranceCount: building.insurance?.length ?? 0,
     vendorCount: building.vendors?.filter(v => v.status === 'active')?.length ?? 0,
-    // Profile completion fields (deferred from simplified signup)
-    hasPhone: !!currentUser.phone,
-    hasBoardTitle: !!buildingMembers.find(m => m.id === currentUser.id)?.boardTitle,
-    hasFullAddress: !!(tenant.address?.city && tenant.address?.state && tenant.address?.zip),
-  }), [tenant.onboarding, building, financial, currentUser, buildingMembers, tenant.address]);
+  }), [tenant.onboarding, building, financial]);
 
   // Compute step states
   const steps: StepState[] = useMemo(() => {

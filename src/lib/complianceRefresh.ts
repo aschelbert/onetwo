@@ -11,7 +11,6 @@
 
 import { getJurisdictionData } from '@/data/jurisdictions';
 import type { JurisdictionCoverage, JurisdictionData } from '@/data/jurisdictions';
-import { toBoardRoleKey, type BoardRoleKey } from '@/types/auth';
 
 export type FiduciaryDuty = 'care' | 'loyalty' | 'obedience';
 
@@ -23,8 +22,6 @@ export interface ComplianceItem {
   whyItMatters: string; consequence: string; howTo: string[];
   fiduciaryDuty: FiduciaryDuty;
   scope: 'governance' | 'operations';
-  primaryRole?: BoardRoleKey;
-  backstopRole?: BoardRoleKey;
 }
 
 export interface ComplianceCategory {
@@ -176,17 +173,6 @@ export function refreshComplianceRequirements(input: RefreshInput): RefreshResul
   if (hasCCRs) regulatoryNotes.push('CC&Rs/Declaration detected — declaration-specific checks enabled.');
   if (!hasBylaws) regulatoryNotes.push('⚠ No bylaws uploaded — some checks use generic references. Upload bylaws for accuracy.');
   regulatoryNotes.push(...jd.regulatoryNotes);
-
-  // Derive primaryRole from the existing role string at load time
-  for (const cat of categories) {
-    for (const item of cat.items) {
-      item.primaryRole = toBoardRoleKey(item.role);
-      // backstopRole: president backstops everything except president items
-      if (item.primaryRole !== 'president') {
-        item.backstopRole = 'president';
-      }
-    }
-  }
 
   return { categories, refreshedAt: new Date().toISOString(), jurisdiction, documentsDetected, regulatoryNotes, coverage: jd.coverage };
 }

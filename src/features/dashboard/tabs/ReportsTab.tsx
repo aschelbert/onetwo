@@ -8,7 +8,6 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
-import { useUndoableAction } from '@/hooks/useUndoableAction';
 import Modal from '@/components/ui/Modal';
 import { fmt } from '@/lib/formatters';
 
@@ -164,7 +163,6 @@ export function buildBoardPacketSnapshot(
 export default function ReportsTab() {
   const { configs, reports, addConfig, updateConfig, deleteConfig, addReport, deleteReport } = useReportStore();
   const { currentUser } = useAuthStore();
-  const { run: undoable } = useUndoableAction();
   const fin = useFinancialStore();
   const comp = useComplianceStore();
   const issues = useIssuesStore();
@@ -400,8 +398,9 @@ export default function ReportsTab() {
                           </button>
                           <button
                             onClick={() => {
-                              deleteConfig(config.id);
-                              undoable({ label: 'Configuration deleted', commit: () => {}, undo: () => {} });
+                              if (confirm(`Delete configuration "${config.name}"?`)) {
+                                deleteConfig(config.id);
+                              }
                             }}
                             className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium"
                           >
@@ -467,9 +466,10 @@ export default function ReportsTab() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteReport(report.id);
-                              if (expandedReport === report.id) setExpandedReport(null);
-                              undoable({ label: 'Report deleted', commit: () => {}, undo: () => {} });
+                              if (confirm('Delete this generated report?')) {
+                                deleteReport(report.id);
+                                if (expandedReport === report.id) setExpandedReport(null);
+                              }
                             }}
                             className="px-3 py-1.5 text-red-400 hover:text-red-600 text-xs font-medium"
                           >
