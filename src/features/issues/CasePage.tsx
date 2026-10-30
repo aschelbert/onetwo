@@ -321,7 +321,7 @@ export default function CasePage({ caseId, inline, onBack }: CasePageProps) {
                 {steps.map((step, i) => (
                   <button
                     key={step.id || i}
-                    onClick={() => store.toggleStep(caseId, i)}
+                    onClick={() => setStepDrawerIdx(i)}
                     className="flex items-center gap-2 w-full text-left px-2 py-1.5 rounded-md hover:bg-ink-50 transition-colors"
                   >
                     <span
@@ -342,6 +342,7 @@ export default function CasePage({ caseId, inline, onBack }: CasePageProps) {
                     >
                       {step.s}
                     </span>
+                    <ChevronRight size={12} className="text-ink-300 ml-auto shrink-0" />
                   </button>
                 ))}
               </div>
