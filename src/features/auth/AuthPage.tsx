@@ -652,7 +652,7 @@ export default function AuthPage() {
   const handleCheckout = async () => {
     if (!isBackendEnabled || !supabase) {
       // Demo mode fallback — skip payment
-      setAuthStep('signup-building');
+      handleCompleteOnboarding();
       return;
     }
 
@@ -771,6 +771,52 @@ export default function AuthPage() {
     login(newMember);
   };
 
+  // Shared Order Summary component (used in both signup steps)
+  const OrderSummary = ({ showBuilding = false }: { showBuilding?: boolean }) => {
+    const currentTier = TIERS.find(t => t.id === selectedTier);
+    const tierPrice = billingInterval === 'annual' ? (currentTier?.annual ?? 0) : (currentTier?.monthly ?? 0);
+    const addOnTotal = ADDONS.filter(a => selectedAddOns.has(a.id)).reduce((sum, a) => sum + (billingInterval === 'annual' ? a.annual : a.monthly), 0);
+    const grandTotal = tierPrice + addOnTotal;
+    const interval = billingInterval === 'annual' ? '/yr' : '/mo';
+
+    return (
+      <div className="bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-5 text-white">
+        <p className="text-xs font-semibold text-accent-300 uppercase tracking-wide mb-3">Order Summary</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-200">{currentTier?.name}</span>
+            <span className="text-sm font-bold">${tierPrice.toLocaleString()}{interval}</span>
+          </div>
+          {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
+            <div key={addon.id} className="flex items-center justify-between">
+              <span className="text-sm text-ink-300">+ {addon.name}</span>
+              <span className="text-sm font-bold">${(billingInterval === 'annual' ? addon.annual : addon.monthly).toLocaleString()}{interval}</span>
+            </div>
+          ))}
+          <div className="border-t border-ink-600 pt-2 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">Total</span>
+              <span className="text-lg font-bold text-accent-300">${grandTotal.toLocaleString()}{interval}</span>
+            </div>
+            <p className="text-[10px] text-ink-400 text-right mt-0.5">Before applicable tax</p>
+            {billingInterval === 'annual' && (
+              <p className="text-[10px] text-ink-400 text-right mt-0.5">${Math.round(grandTotal / 12)}/mo billed annually</p>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-ink-600">
+          <p className="text-xs text-ink-300">{trialDays}-day free trial · Cancel anytime</p>
+        </div>
+        {showBuilding && bldgName && (
+          <div className="mt-3 pt-3 border-t border-ink-600">
+            <p className="text-xs text-ink-300">{bldgName}</p>
+            {bldgSubdomain && <p className="text-xs text-ink-400 font-mono">{bldgSubdomain}.getonetwo.com</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (sessionChecking) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-mist-100 via-white to-sage-50">
@@ -784,7 +830,7 @@ export default function AuthPage() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-gradient-to-br from-ink-50 via-white to-mist-50 flex items-center justify-center overflow-y-auto py-8">
-      <div className={`w-full mx-4 ${authStep === 'signup-plan' ? 'max-w-3xl' : 'max-w-md'}`}>
+      <div className={`w-full mx-4 ${(authStep === 'signup-plan' || authStep === 'signup-building') ? 'max-w-3xl' : 'max-w-md'}`}>
 
         {/* ══════ WELCOME ══════ */}
         {authStep === 'welcome' && (
@@ -969,39 +1015,56 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ SIGNUP — ACCOUNT & PLAN ══════ */}
-        {authStep === 'signup-plan' && (() => {
-          const currentTier = TIERS.find(t => t.id === selectedTier);
-          const tierPrice = billingInterval === 'annual' ? (currentTier?.annual ?? 0) : (currentTier?.monthly ?? 0);
-          const addOnTotal = ADDONS.filter(a => selectedAddOns.has(a.id)).reduce((sum, a) => sum + (billingInterval === 'annual' ? a.annual : a.monthly), 0);
-          const grandTotal = tierPrice + addOnTotal;
-          const interval = billingInterval === 'annual' ? '/yr' : '/mo';
-          return (
+        {/* ══════ SIGNUP — BUILDING & PLAN (Step 1 of 2) ══════ */}
+        {authStep === 'signup-plan' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={0} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Create Your Account</h2>
+            <StepIndicator steps={['Building & Plan', 'Your Account']} current={0} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-1">Building & Plan</h2>
             <p className="text-sm text-ink-400 text-center mb-6">{trialDays}-day free trial on all plans. Cancel anytime.</p>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* Left column — Account + Plan selection */}
+              {/* Left column — Building + Plan selection */}
               <div className="lg:col-span-3 space-y-3">
-                {/* Name */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
-                    <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
-                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
+                {/* Building Name */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
+                  <input value={bldgName} onChange={e => setBldgName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" autoFocus /></div>
+                {/* Subdomain */}
+                <div>
+                  <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
+                  <div className="flex items-center gap-0">
+                    <input value={bldgSubdomain}
+                      onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
+                      className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
+                        subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
+                        subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
+                        'border-ink-200'
+                      }`}
+                      placeholder="sunnyacres" />
+                    <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
+                  </div>
+                  <div className="mt-1 h-4">
+                    {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
+                    {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">&#10003; {bldgSubdomain}.getonetwo.com is available</p>}
+                    {subdomainStatus === 'taken' && <p className="text-xs text-red-600">&#10007; Already taken — try a different name</p>}
+                    {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
+                  </div>
                 </div>
-                {/* Email & Password */}
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                  <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
-                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                {/* Street Address */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
+                  <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" /></div>
+                {/* City/State/ZIP */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">City</label>
+                    <input value={bldgCity} onChange={e => setBldgCity(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="City" /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">State</label>
+                    <input value={bldgState} onChange={e => setBldgState(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="DC" maxLength={2} /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">ZIP</label>
+                    <input value={bldgZip} onChange={e => setBldgZip(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="20001" /></div>
                 </div>
+                {/* Total Units */}
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
+                  <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" /></div>
 
                 {/* Billing Interval Toggle */}
                 <div className="flex items-center justify-center pt-2">
@@ -1032,14 +1095,7 @@ export default function AuthPage() {
                             <p className="text-[10px] text-ink-400">Billed ${annualTotal.toLocaleString()}/yr</p>
                           )}
                         </div>
-                        <p className="text-[11px] text-ink-400 italic mb-2">{tier.tagline}</p>
-                        <ul className="space-y-1">
-                          {tier.features.map(f => (
-                            <li key={f} className="text-xs text-ink-500 flex items-start gap-1.5">
-                              <span className="text-sage-500 mt-0.5">✓</span> {f}
-                            </li>
-                          ))}
-                        </ul>
+                        <p className="text-[11px] text-ink-400 italic">{tier.tagline}</p>
                       </button>
                     );
                   })}
@@ -1062,7 +1118,7 @@ export default function AuthPage() {
                               <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
                                 selected ? 'bg-accent-500 border-accent-500' : 'border-ink-300'
                               }`}>
-                                {selected && <span className="text-white text-[10px]">✓</span>}
+                                {selected && <span className="text-white text-[10px]">&#10003;</span>}
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-ink-900">{addon.name}</p>
@@ -1081,43 +1137,18 @@ export default function AuthPage() {
               {/* Right column — Order Summary */}
               <div className="lg:col-span-2">
                 <div className="lg:sticky lg:top-8 space-y-4">
-                  <div className="bg-gradient-to-br from-ink-900 to-ink-700 rounded-xl p-5 text-white">
-                    <p className="text-xs font-semibold text-accent-300 uppercase tracking-wide mb-3">Order Summary</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-ink-200">{currentTier?.name}</span>
-                        <span className="text-sm font-bold">${tierPrice.toLocaleString()}{interval}</span>
-                      </div>
-                      {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
-                        <div key={addon.id} className="flex items-center justify-between">
-                          <span className="text-sm text-ink-300">+ {addon.name}</span>
-                          <span className="text-sm font-bold">${(billingInterval === 'annual' ? addon.annual : addon.monthly).toLocaleString()}{interval}</span>
-                        </div>
-                      ))}
-                      <div className="border-t border-ink-600 pt-2 mt-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold">Total</span>
-                          <span className="text-lg font-bold text-accent-300">${grandTotal.toLocaleString()}{interval}</span>
-                        </div>
-                        {billingInterval === 'annual' && (
-                          <p className="text-[10px] text-ink-400 text-right mt-0.5">${Math.round(grandTotal / 12)}/mo billed annually</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-ink-600">
-                      <p className="text-xs text-ink-300">{trialDays}-day free trial · Cancel anytime</p>
-                    </div>
-                  </div>
+                  <OrderSummary />
 
                   <button onClick={() => {
-                      if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
-                      if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
-                      if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                      if (!bldgName.trim()) { alert('Please enter your building name.'); return; }
+                      if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
+                      if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
+                      if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
+                      if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
                       setAuthStep('signup-building');
                     }}
                     className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
-                    Continue with {currentTier?.name} →
+                    Continue →
                   </button>
 
                   <div className="text-center space-y-2">
@@ -1128,122 +1159,81 @@ export default function AuthPage() {
               </div>
             </div>
           </div>
-          );
-        })()}
+        )}
 
-        {/* ══════ SIGNUP — BUILDING INFO ══════ */}
+        {/* ══════ SIGNUP — YOUR ACCOUNT (Step 2 of 2) ══════ */}
         {authStep === 'signup-building' && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
-            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={1} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Building Information</h2>
-            <div className="space-y-3">
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
-                <input value={bldgName} onChange={e => setBldgName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" /></div>
-              <div>
-                <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
-                <div className="flex items-center gap-0">
-                  <input value={bldgSubdomain}
-                    onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
-                    className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
-                      subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
-                      subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
-                      'border-ink-200'
-                    }`}
-                    placeholder="sunnyacres" />
-                  <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
-                </div>
-                <div className="mt-1 h-4">
-                  {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
-                  {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">✓ {bldgSubdomain}.getonetwo.com is available</p>}
-                  {subdomainStatus === 'taken' && <p className="text-xs text-red-600">✗ Already taken — try a different name</p>}
-                  {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
-                </div>
-              </div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
-                <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" /></div>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">City</label>
-                  <input value={bldgCity} onChange={e => setBldgCity(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="City" /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">State</label>
-                  <input value={bldgState} onChange={e => setBldgState(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="DC" maxLength={2} /></div>
-                <div><label className="block text-xs font-medium text-ink-700 mb-1">ZIP</label>
-                  <input value={bldgZip} onChange={e => setBldgZip(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="20001" /></div>
-              </div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
-                <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number" className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" /></div>
-              <button onClick={() => {
-                  if (!bldgName) { alert('Please enter your building name.'); return; }
-                  if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
-                  if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
-                  if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
-                  if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
-                  setAuthStep('signup-checkout');
-                }}
-                className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Continue →</button>
-            </div>
-            <div className="mt-4 text-center"><a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
-          </div>
-        )}
+            <StepIndicator steps={['Building & Plan', 'Your Account']} current={1} />
+            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Your Account</h2>
 
-        {/* ══════ SIGNUP — CHECKOUT ══════ */}
-        {authStep === 'signup-checkout' && (
-          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
-            <Logo />
-            <StepIndicator steps={['Account & Plan','Building','Checkout']} current={2} />
-            <h2 className="font-display text-lg font-bold text-ink-900 text-center mb-4">Final Details</h2>
-            <div className="space-y-3">
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
-                <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
-                <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" /></div>
-              <div><label className="block text-xs font-medium text-ink-700 mb-1">Board Role</label>
-                <select value={boardTitle} onChange={e => setBoardTitle(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
-                  <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option>
-                </select></div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Left column — Account fields */}
+              <div className="lg:col-span-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
+                    <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
+                    <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
+                </div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
+                  <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                </div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
+                  <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
+                  <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" /></div>
+                <div><label className="block text-xs font-medium text-ink-700 mb-1">Association Role</label>
+                  <select value={boardTitle} onChange={e => setBoardTitle(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
+                    <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option><option>Unit Owner</option>
+                  </select></div>
+              </div>
 
-              {/* Summary */}
-              <div className="bg-mist-50 border border-mist-200 rounded-xl p-4 mt-2">
-                <p className="text-xs font-semibold text-ink-400 uppercase mb-2">Order Summary</p>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-ink-700">{TIERS.find(t => t.id === selectedTier)?.name}</span>
-                  {billingInterval === 'annual' ? (
-                    <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.annual.toLocaleString()}/yr</span>
+              {/* Right column — Order Summary */}
+              <div className="lg:col-span-2">
+                <div className="lg:sticky lg:top-8 space-y-4">
+                  <OrderSummary showBuilding />
+
+                  {isBackendEnabled ? (
+                    <button onClick={() => {
+                        if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
+                        if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
+                        if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                        if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                        handleCheckout();
+                      }} disabled={checkoutLoading}
+                      className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50">
+                      {checkoutLoading ? 'Setting up...' : 'Start Free Trial \u2192 Checkout'}
+                    </button>
                   ) : (
-                    <span className="font-bold text-ink-900">${TIERS.find(t => t.id === selectedTier)?.monthly}/mo</span>
+                    <button onClick={() => {
+                        if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
+                        if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
+                        if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                        if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                        handleCompleteOnboarding();
+                      }}
+                      className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700">
+                      {'Create Account & Enter \u2192'}
+                    </button>
                   )}
-                </div>
-                {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
-                  <div key={addon.id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink-500">+ {addon.name}</span>
-                    {billingInterval === 'annual' ? (
-                      <span className="font-bold text-ink-900">${addon.annual.toLocaleString()}/yr</span>
-                    ) : (
-                      <span className="font-bold text-ink-900">${addon.monthly}/mo</span>
-                    )}
-                  </div>
-                ))}
-                <div className="flex items-center justify-between text-xs text-ink-400 mt-1">
-                  <span>{bldgName || 'Your building'} · {billingInterval === 'annual' ? 'Annual' : 'Monthly'} billing</span>
-                  <span>{trialDays}-day free trial</span>
-                </div>
-                {bldgSubdomain && <p className="text-xs text-ink-400 mt-1">URL: <span className="font-mono text-ink-600">{bldgSubdomain}.getonetwo.com</span></p>}
-              </div>
+                  <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to secure checkout. No charge during your {trialDays}-day trial.</p>
 
-              {isBackendEnabled ? (
-                <button onClick={handleCheckout} disabled={checkoutLoading}
-                  className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2 disabled:opacity-50">
-                  {checkoutLoading ? 'Setting up...' : `Start Free Trial → Checkout`}
-                </button>
-              ) : (
-                <button onClick={handleCompleteOnboarding}
-                  className="w-full py-3 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 mt-2">Create Account & Enter →</button>
-              )}
-              <p className="text-center text-[10px] text-ink-400">You&apos;ll be redirected to secure checkout. No charge during your {trialDays}-day trial.</p>
+                  <div className="text-center">
+                    <a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Building & Plan</a>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="mt-4 text-center"><a onClick={() => setAuthStep('signup-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">← Back</a></div>
           </div>
         )}
+
 
       </div>
     </div>
