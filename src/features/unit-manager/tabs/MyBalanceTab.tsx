@@ -102,12 +102,12 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
               {totalLateFees > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Late Fees</span><span className="font-medium text-red-600">{fmt(totalLateFees)}</span></div>}
               {totalSA > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Special Assessments</span><span className="font-medium text-amber-600">{fmt(totalSA)}</span></div>}
               <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between"><span className="font-semibold text-ink-900">Total Due</span><span className="font-display text-2xl font-bold text-ink-900">{fmt(totalOwed + totalSA)}</span></div>
+                <div className="flex justify-between"><span className="font-semibold text-ink-900">Total Due</span><span className="font-display text-2xl font-bold text-ink-900">{fmt(totalOwed)}</span></div>
               </div>
             </div>
-            {totalOwed + totalSA > 0 ? (
-              <button onClick={() => handleStripePayment(totalOwed + totalSA, `Unit ${activeUnit.number} — Full Balance`, () => { recordUnitPayment(activeUnit.number, totalOwed, 'stripe'); unpaidSA.forEach(sa => markSpecialAssessmentPaid(activeUnit.number, sa.id)); })} className="w-full mt-3 py-3.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-base transition-all hover:shadow-md flex items-center justify-center gap-2">
-                <StripeIcon /> Pay {fmt(totalOwed + totalSA)} Now
+            {totalOwed > 0 ? (
+              <button onClick={() => handleStripePayment(totalOwed, `Unit ${activeUnit.number} — Full Balance`, () => { recordUnitPayment(activeUnit.number, totalOwed, 'stripe'); unpaidSA.forEach(sa => markSpecialAssessmentPaid(activeUnit.number, sa.id)); })} className="w-full mt-3 py-3.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-base transition-all hover:shadow-md flex items-center justify-center gap-2">
+                <StripeIcon /> Pay {fmt(totalOwed)} Now
               </button>
             ) : (
               <div className="text-center mt-3 py-3 text-sage-600 font-medium text-sm">✓ No balance due — you're all set!</div>
