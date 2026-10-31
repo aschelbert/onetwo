@@ -766,42 +766,59 @@ export default function AuthPage() {
 
       const currentSession = session;
       console.log('[checkout] Opening Chargebee Drop-in...');
+
+      // Track hostedPage errors separately since Chargebee swallows them
+      let hostedPageError: string | null = null;
+
       cbInstanceRef.current.openCheckout({
         hostedPage: async () => {
-          console.log('[checkout] Fetching hosted page from edge function...');
-          const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${currentSession.access_token}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-              },
-              body: JSON.stringify({
-                plan: selectedTier,
-                interval: billingInterval,
-                onCall: selectedAddOns.has('on_call'),
-                pmSeat: selectedAddOns.has('pm_seat'),
-                building: {
-                  name: bldgName,
-                  subdomain: bldgSubdomain,
-                  address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
-                  totalUnits: parseInt(bldgUnits) || 0,
-                  contactName: `${firstName} ${lastName}`.trim(),
-                  boardTitle,
-                  firstName: firstName.trim(),
-                  lastName: lastName.trim(),
+          try {
+            console.log('[checkout] Fetching hosted page from edge function...');
+            const res = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${currentSession.access_token}`,
+                  'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
                 },
-                origin: window.location.origin,
-              }),
+                body: JSON.stringify({
+                  plan: selectedTier,
+                  interval: billingInterval,
+                  onCall: selectedAddOns.has('on_call'),
+                  pmSeat: selectedAddOns.has('pm_seat'),
+                  building: {
+                    name: bldgName,
+                    subdomain: bldgSubdomain,
+                    address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+                    totalUnits: parseInt(bldgUnits) || 0,
+                    contactName: `${firstName} ${lastName}`.trim(),
+                    boardTitle,
+                    firstName: firstName.trim(),
+                    lastName: lastName.trim(),
+                  },
+                  origin: window.location.origin,
+                }),
+              }
+            );
+            const data = await res.json();
+            console.log('[checkout] Edge function response:', JSON.stringify(data).slice(0, 500));
+            if (data.error) {
+              hostedPageError = data.error;
+              throw new Error(data.error);
             }
-          );
-          const data = await res.json();
-          console.log('[checkout] Edge function response:', data);
-          if (data.error) throw new Error(data.error);
-          if (!data.hosted_page) throw new Error('No hosted_page in response');
-          return data.hosted_page;
+            if (!data.hosted_page) {
+              hostedPageError = 'No hosted_page in response: ' + JSON.stringify(data).slice(0, 200);
+              throw new Error(hostedPageError);
+            }
+            console.log('[checkout] hosted_page id:', data.hosted_page.id, 'embed:', data.hosted_page.embed);
+            return data.hosted_page;
+          } catch (e: any) {
+            hostedPageError = hostedPageError || e.message || String(e);
+            console.error('[checkout] hostedPage callback error:', hostedPageError);
+            throw e;
+          }
         },
         success: async (_hostedPageId: string) => {
           console.log('[checkout] Checkout success, polling for tenant...');
@@ -814,8 +831,9 @@ export default function AuthPage() {
           setCheckoutLoading(false);
         },
         error: (error: any) => {
-          console.error('[checkout] Chargebee checkout error:', error);
-          alert('Checkout failed: ' + (error?.message || 'Unknown error'));
+          const detail = hostedPageError || error?.message || JSON.stringify(error);
+          console.error('[checkout] Chargebee error:', detail, error);
+          alert('Checkout failed: ' + detail);
           setCheckoutLoading(false);
         },
       });
