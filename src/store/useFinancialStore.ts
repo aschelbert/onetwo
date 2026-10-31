@@ -96,7 +96,7 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
-  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string, caseId?: string) => UnitInvoice;
+  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string, caseId?: string, dueDate?: string) => UnitInvoice;
   payUnitInvoice: (invoiceId: string, method: string) => void;
 
   // CoA mutations
@@ -935,16 +935,16 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   // Unit Invoices
-  createUnitInvoice: (unitNum, type, amount, description, caseId?) => {
+  createUnitInvoice: (unitNum, type, amount, description, caseId?, dueDate?) => {
     const today = new Date().toISOString().split('T')[0];
-    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const effectiveDueDate = dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const id = generateLocalId('INV-U');
     const m = get().glAccountMapping;
     const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type, m);
     const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
     const invoice: UnitInvoice = {
       id, unitNumber: unitNum, type, description, amount,
-      status: 'sent', createdDate: today, dueDate, paidDate: null,
+      status: 'sent', createdDate: today, dueDate: effectiveDueDate, paidDate: null,
       paidAmount: null, paymentMethod: null, stripePaymentLink: null,
       glEntryId: glEntry?.id || null, paymentGlEntryId: null,
       ...(caseId ? { caseId } : {}),

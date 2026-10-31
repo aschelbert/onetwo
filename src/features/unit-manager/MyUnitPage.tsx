@@ -77,7 +77,11 @@ export default function MyUnitPage() {
   const totalSA = unpaidSA.reduce((s, a) => s + a.amount, 0);
   const totalOwed = activeUnit.balance + totalLateFees;
   const totalPaid = activeUnit.payments.reduce((s, p) => s + p.amount, 0);
-  const isDelinquent = activeUnit.balance > 0;
+  const today = new Date().toISOString().split('T')[0];
+  const overdueInvoices = store.unitInvoices.filter(
+    i => i.unitNumber === activeUnit.number && i.status !== 'paid' && i.status !== 'void' && i.dueDate < today
+  );
+  const isDelinquent = overdueInvoices.reduce((sum, i) => sum + i.amount, 0) > 0;
 
   const TABS: { id: MyUnitTab; label: string }[] = [
     { id: 'balance', label: 'Balance & Payments' },
@@ -136,7 +140,7 @@ export default function MyUnitPage() {
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className={`text-2xl font-bold ${isDelinquent ? 'text-red-600' : 'text-sage-600'}`}>{fmt(totalOwed + totalSA)}</p>
+              <p className={`text-2xl font-bold ${isDelinquent ? 'text-red-600' : 'text-sage-600'}`}>{fmt(totalOwed)}</p>
               <p className="text-xs text-ink-400">{isDelinquent ? 'total owed' : 'balance'}</p>
             </div>
           </div>

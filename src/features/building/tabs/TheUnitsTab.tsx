@@ -4,7 +4,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
-import type { Unit } from '@/types/financial';
+import type { Unit, UnitInvoice } from '@/types/financial';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -13,12 +13,17 @@ type ModalKind = null | 'addUnit' | 'editUnit' | 'pay' | 'fee' | 'special' | 'de
 type SortKey = 'number' | 'owner' | 'balance' | 'accountStatus';
 type AccountFilter = 'all' | 'current' | 'behind' | 'delinquent' | 'for_sale';
 
-function getAccountStatus(u: Unit): { label: string; color: string; sortOrder: number } {
+function getAccountStatus(u: Unit, invoices: UnitInvoice[]): { label: string; color: string; sortOrder: number } {
   if (u.status === 'FOR_SALE') return { label: 'For Sale', color: 'bg-yellow-100 text-yellow-700', sortOrder: 4 };
   if (u.status === 'UNDER_CONTRACT') return { label: 'Under Contract', color: 'bg-blue-100 text-blue-700', sortOrder: 5 };
   if (u.status === 'TRANSFER_PENDING') return { label: 'Transfer Pending', color: 'bg-purple-100 text-purple-700', sortOrder: 6 };
-  if (u.balance === 0) return { label: 'Current', color: 'bg-sage-100 text-sage-700', sortOrder: 0 };
-  const monthsBehind = Math.ceil(u.balance / u.monthlyFee);
+  const today = new Date().toISOString().split('T')[0];
+  const unitInvoices = invoices.filter(i => i.unitNumber === u.number && i.status !== 'paid' && i.status !== 'void');
+  const overdueBalance = unitInvoices
+    .filter(i => i.dueDate < today)
+    .reduce((sum, i) => sum + i.amount, 0);
+  if (overdueBalance === 0) return { label: 'Current', color: 'bg-sage-100 text-sage-700', sortOrder: 0 };
+  const monthsBehind = Math.ceil(overdueBalance / u.monthlyFee);
   if (monthsBehind <= 1) return { label: '1 Month Behind', color: 'bg-yellow-100 text-yellow-700', sortOrder: 1 };
   if (monthsBehind <= 2) return { label: '2 Months Behind', color: 'bg-orange-100 text-orange-700', sortOrder: 2 };
   return { label: 'Delinquent', color: 'bg-red-100 text-red-700', sortOrder: 3 };
@@ -101,7 +106,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
   }
   filtered.sort((a, b) => {
     if (sort === 'balance') return b.balance - a.balance;
-    if (sort === 'accountStatus') return getAccountStatus(a).sortOrder - getAccountStatus(b).sortOrder;
+    if (sort === 'accountStatus') return getAccountStatus(a, store.unitInvoices).sortOrder - getAccountStatus(b, store.unitInvoices).sortOrder;
     if (sort === 'owner') return a.owner.localeCompare(b.owner);
     return a.number.localeCompare(b.number);
   });
@@ -240,7 +245,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const reason = f('reason');
     setSending(true);
     store.addSpecialAssessment(selected, amount, reason);
-    const invoice = store.createUnitInvoice(selected, 'special_assessment', amount, `Special Assessment: ${reason}`);
+    const invoice = store.createUnitInvoice(selected, 'special_assessment', amount, `Special Assessment: ${reason}`, undefined, f('dueDate') || undefined);
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Special Assessment: ${reason}`, 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
@@ -259,7 +264,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     let sentCount = 0;
     for (const unitNum of selectedUnits) {
       store.addSpecialAssessment(unitNum, amount, reason);
-      const invoice = store.createUnitInvoice(unitNum, 'special_assessment', amount, `Special Assessment: ${reason}`);
+      const invoice = store.createUnitInvoice(unitNum, 'special_assessment', amount, `Special Assessment: ${reason}`, undefined, f('dueDate') || undefined);
       const result = await sendInvoiceEmail(invoice.id, unitNum, amount, `Special Assessment: ${reason}`, 'special_assessment');
       if (result.sent) sentCount++;
     }
@@ -272,7 +277,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
     const amount = parseFloat(f('amount'));
     setSending(true);
     store.addSpecialAssessment(f('unitNum'), amount, f('description'));
-    const invoice = store.createUnitInvoice(f('unitNum'), 'special_assessment', amount, f('description'));
+    const invoice = store.createUnitInvoice(f('unitNum'), 'special_assessment', amount, f('description'), undefined, f('dueDate') || undefined);
     const result = await sendInvoiceEmail(invoice.id, f('unitNum'), amount, f('description'), 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === f('unitNum'));
@@ -438,7 +443,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
           </thead>
           <tbody>
             {filtered.map(u => {
-              const acct = getAccountStatus(u);
+              const acct = getAccountStatus(u, store.unitInvoices);
               const activeFees = u.lateFees.filter(lf => !lf.waived).length;
               const unitUnpaidSA = u.specialAssessments.filter(a => !a.paid).length;
               const lastPay = u.payments.length > 0 ? [...u.payments].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
@@ -483,7 +488,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <div className="border-b p-6 flex items-center justify-between">
                 <div>
-                  <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-ink-900">Unit {selectedUnit.number}</h2><span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${getAccountStatus(selectedUnit).color}`}>{getAccountStatus(selectedUnit).label}</span></div>
+                  <div className="flex items-center gap-3"><h2 className="text-xl font-bold text-ink-900">Unit {selectedUnit.number}</h2><span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${getAccountStatus(selectedUnit, store.unitInvoices).color}`}>{getAccountStatus(selectedUnit, store.unitInvoices).label}</span></div>
                   <p className="text-sm text-ink-400">{selectedUnit.owner} · {selectedUnit.email}</p>
                   <p className="text-xs text-ink-300 mt-1">{unitAddr}</p>
                 </div>
@@ -604,15 +609,15 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
 
       {modal === 'fee' && <Modal title={`Impose Fee — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleFee} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A fee invoice will be created, recorded in the GL, and emailed to the unit owner.</p>{field('Amount *', 'amount', 'number', '25')}{field('Reason *', 'reason', 'text', 'e.g., Late payment — Feb 2026')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
-      {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p>{field('Amount *', 'amount', 'number', '500')}{field('Reason *', 'reason', 'text', 'e.g., Roof emergency repair assessment')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
+      {modal === 'special' && <Modal title={`Special Assessment — Unit ${selected}`} onClose={() => { setModal(null); resetForm(); }} onSave={handleSpecial} saveLabel={sending ? 'Sending...' : 'Save'}><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">A special assessment invoice will be created, recorded in the GL, and emailed to the unit owner with a Stripe payment link.</p>{field('Amount *', 'amount', 'number', '500')}{field('Reason *', 'reason', 'text', 'e.g., Roof emergency repair assessment')}{field('Due Date', 'dueDate', 'date')}{sending && <div className="flex items-center gap-2 text-xs text-accent-600"><span className="animate-spin">⏳</span> Sending invoice email...</div>}</div></Modal>}
 
       {modal === 'editDueDay' && <Modal title="Assessment Due Day" onClose={() => { setModal(null); resetForm(); }} onSave={() => { store.setHoaDueDay(parseInt(f('dueDay')) || 1); setModal(null); resetForm(); }}><div className="space-y-3"><p className="text-xs text-ink-500">Set the day of the month when monthly assessments are due.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Due Day (1-28)</label><input type="number" min="1" max="28" value={f('dueDay')} onChange={e => sf('dueDay', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
       {modal === 'editMonthly' && <Modal title="Edit Unit Monthly Fee" onClose={() => { setModal(null); resetForm(); }} onSave={handleUpdateMonthly}><div className="space-y-3"><div><label className="block text-xs font-medium text-ink-700 mb-1">Select Unit</label><select value={f('unitNum')} onChange={e => { sf('unitNum', e.target.value); const u = store.units.find(x => x.number === e.target.value); if (u) sf('monthlyFee', String(u.monthlyFee)); }} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner} ({fmt(u.monthlyFee)})</option>)}</select></div><div><label className="block text-xs font-medium text-ink-700 mb-1">New Monthly Fee</label><input type="number" value={f('monthlyFee')} onChange={e => sf('monthlyFee', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" /></div></div></Modal>}
 
-      {modal === 'bulkAssessment' && <Modal title="Bulk Special Assessment" onClose={() => { setModal(null); resetForm(); }} onSave={handleBulkAssessment} saveLabel="Apply Assessment"><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">Apply a one-time special assessment to multiple units. Invoices will be created for each unit and recorded in the GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Amount per unit *</label><input type="number" value={f('amount')} onChange={e => sf('amount', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="500" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Reason *</label><input value={f('reason')} onChange={e => sf('reason', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Roof emergency repair" /></div><div><div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-ink-700">Apply to units ({selectedUnits.length} selected)</label><div className="flex gap-2"><button type="button" onClick={() => setSelectedUnits(store.units.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Units</button><button type="button" onClick={() => setSelectedUnits([])} className="text-[10px] text-ink-400 font-medium">Clear</button></div></div><div className="max-h-40 overflow-y-auto border border-ink-200 rounded-lg divide-y divide-ink-50">{store.units.map(u => (<label key={u.number} className="flex items-center gap-2 px-3 py-2 hover:bg-mist-50 cursor-pointer"><input type="checkbox" checked={selectedUnits.includes(u.number)} onChange={e => { if (e.target.checked) setSelectedUnits(p => [...p, u.number]); else setSelectedUnits(p => p.filter(n => n !== u.number)); }} className="rounded" /><span className="text-xs font-medium text-ink-700">{u.number}</span><span className="text-xs text-ink-400">{u.owner}</span></label>))}</div></div>{f('amount') && selectedUnits.length > 0 && <div className="bg-white border border-ink-200 rounded-lg p-3 text-center"><p className="text-xs text-ink-500">Total: <strong className="text-ink-900">{fmt(parseFloat(f('amount')) * selectedUnits.length)}</strong> across {selectedUnits.length} units</p></div>}</div></Modal>}
+      {modal === 'bulkAssessment' && <Modal title="Bulk Special Assessment" onClose={() => { setModal(null); resetForm(); }} onSave={handleBulkAssessment} saveLabel="Apply Assessment"><div className="space-y-3"><p className="text-xs text-ink-500 bg-amber-50 rounded-lg p-3 border border-amber-100">Apply a one-time special assessment to multiple units. Invoices will be created for each unit and recorded in the GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Amount per unit *</label><input type="number" value={f('amount')} onChange={e => sf('amount', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="500" /></div><div><label className="block text-xs font-medium text-ink-700 mb-1">Reason *</label><input value={f('reason')} onChange={e => sf('reason', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Roof emergency repair" /></div>{field('Due Date', 'dueDate', 'date')}<div><div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-ink-700">Apply to units ({selectedUnits.length} selected)</label><div className="flex gap-2"><button type="button" onClick={() => setSelectedUnits(store.units.map(u => u.number))} className="text-[10px] text-accent-600 font-medium">All Units</button><button type="button" onClick={() => setSelectedUnits([])} className="text-[10px] text-ink-400 font-medium">Clear</button></div></div><div className="max-h-40 overflow-y-auto border border-ink-200 rounded-lg divide-y divide-ink-50">{store.units.map(u => (<label key={u.number} className="flex items-center gap-2 px-3 py-2 hover:bg-mist-50 cursor-pointer"><input type="checkbox" checked={selectedUnits.includes(u.number)} onChange={e => { if (e.target.checked) setSelectedUnits(p => [...p, u.number]); else setSelectedUnits(p => p.filter(n => n !== u.number)); }} className="rounded" /><span className="text-xs font-medium text-ink-700">{u.number}</span><span className="text-xs text-ink-400">{u.owner}</span></label>))}</div></div>{f('amount') && selectedUnits.length > 0 && <div className="bg-white border border-ink-200 rounded-lg p-3 text-center"><p className="text-xs text-ink-500">Total: <strong className="text-ink-900">{fmt(parseFloat(f('amount')) * selectedUnits.length)}</strong> across {selectedUnits.length} units</p></div>}</div></Modal>}
 
-      {modal === 'sendInvoice' && <Modal title="Send Payment Invoice" onClose={() => { setModal(null); resetForm(); }} onSave={handleSendInvoice} saveLabel="Send Invoice"><div className="space-y-3"><p className="text-xs text-ink-500 bg-indigo-50 rounded-lg p-3 border border-indigo-100">Create an invoice and email the payment link to the unit owner. Recorded in GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label><select value={f('unitNum')} onChange={e => sf('unitNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}</select></div>{field('Amount *', 'amount', 'number', '500')}{field('Description *', 'description', 'text', 'e.g., Window replacement — Unit 301')}</div></Modal>}
+      {modal === 'sendInvoice' && <Modal title="Send Payment Invoice" onClose={() => { setModal(null); resetForm(); }} onSave={handleSendInvoice} saveLabel="Send Invoice"><div className="space-y-3"><p className="text-xs text-ink-500 bg-indigo-50 rounded-lg p-3 border border-indigo-100">Create an invoice and email the payment link to the unit owner. Recorded in GL.</p><div><label className="block text-xs font-medium text-ink-700 mb-1">Unit *</label><select value={f('unitNum')} onChange={e => sf('unitNum', e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"><option value="">Select unit...</option>{store.units.map(u => <option key={u.number} value={u.number}>Unit {u.number} — {u.owner}</option>)}</select></div>{field('Amount *', 'amount', 'number', '500')}{field('Description *', 'description', 'text', 'e.g., Window replacement — Unit 301')}{field('Due Date', 'dueDate', 'date')}</div></Modal>}
 
       {modal === 'stripe' && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setModal(null)}>
