@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } from '@/lib/financial-logic';
@@ -150,12 +150,17 @@ interface FinancialState {
 
 // ── Sync helpers ──
 
+/** Resolve tenant ID from store state, falling back to module-level active tenant. */
+function resolveTenantId(): string | null {
+  return useFinancialStore.getState().tenantId || getActiveTenantId();
+}
+
 function syncUnit(unitNum: string) {
   if (!isBackendEnabled) return;
-  const s = useFinancialStore.getState();
-  if (!s.tenantId) return;
-  const u = s.units.find(x => x.number === unitNum);
-  if (u) financialSvc.upsertUnit(s.tenantId, u).catch(err => console.error('[syncWrite] upsertUnit failed:', err));
+  const tid = resolveTenantId();
+  if (!tid) return;
+  const u = useFinancialStore.getState().units.find(x => x.number === unitNum);
+  if (u) financialSvc.upsertUnit(tid, u).catch(err => console.error('[syncWrite] upsertUnit failed:', err));
 }
 
 function syncBudgetCategory(id: string) {
@@ -166,17 +171,18 @@ function syncBudgetCategory(id: string) {
 
 function syncWorkOrder(localId: string) {
   if (!isBackendEnabled) return;
-  const s = useFinancialStore.getState();
-  if (!s.tenantId) return;
-  const wo = s.workOrders.find(x => x.id === localId);
-  if (wo) financialSvc.updateWorkOrderByLocalId(s.tenantId, localId, wo).catch(err => console.error('[syncWrite] updateWorkOrder failed:', err));
+  const tid = resolveTenantId();
+  if (!tid) return;
+  const wo = useFinancialStore.getState().workOrders.find(x => x.id === localId);
+  if (wo) financialSvc.updateWorkOrderByLocalId(tid, localId, wo).catch(err => console.error('[syncWrite] updateWorkOrder failed:', err));
 }
 
 function syncSettings() {
   if (!isBackendEnabled) return;
+  const tid = resolveTenantId();
+  if (!tid) return;
   const s = useFinancialStore.getState();
-  if (!s.tenantId) return;
-  financialSvc.upsertFinancialSettings(s.tenantId, {
+  financialSvc.upsertFinancialSettings(tid, {
     hoaDueDay: s.hoaDueDay,
     annualReserveContribution: s.annualReserveContribution,
     stripeConnectId: s.stripeConnectId,
@@ -279,8 +285,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       status: 'posted',
     };
     set({ generalLedger: [...state.generalLedger, entry], glNextId: state.glNextId + 1 });
-    if (isBackendEnabled && state.tenantId) {
-      financialSvc.createGLEntry(state.tenantId, entry);
+    if (isBackendEnabled) {
+      const tid = state.tenantId || getActiveTenantId();
+      if (tid) financialSvc.createGLEntry(tid, entry);
     }
     return entry;
   },
@@ -508,8 +515,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const id = generateLocalId('cat');
     const cat: BudgetCategory = { id, name, budgeted, expenses: [] };
     set((s) => ({ budgetCategories: [...s.budgetCategories, cat] }));
-    if (isBackendEnabled && get().tenantId) {
-      financialSvc.createBudgetCategory(get().tenantId!, cat).then(dbRow => {
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) financialSvc.createBudgetCategory(tid, cat).then(dbRow => {
         if (dbRow) {
           set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
           // Update any building assets referencing the old local ID
@@ -579,8 +587,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const id = generateLocalId('res');
     const newItem: ReserveItem = { id, ...item };
     set((s) => ({ reserveItems: [...s.reserveItems, newItem] }));
-    if (isBackendEnabled && get().tenantId) {
-      financialSvc.createReserveItem(get().tenantId!, newItem).then(dbRow => {
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) financialSvc.createReserveItem(tid, newItem).then(dbRow => {
         if (dbRow) {
           set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
           // Update any building assets referencing the old local ID
@@ -609,9 +618,19 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   addUnit: (unit) => {
-    set((s) => ({ units: [...s.units, { ...unit, payments: [], lateFees: [], specialAssessments: [] }] }));
-    if (isBackendEnabled && get().tenantId) {
-      financialSvc.upsertUnit(get().tenantId!, { ...unit, payments: [], lateFees: [], specialAssessments: [] });
+    const fullUnit: Unit = { ...unit, payments: [], lateFees: [], specialAssessments: [] };
+    set((s) => ({ units: [...s.units, fullUnit] }));
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) {
+        financialSvc.upsertUnit(tid, fullUnit).then(ok => {
+          if (!ok) console.error('[addUnit] upsertUnit returned false for unit:', unit.number);
+        }).catch(err => {
+          console.error('[addUnit] upsertUnit failed for unit:', unit.number, err);
+        });
+      } else {
+        console.warn('[addUnit] No tenantId available — unit not persisted to DB:', unit.number);
+      }
     }
   },
 
@@ -630,8 +649,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       attachments: [],
     };
     set((s) => ({ workOrders: [...s.workOrders, newWo] }));
-    if (isBackendEnabled && state.tenantId) {
-      financialSvc.createWorkOrder(state.tenantId, newWo);
+    if (isBackendEnabled) {
+      const tid = state.tenantId || getActiveTenantId();
+      if (tid) financialSvc.createWorkOrder(tid, newWo);
     }
   },
 
@@ -673,7 +693,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       const entry: ChartOfAccountsEntry = { num, name, type: type as any, sub: 'header', parent: null };
       const updated = [...s.chartOfAccounts, entry];
       updated.sort((a, b) => a.num.localeCompare(b.num));
-      if (isBackendEnabled && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
+      if (isBackendEnabled) { const tid = s.tenantId || getActiveTenantId(); if (tid) financialSvc.upsertCoAEntry(tid, entry); }
       return { chartOfAccounts: updated };
     }),
 
@@ -686,7 +706,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       const entry: ChartOfAccountsEntry = { num, name, type, sub, parent };
       const updated = [...s.chartOfAccounts, entry];
       updated.sort((a, b) => a.num.localeCompare(b.num));
-      if (isBackendEnabled && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
+      if (isBackendEnabled) { const tid = s.tenantId || getActiveTenantId(); if (tid) financialSvc.upsertCoAEntry(tid, entry); }
       return { chartOfAccounts: updated };
     }),
 
@@ -698,14 +718,16 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (isBackendEnabled) {
       const s = get();
       const entry = s.chartOfAccounts.find(a => a.num === num);
-      if (entry && s.tenantId) financialSvc.upsertCoAEntry(s.tenantId, entry);
+      const tid = s.tenantId || getActiveTenantId();
+      if (entry && tid) financialSvc.upsertCoAEntry(tid, entry);
     }
   },
 
   deleteCoAAccount: (num) =>
     set((s) => {
       if (s.generalLedger.some((e) => e.debitAcct === num || e.creditAcct === num)) return s;
-      if (isBackendEnabled && s.tenantId) financialSvc.deleteCoAEntry(s.tenantId, num);
+      const tid = s.tenantId || getActiveTenantId();
+      if (isBackendEnabled && tid) financialSvc.deleteCoAEntry(tid, num);
       return { chartOfAccounts: s.chartOfAccounts.filter((a) => a.num !== num) };
     }),
 
@@ -763,8 +785,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   removeUnit: (unitNum) => {
     set(s => ({ units: s.units.filter(u => u.number !== unitNum) }));
-    if (isBackendEnabled && get().tenantId) {
-      financialSvc.deleteUnit(get().tenantId!, unitNum);
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) {
+        financialSvc.deleteUnit(tid, unitNum).catch(err => console.error('[removeUnit] failed:', err));
+      }
     }
   },
 
@@ -925,8 +950,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       ...(caseId ? { caseId } : {}),
     };
     set(s => ({ unitInvoices: [...s.unitInvoices, invoice] }));
-    if (isBackendEnabled && get().tenantId) {
-      financialSvc.createUnitInvoice(get().tenantId!, invoice).then(dbRow => {
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
         if (dbRow) set(s => ({ unitInvoices: s.unitInvoices.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
       }).catch(err => {
         console.error('[syncWrite] createUnitInvoice failed:', err);
