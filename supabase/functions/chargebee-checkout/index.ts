@@ -256,17 +256,32 @@ Deno.serve(async (req) => {
       const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
       const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
 
-      // Create Chargebee customer first so we can link pending_checkouts
+      // Get or create Chargebee customer so we can link pending_checkouts
+      const customerId = `cb_${user.id}`;
       const cp = new URLSearchParams();
-      cp.append('id', `cb_${user.id}`);
       cp.append('email', user.email || '');
       cp.append('first_name', building.firstName || building.contactName || '');
       cp.append('last_name', building.lastName || '');
-      const custResult = await chargebeeRequest('customers', cp);
-      const customerId = custResult.customer.id;
+      try {
+        // Try to create new customer
+        cp.append('id', customerId);
+        await chargebeeRequest('customers', cp);
+      } catch (e: any) {
+        if (e.message?.includes('already present')) {
+          // Customer exists from a previous attempt — update and continue
+          const up = new URLSearchParams();
+          up.append('email', user.email || '');
+          up.append('first_name', building.firstName || building.contactName || '');
+          up.append('last_name', building.lastName || '');
+          await chargebeeRequest(`customers/${customerId}`, up);
+        } else {
+          throw e;
+        }
+      }
 
       // Save building data for the webhook to provision after checkout
-      await sbQuery("POST", "pending_checkouts", {}, {
+      // Use upsert (on_conflict user_id) so retries don't fail
+      const pendingBody = {
         chargebee_customer_id: customerId,
         user_id: user.id,
         payload: {
@@ -289,6 +304,16 @@ Deno.serve(async (req) => {
           ward: building.ward || null,
           addressFlag: building.addressFlag || null,
         },
+      };
+      await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=representation',
+        },
+        body: JSON.stringify(pendingBody),
       });
 
       // PM Seat addon
