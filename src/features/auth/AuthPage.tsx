@@ -874,7 +874,7 @@ export default function AuthPage() {
         <header className="sticky top-0 z-50 bg-navy">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ minHeight: 72 }}>
             <a href="https://getonetwo.com" className="flex items-center gap-2.5 no-underline">
-              <img src="/onetwo-logo-navy.jpg" alt="ONE two" className="w-9 h-[34px] object-cover rounded-md" />
+              <img src="/onetwo-logo-navy.jpg" alt="ONE two" className="w-9 h-[34px] object-cover" />
               <span className="font-display text-[22px] font-bold text-white">ONE <span className="font-medium">two</span></span>
             </a>
             <div className="hidden lg:flex items-center gap-3 text-sm">
