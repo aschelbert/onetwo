@@ -871,25 +871,25 @@ export default function AuthPage() {
     return (
       <div className="fixed inset-0 z-[100] bg-bg-page overflow-y-auto">
         {/* ── Top nav bar ── */}
-        <header className="sticky top-0 z-50 bg-white border-b border-[#e9edf2]">
+        <header className="sticky top-0 z-50 bg-navy">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ minHeight: 72 }}>
             <a href="https://getonetwo.com" className="flex items-center gap-2.5 no-underline">
               <img src="/onetwo-nav-logo.jpg" alt="ONE two" className="w-9 h-[34px] object-cover rounded-md" />
-              <span className="font-display text-[22px] font-bold text-navy">ONE <span className="font-medium">two</span></span>
+              <span className="font-display text-[22px] font-bold text-white">ONE <span className="font-medium">two</span></span>
             </a>
             <div className="hidden lg:flex items-center gap-3 text-sm">
               {stepLabels.map((label, i) => (
                 <span key={label} className="flex items-center gap-3">
-                  {i > 0 && <span className="text-ink-300">&middot;</span>}
-                  <span className={i === currentStepIndex ? 'font-bold text-navy' : i < currentStepIndex ? 'text-ink-500' : 'text-ink-400'}>
+                  {i > 0 && <span className="text-navy-500">&middot;</span>}
+                  <span className={i === currentStepIndex ? 'font-bold text-white' : i < currentStepIndex ? 'text-navy-300' : 'text-navy-500'}>
                     {i + 1} {label}
                   </span>
                 </span>
               ))}
             </div>
             <div className="flex items-center gap-2.5 text-sm">
-              <span className="text-ink-500 hidden sm:inline">Already have an account?</span>
-              <a onClick={() => setAuthStep('login')} className="inline-flex items-center justify-center px-4 font-semibold text-sm text-navy border border-[#c9d2dc] rounded-[10px] cursor-pointer hover:border-navy" style={{ minHeight: 42 }}>Log in</a>
+              <span className="text-navy-300 hidden sm:inline">Already have an account?</span>
+              <a onClick={() => setAuthStep('login')} className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Log in</a>
             </div>
           </div>
         </header>
