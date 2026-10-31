@@ -23,7 +23,11 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
   const unpaidSA = activeUnit.specialAssessments.filter(a => !a.paid);
   const totalSA = unpaidSA.reduce((s, a) => s + a.amount, 0);
   const totalOwed = activeUnit.balance + totalLateFees;
-  const isDelinquent = activeUnit.balance > 0;
+  const today = new Date().toISOString().split('T')[0];
+  const overdueInvoices = unitInvoices.filter(
+    i => i.unitNumber === activeUnit.number && i.status !== 'paid' && i.status !== 'void' && i.dueDate < today
+  );
+  const isDelinquent = overdueInvoices.reduce((sum, i) => sum + i.amount, 0) > 0;
 
   // Invoice history for this unit, sorted newest first
   const myInvoices = unitInvoices
@@ -98,7 +102,7 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
             </div>
             <div className="bg-white rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-ink-500">Monthly Assessment</span><span className="font-medium">{fmt(activeUnit.monthlyFee)}</span></div>
-              {activeUnit.balance > activeUnit.monthlyFee && <div className="flex justify-between text-sm"><span className="text-ink-500">Past Due Balance</span><span className="font-medium text-red-600">{fmt(activeUnit.balance - activeUnit.monthlyFee)}</span></div>}
+              {(activeUnit.balance - totalSA) > activeUnit.monthlyFee && <div className="flex justify-between text-sm"><span className="text-ink-500">Past Due Balance</span><span className="font-medium text-red-600">{fmt(activeUnit.balance - totalSA - activeUnit.monthlyFee)}</span></div>}
               {totalLateFees > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Late Fees</span><span className="font-medium text-red-600">{fmt(totalLateFees)}</span></div>}
               {totalSA > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Special Assessments</span><span className="font-medium text-amber-600">{fmt(totalSA)}</span></div>}
               <div className="border-t pt-2 mt-2">
