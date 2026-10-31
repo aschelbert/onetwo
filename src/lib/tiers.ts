@@ -56,6 +56,8 @@ export interface AddOnConfig {
   description: string;
   monthly: number;
   annual: number;
+  /** Per-tier price overrides. Falls back to top-level monthly/annual if tier not listed. */
+  tierPricing?: Partial<Record<SubscriptionTier, { monthly: number; annual: number }>>;
 }
 
 export const ADDONS: AddOnConfig[] = [
@@ -65,6 +67,9 @@ export const ADDONS: AddOnConfig[] = [
     description: 'A named advisor who knows your building. Monthly call, replies within a business day, budget and year-end reviewed, a seat at the annual meeting.',
     monthly: 249,
     annual: 2490,
+    tierPricing: {
+      facilities: { monthly: 499, annual: 4990 },
+    },
   },
   {
     id: 'pm_seat',
@@ -74,6 +79,12 @@ export const ADDONS: AddOnConfig[] = [
     annual: 790,
   },
 ];
+
+/** Get the effective price for an add-on given the selected tier. */
+export function getAddOnPrice(addon: AddOnConfig, tier: SubscriptionTier, interval: BillingInterval): number {
+  const tp = addon.tierPricing?.[tier];
+  return interval === 'annual' ? (tp?.annual ?? addon.annual) : (tp?.monthly ?? addon.monthly);
+}
 
 export function getTierById(id: string): TierConfig | undefined {
   return TIERS.find(t => t.id === id);

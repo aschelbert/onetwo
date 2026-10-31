@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 
 const Logo = () => (
@@ -860,7 +860,7 @@ export default function AuthPage() {
   const OrderSummary = ({ showBuilding = false }: { showBuilding?: boolean }) => {
     const currentTier = TIERS.find(t => t.id === selectedTier);
     const tierPrice = billingInterval === 'annual' ? (currentTier?.annual ?? 0) : (currentTier?.monthly ?? 0);
-    const addOnTotal = ADDONS.filter(a => selectedAddOns.has(a.id)).reduce((sum, a) => sum + (billingInterval === 'annual' ? a.annual : a.monthly), 0);
+    const addOnTotal = ADDONS.filter(a => selectedAddOns.has(a.id)).reduce((sum, a) => sum + getAddOnPrice(a, selectedTier, billingInterval), 0);
     const grandTotal = tierPrice + addOnTotal;
     const interval = billingInterval === 'annual' ? '/yr' : '/mo';
 
@@ -875,7 +875,7 @@ export default function AuthPage() {
           {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => (
             <div key={addon.id} className="flex items-center justify-between">
               <span className="text-sm text-ink-300">+ {addon.name}</span>
-              <span className="text-sm font-bold">${(billingInterval === 'annual' ? addon.annual : addon.monthly).toLocaleString()}{interval}</span>
+              <span className="text-sm font-bold">${getAddOnPrice(addon, selectedTier, billingInterval).toLocaleString()}{interval}</span>
             </div>
           ))}
           <div className="border-t border-ink-600 pt-2 mt-2">
@@ -1152,7 +1152,7 @@ export default function AuthPage() {
                   <div className="space-y-2">
                     {ADDONS.map(addon => {
                       const selected = selectedAddOns.has(addon.id);
-                      const price = billingInterval === 'annual' ? Math.round(addon.annual / 12) : addon.monthly;
+                      const price = billingInterval === 'annual' ? Math.round(getAddOnPrice(addon, selectedTier, 'annual') / 12) : getAddOnPrice(addon, selectedTier, billingInterval);
                       return (
                         <button key={addon.id} onClick={() => toggleAddOn(addon.id)}
                           className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
