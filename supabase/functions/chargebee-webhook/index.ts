@@ -88,17 +88,18 @@ function parseSubscriptionItems(
     const priceId: string = item.item_price_id || "";
 
     // Plan detection (Chargebee PC 2.0 item price IDs)
-    // Production uses "Compliance-Pro", test site uses "Self-Managed"
+    // Legacy IDs: "Compliance-Pro-*", "Plus-Facilities-*" (with "Yearly" for annual)
+    // Current IDs: "Self-Managed-USD-*", "Facilities-USD-*" (with "Annual" for annual)
     if (priceId.startsWith("Compliance-Pro") || priceId.startsWith("Self-Managed")) {
       plan = "self_managed";
-      interval = priceId.includes("Yearly") ? "annual" : "monthly";
-    } else if (priceId.startsWith("Plus-Facilities")) {
+      interval = (priceId.includes("Yearly") || priceId.includes("Annual")) ? "annual" : "monthly";
+    } else if (priceId.startsWith("Plus-Facilities") || priceId.startsWith("Facilities")) {
       plan = "facilities";
-      interval = priceId.includes("Yearly") ? "annual" : "monthly";
+      interval = (priceId.includes("Yearly") || priceId.includes("Annual")) ? "annual" : "monthly";
     }
 
-    // On Call detection
-    if (priceId.startsWith("On-Call")) {
+    // On Call detection — legacy "On-Call-*", current "OnCall-*"
+    if (priceId.startsWith("On-Call") || priceId.startsWith("OnCall")) {
       onCall = true;
     }
 
