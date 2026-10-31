@@ -765,8 +765,10 @@ export default function AuthPage() {
       }
 
       const currentSession = session;
+      console.log('[checkout] Opening Chargebee Drop-in...');
       cbInstanceRef.current.openCheckout({
         hostedPage: async () => {
+          console.log('[checkout] Fetching hosted page from edge function...');
           const res = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
             {
@@ -796,15 +798,26 @@ export default function AuthPage() {
             }
           );
           const data = await res.json();
+          console.log('[checkout] Edge function response:', data);
           if (data.error) throw new Error(data.error);
+          if (!data.hosted_page) throw new Error('No hosted_page in response');
           return data.hosted_page;
         },
         success: async (_hostedPageId: string) => {
+          console.log('[checkout] Checkout success, polling for tenant...');
           const { data: { user } } = await supabase!.auth.getUser();
           if (user) await pollForTenantAndRedirect(user.id, user);
           setCheckoutLoading(false);
         },
-        close: () => { setCheckoutLoading(false); },
+        close: () => {
+          console.log('[checkout] Checkout modal closed');
+          setCheckoutLoading(false);
+        },
+        error: (error: any) => {
+          console.error('[checkout] Chargebee checkout error:', error);
+          alert('Checkout failed: ' + (error?.message || 'Unknown error'));
+          setCheckoutLoading(false);
+        },
       });
     } catch (err: any) {
       alert(err.message || 'Checkout failed');
