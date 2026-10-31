@@ -749,6 +749,15 @@ export default function AuthPage() {
       }
 
       const currentSession = session;
+
+      // Save session tokens so we can restore them if Chargebee redirects away
+      try {
+        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        }));
+      } catch { /* sessionStorage may be unavailable */ }
+
       console.log('[checkout] Opening Chargebee Drop-in...');
 
       // Track hostedPage errors separately since Chargebee swallows them
@@ -806,8 +815,19 @@ export default function AuthPage() {
         },
         success: async (_hostedPageId: string) => {
           console.log('[checkout] Checkout success, polling for tenant...');
-          const { data: { user } } = await supabase!.auth.getUser();
-          if (user) await pollForTenantAndRedirect(user.id, user);
+          let user = (await supabase!.auth.getUser()).data?.user;
+          // Fall back to the session we saved if getUser fails
+          if (!user && currentSession?.user) {
+            console.log('[checkout] getUser failed, using saved session user');
+            user = currentSession.user;
+          }
+          if (user) {
+            await pollForTenantAndRedirect(user.id, user);
+          } else {
+            console.error('[checkout] No user available after checkout success');
+            // Redirect to provisioned page so session-check can retry
+            window.location.href = '/login?provisioned=1';
+          }
           setCheckoutLoading(false);
         },
         close: () => {
