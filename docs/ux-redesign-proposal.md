@@ -10,16 +10,28 @@ Three mechanisms carry this:
 
 1. **Runbook, the invisible guide.** Obligations, filings, playbook steps, fiduciary alerts, approvals, votes, notice windows and request SLAs already exist in Board Room, Cases and Fiscal Lens. The Runbook runs them as one scheduler, assigns each step to the right role (obligation role field plus the DACI matrix), and emits one card per step.
 2. **Home feed, the single pane.** Replaces the KPI dashboard. One critical banner only when something is critical, then cards in priority order (same ranking rules as today's "Your Action Items"). Tap a card, do the step in a focused sheet, get points. Full modules are one tap away.
-3. **Scoring, training in disguise.** Each card says what it scores: Oversight, Decisive, Communication or Stewardship. Points land only when a module records the action, never on a bare checkbox. Board Health, Building Health, the PM scorecard and the meeting compliance score keep their formulas and feed the same Pulse.
+3. **Scoring, training in disguise.** Each card says what it scores: Timeliness, Compliance, Oversight, Reach or Impact (the stewardship score, per `ONE_two_score_behavior_mapping.xlsx` and handoff 20). Points land only when a module records the action, never on a bare checkbox, and every event carries a receipt the user can read and contest. The building score (collection rate, document completion, quorum, building oversight, engagement) is a separate KPI and stays on the Building header.
+
+### Where the Runbook lives
+
+The Runbook is one scheduler seen from three places:
+
+1. **Home, as cards.** Each obligation, step or approval that needs a person is a card in that person's "Up next". This is where most board members meet it.
+2. **Home, the "Runbook · this month" strip** under the Stewardship card: obligations this month, how many done, the board checklist score. Tapping it opens the full Runbook.
+3. **Building › Governance › Runbook.** The whole calendar: this month, by role, by category, filings, ongoing, all 42. Add a filing, mark filed, attach proof, sources, auto-verified items. This is today's Governance Calendar tab plus the orphaned Compliance page, kept whole.
+
+### The Stewardship card on Home
+
+A navy callout card (board and resident Home, phone and desktop): kicker "STEWARDSHIP" with the band under it, "Good Standing" top right, a radar with a hairline pentagon, the owner's shape in brand cyan over the building mean in brand crimson, the composite as a 60px number in the center, five axis labels with numbers (Timeliness, Impact, Compliance, Oversight, Reach, clockwise from 12), footer "Building avg 84 · +2 this month". Radial scale starts at 60. No percent signs, no vertex dots, no legend. Reference values: owner 94 / 91 / 90 / 90 / 80, composite 91 Excellent; building 87 / 86 / 80 / 80 / 75, mean 84.
 
 ## Information architecture
 
 | Today (board member) | Proposed |
 |---|---|
-| Dashboard | **Home**: feed of Runbook cards, approvals, votes, meetings, alerts, Pulse, setup checklist, advisor |
+| Dashboard | **Home**: feed of Runbook cards, approvals, votes, meetings, alerts, the Stewardship card, the "Runbook · this month" strip, Pulse, setup checklist, advisor |
 | Board Room › Daily Ops, Issues | **Cases**: all open cases and playbooks, step chains, decision trail, notices, bids, budgets |
 | Fiscal Lens, Fee Schedule, Payroll & 1099s, Mailing card | **Money**: three plain numbers up top, every Fiscal Lens table under "Details" |
-| The Building, Board Room, Association Team, The Archives | **Building**: Overview · People · Governance · Documents · Units · Comms |
+| The Building, Board Room, Association Team, The Archives | **Building**: Overview · People · Governance (Runbook, duties, meetings, votes) · Documents · Units · Comms |
 | Avatar menu, Account, Subscription, Support | **Me** (avatar, top right): stewardship radar, leaderboard, account, notifications, subscription, help, role preview |
 
 Residents: Home · Pay (My Unit) · Community · Building.
@@ -28,7 +40,7 @@ Mobile: four bottom tabs, no "More" overflow. Desktop: the same pages with a top
 
 ## Design language
 
-Keeps the brand: DM Serif Display for headings, DM Sans for body, teal `#155E75` and red `#D62839` from the mark, navy `#0D1B2E` for the bar. Red is reserved for "needs you now". White cards on a warm grey ground `#F5F6F4`, 1px lines `#E3E6E2`, 16px radius, no shadows, gradients, left-border stripes or emoji. Dimension colors: Oversight teal `#155E75`, Decisive plum `#4F46A8`, Communication amber `#9A5B00`, Stewardship sage `#3A663A`. Touch targets 44px or more.
+Keeps the brand: DM Serif Display for headings, DM Sans for body, teal `#155E75` and red `#D62839` from the mark, navy `#0D1B2E` for the bar. Red is reserved for "needs you now". White cards on a warm grey ground `#F5F6F4`, 1px lines `#E3E6E2`, 16px radius, no shadows, gradients, left-border stripes or emoji. Dimension chip colors: Timeliness teal `#155E75`, Compliance sage `#3A663A`, Oversight plum `#4F46A8`, Reach amber `#9A5B00`, Impact navy `#0D1B2E`. On the navy Stewardship card the owner's shape is brand cyan `#A5F3FC` and the building's is brand crimson `#D62839`, by explicit decision. Touch targets 44px or more.
 
 ## The engine
 
@@ -36,14 +48,17 @@ Keeps the brand: DM Serif Display for headings, DM Sans for body, teal `#155E75`
 2. **Assignment**: obligation role and DACI driver. Others see "Waiting on others" with a nudge.
 3. **One card, one sheet**: only that step's checklist, documents and primary action. "Full case" and "Details" always available.
 4. **The module records**: invoice approval posts to the ledger, notices go through the mail service, votes write to the election.
-5. **The engine scores**: action maps to a dimension; early earns more; toast, Pulse line and leaderboard update.
+5. **The engine scores**: a stewardship event is logged with a receipt; toast, Pulse line and leaderboard update.
 
-| Dimension | Actions that count |
-|---|---|
-| Oversight | Approve or reject invoices, review vendor certificates and contracts, reconcile, review reports, confirm an obligation, quarterly PM review |
-| Decisive | Cast board votes, accept a bid with a reason, pick a quote, approve a spending request, close a case |
-| Communication | Send notices and letters, post announcements, reply to requests inside 14 days, distribute minutes |
-| Stewardship | Fund reserves, keep maintenance on schedule, keep insurance current, create the annual archive, finish budget season |
+| Dimension | Owner / board max | What counts |
+|---|---|---|
+| Timeliness | 35 / 30 | Dues and assessments paid by the due date (full, half for 1 to 7 days late, quarter for 8 to 30, none after); case and communication replies by their date; payment plans count as on time |
+| Compliance | 35 / 30 | Snapshot: required documents current (25 of 40), required actions done (10 of 40), no open violation (5 of 40; half credit at cure, full after 90 days) |
+| Oversight | 10 / 20 | Owners: acknowledged budget, statements, reserve study, audit requests; attended the annual meeting; voted on money ballots. Board: 70% board checklist (filings on time, insurance renewed, month closed in 15 days, minutes in 30, elections certified in 14, reserve study current, budget adopted by its date, governance items) plus 30% own acknowledgments |
+| Reach | 10 / 10 | Replied to response-required announcements and surveys inside their SLA; boards may publish at most 8 a month |
+| Impact | 10 / 10 | Ballots cast over eligible elections (6) and meetings attended over up to 4 held (4) |
+
+Composite = Timeliness + Compliance + Oversight + min(20, Reach + Impact). Bands: Excellent 90, Good 75, Watch 60, below that Needs attention. Good Standing is separate and bylaw-defined. Rolling 365-day window. The crimson line on the Stewardship card is the mean of every owner's dimension percent, not the building score.
 
 ## Feature parity map
 
@@ -77,7 +92,7 @@ Kept = same screen and actions, restyled. Repackaged = same capability reached f
 ### Board Room
 - Header tiles → Building › Governance counts. Repackaged.
 - Duties & Roles → Building › Governance › Duties and roles. Kept.
-- Governance Calendar / Runbook (sort, role filter, filings, add filing, mark filed, proof, workflow steps, ⋮ actions) → Building › Governance › Obligations checklist and Filings; items due become cards. Fix: step completion persists; Dashboard and Board Room scores unify.
+- Governance Calendar / Runbook (sort, role filter, filings, add filing, mark filed, proof, workflow steps, ⋮ actions) → Building › Governance › Runbook, also opened from the Home strip; items due become cards. Fix: step completion persists; Dashboard and Board Room scores unify.
 - Auto-verified items, satisfying-action chips, Runbook sources, meeting compliance score (orphaned page) → restored. Fix.
 - Meetings (schedule/edit with vote detection and scope, send notice, attendees, minutes, documents, link/create case, linked votes, minutes approval) → Building › Governance › Meetings; notices and approvals as cards. Fix: "+ Case" links the meeting; per-meeting Record vote restored.
 - Votes & Resolutions (full lifecycle, ballots, proxies, compliance checks, timeline, discussion, resolution) → Building › Governance › Votes; Community › Votes for owners; "your vote is needed" cards. Fix: cases from votes get real steps.
@@ -112,6 +127,7 @@ Kept = same screen and actions, restyled. Repackaged = same capability reached f
 - Insurance → Overview › Insurance; renewals as a Runbook case. Card.
 - Units roster → Units. Kept.
 - Property log, Task tracking, PM scorecard, Intercom, User management → People. Cards for assigned tasks and quarterly reviews. Fix: Remove member works.
+- Mocks: Home (phone and desktop), Runbook task sheet, delinquency case, Money, Building hub, Me, Runbook calendar, resident Home, scoring explainer and the parity map are on the canvas linked at the top.
 - Archives reports and annual archives → Documents; "Create the FY archive" card. Card. The 26-type report catalog in code is mounted.
 
 ### Community and My Unit
