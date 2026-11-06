@@ -16,11 +16,16 @@ view.
   and late-fee days. Nothing is entered twice; sources that the runbook
   engine also turns into cards (meetings, votes, filings, insurance,
   maintenance, payments) are listed once, from the source.
-- `CalendarView` shows it month by month with the arrows, with filters
-  (Everything, Mine, Meetings, Votes, Deadlines and filings, Vendors and
-  maintenance, Amenities), a kind chip and an All/Board chip on each item,
-  and an action that opens the owning page. Today is always listed, with
-  what comes next when it is empty.
+- `CalendarView` is the board's carousel: month columns side by side
+  (three on a desktop, two on a tablet, one on a phone) flipped with the
+  arrows, filters above (Everything, Mine, Meetings, Votes, Deadlines and
+  filings, Vendors and maintenance, Amenities), a legend, a dot for the
+  kind on each item, an action chip or an All / Board chip, and a dark
+  outline on what is yours. Today is always listed, with what comes next
+  when it is empty.
+- On Home the calendar is full width under the design's compact header
+  (the scores and the money as chips, the three numbers on the right); the
+  tiles and the stewardship card belong to the Feed view only.
 - Home: Feed | Calendar next to the greeting, kept in the URL
   (`/home?view=calendar`), on desktop and phone. The strip at the foot of
   Home is gone.

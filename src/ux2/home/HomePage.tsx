@@ -27,7 +27,7 @@ import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '
 import { contextFor, todayIso, useCardInput, useStoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
 import { stewardshipFor } from '../score/events';
-import { DIMENSIONS } from '../score/stewardship';
+import { bandFor, DIMENSIONS } from '../score/stewardship';
 import { dayLabel } from './calendar';
 import CalendarView from './CalendarView';
 
@@ -263,6 +263,30 @@ export default function HomePage() {
         <AttentionChips set={set} role={viewer.role} />
       </header>
 
+      {view === 'calendar' ? (
+        <>
+          {/* The calendar's compact header from the design: the scores as chips, the three numbers on the right. */}
+          <div className="flex flex-wrap items-end justify-between gap-4" aria-label="At a glance">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip tone={score.you.total >= 80 ? 'teal' : score.you.total >= 60 ? 'amber' : 'red'} title="Your stewardship">You · {score.you.total} · {bandFor(score.you.total)}</Chip>
+              <Chip tone="navy" title="Building stewardship">Building · {score.building.total} · {bandFor(score.building.total)}</Chip>
+              {boardSide && <Chip tone={kpis.reservePct < 50 ? 'red' : 'ghost'} title="Reserves funded">Reserves {kpis.reservePct}%</Chip>}
+              {boardSide && <Chip tone="ghost" title="Collected this month">Collected {Number.isFinite(kpis.income.collectionRate) ? kpis.income.collectionRate : 0}%</Chip>}
+              {isOwner && <Chip tone={myBalance > 0 ? 'red' : 'ghost'} title="Your balance">Balance {fmt(myBalance)}</Chip>}
+            </div>
+            <div className="flex flex-wrap gap-7">
+              {[
+                [set.forYou.length, 'things for you'],
+                [dated.filter(c => (c.kind === 'filing' || c.kind === 'obligation') && c.daysLeft !== undefined && c.daysLeft >= 0 && c.daysLeft <= 60).length, 'obligations due in 60 days'],
+                ...(boardSide ? [[kpis.openCases, 'open cases'] as const] : []),
+              ].map(([n, label]) => (
+                <div key={String(label)}><div className="font-display text-[32px] font-semibold leading-none text-ux2-ink">{n}</div><div className="text-[13px] text-ux2-muted">{label}</div></div>
+              ))}
+            </div>
+          </div>
+          <CalendarView cards={dated} today={today} forOwner={isOwner} />
+        </>
+      ) : (
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
         <aside className="flex flex-col gap-4 lg:order-2">
@@ -328,17 +352,14 @@ export default function HomePage() {
             </TileRow>
           )}
 
-          {view === 'calendar' ? (
-            <CalendarView cards={dated} today={today} forOwner={isOwner} />
-          ) : (
-            <Card aria-label="Your runbook">
-              <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
-              <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />
-              <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
-            </Card>
-          )}
+          <Card aria-label="Your runbook">
+            <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
+            <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />
+            <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
+          </Card>
         </div>
       </div>
+      )}
 
       <Pulse />
     </div>

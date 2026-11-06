@@ -61,10 +61,10 @@ export interface AgendaSources {
 export const KIND_META: Record<AgendaKind, { label: string; tone: ChipTone }> = {
   meeting: { label: 'Meeting', tone: 'navy' },
   vote: { label: 'Vote', tone: 'plum' },
-  deadline: { label: 'Deadline', tone: 'amber' },
-  vendor: { label: 'Vendor', tone: 'teal' },
-  amenity: { label: 'Amenity', tone: 'cyan' },
-  dues: { label: 'Dues', tone: 'sage' },
+  deadline: { label: 'Deadline', tone: 'cyan' },
+  vendor: { label: 'Vendor', tone: 'amber' },
+  amenity: { label: 'Amenity', tone: 'sage' },
+  dues: { label: 'Dues', tone: 'teal' },
   move: { label: 'Move', tone: 'ghost' },
 };
 

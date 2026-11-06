@@ -45,8 +45,13 @@ describe('Home', () => {
     renderHome('/home?view=calendar');
     expect(document.querySelector('[data-widget="calendar"]')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull();
-    expect(document.querySelector('[data-widget="calendar"] [data-month]')).toBeTruthy();
-    expect(screen.getByText(/Nothing scheduled today|Nothing scheduled in/)).toBeTruthy();
+    expect(document.querySelectorAll('[data-widget="calendar"] [data-month]').length).toBe(6);
+    expect(document.querySelector('[data-widget="calendar"] [data-month] [data-day]')).toBeTruthy();
+    expect(screen.getByText('Nothing scheduled today')).toBeTruthy();
+    expect(document.querySelector('[aria-label="At a glance"]')).toBeTruthy();
+    expect(screen.queryByText('Reserves funded')).toBeNull();
+    expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Later months' }));
     const views = screen.getByRole('navigation', { name: 'Home views' });
     fireEvent.click(within(views).getByRole('button', { name: /^Feed/ }));
     expect(screen.getByRole('region', { name: 'Up next' })).toBeTruthy();
