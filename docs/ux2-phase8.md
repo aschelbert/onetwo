@@ -23,13 +23,12 @@ view.
   kind on each item, an action chip or an All / Board chip, and a dark
   outline on what is yours. Today is always listed, with what comes next
   when it is empty.
-- Home is laid out as the Home › Feed and Home › Calendar mocks: the
-  header carries the greeting, the scores and the money as labelled chips,
-  Feed | Calendar and the three numbers; the Feed is Up next (task cards),
-  Waiting on others, Upcoming obligations, the stewardship card with its
-  dimension pages, and Pulse; the Calendar is the carousel, full width.
-  Owners get Up next, Building news, Quick, the stewardship card and Your
-  account.
+- Home keeps the Feed it had (the tiles, the Up next list, the
+  stewardship card) and adds three widgets in the right column: Your
+  account (the balance on the units you hold, the next dues, Pay and
+  Statements), Building news (the latest notices) and Pulse (the latest
+  scored events across the board, with the dimension each moved). The
+  Calendar view is the carousel, full width under the same header.
 - Home: Feed | Calendar next to the greeting, kept in the URL
   (`/home?view=calendar`), on desktop and phone. The strip at the foot of
   Home is gone.

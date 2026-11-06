@@ -1,17 +1,16 @@
 /**
- * Home — the redesign's landing page, laid out as the Home › Feed and
- * Home › Calendar mocks.
+ * Home — the redesign's landing page.
  *
- *  Header   "Welcome in, {name}", the day and what it holds; the scores and
- *           the money as labelled chips; Feed | Calendar; the three numbers.
- *  Feed     Up next (task cards), Waiting on others (nudge rows), Upcoming
- *           obligations (dated rows) · the stewardship card with its
- *           dimension pages · Pulse. Owners: Up next, Building news, Quick
- *           actions · stewardship · Your account · Pulse.
- *  Calendar the month carousel, full width (`CalendarView`).
+ * One feed: what needs you now, what waits on others, what is coming up,
+ * the building's numbers, your stewardship card, your account, building
+ * news and the pulse. Feed | Calendar flips the feed for the month
+ * carousel of everything dated (`CalendarView`). Every card is a deep link
+ * into the production page that owns the record, so completing a card uses
+ * the existing flow.
  *
- * Every card is a deep link into the production page that owns the record,
- * so completing a card uses the existing flow.
+ *  Board member / manager: Reserves / Collected / Open cases · Up next · Waiting on others ·
+ *                           Upcoming · Stewardship · Your account · Building news · Pulse
+ *  Owner:                   Up next · Stewardship · Your account · Building news · Pulse
  */
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -19,36 +18,53 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt, cn } from '@/lib/formatters';
-import { Chip, PillTabs } from '../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Tile, TileRow } from '../components';
 import type { ChipTone } from '../components';
+import StewardshipRadar from '../components/StewardshipRadar';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
 import { contextFor, todayIso, useCardInput, useStoreSnapshot, type StoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
 import { boardEvents, stewardshipFor } from '../score/events';
-import { bandFor, type Dimension, type ScoreEvent } from '../score/stewardship';
+import { DIMENSIONS, type Dimension, type ScoreEvent } from '../score/stewardship';
 import { dayLabel } from './calendar';
 import CalendarView from './CalendarView';
-import StewardshipCard from './StewardshipCard';
 
-const KIND_LABEL: Record<RunbookCard['kind'], string> = {
-  filing: 'Filing', obligation: 'Obligation', 'case-step': 'Runbook', vote: 'Vote', meeting: 'Meeting', request: 'Request',
-  delinquency: 'Collections', budget: 'Budget', insurance: 'Insurance', maintenance: 'Maintenance', setup: 'Setup', payment: 'Dues',
+const STATUS_TONE: Record<RunbookCard['status'], ChipTone> = {
+  overdue: 'red',
+  due: 'navy',
+  upcoming: 'cyan',
+  waiting: 'ghost',
+  done: 'sage',
 };
+
+const STATUS_LABEL: Record<RunbookCard['status'], string> = {
+  overdue: 'Overdue',
+  due: 'Due',
+  upcoming: 'Upcoming',
+  waiting: 'Waiting',
+  done: 'Done',
+};
+
 const DIM_TONE: Record<Dimension, ChipTone> = { Oversight: 'plum', Timeliness: 'teal', Compliance: 'sage', Reach: 'amber', Impact: 'cyan' };
-const AVATAR: ChipTone[] = ['teal', 'plum', 'amber', 'sage', 'cyan'];
 
 function greeting(now = new Date()): string {
   const h = now.getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Welcome in';
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-function shortDate(iso: string): string {
+function longDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
 function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '·';
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
 
 /** Navigate to a card action. The Funds tab lives in the URL; the financial store's tab is kept in step for the embedded tab components. */
@@ -58,141 +74,159 @@ function useGo() {
   return (path: string) => {
     const m = path.match(/^\/(funds|financial)\?tab=([a-z]+)/);
     if (m) { setActiveTab(m[2]); navigate(`/funds?tab=${m[2]}`); return; }
+    // Obligations and filings live on Building › Obligations.
     if (/^\/boardroom\?tab=runbook/.test(path)) { navigate('/building?tab=obligations&section=calendar'); return; }
     if (/^\/boardroom\?tab=duties/.test(path)) { navigate('/building?tab=obligations&section=duties'); return; }
     navigate(path);
   };
 }
 
-/** A mock `.card`: 22px radius, surface background, an 18px title. */
-function Panel({ title, aside, children, label }: { title: string; aside?: React.ReactNode; children: React.ReactNode; label?: string }) {
+/** The action row inside a tile. Buttons inside dark tiles need their own colours (cn does not merge Tailwind classes). */
+function TileAction({ label, button, dark, onClick }: { label: string; button: string; dark?: boolean; onClick: () => void }) {
   return (
-    <section aria-label={label ?? title} className="flex flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
-      <div className="flex flex-wrap items-center justify-between gap-2.5"><h2 className="m-0 text-lg font-medium text-ux2-ink">{title}</h2>{aside}</div>
-      {children}
+    <>
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-semibold transition-colors',
+          dark ? 'border border-white/40 text-white hover:bg-white/10' : 'border border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface',
+        )}
+      >
+        {button}
+      </button>
+    </>
+  );
+}
+
+function CardRow({ card, onHide }: { card: RunbookCard; onHide?: (id: string) => void }) {
+  const go = useGo();
+  const late = card.daysLeft !== undefined && card.daysLeft < 0;
+  return (
+    <li data-card={card.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-4 border-b border-ux2-line last:border-b-0">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <Chip tone={STATUS_TONE[card.status]} className="mt-0.5 shrink-0">
+          {late ? `${Math.abs(card.daysLeft!)}d late` : card.daysLeft !== undefined && card.status !== 'waiting' ? (card.daysLeft === 0 ? 'Today' : `${card.daysLeft}d`) : STATUS_LABEL[card.status]}
+        </Chip>
+        <div className="min-w-0">
+          <div className="truncate text-[15px] font-semibold text-ux2-ink">{card.title}</div>
+          {card.why && <div className="truncate text-xs text-ux2-muted">{card.why}</div>}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 pl-[calc(theme(spacing.3)+56px)] sm:pl-0">
+        {card.points !== undefined && card.dimension && (
+          <Chip tone="teal" title={`${card.dimension} · ${card.points} points when done`}>+{card.points}</Chip>
+        )}
+        <Button size="sm" onClick={() => go(card.action.path)}>{card.action.label}</Button>
+        {onHide && (
+          <button
+            type="button"
+            aria-label={`Hide ${card.title}`}
+            onClick={() => onHide(card.id)}
+            className="grid h-9 w-9 place-items-center rounded-full text-ux2-dim hover:bg-ux2-surface hover:text-ux2-ink"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Feed({ title, cards, empty, onHide, limit }: { title: string; cards: RunbookCard[]; empty: string; onHide?: (id: string) => void; limit?: number }) {
+  const [all, setAll] = useState(false);
+  const shown = limit && !all ? cards.slice(0, limit) : cards;
+  return (
+    <section aria-label={title}>
+      <div className="mb-1 flex items-center justify-between">
+        <SectionLabel>{title}</SectionLabel>
+        <Chip tone={cards.length > 0 ? 'navy' : 'ghost'}>{cards.length}</Chip>
+      </div>
+      {cards.length === 0 ? (
+        <p className="py-3 text-sm text-ux2-muted">{empty}</p>
+      ) : (
+        <ul className="m-0 list-none p-0">
+          {shown.map(c => <CardRow key={c.id} card={c} onHide={onHide} />)}
+        </ul>
+      )}
+      {limit && cards.length > limit && (
+        <button type="button" onClick={() => setAll(a => !a)} className="mt-2 text-xs font-semibold text-ux2-teal hover:underline">
+          {all ? 'Show fewer' : `Show all ${cards.length}`}
+        </button>
+      )}
     </section>
   );
 }
 
-function dueChip(card: RunbookCard): { text: string; tone: ChipTone } {
-  if (card.daysLeft !== undefined && card.daysLeft < 0) return { text: `${Math.abs(card.daysLeft)}d late`, tone: 'pink' };
-  if (card.daysLeft === 0) return { text: 'Due today', tone: 'pink' };
-  if (card.daysLeft === 1) return { text: 'Due tomorrow', tone: 'pink' };
-  return { text: `${KIND_LABEL[card.kind]}${card.due ? ` · ${dayLabel(card.due)}` : ''}`, tone: 'ghost' };
-}
-
-/** A mock `.task`: chips, title, a line, the dark action pill. */
-function TaskCard({ card, onHide }: { card: RunbookCard; onHide?: (id: string) => void }) {
+function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   const go = useGo();
-  const due = dueChip(card);
+  const counts = attentionCounts(set);
+  const chips: { label: string; count: number; tone: ChipTone; path: string }[] = [];
+  if (counts.overdueFilings) chips.push({ label: 'Overdue', count: counts.overdueFilings, tone: 'red', path: '/boardroom?tab=runbook' });
+  if (counts.urgentCases) chips.push({ label: 'Urgent cases', count: counts.urgentCases, tone: 'red', path: '/issues' });
+  if (counts.newRequests) chips.push({ label: role === 'RESIDENT' ? 'Open requests' : 'New requests', count: counts.newRequests, tone: 'amber', path: role === 'RESIDENT' ? '/community?tab=requests' : '/issues' });
+  if (counts.insuranceExpiring) chips.push({ label: 'Insurance expiring', count: counts.insuranceExpiring, tone: 'amber', path: '/building?tab=insurance' });
+  if (counts.votes) chips.push({ label: 'Votes open', count: counts.votes, tone: 'plum', path: '/community?tab=votes' });
+  if (chips.length === 0) return null;
   return (
-    <div data-card={card.id} className="flex min-h-[44px] flex-col gap-2 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 hover:border-ux2-navy">
-      <div className="flex flex-wrap justify-between gap-2">
-        <Chip tone={due.tone}>{due.text}</Chip>
-        {card.dimension && <Chip tone={DIM_TONE[card.dimension]}>Scores · {card.dimension}</Chip>}
-      </div>
-      <div className="text-[17px] font-semibold leading-[1.3] text-ux2-ink">{card.title}</div>
-      {card.why && <div className="text-[13px] text-ux2-muted">{card.why}</div>}
-      <div className="mt-1 flex items-center gap-2">
-        <button type="button" onClick={() => go(card.action.path)} className="inline-flex h-11 items-center justify-center rounded-full bg-ux2-navy px-[18px] text-[13px] font-semibold text-white hover:bg-ux2-navy/90">{card.action.label}</button>
-        {onHide && <button type="button" aria-label={`Hide ${card.title}`} onClick={() => onHide(card.id)} className="grid h-9 w-9 place-items-center rounded-full text-ux2-dim hover:bg-ux2-surface hover:text-ux2-ink">×</button>}
-      </div>
+    <div className="flex flex-wrap gap-2" aria-label="Needs attention">
+      {chips.map(c => (
+        <button key={c.label} type="button" onClick={() => go(c.path)} className="rounded-full">
+          <Chip tone={c.tone}>{c.label} · {c.count}</Chip>
+        </button>
+      ))}
     </div>
   );
 }
 
-function UpNext({ cards, onHide, limit = 6 }: { cards: RunbookCard[]; onHide?: (id: string) => void; limit?: number }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? cards : cards.slice(0, limit);
-  return (
-    <Panel title="Up next" aside={<Chip tone={cards.length ? 'navy' : 'ghost'}>{cards.length} for you</Chip>}>
-      {cards.length === 0 ? <p className="m-0 py-2 text-sm text-ux2-muted">Nothing needs you right now.</p> : (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))]">
-          {shown.map(c => <TaskCard key={c.id} card={c} onHide={onHide} />)}
-        </div>
-      )}
-      {cards.length > limit && <button type="button" onClick={() => setAll(a => !a)} className="self-start text-xs font-semibold text-ux2-teal hover:underline">{all ? 'Show fewer' : `Show all ${cards.length}`}</button>}
-    </Panel>
-  );
-}
-
-/** A mock `.pulse` row: avatar, text, a chip on the right. */
-function PulseRow({ avatar, tone, children, right }: { avatar: string; tone: ChipTone; children: React.ReactNode; right?: React.ReactNode }) {
-  const bg = { teal: 'bg-ux2-teal-tint text-ux2-teal', plum: 'bg-ux2-plum-tint text-ux2-plum', amber: 'bg-ux2-amber-tint text-ux2-amber', sage: 'bg-ux2-sage-tint text-ux2-sage', cyan: 'bg-ux2-cyan text-ux2-navy' }[tone as 'teal' | 'plum' | 'amber' | 'sage' | 'cyan'] ?? 'bg-ux2-surface text-ux2-ink';
-  return (
-    <div className="flex items-center gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 text-[13px] leading-[1.4] text-ux2-ink">
-      <span className={cn('grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold', bg)}>{avatar}</span>
-      <span className="min-w-0 flex-1">{children}</span>
-      {right}
-    </div>
-  );
-}
-
-function WaitingOnOthers({ cards }: { cards: RunbookCard[] }) {
+/** Your account: the balance on the units you hold, when the next dues are due, Pay and Statements. */
+function YourAccount({ units, balance, dueDay }: { units: { number: string; monthlyFee: number }[]; balance: number; dueDay: number }) {
   const go = useGo();
   return (
-    <Panel title="Waiting on others">
-      {cards.length === 0 ? <p className="m-0 py-2 text-sm text-ux2-muted">Nothing is waiting on anyone else.</p> : (
-        <div className="flex flex-col gap-2">
-          {cards.slice(0, 5).map((c, i) => {
-            const who = c.title.split(' to ')[0];
-            return (
-              <div key={c.id} data-card={c.id}>
-                <PulseRow avatar={initials(who)} tone={AVATAR[i % AVATAR.length]} right={<button type="button" onClick={() => go(c.action.path)} className="rounded-full"><Chip tone="ghost">{c.action.label}</Chip></button>}>
-                  {c.title}{c.why ? <span className="text-ux2-muted"> · {c.why}</span> : null}
-                </PulseRow>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </Panel>
+    <Card aria-label="Your account">
+      <div className="flex items-center justify-between gap-2">
+        <SectionLabel>Your account</SectionLabel>
+        <Chip tone={balance > 0 ? 'red' : 'sage'}>{balance > 0 ? 'Balance due' : 'Current'}</Chip>
+      </div>
+      <div className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ux2-ink">{fmt(balance)}</div>
+      <div className="text-xs text-ux2-muted">Unit {units.map(u => u.number).join(', ')} · next {fmt(units.reduce((s, u) => s + u.monthlyFee, 0))} due on the {ordinal(dueDay)}</div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => go('/my-unit/pay')}>{balance > 0 ? 'Pay' : 'Pay ahead'}</Button>
+        <Button size="sm" variant="ghost" onClick={() => go('/my-unit')}>Statements</Button>
+      </div>
+    </Card>
   );
 }
 
-function UpcomingObligations({ cards, total }: { cards: RunbookCard[]; total: number }) {
-  const go = useGo();
-  return (
-    <Panel title="Upcoming obligations" label="Upcoming" aside={<button type="button" onClick={() => go('/building?tab=obligations')} className="rounded-full"><Chip tone="ghost" className="h-9 px-3.5">All {total} · Building ›</Chip></button>}>
-      {cards.length === 0 ? <p className="m-0 py-2 text-sm text-ux2-muted">Nothing dated in the next 90 days.</p> : (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))]">
-          {cards.slice(0, 6).map(c => {
-            const soon = c.daysLeft !== undefined && c.daysLeft <= 30;
-            return (
-              <button key={c.id} type="button" data-card={c.id} onClick={() => go(c.action.path)} className="flex min-h-[44px] items-center justify-between gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 text-left text-sm text-ux2-ink hover:border-ux2-navy">
-                <span className="min-w-0"><span className={cn('mr-2 inline-block h-2 w-2 rounded-full', soon ? 'bg-ux2-red' : c.daysLeft !== undefined && c.daysLeft <= 60 ? 'bg-ux2-cyan' : 'bg-ux2-line-strong')} />{c.title}{c.why ? <span className="text-xs text-ux2-muted"> · {c.why}</span> : null}</span>
-                <Chip tone={soon ? 'pink' : 'ghost'}>{c.due ? dayLabel(c.due) : ''}{c.daysLeft !== undefined ? ` · ${c.daysLeft} d` : ''}</Chip>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div className="text-xs text-ux2-muted">Each deadline has a Runbook behind it; the steps show up in Up next as they come due</div>
-    </Panel>
-  );
-}
-
+/** Building news: the latest notices from Community. */
 function BuildingNews() {
   const go = useGo();
   const announcements = useComplianceStore(s => s.announcements);
   const recent = [...announcements].sort((a, b) => b.postedDate.localeCompare(a.postedDate)).slice(0, 3);
   return (
-    <Panel title="Building news" aside={<button type="button" onClick={() => go('/community?tab=notices')} className="rounded-full"><Chip tone="ghost" className="h-9 px-3.5">All · Community ›</Chip></button>}>
-      {recent.length === 0 ? <p className="m-0 py-2 text-sm text-ux2-muted">Nothing posted yet.</p> : (
-        <div className="flex flex-col gap-2">
+    <Card aria-label="Building news">
+      <div className="flex items-center justify-between gap-2">
+        <SectionLabel>Building news</SectionLabel>
+        <button type="button" onClick={() => go('/community?tab=notices')} className="text-xs font-semibold text-ux2-teal hover:underline">All ›</button>
+      </div>
+      {recent.length === 0 ? <p className="text-sm text-ux2-muted">Nothing posted yet.</p> : (
+        <ul className="m-0 list-none divide-y divide-ux2-line p-0">
           {recent.map(a => (
-            <button key={a.id} type="button" onClick={() => go('/community?tab=notices')} className="flex min-h-[44px] items-center justify-between gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 text-left text-sm text-ux2-ink hover:border-ux2-navy">
-              <span className="min-w-0 truncate">{a.title}<span className="text-xs text-ux2-muted"> · {a.category}{a.pinned ? ' · pinned' : ''} · {a.postedBy}</span></span>
-              <Chip tone="ghost">{dayLabel(a.postedDate.slice(0, 10))}</Chip>
-            </button>
+            <li key={a.id}>
+              <button type="button" onClick={() => go('/community?tab=notices')} className="flex w-full items-center gap-3 py-2 text-left hover:underline">
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ux2-ink">{a.title}</span><span className="block truncate text-xs text-ux2-muted">{a.category}{a.pinned ? ' · pinned' : ''} · {a.postedBy}</span></span>
+                <span className="shrink-0 text-xs text-ux2-dim">{dayLabel(a.postedDate.slice(0, 10))}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </Panel>
+    </Card>
   );
 }
 
-/** Pulse: the latest scored events across the board (or the owner's own), with the dimension they moved. */
+/** Pulse: the latest scored events across the board (or the owner's own), with the dimension each one moved. */
 function Pulse({ snapshot, events, group, today }: { snapshot: StoreSnapshot; events: ScoreEvent[]; group: 'board' | 'owners'; today: string }) {
   const items = useMemo(() => {
     const rows: { who: string; event: ScoreEvent }[] = group === 'board'
@@ -206,26 +240,22 @@ function Pulse({ snapshot, events, group, today }: { snapshot: StoreSnapshot; ev
       .slice(0, 4);
   }, [snapshot, events, group, today]);
   if (items.length === 0) return null;
+  const bg: Record<Dimension, string> = { Timeliness: 'bg-ux2-teal-tint text-ux2-teal', Oversight: 'bg-ux2-plum-tint text-ux2-plum', Reach: 'bg-ux2-amber-tint text-ux2-amber', Compliance: 'bg-ux2-sage-tint text-ux2-sage', Impact: 'bg-ux2-cyan text-ux2-navy' };
   return (
-    <Panel title="Pulse">
-      <div className="flex flex-col gap-2">
+    <Card aria-label="Pulse">
+      <SectionLabel>Pulse</SectionLabel>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {items.map(({ who, event }) => (
-          <PulseRow key={`${who}:${event.id}`} avatar={initials(who)} tone={DIM_TONE[event.dimension]} right={<Chip tone={DIM_TONE[event.dimension]}>+{event.dimension}</Chip>}>
-            <strong>{who.split(' ')[0]}</strong> {event.label.toLowerCase().startsWith(who.split(' ')[0].toLowerCase()) ? event.label : `· ${event.label}`}{event.reason ? <span className="text-ux2-muted"> · {event.reason.toLowerCase()}</span> : null}<span className="text-ux2-muted"> · {dayLabel(event.date)}</span>
-          </PulseRow>
+          <li key={`${who}:${event.id}`}>
+            <Inner className="flex items-center gap-2.5 text-[13px] leading-[1.4] text-ux2-ink">
+              <span className={cn('grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold', bg[event.dimension])}>{initials(who)}</span>
+              <span className="min-w-0 flex-1"><strong>{who.split(' ')[0]}</strong> · {event.label}{event.reason ? <span className="text-ux2-muted"> · {event.reason.toLowerCase()}</span> : null}<span className="text-ux2-muted"> · {dayLabel(event.date)}</span></span>
+              <Chip tone={DIM_TONE[event.dimension]}>+{event.dimension}</Chip>
+            </Inner>
+          </li>
         ))}
-      </div>
-    </Panel>
-  );
-}
-
-/** A labelled 44px chip from the mock's header. */
-function Stat({ label, tone, className, children }: { label: string; tone: ChipTone; className?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-start">
-      <div className="mb-2 h-4 whitespace-nowrap text-[13px] leading-4 text-ux2-muted">{label}</div>
-      <Chip tone={tone} className={cn('h-11 px-5 !text-sm', className)}>{children}</Chip>
-    </div>
+      </ul>
+    </Card>
   );
 }
 
@@ -239,110 +269,112 @@ export default function HomePage() {
 
   const runbook = useRunbookStore();
   const hidden = useMemo(() => runbook.hiddenFor(viewer.id, today), [runbook.cards, viewer.id, today]); // eslint-disable-line react-hooks/exhaustive-deps
-  const set: CardSet = useMemo(() => generateCards(input, contextFor(snapshot, hidden)), [input, snapshot, hidden]);
+  const set = useMemo(() => generateCards(input, contextFor(snapshot, hidden)), [input, snapshot, hidden]);
   const hide = (id: string) => runbook.hide(viewer.id, id);
-  const counts = attentionCounts(set);
 
   const score = useMemo(() => stewardshipFor(snapshot), [snapshot]);
+  const youDims = score.you.dimensions.map(d => d.pct);
+
   const fin = useFinancialStore();
   const isOwner = viewer.role === 'RESIDENT';
-  const boardSide = !isOwner;
+  const boardSide = viewer.role === 'BOARD_MEMBER' || viewer.role === 'PROPERTY_MANAGER' || viewer.role === 'PLATFORM_ADMIN';
 
   const kpis = useMemo(() => {
     const reserveNeeded = fin.reserveItems.reduce((s, i) => s + i.estimatedCost, 0);
     const reserveFunded = fin.reserveItems.reduce((s, i) => s + i.currentFunding, 0);
     const reservePct = reserveNeeded > 0 ? Math.round((reserveFunded / reserveNeeded) * 100) : 0;
-    const income = fin.getIncomeMetrics() as { collectionRate: number; delinquentUnits: number };
-    const collected = Number.isFinite(income.collectionRate) ? Math.round(income.collectionRate) : 0;
-    const scored = snapshot.obligations.filter(o => !o.autoPass);
-    const checklist = scored.length ? Math.round((scored.filter(o => snapshot.completions[o.id]).length / scored.length) * 100) : 0;
-    return { reservePct, collected, checklist, obligationsTotal: scored.length };
-  }, [fin.reserveItems, fin.units, snapshot.obligations, snapshot.completions]); // eslint-disable-line react-hooks/exhaustive-deps
+    const income = fin.getIncomeMetrics() as { collectionRate: number; monthlyCollected: number; monthlyExpected: number; delinquentUnits: number };
+    const openCases = snapshot.cases.filter(c => c.status === 'open').length;
+    return { reservePct, reserveFunded, income, openCases };
+  }, [fin.reserveItems, fin.units, snapshot.cases]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const myUnits = fin.units.filter(u => viewer.linkedUnits.includes(u.number));
   const myBalance = myUnits.reduce((s, u) => s + u.balance + u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0), 0);
   const dated = useMemo(() => [...set.forYou, ...set.waitingOnOthers, ...set.upcoming].filter(c => c.due), [set]);
-  const dueSoon = useMemo(() => dated.filter(c => (c.kind === 'filing' || c.kind === 'obligation') && c.daysLeft !== undefined && c.daysLeft >= 0 && c.daysLeft <= 60).length, [dated]);
   const [params, setParams] = useSearchParams();
   const view: 'feed' | 'calendar' = params.get('view') === 'calendar' ? 'calendar' : 'feed';
   const setView = (v: string) => setParams(prev => { const p = new URLSearchParams(prev); if (v === 'calendar') p.set('view', 'calendar'); else p.delete('view'); return p; }, { replace: true });
 
-  const overdue = set.forYou.filter(c => c.status === 'overdue').length;
-  const subline = [shortDate(today), `${set.forYou.length} thing${set.forYou.length === 1 ? '' : 's'} for you`, overdue ? `${overdue} overdue` : 'nothing overdue'].join(' · ');
-  const nextDues = myUnits[0] ? `next ${fmt(myUnits[0].monthlyFee)} due on the ${snapshot.hoaDueDay}${snapshot.hoaDueDay === 1 ? 'st' : snapshot.hoaDueDay === 2 ? 'nd' : snapshot.hoaDueDay === 3 ? 'rd' : 'th'}` : '';
-
-  const numbers: [number, string][] = boardSide
-    ? [[set.forYou.length, 'things for you'], [dueSoon, 'obligations due in 60 days'], [kpis.checklist, 'board checklist']]
-    : [[set.forYou.length, 'things for you'], [counts.votes, 'votes open'], [counts.newRequests, 'requests open']];
-
-  const stewardship = (
-    <StewardshipCard you={score.you} events={score.events} buildingDims={score.building.dims} buildingTotal={score.building.total} group={score.group} />
-  );
-
   return (
-    <div data-page="ux2-home" className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-6">
-        <div className="flex flex-col gap-[18px]">
+    <div data-page="ux2-home" className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="m-0 font-display text-[36px] font-medium leading-tight tracking-[-0.01em] text-ux2-ink">{greeting()}, <span className="text-ux2-teal">{viewer.name.split(' ')[0]}</span></h1>
-            <div className="mt-1.5 text-sm text-ux2-muted">{subline} · {tenant.name}</div>
+            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">
+              {greeting()}, {viewer.name.split(' ')[0]}
+            </h1>
+            <p className="text-sm text-ux2-muted">{longDate(today)} · {tenant.name}</p>
           </div>
-          <div className="flex flex-wrap items-start gap-2.5" aria-label="At a glance">
-            <Stat label="Your stewardship" tone="pink">{score.you.total} · {bandFor(score.you.total)}</Stat>
-            <Stat label="Building stewardship" tone="navy">{score.building.total} · {bandFor(score.building.total)}</Stat>
-            {boardSide && <Stat label="Reserves" tone="ghost" className={kpis.reservePct < 50 ? '!text-ux2-red' : '!text-ux2-teal'}>{kpis.reservePct}%</Stat>}
-            {boardSide && <Stat label="Collected" tone="ghost" className={kpis.collected < 90 ? '!text-ux2-red' : '!text-ux2-teal'}>{kpis.collected}%</Stat>}
-            {isOwner && <Stat label="Your account" tone="ghost" className={myBalance > 0 ? '!text-ux2-red' : '!text-ux2-teal'}>{fmt(myBalance)} · {myBalance > 0 ? 'Due' : 'Current'}</Stat>}
-          </div>
+          <PillTabs size="filter" aria-label="Home views" value={view} onChange={setView} tabs={[{ id: 'feed', label: 'Feed', badge: set.forYou.length || undefined }, { id: 'calendar', label: 'Calendar' }]} />
         </div>
-        <div className="flex flex-col items-start gap-[18px] lg:items-end">
-          <PillTabs size="filter" aria-label="Home views" value={view} onChange={setView} tabs={[{ id: 'feed', label: 'Feed' }, { id: 'calendar', label: 'Calendar' }]} />
-          <div className="flex flex-wrap gap-7">
-            {numbers.map(([n, label]) => (
-              <div key={label}><div className="font-display text-[44px] font-medium leading-none tracking-[-0.03em] text-ux2-ink">{n}</div><div className="text-[13px] text-ux2-muted">{label}</div></div>
-            ))}
-          </div>
-        </div>
+        <AttentionChips set={set} role={viewer.role} />
       </header>
 
       {view === 'calendar' ? (
         <CalendarView cards={dated} today={today} forOwner={isOwner} />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="flex min-w-0 flex-col gap-4">
-            <UpNext cards={set.forYou} onHide={hide} />
-            {boardSide ? (
-              <>
-                <WaitingOnOthers cards={set.waitingOnOthers} />
-                <UpcomingObligations cards={set.upcoming} total={kpis.obligationsTotal} />
-              </>
-            ) : (
-              <>
-                <BuildingNews />
-                <Panel title="Quick">
-                  <div className="flex flex-wrap gap-2">
-                    {[['Submit a request', '/community?tab=requests'], ['Reserve an amenity', '/community?tab=amenities'], ['My documents', '/my-unit'], ['Pay', '/my-unit/pay']].map(([label, path]) => (
-                      <button key={label} type="button" onClick={() => go(path)} className="rounded-full"><Chip tone="ghost" className="h-11 px-5 !text-sm">{label}</Chip></button>
-                    ))}
-                  </div>
-                </Panel>
-              </>
-            )}
-          </div>
-          <aside className="flex min-w-0 flex-col gap-4">
-            {stewardship}
-            {isOwner && (
-              <Panel title="Your account" aside={<Chip tone={myBalance > 0 ? 'pink' : 'sage'}>{myBalance > 0 ? 'Balance due' : 'Current'}</Chip>}>
-                <div className="font-display text-[44px] font-medium leading-none tracking-[-0.03em] text-ux2-ink">{fmt(myBalance)}</div>
-                <div className="text-[13px] text-ux2-muted">{myUnits.length ? `Unit ${myUnits.map(u => u.number).join(', ')}` : 'No unit linked'}{nextDues ? ` · ${nextDues}` : ''}</div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => go('/my-unit/pay')} className="inline-flex h-11 items-center justify-center rounded-full bg-ux2-navy px-[18px] text-[13px] font-semibold text-white">{myBalance > 0 ? 'Pay' : 'Pay ahead'}</button>
-                  <button type="button" onClick={() => go('/my-unit')} className="rounded-full"><Chip tone="ghost" className="h-11 px-5 !text-sm">Statements</Chip></button>
-                </div>
-              </Panel>
-            )}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
+          <aside className="flex flex-col gap-4 lg:order-2">
+            <StewardshipRadar you={youDims} total={score.you.total} buildingAvg={score.building.dims} buildingTotal={score.building.total} />
+            {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
+            <Card className="gap-1" aria-label="Stewardship by dimension">
+              <SectionLabel>By dimension</SectionLabel>
+              <ul className="m-0 list-none p-0">
+                {score.you.dimensions.map((d, i) => (
+                  <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
+                      <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
+            </Card>
+            <BuildingNews />
             <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
           </aside>
+
+          <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
+            {boardSide && (
+              <TileRow>
+                <Tile
+                  tone={kpis.reservePct < 50 ? 'red' : 'grey'}
+                  label="Reserves funded"
+                  value={kpis.reservePct}
+                  unit="%"
+                  sub={`${fmt(kpis.reserveFunded)} set aside`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Reserve plan" button="Open" dark={kpis.reservePct < 50} onClick={() => go('/funds?tab=reserves')} />}
+                />
+                <Tile
+                  tone="teal"
+                  label="Collected"
+                  value={Number.isFinite(kpis.income.collectionRate) ? kpis.income.collectionRate : 0}
+                  unit="%"
+                  sub={`${kpis.income.delinquentUnits} unit${kpis.income.delinquentUnits === 1 ? '' : 's'} behind`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Unit ledger" button="Open" dark onClick={() => go('/funds?tab=units')} />}
+                />
+                <Tile
+                  tone="grey"
+                  label="Open cases"
+                  value={kpis.openCases}
+                  sub={`${set.waitingOnOthers.length} waiting on others`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Board Room" button="Open" onClick={() => go('/issues')} />}
+                />
+              </TileRow>
+            )}
+
+            <Card aria-label="Your runbook">
+              <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
+              {boardSide && <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />}
+              <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
+            </Card>
+          </div>
         </div>
       )}
     </div>
