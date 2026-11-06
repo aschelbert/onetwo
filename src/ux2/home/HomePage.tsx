@@ -105,17 +105,18 @@ function CardRow({ card, onHide }: { card: RunbookCard; onHide?: (id: string) =>
   const go = useGo();
   const late = card.daysLeft !== undefined && card.daysLeft < 0;
   return (
-    <li data-card={card.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-4 border-b border-ux2-line last:border-b-0">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Chip tone={STATUS_TONE[card.status]} className="mt-0.5 shrink-0">
+    <li data-card={card.id} className="flex flex-col gap-2.5 py-3 sm:flex-row sm:items-center sm:gap-4 border-b border-ux2-line last:border-b-0">
+      {/* Phone: chip, then the full title, then the actions on one line. Desktop: one row. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
+        <Chip tone={STATUS_TONE[card.status]} className="self-start sm:mt-0.5 sm:shrink-0">
           {late ? `${Math.abs(card.daysLeft!)}d late` : card.daysLeft !== undefined && card.status !== 'waiting' ? (card.daysLeft === 0 ? 'Today' : `${card.daysLeft}d`) : STATUS_LABEL[card.status]}
         </Chip>
         <div className="min-w-0">
-          <div className="truncate text-[15px] font-semibold text-ux2-ink">{card.title}</div>
-          {card.why && <div className="truncate text-xs text-ux2-muted">{card.why}</div>}
+          <div className="text-[15px] font-semibold leading-snug text-ux2-ink sm:truncate">{card.title}</div>
+          {card.why && <div className="text-xs text-ux2-muted sm:truncate">{card.why}</div>}
         </div>
       </div>
-      <div className="flex items-center gap-2 pl-[calc(theme(spacing.3)+56px)] sm:pl-0">
+      <div className="flex items-center gap-2">
         {card.points !== undefined && card.dimension && (
           <Chip tone="teal" title={`${card.dimension} · ${card.points} points when done`}>+{card.points}</Chip>
         )}
@@ -248,9 +249,9 @@ function Pulse({ snapshot, events, group, today }: { snapshot: StoreSnapshot; ev
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {items.map(({ who, event }) => (
           <li key={`${who}:${event.id}`}>
-            <Inner className="flex items-center gap-2.5 text-[13px] leading-[1.4] text-ux2-ink">
+            <Inner className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px] leading-[1.4] text-ux2-ink">
               <span className={cn('grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold', bg[event.dimension])}>{initials(who)}</span>
-              <span className="min-w-0 flex-1"><strong>{who.split(' ')[0]}</strong> · {event.label}{event.reason ? <span className="text-ux2-muted"> · {event.reason.toLowerCase()}</span> : null}<span className="text-ux2-muted"> · {dayLabel(event.date)}</span></span>
+              <span className="min-w-0 flex-1 basis-[180px]"><strong>{who.split(' ')[0]}</strong> · {event.label}{event.reason ? <span className="text-ux2-muted"> · {event.reason.toLowerCase()}</span> : null}<span className="text-ux2-muted"> · {dayLabel(event.date)}</span></span>
               <Chip tone={DIM_TONE[event.dimension]}>+{event.dimension}</Chip>
             </Inner>
           </li>
@@ -313,17 +314,14 @@ export default function HomePage() {
       {view === 'calendar' ? (
         <CalendarView cards={dated} today={today} forOwner={isOwner} />
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
-          <aside className="flex flex-col gap-4 lg:order-2">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
+          {/* Phones read top to bottom: the stewardship card, then the feed, then the other widgets. Desktop places the feed left and stacks the widgets on the right. */}
+          <aside className="lg:col-start-3 lg:row-start-1">
             {/* The mock's stewardship card: the radar, then a page per dimension behind the arrows and dots. */}
             <StewardshipCard you={score.you} events={score.events} buildingDims={score.building.dims} buildingTotal={score.building.total} group={score.group} />
-            {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
-            <BuildingNews />
-            <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
           </aside>
 
-          <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
+          <div className="flex flex-col gap-5 lg:col-span-2 lg:col-start-1 lg:row-span-2 lg:row-start-1">
             {boardSide && (
               <TileRow>
                 <Tile
@@ -361,6 +359,12 @@ export default function HomePage() {
               <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
             </Card>
           </div>
+
+          <aside className="flex flex-col gap-4 lg:col-start-3 lg:row-start-2">
+            {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
+            <BuildingNews />
+            <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
+          </aside>
         </div>
       )}
     </div>
