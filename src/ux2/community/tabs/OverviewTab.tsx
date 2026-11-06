@@ -54,15 +54,15 @@ export default function OverviewTab({ snap, onGo }: { snap: CommunitySnapshot; o
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-2" aria-label="Recent notices">
+        <Card tone="cyan" className="lg:col-span-2" aria-label="Recent notices">
           <div className="flex items-center justify-between">
-            <SectionLabel>Recent notices</SectionLabel>
-            <button type="button" onClick={() => onGo('notices')} className="text-xs font-semibold text-ux2-teal hover:underline">All ›</button>
+            <h2 className="m-0 text-lg font-medium text-ux2-navy">Recent notices</h2>
+            <button type="button" onClick={() => onGo('notices')} className="rounded-full"><Chip tone="white" className="!bg-white !text-ux2-navy">All ›</Chip></button>
           </div>
-          {notices.all.length === 0 ? <p className="text-sm text-ux2-muted">Nothing posted yet.</p> : (
-            <ul className="m-0 list-none divide-y divide-ux2-line p-0">
+          {notices.all.length === 0 ? <p className="text-sm text-ux2-navy/[0.7]">Nothing posted yet.</p> : (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {notices.all.slice(0, 5).map(a => (
-                <li key={a.id} className="flex items-start gap-3 py-2.5">
+                <li key={a.id} className="flex items-start gap-3 rounded-[14px] bg-white px-3.5 py-2.5">
                   <span className="w-14 shrink-0 text-xs font-semibold text-ux2-muted">{dayLabel(a.postedDate.slice(0, 10))}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold text-ux2-ink">{a.title}</span>
@@ -87,41 +87,44 @@ export default function OverviewTab({ snap, onGo }: { snap: CommunitySnapshot; o
       </div>
 
       {lift.length > 0 && (
-        <Card aria-label="Lift it this month">
-          <SectionLabel>Lift it this month</SectionLabel>
-          <ul className="m-0 list-none divide-y divide-ux2-line p-0">
+        <Card tone="navy" aria-label="Lift it this month">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="m-0 text-lg font-medium text-white">Lift it this month</h2>
+            <Chip tone="cyan">{toGo > 0 ? `Excellent at 90 · ${toGo} point${toGo === 1 ? '' : 's'} to go` : 'Excellent · keep it there'}</Chip>
+          </div>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {lift.map(l => (
-              <li key={l.title} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:gap-4">
-                <div className="min-w-0 flex-1"><div className="text-[15px] font-semibold text-ux2-ink">{l.title}</div><div className="text-xs text-ux2-muted">{l.detail}</div></div>
-                <div className="flex items-center gap-2"><Chip tone="teal">{l.dim}</Chip><Button size="sm" onClick={() => onGo(l.tab, l.extra)}>Open</Button></div>
+              <li key={l.title} className="flex flex-col gap-2 rounded-[14px] bg-white/[0.08] px-3.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                <div className="min-w-0 flex-1"><div className="text-[15px] font-semibold text-white">{l.title}</div><div className="text-xs text-white/[0.66]">{l.detail}</div></div>
+                <div className="flex items-center gap-2"><Chip tone={l.dim === '+Impact' ? 'plum' : l.dim === '+Reach' ? 'amber' : 'teal'}>{l.dim}</Chip><button type="button" onClick={() => onGo(l.tab, l.extra)} className="inline-flex h-9 items-center rounded-full border border-white/40 px-3.5 text-xs font-semibold text-white hover:bg-white/10">Open</button></div>
               </li>
             ))}
           </ul>
         </Card>
       )}
 
-      <Card aria-label="Unit owner leaderboard">
+      <Card tone="navy" aria-label="Unit owner leaderboard">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionLabel>Unit owner leaderboard · this year</SectionLabel>
+          <h2 className="m-0 text-lg font-medium text-white">Unit owner leaderboard · this year</h2>
           <div className="flex gap-1.5">
-            <button type="button" onClick={() => setShowAll(false)} className="rounded-full"><Chip tone={!showAll ? 'navy' : 'ghost'}>Top 10</Chip></button>
-            <button type="button" onClick={() => setShowAll(true)} className="rounded-full"><Chip tone={showAll ? 'navy' : 'ghost'}>All {visible.length}</Chip></button>
+            <button type="button" onClick={() => setShowAll(false)} className="rounded-full"><Chip tone={!showAll ? 'cyan' : 'ghost'} className={!showAll ? '' : '!border-white/30 !bg-transparent !text-white'}>Top 10</Chip></button>
+            <button type="button" onClick={() => setShowAll(true)} className="rounded-full"><Chip tone={showAll ? 'cyan' : 'ghost'} className={showAll ? '' : '!border-white/30 !bg-transparent !text-white'}>All {visible.length}</Chip></button>
           </div>
         </div>
-        <p className="text-xs text-ux2-muted">Every owner in the building, board members included. First names and units only; the score is each owner's own stewardship: paying on time, voting, answering and showing up.</p>
-        {visible.length === 0 ? <p className="text-sm text-ux2-muted">No units yet.</p> : (
-          <ol className="m-0 list-none p-0">
+        <p className="text-xs text-white/[0.66]">Every owner in the building, board members included. First names and units only; the score is each owner's own stewardship: paying on time, voting, answering and showing up.</p>
+        {visible.length === 0 ? <p className="text-sm text-white/[0.7]">No units yet.</p> : (
+          <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
             {(showAll ? visible : visible.slice(0, 10)).map((r, i) => (
-              <li key={r.unit} data-leader={r.unit} className={`flex items-center gap-3 border-b border-ux2-line py-2 last:border-b-0 ${r.you ? 'rounded-lg bg-ux2-cyan/40 px-2' : ''}`}>
-                <span className="w-6 text-right text-sm font-semibold text-ux2-dim">{i + 1}</span>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ux2-navy text-[11px] font-bold text-white">{r.name.slice(0, 2).toUpperCase()}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-ux2-ink"><b className="font-semibold">{r.name}</b> · {r.unit}{r.role ? ` · ${r.role}` : ''}</span>
+              <li key={r.unit} data-leader={r.unit} className={`flex items-center gap-3 rounded-[14px] px-3 py-2 ${r.you ? 'bg-ux2-cyan/[0.18] ring-1 ring-ux2-cyan' : 'bg-white/[0.08]'}`}>
+                <span className="w-6 text-right text-sm font-semibold text-white/[0.5]">{i + 1}</span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.12] text-[11px] font-bold text-white">{r.name.slice(0, 2).toUpperCase()}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-white"><b className="font-semibold">{r.name}</b> · {r.unit}{r.role ? ` · ${r.role}` : ''}</span>
                 <Chip tone={r.score >= 90 ? 'teal' : r.score >= 80 ? 'sage' : r.score >= 70 ? 'amber' : 'red'}>{r.band} · {r.score}</Chip>
               </li>
             ))}
           </ol>
         )}
-        <Inner className="text-xs text-ux2-muted">Owners average {scores.owners} · the board averages {scores.boardAvg}{belowHidden > 0 ? ` · ${belowHidden} owner${belowHidden === 1 ? '' : 's'} below 70 see their own place, no one else does` : ''}.</Inner>
+        <Inner className="border-white/15 bg-white/[0.08] text-xs text-white/[0.75]">Owners average {scores.owners} · the board averages {scores.boardAvg}{belowHidden > 0 ? ` · ${belowHidden} owner${belowHidden === 1 ? '' : 's'} below 70 see their own place, no one else does` : ''}.</Inner>
       </Card>
     </div>
   );

@@ -1,31 +1,16 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TheUnitsTab from '@/features/building/tabs/TheUnitsTab';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, SectionLabel, TileSwitcher, type TileSection } from '../../components';
+import { Button, Card, Chip, Inner, SectionLabel, TileSwitcher, type TileSection, Ring } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { agingTotals, behind, collected, invoiceSummary, monthName, ordinal, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
 
 type Section = 'ledger' | 'behind' | 'invoices';
 const SECTIONS: Section[] = ['ledger', 'behind', 'invoices'];
-
-function Ring({ pct, children }: { pct: number; children?: ReactNode }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  return (
-    <div className="flex items-center gap-3">
-      <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="6" />
-        <circle cx="32" cy="32" r={r} fill="none" stroke="#A5F3FC" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(Math.min(100, pct) / 100) * c} ${c}`} transform="rotate(-90 32 32)" />
-        <text x="32" y="37" textAnchor="middle" fontSize="14" fontWeight="700" fill="#fff">{pct}%</text>
-      </svg>
-      <div className="text-sm">{children}</div>
-    </div>
-  );
-}
 
 function BehindList({ snap, onLedger }: { snap: FundsSnapshot; onLedger: () => void }) {
   const list = useMemo(() => behind(snap), [snap]);

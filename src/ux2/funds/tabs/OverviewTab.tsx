@@ -3,7 +3,7 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { fmt } from '@/lib/formatters';
-import { Card, Chip, Inner, SectionLabel, Tile, TileRow } from '../../components';
+import { Card, Chip, Inner, SectionLabel, Tile, TileRow, Ring } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { daysBetween } from '../../runbook/model';
 import { ISO_DATE } from '../../runbook/adapters';
@@ -107,14 +107,16 @@ export default function OverviewTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
             : <Action label={`${bud.onTrack} of ${bud.lines} lines on track`} button="Budget" onClick={() => onGo('planning', 'budget')} />}
         />
         <Tile
-          tone={res.pct < 50 ? 'red' : 'grey'}
+          tone="grey"
           label="Ahead"
           meta={<button type="button" onClick={() => onGo('planning', 'reserves')} className="underline-offset-2 hover:underline">Reserve plan ›</button>}
-          value={res.pct}
-          unit="% funded"
-          sub={res.next ? `${res.next.name} ${res.next.year} · ${fmt(res.next.cost)} · ${fmt(res.funded)} of ${fmt(res.needed)} set aside` : `${fmt(res.funded)} of ${fmt(res.needed)} set aside`}
-          action={<Action label={res.monthly > 0 ? `${fmt(res.monthly)} a month · ${res.onSchedule ? 'on schedule' : `${fmt(res.recommendedMonthly)} recommended`}` : 'No monthly contribution set'} button="Lever" dark={res.pct < 50} onClick={() => onGo('planning', 'reserves')} />}
-        />
+          value={res.next ? String(res.next.year) : res.pct}
+          unit={res.next ? 'next big repair' : '% funded'}
+          sub={res.next ? `${fmt(res.funded)} of ${fmt(res.needed)} funded · ${res.monthly > 0 ? `${fmt(res.monthly)} a month · ${res.onSchedule ? 'on schedule' : `${fmt(res.recommendedMonthly)} recommended`}` : 'no monthly contribution set'}` : `${fmt(res.funded)} of ${fmt(res.needed)} set aside`}
+          action={<Action label={res.next ? `${res.next.name} · ${fmt(res.next.cost)}` : 'Reserve study'} button="Lever" onClick={() => onGo('planning', 'reserves')} />}
+        >
+          <Ring pct={res.pct} light />
+        </Tile>
       </TileRow>
 
       <Card aria-label="Done for you">
