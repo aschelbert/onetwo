@@ -5,9 +5,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
 
+const tenantFlags = vi.hoisted(() => ({ pmSeat: true }));
 vi.mock('@/components/TenantProvider', () => ({
-  useTenantContext: () => ({ name: 'Sunny Acres', isDemo: true, status: 'active', tier: 'management_suite', features: {}, id: 't1' }),
+  useTenantContext: () => ({ name: 'Sunny Acres', isDemo: true, status: 'active', tier: 'management_suite', pmSeat: tenantFlags.pmSeat, features: {}, id: 't1' }),
 }));
+vi.mock('@/features/association-team/tabs/TaskTrackingTab', () => ({ default: () => <div data-testid="legacy-tasks" /> }));
+vi.mock('@/features/association-team/tabs/CommunicationsTab', () => ({ default: () => <div data-testid="legacy-intercom" /> }));
 vi.mock('@/features/issues/IssuesPage', () => ({ default: ({ embedded, prefill }: { embedded?: boolean; prefill?: { catId: string; sitId: string } }) => <div data-testid="legacy-issues" data-embedded={embedded ? '1' : '0'}>{prefill ? `${prefill.catId}/${prefill.sitId}` : 'page'}</div> }));
 vi.mock('@/features/boardroom/BoardRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-boardroom" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/boardroom/tabs/CommunicationsTab', () => ({ default: () => <div data-testid="legacy-comms" /> }));
@@ -38,14 +41,15 @@ function renderAt(path: string) {
 describe('Board Room', () => {
   beforeEach(() => {
     localStorage.clear();
+    tenantFlags.pmSeat = true;
     useRunbookSwitches.setState({ off: ['vendor-bids'] });
   });
 
-  it('renders Open with a row per open case and the five sections', () => {
+  it('renders Open with a row per open case and the seven sections', () => {
     renderAt('/boardroom');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Board Room');
     const nav = screen.getByRole('navigation', { name: 'Board Room sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Open', 'Inbox', 'Runbooks', 'Outbox', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Open', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom', 'Archive']);
     const open = useIssuesStore.getState().cases.filter(c => c.status === 'open').length;
     expect(document.querySelectorAll('tr[data-case]').length).toBe(open);
   });
@@ -108,6 +112,20 @@ describe('Board Room', () => {
     expect(screen.getByText('Drafts')).toBeTruthy();
     renderAt('/boardroom?tab=archive');
     expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
+  });
+
+  it('Tasks and the Intercom mount the team tools with the Property Manager Seat, and are gone without it', () => {
+    renderAt('/boardroom?tab=tasks');
+    expect(screen.getByTestId('legacy-tasks')).toBeTruthy();
+    renderAt('/boardroom?tab=intercom');
+    expect(screen.getByTestId('legacy-intercom')).toBeTruthy();
+    renderAt('/association-team-redirected?tab=x');
+    tenantFlags.pmSeat = false;
+    renderAt('/boardroom?tab=intercom');
+    const navs = screen.getAllByRole('navigation', { name: 'Board Room sections' });
+    const last = navs[navs.length - 1];
+    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Open', 'Inbox', 'Runbooks', 'Outbox', 'Archive']);
+    expect(screen.getAllByTestId('legacy-intercom').length).toBe(1);
   });
 
   it('absorbed tabs redirect to Building and Community; owners keep their own case view', () => {

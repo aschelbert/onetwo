@@ -2,11 +2,14 @@
  * Community — where the building acts together (ux2.community).
  *
  *  Overview   recent notices, building stewardship, the owner leaderboard
+ *  Calendar   everything with a date, the same list Home shows, for owners too
  *  Notices    the bulletin board: alerts, pinned, every post; the board posts here
  *  Meetings   scheduling, notices, agendas, attendance, minutes and approvals
  *  Votes      open owner votes, board decisions, the election, proxies and quorum
  *  Requests   ask the board, follow yours, see the building's
+ *  Log        the property log: anyone logs what they see, the team follows up
  *  Amenities  reserve, approve, rules (management suite)
+ *  Scorecard  the board's quarterly review of the property manager (Property Manager Seat)
  *
  * Owners and the board see the same screen; the board also sees the manage
  * controls. The detail under each section is the production component that
@@ -31,10 +34,13 @@ import MeetingsTab from './tabs/MeetingsTab';
 import VotesTab from './tabs/VotesTab';
 import RequestsTab from './tabs/RequestsTab';
 import AmenitiesSection from './tabs/AmenitiesSection';
+import LogTab from './tabs/LogTab';
+import ScorecardTab from './tabs/ScorecardTab';
+import CalendarView from '../home/CalendarView';
 
-export type CommunityTab = 'overview' | 'notices' | 'meetings' | 'votes' | 'requests' | 'amenities';
-const TAB_IDS: CommunityTab[] = ['overview', 'notices', 'meetings', 'votes', 'requests', 'amenities'];
-export const LEGACY_TABS: Record<string, CommunityTab> = { announcements: 'notices', news: 'overview' };
+export type CommunityTab = 'overview' | 'calendar' | 'notices' | 'meetings' | 'votes' | 'requests' | 'log' | 'amenities' | 'scorecard';
+const TAB_IDS: CommunityTab[] = ['overview', 'calendar', 'notices', 'meetings', 'votes', 'requests', 'log', 'amenities', 'scorecard'];
+export const LEGACY_TABS: Record<string, CommunityTab> = { announcements: 'notices', news: 'overview', 'property-log': 'log', 'pm-scorecard': 'scorecard' };
 
 export function resolveCommunityTab(raw: string | null): CommunityTab {
   if (!raw) return 'overview';
@@ -47,6 +53,7 @@ export default function CommunityModule() {
   const tab = resolveCommunityTab(params.get('tab'));
   const tenant = useTenantContext();
   const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  const pmSeat = tenant.pmSeat;
   const snap = useCommunitySnapshot();
   const isBoard = snap.viewer.isBoard;
 
@@ -69,6 +76,9 @@ export default function CommunityModule() {
 
   const subtitle = {
     overview: 'Where the building acts together: how we are doing as a building, and the latest notices, meetings, votes and requests.',
+    calendar: 'Everything with a date, in one list: meetings, votes, vendor visits, reservations, dues days. The same calendar as Home.',
+    log: 'The property log. Anyone can log what they see around the building; the board and the manager follow up.',
+    scorecard: 'How the property manager is doing, quarter by quarter, as the board rates them in five categories.',
     notices: 'The bulletin board. What the building needs to know, who posted it, and the alerts channel for anything urgent.',
     meetings: 'Scheduling, notices, agendas, attendance, minutes and their approval, in one place for the board and the owners.',
     votes: 'Open votes for owners and the board, ballots, proxies, quorum, results and certification.',
@@ -78,11 +88,14 @@ export default function CommunityModule() {
 
   const tabs = [
     { id: 'overview' as CommunityTab, label: 'Overview' },
+    { id: 'calendar' as CommunityTab, label: 'Calendar' },
     { id: 'notices' as CommunityTab, label: 'Notices', badge: notices.pinned.length ? `${notices.pinned.length} pinned` : undefined, badgeTone: 'cyan' as const },
     { id: 'meetings' as CommunityTab, label: 'Meetings', badge: meetings.next ? dayLabel(meetings.next.meeting.date) : undefined, badgeTone: meetings.noticesOverdue.length ? 'red' as const : 'ghost' as const },
     { id: 'votes' as CommunityTab, label: 'Votes', badge: votes.open.length ? `${votes.open.length} open` : undefined, badgeTone: 'plum' as const },
     { id: 'requests' as CommunityTab, label: 'Requests', badge: (isBoard ? requests.open.length : requests.mineOpen.length) || undefined, badgeTone: requests.overdue.length && isBoard ? 'red' as const : 'ghost' as const },
+    { id: 'log' as CommunityTab, label: 'Property log' },
     ...(isManagementSuite ? [{ id: 'amenities' as CommunityTab, label: 'Amenities', badge: isBoard && pendingApprovals ? `${pendingApprovals} to approve` : myReservations || undefined, badgeTone: 'amber' as const }] : []),
+    ...(pmSeat ? [{ id: 'scorecard' as CommunityTab, label: 'PM scorecard' }] : []),
   ];
 
   return (
@@ -104,11 +117,14 @@ export default function CommunityModule() {
       </header>
 
       {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
+      {tab === 'calendar' && <CalendarView cards={[]} today={snap.today} forOwner={!isBoard} />}
       {tab === 'notices' && <NoticesTab snap={snap} />}
       {tab === 'meetings' && <MeetingsTab snap={snap} highlightId={params.get('meeting')} />}
       {tab === 'votes' && <VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} />}
       {tab === 'requests' && <RequestsTab snap={snap} highlightId={params.get('request')} />}
+      {tab === 'log' && <LogTab isBoard={isBoard} />}
       {tab === 'amenities' && isManagementSuite && <AmenitiesSection snap={snap} />}
+      {tab === 'scorecard' && pmSeat && <ScorecardTab isBoard={isBoard} today={snap.today} />}
     </div>
   );
 }

@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useScorecardStore } from '@/store/useScorecardStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 
+const tenantFlags = vi.hoisted(() => ({ pmSeat: true }));
 vi.mock('@/components/TenantProvider', () => ({
-  useTenantContext: () => ({ name: 'Sunny Acres', isDemo: true, status: 'active', tier: 'management_suite', features: {}, id: 't1' }),
+  useTenantContext: () => ({ name: 'Sunny Acres', isDemo: true, status: 'active', tier: 'management_suite', pmSeat: tenantFlags.pmSeat, features: {}, id: 't1' }),
 }));
+vi.mock('@/features/property-log/PropertyLogPage', () => ({ default: () => <div data-testid="legacy-log" /> }));
 vi.mock('@/features/community/CommunityRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-community" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/boardroom/BoardRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-boardroom" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/elections/ElectionsPage', () => ({ default: ({ embedded, initialSelectedId }: { embedded?: boolean; initialSelectedId?: string | null }) => <div data-testid="legacy-votes" data-embedded={embedded ? '1' : '0'}>{initialSelectedId ?? 'list'}</div> }));
@@ -32,13 +35,14 @@ function renderAt(path: string) {
 describe('Community', () => {
   beforeEach(() => {
     localStorage.clear();
+    tenantFlags.pmSeat = true;
   });
 
-  it('renders the Overview with notices, building stewardship and the leaderboard, and the six sections', () => {
+  it('renders the Overview with notices, building stewardship and the leaderboard, and the nine sections', () => {
     renderAt('/community');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Community');
     const nav = screen.getByRole('navigation', { name: 'Community sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ pinned|\d+ open|\d+ to approve|[A-Z][a-z]{2} \d{1,2}|\d+)$/, '').trim())).toEqual(['Overview', 'Notices', 'Meetings', 'Votes', 'Requests', 'Amenities']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ pinned|\d+ open|\d+ to approve|[A-Z][a-z]{2} \d{1,2}|\d+)$/, '').trim())).toEqual(['Overview', 'Calendar', 'Notices', 'Meetings', 'Votes', 'Requests', 'Property log', 'Amenities', 'PM scorecard']);
     expect(document.querySelector('[aria-label="Recent notices"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Building stewardship"]')).toBeTruthy();
     expect(document.querySelectorAll('[data-leader]').length).toBeGreaterThan(0);
@@ -105,6 +109,45 @@ describe('Community', () => {
       fireEvent.click(upvote);
       expect(screen.getAllByRole('button', { name: /Upvote · \d+/ })[0].textContent).toContain(String(n + 1));
     }
+  });
+
+  it('Calendar shows the building\'s dates to everyone; the Property log takes an owner\'s entry', () => {
+    renderAt('/community?tab=calendar');
+    expect(document.querySelector('[data-widget="calendar"]')).toBeTruthy();
+    useAuthStore.setState({ currentRole: 'RESIDENT' });
+    try {
+      renderAt('/community?tab=log');
+      expect(screen.getAllByTestId('legacy-log').length).toBeGreaterThan(0);
+      expect(document.querySelector('[aria-label="Property log"]')).toBeTruthy();
+    } finally {
+      useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
+    }
+  });
+
+  it('PM scorecard: the board rates the manager through the scorecard store', () => {
+    renderAt('/community?tab=scorecard');
+    expect(document.querySelector('[data-widget="pm-scorecard"]')).toBeTruthy();
+    expect(screen.getByText('This quarter')).toBeTruthy();
+    const before = useScorecardStore.getState().reviews.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Write a review' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Responsiveness 4 of 5' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Financial 5 of 5' }));
+    fireEvent.change(screen.getByLabelText('Summary'), { target: { value: 'A steady quarter.' } });
+    fireEvent.change(screen.getByLabelText('Strengths 1'), { target: { value: 'Reports on time' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit review' }));
+    const reviews = useScorecardStore.getState().reviews;
+    expect(reviews.length).toBe(before + 1);
+    expect(reviews[0]).toMatchObject({ overallRating: 4.5, summary: 'A steady quarter.', strengths: ['Reports on time'] });
+    expect(reviews[0].categoryRatings.financial?.score).toBe(5);
+    useScorecardStore.getState().deleteReview(reviews[0].id);
+  });
+
+  it('without the Property Manager Seat there is no PM scorecard', () => {
+    tenantFlags.pmSeat = false;
+    renderAt('/community?tab=scorecard');
+    const nav = screen.getByRole('navigation', { name: 'Community sections' });
+    expect(within(nav).queryByRole('button', { name: /PM scorecard/ })).toBeNull();
+    expect(document.querySelector('[data-widget="pm-scorecard"]')).toBeNull();
   });
 
   it('Amenities mounts the production tab for the management suite', () => {

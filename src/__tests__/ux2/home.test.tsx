@@ -38,7 +38,19 @@ describe('Home', () => {
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeTruthy();
     expect(screen.getByText('Reserves funded')).toBeTruthy();
     expect(screen.getByText('Collected')).toBeTruthy();
-    expect(document.querySelectorAll('[aria-label="Calendar"] [data-month]')).toHaveLength(4);
+    expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
+  });
+
+  it('Feed | Calendar flips the feed for the merged calendar, kept in the URL', () => {
+    renderHome('/home?view=calendar');
+    expect(document.querySelector('[data-widget="calendar"]')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull();
+    expect(document.querySelector('[data-widget="calendar"] [data-month]')).toBeTruthy();
+    expect(screen.getByText(/Nothing scheduled today|Nothing scheduled in/)).toBeTruthy();
+    const views = screen.getByRole('navigation', { name: 'Home views' });
+    fireEvent.click(within(views).getByRole('button', { name: /^Feed/ }));
+    expect(screen.getByRole('region', { name: 'Up next' })).toBeTruthy();
+    expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
   });
 
   it('a card action deep links into the production page', () => {

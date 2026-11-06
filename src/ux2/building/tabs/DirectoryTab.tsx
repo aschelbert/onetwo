@@ -2,10 +2,6 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BuildingPage from '@/features/building/BuildingPage';
 import TheUnitsTab from '@/features/building/tabs/TheUnitsTab';
-import PropertyLogPage from '@/features/property-log/PropertyLogPage';
-import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
-import PMScorecardTab from '@/features/building/tabs/PMScorecardTab';
-import IntercomTab from '@/features/association-team/tabs/CommunicationsTab';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -16,8 +12,8 @@ import { boardEvents } from '../../score/events';
 import { bandFor, computeScorecard } from '../../score/stewardship';
 import type { BuildingSnapshot } from '../metrics';
 
-type Section = 'units' | 'people' | 'log' | 'tasks' | 'scorecard' | 'intercom';
-const SECTIONS: Section[] = ['units', 'people', 'log', 'tasks', 'scorecard', 'intercom'];
+type Section = 'units' | 'people';
+const SECTIONS: Section[] = ['units', 'people'];
 
 function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('');
@@ -115,12 +111,6 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const tabs = [
     { id: 'units' as Section, label: 'Units & owners', badge: units.length || undefined },
     { id: 'people' as Section, label: 'Board, management & staff', badge: snap.board.length || undefined },
-    ...(isBoard ? [
-      { id: 'log' as Section, label: 'Property log' },
-      { id: 'tasks' as Section, label: 'Tasks' },
-      { id: 'scorecard' as Section, label: 'PM scorecard' },
-      { id: 'intercom' as Section, label: 'Intercom' },
-    ] : []),
   ];
   return (
     <div className="flex flex-col gap-5">
@@ -135,10 +125,6 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
         </Card>
       )}
       {current === 'people' && <People snap={snap} isBoard={isBoard} />}
-      {current === 'log' && isBoard && <div className="ux2-legacy"><PropertyLogPage /></div>}
-      {current === 'tasks' && isBoard && <div className="ux2-legacy"><TaskTrackingTab /></div>}
-      {current === 'scorecard' && isBoard && <div className="ux2-legacy"><PMScorecardTab /></div>}
-      {current === 'intercom' && isBoard && <div className="ux2-legacy"><IntercomTab /></div>}
     </div>
   );
 }

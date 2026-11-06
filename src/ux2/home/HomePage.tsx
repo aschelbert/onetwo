@@ -2,23 +2,25 @@
  * Home — the redesign's landing page (ux2.home).
  *
  * Replaces the role dashboards with one feed: what needs you now, what waits
- * on others, what is coming up, your stewardship card, the building's numbers
- * and a four-month calendar. Every card is a deep link into the production
- * page that owns the record, so completing a card uses the existing flow.
+ * on others, what is coming up, your stewardship card and the building's
+ * numbers. Feed | Calendar flips the feed for the merged calendar of
+ * everything dated (`CalendarView`). Every card is a deep link into the
+ * production page that owns the record, so completing a card uses the
+ * existing flow.
  *
  *  Board member / manager: Up next · Waiting on others · Upcoming · Stewardship ·
  *                           Reserves / Collected / Open cases · Calendar · Pulse
  *  Owner:                   Balance + Pay · Up next · Stewardship · Calendar · Pulse
  */
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt, cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, SectionLabel, Tile, TileRow } from '../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Tile, TileRow } from '../components';
 import type { ChipTone } from '../components';
 import StewardshipRadar from '../components/StewardshipRadar';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
@@ -26,7 +28,8 @@ import { contextFor, todayIso, useCardInput, useStoreSnapshot } from '../runbook
 import { useRunbookStore } from '../runbook/store';
 import { stewardshipFor } from '../score/events';
 import { DIMENSIONS } from '../score/stewardship';
-import { dayLabel, groupByMonth } from './calendar';
+import { dayLabel } from './calendar';
+import CalendarView from './CalendarView';
 
 const STATUS_TONE: Record<RunbookCard['status'], ChipTone> = {
   overdue: 'red',
@@ -167,48 +170,6 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   );
 }
 
-function Calendar({ cards, today }: { cards: RunbookCard[]; today: string }) {
-  const groups = useMemo(() => groupByMonth(cards, today), [cards, today]);
-  const [i, setI] = useState(0);
-  const go = useGo();
-  return (
-    <Card aria-label="Calendar">
-      <div className="flex items-center justify-between">
-        <SectionLabel>Next four months</SectionLabel>
-        <div className="flex gap-1">
-          <button type="button" aria-label="Earlier month" disabled={i === 0} onClick={() => setI(x => Math.max(0, x - 1))} className="h-8 w-8 rounded-full border border-ux2-line bg-white disabled:opacity-40">‹</button>
-          <button type="button" aria-label="Later month" disabled={i >= groups.length - 1} onClick={() => setI(x => Math.min(groups.length - 1, x + 1))} className="h-8 w-8 rounded-full border border-ux2-line bg-white disabled:opacity-40">›</button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        {groups.map((g, gi) => (
-          <Inner key={g.key} className={cn('min-h-[120px]', gi !== i && 'hidden md:block')} data-month={g.key}>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold text-ux2-ink">{g.label}</span>
-              <Chip tone={g.cards.length ? 'cyan' : 'ghost'}>{g.cards.length}</Chip>
-            </div>
-            {g.cards.length === 0 ? (
-              <div className="text-xs text-ux2-dim">Nothing dated</div>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                {g.cards.slice(0, 6).map(c => (
-                  <li key={c.id}>
-                    <button type="button" onClick={() => go(c.action.path)} className="flex w-full items-baseline gap-2 text-left hover:underline">
-                      <span className={cn('w-12 shrink-0 text-[11px] font-semibold', c.status === 'overdue' ? 'text-ux2-red-ink' : 'text-ux2-muted')}>{dayLabel(c.due!)}</span>
-                      <span className="truncate text-xs text-ux2-ink">{c.title}</span>
-                    </button>
-                  </li>
-                ))}
-                {g.cards.length > 6 && <li className="text-[11px] text-ux2-dim">+{g.cards.length - 6} more</li>}
-              </ul>
-            )}
-          </Inner>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
 function Pulse() {
   const go = useGo();
   const meetings = useMeetingsStore(s => s.meetings);
@@ -274,6 +235,9 @@ export default function HomePage() {
   const myUnits = fin.units.filter(u => viewer.linkedUnits.includes(u.number));
   const myBalance = myUnits.reduce((s, u) => s + u.balance + u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0), 0);
   const dated = useMemo(() => [...set.forYou, ...set.waitingOnOthers, ...set.upcoming].filter(c => c.due), [set]);
+  const [params, setParams] = useSearchParams();
+  const view: 'feed' | 'calendar' = params.get('view') === 'calendar' ? 'calendar' : 'feed';
+  const setView = (v: string) => setParams(prev => { const p = new URLSearchParams(prev); if (v === 'calendar') p.set('view', 'calendar'); else p.delete('view'); return p; }, { replace: true });
 
   const radar = (
     <StewardshipRadar
@@ -287,11 +251,14 @@ export default function HomePage() {
   return (
     <div data-page="ux2-home" className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
-        <div>
-          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">
-            {greeting()}, {viewer.name.split(' ')[0]}
-          </h1>
-          <p className="text-sm text-ux2-muted">{longDate(today)} · {tenant.name}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">
+              {greeting()}, {viewer.name.split(' ')[0]}
+            </h1>
+            <p className="text-sm text-ux2-muted">{longDate(today)} · {tenant.name}</p>
+          </div>
+          <PillTabs size="filter" aria-label="Home views" value={view} onChange={setView} tabs={[{ id: 'feed', label: 'Feed', badge: set.forYou.length || undefined }, { id: 'calendar', label: 'Calendar' }]} />
         </div>
         <AttentionChips set={set} role={viewer.role} />
       </header>
@@ -361,15 +328,18 @@ export default function HomePage() {
             </TileRow>
           )}
 
-          <Card aria-label="Your runbook">
-            <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
-            <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />
-            <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
-          </Card>
+          {view === 'calendar' ? (
+            <CalendarView cards={dated} today={today} forOwner={isOwner} />
+          ) : (
+            <Card aria-label="Your runbook">
+              <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
+              <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />
+              <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
+            </Card>
+          )}
         </div>
       </div>
 
-      <Calendar cards={dated} today={today} />
       <Pulse />
     </div>
   );
