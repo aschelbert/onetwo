@@ -16,7 +16,7 @@ interface HowTo {
   steps: string[];
 }
 
-interface GuideSection {
+export interface GuideSection {
   id: string;
   title: string;
   icon: React.ElementType;
@@ -28,7 +28,7 @@ interface GuideSection {
   access: string[];
 }
 
-const GUIDES: GuideSection[] = [
+export const GUIDES: GuideSection[] = [
   {
     id: 'dashboard',
     title: 'Dashboard',

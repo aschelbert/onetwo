@@ -11,15 +11,11 @@ import PayPage from '@/ux2/funds/PayPage';
 import BuildingSwitch, { ArchivesSwitch, AssociationTeamSwitch } from '@/ux2/building/BuildingSwitch';
 import CommunitySwitch, { VotingRedirect } from '@/ux2/community/CommunitySwitch';
 import BoardRoomSwitch, { CasesRedirect, IssuesSwitch } from '@/ux2/boardroom/BoardRoomSwitch';
+import { AccountSwitch, MyUnitSwitch, SubscriptionSwitch, SupportSwitch, UsersSwitch } from '@/ux2/me/MeSwitch';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
-import MyUnitPage from '@/features/unit-manager/MyUnitPage';
-import AccountSettingsPage from '@/features/account/AccountSettingsPage';
-import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
-import HelpSupportPage from '@/features/support/HelpSupportPage';
-import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
 import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
@@ -247,12 +243,12 @@ export default function App() {
           <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamSwitch /></ErrorBoundary>} />
           <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
           <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunitySwitch /></ErrorBoundary>} />
-          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
+          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitSwitch /></ErrorBoundary>} />
           <Route path="/my-unit/pay" element={<ErrorBoundary fallbackLevel="page"><PayPage /></ErrorBoundary>} />
-          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
-          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
-          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
-          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
+          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSwitch /></ErrorBoundary>} />
+          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><SupportSwitch /></ErrorBoundary>} />
+          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionSwitch /></ErrorBoundary>} />
+          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UsersSwitch /></ErrorBoundary>} />
         </Route>
 
         {/* Catch-all */}

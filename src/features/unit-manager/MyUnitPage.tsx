@@ -8,7 +8,8 @@ import MyMoveHistoryTab from './tabs/MyMoveHistoryTab';
 
 type MyUnitTab = 'balance' | 'documents' | 'moves';
 
-export default function MyUnitPage() {
+/** `embedded` hides the gradient header (the Link Unit button moves to a slim row) so the UX2 Me module can mount the unit tabs inside its own layout. Default rendering is unchanged. */
+export default function MyUnitPage({ embedded }: { embedded?: boolean } = {}) {
   const { currentUser } = useAuthStore();
   const store = useFinancialStore();
   const { units, hoaDueDay } = store;
@@ -92,7 +93,12 @@ export default function MyUnitPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white">
+      {embedded && (
+        <div className="flex justify-end">
+          <button onClick={() => setShowLinkModal(true)} className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg text-sm font-medium hover:bg-ink-50">+ Link Unit</button>
+        </div>
+      )}
+      {!embedded && <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-2xl font-bold">My Unit{myUnits.length > 1 ? 's' : ''}</h1>
@@ -100,7 +106,7 @@ export default function MyUnitPage() {
           </div>
           <button onClick={() => setShowLinkModal(true)} className="px-4 py-2 bg-white bg-opacity-20 text-white rounded-lg text-sm font-medium hover:bg-opacity-30">+ Link Unit</button>
         </div>
-      </div>
+      </div>}
 
       {/* Unit selector */}
       {myUnits.length > 1 && (

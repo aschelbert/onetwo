@@ -1,0 +1,87 @@
+/**
+ * Me — the avatar-menu area (ux2.me): My Account, My Unit(s), User
+ * Management, Subscription, Help & Support. Each keeps its production route
+ * (`/account`, `/my-unit`, `/admin/users`, `/subscription`, `/support`) so
+ * the avatar menu and every old link still work; the module draws one
+ * header and tab row over them. The detail under each tab is the
+ * production page, mounted embedded, so profile saves, unit linking,
+ * document upload, invites (`send-invite`), Chargebee (`manage-subscription`,
+ * `chargebee-portal`) and the realtime support thread are the code paths
+ * production runs today.
+ */
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useTenantContext } from '@/components/TenantProvider';
+import { Button, PillTabs } from '../components';
+import { useMeSnapshot } from './useMeSnapshot';
+import AccountTab from './tabs/AccountTab';
+import UnitsTab from './tabs/UnitsTab';
+import UsersTab from './tabs/UsersTab';
+import SubscriptionTab from './tabs/SubscriptionTab';
+import HelpTab from './tabs/HelpTab';
+
+export type MeTab = 'account' | 'unit' | 'users' | 'subscription' | 'help';
+
+export const ME_PATHS: Record<MeTab, string> = { account: '/account', unit: '/my-unit', users: '/admin/users', subscription: '/subscription', help: '/support' };
+
+export function meTabForPath(pathname: string): MeTab {
+  if (pathname.startsWith('/my-unit')) return 'unit';
+  if (pathname.startsWith('/admin/users')) return 'users';
+  if (pathname.startsWith('/subscription')) return 'subscription';
+  if (pathname.startsWith('/support')) return 'help';
+  return 'account';
+}
+
+export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const tab = forced ?? meTabForPath(pathname);
+  const snap = useMeSnapshot();
+  const tenant = useTenantContext();
+  const signOut = useAuthStore(s => s.signOut);
+  const role = snap.viewer.role;
+  const canManage = role === 'BOARD_MEMBER' || role === 'PROPERTY_MANAGER';
+  const canBill = role === 'BOARD_MEMBER' && !tenant.isDemo;
+  const units = snap.viewer.linkedUnits;
+
+  const tabs = [
+    { id: 'account' as MeTab, label: 'My Account' },
+    { id: 'unit' as MeTab, label: units.length > 1 ? 'My Units' : 'My Unit', badge: units.length > 1 ? units.length : units[0], badgeTone: 'cyan' as const },
+    ...(canManage ? [{ id: 'users' as MeTab, label: 'User Management', badge: 'Admin', badgeTone: 'ghost' as const }] : []),
+    ...(canBill ? [{ id: 'subscription' as MeTab, label: 'Subscription', badge: tenant.tier === 'facilities' ? 'Plus Facilities' : 'Self-Managed', badgeTone: 'ghost' as const }] : []),
+    { id: 'help' as MeTab, label: 'Help & Support' },
+  ];
+
+  const title = { account: 'My Account', unit: units.length > 1 ? 'My Units' : `My Unit${units[0] ? ` · ${units[0]}` : ''}`, users: 'User Management', subscription: 'Subscription', help: 'Help & Support' }[tab];
+  const subtitle = {
+    account: `Profile, notifications and preferences. Signed in as ${snap.viewer.email}${snap.viewer.officerTitle ? ` · ${snap.viewer.officerTitle}` : ''}.`,
+    unit: units.length > 1 ? `${units.length} units on one sign-in. One vote per unit, one ledger per unit, one place to see both.` : `${tenant.name} · dues on the ${snap.hoaDueDay}${['th', 'st', 'nd', 'rd'][(snap.hoaDueDay % 100 - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][snap.hoaDueDay % 100] ?? 'th'} · the same page every owner sees.`,
+    users: `Who can sign in to ${tenant.name}, what each role sees, and the invites still out. Admin only.`,
+    subscription: `${tenant.name}'s plan, billing and add-ons. Only admins see this tab.`,
+    help: 'Find an answer, learn how ONE two works, or reach a person.',
+  }[tab];
+
+  return (
+    <div data-page="ux2-me" className="flex flex-col gap-5">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">{title}</h1>
+            <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {tab === 'unit' && units.length > 0 && <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button>}
+            {tab === 'account' && <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>}
+          </div>
+        </div>
+        <PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />
+      </header>
+
+      {tab === 'account' && <AccountTab snap={snap} />}
+      {tab === 'unit' && <UnitsTab snap={snap} />}
+      {tab === 'users' && canManage && <UsersTab snap={snap} />}
+      {tab === 'subscription' && canBill && <SubscriptionTab />}
+      {tab === 'help' && <HelpTab snap={snap} />}
+    </div>
+  );
+}

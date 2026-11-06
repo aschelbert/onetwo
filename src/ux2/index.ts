@@ -21,3 +21,6 @@ export * from './community/metrics';
 export { default as BoardRoomModule } from './boardroom/BoardRoomModule';
 export { default as BoardRoomSwitch } from './boardroom/BoardRoomSwitch';
 export * from './boardroom/runbooks';
+export { default as MeModule } from './me/MeModule';
+export * from './me/metrics';
+export * from './me/help';
