@@ -408,7 +408,7 @@ export default function TheUnitsTab({ variant = 'fiscal' }: { variant?: 'buildin
       {/* Search + Filter */}
       <div className="flex flex-wrap gap-3 items-center">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search units, owners, email..." className="flex-1 min-w-[200px] px-3 py-2 border border-ink-200 rounded-lg text-sm" />
-        {!isBuildingView && <div className="flex gap-1.5">
+        {!isBuildingView && <div className="flex flex-wrap gap-1.5">
           {(['all','current','behind','delinquent','for_sale'] as AccountFilter[]).map(fv => (
             <button key={fv} onClick={() => setFilter(fv)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filter === fv ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-ink-500 hover:border-ink-300'}`}>
               {fv === 'all' ? 'All' : fv === 'behind' ? 'Behind' : fv === 'for_sale' ? 'For Sale' : fv.charAt(0).toUpperCase() + fv.slice(1)}

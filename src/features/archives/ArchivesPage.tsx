@@ -279,9 +279,14 @@ function HeaderMenu({ onNewReport, onNewArchive }: { onNewReport: () => void; on
 // ─── Main page ───────────────────────────────────────────────────────────────
 type PageTab = 'reports' | 'archives';
 
-export default function ArchivesPage() {
+/**
+ * `embedded` hides the gradient header and the tab bar and starts on `tab`,
+ * so the UX2 Building module can mount Reports or Governance Archives inside
+ * its own layout. The create actions move to a slim row. Default rendering is unchanged.
+ */
+export default function ArchivesPage({ embedded, tab: initialTab }: { embedded?: boolean; tab?: PageTab } = {}) {
   // Page tab
-  const [pageTab, setPageTab] = useState<PageTab>('reports');
+  const [pageTab, setPageTab] = useState<PageTab>(initialTab ?? 'reports');
 
   // Stores
   const archiveStore = useArchiveStore();
@@ -473,8 +478,19 @@ export default function ArchivesPage() {
 
   return (
     <div className="space-y-0">
+      {embedded && (
+        <div className="flex items-center justify-between gap-3 pb-3">
+          <div>{backLabel}</div>
+          {!selectedArchiveId && isBoard && (
+            <HeaderMenu
+              onNewReport={openReportPanel}
+              onNewArchive={() => { setArchiveYear(String(new Date().getFullYear() - 1)); setShowCreateArchiveModal(true); }}
+            />
+          )}
+        </div>
+      )}
       {/* ── Gradient header ── */}
-      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
+      {!embedded && <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             {backLabel}
@@ -488,10 +504,10 @@ export default function ArchivesPage() {
             />
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── Tab bar (hidden when viewing an archive detail) ── */}
-      {!selectedArchiveId && (
+      {!selectedArchiveId && !embedded && (
         <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
           <div className="flex min-w-max px-4">
             {([
@@ -516,7 +532,7 @@ export default function ArchivesPage() {
       )}
 
       {/* ── Tab content ── */}
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
 
         {/* ────── REPORTS TAB ────── */}
         {!selectedArchiveId && pageTab === 'reports' && (

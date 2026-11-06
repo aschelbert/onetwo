@@ -6,10 +6,10 @@ import path from 'path'
 
 // Routes that should serve app.html instead of index.html (marketing)
 const APP_ROUTES = [
-  '/login', '/reset-password', '/dashboard', '/financial', '/issues',
+  '/login', '/reset-password', '/dashboard', '/home', '/financial', '/funds', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
-  '/admin', '/portfolio',
+  '/admin', '/portfolio', '/support', '/subscription', '/association-team', '/cases',
 ]
 
 const STATIC_PAGES: Record<string, string> = {
@@ -65,6 +65,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/__tests__/setup.ts'],
-    include: ['src/__tests__/**/*.test.ts'],
+    include: ['src/__tests__/**/*.test.{ts,tsx}'],
   },
 })

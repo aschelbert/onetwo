@@ -25,12 +25,18 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: { la
 
 type ModalState = null | 'addBoard' | 'editBoard' | 'editMgmt' | 'addCounsel' | 'editCounsel' | 'editAddress' | 'editDetails' | 'addDoc' | 'editDoc' | 'addIns' | 'editIns' | 'addVendor' | 'editVendor' | 'addMaint' | 'editMaint' | 'addAsset' | 'editAsset' | 'autoMaintVendor';
 
-export default function BuildingPage() {
+/**
+ * `embedded` hides the gradient header and the tab bar and pins `tab`, so the
+ * UX2 Building module can mount one production tab (with its modals) inside
+ * its own layout. Default rendering is unchanged.
+ */
+export default function BuildingPage({ embedded, tab: forcedTab }: { embedded?: boolean; tab?: typeof TABS[number] } = {}) {
   const store = useBuildingStore();
   const { currentRole } = useAuthStore();
   const finStore = useFinancialStore();
   const isBoard = currentRole === 'BOARD_MEMBER' || currentRole === 'PROPERTY_MANAGER';
-  const [tab, setTab] = useTabParam<typeof TABS[number]>('tab', 'details', [...TABS]);
+  const [urlTab, setTab] = useTabParam<typeof TABS[number]>('tab', 'details', [...TABS]);
+  const tab = forcedTab ?? urlTab;
   const visibleTabs = isBoard ? TABS : TABS.filter(t => t !== 'units' && t !== 'mailing');
   const [modal, setModal] = useState<ModalState>(null);
   const [editId, setEditId] = useState('');
@@ -67,7 +73,7 @@ export default function BuildingPage() {
   return (
     <div className="space-y-0">
       {/* Building header — dark gradient, rounded-t only */}
-      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
+      {!embedded && <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">🏢 {store.name}</h2>
@@ -101,19 +107,19 @@ export default function BuildingPage() {
             <p className="text-[10px] text-accent-300">of each month</p>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Tab Nav */}
-      <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
+      {!embedded && <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
         <div className="flex min-w-max px-4">
           {visibleTabs.map(t => (
             <button key={t} onClick={() => setTab(t)} className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>{TAB_LABELS[t]}{t === 'assets' && <span className="ml-1.5 text-[9px] bg-accent-600 text-white px-1.5 py-0.5 rounded font-bold tracking-wide">NEW</span>}</button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Tab Content */}
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
           {/* CONTACTS */}
           {tab === 'contacts' && (<div className="space-y-6">
             <div>

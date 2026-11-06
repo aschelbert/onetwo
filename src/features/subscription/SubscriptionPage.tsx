@@ -71,7 +71,8 @@ function computeDisplayPrice(
   return total;
 }
 
-export default function SubscriptionPage() {
+/** `embedded` hides the title and the centred box so the UX2 Me module can mount the plan, add-ons, billing and cancel sections inside its own layout. Default rendering is unchanged. */
+export default function SubscriptionPage({ embedded }: { embedded?: boolean } = {}) {
   const { currentRole } = useAuthStore();
   const tenant = useTenantContext();
   const [sub, setSub] = useState<SubscriptionData | null>(null);
@@ -314,8 +315,8 @@ export default function SubscriptionPage() {
   const isManageable = !sub.cancel_at_period_end && sub.status !== 'canceled';
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <h1 className="font-display text-2xl font-bold text-ink-900">Subscription</h1>
+    <div className={embedded ? 'space-y-6' : 'max-w-2xl mx-auto p-6 space-y-6'}>
+      {!embedded && <h1 className="font-display text-2xl font-bold text-ink-900">Subscription</h1>}
 
       {/* Status messages */}
       {error && (

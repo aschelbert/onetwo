@@ -228,7 +228,7 @@ export default function CommunicationsTab() {
           <h3 className="font-display text-xl font-bold text-ink-900">Communications</h3>
           <p className="text-sm text-ink-500 mt-0.5">{communications.length} communications sent</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-ink-100 rounded-lg p-0.5">
             <button onClick={() => setSubView('feed')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${subView === 'feed' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
               Communications
