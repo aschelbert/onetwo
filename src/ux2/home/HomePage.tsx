@@ -248,6 +248,40 @@ export default function HomePage() {
     />
   );
 
+  /** The stewardship card and, for an owner, the balance: the right column in both views. */
+  const stewardship = (
+      <aside className="flex flex-col gap-4 lg:order-2">
+        {radar}
+        {isOwner && (
+          <Tile
+            tone={myBalance > 0 ? 'navy' : 'teal'}
+            label="Balance"
+            meta={myUnits.length ? `Unit ${myUnits.map(u => u.number).join(', ')}` : undefined}
+            value={fmt(myBalance)}
+            sub={myBalance > 0 ? 'Pay by card or bank transfer' : 'Paid up · nothing due'}
+            className="min-h-[180px]"
+            action={<TileAction label={myBalance > 0 ? 'Pay now' : 'View statement'} button={myBalance > 0 ? 'Pay' : 'Open'} dark onClick={() => go('/my-unit/pay')} />}
+          />
+        )}
+        <Card className="gap-1" aria-label="Stewardship by dimension">
+          <SectionLabel>By dimension</SectionLabel>
+          <ul className="m-0 list-none p-0">
+            {score.you.dimensions.map((d, i) => (
+              <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
+                <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
+                  <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
+        </Card>
+
+      </aside>
+  );
+
   return (
     <div data-page="ux2-home" className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
@@ -284,41 +318,15 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-          <CalendarView cards={dated} today={today} forOwner={isOwner} />
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {stewardship}
+            <div className="min-w-0 lg:col-span-2 lg:order-1"><CalendarView cards={dated} today={today} forOwner={isOwner} /></div>
+          </div>
         </>
       ) : (
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
-        <aside className="flex flex-col gap-4 lg:order-2">
-          {radar}
-          {isOwner && (
-            <Tile
-              tone={myBalance > 0 ? 'navy' : 'teal'}
-              label="Balance"
-              meta={myUnits.length ? `Unit ${myUnits.map(u => u.number).join(', ')}` : undefined}
-              value={fmt(myBalance)}
-              sub={myBalance > 0 ? 'Pay by card or bank transfer' : 'Paid up · nothing due'}
-              className="min-h-[180px]"
-              action={<TileAction label={myBalance > 0 ? 'Pay now' : 'View statement'} button={myBalance > 0 ? 'Pay' : 'Open'} dark onClick={() => go('/my-unit/pay')} />}
-            />
-          )}
-          <Card className="gap-1" aria-label="Stewardship by dimension">
-            <SectionLabel>By dimension</SectionLabel>
-            <ul className="m-0 list-none p-0">
-              {score.you.dimensions.map((d, i) => (
-                <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
-                  <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
-                    <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
-          </Card>
-
-        </aside>
+        {stewardship}
 
         <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
           {boardSide && (

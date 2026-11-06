@@ -50,7 +50,7 @@ describe('Home', () => {
     expect(screen.getByText('Nothing scheduled today')).toBeTruthy();
     expect(document.querySelector('[aria-label="At a glance"]')).toBeTruthy();
     expect(screen.queryByText('Reserves funded')).toBeNull();
-    expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeNull();
+    expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Later months' }));
     const views = screen.getByRole('navigation', { name: 'Home views' });
     fireEvent.click(within(views).getByRole('button', { name: /^Feed/ }));
