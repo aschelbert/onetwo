@@ -30,11 +30,18 @@ import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
+export type WizardPrefill = { source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string };
+
+/**
+ * `embedded` swaps the header for pill tabs (Board Room mounts it that way);
+ * `prefill` opens the New Case wizard on a category and situation (the UX2
+ * Board Room's runbooks use it). Default rendering is unchanged.
+ */
+export default function IssuesPage({ embedded, prefill }: { embedded?: boolean; prefill?: WizardPrefill } = {}) {
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useTabParam<string>('view', 'tabs');
-  const [wizardPrefill, setWizardPrefill] = useState<{ source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string } | undefined>();
+  const [wizardPrefill, setWizardPrefill] = useState<WizardPrefill | undefined>(prefill);
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';

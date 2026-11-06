@@ -10,15 +10,14 @@ import FundsSwitch from '@/ux2/funds/FundsSwitch';
 import PayPage from '@/ux2/funds/PayPage';
 import BuildingSwitch, { ArchivesSwitch, AssociationTeamSwitch } from '@/ux2/building/BuildingSwitch';
 import CommunitySwitch, { VotingRedirect } from '@/ux2/community/CommunitySwitch';
+import BoardRoomSwitch, { CasesRedirect, IssuesSwitch } from '@/ux2/boardroom/BoardRoomSwitch';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
-import IssuesPage from '@/features/issues/IssuesPage';
 import MyUnitPage from '@/features/unit-manager/MyUnitPage';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
 import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
-import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
@@ -237,12 +236,13 @@ export default function App() {
           <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomeSwitch /></ErrorBoundary>} />
           <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
           <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
-          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
+          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesSwitch /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingSwitch /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesSwitch /></ErrorBoundary>} />
           <Route path="/voting" element={<VotingRedirect />} />
-          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
+          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomSwitch /></ErrorBoundary>} />
+          <Route path="/cases" element={<CasesRedirect />} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
           <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamSwitch /></ErrorBoundary>} />
           <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />

@@ -18,3 +18,6 @@ export * from './building/metrics';
 export { default as CommunityModule } from './community/CommunityModule';
 export { default as CommunitySwitch } from './community/CommunitySwitch';
 export * from './community/metrics';
+export { default as BoardRoomModule } from './boardroom/BoardRoomModule';
+export { default as BoardRoomSwitch } from './boardroom/BoardRoomSwitch';
+export * from './boardroom/runbooks';
