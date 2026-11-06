@@ -9,6 +9,7 @@ import HomeSwitch from '@/ux2/home/HomeSwitch';
 import FundsSwitch from '@/ux2/funds/FundsSwitch';
 import PayPage from '@/ux2/funds/PayPage';
 import BuildingSwitch, { ArchivesSwitch, AssociationTeamSwitch } from '@/ux2/building/BuildingSwitch';
+import CommunitySwitch, { VotingRedirect } from '@/ux2/community/CommunitySwitch';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import IssuesPage from '@/features/issues/IssuesPage';
@@ -18,7 +19,6 @@ import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
-import CommunityRoomPage from '@/features/community/CommunityRoomPage';
 import HelpSupportPage from '@/features/support/HelpSupportPage';
 import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
@@ -241,12 +241,12 @@ export default function App() {
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingSwitch /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
           <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesSwitch /></ErrorBoundary>} />
-          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
+          <Route path="/voting" element={<VotingRedirect />} />
           <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
           <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamSwitch /></ErrorBoundary>} />
           <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
-          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
+          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunitySwitch /></ErrorBoundary>} />
           <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
           <Route path="/my-unit/pay" element={<ErrorBoundary fallbackLevel="page"><PayPage /></ErrorBoundary>} />
           <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />

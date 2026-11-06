@@ -15,3 +15,6 @@ export * from './funds/metrics';
 export { default as BuildingModule } from './building/BuildingModule';
 export { default as BuildingSwitch } from './building/BuildingSwitch';
 export * from './building/metrics';
+export { default as CommunityModule } from './community/CommunityModule';
+export { default as CommunitySwitch } from './community/CommunitySwitch';
+export * from './community/metrics';

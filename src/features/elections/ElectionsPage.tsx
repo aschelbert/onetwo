@@ -16,7 +16,13 @@ const CHECK_ICON: Record<string, string> = { pass: '✅', fail: '❌', warning: 
 type ModalType = null | 'createElection' | 'addBallotItem' | 'addCandidate' | 'recordBallot' | 'castVote' | 'addAttachment' | 'viewBallotDetail' | 'addComment' | 'addResolution' | 'linkCaseToVote';
 type DetailTab = 'ballot' | 'compliance' | 'timeline' | 'comments' | 'resolution';
 
-export default function VotingPage() {
+/**
+ * `embedded` drops the list header (the Create button moves into the list)
+ * so the UX2 Community module can mount the page inside its own layout;
+ * `initialSelectedId` opens one election straight away (deep links).
+ * Default rendering is unchanged.
+ */
+export default function VotingPage({ embedded, initialSelectedId }: { embedded?: boolean; initialSelectedId?: string | null } = {}) {
   const store = useElectionStore();
   const fin = useFinancialStore();
   const { currentUser, currentRole } = useAuthStore();
@@ -31,7 +37,7 @@ export default function VotingPage() {
   const myLinkedUnits = currentUser?.linkedUnits || [];
   const myUnits = units.filter(u => myLinkedUnits.includes(u.number));
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const [detailTab, setDetailTab] = useState<DetailTab>('ballot');
   const [modal, setModal] = useState<ModalType>(null);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -195,7 +201,12 @@ export default function VotingPage() {
     const openCount = visibleElections.filter(e => e.status === 'open').length;
     return (
       <div className="space-y-0">
-        <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
+        {embedded && isBoard && (
+          <div className="flex justify-end pb-3">
+            <button onClick={() => { setForm({ type: 'board_election', quorum: '25' }); setModal('createElection'); }} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-semibold">+ Create Vote</button>
+          </div>
+        )}
+        {!embedded && <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="font-display text-2xl font-bold">🗳 Votes & Resolutions</h2>
@@ -203,8 +214,8 @@ export default function VotingPage() {
             </div>
             {isBoard && <button onClick={() => { setForm({ type: 'board_election', quorum: '25' }); setModal('createElection'); }} className="px-5 py-2.5 bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg text-sm font-semibold border border-white border-opacity-25">+ New Vote</button>}
           </div>
-        </div>
-        <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+        </div>}
+        <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
           {visibleElections.length === 0 ? (
             <div className="text-center py-12"><p className="text-5xl mb-4">🗳</p><h3 className="text-lg font-bold text-ink-900 mb-2">{isBoard ? 'No votes yet' : 'No open votes'}</h3><p className="text-sm text-ink-500 max-w-md mx-auto">{isBoard ? 'Create a vote with full compliance tracking, document attachments, and ownership-weighted tallying.' : 'When the board opens a vote, it will appear here for you to review details and cast your ballot.'}</p></div>
           ) : (
