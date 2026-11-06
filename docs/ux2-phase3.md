@@ -20,7 +20,7 @@ cards open Building › Obligations instead.
 | Documents | Needs you · Governing and policies · Insurance certificates · Reports and annual archives · minutes link | `BuildingPage embedded tab="legal"`, `ArchivesPage embedded tab="reports" / "archives"` |
 | Obligations | Met / Auto-verified / Board checklist tiles · The list (this month, open, filings, ongoing, by role) · Governance Calendar · Duties and roles | `BoardRoomPage embedded tab="runbook" / "duties"` |
 | Contracts | Needs you · vendors / bids / paperwork tiles · one row per vendor · vendor directory, bids and contracts | `VendorsTab` |
-| Directory | Units & owners · Board, management & staff · Property log · Tasks · PM scorecard · Intercom | `TheUnitsTab variant="building"`, `BuildingPage embedded tab="contacts"`, `PropertyLogPage`, `TaskTrackingTab`, `PMScorecardTab`, Association Team `CommunicationsTab` |
+| Directory | Units & owners · Board, management & staff (the property log, tasks, scorecard and intercom moved on in phase 8: see `docs/ux2-phase8.md`) | `TheUnitsTab variant="building"`, `BuildingPage embedded tab="contacts"` |
 
 ## The `embedded` prop
 
@@ -56,7 +56,7 @@ flow lives.
 | Building `fees`, `mailing` | Funds › gear (fee schedule, mailing card) |
 | Board Room `duties`, `runbook` | obligations › duties, calendar |
 | Archives (`/archives`) | documents › archives |
-| Association Team `property-log`, `task-tracking`, `pm-scorecard`, `communications` | directory › log, tasks, scorecard, intercom |
+| Association Team `property-log`, `task-tracking`, `pm-scorecard`, `communications` | Community › Property log, Board Room › Tasks, Community › PM scorecard, Board Room › Intercom (phase 8) |
 | Association Team `payroll` | Funds › Expenses › Payroll |
 
 `/association-team` and `/archives` redirect into the module when the flag is on.

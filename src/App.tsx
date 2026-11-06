@@ -8,10 +8,9 @@ import Ux2Shell from '@/ux2/shell/Ux2Shell';
 import HomePage from '@/ux2/home/HomePage';
 import FundsPage from '@/ux2/funds/FundsPage';
 import PayPage from '@/ux2/funds/PayPage';
-import BuildingModule from '@/ux2/building/BuildingModule';
 import CommunityModule from '@/ux2/community/CommunityModule';
 import MeModule from '@/ux2/me/MeModule';
-import { BoardRoomRoute, BuildingRedirect, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
+import { BoardRoomRoute, BuildingRedirect, BuildingRoute, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
 import AuthPage from '@/features/auth/AuthPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
@@ -224,10 +223,10 @@ export default function App() {
           <Route path="/dashboard" element={<RedirectKeepQuery to="/home" />} />
           <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
           <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />
-          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingModule /></ErrorBoundary>} />
+          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingRoute /></ErrorBoundary>} />
           <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
           <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
-          <Route path="/property-log" element={<Navigate to="/building?tab=directory&section=log" replace />} />
+          <Route path="/property-log" element={<Navigate to="/community?tab=log" replace />} />
           <Route path="/compliance" element={<Navigate to="/building?tab=obligations" replace />} />
           <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityModule /></ErrorBoundary>} />
           <Route path="/voting" element={<Navigate to="/community?tab=votes" replace />} />

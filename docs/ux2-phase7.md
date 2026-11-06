@@ -35,8 +35,8 @@ Nothing a bookmark, an email or a runbook letter ever linked to goes dead.
 | `/dashboard` | `/home` (query kept) |
 | `/financial?tab=…` | `/funds?tab=…` (query kept; the old Fiscal Lens tab ids resolve inside Funds) |
 | `/archives`, `/archives?tab=reports` | `/building?tab=documents&section=archives` / `…&section=reports` |
-| `/association-team?tab=…` | `/building?tab=directory&section=…` (log, tasks, scorecard, intercom) |
-| `/property-log` | `/building?tab=directory&section=log` |
+| `/association-team?tab=…` | Community › Property log / PM scorecard, Board Room › Tasks / Intercom (see `docs/ux2-phase8.md`) |
+| `/property-log` | `/community?tab=log` |
 | `/compliance` | `/building?tab=obligations` |
 | `/voting` | `/community?tab=votes` |
 | `/board-ops` | `/boardroom` |

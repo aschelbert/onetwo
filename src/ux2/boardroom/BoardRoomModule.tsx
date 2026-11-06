@@ -5,6 +5,8 @@
  *  Inbox     what owners asked for, the 14-day clock, acknowledge, reply, convert to case
  *  Runbooks  the 32 runbooks, which have a case open, on and off
  *  Outbox    every letter and notice: drafts, sent, in transit, templates, delivery
+ *  Tasks     the team's kanban (Property Manager Seat)
+ *  Intercom  the team's realtime channels (Property Manager Seat)
  *  Archive   what this board has closed, read-only, with the decision trail
  *
  * The case workspace and the New Case wizard are the production Issues page,
@@ -14,12 +16,16 @@
  * and conflict panels and the decision trail that the codebase has but the
  * production page never showed.
  *
- * Deep links: `/boardroom?tab=open|inbox|runbooks|outbox|archive`,
+ * Deep links: `/boardroom?tab=open|inbox|runbooks|outbox|tasks|intercom|archive`,
  * `/boardroom?view=case:<id>`, `/boardroom?view=new&cat=<catId>&sit=<sitId>`.
  * `/issues?view=case:<id>` (Home's links) resolves here too.
  */
 import { useSearchParams } from 'react-router-dom';
-import { Button, Chip, PillTabs } from '../components';
+import { useTenantContext } from '@/components/TenantProvider';
+import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
+import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
+import IntercomTab from '@/features/association-team/tabs/CommunicationsTab';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel } from '../components';
 import { useBoardRoomSnapshot } from './useBoardRoomSnapshot';
 import { archiveRows, caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
@@ -29,24 +35,29 @@ import OutboxTab from './tabs/OutboxTab';
 import ArchiveTab from './tabs/ArchiveTab';
 import CaseFrame from './tabs/CaseFrame';
 
-export type BoardRoomTab = 'open' | 'inbox' | 'runbooks' | 'outbox' | 'archive';
-const TAB_IDS: BoardRoomTab[] = ['open', 'inbox', 'runbooks', 'outbox', 'archive'];
-/** Legacy Board Room and Issues tab ids → module tab. */
-export const LEGACY_TABS: Record<string, BoardRoomTab> = { dailyops: 'open', communications: 'outbox', issues: 'inbox' };
+export type BoardRoomTab = 'open' | 'inbox' | 'runbooks' | 'outbox' | 'tasks' | 'intercom' | 'archive';
+const TAB_IDS: BoardRoomTab[] = ['open', 'inbox', 'runbooks', 'outbox', 'tasks', 'intercom', 'archive'];
+/** Tabs that exist only with the Property Manager Seat add-on. */
+export const PM_SEAT_TABS: BoardRoomTab[] = ['tasks', 'intercom'];
+/** Legacy Board Room, Issues and Association Team tab ids → module tab. */
+export const LEGACY_TABS: Record<string, BoardRoomTab> = { dailyops: 'open', communications: 'outbox', issues: 'inbox', 'task-tracking': 'tasks' };
 
-export function resolveBoardRoomTab(raw: string | null, caseTab: string | null): BoardRoomTab {
-  if (raw && (TAB_IDS as string[]).includes(raw)) return raw as BoardRoomTab;
-  if (raw && LEGACY_TABS[raw]) return LEGACY_TABS[raw];
-  if (caseTab === 'issues') return 'inbox';
-  if (caseTab === 'archive') return 'archive';
-  return 'open';
+export function resolveBoardRoomTab(raw: string | null, caseTab: string | null, pmSeat = true): BoardRoomTab {
+  let tab: BoardRoomTab = 'open';
+  if (raw && (TAB_IDS as string[]).includes(raw)) tab = raw as BoardRoomTab;
+  else if (raw && LEGACY_TABS[raw]) tab = LEGACY_TABS[raw];
+  else if (caseTab === 'issues') tab = 'inbox';
+  else if (caseTab === 'archive') tab = 'archive';
+  return !pmSeat && PM_SEAT_TABS.includes(tab) ? 'open' : tab;
 }
 
 export default function BoardRoomModule() {
   const [params, setParams] = useSearchParams();
   const view = params.get('view');
-  const tab = resolveBoardRoomTab(params.get('tab'), params.get('caseTab'));
+  const pmSeat = useTenantContext().pmSeat;
+  const tab = resolveBoardRoomTab(params.get('tab'), params.get('caseTab'), pmSeat);
   const snap = useBoardRoomSnapshot();
+  const openTasks = useTaskTrackingStore(s => s.tasks).filter(t => t.status !== 'done').length;
 
   const cases = casesSummary(caseRows(snap));
   const inbox = inboxSummary(inboxRows(snap));
@@ -81,6 +92,8 @@ export default function BoardRoomModule() {
     inbox: 'What owners have asked the board for, and the 14-day clock on each one. Owners see the status of their own request in Community › Requests.',
     runbooks: 'All 32 are on from day one, each waiting for its trigger. Turn one off only if the building does not want it.',
     outbox: 'Every letter and notice the board sends, drafted from a template, delivered the way the bylaws require, and kept with proof of delivery.',
+    tasks: 'The team\'s board: what the manager, staff and officers are working on, dragged from to-do to done, each linked to the case, log entry or vendor behind it.',
+    intercom: 'The team\'s channels: the board, the manager and staff talking in one place, with a board-only channel. Owners never see it.',
     archive: 'The cases, requests and letters this board has closed, read-only, with the decision trail behind each one. Nothing here needs you.',
   }[tab];
 
@@ -89,6 +102,10 @@ export default function BoardRoomModule() {
     { id: 'inbox' as BoardRoomTab, label: 'Inbox', badge: inbox.open.length || undefined, badgeTone: inbox.overdue.length ? 'red' as const : 'amber' as const },
     { id: 'runbooks' as BoardRoomTab, label: 'Runbooks', badge: runbooks.withOpenCase.length ? `${runbooks.withOpenCase.length} open` : undefined, badgeTone: 'teal' as const },
     { id: 'outbox' as BoardRoomTab, label: 'Outbox', badge: outbox.drafts.length ? `${outbox.drafts.length} draft${outbox.drafts.length === 1 ? '' : 's'}` : undefined, badgeTone: 'cyan' as const },
+    ...(pmSeat ? [
+      { id: 'tasks' as BoardRoomTab, label: 'Tasks', badge: openTasks || undefined, badgeTone: 'teal' as const },
+      { id: 'intercom' as BoardRoomTab, label: 'Intercom' },
+    ] : []),
     { id: 'archive' as BoardRoomTab, label: 'Archive', badge: archive.length || undefined, badgeTone: 'ghost' as const },
   ];
 
@@ -112,6 +129,20 @@ export default function BoardRoomModule() {
       {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
       {tab === 'runbooks' && <RunbooksTab snap={snap} onOpenCase={openCase} onNewCase={newCase} />}
       {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} />}
+      {tab === 'tasks' && pmSeat && (
+        <Card aria-label="Tasks">
+          <SectionLabel>Tasks · {openTasks} open</SectionLabel>
+          <Inner className="text-xs text-ux2-muted">Property log findings become tasks here; a task can link to a case, a vendor or a log entry. Part of the Property Manager Seat.</Inner>
+          <div className="ux2-legacy"><TaskTrackingTab /></div>
+        </Card>
+      )}
+      {tab === 'intercom' && pmSeat && (
+        <Card aria-label="Intercom">
+          <SectionLabel>Intercom · the team's channels</SectionLabel>
+          <Inner className="text-xs text-ux2-muted">General, Maintenance and a board-only channel to start; add up to 50. Messages arrive live, attachments go with them. Part of the Property Manager Seat.</Inner>
+          <div className="ux2-legacy"><IntercomTab /></div>
+        </Card>
+      )}
       {tab === 'archive' && <ArchiveTab snap={snap} onOpenCase={openCase} />}
     </div>
   );

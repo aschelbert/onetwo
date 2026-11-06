@@ -5,13 +5,14 @@
  *  Documents    governing documents and policies, certificates, reports and annual archives
  *  Obligations  the compliance record: every requirement and its state, filings, duties and roles
  *  Contracts    every vendor, the contract behind each, when it ends
- *  Directory    units and owners, board, management and counsel, staff, log, tasks, scorecard, intercom
+ *  Directory    units and owners, board, management and counsel, staff
  *
  * The detail under each section is the production page that owns the records
  * (Building page tabs, Board Room's Duties and Governance Calendar, Archives,
- * Association Team tabs, the Vendors tab), mounted embedded, so uploads,
- * filings, vendor flows, the kanban and the realtime intercom are the same
- * code paths production runs today.
+ * the Vendors tab), mounted embedded, so uploads, filings and vendor flows
+ * are the same code paths production runs today. The Association Team's
+ * tabs live elsewhere now: the property log and the PM scorecard in
+ * Community, tasks and the intercom in the Board Room (`MOVED_TABS`).
  *
  * Deep links: `/building?tab=obligations&section=duties`. Legacy Building,
  * Association Team and Archives tab ids are accepted and mapped.
@@ -44,10 +45,14 @@ export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }>
   archives: { tab: 'documents', section: 'archives' },
   duties: { tab: 'obligations', section: 'duties' },
   runbook: { tab: 'obligations', section: 'calendar' },
-  'property-log': { tab: 'directory', section: 'log' },
-  'task-tracking': { tab: 'directory', section: 'tasks' },
-  'pm-scorecard': { tab: 'directory', section: 'scorecard' },
-  communications: { tab: 'directory', section: 'intercom' },
+};
+
+/** Association Team tab ids that now live in another module (`BuildingRoute` and `BuildingRedirect` send them there). */
+export const MOVED_TABS: Record<string, string> = {
+  'property-log': '/community?tab=log',
+  'pm-scorecard': '/community?tab=scorecard',
+  'task-tracking': '/boardroom?tab=tasks',
+  communications: '/boardroom?tab=intercom',
 };
 
 export function resolveBuildingTab(raw: string | null): { tab: BuildingTab; section?: string } {

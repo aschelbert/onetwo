@@ -29,16 +29,35 @@ describe('Home', () => {
     useRunbookStore.setState({ cards: {} });
   });
 
-  it('renders the board Home with the feed, stewardship radar, tiles and calendar', () => {
+  it('renders the board Home: tiles, the feed, the stewardship card, building news and the pulse', () => {
     renderHome();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good (morning|afternoon|evening), /);
+    expect(screen.getByText('Reserves funded')).toBeTruthy();
+    expect(screen.getByText('Collected')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Up next' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Waiting on others' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Upcoming' })).toBeTruthy();
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeTruthy();
-    expect(screen.getByText('Reserves funded')).toBeTruthy();
-    expect(screen.getByText('Collected')).toBeTruthy();
-    expect(document.querySelectorAll('[aria-label="Calendar"] [data-month]')).toHaveLength(4);
+    expect(document.querySelector('[aria-label="Stewardship by dimension"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Building news"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Your account"]')).toBeTruthy();
+    expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
+  });
+
+  it('Feed | Calendar flips the feed for the merged calendar, kept in the URL', () => {
+    renderHome('/home?view=calendar');
+    expect(document.querySelector('[data-widget="calendar"]')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull();
+    expect(document.querySelectorAll('[data-widget="calendar"] [data-month]').length).toBe(6);
+    expect(document.querySelector('[data-widget="calendar"] [data-month] [data-day]')).toBeTruthy();
+    expect(screen.getByText('Nothing scheduled today')).toBeTruthy();
+    expect(screen.queryByText('Reserves funded')).toBeNull();
+    expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Later months' }));
+    const views = screen.getByRole('navigation', { name: 'Home views' });
+    fireEvent.click(within(views).getByRole('button', { name: /^Feed/ }));
+    expect(screen.getByRole('region', { name: 'Up next' })).toBeTruthy();
+    expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
   });
 
   it('a card action deep links into the production page', () => {
@@ -70,12 +89,14 @@ describe('Home', () => {
     expect(s.hiddenFor('u1', '2026-11-09').size).toBe(0);
   });
 
-  it('renders the owner Home with a balance tile and no board tiles', () => {
+  it('renders the owner Home with the account card, building news and no board tiles', () => {
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
       render(<MemoryRouter><HomePage /></MemoryRouter>);
-      expect(screen.getByText('Balance')).toBeTruthy();
+      expect(document.querySelector('[aria-label="Your account"]')).toBeTruthy();
+      expect(document.querySelector('[aria-label="Building news"]')).toBeTruthy();
       expect(screen.queryByText('Reserves funded')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Waiting on others' })).toBeNull();
     } finally {
       useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
     }

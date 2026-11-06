@@ -87,7 +87,9 @@ const emptyForm = (): LogForm => ({
 export default function PropertyLogPage() {
   const { logs, addLog, updateLog, deleteLog } = usePropertyLogStore();
   const { addTask, moveTask } = useTaskTrackingStore();
-  const { currentUser } = useAuthStore();
+  const { currentUser, currentRole } = useAuthStore();
+  // Everyone in the building can log what they see; editing, deleting and turning findings into tasks stay with the board, the manager and staff.
+  const canManage = currentRole !== 'RESIDENT';
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -133,7 +135,7 @@ export default function PropertyLogPage() {
     }
 
     const cleanFindings = form.findings.filter(f => f.area.trim() !== '');
-    const cleanActions = form.actionItems.filter(a => a.description.trim() !== '');
+    const cleanActions = canManage ? form.actionItems.filter(a => a.description.trim() !== '') : [];
 
     // Determine log ID — for edits we already have it; for adds we save first then read it
     let logId: string;
@@ -419,7 +421,7 @@ export default function PropertyLogPage() {
                       )}
 
                       {/* Action Items Table */}
-                      {log.actionItems.length > 0 && (
+                      {canManage && log.actionItems.length > 0 && (
                         <div>
                           <p className="font-bold text-ink-900 mb-3">Action Items ({log.actionItems.length})</p>
                           <div className="overflow-x-auto">
@@ -495,7 +497,7 @@ export default function PropertyLogPage() {
                       )}
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className={canManage ? 'flex items-center gap-2 pt-2' : 'hidden'}>
                         <button
                           onClick={() => openEdit(log)}
                           className="px-3 py-1.5 bg-ink-900 text-white rounded-lg text-xs font-medium hover:bg-ink-800 transition-colors"
@@ -673,7 +675,7 @@ export default function PropertyLogPage() {
             </div>
 
             {/* Action Items Section */}
-            <div>
+            <div className={canManage ? '' : 'hidden'}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-bold text-ink-900">Action Items</p>
                 <button

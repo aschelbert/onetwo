@@ -1,32 +1,33 @@
 /**
- * Home — the redesign's landing page (ux2.home).
+ * Home — the redesign's landing page.
  *
- * Replaces the role dashboards with one feed: what needs you now, what waits
- * on others, what is coming up, your stewardship card, the building's numbers
- * and a four-month calendar. Every card is a deep link into the production
- * page that owns the record, so completing a card uses the existing flow.
+ * One feed: what needs you now, what waits on others, what is coming up,
+ * the building's numbers, your stewardship card, your account, building
+ * news and the pulse. Feed | Calendar flips the feed for the month
+ * carousel of everything dated (`CalendarView`). Every card is a deep link
+ * into the production page that owns the record, so completing a card uses
+ * the existing flow.
  *
- *  Board member / manager: Up next · Waiting on others · Upcoming · Stewardship ·
- *                           Reserves / Collected / Open cases · Calendar · Pulse
- *  Owner:                   Balance + Pay · Up next · Stewardship · Calendar · Pulse
+ *  Board member / manager: Reserves / Collected / Open cases · Up next · Waiting on others ·
+ *                           Upcoming · Stewardship · Your account · Building news · Pulse
+ *  Owner:                   Up next · Stewardship · Your account · Building news · Pulse
  */
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
-import { useMeetingsStore } from '@/store/useMeetingsStore';
-import { useIssuesStore } from '@/store/useIssuesStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt, cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, SectionLabel, Tile, TileRow } from '../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Tile, TileRow } from '../components';
 import type { ChipTone } from '../components';
 import StewardshipRadar from '../components/StewardshipRadar';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
-import { contextFor, todayIso, useCardInput, useStoreSnapshot } from '../runbook/adapters';
+import { contextFor, todayIso, useCardInput, useStoreSnapshot, type StoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
-import { stewardshipFor } from '../score/events';
-import { DIMENSIONS } from '../score/stewardship';
-import { dayLabel, groupByMonth } from './calendar';
+import { boardEvents, stewardshipFor } from '../score/events';
+import { DIMENSIONS, type Dimension, type ScoreEvent } from '../score/stewardship';
+import { dayLabel } from './calendar';
+import CalendarView from './CalendarView';
 
 const STATUS_TONE: Record<RunbookCard['status'], ChipTone> = {
   overdue: 'red',
@@ -44,6 +45,8 @@ const STATUS_LABEL: Record<RunbookCard['status'], string> = {
   done: 'Done',
 };
 
+const DIM_TONE: Record<Dimension, ChipTone> = { Oversight: 'plum', Timeliness: 'teal', Compliance: 'sage', Reach: 'amber', Impact: 'cyan' };
+
 function greeting(now = new Date()): string {
   const h = now.getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -52,6 +55,16 @@ function greeting(now = new Date()): string {
 function longDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function initials(name: string): string {
+  return name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '·';
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
 
 /** Navigate to a card action. The Funds tab lives in the URL; the financial store's tab is kept in step for the embedded tab components. */
@@ -167,74 +180,78 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   );
 }
 
-function Calendar({ cards, today }: { cards: RunbookCard[]; today: string }) {
-  const groups = useMemo(() => groupByMonth(cards, today), [cards, today]);
-  const [i, setI] = useState(0);
+/** Your account: the balance on the units you hold, when the next dues are due, Pay and Statements. */
+function YourAccount({ units, balance, dueDay }: { units: { number: string; monthlyFee: number }[]; balance: number; dueDay: number }) {
   const go = useGo();
   return (
-    <Card aria-label="Calendar">
-      <div className="flex items-center justify-between">
-        <SectionLabel>Next four months</SectionLabel>
-        <div className="flex gap-1">
-          <button type="button" aria-label="Earlier month" disabled={i === 0} onClick={() => setI(x => Math.max(0, x - 1))} className="h-8 w-8 rounded-full border border-ux2-line bg-white disabled:opacity-40">‹</button>
-          <button type="button" aria-label="Later month" disabled={i >= groups.length - 1} onClick={() => setI(x => Math.min(groups.length - 1, x + 1))} className="h-8 w-8 rounded-full border border-ux2-line bg-white disabled:opacity-40">›</button>
-        </div>
+    <Card aria-label="Your account">
+      <div className="flex items-center justify-between gap-2">
+        <SectionLabel>Your account</SectionLabel>
+        <Chip tone={balance > 0 ? 'red' : 'sage'}>{balance > 0 ? 'Balance due' : 'Current'}</Chip>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        {groups.map((g, gi) => (
-          <Inner key={g.key} className={cn('min-h-[120px]', gi !== i && 'hidden md:block')} data-month={g.key}>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold text-ux2-ink">{g.label}</span>
-              <Chip tone={g.cards.length ? 'cyan' : 'ghost'}>{g.cards.length}</Chip>
-            </div>
-            {g.cards.length === 0 ? (
-              <div className="text-xs text-ux2-dim">Nothing dated</div>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                {g.cards.slice(0, 6).map(c => (
-                  <li key={c.id}>
-                    <button type="button" onClick={() => go(c.action.path)} className="flex w-full items-baseline gap-2 text-left hover:underline">
-                      <span className={cn('w-12 shrink-0 text-[11px] font-semibold', c.status === 'overdue' ? 'text-ux2-red-ink' : 'text-ux2-muted')}>{dayLabel(c.due!)}</span>
-                      <span className="truncate text-xs text-ux2-ink">{c.title}</span>
-                    </button>
-                  </li>
-                ))}
-                {g.cards.length > 6 && <li className="text-[11px] text-ux2-dim">+{g.cards.length - 6} more</li>}
-              </ul>
-            )}
-          </Inner>
-        ))}
+      <div className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ux2-ink">{fmt(balance)}</div>
+      <div className="text-xs text-ux2-muted">Unit {units.map(u => u.number).join(', ')} · next {fmt(units.reduce((s, u) => s + u.monthlyFee, 0))} due on the {ordinal(dueDay)}</div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => go('/my-unit/pay')}>{balance > 0 ? 'Pay' : 'Pay ahead'}</Button>
+        <Button size="sm" variant="ghost" onClick={() => go('/my-unit')}>Statements</Button>
       </div>
     </Card>
   );
 }
 
-function Pulse() {
+/** Building news: the latest notices from Community. */
+function BuildingNews() {
   const go = useGo();
-  const meetings = useMeetingsStore(s => s.meetings);
-  const filings = useComplianceStore(s => s.filings);
-  const communications = useComplianceStore(s => s.communications);
-  const cases = useIssuesStore(s => s.cases);
+  const announcements = useComplianceStore(s => s.announcements);
+  const recent = [...announcements].sort((a, b) => b.postedDate.localeCompare(a.postedDate)).slice(0, 3);
+  return (
+    <Card aria-label="Building news">
+      <div className="flex items-center justify-between gap-2">
+        <SectionLabel>Building news</SectionLabel>
+        <button type="button" onClick={() => go('/community?tab=notices')} className="text-xs font-semibold text-ux2-teal hover:underline">All ›</button>
+      </div>
+      {recent.length === 0 ? <p className="text-sm text-ux2-muted">Nothing posted yet.</p> : (
+        <ul className="m-0 list-none divide-y divide-ux2-line p-0">
+          {recent.map(a => (
+            <li key={a.id}>
+              <button type="button" onClick={() => go('/community?tab=notices')} className="flex w-full items-center gap-3 py-2 text-left hover:underline">
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ux2-ink">{a.title}</span><span className="block truncate text-xs text-ux2-muted">{a.category}{a.pinned ? ' · pinned' : ''} · {a.postedBy}</span></span>
+                <span className="shrink-0 text-xs text-ux2-dim">{dayLabel(a.postedDate.slice(0, 10))}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/** Pulse: the latest scored events across the board (or the owner's own), with the dimension each one moved. */
+function Pulse({ snapshot, events, group, today }: { snapshot: StoreSnapshot; events: ScoreEvent[]; group: 'board' | 'owners'; today: string }) {
   const items = useMemo(() => {
-    const out: { icon: string; text: string; date: string; path: string }[] = [];
-    meetings.filter(m => m.status === 'COMPLETED').slice(0, 2).forEach(m => out.push({ icon: '🗓', text: `${m.title} held`, date: m.date, path: '/community?tab=meetings' }));
-    filings.filter(f => f.status === 'filed').slice(0, 2).forEach(f => out.push({ icon: '✅', text: `${f.name} filed`, date: f.filedDate || '', path: '/boardroom?tab=runbook' }));
-    communications.filter(c => c.status === 'sent').slice(0, 2).forEach(c => out.push({ icon: '📨', text: c.subject, date: c.date, path: '/boardroom?tab=communications' }));
-    cases.filter(c => c.status === 'closed' && c.completedAt).slice(0, 2).forEach(c => out.push({ icon: '📁', text: `${c.title} closed`, date: c.completedAt!.slice(0, 10), path: `/issues?view=case:${c.id}` }));
-    return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
-  }, [meetings, filings, communications, cases]);
+    const rows: { who: string; event: ScoreEvent }[] = group === 'board'
+      ? snapshot.board.flatMap(b => boardEvents(snapshot, { name: b.name, officerTitle: b.role }).map(event => ({ who: b.name, event })))
+      : events.map(event => ({ who: snapshot.viewer.name, event }));
+    const seen = new Set<string>();
+    return rows
+      .filter(r => r.event.date <= today && r.event.earned > 0)
+      .sort((a, b) => b.event.date.localeCompare(a.event.date))
+      .filter(r => { const k = `${r.who}:${r.event.id}`; if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 4);
+  }, [snapshot, events, group, today]);
   if (items.length === 0) return null;
+  const bg: Record<Dimension, string> = { Timeliness: 'bg-ux2-teal-tint text-ux2-teal', Oversight: 'bg-ux2-plum-tint text-ux2-plum', Reach: 'bg-ux2-amber-tint text-ux2-amber', Compliance: 'bg-ux2-sage-tint text-ux2-sage', Impact: 'bg-ux2-cyan text-ux2-navy' };
   return (
     <Card aria-label="Pulse">
       <SectionLabel>Pulse</SectionLabel>
-      <ul className="m-0 list-none divide-y divide-ux2-line p-0">
-        {items.map((a, i) => (
-          <li key={i}>
-            <button type="button" onClick={() => go(a.path)} className="flex w-full items-center gap-3 py-2 text-left hover:underline">
-              <span aria-hidden>{a.icon}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-ux2-ink">{a.text}</span>
-              <span className="text-xs text-ux2-dim">{a.date ? dayLabel(a.date) : ''}</span>
-            </button>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {items.map(({ who, event }) => (
+          <li key={`${who}:${event.id}`}>
+            <Inner className="flex items-center gap-2.5 text-[13px] leading-[1.4] text-ux2-ink">
+              <span className={cn('grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold', bg[event.dimension])}>{initials(who)}</span>
+              <span className="min-w-0 flex-1"><strong>{who.split(' ')[0]}</strong> · {event.label}{event.reason ? <span className="text-ux2-muted"> · {event.reason.toLowerCase()}</span> : null}<span className="text-ux2-muted"> · {dayLabel(event.date)}</span></span>
+              <Chip tone={DIM_TONE[event.dimension]}>+{event.dimension}</Chip>
+            </Inner>
           </li>
         ))}
       </ul>
@@ -274,103 +291,92 @@ export default function HomePage() {
   const myUnits = fin.units.filter(u => viewer.linkedUnits.includes(u.number));
   const myBalance = myUnits.reduce((s, u) => s + u.balance + u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0), 0);
   const dated = useMemo(() => [...set.forYou, ...set.waitingOnOthers, ...set.upcoming].filter(c => c.due), [set]);
-
-  const radar = (
-    <StewardshipRadar
-      you={youDims}
-      total={score.you.total}
-      buildingAvg={score.building.dims}
-      buildingTotal={score.building.total}
-    />
-  );
+  const [params, setParams] = useSearchParams();
+  const view: 'feed' | 'calendar' = params.get('view') === 'calendar' ? 'calendar' : 'feed';
+  const setView = (v: string) => setParams(prev => { const p = new URLSearchParams(prev); if (v === 'calendar') p.set('view', 'calendar'); else p.delete('view'); return p; }, { replace: true });
 
   return (
     <div data-page="ux2-home" className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
-        <div>
-          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">
-            {greeting()}, {viewer.name.split(' ')[0]}
-          </h1>
-          <p className="text-sm text-ux2-muted">{longDate(today)} · {tenant.name}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">
+              {greeting()}, {viewer.name.split(' ')[0]}
+            </h1>
+            <p className="text-sm text-ux2-muted">{longDate(today)} · {tenant.name}</p>
+          </div>
+          <PillTabs size="filter" aria-label="Home views" value={view} onChange={setView} tabs={[{ id: 'feed', label: 'Feed', badge: set.forYou.length || undefined }, { id: 'calendar', label: 'Calendar' }]} />
         </div>
         <AttentionChips set={set} role={viewer.role} />
       </header>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
-        <aside className="flex flex-col gap-4 lg:order-2">
-          {radar}
-          {isOwner && (
-            <Tile
-              tone={myBalance > 0 ? 'navy' : 'teal'}
-              label="Balance"
-              meta={myUnits.length ? `Unit ${myUnits.map(u => u.number).join(', ')}` : undefined}
-              value={fmt(myBalance)}
-              sub={myBalance > 0 ? 'Pay by card or bank transfer' : 'Paid up · nothing due'}
-              className="min-h-[180px]"
-              action={<TileAction label={myBalance > 0 ? 'Pay now' : 'View statement'} button={myBalance > 0 ? 'Pay' : 'Open'} dark onClick={() => go('/my-unit/pay')} />}
-            />
-          )}
-          <Card className="gap-1" aria-label="Stewardship by dimension">
-            <SectionLabel>By dimension</SectionLabel>
-            <ul className="m-0 list-none p-0">
-              {score.you.dimensions.map((d, i) => (
-                <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
-                  <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
-                    <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
-          </Card>
+      {view === 'calendar' ? (
+        <CalendarView cards={dated} today={today} forOwner={isOwner} />
+      ) : (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
+          <aside className="flex flex-col gap-4 lg:order-2">
+            <StewardshipRadar you={youDims} total={score.you.total} buildingAvg={score.building.dims} buildingTotal={score.building.total} />
+            {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
+            <Card className="gap-1" aria-label="Stewardship by dimension">
+              <SectionLabel>By dimension</SectionLabel>
+              <ul className="m-0 list-none p-0">
+                {score.you.dimensions.map((d, i) => (
+                  <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
+                      <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
+            </Card>
+            <BuildingNews />
+            <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
+          </aside>
 
-        </aside>
+          <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
+            {boardSide && (
+              <TileRow>
+                <Tile
+                  tone={kpis.reservePct < 50 ? 'red' : 'grey'}
+                  label="Reserves funded"
+                  value={kpis.reservePct}
+                  unit="%"
+                  sub={`${fmt(kpis.reserveFunded)} set aside`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Reserve plan" button="Open" dark={kpis.reservePct < 50} onClick={() => go('/funds?tab=reserves')} />}
+                />
+                <Tile
+                  tone="teal"
+                  label="Collected"
+                  value={Number.isFinite(kpis.income.collectionRate) ? kpis.income.collectionRate : 0}
+                  unit="%"
+                  sub={`${kpis.income.delinquentUnits} unit${kpis.income.delinquentUnits === 1 ? '' : 's'} behind`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Unit ledger" button="Open" dark onClick={() => go('/funds?tab=units')} />}
+                />
+                <Tile
+                  tone="grey"
+                  label="Open cases"
+                  value={kpis.openCases}
+                  sub={`${set.waitingOnOthers.length} waiting on others`}
+                  className="min-h-[150px]"
+                  action={<TileAction label="Board Room" button="Open" onClick={() => go('/issues')} />}
+                />
+              </TileRow>
+            )}
 
-        <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
-          {boardSide && (
-            <TileRow>
-              <Tile
-                tone={kpis.reservePct < 50 ? 'red' : 'grey'}
-                label="Reserves funded"
-                value={kpis.reservePct}
-                unit="%"
-                sub={`${fmt(kpis.reserveFunded)} set aside`}
-                className="min-h-[150px]"
-                action={<TileAction label="Reserve plan" button="Open" dark={kpis.reservePct < 50} onClick={() => go('/funds?tab=reserves')} />}
-              />
-              <Tile
-                tone="teal"
-                label="Collected"
-                value={Number.isFinite(kpis.income.collectionRate) ? kpis.income.collectionRate : 0}
-                unit="%"
-                sub={`${kpis.income.delinquentUnits} unit${kpis.income.delinquentUnits === 1 ? '' : 's'} behind`}
-                className="min-h-[150px]"
-                action={<TileAction label="Unit ledger" button="Open" dark onClick={() => go('/funds?tab=units')} />}
-              />
-              <Tile
-                tone="grey"
-                label="Open cases"
-                value={kpis.openCases}
-                sub={`${set.waitingOnOthers.length} waiting on others`}
-                className="min-h-[150px]"
-                action={<TileAction label="Board Room" button="Open" onClick={() => go('/issues')} />}
-              />
-            </TileRow>
-          )}
-
-          <Card aria-label="Your runbook">
-            <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
-            <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />
-            <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
-          </Card>
+            <Card aria-label="Your runbook">
+              <Feed title="Up next" cards={set.forYou} empty="Nothing needs you right now." onHide={hide} limit={6} />
+              {boardSide && <Feed title="Waiting on others" cards={set.waitingOnOthers} empty="Nothing is waiting on anyone else." limit={4} />}
+              <Feed title="Upcoming" cards={set.upcoming} empty="Nothing dated in the next 90 days." limit={4} />
+            </Card>
+          </div>
         </div>
-      </div>
-
-      <Calendar cards={dated} today={today} />
-      <Pulse />
+      )}
     </div>
   );
 }

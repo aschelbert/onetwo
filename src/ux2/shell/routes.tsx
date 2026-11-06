@@ -8,7 +8,7 @@ import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import { useAuthStore } from '@/store/useAuthStore';
-import { resolveBuildingTab } from '../building/BuildingModule';
+import BuildingModule, { MOVED_TABS, resolveBuildingTab } from '../building/BuildingModule';
 import BoardRoomModule from '../boardroom/BoardRoomModule';
 
 /** Redirect to `to`, keeping the query string (so `?view=case:…` and `?tab=…` survive). */
@@ -17,10 +17,19 @@ export function RedirectKeepQuery({ to }: { to: string }) {
   return <Navigate to={`${to}${search}`} replace />;
 }
 
-/** The Archives and Association Team pages live under Building now. */
+/** `/building`: the module, unless the tab id asks for a section that moved to Community or the Board Room. */
+export function BuildingRoute() {
+  const [params] = useSearchParams();
+  const moved = MOVED_TABS[params.get('tab') ?? ''];
+  return moved ? <Navigate to={moved} replace /> : <BuildingModule />;
+}
+
+/** The Archives and Association Team pages live under Building now, except the Association Team tabs that moved on (`MOVED_TABS`). */
 export function BuildingRedirect({ defaultTab }: { defaultTab: string }) {
   const [params] = useSearchParams();
-  const { tab, section } = resolveBuildingTab(params.get('tab') ?? defaultTab);
+  const raw = params.get('tab') ?? defaultTab;
+  if (MOVED_TABS[raw]) return <Navigate to={MOVED_TABS[raw]} replace />;
+  const { tab, section } = resolveBuildingTab(raw);
   const q = new URLSearchParams();
   if (tab !== 'overview') q.set('tab', tab);
   if (section) q.set('section', section);

@@ -22,8 +22,8 @@ export interface Ux2Module {
 
 export const UX2_MODULES: Ux2Module[] = [
   { id: 'home', label: 'Home', path: '/home', matches: ['/home', '/dashboard'], legacyIds: ['dashboard'] },
-  { id: 'building', label: 'Building', path: '/building', matches: ['/building', '/archives', '/association-team', '/property-log'], legacyIds: ['contacts'] },
-  { id: 'community', label: 'Community', path: '/community', matches: ['/community', '/voting'], legacyIds: ['community'] },
+  { id: 'building', label: 'Building', path: '/building', matches: ['/building', '/archives', '/association-team'], legacyIds: ['contacts'] },
+  { id: 'community', label: 'Community', path: '/community', matches: ['/community', '/voting', '/property-log'], legacyIds: ['community'] },
   { id: 'funds', label: 'Funds', path: '/funds', matches: ['/funds', '/financial', '/my-unit'], legacyIds: ['financial'] },
   { id: 'boardroom', label: 'Board Room', path: '/boardroom', matches: ['/boardroom', '/issues', '/compliance', '/board-ops'], legacyIds: ['boardroom'] },
 ];

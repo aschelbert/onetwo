@@ -25,6 +25,8 @@ export interface Tenant {
     nextBillingDate: string;
     monthlyRate: number;
     trialEndsAt: string | null;
+    /** Property Manager Seat add-on. */
+    pmAddon?: boolean;
   };
   stats: {
     activeUsers: number;

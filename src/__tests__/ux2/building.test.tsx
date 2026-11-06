@@ -12,21 +12,18 @@ vi.mock('@/features/boardroom/BoardRoomPage', () => ({ default: ({ embedded, tab
 vi.mock('@/features/archives/ArchivesPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-archives" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/building/tabs/TheUnitsTab', () => ({ default: ({ variant }: { variant?: string }) => <div data-testid="legacy-units">{variant}</div> }));
 vi.mock('@/features/building/tabs/VendorsTab', () => ({ default: () => <div data-testid="legacy-vendors" /> }));
-vi.mock('@/features/property-log/PropertyLogPage', () => ({ default: () => <div data-testid="legacy-log" /> }));
-vi.mock('@/features/association-team/tabs/TaskTrackingTab', () => ({ default: () => <div data-testid="legacy-tasks" /> }));
-vi.mock('@/features/building/tabs/PMScorecardTab', () => ({ default: () => <div data-testid="legacy-scorecard" /> }));
-vi.mock('@/features/association-team/tabs/CommunicationsTab', () => ({ default: () => <div data-testid="legacy-intercom" /> }));
 
-import BuildingModule from '@/ux2/building/BuildingModule';
-import { BuildingRedirect } from '@/ux2/shell/routes';
+import { BuildingRedirect, BuildingRoute } from '@/ux2/shell/routes';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/building" element={<BuildingModule />} />
+        <Route path="/building" element={<BuildingRoute />} />
         <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
         <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
+        <Route path="/community" element={<div data-testid="community">community</div>} />
+        <Route path="/boardroom" element={<div data-testid="boardroom">boardroom</div>} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
     </MemoryRouter>,
@@ -54,7 +51,16 @@ describe('Building', () => {
     renderAt('/archives');
     expect(screen.getByTestId('legacy-archives').textContent).toBe('archives');
     renderAt('/association-team?tab=task-tracking');
-    expect(screen.getByTestId('legacy-tasks')).toBeTruthy();
+    expect(screen.getByTestId('boardroom')).toBeTruthy();
+  });
+
+  it('the Association Team sections that moved on redirect to Community and the Board Room', () => {
+    renderAt('/association-team');
+    expect(screen.getByTestId('community')).toBeTruthy();
+    renderAt('/building?tab=pm-scorecard');
+    expect(screen.getAllByTestId('community').length).toBe(2);
+    renderAt('/building?tab=communications');
+    expect(screen.getByTestId('boardroom')).toBeTruthy();
   });
 
   it('legacy Building tab ids deep link into the right section', () => {
@@ -89,15 +95,13 @@ describe('Building', () => {
     expect(screen.getByTestId('legacy-vendors')).toBeTruthy();
   });
 
-  it('Directory opens on units and reaches the log, tasks, scorecard and intercom', () => {
+  it('Directory opens on units and reaches the people', () => {
     renderAt('/building?tab=directory');
     expect(screen.getByTestId('legacy-units').textContent).toBe('building');
     fireEvent.click(screen.getByRole('button', { name: /Board, management/ }));
     expect(document.querySelector('[aria-label="Board"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-building').textContent).toBe('contacts');
-    fireEvent.click(screen.getByRole('button', { name: 'Intercom' }));
-    expect(screen.getByTestId('legacy-intercom')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Property log' }));
-    expect(screen.getByTestId('legacy-log')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Intercom' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Property log' })).toBeNull();
   });
 });
