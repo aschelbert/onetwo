@@ -38,11 +38,11 @@ describe('Community', () => {
     tenantFlags.pmSeat = true;
   });
 
-  it('renders the Overview with notices, building stewardship and the leaderboard, and the nine sections', () => {
+  it('renders the Overview with notices, building stewardship and the leaderboard, and the eight sections', () => {
     renderAt('/community');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Community');
     const nav = screen.getByRole('navigation', { name: 'Community sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ pinned|\d+ open|\d+ to approve|[A-Z][a-z]{2} \d{1,2}|\d+)$/, '').trim())).toEqual(['Overview', 'Calendar', 'Notices', 'Meetings', 'Votes', 'Requests', 'Property log', 'Amenities', 'PM scorecard']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ pinned|\d+ open|\d+ to approve|[A-Z][a-z]{2} \d{1,2}|\d+)$/, '').trim())).toEqual(['Overview', 'Notices', 'Meetings', 'Votes', 'Requests', 'Property log', 'Amenities', 'PM scorecard']);
     expect(document.querySelector('[aria-label="Recent notices"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Building stewardship"]')).toBeTruthy();
     expect(document.querySelectorAll('[data-leader]').length).toBeGreaterThan(0);
@@ -111,9 +111,7 @@ describe('Community', () => {
     }
   });
 
-  it('Calendar shows the building\'s dates to everyone; the Property log takes an owner\'s entry', () => {
-    renderAt('/community?tab=calendar');
-    expect(document.querySelector('[data-widget="calendar"]')).toBeTruthy();
+  it('the Property log takes an owner\'s entry', () => {
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
       renderAt('/community?tab=log');

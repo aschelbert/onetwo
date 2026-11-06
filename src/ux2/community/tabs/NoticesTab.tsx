@@ -95,18 +95,18 @@ export default function NoticesTab({ snap }: { snap: CommunitySnapshot }) {
           </ul>
         </Card>
       ) : (
-        <Inner className="text-xs text-ux2-muted">No active alerts. Urgent notices from the board (water or power off, fire alarm test, elevator out of service) show here and at the top of Home for seven days.</Inner>
+        <Inner className="flex flex-wrap items-center gap-3 text-sm text-ux2-ink"><Chip tone="sage">No active alerts</Chip><span className="text-ux2-muted">Urgent notices from the board (water or power off, fire alarm test, elevator out of service) show here and at the top of Home until they are cleared.</span></Inner>
       )}
 
       {isBoard && (composing ? <NewNotice onDone={() => setComposing(false)} /> : <Button className="self-start" onClick={() => setComposing(true)}>New notice</Button>)}
 
       {notices.pinned.length > 0 && (
-        <Card tone="cyan" aria-label="Pinned">
-          <SectionLabel className="text-ux2-navy/[0.65]">Pinned · shown first to everyone</SectionLabel>
-          <ul className="m-0 list-none divide-y divide-ux2-navy/10 p-0">
+        <Card aria-label="Pinned">
+          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Pinned · shown first to everyone</SectionLabel><span className="text-xs text-ux2-muted">Up to 2 pinned posts</span></div>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {notices.pinned.map(a => (
-              <li key={a.id} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-4">
-                <div className="min-w-0 flex-1"><div className="text-[15px] font-semibold">{a.title}</div><div className="text-xs opacity-75">{label(a.category)} · pinned by {a.postedBy} · {dayLabel(a.postedDate.slice(0, 10))}</div></div>
+              <li key={a.id} className="flex flex-col gap-1 rounded-[14px] border border-ux2-line bg-white px-3.5 py-2.5 sm:flex-row sm:items-center sm:gap-4">
+                <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Chip tone={a.category === 'safety' ? 'red' : a.category === 'maintenance' ? 'amber' : 'teal'}>{label(a.category)}</Chip><span className="text-[15px] font-semibold text-ux2-ink">{a.title}</span></div><div className="text-xs text-ux2-muted">Pinned {dayLabel(a.postedDate.slice(0, 10))} by {a.postedBy}</div></div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="ghost" onClick={() => setOpen(open === a.id ? null : a.id)}>{open === a.id ? 'Close' : 'Open'}</Button>
                   {isBoard && <Button size="sm" variant="ghost" onClick={() => togglePin(a.id)}>Unpin</Button>}

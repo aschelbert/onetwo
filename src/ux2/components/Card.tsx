@@ -4,9 +4,9 @@ import { cn } from '@/lib/formatters';
 /**
  * Card surfaces. `tone` follows the design rules:
  *  surface (default) grey card · navy = act now · teal = help / good standing /
- *  decisions · cyan = worth noticing · red = overdue.
+ *  decisions · cyan = worth noticing · red = overdue · outline = needs you, on white.
  */
-export type CardTone = 'surface' | 'navy' | 'teal' | 'cyan' | 'red';
+export type CardTone = 'surface' | 'navy' | 'teal' | 'cyan' | 'red' | 'outline';
 
 const TONES: Record<CardTone, string> = {
   surface: 'bg-ux2-surface border-ux2-line text-ux2-ink',
@@ -14,6 +14,8 @@ const TONES: Record<CardTone, string> = {
   teal: 'bg-ux2-teal border-ux2-teal text-white',
   cyan: 'bg-ux2-cyan border-ux2-cyan text-ux2-navy',
   red: 'bg-ux2-red border-ux2-red text-white',
+  /** White with a red border: a thing that needs the viewer now, without a dark fill. */
+  outline: 'bg-white border-ux2-red text-ux2-ink',
 };
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {

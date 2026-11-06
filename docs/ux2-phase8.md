@@ -32,8 +32,7 @@ view.
 - Home: Feed | Calendar next to the greeting, kept in the URL
   (`/home?view=calendar`), on desktop and phone. The strip at the foot of
   Home is gone.
-- Community › Calendar: the same list; owners see only what is for
-  everyone, and their own dues lead to Pay.
+- Owners see only what is for everyone, and their own dues lead to Pay.
 
 Not in this phase: the ICS feed link. The `calendar-feed` function needs an
 HMAC token minted server-side and no screen mints one today; that is a

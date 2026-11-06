@@ -122,7 +122,7 @@ export default function PlanningTab({ snap, section, onSection }: { snap: FundsS
     {
       id: 'draft',
       tile: {
-        tone: 'teal',
+        tone: 'navy',
         label: `${draft.year} budget · decide`,
         meta: 'Computed',
         value: fmt(draft.scenarios[1].dues),
