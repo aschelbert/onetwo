@@ -132,7 +132,7 @@ New backend work, all additive: runbook_instances plus a nightly card job; month
 | Gap | Lands in | Phase | Fix |
 | --- | --- | --- | --- |
 | New case wizard | Board Room › New case | 5 | Four-step wizard board |
-| Case step variants (vote, spending, upload, owner message) | Case step card | 5 | Draw on the roof repair case; inline the navigate actions |
+| Case step variants (vote, spending, upload) | Case step card | 5 | Drawn: the roof repair case board (canvas version 220); step actions inline |
 | Elections detail (compliance, timeline, discussion, resolution) | Community › Votes › Election | 4 | One election board |
 | Dashboard PM layout | Home for PM | 1 | Home feed with PM filter |
 | Portfolio | Portfolio home | 1 | Home feed grouped by building |
@@ -144,6 +144,62 @@ New backend work, all additive: runbook_instances plus a nightly card job; month
 | Return-to-case bar (desktop) | Shell | 1 | Draw on Home desktop |
 
 Deliberately not carried: the AI advisor (keyword search instead) and SMS delivery.
+
+## 5b. Net-new features in the design
+
+Thirty-one things on the canvas have no production counterpart. Each belongs to the phase that builds its module and is additive, so none can cause a parity failure. Backend = needs new tables or jobs.
+
+| Feature | Where | Phase | Backend |
+| --- | --- | --- | --- |
+| Runbook engine and Home cards (nightly job) | Home, every module | 1 | yes |
+| Stewardship score, dimensions, bands, radar, Score model page (monthly job, event receipts) | Home, Me, Community | 1 | yes |
+| Building score as the shared KPI | Headers, Home rail | 1 | no |
+| Pulse feed | Home | 1 | no |
+| Calendar view with month carousel; feed and calendar toggle | Home | 1 | no |
+| Upcoming obligations container (deadlines as a list, never banners) | Home | 1 | no |
+| New building setup runbook (9 steps, Stripe at step 6) | Home, Funds › Online payments | 1 | no |
+| Return-to-case bar | Shell | 1 | no |
+| Tile switcher: tiles as table of contents, one detail at a time | Funds › Income, Expenses, Planning | 2 | no |
+| Invoice register as its own list | Funds › Income | 2 | no |
+| Behind view with next runbook step per unit | Funds › Income | 2 | no |
+| Spending decisions deck, oldest first | Funds › Expenses | 2 | no |
+| Work orders list | Funds › Expenses | 2 | no |
+| 2027 draft generated Oct 1 with Computed, Live, needs-you tags; three dues scenarios | Funds › Planning | 2 | yes |
+| Reserve contribution lever (today, recommended, custom) | Funds › Planning › Reserves | 2 | no |
+| Online payments: payouts, fees, fee pass-through, ACH toggle, what owners may pay, pause, invite check payers, failed-autopay retry | Funds › Online payments | 2 | yes |
+| Owner Pay screen: pick items, pay ahead, bank account (ACH), switch autopay to bank | Me › My Unit › Pay | 2 | yes |
+| Runs on its own and Done for you chip lines | Funds | 2 | no |
+| Payroll board | Funds › Expenses | 2 | no |
+| Duties and roles with Member at Large and every-owner expectations | Building › Obligations | 3 | no |
+| Contracts tab | Building | 3 | no |
+| Resale request runbook and unit certificate (10-business-day clock) | Me › My Unit, Board Room | 3 | yes |
+| Unit owner leaderboard with privacy rule (first names and units; below-70 owners see only themselves; per-building switch) | Community › Overview | 4 | no |
+| Building stewardship 90-day chart: building, board, owners | Community › Overview | 4 | no |
+| Lift it this month; Who moved it | Community › Overview | 4 | no |
+| Notices tab; five most recent on Overview | Community | 4 | no |
+| Board decisions outcomes card | Community › Votes | 4 | no |
+| Board votes cast on the case step and its Home card | Board Room, Home | 5 | no |
+| 32 runbooks with on/off, expandable list (26 beyond the 6 production templates) | Board Room › Runbooks | 5 | yes |
+| Units on this account; link a unit with deed check; My Units combined view | Me › My Account, My Units | 6 | yes |
+| Keyword help search over guides, runbooks, rules and law | Me › Help & Support | 6 | no |
+
+## 5c. Design rules the build must follow
+
+A screen that breaks one of these fails its parity review even if its features are complete.
+
+- Colour carries meaning on tiles: navy = act now; brand red = overdue or money to chase; dark teal = help, good standing, decisions; aqua = worth noticing; grey = reference. One emphasised tile per row; no two boards use the same colour sequence.
+- The stewardship radar is one fixed widget: navy background, aqua line for the person, red for the building average. Leaderboards are dark teal.
+- Alerts are tasks: anything urgent is a Home card; deadlines live in an Upcoming obligations container; no alert banners.
+- Tiles are the table of contents: at most three sections per tab, tiles switch the detail, nothing important below the fold. Settings a person must manage sit on the page they govern, not behind an icon.
+- Actions live on the card they affect: no duplicative page-level buttons; one place to manage each thing (vendors under Contracts, billing under Subscription).
+- No disclaimers or explanatory footnotes on working screens; explanations belong in Help & Support.
+- No AI features, no SMS, no profile photos.
+- Honest labels and counts: "All" shows all or offers to; no wording implying inactive items.
+- Navigation order Home, Building, Community, Funds, Board Room; avatar menu My Account, My Unit, User Management, Subscription, Help & Support, Sign out, with no sub-details.
+- Headers carry the logo only, aligned labels, no search icon.
+- Board votes are cast on the case or its Home card; Community shows outcomes.
+- Chart lines are solid in brand colours; dashed is reserved for a projected or missing period.
+- Phones carry the same colouring, with the stewardship card first on Home.
 
 ## 6. Implementation plan by phase
 
