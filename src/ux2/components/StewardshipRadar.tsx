@@ -14,13 +14,15 @@ export interface StewardshipRadarProps {
   compact?: boolean;
   /** Only the chart and the building-average line, for a card that draws its own frame. */
   bare?: boolean;
+  /** What the red line is compared with; "Building avg" unless told otherwise. */
+  compareLabel?: string;
 }
 
 /**
  * The one fixed stewardship widget: navy background, aqua line for the
  * person, red line for the building average. Same everywhere it appears.
  */
-export function StewardshipRadar({ you, total, buildingAvg, buildingTotal, delta, who = 'you', compact, bare }: StewardshipRadarProps) {
+export function StewardshipRadar({ you, total, buildingAvg, buildingTotal, delta, who = 'you', compact, bare, compareLabel = 'Building avg' }: StewardshipRadarProps) {
   const band = bandFor(total);
   const maxWidth = compact ? 280 : 360;
   const label = (i: number) => {
@@ -34,7 +36,7 @@ export function StewardshipRadar({ you, total, buildingAvg, buildingTotal, delta
       <svg
         viewBox="-60 0 420 276"
         role="img"
-        aria-label={`Stewardship radar: ${who} ${total}${buildingTotal !== undefined ? `, building average ${buildingTotal}` : ''}. ${DIMENSIONS.map((d, i) => `${d} ${you[i] ?? 0}`).join(', ')}`}
+        aria-label={`Stewardship radar: ${who} ${total}${buildingTotal !== undefined ? `, ${compareLabel.toLowerCase()} ${buildingTotal}` : ''}. ${DIMENSIONS.map((d, i) => `${d} ${you[i] ?? 0}`).join(', ')}`}
         style={{ display: 'block', width: '100%', maxWidth, height: 'auto' }}
       >
         <polygon points={radarPoints([100, 100, 100, 100, 100])} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="0.8" />
@@ -57,7 +59,7 @@ export function StewardshipRadar({ you, total, buildingAvg, buildingTotal, delta
       {buildingTotal !== undefined ? (
         <span>
           <span className="mr-1.5 inline-block h-0.5 w-3 rounded-sm bg-[#D62839] align-middle" />
-          Building avg <b className="font-semibold text-white">{buildingTotal}</b>
+          {compareLabel} <b className="font-semibold text-white">{buildingTotal}</b>
         </span>
       ) : <span />}
       {delta !== undefined && <span className="font-semibold text-ux2-cyan">{delta >= 0 ? '+' : ''}{delta} this month</span>}
