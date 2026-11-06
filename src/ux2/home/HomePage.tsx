@@ -24,6 +24,7 @@ import StewardshipRadar from '../components/StewardshipRadar';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
 import { contextFor, todayIso, useCardInput, useStoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
+import { isUx2 } from '../flags';
 import { stewardshipFor } from '../score/events';
 import { DIMENSIONS } from '../score/stewardship';
 import { dayLabel, groupByMonth } from './calendar';
@@ -61,6 +62,9 @@ function useGo() {
   return (path: string) => {
     const m = path.match(/^\/(funds|financial)\?tab=([a-z]+)/);
     if (m) { setActiveTab(m[2]); navigate(`/funds?tab=${m[2]}`); return; }
+    // Obligations and filings live on Building › Obligations once the Building module is on.
+    if (isUx2('building') && /^\/boardroom\?tab=runbook/.test(path)) { navigate('/building?tab=obligations&section=calendar'); return; }
+    if (isUx2('building') && /^\/boardroom\?tab=duties/.test(path)) { navigate('/building?tab=obligations&section=duties'); return; }
     navigate(path);
   };
 }

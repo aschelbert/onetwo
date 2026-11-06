@@ -12,3 +12,6 @@ export { default as FundsPage } from './funds/FundsPage';
 export { default as FundsSwitch } from './funds/FundsSwitch';
 export { default as PayPage } from './funds/PayPage';
 export * from './funds/metrics';
+export { default as BuildingModule } from './building/BuildingModule';
+export { default as BuildingSwitch } from './building/BuildingSwitch';
+export * from './building/metrics';
