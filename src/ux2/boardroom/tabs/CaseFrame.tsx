@@ -74,7 +74,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
       )}
 
       {c && (c.boardVotes || (c.decisionTrail && c.decisionTrail.length > 0)) && (
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {c.boardVotes && (
             <Card aria-label="Board vote">
               <SectionLabel>Board vote · recorded for every owner on Community › Votes</SectionLabel>

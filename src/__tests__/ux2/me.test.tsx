@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { _resetUx2ForTests, setUx2Flags } from '@/ux2/flags';
 import { useAuthStore } from '@/store/useAuthStore';
 import { searchHelp } from '@/ux2/me/help';
 
@@ -12,45 +11,35 @@ vi.mock('@/features/account/AccountSettingsPage', () => ({ default: ({ embedded 
 vi.mock('@/features/unit-manager/MyUnitPage', () => ({ default: ({ embedded }: { embedded?: boolean }) => <div data-testid="legacy-unit" data-embedded={embedded ? '1' : '0'} /> }));
 vi.mock('@/features/user-management/UserManagementPage', () => ({ default: ({ embedded }: { embedded?: boolean }) => <div data-testid="legacy-users" data-embedded={embedded ? '1' : '0'} /> }));
 vi.mock('@/features/subscription/SubscriptionPage', () => ({ default: ({ embedded }: { embedded?: boolean }) => <div data-testid="legacy-subscription" data-embedded={embedded ? '1' : '0'} /> }));
-vi.mock('@/features/support/HelpSupportPage', () => ({ default: () => <div data-testid="legacy-help" /> }));
 vi.mock('@/features/support/SupportPage', () => ({ default: () => <div data-testid="legacy-support" /> }));
 vi.mock('@/features/support/HowItWorksPage', () => ({
   default: () => <div data-testid="legacy-guides" />,
   GUIDES: [{ id: 'g1', title: 'Fiscal Lens', summary: 'Ledger, budget and reserves', route: '/financial', howTos: [{ title: 'Record a payment', steps: ['Open the unit', 'Record payment'] }] }],
 }));
 
-import { AccountSwitch, MyUnitSwitch, SubscriptionSwitch, SupportSwitch, UsersSwitch } from '@/ux2/me/MeSwitch';
+import MeModule from '@/ux2/me/MeModule';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/account" element={<AccountSwitch />} />
-        <Route path="/my-unit" element={<MyUnitSwitch />} />
-        <Route path="/admin/users" element={<UsersSwitch />} />
-        <Route path="/subscription" element={<SubscriptionSwitch />} />
-        <Route path="/support" element={<SupportSwitch />} />
+        <Route path="/account" element={<MeModule tab="account" />} />
+        <Route path="/my-unit" element={<MeModule tab="unit" />} />
+        <Route path="/admin/users" element={<MeModule tab="users" />} />
+        <Route path="/subscription" element={<MeModule tab="subscription" />} />
+        <Route path="/support" element={<MeModule tab="help" />} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-describe('Me behind ux2.me', () => {
+describe('Me', () => {
   beforeEach(() => {
     localStorage.clear();
-    _resetUx2ForTests();
-  });
-
-  it('shows the production pages when the flag is off', () => {
-    renderAt('/account');
-    expect(screen.getByTestId('legacy-account').getAttribute('data-embedded')).toBe('0');
-    renderAt('/support');
-    expect(screen.getByTestId('legacy-help')).toBeTruthy();
   });
 
   it('My Account shows the stewardship radar, the receipts, the dimensions and the embedded profile', () => {
-    setUx2Flags('me');
     renderAt('/account');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My Account');
     const nav = screen.getByRole('navigation', { name: 'Me sections' });
@@ -63,7 +52,6 @@ describe('Me behind ux2.me', () => {
   });
 
   it('My Unit shows the balance, the resale packet, receipts and the embedded unit tabs', () => {
-    setUx2Flags('me');
     renderAt('/my-unit');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^My Unit/);
     expect(document.querySelector('[aria-label="Resale ready"]')).toBeTruthy();
@@ -74,7 +62,6 @@ describe('Me behind ux2.me', () => {
   });
 
   it('User Management and Subscription mount the production pages for a board member only', () => {
-    setUx2Flags('me');
     renderAt('/admin/users');
     expect(screen.getByTestId('legacy-users').getAttribute('data-embedded')).toBe('1');
     expect(screen.getByText('People with access')).toBeTruthy();
@@ -94,7 +81,6 @@ describe('Me behind ux2.me', () => {
   });
 
   it('Help searches guides, runbooks, obligations and fees and mounts support and the guides', () => {
-    setUx2Flags('me');
     renderAt('/support');
     expect(screen.getByTestId('legacy-support')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search help'), { target: { value: 'insurance' } });

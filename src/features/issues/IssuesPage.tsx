@@ -203,8 +203,8 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
       {/* Embedded: pill sub-tabs + New Case button on same row */}
       {embedded && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-1 bg-mist-50 rounded-lg p-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex max-w-full gap-1 overflow-x-auto bg-mist-50 rounded-lg p-1">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${tab === t.id ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>
                 {t.label}

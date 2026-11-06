@@ -25,7 +25,7 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
       </TileRow>
       <Card aria-label="Roles">
         <SectionLabel>Who sees what</SectionLabel>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[['Owner, resident', 'Their unit, the ledger, documents, votes and the community'], ['Board member', 'Everything, with writes; officers get their own obligations'], ['Property manager', 'Operations: cases, vendors, work orders, the inbox'], ['Staff', 'Tasks, the property log and the intercom']].map(([r, d]) => (
             <Inner key={r}><div className="text-sm font-semibold text-ux2-ink">{r}</div><div className="text-xs text-ux2-muted">{d}</div></Inner>
           ))}

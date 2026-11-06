@@ -125,7 +125,7 @@ export default function OverviewTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0 sm:flex-row sm:flex-wrap sm:gap-2">
           {done.map(d => (
             <li key={d.label}>
-              <Chip tone={d.on ? 'sage' : 'ghost'}>{d.on ? '✓ ' : ''}{d.label} · {d.detail}</Chip>
+              <Chip tone={d.on ? 'sage' : 'ghost'} className="max-w-full !whitespace-normal !leading-snug">{d.on ? '✓ ' : ''}{d.label} · {d.detail}</Chip>
             </li>
           ))}
         </ul>

@@ -62,7 +62,7 @@ export default function InboxTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot
               <tbody>
                 {list.map(r => (
                   <tr key={r.issue.id} data-request={r.issue.id} className="border-t border-ux2-line align-top">
-                    <td className="py-2.5 pr-3">
+                    <td className="min-w-[220px] py-2.5 pr-3">
                       <div className="font-semibold text-ux2-ink">{r.issue.title}</div>
                       <div className="text-xs text-ux2-dim">{r.issue.id}{r.issue.unitNumber ? ` · Unit ${r.issue.unitNumber}` : ''} · {r.issue.reporterName || 'owner'} · received {dayLabel(r.issue.submittedDate.slice(0, 10))} · {r.upvotes} upvote{r.upvotes === 1 ? '' : 's'}{r.linkedCase ? <> · <button type="button" className="text-ux2-teal hover:underline" onClick={() => onOpenCase(r.linkedCase!.id)}>{r.linkedCase.id}</button></> : null}</div>
                     </td>

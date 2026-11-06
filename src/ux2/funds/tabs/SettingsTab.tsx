@@ -21,7 +21,7 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   return (
     <Card aria-label="Billing rules">
       <SectionLabel>Runs on its own</SectionLabel>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Inner className="flex flex-col gap-2">
           <div className="text-sm font-semibold text-ux2-ink">Dues are due on the {ordinal(snap.hoaDueDay)}</div>
           <label className="text-xs text-ux2-muted" htmlFor="rules-day">Day of the month (1–28)</label>

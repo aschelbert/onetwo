@@ -44,7 +44,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
       </TileRow>
 
       {sum.withOpenCase.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {sum.withOpenCase.slice(0, 3).map(r => {
             const c = r.openCases[0];
             const steps = c.steps ?? [];

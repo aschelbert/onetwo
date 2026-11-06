@@ -34,7 +34,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <StewardshipRadar you={lines.map(l => l.pct)} total={view.you.total} buildingAvg={view.building.dims} buildingTotal={view.building.total} />
         <Card aria-label="This month">
           <SectionLabel>Last scored events · each with a receipt</SectionLabel>

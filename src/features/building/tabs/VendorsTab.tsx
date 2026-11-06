@@ -128,7 +128,7 @@ export default function VendorsTab() {
   return (
     <div className="space-y-5">
       {/* Sub-tab navigation */}
-      <div className="flex items-center gap-1 bg-ink-50 rounded-lg p-1">
+      <div className="flex items-center gap-1 overflow-x-auto bg-ink-50 rounded-lg p-1">
         {SUB_TABS.map(t => (
           <button
             key={t.key}
@@ -146,7 +146,7 @@ export default function VendorsTab() {
       {/* ═══════ DIRECTORY ═══════ */}
       {subTab === 'directory' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-display text-xl font-bold text-ink-900">Preferred Vendors</h3>
             <div className="flex items-center gap-2">
               <button onClick={() => { resetForm(); setModal('addReview'); }} className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-ink-50 text-sm font-medium">+ Review</button>

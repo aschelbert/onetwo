@@ -183,7 +183,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   return (
     <div className="flex flex-col gap-5">
       <TileSwitcher sections={sections} value={current} onChange={onSection} hint="Tap a tile to open its list below. The other two stay one tap away." />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card aria-label="Runs on its own">
           <SectionLabel>Runs on its own</SectionLabel>
           <ul className="m-0 list-none p-0 text-sm text-ux2-ink">

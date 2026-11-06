@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { _resetUx2ForTests, setUx2Flags } from '@/ux2/flags';
 import { useRunbookStore } from '@/ux2/runbook/store';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
@@ -9,9 +8,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', features: {} }),
 }));
-vi.mock('@/features/dashboard/DashboardPage', () => ({ default: () => <div data-testid="legacy-dashboard">legacy dashboard</div> }));
 
-import HomeSwitch from '@/ux2/home/HomeSwitch';
 import HomePage from '@/ux2/home/HomePage';
 import ReturnToCaseBar from '@/ux2/shell/ReturnToCaseBar';
 
@@ -19,30 +16,21 @@ function renderHome(path = '/home') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/home" element={<HomeSwitch />} />
-        <Route path="/dashboard" element={<HomeSwitch />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-describe('Home behind ux2.home', () => {
+describe('Home', () => {
   beforeEach(() => {
     localStorage.clear();
-    _resetUx2ForTests();
     useRunbookStore.setState({ cards: {} });
   });
 
-  it('shows the production dashboard when the flag is off', () => {
-    renderHome('/dashboard');
-    expect(screen.getByTestId('legacy-dashboard')).toBeTruthy();
-  });
-
   it('renders the board Home with the feed, stewardship radar, tiles and calendar', () => {
-    setUx2Flags('shell,home');
     renderHome();
-    expect(screen.queryByTestId('legacy-dashboard')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good (morning|afternoon|evening), /);
     expect(screen.getByRole('region', { name: 'Up next' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Waiting on others' })).toBeTruthy();
@@ -54,7 +42,6 @@ describe('Home behind ux2.home', () => {
   });
 
   it('a card action deep links into the production page', () => {
-    setUx2Flags('home');
     renderHome();
     const upNext = screen.getByRole('region', { name: 'Up next' });
     const buttons = within(upNext).getAllByRole('button').filter(b => !b.getAttribute('aria-label')?.startsWith('Hide') && !/Show/.test(b.textContent || ''));
@@ -64,7 +51,6 @@ describe('Home behind ux2.home', () => {
   });
 
   it('hiding a card takes it off Home and remembers it for this person', () => {
-    setUx2Flags('home');
     renderHome();
     const upNext = screen.getByRole('region', { name: 'Up next' });
     const first = upNext.querySelector('[data-card]') as HTMLElement;
@@ -85,7 +71,6 @@ describe('Home behind ux2.home', () => {
   });
 
   it('renders the owner Home with a balance tile and no board tiles', () => {
-    setUx2Flags('home');
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
       render(<MemoryRouter><HomePage /></MemoryRouter>);
@@ -98,16 +83,15 @@ describe('Home behind ux2.home', () => {
 });
 
 describe('ReturnToCaseBar', () => {
-  it('shows only when a minimised case context exists and we are off the case page', () => {
+  it('shows when a case context exists and we are off the case page', () => {
     const store = useIssuesStore.getState();
     const first = store.cases[0];
     const base = { caseId: first.id, caseTitle: first.title, stepTitle: 'Demand letter', stepIdx: 2, returnPath: '/funds', progress: { done: 2, total: 5 } };
     store.setActiveCaseContext({ ...base, minimized: false });
-    const { unmount } = render(<MemoryRouter initialEntries={['/funds']}><ReturnToCaseBar /></MemoryRouter>);
+    const { unmount } = render(<MemoryRouter initialEntries={['/issues?view=case:x']}><ReturnToCaseBar /></MemoryRouter>);
     expect(document.querySelector('[data-widget="return-to-case"]')).toBeNull();
     unmount();
 
-    store.setActiveCaseContext({ ...base, minimized: true });
     render(
       <MemoryRouter initialEntries={['/funds']}>
         <Routes>

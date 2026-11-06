@@ -118,7 +118,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
       {current === 'calendar' && <div className="ux2-legacy"><BoardRoomPage embedded tab="runbook" /></div>}
       {current === 'duties' && (
         <div className="flex flex-col gap-5">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Card tone="teal" className="gap-1" aria-label="Duty of care">
               <SectionLabel className="text-white/[0.66]">Duty of care</SectionLabel>
               <div className="text-2xl font-semibold">{duties.care} obligations</div>

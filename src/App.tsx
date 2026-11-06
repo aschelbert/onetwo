@@ -4,20 +4,18 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import ShellSwitch from '@/ux2/shell/ShellSwitch';
-import HomeSwitch from '@/ux2/home/HomeSwitch';
-import FundsSwitch from '@/ux2/funds/FundsSwitch';
+import Ux2Shell from '@/ux2/shell/Ux2Shell';
+import HomePage from '@/ux2/home/HomePage';
+import FundsPage from '@/ux2/funds/FundsPage';
 import PayPage from '@/ux2/funds/PayPage';
-import BuildingSwitch, { ArchivesSwitch, AssociationTeamSwitch } from '@/ux2/building/BuildingSwitch';
-import CommunitySwitch, { VotingRedirect } from '@/ux2/community/CommunitySwitch';
-import BoardRoomSwitch, { CasesRedirect, IssuesSwitch } from '@/ux2/boardroom/BoardRoomSwitch';
-import { AccountSwitch, MyUnitSwitch, SubscriptionSwitch, SupportSwitch, UsersSwitch } from '@/ux2/me/MeSwitch';
+import BuildingModule from '@/ux2/building/BuildingModule';
+import CommunityModule from '@/ux2/community/CommunityModule';
+import MeModule from '@/ux2/me/MeModule';
+import { BoardRoomRoute, BuildingRedirect, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
 import AuthPage from '@/features/auth/AuthPage';
-import DashboardPage from '@/features/dashboard/DashboardPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
 import AIAdvisor from '@/components/AIAdvisor';
-import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
 import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
@@ -160,7 +158,7 @@ function LoginRoute() {
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
-      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
     return <Navigate to={target} replace />;
   }
   return <AuthPage />;
@@ -173,7 +171,7 @@ function CatchAll() {
     const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
-      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
     return <Navigate to={target} replace />;
   }
   return <Navigate to="/" replace />;
@@ -186,7 +184,7 @@ function RequirePM({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   if (currentRole !== 'PM_COMPANY') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
   return <>{children}</>;
 }
@@ -197,11 +195,6 @@ function AIAdvisorWrapper() {
   return <AIAdvisor />;
 }
 
-function ActiveCaseWidgetWrapper() {
-  const { isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return null;
-  return <ActiveCaseWidget />;
-}
 
 
 export default function App() {
@@ -225,30 +218,29 @@ export default function App() {
           <Route path="/portfolio/dashboard" element={<ErrorBoundary fallbackLevel="page"><PortfolioDashboardPage /></ErrorBoundary>} />
         </Route>
 
-        {/* Protected app routes */}
-        <Route element={<RequireAuth><TenantProvider><ShellSwitch /></TenantProvider></RequireAuth>}>
-          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeSwitch /></ErrorBoundary>} />
-          {/* UX2: Home behind ux2.home (HomeSwitch), Funds behind ux2.funds (FundsSwitch); production pages otherwise */}
-          <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomeSwitch /></ErrorBoundary>} />
-          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
-          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
-          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesSwitch /></ErrorBoundary>} />
-          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingSwitch /></ErrorBoundary>} />
-          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesSwitch /></ErrorBoundary>} />
-          <Route path="/voting" element={<VotingRedirect />} />
-          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomSwitch /></ErrorBoundary>} />
-          <Route path="/cases" element={<CasesRedirect />} />
+        {/* Protected app routes: the five modules and Me, with every old path redirecting into the module that absorbed it */}
+        <Route element={<RequireAuth><TenantProvider><Ux2Shell /></TenantProvider></RequireAuth>}>
+          <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomePage /></ErrorBoundary>} />
+          <Route path="/dashboard" element={<RedirectKeepQuery to="/home" />} />
+          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
+          <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />
+          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingModule /></ErrorBoundary>} />
+          <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
+          <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
+          <Route path="/property-log" element={<Navigate to="/building?tab=directory&section=log" replace />} />
+          <Route path="/compliance" element={<Navigate to="/building?tab=obligations" replace />} />
+          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityModule /></ErrorBoundary>} />
+          <Route path="/voting" element={<Navigate to="/community?tab=votes" replace />} />
+          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomRoute /></ErrorBoundary>} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamSwitch /></ErrorBoundary>} />
-          <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
-          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunitySwitch /></ErrorBoundary>} />
-          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitSwitch /></ErrorBoundary>} />
+          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesRoute /></ErrorBoundary>} />
+          <Route path="/cases" element={<RedirectKeepQuery to="/issues" />} />
+          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="unit" /></ErrorBoundary>} />
           <Route path="/my-unit/pay" element={<ErrorBoundary fallbackLevel="page"><PayPage /></ErrorBoundary>} />
-          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSwitch /></ErrorBoundary>} />
-          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><SupportSwitch /></ErrorBoundary>} />
-          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionSwitch /></ErrorBoundary>} />
-          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UsersSwitch /></ErrorBoundary>} />
+          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="account" /></ErrorBoundary>} />
+          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="help" /></ErrorBoundary>} />
+          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="subscription" /></ErrorBoundary>} />
+          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="users" /></ErrorBoundary>} />
         </Route>
 
         {/* Catch-all */}
@@ -256,7 +248,6 @@ export default function App() {
       </Routes>
       {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
-      <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
     </ErrorBoundary>

@@ -72,7 +72,7 @@ function People({ snap, isBoard }: { snap: BuildingSnapshot; isBoard: boolean })
         )}
         <Inner className="text-xs text-ux2-muted">Stewardship is the board member's own score from Home. Roles set who gets which Home cards and which obligations are theirs.</Inner>
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card aria-label="Management and counsel">
           <SectionLabel>Management and counsel</SectionLabel>
           <Inner>

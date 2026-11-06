@@ -43,7 +43,7 @@ function UnitCard({ u, snap, one }: { u: UnitSummary; snap: MeSnapshot; one: boo
         </div>
         {!one && <Chip tone={u.owed > 0 ? 'red' : 'sage'}>{u.owed > 0 ? `${fmt(u.owed)} owed` : 'Nothing owed'}</Chip>}
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Inner><div className="text-xs text-ux2-muted">Monthly assessment</div><div className="text-lg font-semibold text-ux2-ink">{fmt(u.unit.monthlyFee)}</div><div className="text-xs text-ux2-dim">next {dayLabel(u.nextDue)}</div></Inner>
         <Inner><div className="text-xs text-ux2-muted">Open now</div><div className="text-lg font-semibold text-ux2-ink">{fmt(u.owed)}</div><div className="text-xs text-ux2-dim">{u.openInvoices[0] ? `${u.openInvoices[0].description} · due ${dayLabel(u.openInvoices[0].dueDate)}` : u.fees ? `${fmt(u.fees)} late fees` : 'nothing owed'}</div></Inner>
         <Inner><div className="text-xs text-ux2-muted">Special assessments</div><div className="text-lg font-semibold text-ux2-ink">{fmt(u.assessments)}</div><div className="text-xs text-ux2-dim">{u.assessments ? 'open on this unit' : 'none open'}</div></Inner>

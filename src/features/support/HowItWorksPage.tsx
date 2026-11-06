@@ -33,7 +33,7 @@ export const GUIDES: GuideSection[] = [
     id: 'dashboard',
     title: 'Dashboard',
     icon: LayoutDashboard,
-    route: '/dashboard',
+    route: '/home',
     summary: 'Your personalized home screen with key metrics, action items, and activity feed — tailored to your role so you see exactly what needs your attention.',
     tabs: [
       {

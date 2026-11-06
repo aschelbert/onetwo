@@ -26,7 +26,7 @@ export function ReserveLever({ snap }: { snap: FundsSnapshot }) {
         <SectionLabel className={res.pct < 50 ? 'text-white/[0.66]' : undefined}>Monthly reserve contribution</SectionLabel>
         <Chip tone={res.onSchedule ? 'teal' : 'amber'}>{res.onSchedule ? 'On schedule' : `Short by ${fmt(Math.max(0, res.recommendedMonthly - res.monthly))} a month`}</Chip>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {choices.map(c => (
           <button
             key={c.id}
@@ -72,7 +72,7 @@ function NextYearDraft({ snap }: { snap: FundsSnapshot }) {
         </div>
         <Button size="sm" onClick={() => navigate('/issues?view=new')}>Start the budget runbook</Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {draft.scenarios.map(s => (
           <button key={s.id} type="button" onClick={() => setPick(s.id)} aria-pressed={pick === s.id} className={`rounded-[14px] border px-3.5 py-3 text-left ${pick === s.id ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
             <div className="text-xs font-semibold uppercase tracking-[0.06em] opacity-70">{s.label}</div>

@@ -6,7 +6,6 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { Card, Chip, Inner, PillTabs, SectionLabel } from '../../components';
-import { isUx2 } from '../../flags';
 import { RUNBOOKS } from '../../boardroom/runbooks';
 import { searchHelp, type HelpHit } from '../help';
 import type { MeSnapshot } from '../metrics';
@@ -26,11 +25,7 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
     boardCount: building.board.length,
     hasManagement: !!building.management.company,
   }).categories.flatMap(c => c.items), [building.address.state, building.legalDocuments, building.insurance, building.board.length, building.management.company]);
-  const routes = useMemo(() => ({
-    obligations: isUx2('building') ? '/building?tab=obligations' : '/boardroom?tab=runbook',
-    runbooks: isUx2('boardroom') ? '/boardroom?tab=runbooks' : '/issues',
-    fees: isUx2('funds') ? '/funds?tab=settings&section=fees' : '/building?tab=fees',
-  }), []);
+  const routes = useMemo(() => ({ obligations: '/building?tab=obligations', runbooks: '/boardroom?tab=runbooks', fees: '/funds?tab=settings&section=fees' }), []);
   const hits = useMemo(() => searchHelp(q, {
     guides: GUIDES.map(g => ({ id: g.id, title: g.title, summary: g.summary, route: g.route, howTos: g.howTos })),
     obligations: obligations.map(o => ({ id: o.id, task: o.task, due: o.due, role: o.role, legalRef: o.legalRef })),
@@ -58,7 +53,7 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
         {!q && <p className="text-xs text-white/[0.7]">Matches by keyword across the {GUIDES.length} guides, {RUNBOOKS.length} runbooks, this building's {obligations.length} obligations and {fees.length} fees, and takes you to the page that holds the answer.</p>}
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[
           { title: 'Runbooks', detail: `Every obligation has steps, dates and a letter ready · ${RUNBOOKS.length}`, path: routes.runbooks },
           { title: 'Stewardship score', detail: 'Five dimensions, scored monthly, a receipt for each event', path: '/account' },

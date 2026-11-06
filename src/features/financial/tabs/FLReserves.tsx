@@ -84,12 +84,12 @@ export default function FLReserves() {
             <h4 className="text-sm font-bold text-ink-800 uppercase tracking-wider mb-3">Unreserved Assets</h4>
             <div className="space-y-2">
               {unlinkedAssets.map(a => (
-                <div key={a.id} className="flex items-center justify-between bg-accent-50 rounded-lg p-3 border border-accent-100 gap-3">
+                <div key={a.id} className="flex flex-wrap items-center justify-between bg-accent-50 rounded-lg p-3 border border-accent-100 gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-ink-900 text-sm">{a.name}</p>
                     <p className="text-xs text-ink-400">{a.category} · {a.remainingLifeYears} yr remaining</p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <select
                       value=""
                       onChange={e => {

@@ -24,7 +24,6 @@ import StewardshipRadar from '../components/StewardshipRadar';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
 import { contextFor, todayIso, useCardInput, useStoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
-import { isUx2 } from '../flags';
 import { stewardshipFor } from '../score/events';
 import { DIMENSIONS } from '../score/stewardship';
 import { dayLabel, groupByMonth } from './calendar';
@@ -55,16 +54,16 @@ function longDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
-/** Navigate to a card action. The production Funds page keeps its tab in the financial store, the redesign in the URL, so set both. */
+/** Navigate to a card action. The Funds tab lives in the URL; the financial store's tab is kept in step for the embedded tab components. */
 function useGo() {
   const navigate = useNavigate();
   const setActiveTab = useFinancialStore(s => s.setActiveTab);
   return (path: string) => {
     const m = path.match(/^\/(funds|financial)\?tab=([a-z]+)/);
     if (m) { setActiveTab(m[2]); navigate(`/funds?tab=${m[2]}`); return; }
-    // Obligations and filings live on Building › Obligations once the Building module is on.
-    if (isUx2('building') && /^\/boardroom\?tab=runbook/.test(path)) { navigate('/building?tab=obligations&section=calendar'); return; }
-    if (isUx2('building') && /^\/boardroom\?tab=duties/.test(path)) { navigate('/building?tab=obligations&section=duties'); return; }
+    // Obligations and filings live on Building › Obligations.
+    if (/^\/boardroom\?tab=runbook/.test(path)) { navigate('/building?tab=obligations&section=calendar'); return; }
+    if (/^\/boardroom\?tab=duties/.test(path)) { navigate('/building?tab=obligations&section=duties'); return; }
     navigate(path);
   };
 }
@@ -181,7 +180,7 @@ function Calendar({ cards, today }: { cards: RunbookCard[]; today: string }) {
           <button type="button" aria-label="Later month" disabled={i >= groups.length - 1} onClick={() => setI(x => Math.min(groups.length - 1, x + 1))} className="h-8 w-8 rounded-full border border-ux2-line bg-white disabled:opacity-40">›</button>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         {groups.map((g, gi) => (
           <Inner key={g.key} className={cn('min-h-[120px]', gi !== i && 'hidden md:block')} data-month={g.key}>
             <div className="mb-2 flex items-center justify-between">
@@ -297,7 +296,7 @@ export default function HomePage() {
         <AttentionChips set={set} role={viewer.role} />
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
         <aside className="flex flex-col gap-4 lg:order-2">
           {radar}

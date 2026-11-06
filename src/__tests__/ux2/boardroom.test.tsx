@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { _resetUx2ForTests, setUx2Flags } from '@/ux2/flags';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
@@ -19,15 +18,15 @@ vi.mock('@/features/issues/components/workflow/ConflictCheckPanel', () => ({ Con
 vi.mock('@/features/issues/components/CaseModals', () => ({ AddBidModal: () => null }));
 vi.mock('@/features/issues/components/CaseComponents', () => ({ BoardVoteDisplay: () => <div data-testid="legacy-vote" /> }));
 
-import BoardRoomSwitch, { CasesRedirect, IssuesSwitch } from '@/ux2/boardroom/BoardRoomSwitch';
+import { BoardRoomRoute, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/boardroom" element={<BoardRoomSwitch />} />
-        <Route path="/issues" element={<IssuesSwitch />} />
-        <Route path="/cases" element={<CasesRedirect />} />
+        <Route path="/boardroom" element={<BoardRoomRoute />} />
+        <Route path="/issues" element={<IssuesRoute />} />
+        <Route path="/cases" element={<RedirectKeepQuery to="/issues" />} />
         <Route path="/building" element={<div data-testid="building">building</div>} />
         <Route path="/community" element={<div data-testid="community">community</div>} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
@@ -36,22 +35,13 @@ function renderAt(path: string) {
   );
 }
 
-describe('Board Room behind ux2.boardroom', () => {
+describe('Board Room', () => {
   beforeEach(() => {
     localStorage.clear();
-    _resetUx2ForTests();
     useRunbookSwitches.setState({ off: ['vendor-bids'] });
   });
 
-  it('shows the production pages when the flag is off', () => {
-    renderAt('/boardroom');
-    expect(screen.getByTestId('legacy-boardroom').textContent).toBe('page');
-    renderAt('/issues?view=case:c1');
-    expect(screen.getByTestId('legacy-issues').textContent).toBe('page');
-  });
-
   it('renders Open with a row per open case and the five sections', () => {
-    setUx2Flags('boardroom');
     renderAt('/boardroom');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Board Room');
     const nav = screen.getByRole('navigation', { name: 'Board Room sections' });
@@ -61,7 +51,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('a case row opens the production workspace inside the case frame, and the breadcrumb returns', () => {
-    setUx2Flags('boardroom');
     renderAt('/boardroom');
     const first = document.querySelector('tr[data-case]') as HTMLElement;
     const id = first.getAttribute('data-case')!;
@@ -74,7 +63,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('Home\'s /issues?view=case: link lands in the case frame; /cases keeps its query', () => {
-    setUx2Flags('boardroom');
     const c = useIssuesStore.getState().cases[0];
     renderAt(`/issues?view=case:${c.id}`);
     expect(document.querySelector('[data-page="ux2-boardroom-case"]')).toBeTruthy();
@@ -84,7 +72,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('the case frame mounts the spending, bid and conflict panels for open steps that need them', () => {
-    setUx2Flags('boardroom');
     const store = useIssuesStore.getState();
     const target = store.cases.find(c => c.status === 'open' && (c.steps ?? []).some(s => !s.done && (s.isSpendingDecision || s.requiresBids || s.requiresConflictCheck)));
     if (!target) return;
@@ -93,7 +80,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('Inbox acknowledges a new request through the issues store and mounts the production inbox', () => {
-    setUx2Flags('boardroom');
     renderAt('/boardroom?tab=inbox');
     expect(screen.getByTestId('legacy-issues').getAttribute('data-embedded')).toBe('1');
     const ack = screen.queryAllByRole('button', { name: 'Acknowledge' })[0];
@@ -105,7 +91,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('Runbooks lists all 32, switches one off and opens the wizard on a situation', () => {
-    setUx2Flags('boardroom');
     renderAt('/boardroom?tab=runbooks');
     fireEvent.click(screen.getByRole('button', { name: /^All 32$/ }));
     expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
@@ -118,7 +103,6 @@ describe('Board Room behind ux2.boardroom', () => {
   });
 
   it('Outbox and Archive render their summaries and the production communications tab', () => {
-    setUx2Flags('boardroom');
     renderAt('/boardroom?tab=outbox');
     expect(screen.getByTestId('legacy-comms')).toBeTruthy();
     expect(screen.getByText('Drafts')).toBeTruthy();
@@ -126,8 +110,7 @@ describe('Board Room behind ux2.boardroom', () => {
     expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
   });
 
-  it('absorbed tabs redirect to Building and Community when those modules are on', () => {
-    setUx2Flags('boardroom,building,community');
+  it('absorbed tabs redirect to Building and Community; owners keep their own case view', () => {
     renderAt('/boardroom?tab=runbook');
     expect(screen.getByTestId('building')).toBeTruthy();
     renderAt('/boardroom?tab=votes');

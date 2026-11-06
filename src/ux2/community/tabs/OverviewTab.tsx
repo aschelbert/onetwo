@@ -43,7 +43,7 @@ export default function OverviewTab({ snap, onGo }: { snap: CommunitySnapshot; o
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2" aria-label="Recent notices">
           <div className="flex items-center justify-between">
             <SectionLabel>Recent notices</SectionLabel>

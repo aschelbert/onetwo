@@ -127,7 +127,7 @@ export default function OverviewTab({ snap, section, onSection, onGo, isBoard }:
 
       <TileSwitcher sections={sections} value={current} onChange={onSection} hint="Tap a tile to open its detail below. The other two stay one tap away. The board edits; every owner can read." />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card aria-label="Next vendor visits">
           <SectionLabel>Next vendor visits</SectionLabel>
           {visits.length === 0 ? <p className="text-sm text-ux2-muted">Nothing scheduled in the next four months.</p> : (

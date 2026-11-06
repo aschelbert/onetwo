@@ -5,16 +5,15 @@ import { Button } from '../components';
 /**
  * "Return to case" — when someone leaves a case step to do something elsewhere
  * (record a payment, upload a document) the step they were on follows them as
- * a slim bar under the top nav. It reads the same `activeCaseContext` the
- * floating ActiveCaseWidget uses and shows only while that widget is
- * minimised, so the two never stack.
+ * a slim bar under the top nav, from the `activeCaseContext` the case
+ * workspace sets. Dismissing it clears the context.
  */
 export default function ReturnToCaseBar() {
   const ctx = useIssuesStore(s => s.activeCaseContext);
   const clear = useIssuesStore(s => s.clearActiveCaseContext);
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  if (!ctx || !ctx.minimized || pathname.startsWith('/issues')) return null;
+  const { pathname, search } = useLocation();
+  if (!ctx || pathname.startsWith('/issues') || (pathname.startsWith('/boardroom') && search.includes('view=case'))) return null;
   return (
     <div data-widget="return-to-case" className="border-b border-ux2-line bg-ux2-teal-tint">
       <div className="mx-auto flex w-full max-w-[1200px] items-center gap-3 px-6 py-2 text-sm">

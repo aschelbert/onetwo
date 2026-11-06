@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { _resetUx2ForTests, setUx2Flags } from '@/ux2/flags';
 import { useComplianceStore } from '@/store/useComplianceStore';
 
 vi.mock('@/components/TenantProvider', () => ({
@@ -11,7 +10,6 @@ vi.mock('@/components/TenantProvider', () => ({
 vi.mock('@/features/building/BuildingPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-building" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/boardroom/BoardRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-boardroom" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/archives/ArchivesPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-archives" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
-vi.mock('@/features/association-team/AssociationTeamPage', () => ({ default: () => <div data-testid="legacy-team">team</div> }));
 vi.mock('@/features/building/tabs/TheUnitsTab', () => ({ default: ({ variant }: { variant?: string }) => <div data-testid="legacy-units">{variant}</div> }));
 vi.mock('@/features/building/tabs/VendorsTab', () => ({ default: () => <div data-testid="legacy-vendors" /> }));
 vi.mock('@/features/property-log/PropertyLogPage', () => ({ default: () => <div data-testid="legacy-log" /> }));
@@ -19,38 +17,28 @@ vi.mock('@/features/association-team/tabs/TaskTrackingTab', () => ({ default: ()
 vi.mock('@/features/building/tabs/PMScorecardTab', () => ({ default: () => <div data-testid="legacy-scorecard" /> }));
 vi.mock('@/features/association-team/tabs/CommunicationsTab', () => ({ default: () => <div data-testid="legacy-intercom" /> }));
 
-import BuildingSwitch, { ArchivesSwitch, AssociationTeamSwitch } from '@/ux2/building/BuildingSwitch';
+import BuildingModule from '@/ux2/building/BuildingModule';
+import { BuildingRedirect } from '@/ux2/shell/routes';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/building" element={<BuildingSwitch />} />
-        <Route path="/archives" element={<ArchivesSwitch />} />
-        <Route path="/association-team" element={<AssociationTeamSwitch />} />
+        <Route path="/building" element={<BuildingModule />} />
+        <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
+        <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-describe('Building behind ux2.building', () => {
+describe('Building', () => {
   beforeEach(() => {
     localStorage.clear();
-    _resetUx2ForTests();
-  });
-
-  it('shows the production pages when the flag is off', () => {
-    renderAt('/building');
-    expect(screen.getByTestId('legacy-building').textContent).toBe('page');
-    renderAt('/archives');
-    expect(screen.getByTestId('legacy-archives').textContent).toBe('page');
-    renderAt('/association-team');
-    expect(screen.getByTestId('legacy-team')).toBeTruthy();
   });
 
   it('renders the Overview with the building line, score and the three tiles', () => {
-    setUx2Flags('building');
     renderAt('/building');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
@@ -63,7 +51,6 @@ describe('Building behind ux2.building', () => {
   });
 
   it('absorbed legacy routes redirect into the module section', () => {
-    setUx2Flags('building');
     renderAt('/archives');
     expect(screen.getByTestId('legacy-archives').textContent).toBe('archives');
     renderAt('/association-team?tab=task-tracking');
@@ -71,7 +58,6 @@ describe('Building behind ux2.building', () => {
   });
 
   it('legacy Building tab ids deep link into the right section', () => {
-    setUx2Flags('building');
     renderAt('/building?tab=legal');
     expect(screen.getByTestId('legacy-building').textContent).toBe('legal');
     renderAt('/building?tab=runbook');
@@ -79,7 +65,6 @@ describe('Building behind ux2.building', () => {
   });
 
   it('Obligations lists every requirement, filters, and marks one done through the compliance store', () => {
-    setUx2Flags('building');
     renderAt('/building?tab=obligations');
     const list = document.querySelector('[aria-label="Obligations list"]')!;
     const row = list.querySelector('tr[data-obligation]') as HTMLElement;
@@ -99,14 +84,12 @@ describe('Building behind ux2.building', () => {
   });
 
   it('Contracts shows a row per vendor and the vendor tools for the board', () => {
-    setUx2Flags('building');
     renderAt('/building?tab=contracts');
     expect(document.querySelectorAll('tr[data-vendor]').length).toBeGreaterThan(0);
     expect(screen.getByTestId('legacy-vendors')).toBeTruthy();
   });
 
   it('Directory opens on units and reaches the log, tasks, scorecard and intercom', () => {
-    setUx2Flags('building');
     renderAt('/building?tab=directory');
     expect(screen.getByTestId('legacy-units').textContent).toBe('building');
     fireEvent.click(screen.getByRole('button', { name: /Board, management/ }));

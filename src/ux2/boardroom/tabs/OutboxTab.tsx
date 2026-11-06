@@ -45,7 +45,7 @@ export default function OutboxTab({ snap, onOpenCase }: { snap: BoardRoomSnapsho
       </TileRow>
 
       <Card aria-label="Alerts and delivery">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Inner>
             <div className="text-sm font-semibold text-ux2-ink">Alerts · urgent notices to every owner</div>
             <p className="text-xs text-ux2-muted">An alert is for things that cannot wait: water or power off, fire alarm test, elevator out of service. It posts as a notice, appears at the top of Home, and emails at once. Regular news goes out as a post.</p>

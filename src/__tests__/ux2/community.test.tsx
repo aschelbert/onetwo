@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { _resetUx2ForTests, setUx2Flags } from '@/ux2/flags';
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
@@ -16,36 +15,26 @@ vi.mock('@/features/elections/ElectionsPage', () => ({ default: ({ embedded, ini
 vi.mock('@/features/community/AmenitiesTab', () => ({ default: () => <div data-testid="legacy-amenities" /> }));
 vi.mock('@/ux2/community/notify', () => ({ emailAnnouncement: async () => ({ sent: 0, note: 'Email not sent: test.' }) }));
 
-import CommunitySwitch, { VotingRedirect } from '@/ux2/community/CommunitySwitch';
+import CommunityModule from '@/ux2/community/CommunityModule';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/community" element={<CommunitySwitch />} />
-        <Route path="/voting" element={<VotingRedirect />} />
-        <Route path="/boardroom" element={<div data-testid="boardroom">boardroom</div>} />
+        <Route path="/community" element={<CommunityModule />} />
+        <Route path="/voting" element={<Navigate to="/community?tab=votes" replace />} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-describe('Community behind ux2.community', () => {
+describe('Community', () => {
   beforeEach(() => {
     localStorage.clear();
-    _resetUx2ForTests();
-  });
-
-  it('shows the production Community Room and the old /voting redirect when the flag is off', () => {
-    renderAt('/community');
-    expect(screen.getByTestId('legacy-community').textContent).toBe('page');
-    renderAt('/voting');
-    expect(screen.getByTestId('boardroom')).toBeTruthy();
   });
 
   it('renders the Overview with notices, building stewardship and the leaderboard, and the six sections', () => {
-    setUx2Flags('community');
     renderAt('/community');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Community');
     const nav = screen.getByRole('navigation', { name: 'Community sections' });
@@ -56,7 +45,6 @@ describe('Community behind ux2.community', () => {
   });
 
   it('a board member posts a notice through the compliance store and can pin and delete it', () => {
-    setUx2Flags('community');
     renderAt('/community?tab=notices');
     const before = useComplianceStore.getState().announcements.length;
     fireEvent.click(screen.getByRole('button', { name: 'New notice' }));
@@ -76,7 +64,6 @@ describe('Community behind ux2.community', () => {
   });
 
   it('Meetings shows the next meeting, lets the viewer RSVP through the store, and mounts the Board Room meetings tab', () => {
-    setUx2Flags('community');
     renderAt('/community?tab=meetings');
     expect(screen.getByTestId('legacy-boardroom').textContent).toBe('meetings');
     const next = document.querySelector('[aria-label="Next meeting"]') as HTMLElement | null;
@@ -91,7 +78,6 @@ describe('Community behind ux2.community', () => {
   });
 
   it('Votes lists board decisions and deep links one election into the embedded Votes page', () => {
-    setUx2Flags('community');
     renderAt('/community?tab=votes');
     expect(document.querySelector('[aria-label="Board decisions"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-votes').textContent).toBe('list');
@@ -103,7 +89,6 @@ describe('Community behind ux2.community', () => {
   });
 
   it('Requests submits through the issues store and upvotes a neighbour\'s request', () => {
-    setUx2Flags('community');
     renderAt('/community?tab=requests');
     const before = useIssuesStore.getState().issues.length;
     fireEvent.click(screen.getByRole('button', { name: 'Make a request' }));
@@ -123,7 +108,6 @@ describe('Community behind ux2.community', () => {
   });
 
   it('Amenities mounts the production tab for the management suite', () => {
-    setUx2Flags('community');
     renderAt('/community?tab=amenities');
     expect(screen.getByTestId('legacy-amenities')).toBeTruthy();
     expect(screen.getByText('Shared spaces')).toBeTruthy();

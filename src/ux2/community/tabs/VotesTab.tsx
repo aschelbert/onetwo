@@ -49,7 +49,7 @@ export default function VotesTab({ snap, selectedId, onSelect }: { snap: Communi
         </Card>
       ))}
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <Card aria-label="Board decisions">
           <SectionLabel>Board decisions · recorded here for everyone</SectionLabel>
           {decisions.length === 0 ? <p className="text-sm text-ux2-muted">No board votes recorded yet.</p> : (

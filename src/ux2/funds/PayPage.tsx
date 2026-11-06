@@ -2,20 +2,18 @@
  * Pay — the owner's payment screen (ux2.funds), at /my-unit/pay.
  * Wraps the production balance tab so Stripe Checkout, autopay and the
  * billing portal are the same calls; adds the unit picker and the balance
- * summary from the design. Without the flag the route falls back to My Unit.
+ * summary from the design.
  */
 import { useMemo, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MyBalanceTab from '@/features/unit-manager/tabs/MyBalanceTab';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
 import { Button, Chip, PillTabs, Tile, TileRow } from '../components';
-import { useUx2 } from '../flags';
 import { openAssessments, ordinal, unpaidFees } from './metrics';
 
 export default function PayPage() {
-  const on = useUx2('funds');
   const currentUser = useAuthStore(s => s.currentUser);
   const units = useFinancialStore(s => s.units);
   const unitInvoices = useFinancialStore(s => s.unitInvoices);
@@ -26,7 +24,6 @@ export default function PayPage() {
   const [selected, setSelected] = useState<string>(mine[0]?.number ?? '');
   const unit = mine.find(u => u.number === selected) ?? mine[0];
 
-  if (!on) return <Navigate to="/my-unit" replace />;
   if (!unit) {
     return (
       <div data-page="ux2-pay" className="flex flex-col gap-4">

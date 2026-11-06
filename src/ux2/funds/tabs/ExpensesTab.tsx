@@ -26,7 +26,7 @@ function WorkOrdersList({ snap, onBills }: { snap: FundsSnapshot; onBills: () =>
         <SectionLabel>Work orders</SectionLabel>
         <Button size="sm" onClick={onBills}>Create a work order</Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {groups.map(g => (
           <Inner key={g.key}>
             <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold text-ux2-ink">{g.label} <span className="text-xs font-normal text-ux2-muted">· {g.note}</span></span><Chip tone={g.key === 'invoiced' && g.list.length ? 'navy' : 'ghost'}>{g.list.length}</Chip></div>
