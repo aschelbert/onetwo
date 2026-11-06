@@ -4,7 +4,8 @@ import { Button, Card, Chip, Inner, SectionLabel } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { useStoreSnapshot } from '../../runbook/adapters';
 import { boardEvents, ownerEvents } from '../../score/events';
-import { average, bandFor, computeScorecard } from '../../score/stewardship';
+import { average, bandFor, computeScorecard, DIMENSIONS, WEIGHTS, type Scorecard, type ScoreEvent } from '../../score/stewardship';
+import StewardshipCard from '../../home/StewardshipCard';
 import { firstName, leaderboardVisible, meetingRows, meetingsSummary, noticesSummary, requestRows, requestsSummary, voteRows, votesSummary, type CommunitySnapshot, type LeaderRow } from '../metrics';
 import type { CommunityTab } from '../CommunityModule';
 
@@ -20,17 +21,26 @@ export default function OverviewTab({ snap, onGo }: { snap: CommunitySnapshot; o
   const [showAll, setShowAll] = useState(false);
 
   const scores = useMemo(() => {
-    const boardScores = board.map(b => computeScorecard(boardEvents(store, { name: b.name, officerTitle: b.role })).total);
+    const boardCards = board.map(b => { const events = boardEvents(store, { name: b.name, officerTitle: b.role }); return { card: computeScorecard(events), events }; });
+    const boardScores = boardCards.map(c => c.card.total);
+    const allEvents: ScoreEvent[] = boardCards.flatMap(c => c.events);
+    const cards: Scorecard[] = boardCards.map(c => c.card);
     const rows: LeaderRow[] = snap.units.map(u => {
       const member = board.find(b => b.name === u.owner);
-      const score = member ? computeScorecard(boardEvents(store, { name: u.owner, officerTitle: member.role })).total : computeScorecard(ownerEvents(store, { name: u.owner, units: [u.number] })).total;
+      const events = member ? boardEvents(store, { name: u.owner, officerTitle: member.role }) : ownerEvents(store, { name: u.owner, units: [u.number] });
+      const card = computeScorecard(events);
+      if (!member) { cards.push(card); allEvents.push(...events); }
       const you = snap.viewer.linkedUnits.includes(u.number) || u.owner === snap.viewer.name;
-      return { unit: u.number, name: you ? 'You' : firstName(u.owner), role: member?.role, score, band: bandFor(score), you };
+      return { unit: u.number, name: you ? 'You' : firstName(u.owner), role: member?.role, score: card.total, band: bandFor(card.total), you };
     }).sort((a, b) => b.score - a.score);
     const owners = average(rows.map(r => r.score));
     const boardAvg = average(boardScores);
     const building = rows.length || boardScores.length ? average([...rows.map(r => r.score), ...boardScores]) : 0;
-    return { rows, owners, boardAvg, building };
+    // The building as one scorecard: each dimension the average of everyone's, so the same card can show it.
+    const dims = DIMENSIONS.map((_, i) => average(cards.map(c => c.dimensions[i]?.pct ?? 0)));
+    const boardDims = DIMENSIONS.map((_, i) => average(boardCards.map(c => c.card.dimensions[i]?.pct ?? 0)));
+    const buildingCard: Scorecard = { total: building, band: bandFor(building), dimensions: DIMENSIONS.map((dimension, i) => ({ dimension, weight: WEIGHTS[dimension], earned: dims[i] / 100, available: 1, points: Math.round((dims[i] / 100) * WEIGHTS[dimension] * 10) / 10, pct: dims[i] })) };
+    return { rows, owners, boardAvg, building, buildingCard, boardDims, allEvents };
   }, [snap.units, snap.viewer, board, store]);
 
   const visible = leaderboardVisible(scores.rows, snap.viewer.isBoard);
@@ -64,15 +74,16 @@ export default function OverviewTab({ snap, onGo }: { snap: CommunitySnapshot; o
             </ul>
           )}
         </Card>
-        <Card tone="teal" aria-label="Building stewardship">
-          <SectionLabel className="text-white/[0.66]">Building stewardship</SectionLabel>
-          <div className="text-[40px] font-semibold leading-none tracking-[-0.04em]">{scores.building}<small className="ml-1.5 text-sm font-medium text-white/[0.66]">· {bandFor(scores.building)}</small></div>
-          <ul className="m-0 list-none p-0 text-sm text-white/[0.9]">
-            <li className="flex justify-between py-0.5"><span>Board, {board.length} member{board.length === 1 ? '' : 's'}</span><b className="font-semibold text-white">{scores.boardAvg}</b></li>
-            <li className="flex justify-between py-0.5"><span>Unit owners, {snap.units.length}</span><b className="font-semibold text-white">{scores.owners}</b></li>
-          </ul>
-          <p className="text-xs text-white/[0.66]">{toGo > 0 ? `Excellent at 90 · ${toGo} point${toGo === 1 ? '' : 's'} to go` : 'Excellent · keep it there'} · each number is the average stewardship score of that group over the last twelve months.</p>
-        </Card>
+        <StewardshipCard
+          label="Building stewardship"
+          you={scores.buildingCard}
+          events={scores.allEvents}
+          buildingDims={scores.boardDims}
+          buildingTotal={scores.boardAvg}
+          compareLabel="Board avg"
+          group="building"
+          subject={`${bandFor(scores.building)} · the board (${board.length}) at ${scores.boardAvg}, owners (${snap.units.length}) at ${scores.owners} · ${toGo > 0 ? `${toGo} to Excellent` : 'Excellent'}`}
+        />
       </div>
 
       {lift.length > 0 && (

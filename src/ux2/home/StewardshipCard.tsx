@@ -2,6 +2,8 @@
  * The stewardship card from the Home mock: navy, the radar on the first
  * page, one page per dimension behind it (score, bar, points, what was
  * counted, the rule), flipped with the arrows and the dots at the foot.
+ * The same card everywhere it appears: Home, My Account, and Community
+ * for the building as a whole (`group: 'building'`).
  */
 import { useState } from 'react';
 import { cn } from '@/lib/formatters';
@@ -9,7 +11,9 @@ import StewardshipRadar from '../components/StewardshipRadar';
 import type { ScoreEvent, Scorecard } from '../score/stewardship';
 import { bandFor, DIMENSIONS, WEIGHTS, type Dimension } from '../score/stewardship';
 
-const RULES: Record<'board' | 'owners', Record<Dimension, string>> = {
+export type StewardshipGroup = 'board' | 'owners' | 'building';
+
+const RULES: Record<StewardshipGroup, Record<Dimension, string>> = {
   board: {
     Timeliness: 'Owner requests answered inside the 14-day window earn full credit; one left past it earns none.',
     Compliance: 'Filings on time earn full credit, half 1 to 7 days late, a quarter 8 to 30 days late. Duties count when they are marked done.',
@@ -23,6 +27,13 @@ const RULES: Record<'board' | 'owners', Record<Dimension, string>> = {
     Oversight: 'Acknowledged over offered. Nothing offered means full credit.',
     Reach: 'Annual and special meetings attended, in person, remote or by proxy.',
     Impact: 'Ballots cast, of the elections your unit could vote in.',
+  },
+  building: {
+    Timeliness: 'Owners on dues paid by the due date; the board on requests answered inside 14 days. Averaged over everyone.',
+    Compliance: 'The board on filings and duties on time; owners on assessments and invoices paid by their date.',
+    Oversight: 'The board on cases closed and none past target; owners on what they acknowledged of what was offered.',
+    Reach: 'Meetings attended, in person, remote or by proxy, by everyone expected there.',
+    Impact: 'The board on decisions voted; owners on ballots cast in elections they could vote in.',
   },
 };
 
@@ -38,18 +49,26 @@ function lines(events: ScoreEvent[]): { label: string; value: string }[] {
   return out;
 }
 
-export default function StewardshipCard({ you, events, buildingDims, buildingTotal, group, delta }: { you: Scorecard; events: ScoreEvent[]; buildingDims: number[]; buildingTotal: number; group: 'board' | 'owners'; delta?: number }) {
+export default function StewardshipCard({ you, events, buildingDims, buildingTotal, group, delta, label = 'Stewardship', subject, compareLabel = 'Building avg' }: {
+  you: Scorecard; events: ScoreEvent[]; buildingDims: number[]; buildingTotal: number; group: StewardshipGroup; delta?: number;
+  /** The card's title and accessible name. */
+  label?: string;
+  /** The line under the title on the first page. */
+  subject?: string;
+  /** What the red line and the "avg" figures are: the building, or the board for the building card. */
+  compareLabel?: string;
+}) {
   const [page, setPage] = useState(0);
   const pages = DIMENSIONS.length + 1;
   const dim = page > 0 ? DIMENSIONS[page - 1] : null;
   const d = dim ? you.dimensions.find(x => x.dimension === dim) : null;
   const band = bandFor(you.total);
   return (
-    <div data-widget="stewardship-radar" aria-label="Stewardship" className="flex flex-col gap-2.5 rounded-[22px] bg-ux2-navy px-[22px] pb-2 pt-5 text-white">
+    <div data-widget="stewardship-radar" aria-label={label} className="flex flex-col gap-2.5 rounded-[22px] bg-ux2-navy px-[22px] pb-2 pt-5 text-white">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[2px]">Stewardship</div>
-          <div className="mt-0.5 text-sm text-white/[0.55]">{dim ? `${dim} · ${WEIGHTS[dim]} of 100 points` : group === 'board' ? 'Your score as a board member, this year' : 'Your score as an owner, this year'}</div>
+          <div className="text-[11px] font-bold uppercase tracking-[2px]">{label}</div>
+          <div className="mt-0.5 text-sm text-white/[0.55]">{dim ? `${dim} · ${WEIGHTS[dim]} of 100 points` : subject ?? (group === 'board' ? 'Your score as a board member, this year' : group === 'owners' ? 'Your score as an owner, this year' : 'Everyone in the building, this year')}</div>
         </div>
         <span className="inline-flex items-center whitespace-nowrap rounded-full bg-[rgba(165,243,252,.16)] px-[11px] py-[6px] text-xs font-semibold leading-none text-ux2-cyan">{you.total >= 70 ? `✓ ${band === 'Excellent' || band === 'Good' ? 'Good standing' : 'Fair standing'}` : `${you.total} of 100`}</span>
       </div>
@@ -58,7 +77,7 @@ export default function StewardshipCard({ you, events, buildingDims, buildingTot
         <div className="flex min-h-[300px] flex-col justify-center gap-3" data-dimension={dim}>
           <div className="flex items-baseline justify-between"><div className="text-xl font-semibold">{dim}</div><div className="font-display text-5xl font-bold leading-none tracking-[-2px]">{d.pct}</div></div>
           <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.12]"><i className="block h-full rounded-full bg-ux2-cyan" style={{ width: `${Math.max(0, Math.min(100, d.pct))}%` }} /></div>
-          <div className="text-xs text-white/[0.45]">{Math.round(d.points * 10) / 10} of {d.weight} points · Building avg <b className="text-white">{buildingDims[page - 1] ?? 0}</b></div>
+          <div className="text-xs text-white/[0.45]">{Math.round(d.points * 10) / 10} of {d.weight} points · {compareLabel} <b className="text-white">{buildingDims[page - 1] ?? 0}</b></div>
           <div className="flex flex-col gap-1.5 text-[13px] text-white/[0.7]">
             {lines(events.filter(e => e.dimension === dim)).map((l, i) => (
               <div key={i} className="flex justify-between gap-3"><span className="min-w-0 truncate">{l.label}</span><strong className="shrink-0 text-white">{l.value}</strong></div>
@@ -67,7 +86,7 @@ export default function StewardshipCard({ you, events, buildingDims, buildingTot
           <div className="text-xs leading-relaxed text-white/[0.45]">{RULES[group][dim]}</div>
         </div>
       ) : (
-        <StewardshipRadar bare you={you.dimensions.map(x => x.pct)} total={you.total} buildingAvg={buildingDims} buildingTotal={buildingTotal} delta={delta} />
+        <StewardshipRadar bare you={you.dimensions.map(x => x.pct)} total={you.total} buildingAvg={buildingDims} buildingTotal={buildingTotal} delta={delta} compareLabel={compareLabel} />
       )}
 
       <div className="flex items-center justify-center">

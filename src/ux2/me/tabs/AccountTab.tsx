@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AccountSettingsPage from '@/features/account/AccountSettingsPage';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { Button, Card, Chip, Inner, SectionLabel } from '../../components';
-import StewardshipRadar from '../../components/StewardshipRadar';
+import StewardshipCard from '../../home/StewardshipCard';
 import { dayLabel } from '../../home/calendar';
 import { useStoreSnapshot } from '../../runbook/adapters';
 import { boardEvents, stewardshipFor } from '../../score/events';
@@ -35,7 +35,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <StewardshipRadar you={lines.map(l => l.pct)} total={view.you.total} buildingAvg={view.building.dims} buildingTotal={view.building.total} />
+        <StewardshipCard you={view.you} events={view.events} buildingDims={view.building.dims} buildingTotal={view.building.total} group={view.group} subject={`${bandFor(view.you.total)} · ${snap.viewer.officerTitle ?? (snap.viewer.isBoard ? 'board member' : 'owner')} · this year`} />
         <Card aria-label="This month">
           <SectionLabel>Last scored events · each with a receipt</SectionLabel>
           {recent.length === 0 ? <p className="text-sm text-ux2-muted">Nothing scored yet.</p> : (
