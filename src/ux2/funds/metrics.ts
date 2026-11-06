@@ -44,6 +44,8 @@ export interface FundsSnapshot {
   lateFee: { enabled: boolean; amount: number; graceDays: number };
   stripeConnected: boolean;
   stripeOnboardingComplete: boolean;
+  /** This year's operating spend by month (Jan first), from the budget lines' expenses. */
+  spendByMonth?: number[];
 }
 
 export const ONLINE_METHODS = ['stripe', 'card', 'online'];

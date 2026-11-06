@@ -52,3 +52,9 @@
 /* Focus rings and selection highlights */
 .ux2-legacy .ring-accent-500, .ux2-legacy .ring-indigo-500, .ux2-legacy .focus\:ring-accent-500:focus, .ux2-legacy .focus\:ring-indigo-500:focus, .ux2-legacy .focus\:ring-teal-600:focus { --tw-ring-color: #155E75; }
 .ux2-legacy .focus\:border-accent-500:focus, .ux2-legacy .focus\:border-indigo-500:focus { border-color: #155E75; }
+
+/* The onboarding banner: navy instead of orange, as the rest of the shell */
+.ux2-onboarding .bg-amber-500 { background-color: #0D1B2E; border-radius: 22px; }
+.ux2-onboarding .text-amber-100, .ux2-onboarding .text-amber-200 { color: rgba(255,255,255,.7); }
+.ux2-onboarding .bg-amber-50 { background-color: #F5F7FA; }
+.ux2-onboarding .border-amber-200 { border-color: #E3E8EE; }

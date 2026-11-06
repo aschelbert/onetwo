@@ -107,14 +107,14 @@ export default function FundsPage() {
             </h1>
             <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Chip tone={health >= 80 ? 'teal' : health >= 60 ? 'amber' : 'red'} title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip tone={health >= 80 ? 'sage' : health >= 60 ? 'amber' : 'red'} className="h-11 px-5 !text-sm" title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>
             {role !== 'RESIDENT' && (
               <>
-                <button type="button" onClick={() => go('payments')} className={`h-9 rounded-full border px-3.5 text-xs font-semibold ${tab === 'payments' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
-                  Online payments
-                </button>
-                <button type="button" aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-9 w-9 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
+                {([['Record a payment', 'income', 'ledger'], ['Pay a bill', 'expenses', 'bills'], ['Create a work order', 'expenses', 'workorders'], ['Transfer funds', 'settings', 'ledger']] as [string, FundsTab, string][]).map(([label, t, s]) => (
+                  <button key={label} type="button" onClick={() => go(t, s)} className="h-11 rounded-full border border-ux2-line-strong bg-white px-5 text-sm font-semibold text-ux2-ink hover:bg-ux2-surface">{label}</button>
+                ))}
+                <button type="button" aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-11 w-11 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
                   ⚙
                 </button>
               </>

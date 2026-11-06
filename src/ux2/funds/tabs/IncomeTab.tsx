@@ -117,6 +117,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   const inv = invoiceSummary(snap.unitInvoices, col.month);
   const current: Section = (SECTIONS as string[]).includes(section ?? '') ? (section as Section) : 'ledger';
   const outstanding = beh.reduce((t, b) => t + b.amount, 0);
+  const aging = agingTotals(beh);
 
   const sections: TileSection<Section>[] = [
     {
@@ -128,12 +129,21 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         children: (
           <>
             <Ring pct={col.pct}><b className="font-semibold">{col.paidUnits} of {col.units} paid</b><div className="text-xs text-white/[0.66]">{fmt(col.amount)} of {fmt(col.billed)}</div></Ring>
-            <div className="mt-1 flex gap-4 text-xs text-white/[0.8]"><span>Card or bank <b className="text-white">{col.online}</b></span><span>By check <b className="text-white">{col.check}</b></span></div>
-            <div className="mt-auto rounded-xl bg-white/[0.1] px-3 py-2 text-[13px]">Unit ledger · every unit, what they pay and owe <b className="float-right font-semibold">{col.units}</b></div>
+            <div className="grid grid-cols-3 gap-2">
+              {[['Paid up', col.paidUnits], ['Card or bank', col.online], ['By check', col.check]].map(([l, v]) => (
+                <div key={String(l)} className="rounded-xl bg-white/[0.1] px-3 py-2"><div className="text-[11px] text-white/[0.66]">{l}</div><div className="text-[15px] font-semibold">{v}</div></div>
+              ))}
+            </div>
+            <div className="mt-auto flex items-center justify-between rounded-xl bg-white/[0.1] px-3 py-2 text-[13px]"><span>Unit ledger · every unit, what they pay and owe</span><Chip tone="white" className="!bg-white/[0.15]">{col.units}</Chip></div>
           </>
         ),
       },
-      detail: <div className="ux2-legacy"><TheUnitsTab variant="fiscal" /></div>,
+      detail: (
+        <Card aria-label="Unit ledger">
+          <div className="flex flex-wrap items-baseline gap-2"><h2 className="m-0 text-lg font-medium text-ux2-ink">Unit ledger</h2><span className="text-sm text-ux2-muted">{col.units} unit{col.units === 1 ? '' : 's'} · balances as of today, {dayLabel(snap.today)} · one row per unit</span></div>
+          <div className="ux2-legacy"><TheUnitsTab variant="fiscal" compact /></div>
+        </Card>
+      ),
     },
     {
       id: 'behind',
@@ -144,9 +154,28 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         value: fmt(outstanding),
         sub: beh.length > 0 ? `outstanding · oldest ${beh[0].daysPastDue} days · Unit ${beh[0].number}` : 'Every unit is current',
         children: beh.length > 0 ? (
-          <ul className="m-0 list-none p-0 text-xs">
-            {beh.slice(0, 3).map(b => <li key={b.number} className="flex justify-between py-0.5"><span>{b.number} · {b.daysPastDue} days</span><b className="font-semibold">{fmt(b.amount)}</b></li>)}
-          </ul>
+          <>
+            <div className="flex items-end gap-2" aria-label="Aging">
+              {(['0-30', '31-60', '61-90', '90+'] as const).map(b => {
+                const max = Math.max(1, ...Object.values(aging));
+                return (
+                  <div key={b} className="flex flex-1 flex-col items-center gap-1 text-[10px] text-white/[0.75]">
+                    <span className="font-semibold text-white">{aging[b] ? fmt(aging[b]) : ''}</span>
+                    <div className="w-full rounded-[3px] bg-white/[0.25]" style={{ height: `${Math.max(3, Math.round((aging[b] / max) * 44))}px`, backgroundColor: aging[b] ? (b === '90+' ? '#FBF1E2' : 'rgba(255,255,255,0.55)') : undefined }} />
+                    <span>{b} d</span>
+                  </div>
+                );
+              })}
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-xs">
+              {beh.slice(0, 3).map(b => (
+                <li key={b.number} className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.1] px-3 py-2">
+                  <span className="min-w-0 truncate"><b className="font-semibold">{b.number}</b> · {b.daysPastDue} days · {fmt(b.amount)}</span>
+                  <Chip tone="white" className="!bg-white !text-ux2-red-ink">{b.forSale ? 'Resale cert' : b.daysPastDue > 60 ? 'Demand letter' : 'Send reminder'}</Chip>
+                </li>
+              ))}
+            </ul>
+          </>
         ) : undefined,
       },
       detail: <BehindList snap={snap} onLedger={() => onSection('ledger')} />,
@@ -159,7 +188,17 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         value: inv.sent,
         unit: 'sent',
         sub: `${inv.paid} paid · ${fmt(inv.paidAmount)} · ${inv.open} open · ${fmt(inv.openAmount)}`,
-        children: <div className="text-xs text-ux2-muted">{inv.byType.monthly} dues · {inv.byType.special_assessment} special · {inv.byType.fee} fees · {inv.byType.amenity_fee} amenity</div>,
+        children: (
+          <>
+            <div className="flex h-2 overflow-hidden rounded-full bg-ux2-line" aria-label="Paid and open"><div className="bg-ux2-navy" style={{ width: `${inv.sent ? Math.round((inv.paid / inv.sent) * 100) : 0}%` }} /><div className="bg-ux2-red" style={{ width: `${inv.sent ? Math.round((inv.open / inv.sent) * 100) : 0}%` }} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-ux2-line bg-white px-3 py-2"><div className="text-[11px] text-ux2-muted"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-ux2-navy" />Paid</div><div className="text-[15px] font-semibold">{inv.paid} · {fmt(inv.paidAmount)}</div></div>
+              <div className="rounded-xl border border-ux2-line bg-white px-3 py-2"><div className="text-[11px] text-ux2-muted"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-ux2-red" />Open</div><div className="text-[15px] font-semibold">{inv.open} · {fmt(inv.openAmount)}</div></div>
+            </div>
+            <div className="text-xs text-ux2-muted">{inv.byType.monthly} dues · {inv.byType.special_assessment} special · {inv.byType.fee} fees · {inv.byType.amenity_fee} amenity</div>
+          </>
+        ),
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">New invoice</b> · fee, assessment, repair or amenity</span><button type="button" onClick={e => { e.stopPropagation(); onSection('ledger'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Create</button></>,
       },
       detail: <InvoiceRegister snap={snap} />,
     },
@@ -168,23 +207,27 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   return (
     <div className="flex flex-col gap-5">
       <TileSwitcher sections={sections} value={current} onChange={onSection} hint="Tap a tile to open its list below. The other two stay one tap away." />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card aria-label="Runs on its own">
-          <SectionLabel>Runs on its own</SectionLabel>
-          <ul className="m-0 list-none p-0 text-sm text-ux2-ink">
-            <li className="py-1">{snap.autoBillingEnabled ? `✓ Billing on the ${ordinal(snap.hoaDueDay)}${snap.lastBillingRun ? ` · ran ${snap.lastBillingRun.slice(0, 10)}` : ''}` : `Billing by hand · dues due on the ${ordinal(snap.hoaDueDay)}`}</li>
-            <li className="py-1">{snap.lateFee.enabled ? `✓ Late fee $${snap.lateFee.amount} after ${snap.lateFee.graceDays} days` : 'No automatic late fee'}</li>
-          </ul>
-          <button type="button" onClick={() => onGo('settings', 'rules')} className="self-start text-xs font-semibold text-ux2-teal hover:underline">Edit rules · Fee schedule</button>
-        </Card>
-        <Card aria-label="Online payments">
-          <div className="flex items-center justify-between">
-            <SectionLabel>Online payments · Stripe</SectionLabel>
-            <Chip tone={snap.stripeOnboardingComplete ? 'teal' : snap.stripeConnected ? 'amber' : 'ghost'}>{snap.stripeOnboardingComplete ? 'Connected' : snap.stripeConnected ? 'Finish setup' : 'Not set up'}</Chip>
-          </div>
-          <p className="text-sm text-ux2-ink">{snap.stripeOnboardingComplete ? `${col.online} unit${col.online === 1 ? '' : 's'} paid by card or bank this month · ${col.check} by check` : 'Connect a Stripe account so owners can pay dues and assessments by card or bank.'}</p>
-          <button type="button" onClick={() => onGo('payments')} className="self-start text-xs font-semibold text-ux2-teal hover:underline">{snap.stripeOnboardingComplete ? 'Refund a payment · Online payments' : 'Get paid online'}</button>
-        </Card>
+      <div className="flex flex-wrap items-center gap-2" aria-label="Runs on its own">
+        <span className="text-sm font-semibold text-ux2-ink">Runs on its own</span>
+        <Chip tone={snap.autoBillingEnabled ? 'teal' : 'ghost'}>{snap.autoBillingEnabled ? `Billing on the ${ordinal(snap.hoaDueDay)}${snap.lastBillingRun ? ` · ran ${dayLabel(snap.lastBillingRun.slice(0, 10))}` : ''}` : `Billing by hand · dues due on the ${ordinal(snap.hoaDueDay)}`}</Chip>
+        <Chip tone={snap.lateFee.enabled ? 'teal' : 'ghost'}>{snap.lateFee.enabled ? `Late fee $${snap.lateFee.amount} after ${snap.lateFee.graceDays} days` : 'No automatic late fee'}</Chip>
+        <Chip tone="ghost">60-day notice · certified</Chip>
+        {beh.some(b => b.daysPastDue > 60) && <Chip tone="teal">Demand at {Math.max(...beh.map(b => b.daysPastDue))} days · {beh.find(b => b.daysPastDue > 60)!.number} today</Chip>}
+        <span className="ml-auto flex gap-3 text-xs font-semibold text-ux2-teal">
+          <button type="button" onClick={() => onGo('settings', 'rules')} className="hover:underline">Edit rules</button>
+          <button type="button" onClick={() => onGo('settings', 'fees')} className="hover:underline">Fee schedule</button>
+        </span>
+      </div>
+      <div className="flex flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-white px-[22px] py-4" aria-label="Online payments">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h2 className="m-0 text-lg font-medium text-ux2-ink">Online payments · Stripe</h2>
+          <Chip tone={snap.stripeOnboardingComplete ? 'sage' : snap.stripeConnected ? 'amber' : 'ghost'}>{snap.stripeOnboardingComplete ? 'Connected' : snap.stripeConnected ? 'Finish setup' : 'Not connected'}</Chip>
+        </div>
+        <p className="m-0 text-[13px] text-ux2-muted">{snap.stripeOnboardingComplete ? `${col.online} unit${col.online === 1 ? '' : 's'} paid by card or bank this month · ${col.check} by check · fees 2.9% + 30¢ paid by the building` : 'Connect a Stripe account so owners can pay dues and assessments by card or bank, with fees paid by the building.'}</p>
+        <div className="flex flex-wrap gap-2">
+          {snap.stripeOnboardingComplete && <Button size="sm" variant="ghost" onClick={() => onGo('payments')}>Refund a payment</Button>}
+          <Button size="sm" variant={snap.stripeOnboardingComplete ? 'ghost' : 'primary'} onClick={() => onGo('payments')}>{snap.stripeOnboardingComplete ? 'Online payments' : 'Connect Stripe'}</Button>
+        </div>
       </div>
     </div>
   );

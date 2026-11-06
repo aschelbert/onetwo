@@ -49,7 +49,7 @@ export default function Ux2TopNav() {
     <header className="ux2 sticky top-0 z-50 bg-white">
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-4 px-6 pt-[22px] pb-3">
         <button type="button" aria-label="ONE two home" onClick={() => goTo('/home')} className="flex h-[46px] items-center">
-          <img src="/onetwo-logo-mark.jpg" alt="ONE two" className="h-11 w-[46px] rounded-md object-cover" />
+          <img src="/onetwo-mark.webp" alt="ONE two" className="h-11 w-[46px] object-contain" />
         </button>
         <button
           type="button"

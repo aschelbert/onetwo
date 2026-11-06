@@ -76,8 +76,14 @@ export default function ExpensesTab({ snap, section, onSection }: { snap: FundsS
           </ul>
         ),
         sub: bl.toApprove.length === 0 ? 'Nothing waiting for approval' : bl.flagged.length > 0 ? `Approve the ${bl.within.length} within budget; the ${bl.flagged.length} flagged one by one` : `All ${bl.toApprove.length} within budget · approve and they pay on their due date`,
+        action: <><span className="min-w-0 truncate">{bl.toApprove.length > 0 ? <><b className="font-semibold">Approve all {bl.within.length} within budget</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</> : <b className="font-semibold">Nothing to approve</b>}</span><button type="button" onClick={e => { e.stopPropagation(); onSection('bills'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-white/40 px-3.5 text-xs font-semibold text-white hover:bg-white/10">{bl.toApprove.length > 0 ? 'Approve' : 'Bills'}</button></>,
       },
-      detail: <div className="ux2-legacy"><FLWorkOrders /></div>,
+      detail: (
+        <Card aria-label="Bills">
+          <div className="flex flex-wrap items-baseline gap-2"><h2 className="m-0 text-lg font-medium text-ux2-ink">Bills</h2><span className="text-sm text-ux2-muted">Approve here means pay: the spending was already decided. Each bill sits on a work order, so the vendor, the budget line and the approval travel together</span></div>
+          <div className="ux2-legacy"><FLWorkOrders /></div>
+        </Card>
+      ),
     },
     {
       id: 'decisions',
@@ -93,6 +99,7 @@ export default function ExpensesTab({ snap, section, onSection }: { snap: FundsS
           </ul>
         ) : undefined,
         sub: pending.length > 0 ? 'Decide, oldest first · each is also a Home card' : 'No decisions open',
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">Decide, oldest first</b> · one card at a time</span><button type="button" onClick={e => { e.stopPropagation(); onSection('decisions'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-white/40 px-3.5 text-xs font-semibold text-white hover:bg-white/10">Deck</button></>,
       },
       detail: <div className="ux2-legacy"><FLApprovals /></div>,
     },
@@ -105,13 +112,18 @@ export default function ExpensesTab({ snap, section, onSection }: { snap: FundsS
         value: bl.open,
         unit: 'open',
         children: (
-          <ul className="m-0 list-none p-0 text-xs text-ux2-muted">
-            <li className="flex justify-between py-0.5"><span>Draft · not yet approved</span><b className="font-semibold text-ux2-ink">{bl.drafts.length}</b></li>
-            <li className="flex justify-between py-0.5"><span>Approved · waiting on the invoice</span><b className="font-semibold text-ux2-ink">{bl.approved.length}</b></li>
-            <li className="flex justify-between py-0.5"><span>Invoiced · in Bills</span><b className="font-semibold text-ux2-ink">{bl.toApprove.length}</b></li>
-          </ul>
+          <>
+            <div className="flex h-2 overflow-hidden rounded-full bg-ux2-line" aria-label="Work orders by stage">
+              {[['bg-ux2-line-strong', bl.drafts.length], ['bg-ux2-teal', bl.approved.length], ['bg-ux2-cyan', bl.toApprove.length]].map(([c, n], i) => <div key={i} className={String(c)} style={{ width: `${bl.open ? Math.round((Number(n) / bl.open) * 100) : 0}%` }} />)}
+            </div>
+            <ul className="m-0 list-none p-0 text-xs text-ux2-muted">
+              <li className="flex items-center justify-between gap-2 py-1"><span><Chip tone="ghost">Draft</Chip> <span className="ml-1">not yet approved</span></span><b className="font-semibold text-ux2-ink">{bl.drafts.length}</b></li>
+              <li className="flex items-center justify-between gap-2 py-1"><span><Chip tone="teal">Approved</Chip> <span className="ml-1">waiting on the invoice</span></span><b className="font-semibold text-ux2-ink">{bl.approved.length}</b></li>
+              <li className="flex items-center justify-between gap-2 py-1"><span><Chip tone="cyan">Invoiced</Chip> <span className="ml-1">in Bills</span></span><b className="font-semibold text-ux2-ink">{bl.toApprove.length}</b></li>
+            </ul>
+          </>
         ),
-        sub: `${bl.paidThisMonth.length} paid this month${bl.paidThisMonth[0]?.paidDate ? ` · last ${dayLabel(bl.paidThisMonth[0].paidDate)}` : ''}`,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">Create a work order</b> · from a case or by hand</span><Chip tone="ghost">{bl.paidThisMonth.length} paid this month</Chip></>,
       },
       detail: <WorkOrdersList snap={snap} onBills={() => onSection('bills')} />,
     },
