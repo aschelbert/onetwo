@@ -1,0 +1,46 @@
+/* UX2 design tokens — Direction 3b, "Midnight on white".
+   Scoped under .ux2 so the redesign and the production screens can coexist
+   behind feature flags. Nothing here restyles legacy markup. */
+
+.ux2 {
+  --ux2-navy: #0D1B2E;
+  --ux2-ink: #1A1F25;
+  --ux2-muted: #5F6C7B;
+  --ux2-dim: #8A96A3;
+  --ux2-line: #E3E8EE;
+  --ux2-line-strong: #D8DCE1;
+  --ux2-surface: #F5F7FA;
+  --ux2-white: #FFFFFF;
+
+  --ux2-red: #E23B4E;
+  --ux2-red-ink: #B71C2A;
+  --ux2-red-tint: #FBE9EB;
+  --ux2-cyan: #A5F3FC;
+  --ux2-teal: #155E75;
+  --ux2-teal-tint: #E6F1F4;
+  --ux2-plum: #4F46A8;
+  --ux2-plum-tint: #ECEBF8;
+  --ux2-sage: #3A663A;
+  --ux2-sage-tint: #E8F0E8;
+  --ux2-amber: #9A5B00;
+  --ux2-amber-tint: #FBF1E2;
+
+  --ux2-radius-card: 22px;
+  --ux2-radius-inner: 14px;
+  --ux2-radius-pill: 999px;
+
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: var(--ux2-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ux2 h1, .ux2 h2, .ux2 h3, .ux2 .font-display {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.ux2-page {
+  background: var(--ux2-white);
+  min-height: 100vh;
+}

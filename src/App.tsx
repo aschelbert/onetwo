@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import AppShell from '@/components/layout/AppShell';
+import ShellSwitch from '@/ux2/shell/ShellSwitch';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import FinancialPage from '@/features/financial/FinancialPage';
@@ -231,8 +231,11 @@ export default function App() {
         </Route>
 
         {/* Protected app routes */}
-        <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
+        <Route element={<RequireAuth><TenantProvider><ShellSwitch /></TenantProvider></RequireAuth>}>
           <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
+          {/* UX2 module aliases: Home and Funds resolve to the production pages until their phases land */}
+          <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
+          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
           <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
           <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
