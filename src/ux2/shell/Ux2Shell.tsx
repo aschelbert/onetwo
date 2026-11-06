@@ -22,7 +22,7 @@ export default function Ux2Shell() {
       <Ux2TopNav />
       <ReturnToCaseBar />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-[88px] pt-4 sm:pb-10">
-        {tenant.status === 'onboarding' && <OnboardingSetupWidget />}
+        {tenant.status === 'onboarding' && <div className="ux2-onboarding"><OnboardingSetupWidget /></div>}
         <div className="animate-fade-in">
           <Outlet />
         </div>
