@@ -2,7 +2,8 @@
  * Home — the redesign's landing page.
  *
  * One feed: what needs you now, what waits on others, what is coming up,
- * the building's numbers, your stewardship card, your account, building
+ * the building's numbers, your stewardship card (the radar, with a page per
+ * dimension behind it), your account, building
  * news and the pulse. Feed | Calendar flips the feed for the month
  * carousel of everything dated (`CalendarView`). Every card is a deep link
  * into the production page that owns the record, so completing a card uses
@@ -20,12 +21,12 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { fmt, cn } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Tile, TileRow } from '../components';
 import type { ChipTone } from '../components';
-import StewardshipRadar from '../components/StewardshipRadar';
+import StewardshipCard from './StewardshipCard';
 import { attentionCounts, generateCards, type RunbookCard, type CardSet } from '../runbook/model';
 import { contextFor, todayIso, useCardInput, useStoreSnapshot, type StoreSnapshot } from '../runbook/adapters';
 import { useRunbookStore } from '../runbook/store';
 import { boardEvents, stewardshipFor } from '../score/events';
-import { DIMENSIONS, type Dimension, type ScoreEvent } from '../score/stewardship';
+import { type Dimension, type ScoreEvent } from '../score/stewardship';
 import { dayLabel } from './calendar';
 import CalendarView from './CalendarView';
 
@@ -273,7 +274,6 @@ export default function HomePage() {
   const hide = (id: string) => runbook.hide(viewer.id, id);
 
   const score = useMemo(() => stewardshipFor(snapshot), [snapshot]);
-  const youDims = score.you.dimensions.map(d => d.pct);
 
   const fin = useFinancialStore();
   const isOwner = viewer.role === 'RESIDENT';
@@ -316,23 +316,9 @@ export default function HomePage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           {/* Stewardship first in DOM so phones see it at the top; desktop moves it to the right column. */}
           <aside className="flex flex-col gap-4 lg:order-2">
-            <StewardshipRadar you={youDims} total={score.you.total} buildingAvg={score.building.dims} buildingTotal={score.building.total} />
+            {/* The mock's stewardship card: the radar, then a page per dimension behind the arrows and dots. */}
+            <StewardshipCard you={score.you} events={score.events} buildingDims={score.building.dims} buildingTotal={score.building.total} group={score.group} />
             {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
-            <Card className="gap-1" aria-label="Stewardship by dimension">
-              <SectionLabel>By dimension</SectionLabel>
-              <ul className="m-0 list-none p-0">
-                {score.you.dimensions.map((d, i) => (
-                  <li key={d.dimension} className="flex items-center justify-between py-1.5 text-sm">
-                    <span className="text-ux2-ink">{DIMENSIONS[i]}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs text-ux2-dim">avg {score.building.dims[i] ?? 0}</span>
-                      <b className="w-8 text-right font-semibold text-ux2-ink">{d.pct}</b>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="pt-1 text-xs text-ux2-dim">Scored on the last twelve months · {score.events.length} events</p>
-            </Card>
             <BuildingNews />
             <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
           </aside>

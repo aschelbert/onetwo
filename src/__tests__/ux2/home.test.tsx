@@ -38,10 +38,22 @@ describe('Home', () => {
     expect(screen.getByRole('region', { name: 'Waiting on others' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Upcoming' })).toBeTruthy();
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Stewardship by dimension"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Stewardship by dimension"]')).toBeNull();
     expect(document.querySelector('[aria-label="Building news"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Your account"]')).toBeTruthy();
     expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
+  });
+
+  it('the stewardship card flips through the five dimensions', () => {
+    renderHome();
+    expect(document.querySelector('[data-widget="stewardship-radar"] svg')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(document.querySelector('[data-dimension="Timeliness"]')).toBeTruthy();
+    expect(document.querySelector('[data-widget="stewardship-radar"] svg')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Compliance' }));
+    expect(document.querySelector('[data-dimension="Compliance"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(document.querySelector('[data-widget="stewardship-radar"] svg')).toBeTruthy();
   });
 
   it('Feed | Calendar flips the feed for the merged calendar, kept in the URL', () => {
