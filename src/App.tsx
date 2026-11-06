@@ -6,9 +6,10 @@ import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ShellSwitch from '@/ux2/shell/ShellSwitch';
 import HomeSwitch from '@/ux2/home/HomeSwitch';
+import FundsSwitch from '@/ux2/funds/FundsSwitch';
+import PayPage from '@/ux2/funds/PayPage';
 import AuthPage from '@/features/auth/AuthPage';
 import DashboardPage from '@/features/dashboard/DashboardPage';
-import FinancialPage from '@/features/financial/FinancialPage';
 import IssuesPage from '@/features/issues/IssuesPage';
 import BuildingPage from '@/features/building/BuildingPage';
 import ArchivesPage from '@/features/archives/ArchivesPage';
@@ -234,10 +235,10 @@ export default function App() {
         {/* Protected app routes */}
         <Route element={<RequireAuth><TenantProvider><ShellSwitch /></TenantProvider></RequireAuth>}>
           <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><HomeSwitch /></ErrorBoundary>} />
-          {/* UX2: Home is the redesign behind ux2.home (HomeSwitch); Funds resolves to the production page until phase 2 */}
+          {/* UX2: Home behind ux2.home (HomeSwitch), Funds behind ux2.funds (FundsSwitch); production pages otherwise */}
           <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomeSwitch /></ErrorBoundary>} />
-          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
-          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
+          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
+          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FundsSwitch /></ErrorBoundary>} />
           <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
           <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
@@ -249,6 +250,7 @@ export default function App() {
           <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
           <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
           <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
+          <Route path="/my-unit/pay" element={<ErrorBoundary fallbackLevel="page"><PayPage /></ErrorBoundary>} />
           <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
           <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
           <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />

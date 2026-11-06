@@ -8,3 +8,7 @@ export { default as HomePage } from './home/HomePage';
 export { default as HomeSwitch } from './home/HomeSwitch';
 export * from './runbook/model';
 export { DIMENSIONS, WEIGHTS, bandFor, timelinessCredit, scoreDimension, computeScorecard, average, radarPoints, radarAxisEnd, type Band, type ScoreEvent, type DimensionScore, type Scorecard } from './score/stewardship';
+export { default as FundsPage } from './funds/FundsPage';
+export { default as FundsSwitch } from './funds/FundsSwitch';
+export { default as PayPage } from './funds/PayPage';
+export * from './funds/metrics';

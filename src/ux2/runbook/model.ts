@@ -477,7 +477,7 @@ export function generateCards(input: CardInput, ctx: CardContext): CardSet {
       roles: ['RESIDENT'],
       dimension: 'Timeliness',
       points: 3,
-      action: { label: 'Pay', path: '/my-unit?tab=balance' },
+      action: { label: 'Pay', path: '/my-unit/pay' },
       priority: d < 0 ? 11 : 110 + d / 1000,
     });
   }

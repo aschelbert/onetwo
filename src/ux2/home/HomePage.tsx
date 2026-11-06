@@ -54,13 +54,13 @@ function longDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
-/** Navigate to a card action. Funds tabs live in the financial store, not the URL, so set them first. */
+/** Navigate to a card action. The production Funds page keeps its tab in the financial store, the redesign in the URL, so set both. */
 function useGo() {
   const navigate = useNavigate();
   const setActiveTab = useFinancialStore(s => s.setActiveTab);
   return (path: string) => {
     const m = path.match(/^\/(funds|financial)\?tab=([a-z]+)/);
-    if (m) { setActiveTab(m[2]); navigate('/funds'); return; }
+    if (m) { setActiveTab(m[2]); navigate(`/funds?tab=${m[2]}`); return; }
     navigate(path);
   };
 }
@@ -305,7 +305,7 @@ export default function HomePage() {
               value={fmt(myBalance)}
               sub={myBalance > 0 ? 'Pay by card or bank transfer' : 'Paid up · nothing due'}
               className="min-h-[180px]"
-              action={<TileAction label={myBalance > 0 ? 'Pay now' : 'View statement'} button={myBalance > 0 ? 'Pay' : 'Open'} dark onClick={() => go('/my-unit?tab=balance')} />}
+              action={<TileAction label={myBalance > 0 ? 'Pay now' : 'View statement'} button={myBalance > 0 ? 'Pay' : 'Open'} dark onClick={() => go('/my-unit/pay')} />}
             />
           )}
           <Card className="gap-1" aria-label="Stewardship by dimension">
