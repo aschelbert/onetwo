@@ -4,3 +4,7 @@ export { default as Ux2Shell } from './shell/Ux2Shell';
 export { default as ShellSwitch } from './shell/ShellSwitch';
 export * from './shell/nav';
 export * from './parity/flows';
+export { default as HomePage } from './home/HomePage';
+export { default as HomeSwitch } from './home/HomeSwitch';
+export * from './runbook/model';
+export { DIMENSIONS, WEIGHTS, bandFor, timelinessCredit, scoreDimension, computeScorecard, average, radarPoints, radarAxisEnd, type Band, type ScoreEvent, type DimensionScore, type Scorecard } from './score/stewardship';

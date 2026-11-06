@@ -3,6 +3,7 @@ import OnboardingSetupWidget from '@/components/OnboardingSetupWidget';
 import { useTenantContext } from '@/components/TenantProvider';
 import Ux2TopNav from './Ux2TopNav';
 import Ux2BottomNav from './Ux2BottomNav';
+import ReturnToCaseBar from './ReturnToCaseBar';
 
 /**
  * The redesign's shell. Phase 0 renders the production pages inside it: same
@@ -19,6 +20,7 @@ export default function Ux2Shell() {
         </div>
       )}
       <Ux2TopNav />
+      <ReturnToCaseBar />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-[88px] pt-4 sm:pb-10">
         {tenant.status === 'onboarding' && <OnboardingSetupWidget />}
         <div className="animate-fade-in">
