@@ -107,6 +107,15 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
       if (existing) f.updateBudgetCategory(existing.id, { budgeted: amount }); else f.addBudgetCategory(item.label, amount);
       return 'Funds › Planning · budget';
     }
+    case 'duties':
+    case 'obligations':
+    case 'houserules': {
+      const topic = item.key.split(':')[1] as 'board' | 'officer' | 'owners' | 'rules';
+      const src = item.fields.text?.[0]?.sources[0];
+      const heading = item.label.replace(/^.+? · /, '').replace(/ duties$/, '') || item.label;
+      b.upsertGoverningClause({ topic, role: v.role !== undefined ? text(v.role) : null, ref: text(v.ref), heading, text: text(v.text), source: src ? `${src.docName}${src.page ? ` p.${src.page}` : ''}` : '' });
+      return 'Building › Obligations · duties and roles';
+    }
     case 'reserves': {
       const r = { name: item.label, estimatedCost: num(v.estimatedCost) ?? 0, currentFunding: 0, usefulLife: num(v.usefulLifeYears) ?? 0, lastReplaced: '', yearsRemaining: num(v.remainingLifeYears) ?? 0, isContingency: false };
       const existing = f.reserveItems.find(x => x.name.trim().toLowerCase() === item.label.trim().toLowerCase());

@@ -16,6 +16,8 @@ import { extractFromPages, wordNumber } from '@/features/setup/extractText';
 import { readSheet, parseCsv } from '@/features/setup/importSpreadsheet';
 import SetupPage from '@/ux2/setup/SetupPage';
 import SetupCard from '@/ux2/setup/SetupCard';
+import ObligationsTab from '@/ux2/building/tabs/ObligationsTab';
+import { useBuildingSnapshot } from '@/ux2/building/useBuildingSnapshot';
 
 const empty = (over: Partial<ReadResult>): ReadResult => ({ docType: 'other', title: '', pageCount: null, summary: '', facts: [], units: [], board: [], insurance: [], vendors: [], budget: [], reserves: [], ...over });
 const src = { page: 3, quote: 'quoted words', confidence: 'high' as const };
@@ -152,6 +154,39 @@ describe('Reading text without AI', () => {
 
     const ins = extractFromPages([['Commercial Property Declarations', 'Named Insured: Maple Court Condominium', 'Insurer: Acme Mutual Insurance Co.', 'Policy Number: CPP-1234567', 'Policy Period: 02/01/2026 to 02/01/2027', 'Premium: $14,250.00']], { title: 'Commercial Property Declarations', docType: 'insurance' });
     expect(ins.insurance).toEqual([expect.objectContaining({ type: 'Commercial Property', carrier: 'Acme Mutual Insurance Co.', policyNumber: 'CPP-1234567', expires: '2027-02-01', premium: 14250 })]);
+  });
+
+  it('reads the clauses of bylaws: board and officer duties, owner obligations, rules; and shows them under Duties and roles', () => {
+    const pages = [
+      ['ARTICLE IV', 'BOARD OF DIRECTORS', 'Section 4.1. Number. The Board of Directors shall consist of five (5) members.', 'Section 4.3. Powers and Duties. The Board shall have all powers necessary for the administration of the Association,', 'including adopting the annual budget and enforcing the rules.', 'Section 4.7. Meetings. Regular meetings of the Board shall be held quarterly.'],
+      ['ARTICLE V OFFICERS', 'Section 5.4. Treasurer. The Treasurer shall keep full and accurate financial records of the Association.'],
+      ['ARTICLE VII OBLIGATIONS OF UNIT OWNERS', 'Section 7.1. Maintenance and Repair. Each unit owner shall maintain and repair the interior of the unit.', 'ARTICLE VIII USE RESTRICTIONS', 'Section 8.1. Pets. No more than two (2) pets may be kept in any unit.'],
+    ];
+    const r = extractFromPages(pages, { title: 'Bylaws', docType: 'bylaws' });
+    expect(r.clauses?.map(c => [c.topic, c.role, c.ref, c.heading, c.page])).toEqual([
+      ['board', null, 'Art. IV §4.3', 'Powers and Duties', 1],
+      ['officer', 'Treasurer', 'Art. V §5.4', 'Treasurer', 2],
+      ['owners', null, 'Art. VII §7.1', 'Maintenance and Repair', 3],
+      ['rules', null, 'Art. VIII §8.1', 'Pets', 3],
+    ]);
+    expect(r.clauses?.[0].text).toMatch(/including adopting the annual budget/);
+
+    useBuildingStore.setState({ governingClauses: [] });
+    const doc: SetupDoc = { id: 'b', name: 'Bylaws.pdf', size: 1, mediaType: 'application/pdf', status: 'read', addedAt: '', result: r };
+    const items = buildItems([doc]);
+    const treasurer = items.find(i => i.section === 'duties' && i.label === 'Treasurer duties')!;
+    expect(applyItem(treasurer)).toBe('Building › Obligations · duties and roles');
+    for (const it of items.filter(i => ['duties', 'obligations', 'houserules'].includes(i.section) && i !== treasurer)) applyItem(it);
+    expect(useBuildingStore.getState().governingClauses.map(c => [c.topic, c.role, c.heading, c.source])).toEqual([
+      ['officer', 'Treasurer', 'Treasurer', 'Bylaws p.2'], ['board', null, 'Powers and Duties', 'Bylaws p.1'], ['owners', null, 'Maintenance and Repair', 'Bylaws p.3'], ['rules', null, 'Pets', 'Bylaws p.3'],
+    ]);
+
+    function Duties() { const snap = useBuildingSnapshot(); return <ObligationsTab snap={snap} section="duties" onSection={() => {}} isBoard />; }
+    render(<MemoryRouter><Duties /></MemoryRouter>);
+    const card = (label: string) => document.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+    expect(within(card('Treasurer duties')).getByText('Art. V §5.4')).toBeTruthy();
+    expect(within(card('Rules for residents')).getByText('Pets')).toBeTruthy();
+    expect(within(card('The board, from your bylaws')).getByText('Powers and Duties')).toBeTruthy();
   });
 
   it('reads pasted text into items to review', () => {
