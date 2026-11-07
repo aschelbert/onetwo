@@ -5,7 +5,7 @@ import { fmt } from '@/lib/formatters';
 export function ReserveStudyPanel() {
   const { legalDocuments } = useBuildingStore();
   const fin = useFinancialStore();
-  const recommended = fin.calculateRecommendedAnnualReserve();
+  const recommended = Math.round(fin.calculateRecommendedAnnualReserve());
   const currentContribution = fin.annualReserveContribution;
   const reserveStatus = fin.getReserveFundingStatus();
 
