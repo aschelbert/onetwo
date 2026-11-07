@@ -2,7 +2,7 @@ import { supabase, logDbError } from '@/lib/supabase';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
   LegalDocument, InsurancePolicy, Vendor, MaintenanceSchedule,
-  BuildingDetails,
+  BuildingDetails, GoverningClause,
 } from '@/store/useBuildingStore';
 
 // ── Board Members ──
@@ -174,6 +174,48 @@ export async function deleteLegalDocument(id: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('legal_documents').delete().eq('id', id);
   if (error) { logDbError('deleteLegalDocument error:', error); return false; }
+  return true;
+}
+
+// ── Governing clauses (bylaws and rules, accepted in setup) ──
+
+type ClauseFields = Omit<GoverningClause, 'id'>;
+const clauseRow = (c: ClauseFields) => ({ topic: c.topic, role: c.role, ref: c.ref, heading: c.heading, body: c.text, source: c.source, updated_at: new Date().toISOString() });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const clauseFrom = (r: any): GoverningClause => ({ id: r.id, topic: r.topic, role: r.role ?? null, ref: r.ref ?? '', heading: r.heading, text: r.body ?? '', source: r.source ?? '' });
+
+export async function fetchGoverningClauses(tenantId: string): Promise<GoverningClause[] | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('governing_clauses').select('*').eq('tenant_id', tenantId).order('created_at');
+  if (error) { logDbError('fetchGoverningClauses error:', error); return null; }
+  return (data || []).map(clauseFrom);
+}
+
+/**
+ * Save a clause: update it by id when it is already in the database,
+ * otherwise insert it; if the building already has one with the same topic,
+ * office and heading (the unique key), update that one instead.
+ */
+export async function saveGoverningClause(tenantId: string, c: ClauseFields, id?: string): Promise<GoverningClause | null> {
+  if (!supabase) return null;
+  if (id) {
+    const { data, error } = await supabase.from('governing_clauses').update(clauseRow(c)).eq('id', id).select().single();
+    if (error) { logDbError('saveGoverningClause update error:', error); return null; }
+    return clauseFrom(data);
+  }
+  const { data, error } = await supabase.from('governing_clauses').insert({ tenant_id: tenantId, ...clauseRow(c) }).select().single();
+  if (!error) return clauseFrom(data);
+  if (error.code !== '23505') { logDbError('saveGoverningClause insert error:', error); return null; }
+  let q = supabase.from('governing_clauses').select('id').eq('tenant_id', tenantId).eq('topic', c.topic).ilike('heading', c.heading.replace(/[%_]/g, m => `\\${m}`));
+  q = c.role ? q.eq('role', c.role) : q.is('role', null);
+  const { data: hit } = await q.limit(1).maybeSingle();
+  return hit ? saveGoverningClause(tenantId, c, hit.id) : null;
+}
+
+export async function deleteGoverningClause(id: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('governing_clauses').delete().eq('id', id);
+  if (error) { logDbError('deleteGoverningClause error:', error); return false; }
   return true;
 }
 
@@ -392,7 +434,7 @@ export async function upsertBuildingProfile(tenantId: string, d: Partial<Buildin
 import * as assetsSvc from '@/lib/services/assets';
 
 export async function fetchAllBuildingData(tenantId: string) {
-  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets] = await Promise.all([
+  const [board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets, clauses] = await Promise.all([
     fetchBoardMembers(tenantId),
     fetchManagementInfo(tenantId),
     fetchLegalCounsel(tenantId),
@@ -402,6 +444,7 @@ export async function fetchAllBuildingData(tenantId: string) {
     fetchMaintenanceSchedules(tenantId),
     fetchBuildingProfile(tenantId),
     assetsSvc.fetchAssets(tenantId),
+    fetchGoverningClauses(tenantId),
   ]);
-  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets };
+  return { board, management, counsel, docs, insurance, vendors, maintenanceSchedules, profile, assets, clauses };
 }
