@@ -258,35 +258,44 @@ situation's workflow falls through to the generic note-and-attach fallback.
 ## Building setup (documents first)
 
 Replaces the amber "Set up your building" widget (`OnboardingSetupWidget`,
-`features/setup/setup-steps.ts`, both removed).
+`features/setup/setup-steps.ts`, both removed). No AI and no outside service:
+everything is read in the browser, so a document costs nothing to read.
 
 - **Home card** (`ux2/setup/SetupCard.tsx`): plum, at the top of Home while
   the tenant is `onboarding` and not live, for everyone but residents. One
   next action, progress, the five steps. "Hide for now" leaves a chip.
 - **/setup** (`ux2/setup/SetupPage.tsx`, `?step=documents|review|finish`;
   listed in `vite.config.ts` APP_ROUTES and the `vercel.json` rewrites):
-  1. *Documents*: drop PDFs, photos of pages, CSV or Excel (.xlsx is turned
-     into text in the browser with `read-excel-file`). Each file is read by
-     the `read-setup-document` edge function and filed in Building ›
-     Documents. The checklist says what each kind of document fills in.
+  1. *Documents* (`features/setup/readDocument.ts`):
+     - PDFs: text pulled out with pdf.js (`pdfText.ts`), then read with rules
+       (`extractText.ts`) for settings (late fee, grace period, due day,
+       quorum, notice, annual meeting, board size and terms, fiscal year,
+       spending limit, assessment cap, owner vote, fines, pets, rentals,
+       units, management company) and lists (unit/ownership tables,
+       officers, budget lines, reserve components, an insurance declarations
+       page). Lists are read only from documents of the matching kind.
+     - Pasted text: the same rules ("Paste text").
+     - Spreadsheets (CSV, Excel via `read-excel-file`): matched by their
+       column headings, in many spellings (`importSpreadsheet.ts`): owner
+       lists, board rosters, budgets.
+     - Word files, photos and scanned PDFs with no text are filed only.
+     - Every file is filed in Building › Documents, named by its type; the
+       type can be changed, which reads the text again with that kind's rules.
   2. *Review what we found*: readings merge into items by what they
      describe (`setupModel.buildItems`); two documents that disagree are a
-     choice, a faint scan is flagged. Matching items accept in one click.
+     choice, a doubtful reading is flagged. Each item shows the page and the
+     sentence (or the row) it came from. Matching items accept in one click.
      Accepting writes through the stores' own actions (`applySetup.applyItem`);
      facts with no home in the app (board quorum, notice period, pets, ...)
      are kept as "rules on file" and listed at go-live.
   3–5. *Fill the gaps · Invite people · Go live*: only what is missing,
      answered in place (address, units, monthly assessments, a board member,
-     opening balances, a budget template, owner emails). Board invites go
-     through `send-invite`; owners are invited at go-live (a visible
-     checkbox). Go live needs four essentials: name and address, units,
-     a board member, an assessment for every unit.
-- **Reading** (`supabase/functions/read-setup-document`): Claude
-  (`claude-opus-5-5`, structured JSON output, server-side refusal
-  fallback), callable by board members, the account owner and managers.
-  Every item carries its page and a short quote. Needs the
-  `ANTHROPIC_API_KEY` secret on the Supabase project; `GET` reports whether
-  it is set, and the page says so when it isn't. Nothing is saved by the
-  function itself.
+     due day and late fee, opening balances, a budget template, owner
+     emails). Board invites go through `send-invite`; owners are invited at
+     go-live (a visible checkbox). Go live needs four essentials.
+- The `read-setup-document` edge function from the first version is retired:
+  its source is removed and the deployed copies (staging, production) are a
+  stub that returns 410 and calls nothing. Delete it from the Supabase
+  dashboard when convenient.
 - Setup state (`features/setup/useSetupStore.ts`) is per browser and resets
   when a different building loads.

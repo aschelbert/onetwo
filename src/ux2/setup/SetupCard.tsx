@@ -31,7 +31,7 @@ export default function SetupCard() {
   }
 
   const steps = [
-    { label: 'Documents', done: s.read > 0 && s.reading === 0, note: s.docs.length ? `${s.read} read${s.reading ? ` · ${s.reading} reading` : ''}` : 'Start here' },
+    { label: 'Documents', done: s.docs.some(d => d.status === 'read' || d.status === 'filed'), note: s.docs.length ? `${s.docs.filter(d => d.status === 'read' || d.status === 'filed').length} added` : 'Start here' },
     { label: 'Review what we found', done: s.items.length > 0 && s.pending.length === 0, note: s.items.length ? (s.pending.length ? `${s.pending.length} to confirm` : 'Done') : '' },
     { label: 'Fill the gaps', done: s.ready, note: s.missing ? `${s.missing} essential${s.missing === 1 ? '' : 's'} left` : 'Done' },
     { label: 'Invite people', done: false, note: 'Optional' },
@@ -44,7 +44,7 @@ export default function SetupCard() {
       <div className="flex flex-col gap-3.5">
         <div className="flex flex-wrap items-center gap-2.5"><span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ux2-plum">Setting up · {s.pct}%</span><span className="text-[13px] text-white/80">About {s.minutes} minute{s.minutes === 1 ? '' : 's'} left</span></div>
         <h2 id="setup-card-h" className="font-display text-[26px] font-semibold leading-tight">Set up {tenant.name}</h2>
-        <p className="m-0 text-[15px] leading-relaxed text-white/[0.88]">Start with the documents you already have. Drop in your bylaws, budget, insurance and owner list and we fill in the building for you. You confirm each item before it's saved.</p>
+        <p className="m-0 text-[15px] leading-relaxed text-white/[0.88]">Start with the documents you already have. Add your bylaws, owner list and budget (PDF, spreadsheet or pasted text) and we pick out what the building needs. You confirm each item before it's saved.</p>
         <div className="flex gap-1" aria-hidden="true">{steps.map((x, i) => <span key={x.label} className={cn('h-1.5 flex-1 rounded-full', x.done ? 'bg-white' : i === current ? 'bg-white/55' : 'bg-white/[0.22]')} />)}</div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => go(s.next.step)} className="h-11 rounded-full bg-white px-5 text-sm font-semibold text-ux2-plum">{s.next.label}</button>

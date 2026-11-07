@@ -11,7 +11,9 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { buildItems, essentials, isClear, progress, resolve, type ReadResult, type SetupDoc } from '@/features/setup/setupModel';
 import { applyItem, monthDay } from '@/features/setup/applySetup';
-import { payloadFor } from '@/features/setup/readDocument';
+import { addPastedText } from '@/features/setup/readDocument';
+import { extractFromPages, wordNumber } from '@/features/setup/extractText';
+import { readSheet, parseCsv } from '@/features/setup/importSpreadsheet';
 import SetupPage from '@/ux2/setup/SetupPage';
 import SetupCard from '@/ux2/setup/SetupCard';
 
@@ -34,7 +36,7 @@ const rules: SetupDoc = {
   id: 'd2', name: 'House Rules.pdf', size: 300_000, mediaType: 'application/pdf', status: 'read', addedAt: '2026-11-07',
   result: empty({ docType: 'rules', title: 'House Rules 2023', facts: [{ key: 'late_fee', value: '10% after 15 days', number: 10, ...src }] }),
 };
-const owners: SetupDoc = {
+const ownersDoc: SetupDoc = {
   id: 'd3', name: 'Owners.xlsx', size: 20_000, mediaType: 'text/csv', status: 'read', addedAt: '2026-11-07',
   result: empty({
     docType: 'owner_list', title: 'Owners 2026',
@@ -46,7 +48,7 @@ const owners: SetupDoc = {
 
 describe('Setup model', () => {
   it('merges readings, flags disagreements and faint scans, and resolves picks and edits', () => {
-    const items = buildItems([bylaws, rules, owners]);
+    const items = buildItems([bylaws, rules, ownersDoc]);
     const late = items.find(i => i.key === 'fact:late_fee')!;
     expect(late.conflicts).toEqual(['value']);
     expect(late.fields.value.map(v => v.display)).toEqual(['$25 per late payment', '10% after 15 days']);
@@ -81,7 +83,7 @@ describe('Applying accepted items', () => {
   });
 
   it('writes units, budget lines, board members and late-fee settings through the stores', () => {
-    const items = buildItems([bylaws, rules, owners]);
+    const items = buildItems([bylaws, rules, ownersDoc]);
     applyItem(items.find(i => i.key === 'unit:1a')!);
     expect(useFinancialStore.getState().units).toEqual([expect.objectContaining({ number: '1A', owner: 'Rivera, Ana', email: 'ana@example.com', votingPct: 50, monthlyFee: 400 })]);
     applyItem(items.find(i => i.key === 'unit:1a')!, undefined, { monthlyFee: 410 });
@@ -99,10 +101,65 @@ describe('Applying accepted items', () => {
     expect(applyItem(items.find(i => i.key === 'fact:annual_meeting_month')!)).toBe('Rules on file');
   });
 
-  it('turns a CSV into text for the reader and refuses Word files', async () => {
-    const csv = await payloadFor(new File(['unit,owner\n1A,Rivera'], 'owners.csv', { type: 'text/csv' }));
-    expect(csv).toMatchObject({ fileName: 'owners.csv', text: 'unit,owner\n1A,Rivera' });
-    expect(await payloadFor(new File(['x'], 'bylaws.docx'))).toHaveProperty('error');
+  it('imports spreadsheets by their headings, whatever they are called', () => {
+    const rows = parseCsv('Maple Court owners\nUnit #,Owner Name,E-mail,% Interest,Monthly Dues\n1A,"Rivera, Ana",ana@example.com,3.85%,$412.00\n1B,Okafor James,,0.0410,439\nTOTAL,,,,851');
+    const r = readSheet(rows, 'Owners');
+    expect('error' in r).toBe(false);
+    if ('error' in r) return;
+    expect(r.docType).toBe('owner_list');
+    expect(r.units.map(u => [u.unit, u.owner, u.email, u.ownershipPct, u.monthlyFee])).toEqual([['1A', 'Rivera, Ana', 'ana@example.com', 3.85, 412], ['1B', 'Okafor James', null, 0.041, 439]]);
+    expect(r.units[0].quote).toMatch(/^Row 3:/);
+    const budget = readSheet([['Line item', 'Proposed 2027'], ['Landscaping', '$12,000'], ['Total', '$12,000']], 'Budget');
+    expect('error' in budget ? [] : budget.budget.map(b => [b.category, b.annualAmount])).toEqual([['Landscaping', 12000]]);
+    expect(readSheet([['Color', 'Shape'], ['red', 'round']], 'x')).toHaveProperty('error');
+  });
+});
+
+const BYLAWS = [
+  ['ARTICLE III MEETINGS', 'Section 3.1. The annual meeting of the Unit Owners shall be held in March of each year.', 'Section 3.4. Notice of each meeting shall be given not less than ten (10) nor more than sixty (60) days before the meeting.', 'Section 3.6. The presence of owners holding twenty-five percent (25%) of the votes shall constitute a quorum.'],
+  ['ARTICLE IV BOARD', 'Section 4.1. The Board of Directors shall consist of five (5) members.', 'Section 4.6. A majority of the directors shall constitute a quorum for the transaction of business.'],
+  ['ARTICLE VI ASSESSMENTS', 'Section 6.1. Assessments shall be payable in equal monthly installments on the first day of each month.', 'Section 6.2. Any installment not paid within fifteen (15) days after the due date shall incur a late charge of twenty-five dollars ($25.00).', 'Section 8.1. The fiscal year of the Association shall begin on January 1 of each year.'],
+];
+
+describe('Reading text without AI', () => {
+  it('finds the settings in bylaws, with the page and sentence', () => {
+    const r = extractFromPages(BYLAWS, { title: 'Bylaws', docType: 'bylaws' });
+    const fact = (k: string) => r.facts.find(f => f.key === k);
+    expect(fact('annual_meeting_month')).toMatchObject({ value: 'March', page: 1 });
+    expect(fact('owner_meeting_notice')).toMatchObject({ value: '10 to 60 days before the meeting', number: 10 });
+    expect(fact('owner_quorum_pct')).toMatchObject({ number: 25 });
+    expect(fact('board_size')).toMatchObject({ number: 5, page: 2 });
+    expect(fact('board_quorum')?.value).toBe('A majority of the directors');
+    expect(fact('assessment_due_day')).toMatchObject({ number: 1, value: 'the 1st of each month', page: 3 });
+    expect(fact('grace_period_days')).toMatchObject({ number: 15 });
+    expect(fact('late_fee')).toMatchObject({ number: 25, value: '$25 per late payment' });
+    expect(fact('late_fee')?.quote).toMatch(/late charge of twenty-five dollars/);
+    expect(fact('fiscal_year_end')?.value).toBe('December 31');
+    expect(r.units).toEqual([]);
+    expect(wordNumber('sixty-seven')).toBe(67);
+    expect(wordNumber('fifteenth')).toBe(15);
+  });
+
+  it('reads tables and lists: owners, officers, budget lines and an insurance declarations page', () => {
+    const owners = extractFromPages([['Unit  Owner  Percentage Interest  Email', '101  Rivera, Ana  3.85%  ana@example.com', '102  Okafor, James  4.10%  james@example.com', '103  Chen, David  3.85%']], { title: 'Owner list', docType: 'owner_list' });
+    expect(owners.units.map(u => [u.unit, u.owner, u.ownershipPct, u.email])).toEqual([['101', 'Rivera, Ana', 3.85, 'ana@example.com'], ['102', 'Okafor, James', 4.1, 'james@example.com'], ['103', 'Chen, David', 3.85, null]]);
+
+    const minutes = extractFromPages([['Minutes of the Annual Meeting, March 12, 2026', 'Ana Rivera was elected President by acclamation.', 'Treasurer: James Okafor', 'Priya Shah - Secretary']], { title: 'AGM minutes', docType: 'minutes' });
+    expect(minutes.board.map(b => [b.name, b.role])).toEqual([['James Okafor', 'Treasurer'], ['Priya Shah', 'Secretary'], ['Ana Rivera', 'President']]);
+
+    const budget = extractFromPages([['Operating Budget 2027', 'Landscaping  $12,000.00', 'Insurance  $18,500.00', 'Utilities  $21,000.00  $22,000.00', 'Total Expenses  $52,500.00']], { title: 'Budget', docType: 'budget' });
+    expect(budget.budget.map(b => [b.category, b.annualAmount, b.confidence])).toEqual([['Landscaping', 12000, 'high'], ['Insurance', 18500, 'high'], ['Utilities', 22000, 'low']]);
+
+    const ins = extractFromPages([['Commercial Property Declarations', 'Named Insured: Maple Court Condominium', 'Insurer: Acme Mutual Insurance Co.', 'Policy Number: CPP-1234567', 'Policy Period: 02/01/2026 to 02/01/2027', 'Premium: $14,250.00']], { title: 'Commercial Property Declarations', docType: 'insurance' });
+    expect(ins.insurance).toEqual([expect.objectContaining({ type: 'Commercial Property', carrier: 'Acme Mutual Insurance Co.', policyNumber: 'CPP-1234567', expires: '2027-02-01', premium: 14250 })]);
+  });
+
+  it('reads pasted text into items to review', () => {
+    useSetupStore.getState().reset();
+    addPastedText(BYLAWS.flat().join('\n'), 'bylaws', 'Bylaws excerpt');
+    const doc = useSetupStore.getState().docs[0];
+    expect(doc).toMatchObject({ name: 'Bylaws excerpt', status: 'read', docType: 'bylaws', pasted: true });
+    expect(buildItems([doc]).find(i => i.key === 'fact:late_fee')?.fields.value[0].sources[0]).toMatchObject({ page: null, docName: 'Bylaws excerpt' });
   });
 });
 
@@ -142,11 +199,15 @@ describe('Setup screens', () => {
     expect(screen.getByText("Drop your building's documents here")).toBeTruthy();
     const governing = document.querySelector('[data-doc-kind="governing"]') as HTMLElement;
     expect(within(governing).getByText('Late fees')).toBeTruthy();
-    expect(within(governing).getByRole('button', { name: 'Upload' })).toBeTruthy();
+    expect(within(governing).getByRole('button', { name: 'Add' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Paste text' }));
+    fireEvent.change(screen.getByLabelText('Text to read'), { target: { value: BYLAWS.flat().join('\n') } });
+    fireEvent.click(screen.getByRole('button', { name: 'Read it' }));
+    expect(document.querySelector('[data-setup-doc="read"]')?.textContent).toMatch(/Bylaws · \d+ found to review/);
   });
 
   it('reviews what was found: accept the matches together, settle a disagreement, and save into the building', () => {
-    useSetupStore.setState({ docs: [bylaws, rules, owners] });
+    useSetupStore.setState({ docs: [bylaws, rules, ownersDoc] });
     renderSetup('/setup?step=review');
     // Units first: 1A matches across the owner list and bylaws; 1B (bylaws only) has no owner yet but is clear.
     fireEvent.click(screen.getByRole('button', { name: 'Accept the 2 that match' }));
@@ -163,7 +224,7 @@ describe('Setup screens', () => {
     expect(useSetupStore.getState().decisions['fact:late_fee']).toMatchObject({ status: 'accepted', picks: { value: 1 } });
 
     const faint = document.querySelector('[data-setup-item="fact:annual_meeting_month"]') as HTMLElement;
-    expect(within(faint).getByText('Check the scan')).toBeTruthy();
+    expect(within(faint).getByText('Check the source')).toBeTruthy();
     fireEvent.click(within(faint).getByRole('button', { name: 'Skip Annual meeting' }));
     expect(useSetupStore.getState().decisions['fact:annual_meeting_month'].status).toBe('skipped');
   });

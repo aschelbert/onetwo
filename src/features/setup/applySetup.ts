@@ -6,7 +6,7 @@
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { resolve, unitKey, type FieldScalar, type Item, type ReadResult, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
+import { resolve, unitKey, type DocType, type FieldScalar, type Item, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
 
 const num = (v: FieldScalar | undefined): number | null => {
   if (v === undefined) return null;
@@ -124,17 +124,24 @@ export function postOpening(fund: 'operating' | 'reserve', amount: number, date 
   else f.glPost(date, 'Opening reserve fund balance (setup)', '1020', '3020', amount, 'transfer', null);
 }
 
-/** File a read document in Building › Documents under its title. Returns the document id. */
-export function fileSetupDocument(doc: SetupDoc & { result: ReadResult }): string | null {
+const docName = (doc: SetupDoc, type: DocType) => `${DOC_TYPE_LABEL[type] ?? 'Document'} · ${doc.name.replace(/\.[a-z0-9]+$/i, '')}`;
+
+/** File a document in Building › Documents, named by its type so it lands in the right group. Returns the document id. */
+export function fileSetupDocument(doc: SetupDoc & { docType: DocType }): string | null {
   const b = useBuildingStore.getState();
-  const r = doc.result;
-  const name = r.title?.trim() || `${DOC_TYPE_LABEL[r.docType] ?? 'Document'} · ${doc.name}`;
-  const year = /\b(19|20)\d{2}\b/.exec(`${r.title} ${r.summary} ${doc.name}`)?.[0] ?? String(new Date().getFullYear());
-  b.addLegalDocument({ name, version: year, size: doc.size > 1024 * 1024 ? `${(doc.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(doc.size / 1024))} KB`, status: 'current' });
+  const name = docName(doc, doc.docType);
+  const year = /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] ?? String(new Date().getFullYear());
+  const size = doc.size > 1024 * 1024 ? `${(doc.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(doc.size / 1024))} KB`;
+  b.addLegalDocument({ name, version: year, size, status: 'current' });
   const filed = [...useBuildingStore.getState().legalDocuments].reverse().find(d => d.name === name);
   if (!filed) return null;
-  b.addLegalDocAttachment(filed.id, { name: doc.name, size: filed.size, type: doc.mediaType || 'application/pdf' });
+  b.addLegalDocAttachment(filed.id, { name: doc.name, size, type: doc.mediaType || 'application/pdf' });
   return filed.id;
+}
+
+/** Change what a filed document is (renames it in Building › Documents). */
+export function retypeSetupDocument(doc: SetupDoc, type: DocType) {
+  if (doc.filedAs) useBuildingStore.getState().updateLegalDocument(doc.filedAs, { name: docName(doc, type) });
 }
 
 /** A starting budget sized to the building: common lines split from the monthly assessments. */

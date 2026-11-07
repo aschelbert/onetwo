@@ -1,6 +1,6 @@
 /**
- * Setup step 2 — review what we found. Every item shows the document, page
- * and words it was read from. Items that match across documents (and were
+ * Setup step 2 — review what we found. Every item shows the document and the
+ * page and words (or spreadsheet row) it came from. Items that match across documents (and were
  * read clearly) can be accepted together; the rest wait for a person: two
  * documents that disagree, or a faint scan. Accepting writes the item into
  * the building's records at once (`applyItem`); Change reopens it.
@@ -62,7 +62,7 @@ function ItemCard({ item }: { item: Item }) {
       <div className="flex flex-col items-start gap-2">
         <b className="font-semibold">{item.label}</b>
         {conflicted && <Chip tone="red">Documents disagree</Chip>}
-        {!conflicted && item.lowConfidence && <Chip tone="amber">Check the scan</Chip>}
+        {!conflicted && item.lowConfidence && <Chip tone="amber">Check the source</Chip>}
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         {editing ? (
@@ -91,7 +91,7 @@ function ItemCard({ item }: { item: Item }) {
                 {plain && <SourceLine sources={plain} />}
               </>
             )}
-            {conflicted && item.conflicts.includes('value') && <p className="m-0 text-xs text-ux2-muted">The newer document usually applies if the board adopted it properly. Not sure? Pick one now and change it later.</p>}
+            {conflicted && item.conflicts.includes('value') && <p className="m-0 text-xs text-ux2-muted">Not sure which is current? Pick one now and change it later.</p>}
           </>
         )}
       </div>
@@ -117,7 +117,7 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
   if (!current) {
     return (
       <div className="flex flex-col items-start gap-3 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
-        <p className="m-0 text-sm text-ux2-muted">{s.reading ? `Reading ${s.reading} document${s.reading === 1 ? '' : 's'}. What they hold shows here as soon as each is read.` : 'Nothing to review yet. Add your documents and what they hold shows here.'}</p>
+        <p className="m-0 text-sm text-ux2-muted">Nothing found to review yet. Add your bylaws, owner list or budget (PDF, spreadsheet or pasted text) and what they hold shows here.</p>
         <div className="flex gap-2"><Button variant="plum" onClick={onDocuments}>Add documents</Button><Button variant="ghost" onClick={onDone}>Fill the gaps</Button></div>
       </div>
     );
