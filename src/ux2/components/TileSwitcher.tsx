@@ -15,6 +15,8 @@ export interface TileSwitcherProps<T extends string = string> {
   defaultId?: T;
   onChange?: (id: T) => void;
   hint?: ReactNode;
+  /** Rendered between the tile row and the selected detail (rules strip, a standing card). */
+  between?: ReactNode;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface TileSwitcherProps<T extends string = string> {
  * tile's detail renders under them, so nothing important sits below the fold.
  * Tap a tile (or press Enter / Space) to switch.
  */
-export function TileSwitcher<T extends string = string>({ sections, value, defaultId, onChange, hint }: TileSwitcherProps<T>) {
+export function TileSwitcher<T extends string = string>({ sections, value, defaultId, onChange, hint, between }: TileSwitcherProps<T>) {
   const [inner, setInner] = useState<T>(defaultId ?? sections[0]?.id);
   const current = value ?? inner;
   const select = (id: T) => {
@@ -56,6 +58,7 @@ export function TileSwitcher<T extends string = string>({ sections, value, defau
         </TileRow>
         <div className="text-xs text-ux2-muted">{hint ?? 'Tap a tile to open its detail below. The others stay one tap away.'}</div>
       </div>
+      {between}
       <div data-section={active?.id}>{active?.detail}</div>
     </div>
   );
