@@ -20,6 +20,7 @@
  * `/boardroom?view=case:<id>`, `/boardroom?view=new&cat=<catId>&sit=<sitId>`.
  * `/issues?view=case:<id>` (Home's links) resolves here too.
  */
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
@@ -57,6 +58,7 @@ export default function BoardRoomModule() {
   const pmSeat = useTenantContext().pmSeat;
   const tab = resolveBoardRoomTab(params.get('tab'), params.get('caseTab'), pmSeat);
   const snap = useBoardRoomSnapshot();
+  const [composeLetter, setComposeLetter] = useState(false);
   const openTasks = useTaskTrackingStore(s => s.tasks).filter(t => t.status !== 'done').length;
 
   const cases = casesSummary(caseRows(snap));
@@ -119,7 +121,7 @@ export default function BoardRoomModule() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {cases.overdue.length > 0 && <Chip tone="red">{cases.overdue.length} overdue</Chip>}
-            <Button onClick={() => newCase()}>New case</Button>
+            {tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
           </div>
         </div>
         <PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />
@@ -128,7 +130,7 @@ export default function BoardRoomModule() {
       {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
       {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
       {tab === 'runbooks' && <RunbooksTab snap={snap} onOpenCase={openCase} onNewCase={newCase} />}
-      {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} />}
+      {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} compose={composeLetter} onComposeDone={() => setComposeLetter(false)} />}
       {tab === 'tasks' && pmSeat && (
         <Card aria-label="Tasks">
           <SectionLabel>Tasks · {openTasks} open</SectionLabel>

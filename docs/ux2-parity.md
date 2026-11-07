@@ -1,0 +1,57 @@
+# UX2 · container parity with the design boards
+
+The design canvas (Design › "ONE two UX redesign", `project/*.dc.html`) is the
+spec for every container. This pass replaces the production components that
+were still mounted inside the redesign with the boards' own containers, backed
+by the same stores, so staging shows the designed widgets rather than a
+re-skinned legacy screen.
+
+## Primitives (`src/ux2/components/Table.tsx`)
+
+`Table / Th / Td / Cell` (white list block inside a grey card, 12px muted
+headers, hairline rows), `RowMenu` (the round ··· with a small menu),
+`Bar` (8px bar with the "should be here by now" mark), `KV` (key/value
+line), `SearchInput`, `Why` (the small-print explanation under a list),
+`Field` + `INPUT` for the inline forms that replace modals. `PillTabs` has a
+`surface="white"` variant for in-card filters; `TileSwitcher` has a
+`between` slot for content that sits under the tiles and above the detail.
+
+## Funds
+
+- **Income** · Unit ledger table (filters, search, record a payment / add a
+  fee / add a special assessment inline), Behind card (table, the three
+  runbook-step cards, aging line), Invoices card (filters, new invoice
+  inline, status chips). The rules strip and the Stripe card sit between the
+  tiles and the selected card, as on the board.
+- **Expenses** · Bills table (filters, approve, receive an invoice inline,
+  approve all within budget), Spending decisions deck (one request at a time
+  with funding-source chips, the limit note and the navy "Know before you
+  decide" panel; "Deck is clear" when empty), Work orders table (create
+  inline, stage actions), Vendors and contracts row. Payroll opens from that
+  row.
+- **Planning** · Budget against actual table (biggest / over / all, "where
+  the dues go" strip, bars with the expected mark, edit the amount inline),
+  Next year draft (three dues options, computed / changes / where it stands
+  panels, done-for-you chips), Reserves card (asset table, approaching
+  replacement notice, the monthly contribution lever with today /
+  recommended / another amount, add an asset, contingency fund).
+
+## Board Room
+
+- **Open** · one pill group (All open, My tasks, Overdue, Funds, Building,
+  People, Board) with search, the board's table columns, priority dots.
+- **Inbox** · Needs you with Assign (inline: pick a board member, becomes a
+  case on the resident-request runbook) / Acknowledge / Reply (inline reply
+  posts a comment through the issues store), the requests table with a
+  Reply button per row, the five-step "Every request runs the same runbook"
+  card. The production Issues page is no longer embedded here.
+- **Runbooks** · heading with the With an open case / All 32 pills and the
+  legend, one card per runbook with a case open (visibility chip, step
+  track, labels), the All runbooks table with On / Off · manual chips.
+  No tiles.
+- **Outbox** · Needs you (meeting notices and drafts), Alerts card, the
+  Drafts / Sent / Scheduled / Templates / Older letters pills, Drafts and
+  Sent tables (edit and send inline, view and resend), Templates (edit
+  inline) and How a letter goes out. "New letter" in the module header
+  composes from a template. The production Communications tab is no longer
+  embedded here.

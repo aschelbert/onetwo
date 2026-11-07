@@ -126,8 +126,8 @@ export default function FundsPage() {
 
       {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
       {tab === 'income' && <IncomeTab snap={snap} section={section} onSection={s => go('income', s)} onGo={go} />}
-      {tab === 'expenses' && <ExpensesTab snap={snap} section={section} onSection={s => go('expenses', s)} />}
-      {tab === 'planning' && <PlanningTab snap={snap} section={section} onSection={s => go('planning', s)} />}
+      {tab === 'expenses' && <ExpensesTab snap={snap} section={section} onSection={s => go('expenses', s)} onGo={go} />}
+      {tab === 'planning' && <PlanningTab snap={snap} section={section} onSection={s => go('planning', s)} onGo={go} />}
       {tab === 'statements' && <StatementsTab snap={snap} />}
       {tab === 'payments' && <PaymentsTab snap={snap} onGo={go} />}
       {tab === 'settings' && <SettingsTab snap={snap} section={section} onSection={s => go('settings', s)} />}

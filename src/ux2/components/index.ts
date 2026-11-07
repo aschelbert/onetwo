@@ -5,3 +5,4 @@ export { Tile, TileRow, type TileTone, type TileProps } from './Tile';
 export { PillTabs, type PillTab, type PillTabsProps } from './PillTabs';
 export { TileSwitcher, type TileSection, type TileSwitcherProps } from './TileSwitcher';
 export { Ring } from './Ring';
+export { Table, Th, Td, Cell, RowMenu, Bar, KV, SearchInput, Why, Field, INPUT, type MenuItem } from './Table';

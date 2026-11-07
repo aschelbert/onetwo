@@ -83,9 +83,12 @@ describe('Board Room', () => {
     expect(document.querySelector('[aria-label="Decisions on this case"]')).toBeTruthy();
   });
 
-  it('Inbox acknowledges a new request through the issues store and mounts the production inbox', () => {
+  it('Inbox lists requests in the mock table with reply, acknowledges through the issues store, and shows the five-step runbook', () => {
     renderAt('/boardroom?tab=inbox');
-    expect(screen.getByTestId('legacy-issues').getAttribute('data-embedded')).toBe('1');
+    expect(screen.queryByTestId('legacy-issues')).toBeNull();
+    const requests = document.querySelector('[aria-label="Requests"]') as HTMLElement;
+    expect(within(requests).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Request', 'Status', 'Reply due', 'Assignee', 'Runbook step', '']);
+    expect(document.querySelector('[aria-label="Request runbook"]')?.textContent).toContain('3 · Assign');
     const ack = screen.queryAllByRole('button', { name: 'Acknowledge' })[0];
     if (ack) {
       const before = useIssuesStore.getState().issues.filter(i => i.status === 'SUBMITTED').length;
@@ -96,20 +99,34 @@ describe('Board Room', () => {
 
   it('Runbooks lists all 32, switches one off and opens the wizard on a situation', () => {
     renderAt('/boardroom?tab=runbooks');
+    expect(screen.queryByText('Switched on')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^All 32$/ }));
     expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
     const sw = screen.getByRole('switch', { name: 'Collections on' });
     fireEvent.click(sw);
     expect(useRunbookSwitches.getState().isOn('collections')).toBe(false);
     const row = document.querySelector('tr[data-runbook="collections"]') as HTMLElement;
-    fireEvent.click(within(row).getByRole('button', { name: 'Open a case' }));
-    expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/delinquent-accounts');
+    const start = within(row).queryByRole('button', { name: 'Open a case' });
+    if (start) {
+      fireEvent.click(start);
+      expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/delinquent-accounts');
+    } else {
+      fireEvent.click(within(row).getByRole('button', { name: /^Open now/ }));
+      expect(document.querySelector('[data-page="ux2-boardroom-case"]')).toBeTruthy();
+    }
   });
 
-  it('Outbox and Archive render their summaries and the production communications tab', () => {
+  it('Outbox shows alerts, drafts, templates and delivery without the production communications tab; New letter composes', () => {
     renderAt('/boardroom?tab=outbox');
-    expect(screen.getByTestId('legacy-comms')).toBeTruthy();
-    expect(screen.getByText('Drafts')).toBeTruthy();
+    expect(screen.queryByTestId('legacy-comms')).toBeNull();
+    expect(document.querySelector('[aria-label="Alerts"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Drafts"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Templates"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="How a letter goes out"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'New letter' }));
+    expect(screen.getByRole('form', { name: 'New letter' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sent · 0' }));
+    expect(document.querySelector('[aria-label="Sent"]')).toBeTruthy();
     renderAt('/boardroom?tab=archive');
     expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
   });
