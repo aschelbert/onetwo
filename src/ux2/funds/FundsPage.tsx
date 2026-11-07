@@ -11,12 +11,12 @@
  * Deep links: `/funds?tab=income&section=behind`. Legacy Fiscal Lens tab ids
  * (`units`, `budget`, `reserves`, `approvals`, …) are accepted and mapped.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
-import { Chip, PillTabs, ModuleHeader, ACTION_BUTTON, STATUS_CHIP } from '../components';
+import { Chip, PillTabs, ModuleHeader, ACTION_BUTTON, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useFundsSnapshot } from './useFundsSnapshot';
 import { bills, budgetSummary, collected, healthLabel, healthScore, reserveSummary } from './metrics';
 import OverviewTab from './tabs/OverviewTab';
@@ -97,28 +97,32 @@ export default function FundsPage() {
   ];
   const pillValue: FundsTab = tab; // payments and settings match no pill, so none is active
 
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
-    <div data-page="ux2-funds" className="flex flex-col gap-5">
-      <ModuleHeader
-        title={tab === 'payments' ? 'Online payments' : tab === 'settings' ? 'Accounts and ledger' : 'Funds'}
-        subtitle={subtitle}
-        status={<Chip tone={health >= 80 ? 'sage' : health >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>}
-        tabs={<PillTabs tabs={tabs} value={pillValue} onChange={id => go(id)} aria-label="Funds sections" />}
-        tabsEnd={role !== 'RESIDENT' ? (
-          <button type="button" aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>⚙</button>
-        ) : undefined}
-        actions={role !== 'RESIDENT' ? ([['Record a payment', 'income', 'ledger'], ['Pay a bill', 'expenses', 'bills'], ['Create a work order', 'expenses', 'workorders'], ['Transfer funds', 'settings', 'ledger']] as [string, FundsTab, string][]).map(([label, t, s]) => (
-          <button key={label} type="button" onClick={() => go(t, s)} className={ACTION_BUTTON}>{label}</button>
-        )) : undefined}
-      />
+    <HeaderSlotProvider value={headerSlot}>
+      <div data-page="ux2-funds" className="flex flex-col gap-5">
+        <ModuleHeader
+          slotRef={setHeaderSlot}
+          title={tab === 'payments' ? 'Online payments' : tab === 'settings' ? 'Accounts and ledger' : 'Funds'}
+          subtitle={subtitle}
+          status={<Chip tone={health >= 80 ? 'sage' : health >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>}
+          tabs={<PillTabs tabs={tabs} value={pillValue} onChange={id => go(id)} aria-label="Funds sections" />}
+          tabsEnd={role !== 'RESIDENT' ? (
+            <button type="button" data-nav-icon aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>⚙</button>
+          ) : undefined}
+          actions={role !== 'RESIDENT' ? ([['Record payment', 'income', 'ledger'], ['Pay a bill', 'expenses', 'bills'], ['Work order', 'expenses', 'workorders'], ['Transfer', 'settings', 'ledger']] as [string, FundsTab, string][]).map(([label, t, s]) => (
+            <button key={label} type="button" onClick={() => go(t, s)} className={ACTION_BUTTON}>{label}</button>
+          )) : undefined}
+        />
 
-      {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
-      {tab === 'income' && <IncomeTab snap={snap} section={section} onSection={s => go('income', s)} onGo={go} />}
-      {tab === 'expenses' && <ExpensesTab snap={snap} section={section} onSection={s => go('expenses', s)} onGo={go} />}
-      {tab === 'planning' && <PlanningTab snap={snap} section={section} onSection={s => go('planning', s)} onGo={go} />}
-      {tab === 'statements' && <StatementsTab snap={snap} />}
-      {tab === 'payments' && <PaymentsTab snap={snap} onGo={go} />}
-      {tab === 'settings' && <SettingsTab snap={snap} section={section} onSection={s => go('settings', s)} onGo={go} />}
-    </div>
+        {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
+        {tab === 'income' && <IncomeTab snap={snap} section={section} onSection={s => go('income', s)} onGo={go} />}
+        {tab === 'expenses' && <ExpensesTab snap={snap} section={section} onSection={s => go('expenses', s)} onGo={go} />}
+        {tab === 'planning' && <PlanningTab snap={snap} section={section} onSection={s => go('planning', s)} onGo={go} />}
+        {tab === 'statements' && <StatementsTab snap={snap} />}
+        {tab === 'payments' && <PaymentsTab snap={snap} onGo={go} />}
+        {tab === 'settings' && <SettingsTab snap={snap} section={section} onSection={s => go('settings', s)} onGo={go} />}
+      </div>
+    </HeaderSlotProvider>
   );
 }

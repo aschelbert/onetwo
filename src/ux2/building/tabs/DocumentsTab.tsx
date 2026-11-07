@@ -5,7 +5,7 @@ import { useReportsStore } from '@/store/useReportsStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { documentsSummary, insuranceStatus, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
@@ -120,10 +120,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0"><h2 className="m-0 text-xl font-medium text-ux2-ink">Documents</h2><p className="m-0 text-sm text-ux2-muted">The building's papers: what governs it, what insures it, and the record of each year.</p></div>
-        <div className="flex flex-wrap items-center gap-2"><SearchInput value={q} onChange={setQ} placeholder="Search documents" label="Search documents" className="h-11" />{isBoard && <Button onClick={() => setUploading(uploading === 'new' ? null : 'new')}>Upload</Button>}</div>
-      </div>
+      <HeaderActions><SearchInput value={q} onChange={setQ} placeholder="Search documents" label="Search documents" className="h-11" />{isBoard && <Button onClick={() => setUploading(uploading === 'new' ? null : 'new')}>Upload</Button>}</HeaderActions>
       {uploading === 'new' && <UploadForm onClose={() => setUploading(null)} />}
 
       {needs.length > 0 && (

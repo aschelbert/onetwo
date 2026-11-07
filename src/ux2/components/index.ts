@@ -6,4 +6,4 @@ export { PillTabs, type PillTab, type PillTabsProps } from './PillTabs';
 export { TileSwitcher, type TileSection, type TileSwitcherProps } from './TileSwitcher';
 export { Ring } from './Ring';
 export { Table, Th, Td, Cell, RowMenu, Bar, KV, SearchInput, Why, Field, INPUT, type MenuItem } from './Table';
-export { ModuleHeader, ACTION_BUTTON, STATUS_CHIP } from './ModuleHeader';
+export { ModuleHeader, HeaderActions, HeaderSlotProvider, ACTION_BUTTON, STATUS_CHIP } from './ModuleHeader';

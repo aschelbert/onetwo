@@ -26,7 +26,7 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import IntercomTab from '@/features/association-team/tabs/CommunicationsTab';
-import { Button, Card, Chip, Inner, PillTabs, SectionLabel, ModuleHeader, STATUS_CHIP } from '../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useBoardRoomSnapshot } from './useBoardRoomSnapshot';
 import { archiveRows, caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
@@ -59,6 +59,7 @@ export default function BoardRoomModule() {
   const tab = resolveBoardRoomTab(params.get('tab'), params.get('caseTab'), pmSeat);
   const snap = useBoardRoomSnapshot();
   const [composeLetter, setComposeLetter] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const openTasks = useTaskTrackingStore(s => s.tasks).filter(t => t.status !== 'done').length;
 
   const cases = casesSummary(caseRows(snap));
@@ -112,34 +113,37 @@ export default function BoardRoomModule() {
   ];
 
   return (
-    <div data-page="ux2-boardroom" className="flex flex-col gap-5">
-      <ModuleHeader
-        title="Board Room"
-        subtitle={subtitle}
-        status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
-        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
-        actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
-      />
+    <HeaderSlotProvider value={headerSlot}>
+      <div data-page="ux2-boardroom" className="flex flex-col gap-5">
+        <ModuleHeader
+          slotRef={setHeaderSlot}
+          title="Board Room"
+          subtitle={subtitle}
+          status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
+          tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
+          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
+        />
 
-      {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
-      {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
-      {tab === 'runbooks' && <RunbooksTab snap={snap} onOpenCase={openCase} onNewCase={newCase} />}
-      {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} compose={composeLetter} onComposeDone={() => setComposeLetter(false)} />}
-      {tab === 'tasks' && pmSeat && (
-        <Card aria-label="Tasks">
-          <SectionLabel>Tasks · {openTasks} open</SectionLabel>
-          <Inner className="text-xs text-ux2-muted">Property log findings become tasks here; a task can link to a case, a vendor or a log entry. Part of the Property Manager Seat.</Inner>
-          <div className="ux2-legacy"><TaskTrackingTab /></div>
-        </Card>
-      )}
-      {tab === 'intercom' && pmSeat && (
-        <Card aria-label="Intercom">
-          <SectionLabel>Intercom · the team's channels</SectionLabel>
-          <Inner className="text-xs text-ux2-muted">General, Maintenance and a board-only channel to start; add up to 50. Messages arrive live, attachments go with them. Part of the Property Manager Seat.</Inner>
-          <div className="ux2-legacy"><IntercomTab /></div>
-        </Card>
-      )}
-      {tab === 'archive' && <ArchiveTab snap={snap} onOpenCase={openCase} />}
-    </div>
+        {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
+        {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
+        {tab === 'runbooks' && <RunbooksTab snap={snap} onOpenCase={openCase} onNewCase={newCase} />}
+        {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} compose={composeLetter} onComposeDone={() => setComposeLetter(false)} />}
+        {tab === 'tasks' && pmSeat && (
+          <Card aria-label="Tasks">
+            <SectionLabel>Tasks · {openTasks} open</SectionLabel>
+            <Inner className="text-xs text-ux2-muted">Property log findings become tasks here; a task can link to a case, a vendor or a log entry. Part of the Property Manager Seat.</Inner>
+            <div className="ux2-legacy"><TaskTrackingTab /></div>
+          </Card>
+        )}
+        {tab === 'intercom' && pmSeat && (
+          <Card aria-label="Intercom">
+            <SectionLabel>Intercom · the team's channels</SectionLabel>
+            <Inner className="text-xs text-ux2-muted">General, Maintenance and a board-only channel to start; add up to 50. Messages arrive live, attachments go with them. Part of the Property Manager Seat.</Inner>
+            <div className="ux2-legacy"><IntercomTab /></div>
+          </Card>
+        )}
+        {tab === 'archive' && <ArchiveTab snap={snap} onOpenCase={openCase} />}
+      </div>
+    </HeaderSlotProvider>
   );
 }

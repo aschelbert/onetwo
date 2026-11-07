@@ -98,10 +98,6 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl font-medium text-ux2-ink">Runbooks</h2>
-          <p className="m-0 max-w-[720px] text-sm text-ux2-muted">All {sum.total} are on from day one, each waiting for its trigger. {sum.withOpenCase.length ? `${sum.withOpenCase.length === 1 ? 'One has' : `${sum.withOpenCase.length} have`} a case open right now.` : 'None has a case open right now.'} Turn one off only if the building does not want it.</p>
-        </div>
         <PillTabs size="filter" surface="white" aria-label="Show runbooks" value={show} onChange={setShow} tabs={[{ id: 'open', label: `With an open case · ${sum.withOpenCase.length}` }, { id: 'all', label: `All ${sum.total}` }]} />
       </div>
       <div className="flex flex-wrap items-center gap-4 text-xs text-ux2-muted" aria-label="Legend">

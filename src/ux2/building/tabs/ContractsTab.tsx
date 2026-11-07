@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { fmt } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { useRunbookSwitches } from '../../boardroom/store';
 import { contractRows, contractsSummary, type ContractRow, type BuildingSnapshot } from '../metrics';
@@ -71,10 +71,7 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0"><h2 className="m-0 text-xl font-medium text-ux2-ink">Contracts</h2><p className="m-0 text-sm text-ux2-muted">Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.</p></div>
-        {isBoard && <div className="flex gap-2"><Button variant="ghost" onClick={() => navigate('/boardroom?view=new&cat=maintenance&sit=vendor-management')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></div>}
-      </div>
+      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => navigate('/boardroom?view=new&cat=maintenance&sit=vendor-management')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></HeaderActions>}
       {adding && <VendorForm onClose={() => setAdding(false)} />}
 
       {needs.length > 0 && (

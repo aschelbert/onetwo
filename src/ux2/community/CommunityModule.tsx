@@ -1,3 +1,4 @@
+import { useState } from 'react';
 /**
  * Community — where the building acts together (ux2.community).
  *
@@ -24,7 +25,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTenantContext } from '@/components/TenantProvider';
 import { tierHasAmenities } from '@/lib/tiers';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
-import { Chip, PillTabs, ModuleHeader, STATUS_CHIP } from '../components';
+import { Chip, PillTabs, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { dayLabel } from '../home/calendar';
 import { useCommunitySnapshot } from './useCommunitySnapshot';
 import { meetingRows, meetingsSummary, noticesSummary, requestRows, requestsSummary, voteRows, votesSummary } from './metrics';
@@ -87,37 +88,41 @@ export default function CommunityModule() {
 
   const tabs = [
     { id: 'overview' as CommunityTab, label: 'Overview' },
-    { id: 'notices' as CommunityTab, label: 'Notices', badge: notices.pinned.length ? `${notices.pinned.length} pinned` : undefined, badgeTone: 'cyan' as const },
+    { id: 'notices' as CommunityTab, label: 'Notices', badge: notices.pinned.length || undefined, badgeTone: 'cyan' as const },
     { id: 'meetings' as CommunityTab, label: 'Meetings', badge: meetings.next ? dayLabel(meetings.next.meeting.date) : undefined, badgeTone: meetings.noticesOverdue.length ? 'red' as const : 'ghost' as const },
-    { id: 'votes' as CommunityTab, label: 'Votes', badge: votes.open.length ? `${votes.open.length} open` : undefined, badgeTone: 'plum' as const },
+    { id: 'votes' as CommunityTab, label: 'Votes', badge: votes.open.length || undefined, badgeTone: 'plum' as const },
     { id: 'requests' as CommunityTab, label: 'Requests', badge: (isBoard ? requests.open.length : requests.mineOpen.length) || undefined, badgeTone: requests.overdue.length && isBoard ? 'red' as const : 'ghost' as const },
     { id: 'log' as CommunityTab, label: 'Property log' },
-    ...(isManagementSuite ? [{ id: 'amenities' as CommunityTab, label: 'Amenities', badge: isBoard && pendingApprovals ? `${pendingApprovals} to approve` : myReservations || undefined, badgeTone: 'amber' as const }] : []),
+    ...(isManagementSuite ? [{ id: 'amenities' as CommunityTab, label: 'Amenities', badge: (isBoard ? pendingApprovals : myReservations) || undefined, badgeTone: 'amber' as const }] : []),
     ...(pmSeat ? [{ id: 'scorecard' as CommunityTab, label: 'PM scorecard' }] : []),
   ];
 
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
-    <div data-page="ux2-community" className="flex flex-col gap-5">
-      <ModuleHeader
-        title="Community"
-        subtitle={subtitle}
-        status={notices.alerts.length > 0 || meetings.next ? <>
-          {notices.alerts.length > 0 && (
-            <button type="button" onClick={() => go('notices')} className="rounded-full"><Chip tone="red" className={STATUS_CHIP}>{notices.alerts.length} alert{notices.alerts.length === 1 ? '' : 's'}</Chip></button>
-          )}
-          {meetings.next && <Chip tone="ghost" className={STATUS_CHIP}>Next meeting {dayLabel(meetings.next.meeting.date)}</Chip>}
-        </> : undefined}
-        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Community sections" />}
-      />
+    <HeaderSlotProvider value={headerSlot}>
+      <div data-page="ux2-community" className="flex flex-col gap-5">
+        <ModuleHeader
+          slotRef={setHeaderSlot}
+          title="Community"
+          subtitle={subtitle}
+          status={notices.alerts.length > 0 || meetings.next ? <>
+            {notices.alerts.length > 0 && (
+              <button type="button" onClick={() => go('notices')} className="rounded-full"><Chip tone="red" className={STATUS_CHIP}>{notices.alerts.length} alert{notices.alerts.length === 1 ? '' : 's'}</Chip></button>
+            )}
+            {meetings.next && <Chip tone="ghost" className={STATUS_CHIP}>Next meeting {dayLabel(meetings.next.meeting.date)}</Chip>}
+          </> : undefined}
+          tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Community sections" />}
+        />
 
-      {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
-      {tab === 'notices' && <NoticesTab snap={snap} />}
-      {tab === 'meetings' && <MeetingsTab snap={snap} highlightId={params.get('meeting')} />}
-      {tab === 'votes' && <VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} />}
-      {tab === 'requests' && <RequestsTab snap={snap} highlightId={params.get('request')} />}
-      {tab === 'log' && <LogTab isBoard={isBoard} />}
-      {tab === 'amenities' && isManagementSuite && <AmenitiesSection snap={snap} />}
-      {tab === 'scorecard' && pmSeat && <ScorecardTab isBoard={isBoard} today={snap.today} />}
-    </div>
+        {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
+        {tab === 'notices' && <NoticesTab snap={snap} />}
+        {tab === 'meetings' && <MeetingsTab snap={snap} highlightId={params.get('meeting')} />}
+        {tab === 'votes' && <VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} />}
+        {tab === 'requests' && <RequestsTab snap={snap} highlightId={params.get('request')} />}
+        {tab === 'log' && <LogTab isBoard={isBoard} />}
+        {tab === 'amenities' && isManagementSuite && <AmenitiesSection snap={snap} />}
+        {tab === 'scorecard' && pmSeat && <ScorecardTab isBoard={isBoard} today={snap.today} />}
+      </div>
+    </HeaderSlotProvider>
   );
 }
