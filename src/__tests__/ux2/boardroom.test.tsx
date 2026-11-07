@@ -129,6 +129,10 @@ describe('Board Room', () => {
     expect(document.querySelector('[aria-label="Sent"]')).toBeTruthy();
     renderAt('/boardroom?tab=archive');
     expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Closed recently"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Export all"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="How long it stays"]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'All types' })).toBeTruthy();
   });
 
   it('Tasks and the Intercom mount the team tools with the Property Manager Seat, and are gone without it', () => {

@@ -140,3 +140,36 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
 
 Primitive fix: `Th` is now `relative` so a visually hidden header label
 stays inside the table's scroller instead of widening the page on phones.
+
+## Funds · Statements, Online payments, Accounts and ledger
+
+- **Statements & taxes** · Needs you (the last closed packet, missing
+  W-9s), What the building owns and owes (balance sheet, expands to the
+  full one), What came in and went out (income statement, expands; Budget
+  variance report inline), Monthly statement packets (year pills, Download
+  as a file, Send to owners posts a financial notice, Month close runbook),
+  Taxes and filings (1120-H draft, the DC return, 1099s, annual report,
+  each expanding inline), Accountant access (Manage access, Export the
+  ledger). No embedded Reports page.
+- **Online payments** · Collected online / Payouts / Fees tiles (pass card
+  fees switch), Recent payments table with refund in place, the building's
+  Stripe account card (Connect / Finish setup through
+  `connect-stripe-account`, dashboard, pause), What owners can pay here
+  switches, and before setup the Get paid online runbook with Have ready /
+  What it costs / After it is on. No embedded Payments manager.
+- **Accounts and ledger** · one page: Needs you (bills invoiced but not
+  paid), Ledger (view pills, search, quick entries and custom entry posting
+  through the store, row menu), Chart of accounts (add account / section,
+  rename in place), Where things post (GL mapping, Save), Fee schedule
+  (dues tiers, late fee, every fee with an On switch and inline amount
+  edit), Billing rules, Bank and payments, and the Mailing card panel at
+  the foot. Section deep links scroll to their card. No embedded Chart of
+  accounts, General ledger or Fee schedule pages.
+
+## Board Room · Archive
+
+- Closed in the last 60 days, year pills with search and Export, type
+  pills from the case categories (Inbox for requests, Letters otherwise),
+  the read-only table with the decision trail (board vote tallies) and a
+  per-row export, Show the other N, Export all (CSV index plus one file
+  per item) and How long it stays.

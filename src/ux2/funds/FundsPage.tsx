@@ -130,7 +130,7 @@ export default function FundsPage() {
       {tab === 'planning' && <PlanningTab snap={snap} section={section} onSection={s => go('planning', s)} onGo={go} />}
       {tab === 'statements' && <StatementsTab snap={snap} />}
       {tab === 'payments' && <PaymentsTab snap={snap} onGo={go} />}
-      {tab === 'settings' && <SettingsTab snap={snap} section={section} onSection={s => go('settings', s)} />}
+      {tab === 'settings' && <SettingsTab snap={snap} section={section} onSection={s => go('settings', s)} onGo={go} />}
     </div>
   );
 }

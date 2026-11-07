@@ -162,22 +162,31 @@ export interface ArchiveRow {
   year: string;
   entries: number;
   caseId?: string;
+  /** Board-facing type: the case's category label, Inbox for requests, Letters otherwise. */
+  type: string;
+  /** "board vote 5 of 5" when the case carried one. */
+  vote?: string;
 }
 
 export function archiveRows(s: BoardRoomSnapshot): ArchiveRow[] {
   const out: ArchiveRow[] = [];
+  const label = (catId: string) => s.categories.find(c => c.id === catId)?.label ?? 'Cases';
+  const typeOfCase = new Map<string, string>();
   for (const c of s.cases.filter(x => x.status === 'closed')) {
     const closed = (c.completedAt ?? c.created).slice(0, 10);
-    out.push({ id: `case:${c.id}`, kind: 'case', title: c.title, detail: `${c.id}${c.unit ? ` · Unit ${c.unit}` : ''} · opened ${c.created.slice(0, 10)}`, closed, outcome: c.closeReason || c.closeNotes || 'Closed', year: closed.slice(0, 4), entries: (c.steps?.filter(st => st.done).length ?? 0) + (c.decisionTrail?.length ?? 0) + (c.boardVotes ? 1 : 0), caseId: c.id });
+    const type = label(c.catId);
+    typeOfCase.set(c.id, type);
+    const yes = c.boardVotes ? c.boardVotes.votes.filter(v => /yes|aye|for|approve/i.test(v.vote)).length : 0;
+    out.push({ id: `case:${c.id}`, kind: 'case', type, title: c.title, detail: `${c.id}${c.unit ? ` · Unit ${c.unit}` : ''} · opened ${c.created.slice(0, 10)}`, closed, outcome: c.closeReason || c.closeNotes || 'Closed', year: closed.slice(0, 4), entries: (c.steps?.filter(st => st.done).length ?? 0) + (c.decisionTrail?.length ?? 0) + (c.boardVotes ? 1 : 0), caseId: c.id, vote: c.boardVotes ? `board vote ${yes} of ${c.boardVotes.votes.length}` : undefined });
   }
   for (const i of s.issues.filter(x => x.status === 'RESOLVED' || x.status === 'CLOSED')) {
     const last = i.comments[i.comments.length - 1]?.date ?? i.submittedDate;
     const closed = last.slice(0, 10);
-    out.push({ id: `request:${i.id}`, kind: 'request', title: i.title, detail: `${i.id}${i.unitNumber ? ` · Unit ${i.unitNumber}` : ''} · received ${i.submittedDate.slice(0, 10)}`, closed, outcome: i.status === 'RESOLVED' ? 'Resolved' : 'Closed', year: closed.slice(0, 4), entries: i.comments.length + 1 });
+    out.push({ id: `request:${i.id}`, kind: 'request', type: 'Inbox', title: i.title, detail: `${i.id}${i.unitNumber ? ` · Unit ${i.unitNumber}` : ''} · received ${i.submittedDate.slice(0, 10)}${i.comments.length ? ` · replied in ${Math.max(0, daysBetween(i.submittedDate.slice(0, 10), i.comments[0].date.slice(0, 10)))} days` : ''}`, closed, outcome: i.status === 'RESOLVED' ? 'Resolved' : 'Closed', year: closed.slice(0, 4), entries: i.comments.length + 1 });
   }
   for (const l of s.letters.filter(x => x.status === 'sent' || x.status === 'archived')) {
     const closed = (l.sentDate || '').slice(0, 10);
-    out.push({ id: `letter:${l.id}`, kind: 'letter', title: l.subject || l.templateName, detail: `Letter · ${l.recipient}${l.unitNumber ? ` · Unit ${l.unitNumber}` : ''} · ${l.sentVia || 'sent'}`, closed, outcome: l.status === 'sent' ? 'Sent' : 'Archived', year: closed.slice(0, 4), entries: 1, caseId: l.caseId ?? undefined });
+    out.push({ id: `letter:${l.id}`, kind: 'letter', type: (l.caseId && typeOfCase.get(l.caseId)) || 'Letters', title: l.subject || l.templateName, detail: `Letter · ${l.recipient}${l.unitNumber ? ` · Unit ${l.unitNumber}` : ''} · ${l.sentVia || 'sent'}${l.caseId ? ` · part of ${l.caseId}` : ''}`, closed, outcome: l.status === 'sent' ? 'Delivered' : 'Archived', year: closed.slice(0, 4), entries: 1, caseId: l.caseId ?? undefined });
   }
   return out.sort((a, b) => b.closed.localeCompare(a.closed));
 }
