@@ -29,6 +29,7 @@ import { boardEvents, stewardshipFor } from '../score/events';
 import { type Dimension, type ScoreEvent } from '../score/stewardship';
 import { dayLabel } from './calendar';
 import CalendarView from './CalendarView';
+import SetupCard from '../setup/SetupCard';
 
 const STATUS_TONE: Record<RunbookCard['status'], ChipTone> = {
   overdue: 'red',
@@ -310,6 +311,8 @@ export default function HomePage() {
         </div>
         <AttentionChips set={set} role={viewer.role} />
       </header>
+      {/* While the building is setting up: the plum setup card (documents first). */}
+      <SetupCard />
 
       {view === 'calendar' ? (
         <CalendarView cards={dated} today={today} forOwner={isOwner} />

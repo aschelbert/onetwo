@@ -1,5 +1,4 @@
 import { Outlet } from 'react-router-dom';
-import OnboardingSetupWidget from '@/components/OnboardingSetupWidget';
 import { useTenantContext } from '@/components/TenantProvider';
 import Ux2TopNav from './Ux2TopNav';
 import Ux2BottomNav from './Ux2BottomNav';
@@ -24,7 +23,6 @@ export default function Ux2Shell() {
       )}
       <Ux2TopNav />
       <main className={cn('mx-auto w-full max-w-[1200px] flex-1 px-6 pt-4', docked ? 'pb-[164px] min-[1080px]:pb-[112px]' : 'pb-[88px] min-[1080px]:pb-10')}>
-        {tenant.status === 'onboarding' && <div className="ux2-onboarding"><OnboardingSetupWidget /></div>}
         <div className="animate-fade-in">
           <Outlet />
         </div>

@@ -6,6 +6,7 @@ import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import Ux2Shell from '@/ux2/shell/Ux2Shell';
 import HomePage from '@/ux2/home/HomePage';
+import SetupPage from '@/ux2/setup/SetupPage';
 import FundsPage from '@/ux2/funds/FundsPage';
 import PayPage from '@/ux2/funds/PayPage';
 import CommunityModule from '@/ux2/community/CommunityModule';
@@ -219,6 +220,7 @@ export default function App() {
         {/* Protected app routes: the five modules and Me, with every old path redirecting into the module that absorbed it */}
         <Route element={<RequireAuth><TenantProvider><Ux2Shell /></TenantProvider></RequireAuth>}>
           <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomePage /></ErrorBoundary>} />
+          <Route path="/setup" element={<ErrorBoundary fallbackLevel="page"><SetupPage /></ErrorBoundary>} />
           <Route path="/dashboard" element={<RedirectKeepQuery to="/home" />} />
           <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
           <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />

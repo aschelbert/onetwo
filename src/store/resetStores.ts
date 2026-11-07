@@ -19,10 +19,12 @@ import { useAmenitiesStore } from './useAmenitiesStore';
 import { usePayrollStore } from './usePayrollStore';
 import { useTaskTrackingStore } from './useTaskTrackingStore';
 import { useCaseDockStore } from '@/ux2/shell/caseDock';
+import { useSetupStore } from '@/features/setup/useSetupStore';
 
 export function resetStoresForRealTenant() {
   // The case dock remembers case ids per browser; another building's ids mean nothing here.
   useCaseDockStore.getState().reset();
+  useSetupStore.getState().reset();
 
   useBuildingStore.setState({
     name: '',
