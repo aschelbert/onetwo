@@ -5,6 +5,7 @@
 
 import { useBuildingStore } from './useBuildingStore';
 import { useFinancialStore } from './useFinancialStore';
+import { DEFAULT_GL_MAPPING } from '@/lib/financial-logic';
 import { useMeetingsStore } from './useMeetingsStore';
 import { useComplianceStore } from './useComplianceStore';
 import { useIssuesStore } from './useIssuesStore';
@@ -39,6 +40,12 @@ export function resetStoresForRealTenant() {
     assets: [],
   });
 
+  // The financial store is persisted under one localStorage key for every
+  // building opened in this browser, so per-building settings have to be
+  // cleared here too, or the previous building's Stripe account, billing
+  // automation and late-fee rules show up on a building that has none.
+  // loadFromSupabase() only overwrites them when a financial_settings row
+  // exists, which a freshly provisioned building does not have yet.
   useFinancialStore.setState({
     units: [],
     budgetCategories: [],
@@ -46,8 +53,19 @@ export function resetStoresForRealTenant() {
     generalLedger: [],
     workOrders: [],
     unitInvoices: [],
+    unitDocuments: [],
+    moveEvents: [],
     hoaDueDay: 15,
     annualReserveContribution: 0,
+    stripeConnectId: null,
+    stripeOnboardingComplete: false,
+    autoBillingEnabled: false,
+    lastBillingRun: null,
+    lateFeeEnabled: false,
+    lateFeeAmount: 25,
+    lateFeeGraceDays: 15,
+    lastLateFeeRun: null,
+    glAccountMapping: { ...DEFAULT_GL_MAPPING },
   });
 
   useMeetingsStore.setState({ meetings: [] });
