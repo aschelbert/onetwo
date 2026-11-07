@@ -203,3 +203,22 @@ still right-aligned.
   events before that day, averaged per group; a mover is one event in the
   last 30 days, sized by how much it changed that person's score. Owners
   pulling it down are named only to the board; others see the unit.
+
+## The case dock, Ops and the Archive
+
+- **Case dock** (`src/ux2/shell/CaseDock.tsx`, `caseDock.ts`) replaces the
+  "Return to case" bar, which only appeared after a few `/financial` step
+  buttons. Opening an open case makes it your active case however you then
+  leave. On desktop the dock floats at the bottom at the page's content
+  width and expands upward with the current step's checklist (ticks record
+  on the case through `toggleCheck`, or "Mark step done" when the step has
+  no checklist) and up to two other open cases to switch to. On phones and
+  tablets it is a chip above the bottom bar that opens a sheet with the
+  same content. It hides on that case's own page, goes away when the case
+  closes or its last step is done, and Dismiss hides it until the case is
+  opened again. Pages keep extra bottom space while it shows. The dock's
+  memory resets when a real building loads.
+- **Board Room › Ops** is the former Open tab (same URL id, `open`).
+- **Building › Archive** is the former Board Room Archive, shown to the
+  board and manager only. `/boardroom?tab=archive` and `caseTab=archive`
+  redirect there; a closed case still opens in the Board Room's case frame.

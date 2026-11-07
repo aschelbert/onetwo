@@ -45,11 +45,11 @@ describe('Board Room', () => {
     useRunbookSwitches.setState({ off: ['vendor-bids'] });
   });
 
-  it('renders Open with a row per open case and the seven sections', () => {
+  it('renders Ops with a row per open case and the six sections', () => {
     renderAt('/boardroom');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Board Room');
     const nav = screen.getByRole('navigation', { name: 'Board Room sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Open', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Ops', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom']);
     const open = useIssuesStore.getState().cases.filter(c => c.status === 'open').length;
     expect(document.querySelectorAll('tr[data-case]').length).toBe(open);
   });
@@ -127,12 +127,11 @@ describe('Board Room', () => {
     expect(screen.getByRole('form', { name: 'New letter' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sent · 0' }));
     expect(document.querySelector('[aria-label="Sent"]')).toBeTruthy();
+    // The Archive moved to Building; old Board Room archive links land there.
     renderAt('/boardroom?tab=archive');
-    expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Closed recently"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Export all"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="How long it stays"]')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'All types' })).toBeTruthy();
+    expect(screen.getAllByTestId('building').length).toBeGreaterThan(0);
+    renderAt('/boardroom?caseTab=archive');
+    expect(screen.getAllByTestId('building').length).toBeGreaterThan(1);
   });
 
   it('Tasks and the Intercom mount the team tools with the Property Manager Seat, and are gone without it', () => {
@@ -145,7 +144,7 @@ describe('Board Room', () => {
     renderAt('/boardroom?tab=intercom');
     const navs = screen.getAllByRole('navigation', { name: 'Board Room sections' });
     const last = navs[navs.length - 1];
-    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Open', 'Inbox', 'Runbooks', 'Outbox', 'Archive']);
+    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Ops', 'Inbox', 'Runbooks', 'Outbox']);
     expect(screen.getAllByTestId('legacy-intercom').length).toBe(1);
   });
 

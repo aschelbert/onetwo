@@ -139,7 +139,7 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PillTabs size="filter" aria-label="Outbox sections" value={section} onChange={id => { if (id === 'older') navigate('/boardroom?tab=archive'); else setSection(id); }} tabs={[{ id: 'drafts', label: `Drafts · ${o.drafts.length}` }, { id: 'sent', label: `Sent · ${sent30.length}` }, { id: 'scheduled', label: 'Scheduled · 0' }, { id: 'templates', label: `Templates · ${o.templates.length}` }, { id: 'older', label: 'Older letters' }]} />
+        <PillTabs size="filter" aria-label="Outbox sections" value={section} onChange={id => { if (id === 'older') navigate('/building?tab=archive'); else setSection(id); }} tabs={[{ id: 'drafts', label: `Drafts · ${o.drafts.length}` }, { id: 'sent', label: `Sent · ${sent30.length}` }, { id: 'scheduled', label: 'Scheduled · 0' }, { id: 'templates', label: `Templates · ${o.templates.length}` }, { id: 'older', label: 'Older letters' }]} />
         <SearchInput value={search} onChange={setSearch} placeholder="Search subject, unit, template" label="Search letters" className="w-[260px] max-w-full" />
       </div>
 
@@ -174,7 +174,7 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
 
       {section === 'sent' && (
         <Card aria-label="Sent" className="gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Sent · last 30 days</SectionLabel><button type="button" onClick={() => navigate('/boardroom?tab=archive')} className="text-xs font-semibold text-ux2-teal underline">Everything older is in Archive</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Sent · last 30 days</SectionLabel><button type="button" onClick={() => navigate('/building?tab=archive')} className="text-xs font-semibold text-ux2-teal underline">Everything older is in Archive</button></div>
           {sent30.filter(match).length === 0 ? <p className="m-0 text-sm text-ux2-muted">Nothing sent in the last 30 days.</p> : (
             <Table minWidth={820}>
               <thead><tr><Th>Letter</Th><Th>To</Th><Th>Delivery</Th><Th>Proof</Th><Th>Sent</Th><Th aria-label="Actions" /></tr></thead>
