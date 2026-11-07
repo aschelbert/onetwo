@@ -63,6 +63,8 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const [member, setMember] = useState({ name: '', role: 'President', email: '' });
   const [sameFee, setSameFee] = useState('');
   const [balances, setBalances] = useState({ operating: '', reserve: '' });
+  const [fees, setFees] = useState({ dueDay: String(f.hoaDueDay ?? 1), lateFee: f.lateFeeEnabled ? String(f.lateFeeAmount) : '', grace: String(f.lateFeeGraceDays) });
+  const [feesSaved, setFeesSaved] = useState(false);
   const [inviteOff, setInviteOff] = useState<string[]>([]);
   const [inviteOwners, setInviteOwners] = useState(true);
   const [note, setNote] = useState<{ tone: 'sage' | 'red'; text: string } | null>(null);
@@ -94,6 +96,13 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     if (rs > 0) postOpening('reserve', rs);
   };
 
+  const saveFees = () => {
+    const due = Number(fees.dueDay); const fee = Number(fees.lateFee.replace(/[$,]/g, '')); const grace = Number(fees.grace);
+    if (due >= 1 && due <= 28) f.setHoaDueDay(due);
+    f.setLateFeeSettings(fee > 0, fee > 0 ? fee : f.lateFeeAmount, grace >= 0 ? grace : f.lateFeeGraceDays);
+    setFeesSaved(true);
+  };
+
   const inviteBoard = async () => {
     const list = boardWithEmail.filter(m => !inviteOff.includes(m.id)).map(m => ({ email: m.email, role: 'board_member' }));
     if (!list.length) return;
@@ -109,7 +118,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
       if (inviteOwners && ownersWithEmail.length) await sendInvites(ownersWithEmail.map(u => ({ email: u.email, role: 'resident', unit: u.number })), viewer.name);
       await tenant.updateOnboardingStep('buildingProfileComplete', true);
       await tenant.updateOnboardingStep('unitsConfigured', true);
-      if (s.docs.some(d => d.result && ['bylaws', 'declaration'].includes(d.result.docType))) await tenant.updateOnboardingStep('bylawsUploaded', true);
+      if (s.docs.some(d => d.docType === 'bylaws' || d.docType === 'declaration')) await tenant.updateOnboardingStep('bylawsUploaded', true);
       if (f.budgetCategories.length) await tenant.updateOnboardingStep('financialSetupDone', true);
       if (invitedBoard || inviteOwners) await tenant.updateOnboardingStep('firstUserInvited', true);
       await tenant.updateOnboardingStep('goLive', true);
@@ -147,8 +156,8 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={saveProfile}>Save</Button>
           </span>
         </Gap>
-        <Gap id="units" required done={s.ess.units} title="Units and owners" note="Best from your owner list (Excel or CSV); or add them in Building › Directory.">
-          <Button size="sm" variant="plum" onClick={onDocuments}>Upload the owner list</Button>
+        <Gap id="units" required done={s.ess.units} title="Units and owners" note="Best from your owner list (Excel, CSV or PDF); or add them in Building › Directory.">
+          <Button size="sm" variant="plum" onClick={onDocuments}>Add the owner list</Button>
           <Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=directory')}>Add by hand</Button>
         </Gap>
         <Gap id="assessment" required done={s.ess.assessment} title="Monthly assessment for every unit" note={units.length ? `${unassessed.length} of ${units.length} units have no monthly amount yet.` : 'Add units first.'}>
@@ -170,7 +179,15 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={addMember}>Add</Button>
           </span>
         </Gap>
-        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements. Type today's balances, or upload a statement.">
+        <Gap id="fees" done={feesSaved} title="Due day and late fee" note="From your bylaws or collection policy: the day assessments are due, and the fee once a payment is late.">
+          <span className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-due">Due day<input id="sp-due" inputMode="numeric" className={cn(INPUT, 'w-16')} value={fees.dueDay} onChange={e => setFees(x => ({ ...x, dueDay: e.target.value }))} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-fee">Late fee $<input id="sp-fee" inputMode="decimal" className={cn(INPUT, 'w-20')} placeholder="none" value={fees.lateFee} onChange={e => setFees(x => ({ ...x, lateFee: e.target.value }))} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-grace">after<input id="sp-grace" inputMode="numeric" className={cn(INPUT, 'w-16')} value={fees.grace} onChange={e => setFees(x => ({ ...x, grace: e.target.value }))} />days</label>
+            <Button size="sm" variant="plum" onClick={saveFees}>Save</Button>
+          </span>
+        </Gap>
+        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements: today's balances in the operating and reserve accounts.">
           <span className="flex flex-wrap items-center gap-2">
             <label className="sr-only" htmlFor="sp-op">Operating balance</label><input id="sp-op" className={cn(INPUT, 'w-32')} placeholder="Operating $" value={balances.operating} onChange={e => setBalances(x => ({ ...x, operating: e.target.value }))} />
             <label className="sr-only" htmlFor="sp-rs">Reserve balance</label><input id="sp-rs" className={cn(INPUT, 'w-32')} placeholder="Reserve $" value={balances.reserve} onChange={e => setBalances(x => ({ ...x, reserve: e.target.value }))} />
@@ -179,7 +196,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
         </Gap>
         <Gap id="budget" done={f.budgetCategories.length > 0} title="This year's budget" note={f.budgetCategories.length ? `${f.budgetCategories.length} budget lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : annualFromUnits ? `Not uploaded. Start from a template sized to ${fmt(annualFromUnits)} a year of assessments, then adjust the lines in Funds › Planning.` : 'Upload it, or set assessments first and start from a template.'}>
           {annualFromUnits > 0 && <Button size="sm" variant="plum" onClick={() => applyBudgetTemplate(annualFromUnits)}>Use the template</Button>}
-          <Button size="sm" variant="ghost" onClick={onDocuments}>Upload the budget</Button>
+          <Button size="sm" variant="ghost" onClick={onDocuments}>Add the budget</Button>
         </Gap>
         <Gap id="emails" done={units.length > 0 && noEmail.length === 0} title={noEmail.length ? `Emails for ${noEmail.length} owner${noEmail.length === 1 ? '' : 's'}` : 'Owner emails'} note={noEmail.length ? `${noEmail.length === 1 ? 'Unit' : 'Units'} ${noEmail.slice(0, 4).map(u => u.number).join(', ')}${noEmail.length > 4 ? '…' : ''} ${noEmail.length === 1 ? 'gets' : 'get'} paper notices until you add an email.` : 'Every owner with a unit has an email.'}>
           <Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=directory')}>Add in Directory</Button>

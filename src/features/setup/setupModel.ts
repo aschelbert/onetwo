@@ -51,7 +51,8 @@ export interface ReadResult {
   reserves: ReserveRow[];
 }
 
-export type DocStatus = 'reading' | 'read' | 'error';
+/** reading: being opened; read: items found to review; filed: kept in Building › Documents with nothing found; error: couldn't be opened. */
+export type DocStatus = 'reading' | 'read' | 'filed' | 'error';
 export interface SetupDoc {
   id: string;
   name: string;
@@ -61,6 +62,12 @@ export interface SetupDoc {
   error?: string;
   addedAt: string;
   result?: ReadResult;
+  /** What the document is (guessed from the name for filed documents; the person can change it). */
+  docType?: DocType;
+  /** A line about what happened (for filed documents). */
+  note?: string;
+  /** Text pasted in rather than a file. */
+  pasted?: boolean;
   /** Filed in Building › Documents (the legal document id). */
   filedAs?: string;
 }
@@ -107,17 +114,19 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
   insurance: 'Insurance', contract: 'Contract', owner_list: 'Owner list', minutes: 'Meeting minutes', other: 'Other document',
 };
 
-/** What to upload, and what each kind fills in: the checklist on the Documents step. */
-export const DOC_KINDS: { id: string; label: string; types: DocType[]; fills: string[] }[] = [
-  { id: 'governing', label: 'Declaration and bylaws', types: ['bylaws', 'declaration'], fills: ['Units and ownership %', 'Board size and terms', 'Quorum and notice rules', 'Assessment due day', 'Late fees'] },
-  { id: 'owners', label: 'Owner list', types: ['owner_list'], fills: ['Units', 'Owners and contacts', 'Mailing addresses', 'Invites'] },
-  { id: 'budget', label: "This year's budget", types: ['budget'], fills: ['Budget lines by category', 'Monthly assessment per unit'] },
-  { id: 'statements', label: 'Year-end financial statement or bank statements', types: ['financial_statement', 'bank_statement'], fills: ['Operating and reserve accounts', 'Opening balances'] },
-  { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], fills: ['Reserve components', 'Useful life and cost'] },
-  { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], fills: ['Policies and limits', 'Renewal dates → Obligations'] },
-  { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], fills: ['Vendors', 'Terms and renewals → Contracts'] },
-  { id: 'rules', label: 'Rules and regulations', types: ['rules'], fills: ['Pet and rental rules', 'Fines'] },
-  { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], fills: ['Board and officers', 'Term end dates'] },
+/**
+ * What to upload. Spreadsheets (`imports`) become items to review; the rest
+ * are filed in Building › Documents and their settings asked in Fill the gaps.
+ */
+export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[] }[] = [
+  { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Quorum and notice rules', 'Board size and terms', 'Assessment due day', 'Late fees', 'Fiscal year', 'Unit ownership table'] },
+  { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Invites'] },
+  { id: 'budget', label: "This year's budget (Excel, CSV or PDF)", types: ['budget'], imports: true, fills: ['Budget lines by category'] },
+  { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], imports: true, fills: ['Board and officers'] },
+  { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Pet and rental rules', 'Fines', 'Late fees'] },
+  { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], imports: true, fills: ['Carrier and policy number', 'Limits', 'Renewal date'] },
+  { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], imports: true, fills: ['Reserve components', 'Useful life and cost'] },
+  { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], imports: false, fills: ['Kept in Building › Documents'] },
 ];
 
 // ── Items ──────────────────────────────────────────────────────────
