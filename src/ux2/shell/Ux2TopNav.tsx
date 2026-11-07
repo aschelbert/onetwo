@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
 import { useTenantContext } from '@/components/TenantProvider';
@@ -23,7 +23,6 @@ export default function Ux2TopNav() {
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const legacyNav = permissions.length > 0
@@ -41,23 +40,15 @@ export default function Ux2TopNav() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
-  useEffect(() => { setMobileOpen(false); setMenuOpen(false); }, [location.pathname]);
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
-  const goTo = (path: string) => { setMenuOpen(false); setMobileOpen(false); navigate(path); };
+  const goTo = (path: string) => { setMenuOpen(false); navigate(path); };
 
   return (
     <header className="ux2 sticky top-0 z-50 bg-white">
       <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-4 px-6 pt-[22px] pb-3">
         <button type="button" aria-label="ONE two home" onClick={() => goTo('/home')} className="flex h-[46px] items-center">
           <img src="/onetwo-mark.webp" alt="ONE two" className="h-11 w-[46px] object-contain" />
-        </button>
-        <button
-          type="button"
-          className="rounded-full border border-ux2-line-strong p-2 text-ink-700 min-[1080px]:hidden"
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          onClick={() => setMobileOpen(o => !o)}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
         <div className="flex-1" />
 
@@ -136,21 +127,6 @@ export default function Ux2TopNav() {
           </div>
         </div>
       </div>
-
-      {mobileOpen && (
-        <div className="border-t border-ux2-line px-4 py-3 min-[1080px]:hidden">
-          <div className="flex flex-col gap-1">
-            {modules.map(m => {
-              const on = active === m.id;
-              return (
-                <button key={m.id} type="button" onClick={() => goTo(m.path)} className={cn('flex h-11 items-center rounded-full px-4 text-sm font-medium', on ? 'bg-ux2-navy text-white' : 'text-ink-700 hover:bg-ux2-surface')}>
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </header>
   );
 }

@@ -142,7 +142,6 @@ export default function AmenitiesSection({ snap }: { snap: CommunitySnapshot }) 
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PillTabs size="filter" aria-label="Amenity views" value={view} onChange={setView} tabs={tabs} />
-        <span className="text-xs text-ux2-muted">{isBoard ? 'Approvals and Settings show for the board and manager only' : 'The board approves requests within a day'}</span>
       </div>
 
       {view === 'all' && (
