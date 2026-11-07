@@ -22,6 +22,7 @@
  */
 import { useSearchParams } from 'react-router-dom';
 import { useTenantContext } from '@/components/TenantProvider';
+import { tierHasAmenities } from '@/lib/tiers';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 import { Chip, PillTabs } from '../components';
 import { dayLabel } from '../home/calendar';
@@ -50,7 +51,8 @@ export default function CommunityModule() {
   const [params, setParams] = useSearchParams();
   const tab = resolveCommunityTab(params.get('tab'));
   const tenant = useTenantContext();
-  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  // Amenities come with Plus Facilities (and the legacy tiers that became it); the demo shows everything.
+  const isManagementSuite = tierHasAmenities(tenant.tier) || tenant.isDemo;
   const pmSeat = tenant.pmSeat;
   const snap = useCommunitySnapshot();
   const isBoard = snap.viewer.isBoard;
