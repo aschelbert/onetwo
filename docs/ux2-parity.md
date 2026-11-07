@@ -55,3 +55,31 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   inline) and How a letter goes out. "New letter" in the module header
   composes from a template. The production Communications tab is no longer
   embedded here.
+
+## Building
+
+- **Overview** · heading with Edit details / Add asset (inline forms),
+  Needs you, Details and Insurance cards side by side (key/value lists,
+  the renewal runbook row), Assets and maintenance table with the next
+  vendor visits, Mailing address and contact preferences. No tiles, no
+  embedded Building page.
+- **Documents** · search and Upload (inline), Needs you, group pills (All,
+  Governing, Policies, Insurance, Reserve, Reports, Minutes, Contracts) with
+  the Everyone + Board / What owners see switch, one grouped library table
+  (Download / Open / Add file inline), Settings card. No embedded Archives
+  page.
+- **Obligations** · This month / By role / By category / Filings / Ongoing /
+  Duties and roles pills, four compact counts, the month's table with
+  expandable rows (why it matters, if missed, how to; Mark done and Mark
+  filed with proof inline), the duties view with the three duty cards, Who
+  carries what, one card per officer, the Member at Large and Every unit
+  owner cards. No embedded Governance Calendar or Duties page.
+- **Contracts** · heading with Request bids / Add a vendor (inline), Needs
+  you (Countersign opens the renewal inline; Turn on bids flips the runbook
+  switch), vendors table with the bids switch, Bids and Paperwork on file
+  cards. No tiles, no embedded Vendors tab.
+- **Directory** · heading with Export list (CSV) / Invite (inline), section
+  pills with search, Needs you (pending invites, units on paper notices),
+  Units and owners table with role chips, Board (add / edit / remove
+  inline, stewardship chip), Management and counsel, Staff, Emergency
+  contacts, Tasks and property log. No embedded Units tab or contacts page.
