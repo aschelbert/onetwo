@@ -9,7 +9,7 @@
  * Input is pages of lines (`string[][]`); output is the same `ReadResult` the
  * spreadsheet import produces.
  */
-import type { BoardRow, BudgetRow, Confidence, DocType, FactKey, FactRow, InsuranceRow, ReadResult, ReserveRow, UnitRow } from './setupModel';
+import type { BoardRow, BudgetRow, ClauseRow, ClauseTopic, Confidence, DocType, FactKey, FactRow, InsuranceRow, ReadResult, ReserveRow, UnitRow } from './setupModel';
 
 // ── Numbers written as words ───────────────────────────────────────
 
@@ -344,6 +344,82 @@ function insurance(pages: string[][], paged: boolean, title: string): InsuranceR
   }];
 }
 
+// ── Clauses ───────────────────────────────────────────────────────
+//
+// Bylaws and rules are written in articles and sections. Each section is
+// sorted by its heading (and its article's title): an officer's duties, the
+// board's powers and duties, what owners must do, or a rule for residents.
+// Sections about procedure (how meetings run, how votes are counted) are
+// left out; their numbers are already read as settings above.
+
+const ARTICLE = /^\s*ARTICLE\s+([IVXLC]+|\d+)\b[\s.:–—-]*(.*)$/i;
+const SECTION = /^\s*(?:Section|Sec\.|§)\s*(\d+(?:\.\d+)*[A-Za-z]?)\.?\s*[:.–—-]?\s*(.*)$/i;
+const NUMBERED = /^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\.?\s+([A-Z][^.]{2,80}?)(?:\.\s+(.*)|\s*$)/;
+const LIST_ITEM = /^\s*(\d{1,2}|[a-z])[.)]\s+(.{12,})$/;
+
+const OFFICE = /\b(President|Vice[- ]President|Treasurer|Secretary)\b/;
+const RULE_WORDS = /\b(use restrictions?|restrictions?|pets?|animals?|leas\w*|rental|renting|nuisance|noise|parking|vehicles?|signs?|alterations?|architectur\w*|trash|garbage|refuse|smok\w*|occupancy|rules|regulations|balcon\w*|storage|common elements? use)\b/i;
+const OWNER_WORDS = /\b(obligations?|duties|responsibilit\w*|maintenance|maintain|repair|insurance|compliance|comply|liabilit\w*|access|right of entry|sale|transfer|notify|notice to)\b/i;
+const BOARD_WORDS = /\b(powers?|duties|responsibilit\w*|qualifications?|removal|vacanc\w*|conflicts? of interest|compensation|indemnif\w*|fidelity|standard of conduct|limitations?)\b/i;
+
+function classify(heading: string, article: string, body: string): { topic: ClauseTopic; role: string | null } | null {
+  const h = `${heading} ${article}`;
+  const office = OFFICE.exec(heading) ?? (/\bofficers?\b/i.test(article) ? OFFICE.exec(body.slice(0, 80)) : null);
+  if (office && !/\belection|\bremoval|\bvacanc/i.test(heading)) return { topic: 'officer', role: office[1].replace('-', ' ').replace(/\bvice\b/i, 'Vice') };
+  if (RULE_WORDS.test(heading) || (/\b(use|restriction|rules)\b/i.test(article) && heading)) return { topic: 'rules', role: null };
+  if (/\b(unit )?owners?\b|\bmembers?\b/i.test(h) && OWNER_WORDS.test(heading)) return { topic: 'owners', role: null };
+  if (/\bmaintenance|repair\b/i.test(heading)) return { topic: 'owners', role: null };
+  if (/\b(board|directors?)\b/i.test(h) && BOARD_WORDS.test(heading)) return { topic: 'board', role: null };
+  return null;
+}
+
+interface Open { ref: string; heading: string; article: string; lines: string[]; page: number | null }
+
+function clauses(pages: string[][], paged: boolean, docType: DocType): ClauseRow[] {
+  const out: ClauseRow[] = [];
+  let article = ''; let articleNo = '';
+  let cur: Open | null = null;
+  const close = () => {
+    if (!cur) return;
+    const body = cur.lines.join(' ').replace(/\s+/g, ' ').replace(/(\w)- (\w)/g, '$1-$2').trim();
+    const heading = cur.heading || clip(body, 70);
+    const kind = classify(heading, cur.article, body);
+    if (kind && body.length >= 25) {
+      const first = body.split(/(?<=[.;])\s+/)[0] ?? body;
+      out.push({ topic: kind.topic, role: kind.role, ref: cur.ref, heading: heading.replace(/[.:]$/, ''), text: clip(body, 900), page: cur.page, quote: clip(first, 200), confidence: 'high' });
+    }
+    cur = null;
+  };
+  pages.forEach((lines, i) => {
+    const page = paged ? i + 1 : null;
+    for (const line of lines) {
+      const a = ARTICLE.exec(line);
+      if (a) { close(); articleNo = a[1]; article = a[2].trim(); continue; }
+      if (article === '' && articleNo && line.trim() && !SECTION.test(line) && !NUMBERED.test(line) && line.trim().length < 80) { article = line.trim(); continue; }
+      const sec = SECTION.exec(line);
+      const num = sec ? null : NUMBERED.exec(line);
+      const item = sec || num || docType !== 'rules' ? null : LIST_ITEM.exec(line);
+      if (sec || num) {
+        close();
+        const no = (sec ?? num)![1];
+        const rest = sec ? sec[2] : `${num![2]}.${num![3] ? ` ${num![3]}` : ''}`;
+        // "Powers and Duties. The Board shall…": the words before the first full stop are the heading.
+        const hm = /^([A-Z][^.]{2,80}?)\.\s+(.*)$/.exec(rest) ?? /^([A-Z][^.]{2,80}?)\.?$/.exec(rest);
+        cur = { ref: `${articleNo ? `Art. ${articleNo} ` : ''}§${no}`, heading: hm ? hm[1].trim() : '', article, lines: hm?.[2] ? [hm[2]] : hm ? [] : [rest], page };
+        continue;
+      }
+      if (item) {
+        close();
+        cur = { ref: `Rule ${item[1]}`, heading: '', article: article || 'Rules', lines: [item[2]], page };
+        continue;
+      }
+      if (cur) cur.lines.push(line);
+    }
+  });
+  close();
+  return out;
+}
+
 // ── The reading ───────────────────────────────────────────────────
 
 /** What a document is, from its words when the file name didn't say. */
@@ -382,7 +458,8 @@ export function extractFromPages(pages: string[][], opts: { title: string; docTy
     vendors: [],
     budget: t === 'budget' ? budget(pages, paged) : [],
     reserves: t === 'reserve_study' ? reserves(pages, paged) : [],
+    clauses: ['bylaws', 'declaration', 'rules', 'other'].includes(t) ? clauses(pages, paged, t) : [],
   };
 }
 
-export const foundIn = (r: ReadResult) => r.facts.length + r.units.length + r.board.length + r.insurance.length + r.budget.length + r.reserves.length;
+export const foundIn = (r: ReadResult) => r.facts.length + r.units.length + r.board.length + r.insurance.length + r.budget.length + r.reserves.length + (r.clauses?.length ?? 0);

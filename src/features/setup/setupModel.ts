@@ -35,6 +35,9 @@ export interface BoardRow extends SourceBits { name: string; role: string; email
 export interface InsuranceRow extends SourceBits { type: string; carrier: string; policyNumber: string | null; coverage: string | null; premium: number | null; expires: string | null }
 export interface VendorRow extends SourceBits { name: string; service: string; contact: string | null; phone: string | null; email: string | null; contractEnds: string | null; annualCost: number | null }
 export interface BudgetRow extends SourceBits { category: string; annualAmount: number }
+/** A clause of the bylaws or rules: board duties, an officer's duties, what owners must do, or a rule for residents. */
+export type ClauseTopic = 'board' | 'officer' | 'owners' | 'rules';
+export interface ClauseRow extends SourceBits { topic: ClauseTopic; role: string | null; ref: string; heading: string; text: string }
 export interface ReserveRow extends SourceBits { component: string; estimatedCost: number | null; usefulLifeYears: number | null; remainingLifeYears: number | null }
 
 export interface ReadResult {
@@ -49,6 +52,8 @@ export interface ReadResult {
   vendors: VendorRow[];
   budget: BudgetRow[];
   reserves: ReserveRow[];
+  /** Clauses (bylaws, declaration, rules); absent for spreadsheets. */
+  clauses?: ClauseRow[];
 }
 
 /** reading: being opened; read: items found to review; filed: kept in Building › Documents with nothing found; error: couldn't be opened. */
@@ -72,11 +77,14 @@ export interface SetupDoc {
   filedAs?: string;
 }
 
-export type Section = 'profile' | 'rules' | 'units' | 'board' | 'insurance' | 'vendors' | 'budget' | 'reserves' | 'accounts';
+export type Section = 'profile' | 'rules' | 'units' | 'board' | 'duties' | 'obligations' | 'houserules' | 'insurance' | 'vendors' | 'budget' | 'reserves' | 'accounts';
 export const SECTIONS: { id: Section; label: string }[] = [
   { id: 'profile', label: 'Building profile' },
   { id: 'units', label: 'Units and ownership' },
   { id: 'board', label: 'Board and officers' },
+  { id: 'duties', label: 'Board and officer duties' },
+  { id: 'obligations', label: 'Owner obligations' },
+  { id: 'houserules', label: 'Rules for residents' },
   { id: 'rules', label: 'Rules and money' },
   { id: 'accounts', label: 'Bank balances' },
   { id: 'insurance', label: 'Insurance' },
@@ -119,11 +127,11 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
  * are filed in Building › Documents and their settings asked in Fill the gaps.
  */
 export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[] }[] = [
-  { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Quorum and notice rules', 'Board size and terms', 'Assessment due day', 'Late fees', 'Fiscal year', 'Unit ownership table'] },
+  { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Board and officer duties', 'Owner obligations', 'Rules for residents', 'Quorum and notice rules', 'Assessment due day', 'Late fees', 'Unit ownership table'] },
   { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Invites'] },
   { id: 'budget', label: "This year's budget (Excel, CSV or PDF)", types: ['budget'], imports: true, fills: ['Budget lines by category'] },
   { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], imports: true, fills: ['Board and officers'] },
-  { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Pet and rental rules', 'Fines', 'Late fees'] },
+  { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Rules for residents', 'Fines', 'Late fees'] },
   { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], imports: true, fills: ['Carrier and policy number', 'Limits', 'Renewal date'] },
   { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], imports: true, fills: ['Reserve components', 'Useful life and cost'] },
   { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], imports: false, fills: ['Kept in Building › Documents'] },
@@ -151,7 +159,7 @@ export const FIELD_LABEL: Record<string, string> = {
   monthlyFee: 'Monthly assessment', role: 'Office', termEnds: 'Term ends', carrier: 'Carrier', policyNumber: 'Policy number',
   coverage: 'Coverage', premium: 'Premium', expires: 'Expires', service: 'Service', contact: 'Contact', contractEnds: 'Contract ends',
   annualCost: 'Annual cost', annualAmount: 'Annual amount', estimatedCost: 'Replacement cost', usefulLifeYears: 'Useful life',
-  remainingLifeYears: 'Years left',
+  remainingLifeYears: 'Years left', text: 'Clause', ref: 'Section',
 };
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
@@ -224,6 +232,15 @@ export function buildItems(docs: SetupDoc[]): Item[] {
       if (!l.category?.trim()) continue;
       addValue(get(`budget:${keyPart(l.category)}`, 'budget', l.category.trim()), 'annualAmount', l.annualAmount, src(l));
     }
+    for (const c of r.clauses ?? []) {
+      const section: Section = c.topic === 'owners' ? 'obligations' : c.topic === 'rules' ? 'houserules' : 'duties';
+      const label = c.role && c.heading.toLowerCase().replace(/-/g, ' ') === c.role.toLowerCase() ? `${c.role} duties` : `${c.role ? `${c.role} · ` : ''}${c.heading}`;
+      const it = get(`clause:${c.topic}:${keyPart(`${c.role ?? ''} ${c.heading}`)}`, section, label);
+      const s = src(c);
+      addValue(it, 'text', c.text, s);
+      if (c.ref) addValue(it, 'ref', c.ref, s);
+      if (c.role) addValue(it, 'role', c.role, s);
+    }
     for (const x of r.reserves ?? []) {
       if (!x.component?.trim()) continue;
       const it = get(`reserve:${keyPart(x.component)}`, 'reserves', x.component.trim());
@@ -260,6 +277,9 @@ export function itemSummary(it: Item, picks?: Record<string, number>): string {
     case 'insurance': return [v('carrier'), v('coverage'), v('expires') && `expires ${v('expires')}`].filter(Boolean).join(' · ');
     case 'vendors': return [v('service'), v('contact'), v('contractEnds') && `contract ends ${v('contractEnds')}`].filter(Boolean).join(' · ');
     case 'budget': return `${v('annualAmount')} a year`;
+    case 'duties':
+    case 'obligations':
+    case 'houserules': { const t = v('text') ?? ''; return `${v('ref') ? `${v('ref')} · ` : ''}${t.length > 240 ? `${t.slice(0, 239)}…` : t}`; }
     case 'reserves': return [v('estimatedCost'), v('usefulLifeYears') && `${v('usefulLifeYears')} life`, v('remainingLifeYears') && `${v('remainingLifeYears')} left`].filter(Boolean).join(' · ');
     default: return v('value') ?? '';
   }

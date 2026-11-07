@@ -274,6 +274,17 @@ everything is read in the browser, so a document costs nothing to read.
        units, management company) and lists (unit/ownership tables,
        officers, budget lines, reserve components, an insurance declarations
        page). Lists are read only from documents of the matching kind.
+     - Clauses: bylaws, declarations and rules are split into their
+       articles and sections ("ARTICLE IV", "Section 4.3 Powers and Duties")
+       and each section is sorted by its heading into board duties (powers,
+       qualifications, removal, conflicts), an officer's duties (President,
+       Vice President, Treasurer, Secretary), owner obligations
+       (maintenance, insurance, compliance) or rules for residents (pets,
+       leasing, noise, parking, alterations). Procedure sections (number,
+       meetings) are left out. Accepted clauses are kept on the building
+       (`useBuildingStore.governingClauses`, per browser like the bylaws
+       settings) and shown under Building › Obligations › Duties and roles,
+       each with its section and page.
      - Pasted text: the same rules ("Paste text").
      - Spreadsheets (CSV, Excel via `read-excel-file`): matched by their
        column headings, in many spellings (`importSpreadsheet.ts`): owner

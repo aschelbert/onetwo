@@ -103,6 +103,18 @@ export interface BuildingAsset {
   insuredValue: number;
 }
 
+/** A clause from the bylaws or rules, accepted in setup: shown under Building › Obligations › Duties and roles. */
+export interface GoverningClause {
+  id: string;
+  topic: 'board' | 'officer' | 'owners' | 'rules';
+  role: string | null;
+  ref: string;
+  heading: string;
+  text: string;
+  /** Where it came from: document and page. */
+  source: string;
+}
+
 export interface BylawsConfig {
   assessmentCapPct: number;
   ownerVoteThreshold: number;
@@ -124,6 +136,10 @@ interface BuildingState {
   assets: BuildingAsset[];
   bylawsConfig: BylawsConfig;
   updateBylawsConfig: (config: Partial<BylawsConfig>) => void;
+  governingClauses: GoverningClause[];
+  /** Add or replace (same topic, role and heading) a clause. */
+  upsertGoverningClause: (c: Omit<GoverningClause, 'id'>) => void;
+  removeGoverningClause: (id: string) => void;
 
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
@@ -743,6 +759,13 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
+  governingClauses: [],
+  upsertGoverningClause: (c) => set(s => {
+    const same = (x: GoverningClause) => x.topic === c.topic && (x.role ?? '') === (c.role ?? '') && x.heading.toLowerCase() === c.heading.toLowerCase();
+    const existing = s.governingClauses.find(same);
+    return { governingClauses: existing ? s.governingClauses.map(x => (same(x) ? { ...x, ...c } : x)) : [...s.governingClauses, { id: `gc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, ...c }] };
+  }),
+  removeGoverningClause: (id) => set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id) })),
 }), {
   name: 'onetwo-building',
   version: 4,
@@ -759,6 +782,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     maintenanceSchedules: state.maintenanceSchedules,
     assets: state.assets,
     bylawsConfig: state.bylawsConfig,
+    governingClauses: state.governingClauses,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,
