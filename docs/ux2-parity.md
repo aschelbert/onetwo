@@ -185,3 +185,21 @@ keeps its inline form in the tab. Tabs carry no title or description block
 of their own. Header buttons are compact (40px, 13px text) to match the
 tabs; if a row is ever too narrow, the button group wraps under the tabs,
 still right-aligned.
+
+## Page descriptions and the Community overview
+
+- Module and tab descriptions no longer sit under the title or the tabs.
+  They live behind a superscript (i) beside the module title, opening on
+  hover, focus or tap; the popover anchors to the title block so it never
+  widens a phone page. Tab-specific notes (owner versus board views,
+  Amenities approvals, Building's per-tab descriptions) are part of it.
+- Community › Overview follows the board: Recent notices in the left
+  column; Building stewardship as a rolling chart (whole building, board,
+  owners; 12 months / 90 days / 30 days, hover for a day's values) with
+  Lift it this month, Who moved it up and Who is pulling it down inside the
+  same card; the unit owner leaderboard on dark teal with band and score,
+  the viewer's row outlined. The trend and movers come from
+  `src/ux2/score/trend.ts`: a point is each person's score from the year of
+  events before that day, averaged per group; a mover is one event in the
+  last 30 days, sized by how much it changed that person's score. Owners
+  pulling it down are named only to the board; others see the unit.
