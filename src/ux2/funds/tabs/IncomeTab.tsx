@@ -336,24 +336,24 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
     {
       id: 'behind',
       tile: {
-        tone: beh.length > 0 ? 'red' : 'grey',
+        tone: 'red',
         label: 'Behind',
-        meta: <Chip tone={beh.length > 0 ? 'red' : 'ghost'} className={beh.length > 0 ? '!bg-white !text-ux2-red-ink' : ''}>{beh.length} unit{beh.length === 1 ? '' : 's'}</Chip>,
+        meta: <Chip tone="red" className="!bg-white !text-ux2-red-ink">{beh.length} unit{beh.length === 1 ? '' : 's'}</Chip>,
         children: (
           <>
             <div className="grid grid-cols-[120px_minmax(0,1fr)] items-end gap-4">
               <div>
                 <div className="text-[32px] font-semibold leading-none tracking-[-0.03em]">{fmt(outstanding)}</div>
-                <div className={`text-xs ${beh.length ? 'text-white/[0.66]' : 'text-ux2-muted'}`}>outstanding</div>
-                <div className={`mt-2 text-xs ${beh.length ? 'text-white/[0.66]' : 'text-ux2-muted'}`}>Lien allowed at 90 days <span className="opacity-70">§ 42-1903.13</span></div>
+                <div className="text-xs text-white/[0.72]">{beh.length ? 'outstanding' : 'outstanding · every unit is current'}</div>
+                <div className="mt-2 text-xs text-white/[0.72]">Lien allowed at 90 days <span className="opacity-70">§ 42-1903.13</span></div>
               </div>
               <div className="flex items-end gap-2" aria-label="Outstanding by age">
                 {(['0-30', '31-60', '61-90', '90+'] as const).map(b => {
                   const max = Math.max(1, ...Object.values(aging));
                   return (
-                    <div key={b} className={`flex flex-1 flex-col items-center gap-1 text-[10px] ${beh.length ? 'text-white/[0.62]' : 'text-ux2-muted'}`}>
-                      <span className={`text-[11px] font-semibold ${beh.length ? 'text-white' : 'text-ux2-ink'}`}>{aging[b] ? fmt(aging[b]) : ''}</span>
-                      <div className="w-full rounded-[4px]" style={{ height: `${aging[b] ? Math.max(6, Math.round((aging[b] / max) * 56)) : 4}px`, backgroundColor: aging[b] ? (b === '0-30' ? '#F2B866' : b === '31-60' ? '#FBF1E2' : '#FFFFFF') : '#D8DCE1', opacity: aging[b] && b !== '0-30' ? 0.9 : 1 }} />
+                    <div key={b} className="flex flex-1 flex-col items-center gap-1 text-[10px] text-white/[0.72]">
+                      <span className="text-[11px] font-semibold text-white">{aging[b] ? fmt(aging[b]) : ''}</span>
+                      <div className="w-full rounded-[4px]" style={{ height: `${aging[b] ? Math.max(6, Math.round((aging[b] / max) * 56)) : 4}px`, backgroundColor: aging[b] ? (b === '0-30' ? '#F2B866' : b === '31-60' ? '#FBF1E2' : '#FFFFFF') : 'rgba(255,255,255,0.35)', opacity: aging[b] && b !== '0-30' ? 0.9 : 1 }} />
                       <span>{b} d</span>
                     </div>
                   );
