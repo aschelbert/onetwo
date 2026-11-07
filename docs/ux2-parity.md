@@ -222,3 +222,9 @@ still right-aligned.
 - **Building › Archive** is the former Board Room Archive, shown to the
   board and manager only. `/boardroom?tab=archive` and `caseTab=archive`
   redirect there; a closed case still opens in the Board Room's case frame.
+- **Case workspace on phones and tablets** (below 1080px, `useNarrowScreen`):
+  one column with the case summary, the step list and the case's sections;
+  tapping a step opens it full screen with the same header, guidance,
+  checklist and actions as the desktop right column, plus All steps,
+  previous and next. The view is portalled to the page body so the sticky
+  top bar cannot cover it. Desktop keeps the two columns.
