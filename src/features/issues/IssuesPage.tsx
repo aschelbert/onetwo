@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNarrowScreen } from '@/hooks/useNarrowScreen';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { spotFromSearch, useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import type { StepAction } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -49,7 +50,7 @@ export default function IssuesPage({ embedded, prefill }: { embedded?: boolean; 
   const isBoard = role !== 'RESIDENT';
 
   if (view === 'new') return <WizardView onDone={(id) => { setWizardPrefill(undefined); setView(`case:${id}`); }} onBack={() => { setWizardPrefill(undefined); setView('tabs'); }} prefill={wizardPrefill} />;
-  if (view.startsWith('case:')) return <CaseDetail caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;
+  if (view.startsWith('case:')) return <CaseDetail key={view} caseId={view.split(':')[1]} onBack={() => setView('tabs')} onNav={setView} />;
 
   const open = cases.filter(c => c.status === 'open' || c.status === 'on-hold');
   const closed = cases.filter(c => c.status === 'closed');
@@ -935,19 +936,51 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const [inlineStepIdx, setInlineStepIdx] = useState<number | null>(null);
   const [docTargetStep, setDocTargetStep] = useState<number | null>(null);
   const [voteTargetStep, setVoteTargetStep] = useState<number | null>(null);
-  const [activeStep, setActiveStep] = useState(0);
-  const [activeApproachIdx, setActiveApproachIdx] = useState<number | null>(null);
+  // Open on the step you were on: the one the URL names (the case dock's Back), else the one you
+  // last had open in this case (e.g. the browser's back button), else the first. CaseDetail is keyed
+  // by case, so this runs once per case.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initialSpot] = useState(() => {
+    const fromUrl = spotFromSearch(searchParams);
+    if (fromUrl) return { ...fromUrl, fromUrl: true };
+    const kept = useCaseDockStore.getState().spots[caseId];
+    return kept ? { ...kept, fromUrl: false } : null;
+  });
+  const [activeStep, setActiveStep] = useState(initialSpot?.step ?? 0);
+  const [activeApproachIdx, setActiveApproachIdx] = useState<number | null>(initialSpot?.approach ?? null);
+  const [focusCheck, setFocusCheck] = useState<string | null>(initialSpot?.check ?? null);
+  const rememberSpot = useCaseDockStore(s => s.remember);
   const [checkDocModal, setCheckDocModal] = useState<{ stepIdx: number; checkId: string; checkLabel: string; reportType: string | null } | null>(null);
 
   const buildingState = useBuildingStore(s => s.address.state);
 
-  // Reset active step when navigating to a different case
-  useEffect(() => { setActiveStep(0); setActiveApproachIdx(null); }, [caseId]);
   // Phones and tablets (below 1080px, where the app switches to its bottom bar) get one column:
   // the step list, and a tapped step opens full screen instead of in a right column that does not fit.
+  // Coming back to a step (the dock's Back, or after leaving from a checklist item) opens it.
   const narrow = useNarrowScreen();
-  const [stepOpen, setStepOpen] = useState(false);
-  useEffect(() => { setStepOpen(false); }, [caseId]);
+  const [stepOpen, setStepOpen] = useState(!!initialSpot && (initialSpot.fromUrl || !!initialSpot.check));
+  // Keep where you are, so leaving the case (a step link, the top nav) and coming back lands here.
+  useEffect(() => { rememberSpot(caseId, { step: activeStep, approach: activeApproachIdx }); }, [caseId, activeStep, activeApproachIdx, rememberSpot]);
+  // The URL's step has been applied; drop it so it does not outlive this visit.
+  useEffect(() => {
+    if (!initialSpot?.fromUrl) return;
+    setSearchParams(prev => { const q = new URLSearchParams(prev); q.delete('step'); q.delete('approach'); q.delete('check'); return q; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Bring the checklist item you left from into view, and mark it for a moment.
+  useEffect(() => {
+    if (!focusCheck) return;
+    const t = window.setTimeout(() => {
+      const el = Array.from(document.querySelectorAll<HTMLElement>('[data-check-row]')).find(n => n.dataset.checkRow === focusCheck);
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.classList.add('ring-2', 'ring-accent-300');
+        window.setTimeout(() => el.classList.remove('ring-2', 'ring-accent-300'), 2400);
+      }
+      setFocusCheck(null);
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [focusCheck]);
   useEffect(() => {
     if (!stepOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setStepOpen(false); };
@@ -987,7 +1020,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             stepTitle,
             stepIdx,
             stepTiming: step?.t || undefined,
-            returnPath: `/issues?view=case:${c.id}`,
+            returnPath: `/issues?view=case:${c.id}&step=${stepIdx + 1}`,
             phaseLabel: phase?.label,
             phaseColor,
             progress: { done: doneCount, total: steps.length },

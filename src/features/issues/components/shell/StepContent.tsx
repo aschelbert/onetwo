@@ -9,6 +9,7 @@ import { ReserveStudyPanel } from '../workflow/ReserveStudyPanel';
 import { ContractRenewalPanel } from '../workflow/ContractRenewalPanel';
 import { BudgetDraftPanel } from '../workflow/BudgetDraftPanel';
 import { BylawsReviewPanel } from '../workflow/BylawsReviewPanel';
+import { CheckAssist } from '../workflow/CheckAssist';
 
 interface StepContentProps {
   c: CaseTrackerCase;
@@ -228,6 +229,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                       return (
                         <div
                           key={ck.id}
+                          data-check-row={ck.id}
                           className={`bg-white rounded-lg border overflow-hidden transition-all ${
                             ck.checked ? 'border-sage-200' : 'border-ink-100'
                           }`}
@@ -296,6 +298,10 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                             {ck.checked && ck.checkedDate && (
                               <span className="text-[10px] text-sage-500 shrink-0">{ck.checkedDate}</span>
                             )}
+                          </div>
+                          {/* What this item needs: the information to review, a step tool, or where to do it */}
+                          <div className={`border-t border-ink-50 px-4 pb-3 ${ck.checked ? 'opacity-70' : ''}`}>
+                            <CheckAssist c={c} step={step} stepIndex={stepIndex} checkId={ck.id} label={ck.label} onAction={onAction} onAddNote={onAddNote} onUploadCheckDoc={onUploadCheckDoc} />
                           </div>
                         </div>
                       );

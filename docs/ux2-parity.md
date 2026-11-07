@@ -218,6 +218,11 @@ still right-aligned.
   closes or its last step is done, and Dismiss hides it until the case is
   opened again. Pages keep extra bottom space while it shows. The dock's
   memory resets when a real building loads.
+- **Back returns to where you were**: the dock remembers, per case, the step
+  you had open and the checklist item you last used an assist on. Back opens
+  the case on that step (full screen on phones), scrolls to the item and
+  marks it for a moment. The browser's back button lands there too. The
+  dock's checklist shows that step while it is still to do.
 - **Board Room › Ops** is the former Open tab (same URL id, `open`).
 - **Building › Archive** is the former Board Room Archive, shown to the
   board and manager only. `/boardroom?tab=archive` and `caseTab=archive`
@@ -228,3 +233,24 @@ still right-aligned.
   checklist and actions as the desktop right column, plus All steps,
   previous and next. The view is portalled to the page body so the sticky
   top bar cannot cover it. Desktop keeps the two columns.
+
+## Case checklist assists
+
+Every checklist item in a case step carries one or more assists, so an item
+is never just a box to tick (`src/features/issues/checkAssist.ts`):
+
+- **Review in place**: a panel opens under the item with the information to
+  check. Budget items open the budget drafter (operating lines by category,
+  reserve contribution, contingency, per-unit impact); reserve items open the
+  reserve study; others show financials, the unit ledger, delinquency, fees,
+  the allocation calculator, insurance, vendors, documents, the owner, board
+  quorum, counsel, meetings, assets or filings. Each panel links to the module
+  where the record lives.
+- **Do it here**: the step's tools (send a letter, board or owner vote, attach
+  a document, work order, invoice, meeting, note).
+- **Go to the module**: a deep link; the case dock follows you back.
+- **Official site**: DC agencies and courts, for work done outside the app.
+
+Items are matched by ordered rules on the item's text, then on the step's
+title. `src/__tests__/checkAssist.test.ts` fails if any item in any
+situation's workflow falls through to the generic note-and-attach fallback.

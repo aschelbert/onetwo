@@ -16,7 +16,7 @@ export function BudgetDraftPanel({ caseId, stepIdx, step }: BudgetDraftPanelProp
   const store = useIssuesStore();
   const { details } = useBuildingStore();
   const totalUnits = details.totalUnits;
-  const recommended = fin.calculateRecommendedAnnualReserve();
+  const recommended = Math.round(fin.calculateRecommendedAnnualReserve());
   const variance = fin.getBudgetVariance();
 
   const existingDraft = step.budgetDraft;
