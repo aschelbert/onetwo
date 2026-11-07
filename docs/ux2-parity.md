@@ -281,10 +281,13 @@ everything is read in the browser, so a document costs nothing to read.
        Vice President, Treasurer, Secretary), owner obligations
        (maintenance, insurance, compliance) or rules for residents (pets,
        leasing, noise, parking, alterations). Procedure sections (number,
-       meetings) are left out. Accepted clauses are kept on the building
-       (`useBuildingStore.governingClauses`, per browser like the bylaws
-       settings) and shown under Building › Obligations › Duties and roles,
-       each with its section and page.
+       meetings) are left out. Accepted clauses are saved to the
+       `governing_clauses` table (migration 034: everyone in the building
+       reads them; the board, the manager and the account owner manage
+       them), loaded with the building, and shown under Building ›
+       Obligations › Duties and roles, each with its section and page.
+       Clauses accepted in a browser before the table existed are uploaded
+       the next time the building loads.
      - Pasted text: the same rules ("Paste text").
      - Spreadsheets (CSV, Excel via `read-excel-file`): matched by their
        column headings, in many spellings (`importSpreadsheet.ts`): owner

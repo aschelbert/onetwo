@@ -115,6 +115,9 @@ export interface GoverningClause {
   source: string;
 }
 
+/** A clause accepted in this browser and not yet saved to the database. */
+const isLocalClause = (id: string) => id.startsWith('gc-');
+
 export interface BylawsConfig {
   assessmentCapPct: number;
   ownerVoteThreshold: number;
@@ -500,6 +503,17 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (data.vendors) updates.vendors = data.vendors;
     if (data.maintenanceSchedules) updates.maintenanceSchedules = data.maintenanceSchedules;
     if (data.assets) updates.assets = data.assets;
+    if (data.clauses) {
+      // Clauses accepted in this browser before they were saved (no database id yet) go up now.
+      const localOnly = useBuildingStore.getState().governingClauses.filter(c => isLocalClause(c.id));
+      updates.governingClauses = [...data.clauses, ...localOnly];
+      for (const c of localOnly) {
+        const { id, ...fields } = c;
+        buildingSvc.saveGoverningClause(tenantId, fields).then(row => {
+          if (row) set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id && x.id !== row.id).concat(row) }));
+        });
+      }
+    }
     if (data.profile) {
       const current = useBuildingStore.getState().details;
       updates.details = { ...current, ...data.profile };
@@ -760,12 +774,23 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
 
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
   governingClauses: [],
-  upsertGoverningClause: (c) => set(s => {
+  upsertGoverningClause: (c) => {
     const same = (x: GoverningClause) => x.topic === c.topic && (x.role ?? '') === (c.role ?? '') && x.heading.toLowerCase() === c.heading.toLowerCase();
-    const existing = s.governingClauses.find(same);
-    return { governingClauses: existing ? s.governingClauses.map(x => (same(x) ? { ...x, ...c } : x)) : [...s.governingClauses, { id: `gc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, ...c }] };
-  }),
-  removeGoverningClause: (id) => set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id) })),
+    const existing = useBuildingStore.getState().governingClauses.find(same);
+    const id = existing?.id ?? `gc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    set(s => ({ governingClauses: existing ? s.governingClauses.map(x => (same(x) ? { ...x, ...c } : x)) : [...s.governingClauses, { id, ...c }] }));
+    // Saved for the whole board; the database id replaces the local one.
+    const tid = getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.saveGoverningClause(tid, c, isLocalClause(id) ? undefined : id).then(row => {
+        if (row) set(s => ({ governingClauses: s.governingClauses.map(x => (x.id === id ? row : x)) }));
+      }).catch(err => console.error('[syncWrite] saveGoverningClause failed:', err));
+    }
+  },
+  removeGoverningClause: (id) => {
+    set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id) }));
+    if (isBackendEnabled && !isLocalClause(id)) buildingSvc.deleteGoverningClause(id);
+  },
 }), {
   name: 'onetwo-building',
   version: 4,
