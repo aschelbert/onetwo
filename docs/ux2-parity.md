@@ -83,3 +83,60 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   Units and owners table with role chips, Board (add / edit / remove
   inline, stewardship chip), Management and counsel, Staff, Emergency
   contacts, Tasks and property log. No embedded Units tab or contacts page.
+
+## Community
+
+- **Overview** · unchanged layout, plus the Who moved it this month card
+  beside Lift it this month, and the leaderboard in two columns.
+- **Notices** · Alerts strip, New notice (inline), Pinned card (Open /
+  Unpin), category and search pills, three-column notice cards (author,
+  audience, read count, comments; Open / Edit / Pin, Delete in the row
+  menu), How notices work. No embedded Community page.
+- **Meetings** · Schedule a meeting (inline), Next meeting with notice /
+  agenda / RSVP / room cells, filter pills, the Schedule table, Agenda
+  (add and edit items inline), Approvals and Attendance. No embedded Board
+  Room meetings tab.
+- **Votes** · Record a proxy / Open a vote (inline), Open owner vote with
+  the ballot, Board decisions, Election (nominate inline), Proxies and
+  quorum, Ballot preview, Results and certification (certify inline). No
+  embedded Elections page.
+- **Requests** · Make a request (inline), Your requests with the step track
+  and the thread, What happens next, Your past requests, Building-wide
+  requests with Open / Resolved pills and Upvote. No embedded Issues page.
+- **Amenities** · All amenities / My reservations / Calendar /
+  Notifications / Approvals pills, one card per shared space with its rules
+  as chips, Settings (board, inline) and Reserve (inline), the Approvals
+  card (Approve, Deny with a reason) and the This week strip. No embedded
+  Amenities tab.
+
+## Me
+
+- **My Account** · This month, On the board, By dimension and Board
+  leaderboard, Profile (inline edits), Preferences, Notifications toggles,
+  Units on this account, Switch building, Danger zone. No embedded Account
+  Settings page.
+- **My Unit** · Balance / Autopay and payment methods / Resale ready tiles
+  (packet checklist), the unit card, Dues and fees this year (month boxes),
+  Statements and receipts, Unit details, Documents for this unit (Upload),
+  Move history (Report a move inline), Requests from this unit, Owner
+  responsibilities, Link a unit. No embedded My Unit page.
+- **User Management** · People with access / Invites / Roles tiles, Members
+  table (role chips, Change role / Reset password / Resend welcome / Remove
+  in the row menu), Invite (one person or bulk, inline), Audit log,
+  Permissions matrix. Live tenants read `tenant_users` and `invitations`
+  and send through `send-invite`; demo tenants use the auth store. No
+  embedded User Management page.
+- **Subscription** · Plan / Add-ons (toggles) / Billing (interval pills,
+  Portal) tiles, Plans (Move up / down), Invoices table, Who can change
+  this, Cancel (type the building's name). Live tenants call
+  `manage-subscription` and `chargebee-portal`; the tab now also shows for
+  board members in the demo. No embedded Subscription page.
+- **Help & Support** · Find an answer (search with example chips), Runbooks /
+  How ONE two works / Guides row, Contact us (open threads from the admin
+  project; Reply mounts the live thread), Guides list, Send feedback or
+  start a thread (inline; writes `support_threads` and `support_messages`),
+  Legal references, Release notes, Legal. The support thread UI is mounted
+  only on Reply.
+
+Primitive fix: `Th` is now `relative` so a visually hidden header label
+stays inside the table's scroller instead of widening the page on phones.

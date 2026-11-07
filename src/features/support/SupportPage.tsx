@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { ROLE_LABELS } from '@/types/auth';
 import { getInitials } from '@/lib/formatters';
 import { Plus, Send, MessageCircle, Paperclip, X } from 'lucide-react';
 
-// Secondary Supabase client — connects to admin project for support tables
-const adminUrl = import.meta.env.VITE_ADMIN_SUPABASE_URL as string;
-const adminKey = import.meta.env.VITE_ADMIN_SUPABASE_ANON_KEY as string;
-const adminSupabase = adminUrl && adminKey ? createClient(adminUrl, adminKey) : null;
+import { adminSupabase } from '@/lib/adminSupabase';
 
 interface Thread {
   id: string;

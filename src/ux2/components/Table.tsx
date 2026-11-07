@@ -19,7 +19,7 @@ export function Table({ children, minWidth = 900, className, ...rest }: HTMLAttr
 
 export function Th({ num, className, children, ...rest }: ThHTMLAttributes<HTMLTableCellElement> & { num?: boolean }) {
   return (
-    <th className={cn('whitespace-nowrap border-b border-ux2-line px-3 py-2.5 text-left text-xs font-semibold text-ux2-muted', num && 'text-right', className)} {...rest}>
+    <th className={cn('relative whitespace-nowrap border-b border-ux2-line px-3 py-2.5 text-left text-xs font-semibold text-ux2-muted', num && 'text-right', className)} {...rest}>
       {children}
     </th>
   );
