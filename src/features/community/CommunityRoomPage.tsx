@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tierHasAmenities } from '@/lib/tiers';
 import { useTabParam } from '@/hooks/useTabParam';
 import { useMeetingsStore, type Meeting } from '@/store/useMeetingsStore';
 import { useElectionStore } from '@/store/useElectionStore';
@@ -35,7 +36,7 @@ const REQ_CATS = [
  */
 export default function CommunityRoomPage({ embedded, tab: forcedTab }: { embedded?: boolean; tab?: TabId } = {}) {
   const tenant = useTenantContext();
-  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  const isManagementSuite = tierHasAmenities(tenant.tier) || tenant.isDemo;
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
