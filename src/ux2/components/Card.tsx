@@ -6,10 +6,11 @@ import { cn } from '@/lib/formatters';
  *  surface (default) grey card · navy = act now · teal = help / good standing /
  *  decisions · cyan = worth noticing · red = overdue · outline = needs you, on white.
  */
-export type CardTone = 'surface' | 'navy' | 'teal' | 'cyan' | 'red' | 'outline';
+export type CardTone = 'surface' | 'white' | 'navy' | 'teal' | 'cyan' | 'red' | 'outline';
 
 const TONES: Record<CardTone, string> = {
   surface: 'bg-ux2-surface border-ux2-line text-ux2-ink',
+  white: 'bg-white border-ux2-line text-ux2-ink',
   navy: 'bg-ux2-navy border-ux2-navy text-white',
   teal: 'bg-ux2-teal border-ux2-teal text-white',
   cyan: 'bg-ux2-cyan border-ux2-cyan text-ux2-navy',

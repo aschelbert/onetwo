@@ -254,3 +254,39 @@ is never just a box to tick (`src/features/issues/checkAssist.ts`):
 Items are matched by ordered rules on the item's text, then on the step's
 title. `src/__tests__/checkAssist.test.ts` fails if any item in any
 situation's workflow falls through to the generic note-and-attach fallback.
+
+## Building setup (documents first)
+
+Replaces the amber "Set up your building" widget (`OnboardingSetupWidget`,
+`features/setup/setup-steps.ts`, both removed).
+
+- **Home card** (`ux2/setup/SetupCard.tsx`): plum, at the top of Home while
+  the tenant is `onboarding` and not live, for everyone but residents. One
+  next action, progress, the five steps. "Hide for now" leaves a chip.
+- **/setup** (`ux2/setup/SetupPage.tsx`, `?step=documents|review|finish`;
+  listed in `vite.config.ts` APP_ROUTES and the `vercel.json` rewrites):
+  1. *Documents*: drop PDFs, photos of pages, CSV or Excel (.xlsx is turned
+     into text in the browser with `read-excel-file`). Each file is read by
+     the `read-setup-document` edge function and filed in Building ›
+     Documents. The checklist says what each kind of document fills in.
+  2. *Review what we found*: readings merge into items by what they
+     describe (`setupModel.buildItems`); two documents that disagree are a
+     choice, a faint scan is flagged. Matching items accept in one click.
+     Accepting writes through the stores' own actions (`applySetup.applyItem`);
+     facts with no home in the app (board quorum, notice period, pets, ...)
+     are kept as "rules on file" and listed at go-live.
+  3–5. *Fill the gaps · Invite people · Go live*: only what is missing,
+     answered in place (address, units, monthly assessments, a board member,
+     opening balances, a budget template, owner emails). Board invites go
+     through `send-invite`; owners are invited at go-live (a visible
+     checkbox). Go live needs four essentials: name and address, units,
+     a board member, an assessment for every unit.
+- **Reading** (`supabase/functions/read-setup-document`): Claude
+  (`claude-opus-5-5`, structured JSON output, server-side refusal
+  fallback), callable by board members, the account owner and managers.
+  Every item carries its page and a short quote. Needs the
+  `ANTHROPIC_API_KEY` secret on the Supabase project; `GET` reports whether
+  it is set, and the page says so when it isn't. Nothing is saved by the
+  function itself.
+- Setup state (`features/setup/useSetupStore.ts`) is per browser and resets
+  when a different building loads.

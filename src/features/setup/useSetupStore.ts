@@ -1,0 +1,53 @@
+/**
+ * Building setup state: the documents you added (and what was read from
+ * them) and your decision on each item found. Kept per browser and reset
+ * when a different building loads. What you accept is written into the
+ * building's own records straight away (`applySetup`), so this store only
+ * remembers the review, not the data.
+ */
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { Decision, SetupDoc } from './setupModel';
+
+interface SetupState {
+  docs: SetupDoc[];
+  decisions: Record<string, Decision>;
+  /** Steps marked "later" in Fill the gaps. */
+  later: string[];
+  /** The Home card is hidden; a chip stays in the header. */
+  hidden: boolean;
+  invitedBoard: boolean;
+  addDoc: (doc: SetupDoc) => void;
+  updateDoc: (id: string, patch: Partial<SetupDoc>) => void;
+  removeDoc: (id: string) => void;
+  decide: (key: string, d: Omit<Decision, 'at'>) => void;
+  undo: (key: string) => void;
+  setLater: (id: string, later: boolean) => void;
+  setHidden: (hidden: boolean) => void;
+  setInvitedBoard: (v: boolean) => void;
+  reset: () => void;
+}
+
+const EMPTY = { docs: [] as SetupDoc[], decisions: {} as Record<string, Decision>, later: [] as string[], hidden: false, invitedBoard: false };
+
+export const useSetupStore = create<SetupState>()(persist((set) => ({
+  ...EMPTY,
+  addDoc: (doc) => set(s => ({ docs: [...s.docs, doc] })),
+  updateDoc: (id, patch) => set(s => ({ docs: s.docs.map(d => (d.id === id ? { ...d, ...patch } : d)) })),
+  removeDoc: (id) => set(s => ({ docs: s.docs.filter(d => d.id !== id) })),
+  decide: (key, d) => set(s => ({ decisions: { ...s.decisions, [key]: { ...d, at: new Date().toISOString() } } })),
+  undo: (key) => set(s => { const next = { ...s.decisions }; delete next[key]; return { decisions: next }; }),
+  setLater: (id, later) => set(s => ({ later: later ? [...new Set([...s.later, id])] : s.later.filter(x => x !== id) })),
+  setHidden: (hidden) => set({ hidden }),
+  setInvitedBoard: (invitedBoard) => set({ invitedBoard }),
+  reset: () => set({ ...EMPTY }),
+}), {
+  name: 'onetwo-setup',
+  version: 1,
+  // A document still "reading" when the page closed never finished: show it as failed so it can be read again.
+  onRehydrateStorage: () => (state) => {
+    if (!state) return;
+    const stuck = state.docs.some(d => d.status === 'reading');
+    if (stuck) useSetupStore.setState({ docs: state.docs.map(d => (d.status === 'reading' ? { ...d, status: 'error' as const, error: 'Reading stopped when the page closed. Add the file again.' } : d)) });
+  },
+}));
