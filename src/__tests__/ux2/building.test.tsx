@@ -40,7 +40,7 @@ describe('Building', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Building sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Documents', 'Obligations', 'Contracts', 'Directory']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     expect(document.querySelector('[aria-label="Details"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Insurance"]')).toBeTruthy();
@@ -117,5 +117,22 @@ describe('Building', () => {
     expect(document.querySelector('[aria-label="Emergency contacts"]')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Intercom' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Property log' })).toBeNull();
+  });
+
+  it('Archive lists closed cases, requests and letters for the board, and owners do not get it', async () => {
+    const { useAuthStore } = await import('@/store/useAuthStore');
+    renderAt('/building?tab=archive');
+    expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Closed recently"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="How long it stays"]')).toBeTruthy();
+    const prev = useAuthStore.getState().currentRole;
+    useAuthStore.setState({ currentRole: 'RESIDENT' });
+    try {
+      renderAt('/building?tab=archive');
+      const navs = screen.getAllByRole('navigation', { name: 'Building sections' });
+      expect(within(navs[navs.length - 1]).queryByRole('button', { name: /Archive/ })).toBeNull();
+    } finally {
+      useAuthStore.setState({ currentRole: prev });
+    }
   });
 });

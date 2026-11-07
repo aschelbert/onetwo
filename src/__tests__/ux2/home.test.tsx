@@ -10,7 +10,8 @@ vi.mock('@/components/TenantProvider', () => ({
 }));
 
 import HomePage from '@/ux2/home/HomePage';
-import ReturnToCaseBar from '@/ux2/shell/ReturnToCaseBar';
+import CaseDock from '@/ux2/shell/CaseDock';
+import { dockFor, caseIdFromLocation, useCaseDockStore } from '@/ux2/shell/caseDock';
 
 function renderHome(path = '/home') {
   return render(
@@ -115,27 +116,73 @@ describe('Home', () => {
   });
 });
 
-describe('ReturnToCaseBar', () => {
-  it('shows when a case context exists and we are off the case page', () => {
-    const store = useIssuesStore.getState();
-    const first = store.cases[0];
-    const base = { caseId: first.id, caseTitle: first.title, stepTitle: 'Demand letter', stepIdx: 2, returnPath: '/funds', progress: { done: 2, total: 5 } };
-    store.setActiveCaseContext({ ...base, minimized: false });
-    const { unmount } = render(<MemoryRouter initialEntries={['/issues?view=case:x']}><ReturnToCaseBar /></MemoryRouter>);
-    expect(document.querySelector('[data-widget="return-to-case"]')).toBeNull();
+describe('Case dock', () => {
+  beforeEach(() => useCaseDockStore.getState().reset());
+
+  it('picks the most recent open case with a step left, hides on that case, and skips dismissed ones', () => {
+    const cases = useIssuesStore.getState().cases.filter(c => c.status !== 'closed' && c.steps?.some(s => !s.done));
+    expect(cases.length).toBeGreaterThan(1);
+    const [a, b] = cases;
+    const d = dockFor(useIssuesStore.getState().cases, [a.id, b.id], [], null)!;
+    expect(d.active.c.id).toBe(a.id);
+    expect(d.active.step.done).toBe(false);
+    expect(d.others.map(o => o.c.id)).toEqual([b.id]);
+    expect(dockFor(useIssuesStore.getState().cases, [a.id, b.id], [], a.id)).toBeNull();
+    expect(dockFor(useIssuesStore.getState().cases, [a.id, b.id], [a.id], null)!.active.c.id).toBe(b.id);
+    expect(caseIdFromLocation('/boardroom', '?view=case:c3')).toBe('c3');
+    expect(caseIdFromLocation('/funds', '?view=case:c3')).toBeNull();
+  });
+
+  it('follows you off the case: shows the step, ticks a check on the case, goes back, and dismisses', () => {
+    const issues = useIssuesStore.getState();
+    const c = issues.cases.find(x => x.status !== 'closed' && x.steps?.some(s => !s.done && (s.checks?.length ?? 0) > 0))
+      ?? issues.cases.find(x => x.status !== 'closed' && x.steps?.some(s => !s.done))!;
+    useCaseDockStore.getState().touch(c.id);
+    const { unmount } = render(<MemoryRouter initialEntries={[`/boardroom?view=case:${c.id}`]}><CaseDock /></MemoryRouter>);
+    expect(document.querySelector('[data-widget="case-dock"]')).toBeNull();
     unmount();
 
     render(
       <MemoryRouter initialEntries={['/funds']}>
         <Routes>
-          <Route path="/funds" element={<ReturnToCaseBar />} />
+          <Route path="/funds" element={<CaseDock />} />
           <Route path="/issues" element={<div data-testid="case-page">case</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText(/Step 3 of 5: Demand letter/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Back to the step' }));
+    const dock = document.querySelector('[data-widget="case-dock"]') as HTMLElement;
+    expect(dock).toBeTruthy();
+    expect(within(dock).getByText(new RegExp(`${c.id} · `))).toBeTruthy();
+    fireEvent.click(within(dock).getByRole('button', { name: 'Expand the case dock' }));
+    const stepIdx = c.steps!.findIndex(s => !s.done);
+    const step = c.steps![stepIdx];
+    if (step.checks?.length) {
+      const first = step.checks[0];
+      fireEvent.click(within(dock).getByRole('checkbox', { name: first.label }));
+      const after = useIssuesStore.getState().cases.find(x => x.id === c.id)!.steps![stepIdx].checks!.find(k => k.id === first.id)!;
+      expect(after.checked).toBe(!first.checked);
+      useIssuesStore.getState().toggleCheck(c.id, stepIdx, first.id);
+    } else {
+      expect(within(dock).getByRole('button', { name: 'Mark step done' })).toBeTruthy();
+    }
+    fireEvent.click(within(dock).getByRole('button', { name: 'Dismiss the case dock' }));
+    expect(document.querySelector('[data-widget="case-dock"]')).toBeNull();
+    expect(useCaseDockStore.getState().dismissed).toContain(c.id);
+  });
+
+  it('Back to the step returns to the case', () => {
+    const c = useIssuesStore.getState().cases.find(x => x.status !== 'closed' && x.steps?.some(s => !s.done))!;
+    useCaseDockStore.getState().touch(c.id);
+    render(
+      <MemoryRouter initialEntries={['/funds']}>
+        <Routes>
+          <Route path="/funds" element={<CaseDock />} />
+          <Route path="/issues" element={<div data-testid="case-page">case</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const dock = document.querySelector('[data-widget="case-dock"]') as HTMLElement;
+    fireEvent.click(within(dock).getByRole('button', { name: 'Back to the step' }));
     expect(screen.getByTestId('case-page')).toBeTruthy();
-    store.clearActiveCaseContext();
   });
 });
