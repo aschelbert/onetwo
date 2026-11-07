@@ -16,7 +16,11 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   boardroom: Gavel,
 };
 
-/** Phone bottom nav: five tabs for the board, four for residents, no More flyout. */
+/**
+ * Bottom nav for phones and tablets: five tabs for the board, four for
+ * residents, no More flyout. It shows wherever the top bar's module pills
+ * are hidden (below 1080px), so it is the only module navigation there.
+ */
 export default function Ux2BottomNav() {
   const { currentRole } = useAuthStore();
   const permissions = usePlatformAdminStore(s => s.permissions);
@@ -31,7 +35,7 @@ export default function Ux2BottomNav() {
   const isOn = (matches: string[]) => matches.some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
 
   return (
-    <nav aria-label="Primary" className="ux2 fixed bottom-0 left-0 right-0 z-50 border-t border-ux2-line bg-white px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 sm:hidden">
+    <nav aria-label="Primary" className="ux2 fixed bottom-0 left-0 right-0 z-50 border-t border-ux2-line bg-white px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 min-[1080px]:hidden">
       <div className="flex items-center justify-around rounded-full border border-ux2-line bg-ux2-surface p-1">
         {tabs.map(t => {
           const Icon = ICONS[t.id] ?? Home;
