@@ -24,7 +24,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTenantContext } from '@/components/TenantProvider';
 import { tierHasAmenities } from '@/lib/tiers';
 import { useAmenitiesStore } from '@/store/useAmenitiesStore';
-import { Chip, PillTabs } from '../components';
+import { Chip, PillTabs, ModuleHeader, STATUS_CHIP } from '../components';
 import { dayLabel } from '../home/calendar';
 import { useCommunitySnapshot } from './useCommunitySnapshot';
 import { meetingRows, meetingsSummary, noticesSummary, requestRows, requestsSummary, voteRows, votesSummary } from './metrics';
@@ -98,21 +98,17 @@ export default function CommunityModule() {
 
   return (
     <div data-page="ux2-community" className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">Community</h1>
-            <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {notices.alerts.length > 0 && (
-              <button type="button" onClick={() => go('notices')} className="rounded-full"><Chip tone="red">{notices.alerts.length} alert{notices.alerts.length === 1 ? '' : 's'}</Chip></button>
-            )}
-            {meetings.next && <Chip tone="ghost">Next meeting {dayLabel(meetings.next.meeting.date)}</Chip>}
-          </div>
-        </div>
-        <PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Community sections" />
-      </header>
+      <ModuleHeader
+        title="Community"
+        subtitle={subtitle}
+        status={notices.alerts.length > 0 || meetings.next ? <>
+          {notices.alerts.length > 0 && (
+            <button type="button" onClick={() => go('notices')} className="rounded-full"><Chip tone="red" className={STATUS_CHIP}>{notices.alerts.length} alert{notices.alerts.length === 1 ? '' : 's'}</Chip></button>
+          )}
+          {meetings.next && <Chip tone="ghost" className={STATUS_CHIP}>Next meeting {dayLabel(meetings.next.meeting.date)}</Chip>}
+        </> : undefined}
+        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Community sections" />}
+      />
 
       {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
       {tab === 'notices' && <NoticesTab snap={snap} />}
