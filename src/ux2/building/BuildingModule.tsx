@@ -19,7 +19,7 @@
  */
 import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Chip, PillTabs } from '../components';
+import { Chip, PillTabs, ModuleHeader, STATUS_CHIP } from '../components';
 import { useBuildingSnapshot } from './useBuildingSnapshot';
 import { buildingScore, contractRows, contractsSummary, insuranceStatus, obligationRows, obligationsSummary } from './metrics';
 import { dayLabel } from '../home/calendar';
@@ -104,23 +104,19 @@ export default function BuildingModule() {
 
   return (
     <div data-page="ux2-building" className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">{snap.name}</h1>
-            <p className="max-w-[760px] text-sm text-ux2-muted">{line} · the building itself: what it is, what it must keep, who is in it</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
-            {alert && (
-              <button type="button" onClick={() => go('overview', 'insurance')} className="rounded-full">
-                <Chip tone="red">{alert.type} {alert.state === 'lapsed' ? `lapsed ${dayLabel(alert.expires)}` : `expires ${dayLabel(alert.expires)}`}</Chip>
-              </button>
-            )}
-          </div>
-        </div>
-        <PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Building sections" />
-      </header>
+      <ModuleHeader
+        title={snap.name}
+        subtitle={<>{line} · the building itself: what it is, what it must keep, who is in it</>}
+        status={<>
+          <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
+          {alert && (
+            <button type="button" onClick={() => go('overview', 'insurance')} className="rounded-full">
+              <Chip tone="red" className={STATUS_CHIP}>{alert.type} {alert.state === 'lapsed' ? `lapsed ${dayLabel(alert.expires)}` : `expires ${dayLabel(alert.expires)}`}</Chip>
+            </button>
+          )}
+        </>}
+        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Building sections" />}
+      />
 
       {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
       {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}

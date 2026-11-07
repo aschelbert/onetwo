@@ -26,7 +26,7 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import IntercomTab from '@/features/association-team/tabs/CommunicationsTab';
-import { Button, Card, Chip, Inner, PillTabs, SectionLabel } from '../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, ModuleHeader, STATUS_CHIP } from '../components';
 import { useBoardRoomSnapshot } from './useBoardRoomSnapshot';
 import { archiveRows, caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
@@ -113,19 +113,13 @@ export default function BoardRoomModule() {
 
   return (
     <div data-page="ux2-boardroom" className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">Board Room</h1>
-            <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {cases.overdue.length > 0 && <Chip tone="red">{cases.overdue.length} overdue</Chip>}
-            {tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
-          </div>
-        </div>
-        <PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />
-      </header>
+      <ModuleHeader
+        title="Board Room"
+        subtitle={subtitle}
+        status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
+        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
+        actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
+      />
 
       {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
       {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}

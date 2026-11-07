@@ -12,7 +12,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
-import { Button, PillTabs } from '../components';
+import { Button, PillTabs, ModuleHeader } from '../components';
 import { useMeSnapshot } from './useMeSnapshot';
 import AccountTab from './tabs/AccountTab';
 import UnitsTab from './tabs/UnitsTab';
@@ -63,22 +63,18 @@ export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
 
   return (
     <div data-page="ux2-me" className="flex flex-col gap-5">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">{title}</h1>
-            <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {tab === 'unit' && units.length > 0 && <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button>}
-            {tab === 'account' && <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>}
-            {tab === 'users' && <><Button onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Invite someone</Button><Button variant="ghost" onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Bulk invite</Button></>}
-            {tab === 'subscription' && <><Button onClick={() => document.getElementById('plans-card')?.scrollIntoView({ behavior: 'smooth' })}>Manage plan</Button><Button variant="ghost" onClick={() => document.getElementById('invoices-card')?.scrollIntoView({ behavior: 'smooth' })}>Latest invoice</Button></>}
-            {tab === 'help' && <Button onClick={() => document.getElementById('thread-card')?.scrollIntoView({ behavior: 'smooth' })}>New support thread</Button>}
-          </div>
-        </div>
-        <PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />
-      </header>
+      <ModuleHeader
+        title={title}
+        subtitle={subtitle}
+        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />}
+        actions={
+          tab === 'unit' ? (units.length > 0 ? <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button> : undefined)
+          : tab === 'account' ? <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>
+          : tab === 'users' ? <><Button onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Invite someone</Button><Button variant="ghost" onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Bulk invite</Button></>
+          : tab === 'subscription' ? <><Button onClick={() => document.getElementById('plans-card')?.scrollIntoView({ behavior: 'smooth' })}>Manage plan</Button><Button variant="ghost" onClick={() => document.getElementById('invoices-card')?.scrollIntoView({ behavior: 'smooth' })}>Latest invoice</Button></>
+          : <Button onClick={() => document.getElementById('thread-card')?.scrollIntoView({ behavior: 'smooth' })}>New support thread</Button>
+        }
+      />
 
       {tab === 'account' && <AccountTab snap={snap} />}
       {tab === 'unit' && <UnitsTab snap={snap} />}
