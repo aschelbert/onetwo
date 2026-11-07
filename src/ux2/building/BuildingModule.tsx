@@ -7,6 +7,7 @@ import { useState } from 'react';
  *  Obligations  the compliance record: every requirement and its state, filings, duties and roles
  *  Contracts    every vendor, the contract behind each, when it ends
  *  Directory    units and owners, board, management and counsel, staff
+ *  Archive      closed cases, requests and letters with the decision trail (board only)
  *
  * The detail under each section is the production page that owns the records
  * (Building page tabs, Board Room's Duties and Governance Calendar, Archives,
@@ -29,9 +30,10 @@ import DocumentsTab from './tabs/DocumentsTab';
 import ObligationsTab from './tabs/ObligationsTab';
 import ContractsTab from './tabs/ContractsTab';
 import DirectoryTab from './tabs/DirectoryTab';
+import ArchiveSection from './tabs/ArchiveSection';
 
-export type BuildingTab = 'overview' | 'documents' | 'obligations' | 'contracts' | 'directory';
-const TAB_IDS: BuildingTab[] = ['overview', 'documents', 'obligations', 'contracts', 'directory'];
+export type BuildingTab = 'overview' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
+const TAB_IDS: BuildingTab[] = ['overview', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
 
 /** Legacy tab ids (Building page, Association Team, Archives, Board Room) → Building tab and section. */
 export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }> = {
@@ -65,10 +67,11 @@ export function resolveBuildingTab(raw: string | null): { tab: BuildingTab; sect
 export default function BuildingModule() {
   const [params, setParams] = useSearchParams();
   const resolved = resolveBuildingTab(params.get('tab'));
-  const tab = resolved.tab;
   const section = params.get('section') ?? resolved.section;
   const role = useAuthStore(s => s.currentRole);
   const isBoard = role === 'BOARD_MEMBER' || role === 'PROPERTY_MANAGER' || role === 'PLATFORM_ADMIN';
+  // Owners never see the archive; a resident landing on it gets the Overview.
+  const tab: BuildingTab = resolved.tab === 'archive' && !isBoard ? 'overview' : resolved.tab;
 
   const snap = useBuildingSnapshot();
   const score = buildingScore(snap);
@@ -101,6 +104,7 @@ export default function BuildingModule() {
     { id: 'obligations' as BuildingTab, label: 'Obligations', badge: obl.overdue.length + obl.inProgress.length || undefined, badgeTone: obl.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'contracts' as BuildingTab, label: 'Contracts', badge: con.lapsed.length ? `${con.lapsed.length} lapsed` : undefined, badgeTone: 'red' as const },
     { id: 'directory' as BuildingTab, label: 'Directory' },
+    ...(isBoard ? [{ id: 'archive' as BuildingTab, label: 'Archive' }] : []),
   ];
 
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -116,6 +120,7 @@ export default function BuildingModule() {
             obligations: "The things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.",
             contracts: 'Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.',
             directory: 'The one directory: units and owners, the board, advisers, staff, and who to call at 2am.',
+            archive: 'The cases, requests and letters this board has closed, read-only, with the decision trail behind each one. Nothing here needs you; owners never see it.',
           }[tab] ?? 'The building itself: what it is, what it must keep, who is in it.'}</span></>}
           status={<>
             <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
@@ -133,6 +138,7 @@ export default function BuildingModule() {
         {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
         {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}
         {tab === 'directory' && <DirectoryTab snap={snap} section={section} onSection={s => go('directory', s)} isBoard={isBoard} />}
+        {tab === 'archive' && isBoard && <ArchiveSection />}
       </div>
     </HeaderSlotProvider>
   );

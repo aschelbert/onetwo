@@ -3,7 +3,8 @@ import OnboardingSetupWidget from '@/components/OnboardingSetupWidget';
 import { useTenantContext } from '@/components/TenantProvider';
 import Ux2TopNav from './Ux2TopNav';
 import Ux2BottomNav from './Ux2BottomNav';
-import ReturnToCaseBar from './ReturnToCaseBar';
+import CaseDock, { useCaseDock } from './CaseDock';
+import { cn } from '@/lib/formatters';
 
 /**
  * The redesign's shell. Phase 0 renders the production pages inside it: same
@@ -12,6 +13,8 @@ import ReturnToCaseBar from './ReturnToCaseBar';
  */
 export default function Ux2Shell() {
   const tenant = useTenantContext();
+  // While a case is docked the page keeps room at the bottom, so the dock never covers the last row.
+  const docked = !!useCaseDock();
   return (
     <div className="ux2 ux2-page flex min-h-screen flex-col">
       {tenant.isDemo && (
@@ -20,13 +23,13 @@ export default function Ux2Shell() {
         </div>
       )}
       <Ux2TopNav />
-      <ReturnToCaseBar />
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-[88px] pt-4 min-[1080px]:pb-10">
+      <main className={cn('mx-auto w-full max-w-[1200px] flex-1 px-6 pt-4', docked ? 'pb-[164px] min-[1080px]:pb-[112px]' : 'pb-[88px] min-[1080px]:pb-10')}>
         {tenant.status === 'onboarding' && <div className="ux2-onboarding"><OnboardingSetupWidget /></div>}
         <div className="animate-fade-in">
           <Outlet />
         </div>
       </main>
+      <CaseDock />
       <Ux2BottomNav />
     </div>
   );

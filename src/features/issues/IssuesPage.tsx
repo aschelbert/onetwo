@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNarrowScreen } from '@/hooks/useNarrowScreen';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useIssuesStore, CATS, APPR_LABELS, APPR_COLORS, PRIO_COLORS, SITUATION_PHASES, PHASE_COLORS } from '@/store/useIssuesStore';
 import type { StepAction } from '@/store/useIssuesStore';
@@ -941,6 +943,17 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
 
   // Reset active step when navigating to a different case
   useEffect(() => { setActiveStep(0); setActiveApproachIdx(null); }, [caseId]);
+  // Phones and tablets (below 1080px, where the app switches to its bottom bar) get one column:
+  // the step list, and a tapped step opens full screen instead of in a right column that does not fit.
+  const narrow = useNarrowScreen();
+  const [stepOpen, setStepOpen] = useState(false);
+  useEffect(() => { setStepOpen(false); }, [caseId]);
+  useEffect(() => {
+    if (!stepOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setStepOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [stepOpen]);
 
   const ACTION_NAV: Record<string, { route: string; tab?: string }> = {
     'financial':            { route: '/financial' },
@@ -1068,8 +1081,8 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
   const pct = totalProgress > 0 ? Math.round((doneProgress / totalProgress) * 100) : 0;
 
   // Selection handlers
-  const handleSelectPrimaryStep = (i: number) => { setActiveStep(i); setActiveApproachIdx(null); };
-  const handleSelectAdditionalStep = (ai: number, si: number) => { setActiveApproachIdx(ai); setActiveStep(si); };
+  const handleSelectPrimaryStep = (i: number) => { setActiveStep(i); setActiveApproachIdx(null); setStepOpen(true); };
+  const handleSelectAdditionalStep = (ai: number, si: number) => { setActiveApproachIdx(ai); setActiveStep(si); setStepOpen(true); };
 
   // Clamp activeStep to valid range
   const safeStep = Math.max(0, Math.min(activeStep, steps.length - 1));
@@ -1111,6 +1124,94 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
     return <OwnerCaseView c={c} onBack={onBack} />;
   }
 
+  const caseColumn = (
+    <>
+    <BudgetTracker c={c} />
+    <CaseHeader
+      c={c}
+      pct={pct}
+      onAddApproach={() => setShowApproachModal(true)}
+      onClose={() => setShowCloseModal(true)}
+      onReopen={() => store.reopenCase(caseId)}
+      onDelete={() => setShowDeleteModal(true)}
+    />
+    <StepList
+      c={c}
+      steps={steps}
+      activeStep={isAdditionalActive ? activeStep : safeStep}
+      onSelectStep={handleSelectPrimaryStep}
+      onToggleAdditionalStep={(ai, si) => store.toggleAdditionalStep(caseId, ai, si)}
+      onSelectAdditionalStep={handleSelectAdditionalStep}
+      activeApproachIdx={activeApproachIdx}
+    />
+    <SideSections
+      c={c}
+      onUploadDoc={() => setShowDocModal(true)}
+      onSendComm={() => {
+        setComposePanelContext({
+          scope: c.unit ? 'unit' : 'community',
+          recipientUnit: c.unit || undefined,
+          recipientName: c.owner || undefined,
+          caseId: c.id,
+          caseLink: `Case ${c.id}`,
+          source: 'case-workflow',
+        });
+        setShowComposePanel(true);
+      }}
+      onRecordVote={() => setShowVoteModal(true)}
+      onFiscalLens={() => navigate('/financial')}
+      onExport={handleExport}
+    />
+    </>
+  );
+  const stepPane = currentStep ? (
+    <>
+    <ShellStepHeader
+      step={currentStep}
+      stepNumber={currentStepIdx + 1}
+      caseSitId={c.sitId}
+      approachLabel={isAdditionalActive ? APPR_LABELS[additionalApproaches[activeApproachIdx!].approach] : undefined}
+      approachColorClass={isAdditionalActive ? APPR_COLORS[additionalApproaches[activeApproachIdx!].approach] : undefined}
+    />
+    <StepContent
+      c={c}
+      step={currentStep}
+      stepIndex={currentStepIdx}
+      stNote={stNote}
+      stateAbbr={stateAbbr}
+      onToggleStep={(idx) => {
+        if (isAdditionalActive) store.toggleAdditionalStep(caseId, activeApproachIdx!, idx);
+        else store.toggleStep(caseId, idx);
+      }}
+      onAddNote={handleAddNote}
+      onToggleAction={(actionId) => {
+        if (isAdditionalActive) store.toggleAdditionalAction(caseId, activeApproachIdx!, currentStepIdx, actionId);
+        else store.toggleAction(caseId, safeStep, actionId);
+      }}
+      onToggleCheck={(checkId) => {
+        if (isAdditionalActive) store.toggleAdditionalCheck(caseId, activeApproachIdx!, currentStepIdx, checkId);
+        else store.toggleCheck(caseId, safeStep, checkId);
+      }}
+      onAction={(action, stepIdx) => handleAction(action, stepIdx)}
+      onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
+      onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}
+      onGenerateCheckDoc={(checkId, reportType) => {
+        const ck = currentStep.checks?.find(x => x.id === checkId);
+        if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType });
+      }}
+      onUploadCheckDoc={(checkId) => {
+        const ck = currentStep.checks?.find(x => x.id === checkId);
+        if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType: null });
+      }}
+      onAttachFromBuilding={(checkId, source) => handleAttachFromBuilding(caseId, currentStepIdx, checkId, source)}
+      inlineStepIdx={inlineStepIdx}
+      caseId={caseId}
+    />
+    </>
+  ) : null;
+  const stepCount = isAdditionalActive ? additionalApproaches[activeApproachIdx!].steps.length : steps.length;
+  const gotoStep = (i: number) => { if (i >= 0 && i < stepCount) setActiveStep(i); };
+
   return (
     <div>
       {/* Breadcrumb bar */}
@@ -1122,50 +1223,41 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         <span className="text-xs text-ink-500 font-medium truncate">{c.title}</span>
       </div>
 
-      {/* Two-column grid */}
-      {c.steps && currentStep ? (
+      {/* Desktop: two columns. */}
+      {/* Phones and tablets: one column; a tapped step opens full screen. */}
+      {c.steps && currentStep && narrow ? (
+        <div data-case-layout="narrow" className="bg-white">
+          {caseColumn}
+          {stepOpen && createPortal(
+            <div role="dialog" aria-modal="true" aria-label={`Step ${currentStepIdx + 1} of ${stepCount}: ${currentStep.s}`} className="fixed inset-0 z-[70] flex flex-col bg-ink-50">
+              <div className="flex items-center gap-2 border-b border-ink-100 bg-white px-3 py-2">
+                <button type="button" onClick={() => setStepOpen(false)} className="flex h-11 items-center gap-1 rounded-full px-3 text-sm font-semibold text-ink-700 hover:bg-ink-50" aria-label="Back to all steps">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                  All steps
+                </button>
+                <span className="min-w-0 flex-1 truncate text-center text-xs text-ink-500">Step {currentStepIdx + 1} of {stepCount}</span>
+                <button type="button" aria-label="Previous step" disabled={currentStepIdx <= 0} onClick={() => gotoStep(currentStepIdx - 1)} className="grid h-11 w-11 place-items-center rounded-full text-ink-700 hover:bg-ink-50 disabled:opacity-30">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                </button>
+                <button type="button" aria-label="Next step" disabled={currentStepIdx >= stepCount - 1} onClick={() => gotoStep(currentStepIdx + 1)} className="grid h-11 w-11 place-items-center rounded-full text-ink-700 hover:bg-ink-50 disabled:opacity-30">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">{stepPane}</div>
+            </div>,
+            // Portalled to the body: the page content sits in an animated (transformed) wrapper,
+            // which would otherwise trap a fixed element under the sticky top bar.
+            document.body,
+          )}
+        </div>
+      ) : c.steps && currentStep ? (
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr' }}>
           {/* LEFT COLUMN — sticky, independent scroll */}
           <div
             className="border-r border-ink-200 bg-white overflow-y-auto"
             style={{ height: 'calc(100vh - 140px)', position: 'sticky', top: 140 }}
           >
-            <BudgetTracker c={c} />
-            <CaseHeader
-              c={c}
-              pct={pct}
-              onAddApproach={() => setShowApproachModal(true)}
-              onClose={() => setShowCloseModal(true)}
-              onReopen={() => store.reopenCase(caseId)}
-              onDelete={() => setShowDeleteModal(true)}
-            />
-            <StepList
-              c={c}
-              steps={steps}
-              activeStep={isAdditionalActive ? activeStep : safeStep}
-              onSelectStep={handleSelectPrimaryStep}
-              onToggleAdditionalStep={(ai, si) => store.toggleAdditionalStep(caseId, ai, si)}
-              onSelectAdditionalStep={handleSelectAdditionalStep}
-              activeApproachIdx={activeApproachIdx}
-            />
-            <SideSections
-              c={c}
-              onUploadDoc={() => setShowDocModal(true)}
-              onSendComm={() => {
-                setComposePanelContext({
-                  scope: c.unit ? 'unit' : 'community',
-                  recipientUnit: c.unit || undefined,
-                  recipientName: c.owner || undefined,
-                  caseId: c.id,
-                  caseLink: `Case ${c.id}`,
-                  source: 'case-workflow',
-                });
-                setShowComposePanel(true);
-              }}
-              onRecordVote={() => setShowVoteModal(true)}
-              onFiscalLens={() => navigate('/financial')}
-              onExport={handleExport}
-            />
+            {caseColumn}
           </div>
 
           {/* RIGHT COLUMN — independent scroll */}
@@ -1173,47 +1265,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             className="overflow-y-auto bg-ink-50"
             style={{ height: 'calc(100vh - 140px)' }}
           >
-            <ShellStepHeader
-              step={currentStep}
-              stepNumber={currentStepIdx + 1}
-              caseSitId={c.sitId}
-              approachLabel={isAdditionalActive ? APPR_LABELS[additionalApproaches[activeApproachIdx!].approach] : undefined}
-              approachColorClass={isAdditionalActive ? APPR_COLORS[additionalApproaches[activeApproachIdx!].approach] : undefined}
-            />
-            <StepContent
-              c={c}
-              step={currentStep}
-              stepIndex={currentStepIdx}
-              stNote={stNote}
-              stateAbbr={stateAbbr}
-              onToggleStep={(idx) => {
-                if (isAdditionalActive) store.toggleAdditionalStep(caseId, activeApproachIdx!, idx);
-                else store.toggleStep(caseId, idx);
-              }}
-              onAddNote={handleAddNote}
-              onToggleAction={(actionId) => {
-                if (isAdditionalActive) store.toggleAdditionalAction(caseId, activeApproachIdx!, currentStepIdx, actionId);
-                else store.toggleAction(caseId, safeStep, actionId);
-              }}
-              onToggleCheck={(checkId) => {
-                if (isAdditionalActive) store.toggleAdditionalCheck(caseId, activeApproachIdx!, currentStepIdx, checkId);
-                else store.toggleCheck(caseId, safeStep, checkId);
-              }}
-              onAction={(action, stepIdx) => handleAction(action, stepIdx)}
-              onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
-              onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}
-              onGenerateCheckDoc={(checkId, reportType) => {
-                const ck = currentStep.checks?.find(x => x.id === checkId);
-                if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType });
-              }}
-              onUploadCheckDoc={(checkId) => {
-                const ck = currentStep.checks?.find(x => x.id === checkId);
-                if (ck) setCheckDocModal({ stepIdx: currentStepIdx, checkId, checkLabel: getCleanLabel(ck.label), reportType: null });
-              }}
-              onAttachFromBuilding={(checkId, source) => handleAttachFromBuilding(caseId, currentStepIdx, checkId, source)}
-              inlineStepIdx={inlineStepIdx}
-              caseId={caseId}
-            />
+            {stepPane}
           </div>
         </div>
       ) : (
