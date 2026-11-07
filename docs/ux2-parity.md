@@ -173,3 +173,15 @@ stays inside the table's scroller instead of widening the page on phones.
   the read-only table with the decision trail (board vote tallies) and a
   per-row export, Show the other N, Export all (CSV index plus one file
   per item) and How long it stays.
+
+## Module header
+
+Every module (Funds, Board Room, Building, Community, Me) uses
+`ModuleHeader`: title and subtitle with status chips at the right; then the
+section tabs with the calls to action right-justified on the same row, to
+the left of any navigation icon (the Funds gear). A tab adds its own buttons
+there with `<HeaderActions>`, which portals into the header so the button
+keeps its inline form in the tab. Tabs carry no title or description block
+of their own. Header buttons are compact (40px, 13px text) to match the
+tabs; if a row is ever too narrow, the button group wraps under the tabs,
+still right-aligned.

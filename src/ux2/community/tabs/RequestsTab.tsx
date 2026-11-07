@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import type { Issue } from '@/types/issues';
 import { cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Cell, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Cell, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { requestRows, requestsSummary, type RequestRow, type CommunitySnapshot } from '../metrics';
 
@@ -104,13 +104,10 @@ export default function RequestsTab({ snap, highlightId }: { snap: CommunitySnap
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Why className="max-w-[760px]">{isBoard ? 'This is the owner-facing side of the same requests the board works in Board Room › Inbox. Board replies, the 14-day clock and the convert-to-case step happen there; the owner sees the status, the dates and the replies.' : 'Ask the board for something, follow where it is, and see what neighbours have asked for.'}</Why>
-        <div className="flex gap-2">{isBoard && <Button variant="ghost" onClick={() => navigate('/boardroom?tab=inbox')}>Board Room › Inbox</Button>}<Button onClick={() => { setComposing(true); document.getElementById('make-request')?.scrollIntoView({ behavior: 'smooth' }); }}>Make a request</Button></div>
-      </div>
+      <HeaderActions><Button onClick={() => { setComposing(true); document.getElementById('make-request')?.scrollIntoView({ behavior: 'smooth' }); }}>Make a request</Button></HeaderActions>
 
       <Card aria-label="Your requests" className="gap-3">
-        <SectionLabel>Your requests · {mineOpen.length} open</SectionLabel>
+        <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Your requests · {mineOpen.length} open</SectionLabel>{isBoard && <button type="button" onClick={() => navigate('/boardroom?tab=inbox')} className="text-xs font-semibold text-ux2-teal hover:underline">Board replies happen in Board Room › Inbox</button>}</div>
         {mineOpen.length === 0 ? <Inner className="text-sm text-ux2-muted">Nothing open. Make a request below.</Inner> : mineOpen.map(r => <MyRequest key={r.issue.id} r={r} snap={snap} highlight={r.issue.id === highlightId} />)}
       </Card>
 

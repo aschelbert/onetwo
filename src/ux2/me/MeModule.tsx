@@ -1,3 +1,4 @@
+import { useState } from 'react';
 /**
  * Me — the avatar-menu area (ux2.me): My Account, My Unit(s), User
  * Management, Subscription, Help & Support. Each keeps its production route
@@ -12,7 +13,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
-import { Button, PillTabs, ModuleHeader } from '../components';
+import { Button, PillTabs, ModuleHeader, HeaderSlotProvider } from '../components';
 import { useMeSnapshot } from './useMeSnapshot';
 import AccountTab from './tabs/AccountTab';
 import UnitsTab from './tabs/UnitsTab';
@@ -61,26 +62,30 @@ export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
     help: 'Find an answer, learn how ONE two works, or reach a person.',
   }[tab];
 
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
-    <div data-page="ux2-me" className="flex flex-col gap-5">
-      <ModuleHeader
-        title={title}
-        subtitle={subtitle}
-        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />}
-        actions={
-          tab === 'unit' ? (units.length > 0 ? <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button> : undefined)
-          : tab === 'account' ? <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>
-          : tab === 'users' ? <><Button onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Invite someone</Button><Button variant="ghost" onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Bulk invite</Button></>
-          : tab === 'subscription' ? <><Button onClick={() => document.getElementById('plans-card')?.scrollIntoView({ behavior: 'smooth' })}>Manage plan</Button><Button variant="ghost" onClick={() => document.getElementById('invoices-card')?.scrollIntoView({ behavior: 'smooth' })}>Latest invoice</Button></>
-          : <Button onClick={() => document.getElementById('thread-card')?.scrollIntoView({ behavior: 'smooth' })}>New support thread</Button>
-        }
-      />
+    <HeaderSlotProvider value={headerSlot}>
+      <div data-page="ux2-me" className="flex flex-col gap-5">
+        <ModuleHeader
+          slotRef={setHeaderSlot}
+          title={title}
+          subtitle={subtitle}
+          tabs={<PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />}
+          actions={
+            tab === 'unit' ? (units.length > 0 ? <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button> : undefined)
+            : tab === 'account' ? <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>
+            : tab === 'users' ? <><Button onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Invite someone</Button><Button variant="ghost" onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Bulk invite</Button></>
+            : tab === 'subscription' ? <><Button onClick={() => document.getElementById('plans-card')?.scrollIntoView({ behavior: 'smooth' })}>Manage plan</Button><Button variant="ghost" onClick={() => document.getElementById('invoices-card')?.scrollIntoView({ behavior: 'smooth' })}>Latest invoice</Button></>
+            : <Button onClick={() => document.getElementById('thread-card')?.scrollIntoView({ behavior: 'smooth' })}>New support thread</Button>
+          }
+        />
 
-      {tab === 'account' && <AccountTab snap={snap} />}
-      {tab === 'unit' && <UnitsTab snap={snap} />}
-      {tab === 'users' && canManage && <UsersTab snap={snap} />}
-      {tab === 'subscription' && canBill && <SubscriptionTab snap={snap} />}
-      {tab === 'help' && <HelpTab snap={snap} />}
-    </div>
+        {tab === 'account' && <AccountTab snap={snap} />}
+        {tab === 'unit' && <UnitsTab snap={snap} />}
+        {tab === 'users' && canManage && <UsersTab snap={snap} />}
+        {tab === 'subscription' && canBill && <SubscriptionTab snap={snap} />}
+        {tab === 'help' && <HelpTab snap={snap} />}
+      </div>
+    </HeaderSlotProvider>
   );
 }

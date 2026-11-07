@@ -1,3 +1,4 @@
+import { useState } from 'react';
 /**
  * Building — the redesign's module for the building itself (ux2.building).
  *
@@ -19,7 +20,7 @@
  */
 import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Chip, PillTabs, ModuleHeader, STATUS_CHIP } from '../components';
+import { Chip, PillTabs, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useBuildingSnapshot } from './useBuildingSnapshot';
 import { buildingScore, contractRows, contractsSummary, insuranceStatus, obligationRows, obligationsSummary } from './metrics';
 import { dayLabel } from '../home/calendar';
@@ -102,27 +103,31 @@ export default function BuildingModule() {
     { id: 'directory' as BuildingTab, label: 'Directory' },
   ];
 
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
-    <div data-page="ux2-building" className="flex flex-col gap-5">
-      <ModuleHeader
-        title={snap.name}
-        subtitle={<>{line} · the building itself: what it is, what it must keep, who is in it</>}
-        status={<>
-          <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
-          {alert && (
-            <button type="button" onClick={() => go('overview', 'insurance')} className="rounded-full">
-              <Chip tone="red" className={STATUS_CHIP}>{alert.type} {alert.state === 'lapsed' ? `lapsed ${dayLabel(alert.expires)}` : `expires ${dayLabel(alert.expires)}`}</Chip>
-            </button>
-          )}
-        </>}
-        tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Building sections" />}
-      />
+    <HeaderSlotProvider value={headerSlot}>
+      <div data-page="ux2-building" className="flex flex-col gap-5">
+        <ModuleHeader
+          slotRef={setHeaderSlot}
+          title={snap.name}
+          subtitle={<>{line} · the building itself: what it is, what it must keep, who is in it</>}
+          status={<>
+            <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
+            {alert && (
+              <button type="button" onClick={() => go('overview', 'insurance')} className="rounded-full">
+                <Chip tone="red" className={STATUS_CHIP}>{alert.type} {alert.state === 'lapsed' ? `lapsed ${dayLabel(alert.expires)}` : `expires ${dayLabel(alert.expires)}`}</Chip>
+              </button>
+            )}
+          </>}
+          tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Building sections" />}
+        />
 
-      {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
-      {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}
-      {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
-      {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}
-      {tab === 'directory' && <DirectoryTab snap={snap} section={section} onSection={s => go('directory', s)} isBoard={isBoard} />}
-    </div>
+        {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
+        {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}
+        {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
+        {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}
+        {tab === 'directory' && <DirectoryTab snap={snap} section={section} onSection={s => go('directory', s)} isBoard={isBoard} />}
+      </div>
+    </HeaderSlotProvider>
   );
 }

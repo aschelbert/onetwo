@@ -4,7 +4,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useElectionStore, type Election, type VoteChoice } from '@/store/useElectionStore';
-import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { boardDecisions, voteRows, votesSummary, type VoteRow, type CommunitySnapshot } from '../metrics';
 
@@ -100,10 +100,7 @@ export default function VotesTab({ snap, selectedId, onSelect }: { snap: Communi
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Why className="max-w-[720px]">Owners see the open owner votes with a Vote button, the election, their proxy, and results once certified. Board votes and the manage controls show for the board only.</Why>
-        {isBoard && <div className="flex gap-2"><Button variant="ghost" disabled={!open} onClick={() => setProxyFor(open && proxyFor === open.election.id ? null : open?.election.id ?? null)}>Record a proxy</Button><Button onClick={() => setOpening(v => !v)}>Open a vote</Button></div>}
-      </div>
+      {isBoard && <HeaderActions><Button variant="ghost" disabled={!open} onClick={() => setProxyFor(open && proxyFor === open.election.id ? null : open?.election.id ?? null)}>Add proxy</Button><Button onClick={() => setOpening(v => !v)}>Open a vote</Button></HeaderActions>}
       {opening && <OpenVoteForm snap={snap} onClose={() => setOpening(false)} />}
       {proxyFor && open && <ProxyForm r={open} snap={snap} onClose={() => setProxyFor(null)} />}
 

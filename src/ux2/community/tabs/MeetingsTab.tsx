@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
-import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { meetingRows, meetingsSummary, type MeetingRow, type CommunitySnapshot } from '../metrics';
 
@@ -79,12 +79,7 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
 
   return (
     <div className="flex flex-col gap-4">
-      {isBoard && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Why className="max-w-[720px]">Owners see this same page without the manage controls: they RSVP, read the agenda, add a proxy and read posted minutes. Notices themselves are sent from the Board Room outbox.</Why>
-          <div className="flex gap-2"><Button variant="ghost" onClick={() => navigate('/home?view=calendar')}>Open the calendar</Button><Button onClick={() => setScheduling(v => !v)}>Schedule a meeting</Button></div>
-        </div>
-      )}
+      {isBoard && <HeaderActions><Button onClick={() => setScheduling(v => !v)}>Schedule a meeting</Button></HeaderActions>}
       {scheduling && <ScheduleForm onClose={() => setScheduling(false)} />}
 
       {next ? (
@@ -111,7 +106,7 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PillTabs size="filter" aria-label="Meeting filters" value={filter} onChange={setFilter} tabs={[{ id: 'all', label: 'All meetings' }, { id: 'upcoming', label: `Upcoming · ${sum.upcoming.length}` }, { id: 'past', label: `Past · ${sum.past.length}` }, { id: 'board', label: 'Board meetings' }, { id: 'owner', label: 'Owner meetings' }]} />
-        <span className="text-xs text-ux2-muted">Minutes archive is in <button type="button" onClick={() => navigate('/building?tab=documents')} className="font-semibold text-ux2-teal hover:underline">Building › Documents</button></span>
+        <span className="text-xs text-ux2-muted"><button type="button" onClick={() => navigate('/home?view=calendar')} className="font-semibold text-ux2-teal hover:underline">Open the calendar</button> · Minutes archive is in <button type="button" onClick={() => navigate('/building?tab=documents')} className="font-semibold text-ux2-teal hover:underline">Building › Documents</button></span>
       </div>
 
       <Card aria-label="All meetings" className="gap-2.5">

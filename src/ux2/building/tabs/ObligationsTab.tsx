@@ -195,7 +195,6 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
 
   return (
     <div className="flex flex-col gap-4">
-      <div><h2 className="m-0 text-xl font-medium text-ux2-ink">Obligations</h2><p className="m-0 max-w-[760px] text-sm text-ux2-muted">The {sum.total} things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.</p></div>
       <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'ongoing', label: `Ongoing · ${sum.ongoing}` }, { id: 'duties', label: 'Duties and roles' }]} />
       {view !== 'duties' && (
         <>

@@ -4,7 +4,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useComplianceStore, type Announcement } from '@/store/useComplianceStore';
 import { cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, KV, RowMenu, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, KV, RowMenu, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { emailAnnouncement } from '../notify';
 import { noticesSummary, type CommunitySnapshot } from '../metrics';
@@ -89,7 +89,7 @@ export default function NoticesTab({ snap }: { snap: CommunitySnapshot }) {
       ) : (
         <Inner className="flex flex-wrap items-center gap-3 text-sm text-ux2-ink"><Chip tone="sage">No active alerts</Chip><span className="text-ux2-muted">Urgent notices from the board (water or power off, fire alarm test, elevator out of service) show here and at the top of Home until they are cleared.</span></Inner>
       )}
-      {isBoard && !composing && <Button className="self-end" onClick={() => setComposing(true)}>New notice</Button>}
+      {isBoard && <HeaderActions><Button onClick={() => setComposing(v => !v)}>New notice</Button></HeaderActions>}
       {composing && <NewNotice onDone={() => setComposing(false)} />}
 
       {notices.pinned.length > 0 && (

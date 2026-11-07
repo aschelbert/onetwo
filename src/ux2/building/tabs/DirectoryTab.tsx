@@ -10,7 +10,7 @@ import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import { cn, fmt } from '@/lib/formatters';
 import type { Role } from '@/types/auth';
 import type { Unit } from '@/types/financial';
-import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, KV, RowMenu, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, KV, RowMenu, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { useStoreSnapshot } from '../../runbook/adapters';
 import { boardEvents } from '../../score/events';
@@ -103,10 +103,7 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0"><h2 className="m-0 text-xl font-medium text-ux2-ink">Directory</h2><p className="m-0 text-sm text-ux2-muted">The one directory: units and owners, the board, advisers, staff, and who to call at 2am.</p></div>
-        {isBoard && <div className="flex gap-2"><Button variant="ghost" onClick={exportList}>Export list</Button><Button onClick={() => setInviting(v => !v)}>Invite</Button></div>}
-      </div>
+      {isBoard && <HeaderActions><Button variant="ghost" onClick={exportList}>Export list</Button><Button onClick={() => setInviting(v => !v)}>Invite</Button></HeaderActions>}
       {inviting && <InviteForm onClose={() => setInviting(false)} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PillTabs size="filter" aria-label="Directory sections" value={current} onChange={goto} tabs={[{ id: 'units', label: 'Units & owners', badge: units.length || undefined }, { id: 'board', label: 'Board', badge: snap.board.length || undefined }, { id: 'management', label: 'Management & counsel' }, { id: 'staff', label: 'Staff', badge: staff.length || undefined }, { id: 'emergency', label: 'Emergency' }]} />

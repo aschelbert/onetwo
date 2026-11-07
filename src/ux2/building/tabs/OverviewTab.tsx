@@ -5,7 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { daysBetween } from '../../runbook/model';
 import { ISO_DATE } from '../../runbook/adapters';
@@ -151,13 +151,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl font-medium text-ux2-ink">Overview</h2>
-          <p className="m-0 max-w-[720px] text-sm text-ux2-muted">What the building is, what protects it, what it is made of and who keeps it running. The board edits; every owner can read it.</p>
-        </div>
-        {isBoard && <div className="flex gap-2"><Button variant="ghost" onClick={() => setEditing(v => !v)}>Edit details</Button><Button onClick={() => setAddingAsset(v => !v)}>Add asset</Button></div>}
-      </div>
+      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => setEditing(v => !v)}>Edit details</Button><Button onClick={() => setAddingAsset(v => !v)}>Add asset</Button></HeaderActions>}
       {editing && <DetailsForm snap={snap} onClose={() => setEditing(false)} />}
       {addingAsset && <AssetForm onClose={() => setAddingAsset(false)} />}
 
