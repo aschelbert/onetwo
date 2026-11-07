@@ -107,21 +107,23 @@ export default function FundsPage() {
             </h1>
             <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip tone={health >= 80 ? 'sage' : health >= 60 ? 'amber' : 'red'} className="h-11 px-5 !text-sm" title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>
-            {role !== 'RESIDENT' && (
-              <>
-                {([['Record a payment', 'income', 'ledger'], ['Pay a bill', 'expenses', 'bills'], ['Create a work order', 'expenses', 'workorders'], ['Transfer funds', 'settings', 'ledger']] as [string, FundsTab, string][]).map(([label, t, s]) => (
-                  <button key={label} type="button" onClick={() => go(t, s)} className="h-11 rounded-full border border-ux2-line-strong bg-white px-5 text-sm font-semibold text-ux2-ink hover:bg-ux2-surface">{label}</button>
-                ))}
-                <button type="button" aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-11 w-11 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
-                  ⚙
-                </button>
-              </>
-            )}
-          </div>
+          <Chip tone={health >= 80 ? 'sage' : health >= 60 ? 'amber' : 'red'} className="h-11 shrink-0 px-5 !text-sm" title="Collection, reserves and budget pace, the Fiscal Lens formula">{healthLabel(health)} · {health}</Chip>
         </div>
-        <PillTabs tabs={tabs} value={pillValue} onChange={id => go(id)} aria-label="Funds sections" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><PillTabs tabs={tabs} value={pillValue} onChange={id => go(id)} aria-label="Funds sections" /></div>
+          {role !== 'RESIDENT' && (
+            <button type="button" aria-label="Accounts and ledger" title="Accounts and ledger" onClick={() => go('settings')} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border ${tab === 'settings' ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>
+              ⚙
+            </button>
+          )}
+        </div>
+        {role !== 'RESIDENT' && (
+          <div className="flex flex-wrap items-center gap-2" aria-label="Funds actions" role="group">
+            {([['Record a payment', 'income', 'ledger'], ['Pay a bill', 'expenses', 'bills'], ['Create a work order', 'expenses', 'workorders'], ['Transfer funds', 'settings', 'ledger']] as [string, FundsTab, string][]).map(([label, t, s]) => (
+              <button key={label} type="button" onClick={() => go(t, s)} className="h-10 rounded-full border border-ux2-line-strong bg-white px-4 text-sm font-semibold text-ux2-ink hover:bg-ux2-surface">{label}</button>
+            ))}
+          </div>
+        )}
       </header>
 
       {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
