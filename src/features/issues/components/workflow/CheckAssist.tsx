@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
 import type { StepAction } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useCaseDockStore } from '@/ux2/shell/caseDock';
 import { resolveCheck, type Assist, type ToolId } from '../../checkAssist';
 import { CheckPanel } from './CheckPanels';
 
@@ -29,6 +30,7 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, onAction, onAd
 }) {
   const navigate = useNavigate();
   const units = useFinancialStore(s => s.units);
+  const rememberCheck = useCaseDockStore(s => s.rememberCheck);
   const [open, setOpen] = useState<string | null>(null);
   const hasUnit = !!c.unit && units.some(u => u.number === c.unit);
   const { assists } = resolveCheck(label, { catId: c.catId, sitId: c.sitId, step: step.s, hasUnit });
@@ -44,7 +46,9 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, onAction, onAd
   };
 
   return (
-    <div className="mt-2" data-check-assist={checkId}>
+    // Any assist you use (including a panel's link out of the case) marks this item as where you
+    // were, so the case dock's Back returns you to it.
+    <div className="mt-2" data-check-assist={checkId} onClickCapture={() => rememberCheck(c.id, checkId)}>
       <div className="flex flex-wrap gap-1.5">
         {assists.map((a, i) => {
           const primary = i === 0;

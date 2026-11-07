@@ -218,6 +218,11 @@ still right-aligned.
   closes or its last step is done, and Dismiss hides it until the case is
   opened again. Pages keep extra bottom space while it shows. The dock's
   memory resets when a real building loads.
+- **Back returns to where you were**: the dock remembers, per case, the step
+  you had open and the checklist item you last used an assist on. Back opens
+  the case on that step (full screen on phones), scrolls to the item and
+  marks it for a moment. The browser's back button lands there too. The
+  dock's checklist shows that step while it is still to do.
 - **Board Room › Ops** is the former Open tab (same URL id, `open`).
 - **Building › Archive** is the former Board Room Archive, shown to the
   board and manager only. `/boardroom?tab=archive` and `caseTab=archive`

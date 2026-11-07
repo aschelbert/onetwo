@@ -22,13 +22,14 @@ export function useCaseDock() {
   const cases = useIssuesStore(s => s.cases);
   const recent = useCaseDockStore(s => s.recent);
   const dismissed = useCaseDockStore(s => s.dismissed);
+  const spots = useCaseDockStore(s => s.spots);
   const touch = useCaseDockStore(s => s.touch);
   const viewing = caseIdFromLocation(pathname, search);
   // Opening a case makes it the active one.
   useEffect(() => {
     if (viewing && cases.some(c => c.id === viewing && c.status !== 'closed')) touch(viewing);
   }, [viewing, cases, touch]);
-  return dockFor(cases, recent, dismissed, viewing);
+  return dockFor(cases, recent, dismissed, viewing, spots);
 }
 
 function Progress({ d, className }: { d: DockedCase; className?: string }) {
@@ -43,6 +44,7 @@ const summary = (d: DockedCase) => `Step ${d.stepIdx + 1} of ${d.steps.length} �
 
 /** Checklist and other cases: the expanded content, shared by the desktop panel and the phone sheet. */
 function DockBody({ d, others, onGo, light }: { d: DockedCase; others: DockedCase[]; onGo: (path: string) => void; light?: boolean }) {
+  const spots = useCaseDockStore(s => s.spots);
   const toggleCheck = useIssuesStore(s => s.toggleCheck);
   const toggleStep = useIssuesStore(s => s.toggleStep);
   const checks = d.step.checks ?? [];
@@ -67,7 +69,7 @@ function DockBody({ d, others, onGo, light }: { d: DockedCase; others: DockedCas
       <div className="flex flex-col gap-2">
         <div className={cn('text-xs font-semibold uppercase tracking-[0.08em]', label)}>{others.length ? 'Your other open cases' : 'Other cases'}</div>
         {others.map(o => (
-          <button key={o.c.id} type="button" onClick={() => onGo(casePath(o.c.id))} className={cn('flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px]', light ? 'border border-ux2-line bg-ux2-surface text-ux2-ink' : 'bg-white/[0.08] text-white hover:bg-white/[0.14]')}>
+          <button key={o.c.id} type="button" onClick={() => onGo(casePath(o.c.id, spots[o.c.id]))} className={cn('flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px]', light ? 'border border-ux2-line bg-ux2-surface text-ux2-ink' : 'bg-white/[0.08] text-white hover:bg-white/[0.14]')}>
             <span className="min-w-0 flex-1"><b className="font-semibold">{o.c.id} · {o.c.title}</b><span className={cn('block text-xs', label)}>Step {o.stepIdx + 1} of {o.steps.length} · {o.step.s}</span></span>
             <span className={cn('shrink-0 font-semibold', light ? 'text-ux2-teal' : 'text-ux2-cyan')}>Switch</span>
           </button>
@@ -82,6 +84,7 @@ function DockBody({ d, others, onGo, light }: { d: DockedCase; others: DockedCas
 export default function CaseDock() {
   const dock = useCaseDock();
   const dismiss = useCaseDockStore(s => s.dismiss);
+  const spots = useCaseDockStore(s => s.spots);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -95,7 +98,8 @@ export default function CaseDock() {
   if (!dock) return null;
   const { active: d, others } = dock;
   const go = (path: string) => { setOpen(false); navigate(path); };
-  const back = () => go(casePath(d.c.id));
+  // Back to where you were: the step you had open and the checklist item you acted on.
+  const back = () => go(casePath(d.c.id, spots[d.c.id] ?? { step: d.stepIdx, approach: null }));
 
   return (
     <>
