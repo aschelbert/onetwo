@@ -228,3 +228,24 @@ still right-aligned.
   checklist and actions as the desktop right column, plus All steps,
   previous and next. The view is portalled to the page body so the sticky
   top bar cannot cover it. Desktop keeps the two columns.
+
+## Case checklist assists
+
+Every checklist item in a case step carries one or more assists, so an item
+is never just a box to tick (`src/features/issues/checkAssist.ts`):
+
+- **Review in place**: a panel opens under the item with the information to
+  check. Budget items open the budget drafter (operating lines by category,
+  reserve contribution, contingency, per-unit impact); reserve items open the
+  reserve study; others show financials, the unit ledger, delinquency, fees,
+  the allocation calculator, insurance, vendors, documents, the owner, board
+  quorum, counsel, meetings, assets or filings. Each panel links to the module
+  where the record lives.
+- **Do it here**: the step's tools (send a letter, board or owner vote, attach
+  a document, work order, invoice, meeting, note).
+- **Go to the module**: a deep link; the case dock follows you back.
+- **Official site**: DC agencies and courts, for work done outside the app.
+
+Items are matched by ordered rules on the item's text, then on the step's
+title. `src/__tests__/checkAssist.test.ts` fails if any item in any
+situation's workflow falls through to the generic note-and-attach fallback.
