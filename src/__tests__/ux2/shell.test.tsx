@@ -17,7 +17,6 @@ vi.mock('@/store/useAuthStore', () => ({
 vi.mock('@/store/usePlatformAdminStore', () => ({
   usePlatformAdminStore: (sel: (s: { permissions: unknown[] }) => unknown) => sel({ permissions: [] }),
 }));
-vi.mock('@/components/OnboardingSetupWidget', () => ({ default: () => null }));
 vi.mock('@/components/shared/SyncIndicator', () => ({ default: () => null }));
 
 import Ux2Shell from '@/ux2/shell/Ux2Shell';

@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, AnchorHTMLAttributes, ReactNode } from 'reac
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/formatters';
 
-type Variant = 'primary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'ghost' | 'danger' | 'plum';
 type Size = 'md' | 'sm';
 
 const BASE = 'inline-flex items-center justify-center gap-2 rounded-full font-semibold font-body transition-colors disabled:opacity-55 disabled:cursor-not-allowed';
@@ -10,6 +10,8 @@ const VARIANTS: Record<Variant, string> = {
   primary: 'bg-ux2-navy text-white hover:bg-navy-800',
   ghost: 'bg-white text-ux2-ink border border-ux2-line-strong hover:bg-ux2-surface',
   danger: 'bg-white text-ux2-red-ink border border-[#F3C9CF] hover:bg-ux2-red-tint',
+  /** Setup: the brand's second colour, so getting started never reads as an alert. */
+  plum: 'bg-ux2-plum text-white hover:bg-[#433C92]',
 };
 const SIZES: Record<Size, string> = {
   md: 'h-11 px-[18px] text-sm',
