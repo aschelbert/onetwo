@@ -103,9 +103,17 @@ supabase secrets set \
 
 # Deploy Edge Functions
 supabase functions deploy create-hosted-page
-supabase functions deploy chargebee-webhook
+supabase functions deploy chargebee-webhook --no-verify-jwt
 supabase functions deploy provision-tenant
 ```
+
+> `chargebee-webhook` and `stripe-webhook` must be deployed **without** JWT
+> verification (`supabase/config.toml` sets `verify_jwt = false` for both, and
+> the flag above makes it explicit). Chargebee authenticates with Basic auth
+> and Stripe with a signature header, not a Supabase JWT; with verification on,
+> the gateway returns 401 before the function runs and paid signups are never
+> provisioned. Check the function's **Verify JWT** toggle in the dashboard after
+> deploying.
 
 ### Step 4: Install Frontend Dependencies
 

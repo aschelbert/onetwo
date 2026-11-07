@@ -4,30 +4,23 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import AppShell from '@/components/layout/AppShell';
+import Ux2Shell from '@/ux2/shell/Ux2Shell';
+import HomePage from '@/ux2/home/HomePage';
+import FundsPage from '@/ux2/funds/FundsPage';
+import PayPage from '@/ux2/funds/PayPage';
+import CommunityModule from '@/ux2/community/CommunityModule';
+import MeModule from '@/ux2/me/MeModule';
+import { BoardRoomRoute, BuildingRedirect, BuildingRoute, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
 import AuthPage from '@/features/auth/AuthPage';
-import DashboardPage from '@/features/dashboard/DashboardPage';
-import FinancialPage from '@/features/financial/FinancialPage';
-import IssuesPage from '@/features/issues/IssuesPage';
-import BuildingPage from '@/features/building/BuildingPage';
-import ArchivesPage from '@/features/archives/ArchivesPage';
-import MyUnitPage from '@/features/unit-manager/MyUnitPage';
-import AccountSettingsPage from '@/features/account/AccountSettingsPage';
-import UserManagementPage from '@/features/user-management/UserManagementPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
-import BoardRoomPage from '@/features/boardroom/BoardRoomPage';
-import AssociationTeamPage from '@/features/association-team/AssociationTeamPage';
-import CommunityRoomPage from '@/features/community/CommunityRoomPage';
-import HelpSupportPage from '@/features/support/HelpSupportPage';
-import SubscriptionPage from '@/features/subscription/SubscriptionPage';
 import AIAdvisor from '@/components/AIAdvisor';
-import ActiveCaseWidget from '@/components/ActiveCaseWidget';
 import TenantProvider from '@/components/TenantProvider';
 import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
+import { isTenantHost } from '@/lib/tenantHost';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -161,11 +154,10 @@ function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
     // On tenant subdomains, platform admins should see the tenant dashboard
-    const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
-      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
     return <Navigate to={target} replace />;
   }
   return <AuthPage />;
@@ -174,11 +166,10 @@ function LoginRoute() {
 function CatchAll() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
-    const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
-      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/dashboard';
+      : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
     return <Navigate to={target} replace />;
   }
   return <Navigate to="/" replace />;
@@ -191,7 +182,7 @@ function RequirePM({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   if (currentRole !== 'PM_COMPANY') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
   return <>{children}</>;
 }
@@ -202,11 +193,6 @@ function AIAdvisorWrapper() {
   return <AIAdvisor />;
 }
 
-function ActiveCaseWidgetWrapper() {
-  const { isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return null;
-  return <ActiveCaseWidget />;
-}
 
 
 export default function App() {
@@ -230,25 +216,29 @@ export default function App() {
           <Route path="/portfolio/dashboard" element={<ErrorBoundary fallbackLevel="page"><PortfolioDashboardPage /></ErrorBoundary>} />
         </Route>
 
-        {/* Protected app routes */}
-        <Route element={<RequireAuth><TenantProvider><AppShell /></TenantProvider></RequireAuth>}>
-          <Route path="/dashboard" element={<ErrorBoundary fallbackLevel="page"><DashboardPage /></ErrorBoundary>} />
-          <Route path="/financial" element={<ErrorBoundary fallbackLevel="page"><FinancialPage /></ErrorBoundary>} />
-          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesPage /></ErrorBoundary>} />
-          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingPage /></ErrorBoundary>} />
-          <Route path="/compliance" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/archives" element={<ErrorBoundary fallbackLevel="page"><ArchivesPage /></ErrorBoundary>} />
-          <Route path="/voting" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomPage /></ErrorBoundary>} />
+        {/* Protected app routes: the five modules and Me, with every old path redirecting into the module that absorbed it */}
+        <Route element={<RequireAuth><TenantProvider><Ux2Shell /></TenantProvider></RequireAuth>}>
+          <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomePage /></ErrorBoundary>} />
+          <Route path="/dashboard" element={<RedirectKeepQuery to="/home" />} />
+          <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
+          <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />
+          <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingRoute /></ErrorBoundary>} />
+          <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
+          <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
+          <Route path="/property-log" element={<Navigate to="/community?tab=log" replace />} />
+          <Route path="/compliance" element={<Navigate to="/building?tab=obligations" replace />} />
+          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityModule /></ErrorBoundary>} />
+          <Route path="/voting" element={<Navigate to="/community?tab=votes" replace />} />
+          <Route path="/boardroom" element={<ErrorBoundary fallbackLevel="page"><BoardRoomRoute /></ErrorBoundary>} />
           <Route path="/board-ops" element={<Navigate to="/boardroom" replace />} />
-          <Route path="/association-team" element={<ErrorBoundary fallbackLevel="page"><AssociationTeamPage /></ErrorBoundary>} />
-          <Route path="/property-log" element={<Navigate to="/association-team?tab=property-log" replace />} />
-          <Route path="/community" element={<ErrorBoundary fallbackLevel="page"><CommunityRoomPage /></ErrorBoundary>} />
-          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MyUnitPage /></ErrorBoundary>} />
-          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><AccountSettingsPage /></ErrorBoundary>} />
-          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><HelpSupportPage /></ErrorBoundary>} />
-          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><SubscriptionPage /></ErrorBoundary>} />
-          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><UserManagementPage /></ErrorBoundary>} />
+          <Route path="/issues" element={<ErrorBoundary fallbackLevel="page"><IssuesRoute /></ErrorBoundary>} />
+          <Route path="/cases" element={<RedirectKeepQuery to="/issues" />} />
+          <Route path="/my-unit" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="unit" /></ErrorBoundary>} />
+          <Route path="/my-unit/pay" element={<ErrorBoundary fallbackLevel="page"><PayPage /></ErrorBoundary>} />
+          <Route path="/account" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="account" /></ErrorBoundary>} />
+          <Route path="/support" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="help" /></ErrorBoundary>} />
+          <Route path="/subscription" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="subscription" /></ErrorBoundary>} />
+          <Route path="/admin/users" element={<ErrorBoundary fallbackLevel="page"><MeModule tab="users" /></ErrorBoundary>} />
         </Route>
 
         {/* Catch-all */}
@@ -256,7 +246,6 @@ export default function App() {
       </Routes>
       {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
-      <ActiveCaseWidgetWrapper />
     </BrowserRouter>
     </HydrationGate>
     </ErrorBoundary>

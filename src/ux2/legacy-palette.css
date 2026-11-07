@@ -1,0 +1,60 @@
+/* Production components mounted inside the redesign (`.ux2-legacy`) keep their
+   markup and behaviour but take the redesign's palette, so a bill table, a
+   kanban or a Stripe banner inside Funds or the Board Room is coloured like
+   the widgets around it. Only colour utilities are mapped; layout is untouched.
+   Two-class selectors outrank Tailwind's single-class utilities. */
+
+/* Dark buttons and fills → navy */
+.ux2-legacy .bg-ink-900, .ux2-legacy .bg-ink-800,
+.ux2-legacy .bg-indigo-600, .ux2-legacy .bg-indigo-700,
+.ux2-legacy .bg-accent-600, .ux2-legacy .bg-accent-700, .ux2-legacy .bg-accent-800,
+.ux2-legacy .bg-amber-600, .ux2-legacy .bg-amber-700,
+.ux2-legacy .bg-blue-600, .ux2-legacy .bg-blue-700,
+.ux2-legacy .hover\:bg-ink-800:hover, .ux2-legacy .hover\:bg-indigo-700:hover, .ux2-legacy .hover\:bg-accent-700:hover,
+.ux2-legacy .hover\:bg-amber-700:hover, .ux2-legacy .hover\:bg-blue-700:hover { background-color: #0D1B2E; color: #fff; }
+
+/* Reds (the legacy "accent" is a red) */
+.ux2-legacy .bg-accent-500, .ux2-legacy .bg-red-500, .ux2-legacy .bg-red-600, .ux2-legacy .hover\:bg-red-700:hover { background-color: #E23B4E; }
+.ux2-legacy .bg-accent-50, .ux2-legacy .bg-accent-100, .ux2-legacy .bg-red-50, .ux2-legacy .bg-red-100 { background-color: #FBE9EB; }
+.ux2-legacy .text-accent-500, .ux2-legacy .text-accent-600, .ux2-legacy .text-accent-700, .ux2-legacy .text-accent-800,
+.ux2-legacy .text-red-400, .ux2-legacy .text-red-500, .ux2-legacy .text-red-600, .ux2-legacy .text-red-700, .ux2-legacy .text-red-800,
+.ux2-legacy .hover\:text-accent-700:hover, .ux2-legacy .hover\:text-accent-800:hover, .ux2-legacy .hover\:text-red-600:hover, .ux2-legacy .hover\:text-red-700:hover { color: #B71C2A; }
+.ux2-legacy .border-accent-200, .ux2-legacy .border-accent-300, .ux2-legacy .border-accent-400, .ux2-legacy .border-red-200, .ux2-legacy .border-red-300 { border-color: #F3C4CA; }
+
+/* Greens → sage */
+.ux2-legacy .bg-sage-500, .ux2-legacy .bg-sage-600, .ux2-legacy .bg-sage-700, .ux2-legacy .bg-green-500, .ux2-legacy .bg-green-600, .ux2-legacy .bg-emerald-500, .ux2-legacy .bg-emerald-600 { background-color: #3A663A; }
+.ux2-legacy .bg-sage-50, .ux2-legacy .bg-sage-100, .ux2-legacy .bg-green-50, .ux2-legacy .bg-green-100, .ux2-legacy .bg-emerald-50, .ux2-legacy .bg-emerald-100 { background-color: #E8F0E8; }
+.ux2-legacy .text-sage-500, .ux2-legacy .text-sage-600, .ux2-legacy .text-sage-700, .ux2-legacy .text-sage-800, .ux2-legacy .text-green-600, .ux2-legacy .text-green-700, .ux2-legacy .text-green-800, .ux2-legacy .text-emerald-600, .ux2-legacy .text-emerald-700 { color: #3A663A; }
+.ux2-legacy .border-sage-200, .ux2-legacy .border-sage-300, .ux2-legacy .border-green-200, .ux2-legacy .border-emerald-200 { border-color: #CFE0CF; }
+
+/* Yellows and ambers → amber */
+.ux2-legacy .bg-amber-50, .ux2-legacy .bg-amber-100, .ux2-legacy .bg-yellow-50, .ux2-legacy .bg-yellow-100, .ux2-legacy .bg-orange-50, .ux2-legacy .bg-orange-100 { background-color: #FBF1E2; }
+.ux2-legacy .bg-amber-500, .ux2-legacy .bg-yellow-500, .ux2-legacy .bg-orange-500, .ux2-legacy .bg-orange-600 { background-color: #9A5B00; color: #fff; }
+.ux2-legacy .text-amber-600, .ux2-legacy .text-amber-700, .ux2-legacy .text-amber-800, .ux2-legacy .text-yellow-600, .ux2-legacy .text-yellow-700, .ux2-legacy .text-yellow-800, .ux2-legacy .text-orange-600, .ux2-legacy .text-orange-700 { color: #9A5B00; }
+.ux2-legacy .border-amber-100, .ux2-legacy .border-amber-200, .ux2-legacy .border-yellow-200, .ux2-legacy .border-orange-200 { border-color: #F0DDBF; }
+
+/* Blues and purples → teal and plum */
+.ux2-legacy .bg-mist-50, .ux2-legacy .bg-mist-100, .ux2-legacy .bg-blue-50, .ux2-legacy .bg-blue-100, .ux2-legacy .bg-sky-50, .ux2-legacy .bg-cyan-50 { background-color: #E6F1F4; }
+.ux2-legacy .text-mist-600, .ux2-legacy .text-mist-700, .ux2-legacy .text-blue-600, .ux2-legacy .text-blue-700, .ux2-legacy .text-blue-800, .ux2-legacy .text-teal-700, .ux2-legacy .text-sky-700 { color: #155E75; }
+.ux2-legacy .border-mist-100, .ux2-legacy .border-mist-200, .ux2-legacy .border-blue-200, .ux2-legacy .border-sky-200 { border-color: #CFE2E8; }
+.ux2-legacy .bg-purple-50, .ux2-legacy .bg-purple-100, .ux2-legacy .bg-violet-50, .ux2-legacy .bg-indigo-50, .ux2-legacy .bg-indigo-100 { background-color: #ECEBF8; }
+.ux2-legacy .text-purple-600, .ux2-legacy .text-purple-700, .ux2-legacy .text-violet-700, .ux2-legacy .text-indigo-600, .ux2-legacy .text-indigo-700 { color: #4F46A8; }
+
+/* Greys → the redesign's surface and line */
+.ux2-legacy .bg-ink-50, .ux2-legacy .bg-ink-100, .ux2-legacy .bg-gray-50, .ux2-legacy .bg-gray-100, .ux2-legacy .bg-slate-50, .ux2-legacy .bg-slate-100 { background-color: #F5F7FA; }
+.ux2-legacy .border-ink-50, .ux2-legacy .border-ink-100, .ux2-legacy .border-ink-200, .ux2-legacy .border-gray-100, .ux2-legacy .border-gray-200, .ux2-legacy .border-slate-200 { border-color: #E3E8EE; }
+.ux2-legacy .border-ink-900, .ux2-legacy .border-indigo-600 { border-color: #0D1B2E; }
+.ux2-legacy .text-ink-300, .ux2-legacy .text-ink-400 { color: #8A96A3; }
+.ux2-legacy .text-ink-500, .ux2-legacy .text-ink-600 { color: #5F6C7B; }
+.ux2-legacy .text-ink-700, .ux2-legacy .text-ink-800, .ux2-legacy .text-ink-900 { color: #1A1F25; }
+.ux2-legacy .bg-white .text-white, .ux2-legacy .bg-ink-900 .text-white { color: #fff; }
+
+/* Focus rings and selection highlights */
+.ux2-legacy .ring-accent-500, .ux2-legacy .ring-indigo-500, .ux2-legacy .focus\:ring-accent-500:focus, .ux2-legacy .focus\:ring-indigo-500:focus, .ux2-legacy .focus\:ring-teal-600:focus { --tw-ring-color: #155E75; }
+.ux2-legacy .focus\:border-accent-500:focus, .ux2-legacy .focus\:border-indigo-500:focus { border-color: #155E75; }
+
+/* The onboarding banner: navy instead of orange, as the rest of the shell */
+.ux2-onboarding .bg-amber-500 { background-color: #0D1B2E; border-radius: 22px; }
+.ux2-onboarding .text-amber-100, .ux2-onboarding .text-amber-200 { color: rgba(255,255,255,.7); }
+.ux2-onboarding .bg-amber-50 { background-color: #F5F7FA; }
+.ux2-onboarding .border-amber-200 { border-color: #E3E8EE; }

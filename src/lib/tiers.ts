@@ -93,3 +93,12 @@ export function getTierById(id: string): TierConfig | undefined {
 export function getTierDisplayName(id: string): string {
   return getTierById(id)?.name || id;
 }
+
+/**
+ * Amenity reservations and rules come with Plus Facilities. The legacy tier
+ * ids that mapped onto it (Management Suite, Estate) count too, so a tenant
+ * that has not been re-tiered keeps what it had.
+ */
+export function tierHasAmenities(tier: string | undefined | null): boolean {
+  return tier === 'facilities' || tier === 'management_suite' || tier === 'estate';
+}

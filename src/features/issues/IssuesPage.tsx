@@ -30,11 +30,18 @@ import type { CaseApproach, CasePriority, CaseComm } from '@/types/issues';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-export default function IssuesPage({ embedded }: { embedded?: boolean } = {}) {
+export type WizardPrefill = { source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string };
+
+/**
+ * `embedded` swaps the header for pill tabs (Board Room mounts it that way);
+ * `prefill` opens the New Case wizard on a category and situation (the UX2
+ * Board Room's runbooks use it). Default rendering is unchanged.
+ */
+export default function IssuesPage({ embedded, prefill }: { embedded?: boolean; prefill?: WizardPrefill } = {}) {
   const store = useIssuesStore();
   const { cases, issues } = store;
   const [view, setView] = useTabParam<string>('view', 'tabs');
-  const [wizardPrefill, setWizardPrefill] = useState<{ source?: string; sourceId?: string; catId?: string; sitId?: string; title?: string; unit?: string; owner?: string; priority?: CasePriority; notes?: string } | undefined>();
+  const [wizardPrefill, setWizardPrefill] = useState<WizardPrefill | undefined>(prefill);
   const role = useAuthStore(s => s.currentUser.role);
   const user = useAuthStore(s => s.currentUser);
   const isBoard = role !== 'RESIDENT';
@@ -196,8 +203,8 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
 
       {/* Embedded: pill sub-tabs + New Case button on same row */}
       {embedded && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-1 bg-mist-50 rounded-lg p-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex max-w-full gap-1 overflow-x-auto bg-mist-50 rounded-lg p-1">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${tab === t.id ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>
                 {t.label}

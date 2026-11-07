@@ -4,7 +4,8 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { getInitials } from '@/lib/formatters';
 import { isBackendEnabled } from '@/lib/supabase';
 
-export default function AccountSettingsPage() {
+/** `embedded` hides the header card so the UX2 Me module can mount the profile, units, preferences and security sections inside its own layout. Default rendering is unchanged. */
+export default function AccountSettingsPage({ embedded }: { embedded?: boolean } = {}) {
   const { currentUser, updateProfile } = useAuthStore();
   const allUnits = useFinancialStore(s => s.units);
   const [name, setName] = useState(currentUser?.name || '');
@@ -56,9 +57,9 @@ export default function AccountSettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className={embedded ? 'space-y-6' : 'space-y-6 max-w-2xl'}>
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
+      {!embedded && <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-ink-900 flex items-center justify-center shrink-0">
             <span className="text-white text-xl font-bold">{getInitials(currentUser?.name || '')}</span>
@@ -68,7 +69,7 @@ export default function AccountSettingsPage() {
             <p className="text-sm text-ink-500">{currentUser?.email}</p>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Profile */}
       <div className="bg-white rounded-xl shadow-sm border border-ink-100 p-6 space-y-4">

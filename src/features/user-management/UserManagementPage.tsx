@@ -46,7 +46,8 @@ const roleBadge = (r: string) =>
   r === 'property_manager' || r === 'PROPERTY_MANAGER' ? 'bg-accent-100 text-accent-700' :
   r === 'staff' || r === 'STAFF' ? 'bg-amber-100 text-amber-700' : 'bg-mist-100 text-ink-600';
 
-export default function UserManagementPage() {
+/** `embedded` hides the title so the UX2 Me module can mount the members, invites and invite modals inside its own layout. Default rendering is unchanged. */
+export default function UserManagementPage({ embedded }: { embedded?: boolean } = {}) {
   const { currentUser, buildingMembers, buildingInvites, inviteMember, removeMember, revokeInvite } = useAuthStore();
   const units = useFinancialStore(s => s.units);
   const tenant = useTenantContext();
@@ -276,13 +277,13 @@ export default function UserManagementPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
+        {embedded ? <div /> : <div>
           <h2 className="font-display text-2xl font-bold text-ink-900">User Management</h2>
           <p className="text-sm text-ink-500">
             {displayMembers.length} member{displayMembers.length !== 1 ? 's' : ''}
             {pendingCount > 0 && ` · ${pendingCount} pending invite${pendingCount !== 1 ? 's' : ''}`}
           </p>
-        </div>
+        </div>}
         <div className="flex gap-2">
           <button onClick={() => setShowBulk(true)} className="px-4 py-2 border border-ink-200 text-ink-700 rounded-lg hover:bg-ink-50 font-medium text-sm">Bulk Invite</button>
           <button onClick={() => setShowInvite(true)} className="px-4 py-2 bg-ink-900 text-white rounded-lg hover:bg-ink-800 font-medium text-sm">+ Invite Member</button>

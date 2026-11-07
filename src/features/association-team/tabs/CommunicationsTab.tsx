@@ -89,6 +89,8 @@ export default function CommunicationsTab() {
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [tenantUserId, setTenantUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
@@ -125,14 +127,21 @@ export default function CommunicationsTab() {
 
   // ─── Load channels (seed defaults if none) ───────────────────
   const loadChannels = useCallback(async () => {
-    if (!supabase || !tenantId) return;
+    if (!supabase || !tenantId) { setLoading(false); return; }
 
     // Check if channels exist
-    let { data: chs } = await supabase
+    const first = await supabase
       .from('team_channels')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
+    if (first.error) {
+      logDbError('team_channels select', first.error);
+      setLoadError(first.error.message);
+      setLoading(false);
+      return;
+    }
+    let chs: TeamChannel[] | null = first.data as unknown as TeamChannel[] | null;
 
     // Seed defaults if empty
     if (!chs || chs.length === 0) {
@@ -151,7 +160,7 @@ export default function CommunicationsTab() {
         .select('*')
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: true });
-      chs = result.data;
+      chs = result.data as unknown as TeamChannel[] | null;
     }
 
     if (chs) {
@@ -264,7 +273,8 @@ export default function CommunicationsTab() {
       }
     }
 
-    await supabase.from('team_messages').insert({
+    // Append the saved row ourselves: realtime is the fast path, not the only one.
+    const { data: sent, error: sendErr } = await supabase.from('team_messages').insert({
       tenant_id: tenantId,
       channel_id: activeChannelId,
       sender_id: tenantUserId,
@@ -274,7 +284,18 @@ export default function CommunicationsTab() {
       attachment_url: attachmentUrl,
       attachment_name: attachmentName,
       read_by: [tenantUserId],
-    });
+    }).select().single();
+    if (sendErr) {
+      logDbError('team_messages insert', sendErr);
+      setSendError(sendErr.message);
+      setSending(false);
+      return;
+    }
+    setSendError(null);
+    if (sent) {
+      const row = sent as unknown as TeamMessage;
+      setMessages(prev => (prev.some(m => m.id === row.id) ? prev : [...prev, row]));
+    }
 
     setDraft('');
     setAttachFile(null);
@@ -330,6 +351,22 @@ export default function CommunicationsTab() {
     );
   }
 
+  // ─── No backend, or nothing to load ───────────────────────────
+  if (!supabase || !tenantId) {
+    return (
+      <div className="flex items-center justify-center h-40 text-center">
+        <p className="text-sm text-ink-500">The intercom runs on the live backend. Sign in to a building to use it; the demo does not include it.</p>
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center h-40 text-center">
+        <p className="text-sm text-red-600">The channels could not be loaded: {loadError}</p>
+      </div>
+    );
+  }
+
   // ─── Loading ──────────────────────────────────────────────────
   if (loading) {
     return (
@@ -341,9 +378,9 @@ export default function CommunicationsTab() {
 
   // ─── Main layout ──────────────────────────────────────────────
   return (
-    <div className="flex border border-ink-100 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 360px)', minHeight: 420 }}>
-      {/* Left Rail */}
-      <div className="w-[240px] flex-shrink-0 border-r border-ink-100 flex flex-col bg-white">
+    <div className="flex flex-col md:flex-row border border-ink-100 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 360px)', minHeight: 480 }}>
+      {/* Left Rail: a column on desktop, a strip of channels on a phone */}
+      <div className="w-full md:w-[240px] flex-shrink-0 border-b md:border-b-0 md:border-r border-ink-100 flex flex-col bg-white max-h-[40%] md:max-h-none">
         <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Channels</span>
           {channels.length < MAX_CHANNELS && (
@@ -357,6 +394,7 @@ export default function CommunicationsTab() {
           )}
         </div>
         <div className="flex-1 overflow-y-auto py-1">
+          {sendError && <p className="px-4 py-1 text-[11px] text-red-600">Not sent: {sendError}</p>}
           {/* New channel form */}
           {showNewChannel && (
             <div className="px-3 py-2 border-b border-ink-100 space-y-2">

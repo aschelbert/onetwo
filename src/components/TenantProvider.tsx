@@ -39,6 +39,8 @@ export interface TenantInfo {
   subdomain: string;
   status: string;
   tier: string;
+  /** The Property Manager Seat add-on is on the subscription: Tasks and the Intercom in the Board Room, the PM scorecard in Community. */
+  pmSeat: boolean;
   features: Record<string, boolean>;
   address: { street: string; city: string; state: string; zip: string };
   totalUnits: number;
@@ -57,7 +59,7 @@ const defaultOnboarding: OnboardingState = {
 
 const defaultTenant: TenantInfo = {
   id: 'demo', name: 'Sunny Acres Condominium', subdomain: 'demo',
-  status: 'active', tier: 'management_suite', features: { ...TIER_FEATURES['management_suite'] },
+  status: 'active', tier: 'management_suite', pmSeat: true, features: { ...TIER_FEATURES['management_suite'] },
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
   totalUnits: 50, isDemo: true, onboarding: defaultOnboarding,
 };
@@ -128,6 +130,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         subdomain: adminTenant.subdomain,
         status: adminTenant.status,
         tier: adminTenant.subscription.tier,
+        pmSeat: adminTenant.subscription.pmAddon ?? false,
         features: adminTenant.features as Record<string, boolean>,
         address: adminTenant.address,
         totalUnits: adminTenant.totalUnits,
@@ -146,7 +149,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
       const { data: sub } = await supabase
         .from('subscriptions')
-        .select('tier')
+        .select('tier, pm_addon')
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
@@ -163,6 +166,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         subdomain: t.subdomain,
         status: t.status,
         tier: sub?.tier || 'compliance_pro',
+        pmSeat: !!sub?.pm_addon,
         features: feat ? {
           fiscalLens: feat.fiscal_lens,
           caseOps: feat.case_ops,
@@ -330,7 +334,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
         const { data: sub } = await supabase
           .from('subscriptions')
-          .select('tier')
+          .select('tier, pm_addon')
           .eq('tenant_id', tu.tenant_id)
           .maybeSingle();
 
@@ -347,6 +351,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           subdomain: t.subdomain,
           status: t.status,
           tier: sub?.tier || 'compliance_pro',
+        pmSeat: !!sub?.pm_addon,
           features: feat ? {
             fiscalLens: feat.fiscal_lens,
             caseOps: feat.case_ops,

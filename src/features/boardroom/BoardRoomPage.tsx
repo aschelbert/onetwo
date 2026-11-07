@@ -52,7 +52,12 @@ function RunbookActionMenu({ itemId, itemTask, onAttach, onComm, onCase, onMeeti
   );
 }
 
-export default function BoardRoomPage() {
+/**
+ * `embedded` hides the gradient header and the tab bar and pins `tab`, so the
+ * UX2 Building module can mount Duties & Roles or the Governance Calendar
+ * inside its own layout. Default rendering is unchanged.
+ */
+export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?: boolean; tab?: TabId } = {}) {
   const comp = useComplianceStore();
   const mtg = useMeetingsStore();
   const { board, address, legalDocuments, insurance, management } = useBuildingStore();
@@ -66,7 +71,8 @@ export default function BoardRoomPage() {
   const refreshResult = refreshComplianceRequirements({ state: address.state, legalDocuments: legalDocuments.map(d => ({ name: d.name, status: d.status })), insurance: insurance.map(p => ({ type: p.type, expires: p.expires })), boardCount: board.length, hasManagement: !!management.company });
   const categories = refreshResult.categories;
 
-  const [tab, setTab] = useTabParam<TabId>('tab', 'duties', ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops']);
+  const [urlTab, setTab] = useTabParam<TabId>('tab', 'duties', ['duties', 'runbook', 'meetings', 'votes', 'communications', 'dailyops']);
+  const tab = forcedTab ?? urlTab;
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal] = useState<ModalType>(null);
   const [targetId, setTargetId] = useState('');
@@ -90,6 +96,8 @@ export default function BoardRoomPage() {
 
   // Completion = all workflow steps checked
   const isItemComplete = (itemId: string, howToLength: number): boolean => {
+    // A completion recorded in the compliance store (persisted, and what Home and Building read) counts as done.
+    if (comp.completions[itemId]) return true;
     const steps = workflowSteps[itemId];
     if (!steps || steps.length === 0) return false;
     return steps.length >= howToLength && steps.every(Boolean);
@@ -344,7 +352,7 @@ export default function BoardRoomPage() {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
+      {!embedded && <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
         <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div><h2 className="font-display text-2xl font-bold">🏛 Board Room</h2></div>
         </div>
@@ -374,12 +382,12 @@ export default function BoardRoomPage() {
             </div>
           );
         })()}
-      </div>
+      </div>}
 
       {/* Tabs */}
-      <div className="bg-white border-x border-ink-100 border-b overflow-x-auto"><div className="flex min-w-max px-4">{TABS.map(t => (<button key={t.id} onClick={() => setTab(t.id)} className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${tab === t.id ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>{t.label}{t.badge && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 font-bold">{t.badge}</span>}</button>))}</div></div>
+      {!embedded && <div className="bg-white border-x border-ink-100 border-b overflow-x-auto"><div className="flex min-w-max px-4">{TABS.map(t => (<button key={t.id} onClick={() => setTab(t.id)} className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${tab === t.id ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>{t.label}{t.badge && <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 font-bold">{t.badge}</span>}</button>))}</div></div>}
 
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
 
         {/* ═══ DUTIES & ROLES TAB ═══ */}
         {tab === 'duties' && (() => {
@@ -688,8 +696,8 @@ export default function BoardRoomPage() {
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span>
                           </div>
                           <div className="flex gap-2">
-                            {!allDone && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) }); if (!allDone) promptComm(item.task); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
-                            {completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
+                            {!allDone && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) }); comp.setCompletion(item.id, true); if (!allDone) promptComm(item.task); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}
+                            {completedSteps > 0 && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) }); if (comp.completions[item.id]) comp.setCompletion(item.id, false); }} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}
                           </div>
                         </div>
                         <div className="divide-y divide-ink-50">
@@ -844,7 +852,7 @@ export default function BoardRoomPage() {
                       <div className={`border rounded-xl overflow-hidden ${allStepsDone ? 'border-sage-300 bg-sage-50' : 'border-ink-200 bg-white'}`}>
                         <div className="p-3 border-b border-ink-100 flex items-center justify-between">
                           <div className="flex items-center gap-2"><p className="text-xs font-bold text-ink-900">📝 Workflow Steps</p><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${allStepsDone ? 'bg-sage-200 text-sage-700' : 'bg-ink-100 text-ink-600'}`}>{completedSteps}/{item.howTo.length}</span></div>
-                          <div className="flex gap-2">{!allStepsDone && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) })} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) })} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
+                          <div className="flex gap-2">{!allStepsDone && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => true) }); comp.setCompletion(item.id, true); }} className="text-[10px] text-accent-600 font-medium hover:underline">Complete all</button>}{completedSteps > 0 && <button onClick={() => { setWorkflowSteps({ ...workflowSteps, [item.id]: item.howTo.map(() => false) }); if (comp.completions[item.id]) comp.setCompletion(item.id, false); }} className="text-[10px] text-ink-400 font-medium hover:underline">Reset</button>}</div>
                         </div>
                         <div className="divide-y divide-ink-50">{item.howTo.map((step, si) => (<label key={si} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors ${steps[si] ? 'bg-sage-50' : 'hover:bg-ink-50'}`}><input type="checkbox" checked={steps[si] || false} onChange={() => toggleStep(si)} className="h-4 w-4 mt-0.5 shrink-0 accent-sage-600 rounded" /><div className="flex-1"><span className={`text-xs ${steps[si] ? 'text-sage-600 line-through' : 'text-ink-800'}`}>{step}</span></div><span className={`text-[10px] font-bold shrink-0 ${steps[si] ? 'text-sage-500' : 'text-ink-300'}`}>{si + 1}</span></label>))}</div>
                         {allStepsDone && (<div className="p-3 border-t border-sage-200 bg-sage-100 flex items-center justify-center gap-2"><svg className="w-4 h-4 text-sage-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg><span className="text-xs text-sage-700 font-semibold">All workflow steps complete — item fulfilled</span></div>)}

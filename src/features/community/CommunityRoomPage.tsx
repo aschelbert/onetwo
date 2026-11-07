@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tierHasAmenities } from '@/lib/tiers';
 import { useTabParam } from '@/hooks/useTabParam';
 import { useMeetingsStore, type Meeting } from '@/store/useMeetingsStore';
 import { useElectionStore } from '@/store/useElectionStore';
@@ -28,9 +29,14 @@ const REQ_CATS = [
   'Architectural Modification Request', 'General Question', 'Other',
 ];
 
-export default function CommunityRoomPage() {
+/**
+ * `embedded` hides the gradient header and the tab bar and pins `tab`, so the
+ * UX2 Community module can mount one production tab (the request form and
+ * lists, the owner meeting view) inside its own layout. Default rendering is unchanged.
+ */
+export default function CommunityRoomPage({ embedded, tab: forcedTab }: { embedded?: boolean; tab?: TabId } = {}) {
   const tenant = useTenantContext();
-  const isManagementSuite = tenant.tier === 'management_suite' || tenant.isDemo;
+  const isManagementSuite = tierHasAmenities(tenant.tier) || tenant.isDemo;
   const amenitiesStore = useAmenitiesStore();
   const user = useAuthStore(s => s.currentUser);
   const currentRole = useAuthStore(s => s.currentRole);
@@ -40,7 +46,8 @@ export default function CommunityRoomPage() {
   const validTabs: TabId[] = isManagementSuite
     ? ['announcements', 'requests', 'meetings', 'votes', 'amenities']
     : ['announcements', 'requests', 'meetings', 'votes'];
-  const [tab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
+  const [urlTab, setTab] = useTabParam<TabId>('tab', 'announcements', validTabs);
+  const tab = forcedTab ?? urlTab;
   const mtg = useMeetingsStore();
   const elections = useElectionStore();
   const { board } = useBuildingStore();
@@ -131,7 +138,7 @@ export default function CommunityRoomPage() {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
+      {!embedded && <div className="rounded-t-xl p-8 text-white shadow-sm" style={{ background: 'linear-gradient(to right, rgb(21, 94, 117), #991b1b)' }}>
         <div className="flex items-center justify-between flex-wrap gap-4 mb-5">
           <div><h2 className="font-display text-2xl font-bold">🏠 Community Room</h2></div>
         </div>
@@ -153,10 +160,10 @@ export default function CommunityRoomPage() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Tab Nav */}
-      <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
+      {!embedded && <div className="bg-white border-x border-ink-100 border-b overflow-x-auto">
         <div className="flex min-w-max px-4">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${tab === t.id ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>
@@ -165,10 +172,10 @@ export default function CommunityRoomPage() {
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Tab Content */}
-      <div className="bg-white rounded-b-xl border-x border-b border-ink-100 p-6">
+      <div className={embedded ? '' : 'bg-white rounded-b-xl border-x border-b border-ink-100 p-6'}>
 
         {/* ═══ ANNOUNCEMENTS ═══ */}
         {tab === 'announcements' && (

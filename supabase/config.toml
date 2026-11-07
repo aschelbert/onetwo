@@ -20,3 +20,13 @@ additional_redirect_urls = [
 enable_signup = true
 enable_confirmations = false
 
+
+# Webhooks are authenticated by the function itself (Chargebee Basic auth,
+# Stripe signature), not by a Supabase JWT. Deploying with JWT verification on
+# makes the gateway reject every delivery with 401 before the function runs,
+# and paid signups never get provisioned.
+[functions.chargebee-webhook]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

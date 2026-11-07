@@ -4,6 +4,7 @@ import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
+import { tenantLoginUrl } from '@/lib/tenantHost';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -207,13 +208,15 @@ export default function AuthPage() {
     addMember(m);
     login(m);
 
-    // Redirect to tenant subdomain if on root domain
-    const hostname = window.location.hostname;
-    if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
-      const { data: sessionData } = await supabase!.auth.getSession();
-      const accessToken = sessionData?.session?.access_token || '';
-      const refreshToken = sessionData?.session?.refresh_token || '';
-      window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
+    // Hop to the building's own host in production; stay put on staging,
+    // previews and localhost, whose sessions belong to their own project.
+    const { data: sessionData } = await supabase!.auth.getSession();
+    const target = tenantLoginUrl(tenant?.subdomain, {
+      accessToken: sessionData?.session?.access_token || '',
+      refreshToken: sessionData?.session?.refresh_token || '',
+    });
+    if (target) {
+      window.location.href = target;
       return true; // redirecting
     }
     return false;
@@ -519,14 +522,15 @@ export default function AuthPage() {
             addMember(member);
             login(member);
 
-            // Redirect to tenant subdomain if on root domain
-            const hostname = window.location.hostname;
-            if (tenant?.subdomain && !hostname.startsWith(tenant.subdomain)) {
-              // Pass session tokens so the subdomain can restore the auth state
-              const { data: sessionData } = await supabase.auth.getSession();
-              const accessToken = sessionData?.session?.access_token || '';
-              const refreshToken = sessionData?.session?.refresh_token || '';
-              window.location.href = `https://${tenant.subdomain}.getonetwo.com/login?sb_access=${accessToken}&sb_refresh=${refreshToken}`;
+            // Hop to the building's own host in production (the session rides
+            // along in the URL); stay put on staging, previews and localhost.
+            const { data: sessionData } = await supabase.auth.getSession();
+            const target = tenantLoginUrl(tenant?.subdomain, {
+              accessToken: sessionData?.session?.access_token || '',
+              refreshToken: sessionData?.session?.refresh_token || '',
+            });
+            if (target) {
+              window.location.href = target;
               return;
             }
 
@@ -653,12 +657,14 @@ export default function AuthPage() {
         addMember(member);
         login(member);
 
-        // Redirect to tenant subdomain
+        // Hop to the building's own host in production; stay put elsewhere
         if (inviteData.subdomain) {
           const { data: sessionData } = await supabase.auth.getSession();
-          const at = sessionData?.session?.access_token || '';
-          const rt = sessionData?.session?.refresh_token || '';
-          window.location.href = `https://${inviteData.subdomain}.getonetwo.com/login?sb_access=${at}&sb_refresh=${rt}`;
+          const target = tenantLoginUrl(inviteData.subdomain, {
+            accessToken: sessionData?.session?.access_token || '',
+            refreshToken: sessionData?.session?.refresh_token || '',
+          });
+          if (target) window.location.href = target;
         }
 
         setSending(false);
