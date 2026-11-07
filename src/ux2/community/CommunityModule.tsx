@@ -80,10 +80,10 @@ export default function CommunityModule() {
     log: 'The property log. Anyone can log what they see around the building; the board and the manager follow up.',
     scorecard: 'How the property manager is doing, quarter by quarter, as the board rates them in five categories.',
     notices: 'The bulletin board. What the building needs to know, who posted it, and the alerts channel for anything urgent.',
-    meetings: 'Scheduling, notices, agendas, attendance, minutes and their approval, in one place for the board and the owners.',
-    votes: 'Open votes for owners and the board, ballots, proxies, quorum, results and certification.',
-    requests: 'Ask the board for something, follow where it is, and see what neighbours have asked for.',
-    amenities: 'Reserve the shared spaces, follow your reservations, and the rules the board set.',
+    meetings: 'Scheduling, notices, agendas, attendance, minutes and their approval, in one place for the board and the owners. Owners see this same page without the manage controls: they RSVP, read the agenda, add a proxy and read posted minutes. Notices themselves are sent from the Board Room outbox.',
+    votes: 'Open votes for owners and the board, ballots, proxies, quorum, results and certification. Owners see the open owner votes with a Vote button, the election, their proxy, and results once certified. Board votes and the manage controls show for the board only.',
+    requests: isBoard ? 'Ask the board for something, follow where it is, and see what neighbours have asked for. This is the owner-facing side of the requests the board works in Board Room › Inbox: replies, the 14-day clock and the convert-to-case step happen there; the owner sees the status, the dates and the replies.' : 'Ask the board for something, follow where it is, and see what neighbours have asked for. The board replies within 14 days.',
+    amenities: isBoard ? 'Reserve the shared spaces, follow your reservations, and the rules the board set. Approvals and Settings show for the board and manager only.' : 'Reserve the shared spaces, follow your reservations, and the rules the board set. The board approves requests within a day.',
   }[tab];
 
   const tabs = [

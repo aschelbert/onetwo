@@ -1,15 +1,15 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
  * The module header every UX2 module uses, so the layout never shifts
  * between modules or tabs:
  *
- *   Title                                              [status chips]
- *   subtitle
+ *   Title (i)                                          [status chips]
  *   [ section tabs ......... ]   [tab actions] [module actions] [gear]
  *
- * Status (scores, alerts) sits beside the title. Calls to action sit on the
+ * The description lives behind the (i) beside the title. Status (scores,
+ * alerts) sits at the right of the title. Calls to action sit on the
  * tabs row, right-justified, to the left of any navigation icon (the Funds
  * gear). A tab body adds its own buttons there with <HeaderActions>, so a
  * button keeps its inline form in the tab but shows up in the same place on
@@ -38,9 +38,9 @@ export function ModuleHeader({ title, subtitle, status, tabs, tabsEnd, actions, 
   return (
     <header className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-[320px]">
+        <div className="relative flex min-w-0 flex-1 basis-[320px] items-start gap-1.5">
           <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ux2-ink">{title}</h1>
-          {subtitle && <p className="max-w-[760px] text-sm text-ux2-muted">{subtitle}</p>}
+          {subtitle && <InfoTip label={`About ${typeof title === 'string' ? title : 'this page'}`}>{subtitle}</InfoTip>}
         </div>
         {status && <div className="flex max-w-full flex-wrap items-center justify-end gap-2">{status}</div>}
       </div>
@@ -53,6 +53,23 @@ export function ModuleHeader({ title, subtitle, status, tabs, tabsEnd, actions, 
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * The page description, behind a superscript "i" beside the title. The
+ * popover anchors to the title block (the nearest positioned ancestor), so
+ * it never runs past the page edge on a phone. It opens on hover, on
+ * keyboard focus and on tap (focus), and stays in the DOM so screen readers
+ * get it through aria-describedby.
+ */
+function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <span className="group mt-0.5 inline-flex">
+      <button type="button" aria-label={label} aria-describedby={id} className="grid h-5 w-5 place-items-center rounded-full border border-ux2-line-strong bg-white text-[11px] font-bold italic leading-none text-ux2-muted hover:border-ux2-navy hover:text-ux2-navy focus:border-ux2-navy focus:text-ux2-navy focus:outline-none">i</button>
+      <span id={id} role="tooltip" className="invisible absolute left-0 top-full z-40 mt-1 w-[min(420px,100%)] min-w-[260px] max-w-full rounded-[14px] border border-ux2-line bg-white px-4 py-3 text-sm leading-relaxed text-ux2-ink opacity-0 shadow-[0_14px_36px_rgba(13,27,46,.14)] transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">{children}</span>
+    </span>
   );
 }
 
