@@ -20,6 +20,7 @@ import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
+import { isTenantHost } from '@/lib/tenantHost';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -153,8 +154,7 @@ function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
     // On tenant subdomains, platform admins should see the tenant dashboard
-    const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
@@ -166,8 +166,7 @@ function LoginRoute() {
 function CatchAll() {
   const { isAuthenticated, currentRole } = useAuthStore();
   if (isAuthenticated) {
-    const host = window.location.hostname;
-    const isTenantSubdomain = host.endsWith('.getonetwo.com') && host !== 'app.getonetwo.com';
+    const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'
       ? '/portfolio'
       : currentRole === 'PLATFORM_ADMIN' && !isTenantSubdomain ? '/admin/console' : '/home';
