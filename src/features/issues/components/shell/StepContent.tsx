@@ -229,6 +229,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                       return (
                         <div
                           key={ck.id}
+                          data-check-row={ck.id}
                           className={`bg-white rounded-lg border overflow-hidden transition-all ${
                             ck.checked ? 'border-sage-200' : 'border-ink-100'
                           }`}

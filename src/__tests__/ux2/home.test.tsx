@@ -11,7 +11,8 @@ vi.mock('@/components/TenantProvider', () => ({
 
 import HomePage from '@/ux2/home/HomePage';
 import CaseDock from '@/ux2/shell/CaseDock';
-import { dockFor, caseIdFromLocation, useCaseDockStore } from '@/ux2/shell/caseDock';
+import { dockFor, caseIdFromLocation, casePath, spotFromSearch, useCaseDockStore } from '@/ux2/shell/caseDock';
+import { useLocation } from 'react-router-dom';
 
 function renderHome(path = '/home') {
   return render(
@@ -184,5 +185,38 @@ describe('Case dock', () => {
     const dock = document.querySelector('[data-widget="case-dock"]') as HTMLElement;
     fireEvent.click(within(dock).getByRole('button', { name: 'Back to the step' }));
     expect(screen.getByTestId('case-page')).toBeTruthy();
+  });
+
+  it('Back returns to the step and checklist item you left from', () => {
+    const c = useIssuesStore.getState().cases.find(x => x.status !== 'closed' && (x.steps?.filter(s => !s.done).length ?? 0) > 1 && x.steps!.some(s => !s.done && (s.checks?.length ?? 0) > 0))!;
+    const later = c.steps!.reduce((last, s, i) => (!s.done && (s.checks?.length ?? 0) > 0 ? i : last), -1);
+    const check = c.steps![later].checks![0].id;
+    const dockStore = useCaseDockStore.getState();
+    dockStore.touch(c.id);
+    dockStore.remember(c.id, { step: later, approach: null });
+    useCaseDockStore.getState().rememberCheck(c.id, check);
+
+    // The dock shows the step you were on, not the first step left.
+    expect(dockFor(useIssuesStore.getState().cases, [c.id], [], null, useCaseDockStore.getState().spots)!.active.stepIdx).toBe(later);
+
+    function CasePage() { const { search } = useLocation(); return <div data-testid="case-page">{search}</div>; }
+    render(
+      <MemoryRouter initialEntries={['/funds']}>
+        <Routes>
+          <Route path="/funds" element={<CaseDock />} />
+          <Route path="/issues" element={<CasePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const dock = document.querySelector('[data-widget="case-dock"]') as HTMLElement;
+    fireEvent.click(within(dock).getByRole('button', { name: 'Back to the step' }));
+    const spot = spotFromSearch(screen.getByTestId('case-page').textContent!);
+    expect(spot).toEqual({ step: later, approach: null, check });
+
+    // Moving to another step forgets the item.
+    useCaseDockStore.getState().remember(c.id, { step: 0, approach: null });
+    expect(useCaseDockStore.getState().spots[c.id]).toEqual({ step: 0, approach: null });
+    expect(casePath('c1', { step: 2, approach: 1, check: 'k 1' })).toBe('/issues?view=case:c1&step=3&approach=2&check=k%201');
+    expect(spotFromSearch('?view=case:c1')).toBeNull();
   });
 });
