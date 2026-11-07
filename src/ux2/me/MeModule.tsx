@@ -3,11 +3,11 @@
  * Management, Subscription, Help & Support. Each keeps its production route
  * (`/account`, `/my-unit`, `/admin/users`, `/subscription`, `/support`) so
  * the avatar menu and every old link still work; the module draws one
- * header and tab row over them. The detail under each tab is the
- * production page, mounted embedded, so profile saves, unit linking,
- * document upload, invites (`send-invite`), Chargebee (`manage-subscription`,
- * `chargebee-portal`) and the realtime support thread are the code paths
- * production runs today.
+ * header and tab row over them. Each tab is built to its design board and
+ * writes through the same paths production used: profile saves and unit
+ * linking in the auth store, invites through `send-invite`, Chargebee
+ * through `manage-subscription` and `chargebee-portal`, support threads in
+ * the admin project.
  */
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -41,7 +41,7 @@ export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
   const signOut = useAuthStore(s => s.signOut);
   const role = snap.viewer.role;
   const canManage = role === 'BOARD_MEMBER' || role === 'PROPERTY_MANAGER';
-  const canBill = role === 'BOARD_MEMBER' && !tenant.isDemo;
+  const canBill = role === 'BOARD_MEMBER';
   const units = snap.viewer.linkedUnits;
 
   const tabs = [
@@ -72,6 +72,9 @@ export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
           <div className="flex flex-wrap items-center gap-2">
             {tab === 'unit' && units.length > 0 && <Button onClick={() => navigate('/my-unit/pay')}>Pay</Button>}
             {tab === 'account' && <Button variant="ghost" onClick={() => { signOut(); navigate('/login'); }}>Sign out</Button>}
+            {tab === 'users' && <><Button onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Invite someone</Button><Button variant="ghost" onClick={() => document.getElementById('invite-card')?.scrollIntoView({ behavior: 'smooth' })}>Bulk invite</Button></>}
+            {tab === 'subscription' && <><Button onClick={() => document.getElementById('plans-card')?.scrollIntoView({ behavior: 'smooth' })}>Manage plan</Button><Button variant="ghost" onClick={() => document.getElementById('invoices-card')?.scrollIntoView({ behavior: 'smooth' })}>Latest invoice</Button></>}
+            {tab === 'help' && <Button onClick={() => document.getElementById('thread-card')?.scrollIntoView({ behavior: 'smooth' })}>New support thread</Button>}
           </div>
         </div>
         <PillTabs tabs={tabs} value={tab} onChange={id => navigate(ME_PATHS[id])} aria-label="Me sections" />
@@ -80,7 +83,7 @@ export default function MeModule({ tab: forced }: { tab?: MeTab } = {}) {
       {tab === 'account' && <AccountTab snap={snap} />}
       {tab === 'unit' && <UnitsTab snap={snap} />}
       {tab === 'users' && canManage && <UsersTab snap={snap} />}
-      {tab === 'subscription' && canBill && <SubscriptionTab />}
+      {tab === 'subscription' && canBill && <SubscriptionTab snap={snap} />}
       {tab === 'help' && <HelpTab snap={snap} />}
     </div>
   );

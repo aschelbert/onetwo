@@ -6,6 +6,7 @@ import { useScorecardStore } from '@/store/useScorecardStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
+import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 
 const tenantFlags = vi.hoisted(() => ({ pmSeat: true }));
 vi.mock('@/components/TenantProvider', () => ({
@@ -15,7 +16,6 @@ vi.mock('@/features/property-log/PropertyLogPage', () => ({ default: () => <div 
 vi.mock('@/features/community/CommunityRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-community" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/boardroom/BoardRoomPage', () => ({ default: ({ embedded, tab }: { embedded?: boolean; tab?: string }) => <div data-testid="legacy-boardroom" data-embedded={embedded ? '1' : '0'}>{tab ?? 'page'}</div> }));
 vi.mock('@/features/elections/ElectionsPage', () => ({ default: ({ embedded, initialSelectedId }: { embedded?: boolean; initialSelectedId?: string | null }) => <div data-testid="legacy-votes" data-embedded={embedded ? '1' : '0'}>{initialSelectedId ?? 'list'}</div> }));
-vi.mock('@/features/community/AmenitiesTab', () => ({ default: () => <div data-testid="legacy-amenities" /> }));
 vi.mock('@/ux2/community/notify', () => ({ emailAnnouncement: async () => ({ sent: 0, note: 'Email not sent: test.' }) }));
 
 import CommunityModule from '@/ux2/community/CommunityModule';
@@ -67,29 +67,37 @@ describe('Community', () => {
     expect(useComplianceStore.getState().announcements.length).toBe(before);
   });
 
-  it('Meetings shows the next meeting, lets the viewer RSVP through the store, and mounts the Board Room meetings tab', () => {
+  it('Meetings shows the next meeting, the schedule table and the agenda, and lets the viewer RSVP through the store', () => {
     renderAt('/community?tab=meetings');
-    expect(screen.getByTestId('legacy-boardroom').textContent).toBe('meetings');
+    expect(screen.queryByTestId('legacy-boardroom')).toBeNull();
+    expect(document.querySelector('[aria-label="All meetings"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Agenda"]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-meeting]').length).toBeGreaterThan(0);
     const next = document.querySelector('[aria-label="Next meeting"]') as HTMLElement | null;
     if (next) {
       const me = useAuthStore.getState().currentUser.name;
       const id = (document.querySelector('[data-meeting]') as HTMLElement).getAttribute('data-meeting')!;
-      fireEvent.click(within(next).getByRole('button', { name: /RSVP|Going/ }));
-      const m = useMeetingsStore.getState().meetings.find(x => x.id === id)!;
-      const going = m.attendees.board.includes(me) || m.attendees.owners.includes(me);
-      expect(typeof going).toBe('boolean');
+      const rsvp = within(next).queryByRole('button', { name: /RSVP|Going/ });
+      if (rsvp) {
+        fireEvent.click(rsvp);
+        const m = useMeetingsStore.getState().meetings.find(x => x.id === id)!;
+        expect(m.attendees.board.includes(me) || m.attendees.owners.includes(me)).toBe(true);
+      } else {
+        // A board member sees the manage controls instead of RSVP.
+        expect(within(next).getByRole('button', { name: 'Send notice' })).toBeTruthy();
+      }
     }
   });
 
-  it('Votes lists board decisions and deep links one election into the embedded Votes page', () => {
+  it('Votes shows the open owner vote, board decisions, the election and the results without the legacy page', () => {
     renderAt('/community?tab=votes');
     expect(document.querySelector('[aria-label="Board decisions"]')).toBeTruthy();
-    expect(screen.getByTestId('legacy-votes').textContent).toBe('list');
-    renderAt('/community?tab=votes&vote=e-123');
-    const all = screen.getAllByTestId('legacy-votes');
-    expect(all[all.length - 1].textContent).toBe('e-123');
+    expect(document.querySelector('[aria-label="Open owner vote"]') || document.querySelector('[aria-label="Election"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Results and certification"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Proxies and quorum"]')).toBeTruthy();
+    expect(screen.queryByTestId('legacy-votes')).toBeNull();
     renderAt('/voting');
-    expect(screen.getAllByTestId('legacy-votes').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('[aria-label="Board decisions"]').length).toBeGreaterThan(0);
   });
 
   it('Requests submits through the issues store and upvotes a neighbour\'s request', () => {
@@ -148,9 +156,21 @@ describe('Community', () => {
     expect(document.querySelector('[data-widget="pm-scorecard"]')).toBeNull();
   });
 
-  it('Amenities mounts the production tab for the management suite', () => {
+  it('Amenities lists the shared spaces, takes a reservation through the store, and shows the week', () => {
     renderAt('/community?tab=amenities');
-    expect(screen.getByTestId('legacy-amenities')).toBeTruthy();
-    expect(screen.getByText('Shared spaces')).toBeTruthy();
+    expect(screen.queryByTestId('legacy-amenities')).toBeNull();
+    expect(document.querySelectorAll('[data-amenity]').length).toBeGreaterThan(0);
+    expect(document.querySelector('[aria-label="This week"]')).toBeTruthy();
+    const before = useAmenitiesStore.getState().reservations.length;
+    const reserve = screen.getAllByRole('button', { name: /^Reserve the / })[0];
+    fireEvent.click(reserve);
+    const form = document.querySelector('form[aria-label^="Reserve the"]') as HTMLElement;
+    fireEvent.change(within(form).getByLabelText('From'), { target: { value: '14:00' } });
+    fireEvent.change(within(form).getByLabelText('To'), { target: { value: '15:00' } });
+    fireEvent.change(within(form).getByLabelText('Notes'), { target: { value: 'birthday' } });
+    fireEvent.click(within(form).getByRole('button', { name: /Reserve|Request/ }));
+    const after = useAmenitiesStore.getState().reservations;
+    expect(after.length).toBe(before + 1);
+    expect(after[after.length - 1].notes).toBe('birthday');
   });
 });

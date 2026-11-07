@@ -6,3 +6,6 @@ vi.mock('@/lib/supabase', () => ({
   getActiveTenantId: () => null,
   logDbError: () => {},
 }));
+
+// jsdom has no scrollIntoView; the UX2 header buttons scroll to a card.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
