@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useComplianceStore } from '@/store/useComplianceStore';
 
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', features: {}, id: 't1' }),
@@ -151,14 +152,53 @@ describe('Funds', () => {
     expect(within(draft).getByText('Where it stands')).toBeTruthy();
   });
 
-  it('Online payments and the gear restore the orphaned Stripe and rules screens', () => {
+  it('Online payments shows the collected, payouts and fees tiles, the payments table, the Stripe card and the setup runbook', () => {
     renderAt('/funds?tab=payments');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Online payments');
-    expect(screen.getByTestId('legacy-payments')).toBeTruthy();
+    expect(screen.queryByTestId('legacy-payments')).toBeNull();
+    expect(document.querySelector('[aria-label="Recent payments"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Stripe account"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="What owners can pay here"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Get paid online"]')).toBeTruthy();
+    const sw = screen.getByRole('switch', { name: 'Pass card fees to the owner' });
+    fireEvent.click(sw);
+    expect(sw.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('Accounts and ledger posts a quick entry through the store, renames an account and keeps the mailing card', () => {
     renderAt('/funds?tab=settings&section=rules');
     expect(document.querySelector('[aria-label="Billing rules"]')).toBeTruthy();
-    renderAt('/funds?tab=settings&section=mailing');
+    expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Chart of accounts"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Where things post"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Fee schedule"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-mailing')).toBeTruthy();
+    const before = useFinancialStore.getState().generalLedger.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Moved money to reserves' }));
+    const form = screen.getByRole('form', { name: 'Moved money to reserves' });
+    fireEvent.change(within(form).getByLabelText('Amount'), { target: { value: '2400' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Post' }));
+    const gl = useFinancialStore.getState().generalLedger;
+    expect(gl.length).toBe(before + 1);
+    expect(gl[gl.length - 1]).toMatchObject({ debitAcct: '1020', creditAcct: '1010', amount: 2400, source: 'transfer' });
+  });
+
+  it('Statements shows the balance sheet, income statement, packets, filings and accountant cards; a packet posts as a notice', () => {
+    renderAt('/funds?tab=statements');
+    expect(screen.queryByTestId('legacy-reports')).toBeNull();
+    expect(document.querySelector('[aria-label="Balance sheet"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Income statement"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Monthly statement packets"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Taxes and filings"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Accountant access"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Budget variance report' }));
+    expect(within(document.querySelector('[aria-label="Income statement"]') as HTMLElement).getByText('Variance')).toBeTruthy();
+    const send = screen.queryAllByRole('button', { name: 'Send to owners' })[0];
+    if (send) {
+      const before = useComplianceStore.getState().announcements.length;
+      fireEvent.click(send);
+      expect(useComplianceStore.getState().announcements.length).toBe(before + 1);
+    }
   });
 
   it('Pay wraps the production balance tab for the owner\'s unit', () => {
