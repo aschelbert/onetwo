@@ -23,6 +23,39 @@ p{margin:0}
 .muted{color:#4b5a6b}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 @media (max-width:640px){.wrap{padding:0 16px}}
+.policy{max-width:780px;margin:0 auto;padding:80px 32px 64px;font-size:17px;line-height:1.7;color:#2b3a4c}
+.policy h1{font-size:40px;line-height:1.12;margin-bottom:12px;color:#0D1B2E}
+.policy .effective{color:#4b5a6b;font-size:15px;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid #e3e8ee}
+.policy section{scroll-margin-top:96px}
+.policy h2{font-size:26px;line-height:1.25;color:#0D1B2E;margin:56px 0 16px}
+.policy p{margin:0 0 16px}
+.policy ul{margin:0 0 16px;padding-left:22px}
+.policy li{margin-bottom:10px}
+.policy strong{color:#0D1B2E;font-weight:600}
+.policy address{font-style:normal}
+.policy .callout{background:#f3f6f9;border-left:3px solid #155E75;padding:14px 18px;border-radius:0 8px 8px 0}
+.toc{background:#f7f9fb;border:1px solid #e3e8ee;border-radius:12px;padding:20px 24px;font-size:15px}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px}
+.toc li{margin-bottom:6px;break-inside:avoid}
+.toc a{text-decoration:none}.toc a:hover{text-decoration:underline}
+.data{width:100%;border-collapse:collapse;font-size:15px;line-height:1.55;margin:8px 0 24px}
+.data th,.data td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid #e3e8ee}
+.data thead th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#4b5a6b;font-weight:600;border-bottom:2px solid #d5dde6;font-family:'DM Sans',system-ui,sans-serif}
+.data tbody th{font-family:'DM Sans',system-ui,sans-serif;font-weight:600;color:#0D1B2E;width:28%}
+.data.providers tbody th{width:32%}
+@media (max-width:640px){
+  .policy{padding:48px 16px 48px;font-size:16px}
+  .policy h1{font-size:32px}
+  .policy h2{font-size:22px;margin-top:44px}
+  .toc ol{columns:1}
+  .data thead{display:none}
+  .data,.data tbody,.data tr,.data th,.data td{display:block;width:auto}
+  .data tr{border:1px solid #e3e8ee;border-radius:10px;padding:4px 0;margin-bottom:12px}
+  .data tbody th,.data td{border:0;padding:8px 14px}
+  .data tbody th{width:auto;font-size:16px}
+  .data td[data-label]::before{content:attr(data-label);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#4b5a6b;font-weight:600;margin-bottom:2px}
+}
+
 </style>
 </head>
 <body>
@@ -33,11 +66,150 @@ p{margin:0}
   </div>
 </header>
 
-<main style="max-width:780px;margin:0 auto;padding:80px 32px 64px">
-  <h1 style="font-size:40px;line-height:1.12;margin-bottom:12px">Privacy Policy</h1>
-  <p class="muted" style="font-size:15px;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #e3e8ee">Effective Date: February 21, 2026</p>
-  <p style="font-size:17px;line-height:1.7;color:#4b5a6b">[Content under review]</p>
-  <p style="font-size:15px;line-height:1.7;color:#4b5a6b;margin-top:24px">For questions about our privacy practices, contact <a href="mailto:privacy@getonetwo.com">privacy@getonetwo.com</a>.</p>
+<main class="policy">
+  <h1>Privacy Policy</h1>
+  <p class="effective">Effective date: November 8, 2026</p>
+
+  <nav class="toc" aria-label="Contents">
+    <ol>
+      <li><a href="#who-we-are">Who we are and what this policy covers</a></li>
+      <li><a href="#information-we-collect">Information we collect</a></li>
+      <li><a href="#how-we-use">How we use information</a></li>
+      <li><a href="#how-we-share">How we share information</a></li>
+      <li><a href="#retention">How long we keep information</a></li>
+      <li><a href="#security">How we protect information</a></li>
+      <li><a href="#your-rights">Your choices and rights</a></li>
+      <li><a href="#children">Children</a></li>
+      <li><a href="#where">Where we process information</a></li>
+      <li><a href="#changes">Changes to this policy</a></li>
+      <li><a href="#contact">Contact us</a></li>
+    </ol>
+  </nav>
+
+  <section id="who-we-are">
+    <h2>1. Who we are and what this policy covers</h2>
+    <p>ONE two LLC (&ldquo;ONE two,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) is a District of Columbia limited liability company. We provide governance, compliance and financial software for self-managed condominium and homeowner associations.</p>
+    <p>This policy explains how we collect, use, share and protect personal information when you visit getonetwo.com, sign up for a trial or subscription, or use the ONE two application (together, the &ldquo;Services&rdquo;).</p>
+    <p><strong>Two roles.</strong> We handle personal information in two different capacities:</p>
+    <ul>
+      <li><strong>For our own business.</strong> Information about the people who sign up, buy subscriptions, contact us or visit our website. We decide how this information is used.</li>
+      <li><strong>On behalf of associations.</strong> Information an association stores in ONE two about its units, owners, residents, vendors and board. The association (usually acting through its board) controls that information and decides who can see it. We process it to provide the Services under our agreement with the association.</li>
+    </ul>
+    <p class="callout">If you are an owner or resident and have questions about records your association keeps in ONE two, please contact your board first. We will help your association respond.</p>
+  </section>
+
+  <section id="information-we-collect">
+    <h2>2. Information we collect</h2>
+    <table class="data">
+      <thead><tr><th scope="col">Category</th><th scope="col">Examples</th><th scope="col">Where it comes from</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Account and contact</th><td data-label="Examples">Name, email, phone, mailing address, role (board member, owner, resident, property manager), password (stored only as a secure hash)</td><td data-label="Source">You, or a board member who invites you</td></tr>
+        <tr><th scope="row">Building and unit records</th><td data-label="Examples">Building name and address, unit numbers, owner and resident names, mailing addresses, ownership share, directory details</td><td data-label="Source">The association&rsquo;s board and users</td></tr>
+        <tr><th scope="row">Association financial records</th><td data-label="Examples">Budgets, general ledger entries, assessments, unit invoices and payment history, reserve and asset records, vendor contracts, bids and invoices</td><td data-label="Source">The association&rsquo;s board and users</td></tr>
+        <tr><th scope="row">Governance records</th><td data-label="Examples">Meetings, agendas, minutes, notices, elections, ballots and votes, cases, issues, comments, documents and attachments</td><td data-label="Source">The association&rsquo;s board and users</td></tr>
+        <tr><th scope="row">Vendor information</th><td data-label="Examples">Business name, contact details, and tax information needed to prepare 1099 filings</td><td data-label="Source">The association&rsquo;s board</td></tr>
+        <tr><th scope="row">Activity and stewardship data</th><td data-label="Examples">Actions taken in the app (for example, completing a task, paying on time, voting, attending a meeting), and the stewardship scores we calculate from them</td><td data-label="Source">Your use of the Services</td></tr>
+        <tr><th scope="row">Payment information</th><td data-label="Examples">Billing name, address, plan, and the last four digits and type of a card. Full card and bank numbers are collected and stored by our payment processors, not by us</td><td data-label="Source">You, and our payment processors</td></tr>
+        <tr><th scope="row">Communications</th><td data-label="Examples">Emails, letters and notices sent through the Services, delivery status, support requests and messages to us</td><td data-label="Source">You and the Services</td></tr>
+        <tr><th scope="row">Technical data</th><td data-label="Examples">IP address, browser and device type, pages viewed, error reports, performance data, and recordings of some app sessions used to diagnose problems</td><td data-label="Source">Automatically, when you use the Services</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Cookies and local storage.</strong> We use cookies and browser storage that are needed to sign you in, keep your session secure and remember display preferences (such as a collapsed sidebar). We also use analytics cookies and similar technologies from Mixpanel on our website and in the application to understand how the Services are used and improve them. We do not use advertising cookies in the application.</p>
+    <p><strong>Information we do not seek.</strong> Please do not enter Social Security numbers, health information or other sensitive personal information into free-text fields, notes or attachments unless it is required for a specific feature.</p>
+  </section>
+
+  <section id="how-we-use">
+    <h2>3. How we use information</h2>
+    <p>We use personal information to:</p>
+    <ul>
+      <li><strong>Provide the Services:</strong> create accounts, run your association&rsquo;s workspace, generate reports, notices, invoices and filings, and send the emails and postal mail your board asks us to send.</li>
+      <li><strong>Process payments:</strong> bill subscriptions and add-ons, and let associations collect assessments and other payments from owners.</li>
+      <li><strong>Calculate stewardship scores:</strong> summarize how owners and board members take part in running the building (timeliness, compliance, oversight, reach and impact) so the association can encourage good habits. Scores are not used to make legal, credit, housing or eligibility decisions about anyone.</li>
+      <li><strong>Support you:</strong> answer questions, troubleshoot problems and, if your association subscribes to On Call, provide advisory support.</li>
+      <li><strong>Keep the Services secure and working:</strong> authenticate users, enforce access permissions, detect fraud and abuse, monitor errors and fix bugs.</li>
+      <li><strong>Improve the Services:</strong> understand which features are used and where people get stuck. Where practical we use aggregated or de-identified data for this.</li>
+      <li><strong>Communicate with you:</strong> send service messages (trial reminders, billing notices, security alerts) and, if you have not opted out, news about ONE two.</li>
+      <li><strong>Meet legal obligations:</strong> keep financial and tax records, respond to lawful requests and enforce our Terms.</li>
+    </ul>
+    <p><strong>Association data stays the association&rsquo;s.</strong> We use the records an association stores in ONE two only to provide the Services to that association, as described above. We do not sell them, use them to market to owners on our own behalf, or combine one association&rsquo;s records with another&rsquo;s except in aggregated, de-identified form.</p>
+    <p><strong>AI features.</strong> Some features may use an AI model to answer questions or draft content. When you use them, your prompt and the building context needed to answer it are sent to our AI provider to generate a response. We do not permit our AI provider to train its models on this data.</p>
+  </section>
+
+  <section id="how-we-share">
+    <h2>4. How we share information</h2>
+    <p class="callout">We do not sell personal information, and we do not share it for cross-context behavioral advertising.</p>
+    <p><strong>Within your association.</strong> What other users can see depends on their role and the association&rsquo;s settings. Board members can generally see unit, owner, financial and governance records. Owners and residents see their own records plus whatever the board chooses to publish (for example, the directory, announcements, meeting materials or a building-wide stewardship average). Ballots and votes recorded in ONE two are visible to the board members who administer the election.</p>
+    <p><strong>Service providers.</strong> We use the companies below to run the Services. They may process personal information only on our instructions and for these purposes.</p>
+    <table class="data providers">
+      <thead><tr><th scope="col">Provider</th><th scope="col">What they do for us</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Supabase</th><td>Database, user authentication, file storage and server functions</td></tr>
+        <tr><th scope="row">Vercel</th><td>Website and application hosting</td></tr>
+        <tr><th scope="row">Chargebee</th><td>Subscription billing and sales tax</td></tr>
+        <tr><th scope="row">Stripe</th><td>Payment processing, including owner payments to associations through Stripe Connect</td></tr>
+        <tr><th scope="row">Mailjet</th><td>Delivery of email sent through the Services</td></tr>
+        <tr><th scope="row">LetterStream</th><td>Printing and mailing of postal letters and notices</td></tr>
+        <tr><th scope="row">U.S. Postal Service</th><td>Mailing address verification</td></tr>
+        <tr><th scope="row">Mixpanel</th><td>Product and website usage analytics</td></tr>
+        <tr><th scope="row">Sentry</th><td>Error monitoring, performance monitoring and session diagnostics</td></tr>
+        <tr><th scope="row">Anthropic</th><td>AI model for AI features, when used</td></tr>
+      </tbody>
+    </table>
+    <p>We may add or replace providers as the Services change. We will update this list when we do.</p>
+    <p><strong>Other disclosures.</strong> We may also share personal information:</p>
+    <ul>
+      <li>With people you or your board direct us to send it to, such as a property manager, attorney, auditor or vendor.</li>
+      <li>To comply with law, a subpoena or court order, or to protect the rights, safety or property of ONE two, our users or others.</li>
+      <li>In connection with a merger, acquisition, financing or sale of all or part of our business, subject to this policy.</li>
+      <li>With your consent.</li>
+    </ul>
+  </section>
+
+  <section id="retention">
+    <h2>5. How long we keep information</h2>
+    <p>We keep account and association information for as long as the association&rsquo;s subscription is active. Associations often must keep financial, election and meeting records for years under their governing documents and local law, so boards can export records at any time.</p>
+    <p>After a subscription ends, we keep association data for 90 days so the board can export it, then delete or de-identify it, except where we must keep certain records (such as our own billing and tax records) to meet legal obligations. Backups are overwritten on a rolling schedule.</p>
+  </section>
+
+  <section id="security">
+    <h2>6. How we protect information</h2>
+    <p>We use administrative, technical and physical safeguards, including encryption in transit, role-based access controls that separate each association&rsquo;s data, hashed passwords and access logging. No system is perfectly secure. If we learn of a breach that affects your personal information, we will notify you and the affected association as required by law.</p>
+  </section>
+
+  <section id="your-rights">
+    <h2>7. Your choices and rights</h2>
+    <ul>
+      <li><strong>Access and correction.</strong> You can view and update most of your account information in the app. Ask your board to correct association records about you.</li>
+      <li><strong>Deletion.</strong> You can ask us to delete your account. Records the association must keep (for example, ledger entries or meeting minutes that name you) may remain with the association.</li>
+      <li><strong>Email.</strong> You can unsubscribe from marketing emails using the link in each message. You will still receive service and billing messages.</li>
+      <li><strong>State privacy rights.</strong> Depending on where you live, you may have additional rights to access, correct, delete or obtain a copy of your personal information, and to opt out of its sale or use for targeted advertising (we do neither). To make a request, email us at <a href="mailto:privacy@getonetwo.com">privacy@getonetwo.com</a>. We will verify your identity before responding and will not discriminate against you for exercising your rights. If your request concerns records we hold for an association, we will forward it to that association and help it respond. You may use an authorized agent, and you may appeal a decision by replying to our response.</li>
+    </ul>
+  </section>
+
+  <section id="children">
+    <h2>8. Children</h2>
+    <p>The Services are for adults who own, live in or manage property. We do not knowingly collect personal information from children under 13. If you believe a child has given us information, contact us and we will delete it.</p>
+  </section>
+
+  <section id="where">
+    <h2>9. Where we process information</h2>
+    <p>ONE two is based in the United States, and our service providers store and process information in the United States.</p>
+  </section>
+
+  <section id="changes">
+    <h2>10. Changes to this policy</h2>
+    <p>We may update this policy as the Services change. We will post the new version on this page with a new effective date and, for material changes, notify account holders by email or in the app before the changes take effect.</p>
+  </section>
+
+  <section id="contact">
+    <h2>11. Contact us</h2>
+    <address>
+      ONE two LLC<br>
+      <a href="mailto:privacy@getonetwo.com">privacy@getonetwo.com</a><br>
+      1763 Columbia Rd NW, Ste 175, PMB 688725<br>
+      Washington, DC 20009-2891
+    </address>
+  </section>
 </main>
 
 <footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>

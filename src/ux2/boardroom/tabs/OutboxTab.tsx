@@ -12,6 +12,8 @@ import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, 
 import { dayLabel } from '../../home/calendar';
 import { meetingRows, meetingsSummary } from '../../community/metrics';
 import { outboxSummary, type BoardRoomSnapshot } from '../metrics';
+import { sendMeetingNotice } from '../../community/meetingNotice';
+import { emailAnnouncement } from '../../community/notify';
 
 type Section = 'drafts' | 'sent' | 'scheduled' | 'templates' | 'older';
 
@@ -92,6 +94,8 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [sendNote, setSendNote] = useState<{ text: string; mailto?: string } | null>(null);
+  const addAnnouncement = useComplianceStore(s => s.addAnnouncement);
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
   const certifiedCents = 750;
   const notices = useMemo(() => meetingsSummary(meetingRows({ today: snap.today, viewer: { ...snap.viewer, isBoard: true }, announcements: [], communications, meetings, elections: [], issues: [], units: [] })).noticesOverdue, [snap.today, snap.viewer, communications, meetings]);
@@ -100,10 +104,41 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
   const sent30 = o.sent.filter(l => l.sentDate && Date.parse(snap.today) - Date.parse(l.sentDate.slice(0, 10)) <= 30 * 86_400_000);
   const q = search.toLowerCase();
   const match = (l: GeneratedLetter) => !q || `${l.subject} ${l.templateName} ${l.recipient} ${l.unitNumber}`.toLowerCase().includes(q);
-  const send = (l: GeneratedLetter) => updateLetter(l.id, { status: 'sent', sentDate: new Date().toISOString().slice(0, 10), sentVia: l.sentVia || (l.unitNumber ? 'Email' : 'In-app and email') });
-  const resend = (l: GeneratedLetter) => addLetter({ templateId: l.templateId, templateName: l.templateName, recipient: l.recipient, unitNumber: l.unitNumber, subject: l.subject, body: l.body, status: 'sent', sentDate: new Date().toISOString().slice(0, 10), sentVia: l.sentVia, createdBy: snap.viewer.name, caseId: l.caseId ?? null });
+  const toBoard = (l: GeneratedLetter) => !l.unitNumber && /board/i.test(l.recipient);
+  /** A draft in the person's own email app: to the unit's owner, the board, or every owner (bcc). */
+  const mailtoFor = (l: GeneratedLetter): string | undefined => {
+    const emails = l.unitNumber ? [units.find(u => u.number === l.unitNumber)?.email] : toBoard(l) ? board.map(b => b.email) : units.map(u => u.email);
+    const list = [...new Set(emails.filter((e): e is string => !!e && e.includes('@')))];
+    if (!list.length) return undefined;
+    const q = `subject=${encodeURIComponent(l.subject || l.templateName)}&body=${encodeURIComponent(l.body)}`;
+    return l.unitNumber || list.length === 1 ? `mailto:${list.join(',')}?${q}` : `mailto:?bcc=${list.join(',')}&${q}`;
+  };
+  /**
+   * What sending actually does. A letter to all owners is posted in-app (Community › Notices) and emailed
+   * through the announcement email. A letter to one unit or the board is logged; the Outbox doesn't email
+   * those, so Open in email drafts it in the sender's own email app.
+   */
+  const deliver = async (l: GeneratedLetter) => {
+    const mailto = mailtoFor(l);
+    if (l.unitNumber || toBoard(l)) {
+      setSendNote({ text: `Logged as sent. The Outbox doesn't email letters to ${l.unitNumber ? 'one unit' : 'the board'}; ${mailto ? 'Open in email drafts it in your own email app' : 'no email address is on file, so print and mail it'}.`, mailto });
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    addAnnouncement({ title: l.subject || l.templateName, body: l.body, category: 'general', postedBy: snap.viewer.name, postedDate: today, pinned: true });
+    const recipients = units.filter(u => u.email).map(u => ({ email: u.email, name: u.owner }));
+    const r = await emailAnnouncement({ title: l.subject || l.templateName, body: l.body, category: 'general', postedBy: snap.viewer.name, recipients });
+    setSendNote(r.sent > 0
+      ? { text: `Posted in Community › Notices and emailed to ${r.sent} owner${r.sent === 1 ? '' : 's'}.` }
+      : { text: `Posted in Community › Notices for every owner, but not emailed: ${(r.note ?? 'email failed').replace(/^Not emailed:\s*/i, '').replace(/\.$/, '')}.${mailto ? ' Open in email sends it from your own email app.' : ''}`, mailto });
+  };
+  const send = (l: GeneratedLetter) => {
+    updateLetter(l.id, { status: 'sent', sentDate: new Date().toISOString().slice(0, 10), sentVia: l.sentVia || (l.unitNumber ? 'Email' : 'In-app and email') });
+    void deliver(l);
+  };
+  const resend = (l: GeneratedLetter) => { void deliver(l); return addLetter({ templateId: l.templateId, templateName: l.templateName, recipient: l.recipient, unitNumber: l.unitNumber, subject: l.subject, body: l.body, status: 'sent', sentDate: new Date().toISOString().slice(0, 10), sentVia: l.sentVia, createdBy: snap.viewer.name, caseId: l.caseId ?? null }); };
   const needs = [
-    ...notices.slice(0, 2).map(m => ({ id: `notice:${m.meeting.id}`, title: `Send the notice for the ${m.meeting.title} on ${dayLabel(m.meeting.date)}`, chip: <Chip tone="red">Overdue · was due {dayLabel(m.noticeDue)}</Chip>, detail: `Goes to every active member in-app and by email. The bylaws ask for 10 days; DC's minimum is 48 hours, so sending today still meets the law.`, cite: 'DC Code § 29-1101 et seq.', actions: <><Button size="sm" variant="ghost" onClick={() => navigate(`/community?tab=meetings&meeting=${m.meeting.id}`)}>Open the meeting</Button><Button size="sm" onClick={() => navigate(`/community?tab=meetings&meeting=${m.meeting.id}`)}>Send now</Button></> })),
+    ...notices.slice(0, 2).map(m => ({ id: `notice:${m.meeting.id}`, title: `Send the notice for the ${m.meeting.title} on ${dayLabel(m.meeting.date)}`, chip: <Chip tone="red">Overdue · was due {dayLabel(m.noticeDue)}</Chip>, detail: `Goes to every active member in-app and by email. The bylaws ask for 10 days; DC's minimum is 48 hours, so sending today still meets the law.`, cite: 'DC Code § 29-1101 et seq.', actions: <><Button size="sm" variant="ghost" onClick={() => navigate(`/community?tab=meetings&meeting=${m.meeting.id}`)}>Open the meeting</Button><Button size="sm" onClick={() => { void sendMeetingNotice(m.meeting, snap.viewer.name, snap.today).then(r => setSendNote({ text: r.note })); }}>Send now</Button></> })),
     ...o.drafts.slice(0, 2).map(l => ({ id: `draft:${l.id}`, title: `Send the ${(l.subject || l.templateName).toLowerCase()}${l.unitNumber ? ` to Unit ${l.unitNumber}` : ''}`, chip: <Chip tone="amber">Draft · {deliveryOf(l, certifiedCents).how.toLowerCase()}</Chip>, detail: `${l.recipient}${l.caseId ? ` · ${l.caseId}` : ''} · drafted by ${l.createdBy} from the ${l.templateName} template.${/certif/i.test(l.sentVia) ? ` Certified mail is ${fmt(certifiedCents / 100)}, charged to the card on file; tracking is attached to the case.` : ''}`, cite: /demand|lien|collection/i.test(l.templateName) ? 'DC Code § 42-1903.13' : '', actions: <>{l.caseId ? <Button size="sm" variant="ghost" onClick={() => onOpenCase(l.caseId!)}>Open the case</Button> : <Button size="sm" variant="ghost" onClick={() => setEditing(l.id)}>Edit</Button>}<Button size="sm" onClick={() => send(l)}>{l.caseId ? 'Review and send' : 'Send now'}</Button></> })),
   ].slice(0, 3);
 
@@ -113,10 +148,19 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
   return (
     <div className="flex flex-col gap-5">
       {compose && <LetterForm templates={o.templates} viewer={snap.viewer.name} onClose={() => onComposeDone?.()} />}
+      {sendNote && (
+        <Inner role="status" className="flex flex-wrap items-center justify-between gap-3 text-sm text-ux2-ink">
+          <span className="min-w-0 flex-1">{sendNote.text}</span>
+          <span className="flex gap-1.5">
+            {sendNote.mailto && <a href={sendNote.mailto} className="inline-flex h-9 items-center rounded-full bg-ux2-navy px-3.5 text-xs font-semibold text-white">Open in email</a>}
+            <Button size="sm" variant="ghost" onClick={() => setSendNote(null)}>Dismiss</Button>
+          </span>
+        </Inner>
+      )}
 
       {needs.length > 0 && (
         <Card aria-label="Needs you" className="gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Needs you</SectionLabel><span className="text-xs text-ux2-muted">Sending a letter logs who sent it, when, how and to whom</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Needs you</SectionLabel><span className="text-xs text-ux2-muted">Sending logs who sent it, when, how and to whom; a letter to all owners is posted in-app and emailed, a letter to one unit opens in your email</span></div>
           {needs.map((n, i) => (
             <Inner key={n.id} className={cn('flex flex-wrap items-center justify-between gap-3', i === 0 && 'border-ux2-navy')}>
               <div className="min-w-0 text-sm"><b className="font-semibold text-ux2-ink">{n.title}</b> <span className="ml-1.5">{n.chip}</span><div className="mt-1 text-xs text-ux2-muted">{n.detail} {n.cite && <span className="text-ux2-dim">{n.cite}</span>}</div></div>
@@ -188,9 +232,9 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
                         <Td><LetterCell l={l} /></Td>
                         <Td><ToCell l={l} /></Td>
                         <Td><Cell title={<span className="font-normal">{d.how}</span>} note={d.note} /></Td>
-                        <Td><Cell title={<Chip tone="sage">{rec ? `${rec.status[0].toUpperCase()}${rec.status.slice(1)}` : l.unitNumber ? 'Sent' : `Posted to ${units.length} owners`}</Chip>} note={rec?.letterstreamJobId ? `tracking ${rec.letterstreamJobId}` : l.unitNumber ? 'read log kept' : 'pinned in Community › News'} /></Td>
+                        <Td><Cell title={<Chip tone={rec || (!l.unitNumber && !toBoard(l)) ? 'sage' : 'ghost'}>{rec ? `${rec.status[0].toUpperCase()}${rec.status.slice(1)}` : l.unitNumber || toBoard(l) ? 'Logged' : `Posted to ${units.length} owners`}</Chip>} note={rec?.letterstreamJobId ? `tracking ${rec.letterstreamJobId}` : l.unitNumber || toBoard(l) ? 'delivered outside the app' : 'pinned in Community › Notices'} /></Td>
                         <Td className="whitespace-nowrap text-ux2-muted">{l.createdBy} · {l.sentDate ? dayLabel(l.sentDate.slice(0, 10)) : '—'}</Td>
-                        <Td num><span className="flex justify-end gap-1.5"><Button size="sm" variant="ghost" onClick={() => setViewing(viewing === l.id ? null : l.id)}>View</Button><Button size="sm" variant="ghost" onClick={() => resend(l)}>Resend</Button></span></Td>
+                        <Td num><span className="flex justify-end gap-1.5"><Button size="sm" variant="ghost" onClick={() => setViewing(viewing === l.id ? null : l.id)}>View</Button>{mailtoFor(l) && <a href={mailtoFor(l)} className="inline-flex h-9 items-center rounded-full px-3 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Open in email</a>}<Button size="sm" variant="ghost" onClick={() => resend(l)}>Resend</Button></span></Td>
                       </tr>
                       {viewing === l.id && <tr><td colSpan={6} className="px-3 py-2"><Inner className="whitespace-pre-wrap text-sm text-ux2-ink"><div className="mb-1 font-semibold">{l.subject}</div>{l.body}</Inner></td></tr>}
                     </Fragment>
