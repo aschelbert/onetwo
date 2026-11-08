@@ -86,10 +86,12 @@ Deploy notes:
   building's connected account, so the endpoint must receive connected
   account events (Stripe Dashboard → Webhooks → "Listen to events on
   Connected accounts").
-- The server posts to the default accounts (1010, 1110, 1120, 1130, 2020,
-  4010, 4020, 4030, 4060). The per-building mapping under "Where things post"
-  lives in the browser and is not stored yet; a building that remaps those
-  accounts should expect server-side postings to use the defaults.
+- Apply migration 045 as well: it saves the building's "Where things post"
+  mapping on `financial_settings` and makes the server functions read it,
+  with the app's defaults as the fallback, so a building that remaps an
+  account gets the same accounts from the app and from Stripe. The mapping
+  is saved the next time any Funds setting is changed (or "Save mapping" is
+  pressed); until then the server uses the defaults.
 
 ## Reading the statements
 

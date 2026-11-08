@@ -294,6 +294,7 @@ function syncSettings() {
     lastBillingRun: s.lastBillingRun,
     lastLateFeeRun: s.lastLateFeeRun,
     autoReserveTransfer: s.autoReserveTransfer,
+    glAccountMapping: { ...DEFAULT_GL_MAPPING, ...s.glAccountMapping },
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
 
@@ -373,6 +374,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.lastLateFeeRun = data.settings.lastLateFeeRun;
       updates.closedThrough = data.settings.closedThrough;
       updates.autoReserveTransfer = data.settings.autoReserveTransfer;
+      // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
+      if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
     if (Object.keys(updates).length > 0) set(updates);
   },

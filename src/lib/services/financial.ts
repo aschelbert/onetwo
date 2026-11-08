@@ -435,6 +435,8 @@ export interface FinancialSettingsRow {
   /** The books are closed through this date (YYYY-MM-DD); nothing posts on or before it. */
   closedThrough: string | null;
   autoReserveTransfer: boolean;
+  /** "Where things post": the building's account mapping, so the server posts to the same accounts as the app. */
+  glAccountMapping: Record<string, string> | null;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -459,6 +461,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     lastLateFeeRun: (data.last_late_fee_run as string) || null,
     closedThrough: (data.closed_through as string) || null,
     autoReserveTransfer: (data.auto_reserve_transfer as boolean) ?? true,
+    glAccountMapping: (data.gl_account_mapping as Record<string, string>) || null,
   };
 }
 
@@ -477,6 +480,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.lastLateFeeRun !== undefined) row.last_late_fee_run = s.lastLateFeeRun;
   if (s.closedThrough !== undefined) row.closed_through = s.closedThrough;
   if (s.autoReserveTransfer !== undefined) row.auto_reserve_transfer = s.autoReserveTransfer;
+  if (s.glAccountMapping !== undefined) row.gl_account_mapping = s.glAccountMapping;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
