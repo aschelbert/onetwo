@@ -488,4 +488,16 @@ describe('Setup screens', () => {
     expect(useBuildingStore.getState().vendors.map(v => v.name)).toEqual(['Acme Elevator']);
     expect(within(contracts).getByText('Acme Elevator')).toBeTruthy();
   });
+
+  it('an invitation created but not emailed shows its code to share, not "Sent"', () => {
+    useSetupStore.setState({ invites: [
+      { id: 'i1', email: 'owner@example.com', access: 'owner', seat: null, unit: '3' },
+      { id: 'i2', email: 'emailed@example.com', access: 'owner', seat: null, unit: '2' },
+    ] });
+    useSetupStore.getState().recordInviteResults([{ email: 'owner@example.com', code: 'CON-RES-WHEZ', sent: false }, { email: 'EMAILED@example.com', code: 'CON-RES-MTN9', sent: true }], '2026-11-08T16:08:27Z');
+    expect(useSetupStore.getState().invites.map(i => [i.email, i.code, i.emailed, !!i.sentAt])).toEqual([['owner@example.com', 'CON-RES-WHEZ', false, true], ['emailed@example.com', 'CON-RES-MTN9', true, true]]);
+    renderSetup('/setup?step=finish');
+    expect(document.querySelector('[data-invite="owner@example.com"]')?.textContent).toContain('Not emailed · code CON-RES-WHEZ');
+    expect(document.querySelector('[data-invite="emailed@example.com"]')?.textContent).toContain('Sent');
+  });
 });

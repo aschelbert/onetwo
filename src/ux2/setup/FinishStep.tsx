@@ -48,7 +48,7 @@ async function sendInvites(invitees: { email: string; role: string; unit?: strin
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
-  return data;
+  return data as { total?: number; sent?: number; invitations?: { email: string; code?: string; sent: boolean; error?: string }[] };
 }
 
 export default function FinishStep({ onReview, onDocuments }: { onReview: () => void; onDocuments: () => void }) {
@@ -72,7 +72,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const invites = useSetupStore(x => x.invites);
   const addInvites = useSetupStore(x => x.addInvites);
   const removeInvite = useSetupStore(x => x.removeInvite);
-  const markInvitesSent = useSetupStore(x => x.markInvitesSent);
+  const recordInviteResults = useSetupStore(x => x.recordInviteResults);
   const [person, setPerson] = useState<{ email: string; access: InviteAccess; seat: string; unit: string }>({ email: '', access: 'owner', seat: 'director', unit: '' });
   const [personError, setPersonError] = useState('');
   const [unitsOpen, setUnitsOpen] = useState(f.units.length === 0);
@@ -145,10 +145,12 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     if (!list.length) return;
     setBusy(true); setNote(null);
     try {
-      await sendInvites(list.map(invitePayload), viewer.name);
+      const data = await sendInvites(list.map(invitePayload), viewer.name);
       const at = new Date().toISOString();
       addInvites(roster);
-      markInvitesSent(list.map(i => i.email), at);
+      // What actually happened per person: the invitation exists either way; the email may not have gone out.
+      const results = data.invitations ?? list.map(i => ({ email: i.email, sent: true }));
+      recordInviteResults(results, at);
       if (roster.length) setInvitedBoard(true);
       // An owner invited to a unit that has no email on file: keep the email on the unit too.
       for (const i of list) {
@@ -157,7 +159,14 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
           if (u && !u.email) f.updateUnit(u.number, { email: i.email });
         }
       }
-      setNote({ tone: 'sage', text: `${list.length} invitation${list.length === 1 ? '' : 's'} sent.` });
+      const emailed = results.filter(r => r.sent).length;
+      const n = results.length;
+      const login = `${window.location.origin}/login`;
+      setNote(emailed === n
+        ? { tone: 'sage', text: `${n} invitation${n === 1 ? '' : 's'} sent.` }
+        : results.some(r => !r.sent && /not configured/i.test((r as { error?: string }).error ?? ''))
+          ? { tone: 'red', text: `${n} invitation${n === 1 ? '' : 's'} created, but email isn't set up here, so ${emailed ? `only ${emailed} went out` : 'none were emailed'}. Share each code below; people enter it at ${login}.` }
+          : { tone: 'red', text: `${emailed} of ${n} invitation emails went out. Share the codes below with the rest; people enter them at ${login}.` });
     } catch (e) { setNote({ tone: 'red', text: e instanceof Error ? e.message : 'Invitations could not be sent.' }); }
     finally { setBusy(false); }
   };
@@ -331,7 +340,11 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             {invites.map(i => (
               <li key={i.id} data-invite={i.email} className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-2.5 text-sm">
                 <span className="min-w-[220px] flex-1 break-words"><b className="font-semibold">{i.email}</b> <span className="text-ux2-muted">· {accessLabel(i)}{i.unit ? ` · Unit ${i.unit}` : ''}</span></span>
-                {i.sentAt ? <Chip tone="sage">Sent</Chip> : <Chip tone="plum">Not sent yet</Chip>}
+                {i.sentAt
+                  ? i.emailed === false
+                    ? <Chip tone="amber" title="Created, but the email didn't go out. Share the code; they enter it on the sign-in page.">Not emailed · code {i.code ?? '—'}</Chip>
+                    : <Chip tone="sage">Sent</Chip>
+                  : <Chip tone="plum">Not sent yet</Chip>}
                 {!i.sentAt && <Button size="sm" variant="ghost" aria-label={`Remove ${i.email}`} onClick={() => removeInvite(i.id)}>Remove</Button>}
               </li>
             ))}
