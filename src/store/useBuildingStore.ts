@@ -31,6 +31,8 @@ export interface LegalDocFile {
   archivedBy?: string;
   /** The year or period a past version is for ("2024"). */
   period?: string;
+  /** Where the file is stored (building-documents bucket); files added before storage have none. */
+  path?: string;
 }
 export interface LegalDocument {
   id: string; name: string; version: string; size: string; status: 'current' | 'review-due';

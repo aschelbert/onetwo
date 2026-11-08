@@ -1,4 +1,5 @@
 import { useBuildingStore, type LegalDocFile, type LegalDocument } from '@/store/useBuildingStore';
+import { removeDocumentFiles } from '@/lib/services/documentFiles';
 
 /**
  * The documents a building should have on file, by section. Building ›
@@ -84,7 +85,31 @@ export function findDocument(name: string, docs = useBuildingStore.getState().le
   return matches.find(d => currentFiles(d).length) ?? matches.find(d => d.attachments.length) ?? matches[0];
 }
 
-export type NewFile = { name: string; size: string; type: string; fileId?: string; period?: string };
+export type NewFile = { name: string; size: string; type: string; fileId?: string; period?: string; path?: string };
+
+/** Where a file is stored, from any document it's on. */
+export function pathOf(fileId: string): string | undefined {
+  for (const d of useBuildingStore.getState().legalDocuments) for (const a of d.attachments) if (a.fileId === fileId && a.path) return a.path;
+  return undefined;
+}
+
+/** Delete stored files that no document uses any more (a file on several documents is kept until the last one lets go). */
+export function releaseUnused(paths: (string | undefined)[]): void {
+  const used = new Set(useBuildingStore.getState().legalDocuments.flatMap(d => d.attachments.map(a => a.path).filter(Boolean)));
+  const gone = [...new Set(paths.filter((p): p is string => !!p && !used.has(p)))];
+  if (gone.length) void removeDocumentFiles(gone);
+}
+
+/** Record where an uploaded file is stored, on every document it's on. A file taken out before its upload finished is deleted again. */
+export function setFilePath(fileId: string, path: string): void {
+  let found = false;
+  for (const d of useBuildingStore.getState().legalDocuments) {
+    if (!d.attachments.some(a => a.fileId === fileId)) continue;
+    found = true;
+    setFiles(d.id, d.attachments.map(a => (a.fileId === fileId ? { ...a, path } : a)));
+  }
+  if (!found) releaseUnused([path]);
+}
 const sameFile = (a: LegalDocFile, f: NewFile) => (f.fileId && a.fileId ? a.fileId === f.fileId : a.name === f.name);
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -122,7 +147,9 @@ export function placeFile(names: string[], file: NewFile, opts: PlaceOptions = {
   const ids: string[] = [];
   const stamp = today();
   const fileId = file.fileId ?? `f-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const entry: LegalDocFile = { name: file.name, size: file.size, type: file.type, fileId, uploadedAt: stamp, ...(file.period ? { period: file.period } : {}) };
+  const path = file.path ?? (file.fileId ? pathOf(file.fileId) : undefined);
+  const entry: LegalDocFile = { name: file.name, size: file.size, type: file.type, fileId, uploadedAt: stamp, ...(file.period ? { period: file.period } : {}), ...(path ? { path } : {}) };
+  const dropped: (string | undefined)[] = [];
   for (const name of names) {
     let doc = findDocument(name);
     if (!doc) {
@@ -142,10 +169,12 @@ export function placeFile(names: string[], file: NewFile, opts: PlaceOptions = {
     if (had && !had.archived) continue;
     const rest = doc.attachments.filter(a => a !== had).flatMap(a => {
       if (a.archived) return [a];
-      return opts.replaced === 'delete' ? [] : [{ ...a, archived: stamp, archivedBy: fileId }];
+      if (opts.replaced === 'delete') { dropped.push(a.path); return []; }
+      return [{ ...a, archived: stamp, archivedBy: fileId }];
     });
     setFiles(doc.id, [...rest, { ...entry, uploadedAt: had?.uploadedAt ?? stamp }]);
   }
+  releaseUnused(dropped);
   return ids;
 }
 
@@ -154,23 +183,30 @@ export function placeFile(names: string[], file: NewFile, opts: PlaceOptions = {
  * `keep`). Files it had replaced become current again; a document left with
  * no files at all is removed.
  */
-export function unplaceFile(file: { fileId?: string; name: string }, keep: string[] = []): void {
+export function unplaceFile(file: { fileId?: string; name: string }, keep: string[] = [], release = true): void {
   const b = useBuildingStore.getState();
+  const dropped: (string | undefined)[] = [];
   for (const d of [...b.legalDocuments]) {
     if (keep.some(n => sameDocument(d.name, n))) continue;
     const on = d.attachments.filter(a => sameFile(a, file as NewFile));
     if (!on.length) continue;
+    dropped.push(...on.map(a => a.path));
     const ids = new Set(on.map(a => a.fileId).filter(Boolean));
     const rest = d.attachments.filter(a => !on.includes(a)).map(a => (a.archivedBy && ids.has(a.archivedBy) ? { ...a, archived: undefined, archivedBy: undefined } : a));
     if (rest.length) setFiles(d.id, rest);
     else b.removeLegalDocument(d.id);
   }
+  if (release) releaseUnused(dropped);
 }
 
 /** Put a file on exactly these documents: taken off any others, added where it's missing. */
 export function setFilePlaces(names: string[], file: NewFile & { fileId: string }, opts: PlaceOptions = {}): string[] {
-  unplaceFile(file, names);
-  return placeFile(names, file, opts);
+  // The stored file moves with it: its path is kept while it's taken off the documents it no longer is.
+  const path = file.path ?? pathOf(file.fileId);
+  unplaceFile(file, names, false);
+  const ids = placeFile(names, { ...file, path }, opts);
+  releaseUnused([path]);
+  return ids;
 }
 
 /** The files a file replaced, on any document (kept as earlier versions). */
@@ -183,7 +219,9 @@ const fileKey = (a: LegalDocFile) => [a.fileId, a.name, a.uploadedAt, a.archived
 /** Delete one file from a document (an earlier version, or one a new file replaced). */
 export function deleteFile(docId: string, file: LegalDocFile): void {
   const d = useBuildingStore.getState().legalDocuments.find(x => x.id === docId);
-  if (d) setFiles(docId, d.attachments.filter(a => fileKey(a) !== fileKey(file)));
+  if (!d) return;
+  setFiles(docId, d.attachments.filter(a => fileKey(a) !== fileKey(file)));
+  releaseUnused([file.path]);
 }
 
 /** Make an earlier version current again (the current one becomes an earlier version). */

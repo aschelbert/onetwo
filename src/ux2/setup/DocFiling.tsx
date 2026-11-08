@@ -13,6 +13,7 @@ import { HISTORY_KINDS, type SetupDoc } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { ACCEPT, addFiles, setCovers } from '@/features/setup/readDocument';
 import { Button, Chip } from '../components';
+import { canStoreFiles, removeDocumentFiles, uploadDocumentFile } from '@/lib/services/documentFiles';
 import { DocumentPicker } from '../building/DocumentPicker';
 
 const labelOf = (key: string) => DOC_CATALOGUE.find(e => e.key === key)?.label ?? key;
@@ -114,9 +115,19 @@ export function VendorContracts() {
   const [f, setF] = useState(empty);
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const ready = f.vendor.trim() && f.start && f.end;
-  const add = () => {
-    if (!ready) return;
+  const add = async () => {
+    if (!ready || saving) return;
+    // The contract's file is stored first (building-documents bucket), so the contract never lists a file that isn't there.
+    let path: string | undefined;
+    if (file && canStoreFiles()) {
+      setSaving(true); setError('');
+      path = (await uploadDocumentFile(`c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, file)) ?? undefined;
+      setSaving(false);
+      if (!path) { setError("The file couldn't be uploaded. Try again, or add the contract without it."); return; }
+    }
     const b = useBuildingStore.getState();
     let v = b.vendors.find(x => norm(x.name) === norm(f.vendor));
     if (!v) {
@@ -127,7 +138,7 @@ export function VendorContracts() {
     useVendorTrackerStore.getState().addContract({
       vendorId: v?.id ?? '', vendorName: f.vendor.trim(), title: `${f.service.trim() || f.vendor.trim()} contract`, startDate: f.start, endDate: f.end,
       amount: Number(f.amount.replace(/[$,]/g, '')) || 0, status: f.end < today ? 'expired' : 'active', autoRenew: f.autoRenew,
-      attachments: file ? [{ name: file.name, size: sizeLabel(file.size) }] : [], notes: SETUP_NOTE,
+      attachments: file ? [{ name: file.name, size: sizeLabel(file.size), ...(path ? { path } : {}) }] : [], notes: SETUP_NOTE,
     });
     setF(empty); setFile(null);
   };
@@ -145,13 +156,13 @@ export function VendorContracts() {
           {contracts.map(c => (
             <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-ux2-surface px-3 py-2 text-[13px]">
               <span className="min-w-0 flex-1"><b className="font-semibold">{c.vendorName}</b> <span className="text-ux2-muted">· {c.title} · {c.startDate} to {c.endDate}{c.autoRenew ? ' · renews itself' : ''}{c.attachments.length ? ` · ${c.attachments[0].name}` : ''}</span></span>
-              <Button size="sm" variant="ghost" aria-label={`Remove ${c.vendorName} contract`} onClick={() => remove(c.id)}>Remove</Button>
+              <Button size="sm" variant="ghost" aria-label={`Remove ${c.vendorName} contract`} onClick={() => { remove(c.id); void removeDocumentFiles(c.attachments.map(a => a.path).filter((p): p is string => !!p)); }}>Remove</Button>
             </li>
           ))}
         </ul>
       )}
       {open && (
-        <form aria-label="Add a vendor contract" onSubmit={e => { e.preventDefault(); add(); }} className="flex flex-wrap items-end gap-2.5">
+        <form aria-label="Add a vendor contract" onSubmit={e => { e.preventDefault(); void add(); }} className="flex flex-wrap items-end gap-2.5">
           <label className="flex flex-col gap-1 text-xs text-ux2-muted">Vendor<input className={cn(INPUT, 'min-w-[160px]')} value={f.vendor} onChange={e => setF({ ...f, vendor: e.target.value })} placeholder="Acme Elevator" /></label>
           <label className="flex flex-col gap-1 text-xs text-ux2-muted">For<input className={cn(INPUT, 'min-w-[140px]')} value={f.service} onChange={e => setF({ ...f, service: e.target.value })} placeholder="Elevator maintenance" /></label>
           <label className="flex flex-col gap-1 text-xs text-ux2-muted">Starts<input type="date" className={INPUT} value={f.start} onChange={e => setF({ ...f, start: e.target.value })} /></label>
@@ -159,7 +170,8 @@ export function VendorContracts() {
           <label className="flex flex-col gap-1 text-xs text-ux2-muted">A year<input className={cn(INPUT, 'w-[110px]')} value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} placeholder="$12,000" /></label>
           <label className="flex items-center gap-1.5 pb-2 text-xs text-ux2-muted"><input type="checkbox" className="accent-[#4F46A8]" checked={f.autoRenew} onChange={e => setF({ ...f, autoRenew: e.target.checked })} />Renews itself</label>
           <label className="flex flex-col gap-1 text-xs text-ux2-muted">File (optional)<input type="file" accept={ACCEPT} onChange={e => setFile(e.target.files?.[0] ?? null)} className="text-[13px]" /></label>
-          <Button type="submit" size="sm" variant="plum" disabled={!ready}>Add contract</Button>
+          <Button type="submit" size="sm" variant="plum" disabled={!ready || saving}>{saving ? 'Uploading…' : 'Add contract'}</Button>
+          {error && <span role="alert" className="basis-full text-[13px] font-semibold text-ux2-red-ink">{error}</span>}
         </form>
       )}
     </section>
