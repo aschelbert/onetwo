@@ -90,6 +90,11 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
         </div>
       )}
 
+      {c && (c.source === 'obligation' || c.source === 'filing') && c.sourceId && (
+        <Inner className="text-xs text-ux2-muted">
+          Opened from {c.source === 'filing' ? 'the filing' : 'the obligation'} {c.sourceId} on Building › Obligations. Closing this case as Resolved marks it {c.source === 'filing' ? 'filed' : 'done'} there; closing it any other way leaves it open.
+        </Inner>
+      )}
       {c && c.source === 'issue' && c.sourceId && (
         <Inner className="text-xs text-ux2-muted">Opened from request {c.sourceId}. The owner follows it on Community › Requests; the 14-day reply clock runs on the Inbox. <button type="button" className="text-ux2-teal hover:underline" onClick={() => onOpenCase(c.id)}>Refresh</button></Inner>
       )}

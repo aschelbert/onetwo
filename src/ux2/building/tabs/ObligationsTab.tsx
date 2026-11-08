@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { caseProgress, obligationCase } from '../../runbook/obligationCases';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore, type GoverningClause } from '@/store/useBuildingStore';
 import { cn } from '@/lib/formatters';
@@ -37,6 +39,8 @@ function FileForm({ r, onClose }: { r: ObligationRow; onClose: () => void }) {
 
 function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: ObligationRow[]; snap: BuildingSnapshot; isBoard: boolean; title: string; note: string; groupBy?: 'role' | 'category' }) {
   const setCompletion = useComplianceStore(s => s.setCompletion);
+  const cases = useIssuesStore(s => s.cases);
+  const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
   const [filing, setFiling] = useState<string | null>(null);
   const items = useMemo(() => new Map(snap.obligations.map(o => [o.id, o])), [snap.obligations]);
@@ -64,10 +68,18 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
                         <Td className="text-ux2-muted">{howItGetsDone(r)}</Td>
                         <Td><Chip tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === 'overdue' && r.daysLeft !== undefined ? ` · ${Math.abs(r.daysLeft)}d` : ''}</Chip></Td>
                         <Td num onClick={e => e.stopPropagation()}>
+                          {isBoard && r.state !== 'met' && r.state !== 'auto' && (() => {
+                            // Start walks through the steps as a case; once one is open, Continue picks it up.
+                            const c = obligationCase(cases, r.kind === 'filing' ? 'filing' : 'obligation', r.id);
+                            const p = c ? caseProgress(c) : null;
+                            return c && p
+                              ? <Button size="sm" onClick={() => navigate(`/issues?view=case:${encodeURIComponent(c.id)}`)}>Continue · {p.done} of {p.total}</Button>
+                              : <Button size="sm" onClick={() => navigate(`/obligations/start?kind=${r.kind === 'filing' ? 'filing' : 'obligation'}&id=${encodeURIComponent(r.id)}`)}>Start</Button>;
+                          })()}
                           {isBoard && r.kind === 'obligation' && r.state !== 'auto' && (r.state === 'met'
                             ? <Button size="sm" variant="ghost" onClick={() => setCompletion(r.id, false)}>Reopen</Button>
                             : <Button size="sm" variant="ghost" onClick={() => setCompletion(r.id, true)}>Mark done</Button>)}
-                          {isBoard && r.kind === 'filing' && r.state !== 'met' && <Button size="sm" onClick={() => setFiling(filing === r.id ? null : r.id)}>Mark filed</Button>}
+                          {isBoard && r.kind === 'filing' && r.state !== 'met' && <Button size="sm" variant="ghost" onClick={() => setFiling(filing === r.id ? null : r.id)}>Mark filed</Button>}
                         </Td>
                       </tr>
                       {(open === key || filing === r.id) && (
@@ -91,7 +103,7 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
           </tbody>
         </Table>
       )}
-      <Why>Expanding a row shows why it matters, what happens if it is missed and the how-to steps; "Mark filed" asks for proof. "How it gets done" is the runbook in Board Room for the board; owners see the status only.</Why>
+      <Why>Start walks through an obligation as a case: its runbook's steps, or its how-to list as a checklist where each item links to where it's done, then a step to record it. Closing the case as Resolved marks it done (a filing: filed). Mark done and Mark filed are there when it's already been handled. Expanding a row shows why it matters, what happens if it is missed and the how-to steps; owners see the status only.</Why>
     </Card>
   );
 }

@@ -27,6 +27,7 @@ import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { addDays, daysBetween, type CardInput, type CaseStep, type CardContext } from './model';
+import { caseProgress, obligationCase } from './obligationCases';
 
 /** Owner requests get this many days for a first reply (the design's SLA chip). */
 export const REQUEST_SLA_DAYS = 14;
@@ -110,6 +111,11 @@ export function noticeSentFor(meeting: Meeting, communications: OwnerCommunicati
   );
 }
 
+function openCaseFor(cases: StoreSnapshot['cases'], kind: 'obligation' | 'filing', id: string) {
+  const c = obligationCase(cases, kind, id);
+  return c ? { id: c.id, ...caseProgress(c) } : undefined;
+}
+
 export function buildCardInput(s: StoreSnapshot): CardInput {
   const v = s.viewer;
   const boardSide = v.role === 'BOARD_MEMBER' || v.role === 'PROPERTY_MANAGER' || v.role === 'PLATFORM_ADMIN';
@@ -128,11 +134,12 @@ export function buildCardInput(s: StoreSnapshot): CardInput {
       kind: 'obligation',
       completed: !!s.completions[item.id] || !!item.autoPass,
       howToCount: item.howTo?.length,
+      openCase: openCaseFor(s.cases, 'obligation', item.id),
     });
   }
   for (const f of s.filings) {
     if (v.officerTitle && f.responsible && f.responsible !== v.officerTitle && v.role === 'BOARD_MEMBER') continue;
-    obligations.push({ id: f.id, task: f.name, role: f.responsible || 'President', due: f.dueDate, critical: true, kind: 'filing', completed: f.status === 'filed' });
+    obligations.push({ id: f.id, task: f.name, role: f.responsible || 'President', due: f.dueDate, critical: true, kind: 'filing', completed: f.status === 'filed', openCase: openCaseFor(s.cases, 'filing', f.id) });
   }
 
   // Case steps: the first open step of each open or on-hold case.
