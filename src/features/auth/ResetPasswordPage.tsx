@@ -48,6 +48,11 @@ export default function ResetPasswordPage() {
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+      } else if (data.fallback) {
+        // The app's own email isn't set up yet: Supabase Auth sends its built-in reset email instead.
+        const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+        if (authError) setError(`The reset email couldn't be sent: ${authError.message}`);
+        else setMessage('Check your email for a password reset link. It may take a minute to arrive.');
       } else {
         setMessage('Check your email for a password reset link. It may take a minute to arrive.');
       }

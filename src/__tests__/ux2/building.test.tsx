@@ -119,6 +119,37 @@ describe('Building', () => {
     expect(screen.queryByRole('button', { name: 'Property log' })).toBeNull();
   });
 
+  it('Directory lets the board add, edit and remove the property manager and legal counsel', async () => {
+    const { useBuildingStore } = await import('@/store/useBuildingStore');
+    useBuildingStore.setState({ management: { company: '', contact: '', title: '', email: '', phone: '', emergency: '', address: '', hours: '', afterHours: '' }, legalCounsel: [] });
+    renderAt('/building?tab=directory');
+    const card = document.querySelector('[aria-label="Management and counsel"]') as HTMLElement;
+    expect(within(card).getByText('Self-managed · no property manager')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Add a property manager' }));
+    const pm = within(card).getByRole('form', { name: 'Add a property manager' });
+    fireEvent.change(within(pm).getByLabelText('Company'), { target: { value: 'Harbor PM' } });
+    fireEvent.change(within(pm).getByLabelText('Contact'), { target: { value: 'Jo Park' } });
+    fireEvent.change(within(pm).getByLabelText('Emergency phone'), { target: { value: '555-0199' } });
+    fireEvent.click(within(pm).getByRole('button', { name: 'Save' }));
+    expect(useBuildingStore.getState().management).toMatchObject({ company: 'Harbor PM', contact: 'Jo Park', emergency: '555-0199' });
+    expect(within(card).getByText('Harbor PM · property manager')).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Add legal counsel' }));
+    const lc = within(card).getByRole('form', { name: 'Add legal counsel' });
+    fireEvent.change(within(lc).getByLabelText('Firm'), { target: { value: 'Lee Law' } });
+    fireEvent.change(within(lc).getByLabelText('Attorney'), { target: { value: 'Sam Lee' } });
+    fireEvent.click(within(lc).getByRole('button', { name: 'Add' }));
+    expect(useBuildingStore.getState().legalCounsel).toEqual([expect.objectContaining({ firm: 'Lee Law', attorney: 'Sam Lee' })]);
+    expect(within(card).getByText('Lee Law · counsel')).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'More for Lee Law' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    expect(useBuildingStore.getState().legalCounsel).toEqual([]);
+    fireEvent.click(within(card).getByRole('button', { name: 'More for the property manager' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /back to self-managed/ }));
+    expect(useBuildingStore.getState().management.company).toBe('');
+  });
+
   it('Archive lists closed cases, requests and letters for the board, and owners do not get it', async () => {
     const { useAuthStore } = await import('@/store/useAuthStore');
     renderAt('/building?tab=archive');

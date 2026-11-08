@@ -6,6 +6,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { meetingRows, meetingsSummary, type MeetingRow, type CommunitySnapshot } from '../metrics';
+import { sendMeetingNotice } from '../meetingNotice';
 
 type Filter = 'all' | 'upcoming' | 'past' | 'board' | 'owner';
 
@@ -48,6 +49,12 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
   const rows = meetingRows(snap);
   const sum = meetingsSummary(rows);
   const isBoard = snap.viewer.isBoard;
+  const [noticeNote, setNoticeNote] = useState<string | null>(null);
+  const [sendingNotice, setSendingNotice] = useState(false);
+  const sendNotice = async (m: MeetingRow['meeting']) => {
+    setSendingNotice(true); setNoticeNote(null);
+    try { setNoticeNote((await sendMeetingNotice(m, snap.viewer.name, snap.today)).note); } finally { setSendingNotice(false); }
+  };
   const board = useBuildingStore(s => s.board);
   const cases = useIssuesStore(s => s.cases);
   const updateMeeting = useMeetingsStore(s => s.updateMeeting);
@@ -91,11 +98,12 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
               <div className="text-sm text-ux2-muted">{next.meeting.location || 'Location to set'}{next.meeting.virtualLink ? ' and remote' : ''} · open to all owners · {next.agendaCount} agenda item{next.agendaCount === 1 ? '' : 's'} · {next.rsvpUnits} of {snap.units.length} units have replied</div>
             </div>
             <div className="flex gap-1.5">
-              {isBoard ? <><Button size="sm" variant="ghost" onClick={() => setEditingAgenda('new')}>Edit the draft</Button><Button size="sm" onClick={() => navigate('/boardroom?tab=outbox')}>Send notice</Button></> : <Rsvp row={next} snap={snap} />}
+              {isBoard ? <><Button size="sm" variant="ghost" onClick={() => setEditingAgenda('new')}>Edit the draft</Button>{!next.noticeSent && <Button size="sm" disabled={sendingNotice} onClick={() => { void sendNotice(next.meeting); }}>{sendingNotice ? 'Sending…' : 'Send notice'}</Button>}</> : <Rsvp row={next} snap={snap} />}
             </div>
           </div>
+          {noticeNote && <div role="status" className="text-[13px] text-ux2-ink">{noticeNote}</div>}
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Notice</span><span className={`text-[15px] font-semibold ${next.noticeOverdue ? 'text-ux2-red-ink' : 'text-ux2-ink'}`}>{next.noticeSent ? 'Sent' : next.noticeOverdue ? `Draft in the outbox · ${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000))} day${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000)) === 1 ? '' : 's'} late` : `Due ${dayLabel(next.noticeDue)}`}</span><span className="text-xs text-ux2-muted">Sends by email and in-app card to all {snap.units.length} units. Ten days' notice per the bylaws and DC Code § 29-1101 et seq.</span></Inner>
+            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Notice</span><span className={`text-[15px] font-semibold ${next.noticeOverdue ? 'text-ux2-red-ink' : 'text-ux2-ink'}`}>{next.noticeSent ? 'Sent' : next.noticeOverdue ? `Not sent · ${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000))} day${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000)) === 1 ? '' : 's'} late` : `Due ${dayLabel(next.noticeDue)}`}</span><span className="text-xs text-ux2-muted">Posted in-app for every member and emailed to everyone with an address on file. Ten days' notice per the bylaws and DC Code § 29-1101 et seq.</span></Inner>
             <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Agenda</span><span className="text-[15px] font-semibold text-ux2-ink">{next.agendaCount} item{next.agendaCount === 1 ? '' : 's'}</span><span className="truncate text-xs text-ux2-muted">{next.meeting.agenda.slice(0, 4).join(', ') || 'Nothing on it yet'}. Goes out with the notice.</span></Inner>
             <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">RSVP</span><span className="text-[15px] font-semibold text-ux2-ink">{next.rsvpUnits} of {snap.units.length} units</span><span className="text-xs text-ux2-muted">Board: {next.rsvpBoard} of {boardCount} confirmed{board.filter(b => !next.meeting.attendees.board.includes(b.name))[0] ? `, ${board.filter(b => !next.meeting.attendees.board.includes(b.name))[0].name.split(' ')[0]} not yet` : ''}.</span></Inner>
             <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Room</span><span className="text-[15px] font-semibold text-ux2-ink">{next.meeting.location ? `${next.meeting.location} reserved` : 'To set'}</span><span className="text-xs text-ux2-muted">{next.meeting.virtualLink ? 'Remote link added to the notice.' : 'In person; add a remote link on the meeting.'}</span></Inner>
@@ -162,7 +170,7 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
                 {r.minutes === 'approved' ? <Chip tone="sage">Approved</Chip> : isBoard && !approvedBy(r).includes(snap.viewer.name) ? <Button size="sm" onClick={() => approveMinutes(r.meeting.id, { name: snap.viewer.name, role: board.find(b => b.name === snap.viewer.name)?.role ?? 'Board', date: new Date().toISOString().slice(0, 10) })}>Approve</Button> : <Chip tone="amber">Waiting</Chip>}
               </Inner>
             ))}
-            {next && <Inner className="flex items-center justify-between gap-3"><Cell title={`${dayLabel(next.meeting.date)} notice`} note={next.noticeSent ? 'sent from the outbox' : 'draft in the outbox · waiting on you'} />{next.noticeSent ? <Chip tone="sage">Sent</Chip> : isBoard ? <Button size="sm" onClick={() => navigate('/boardroom?tab=outbox')}>Send notice</Button> : <Chip tone="amber">Not sent</Chip>}</Inner>}
+            {next && <Inner className="flex items-center justify-between gap-3"><Cell title={`${dayLabel(next.meeting.date)} notice`} note={next.noticeSent ? 'sent' : 'not sent yet · waiting on you'} />{next.noticeSent ? <Chip tone="sage">Sent</Chip> : isBoard ? <Button size="sm" disabled={sendingNotice} onClick={() => { void sendNotice(next.meeting); }}>{sendingNotice ? 'Sending…' : 'Send notice'}</Button> : <Chip tone="amber">Not sent</Chip>}</Inner>}
             {minutesDrafts.length === 0 && !next && <Why>Nothing waiting for approval.</Why>}
             <Why>Minutes are drafted by the Secretary from the recording and the agenda, approved at the next meeting or by board vote in between, then posted. Owners see minutes only once approved.</Why>
           </Card>

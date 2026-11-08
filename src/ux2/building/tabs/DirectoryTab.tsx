@@ -61,6 +61,49 @@ function BoardMemberForm({ id, onClose }: { id?: string; onClose: () => void }) 
   );
 }
 
+const EMPTY_MANAGEMENT = { company: '', contact: '', title: '', email: '', phone: '', emergency: '', address: '', hours: '', afterHours: '' };
+
+function ManagementForm({ onClose }: { onClose: () => void }) {
+  const management = useBuildingStore(s => s.management);
+  const update = useBuildingStore(s => s.updateManagement);
+  const [f, setF] = useState({ ...EMPTY_MANAGEMENT, ...management });
+  const set = (k: keyof typeof EMPTY_MANAGEMENT) => (e: { target: { value: string } }) => setF(v => ({ ...v, [k]: e.target.value }));
+  return (
+    <form aria-label={management.company ? 'Edit the property manager' : 'Add a property manager'} onSubmit={e => { e.preventDefault(); if (!f.company.trim()) return; update({ ...f, company: f.company.trim() }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+      <Field label="Company" className="min-w-[200px] flex-1"><input value={f.company} onChange={set('company')} className={INPUT} /></Field>
+      <Field label="Contact" className="w-[180px]"><input value={f.contact} onChange={set('contact')} className={INPUT} /></Field>
+      <Field label="Title" className="w-[160px]"><input value={f.title} onChange={set('title')} placeholder="Property Manager" className={INPUT} /></Field>
+      <Field label="Email" className="w-[200px]"><input type="email" value={f.email} onChange={set('email')} className={INPUT} /></Field>
+      <Field label="Phone" className="w-[140px]"><input value={f.phone} onChange={set('phone')} className={INPUT} /></Field>
+      <Field label="Emergency phone" className="w-[150px]"><input value={f.emergency} onChange={set('emergency')} className={INPUT} /></Field>
+      <Field label="Office hours" className="w-[190px]"><input value={f.hours} onChange={set('hours')} placeholder="Mon–Fri 9 AM – 5 PM" className={INPUT} /></Field>
+      <Field label="After hours" className="w-[170px]"><input value={f.afterHours} onChange={set('afterHours')} placeholder="24/7 emergency line" className={INPUT} /></Field>
+      <Field label="Address" className="min-w-[240px] flex-1"><input value={f.address} onChange={set('address')} className={INPUT} /></Field>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!f.company.trim()}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+    </form>
+  );
+}
+
+function CounselForm({ id, onClose }: { id?: string; onClose: () => void }) {
+  const counsel = useBuildingStore(s => s.legalCounsel);
+  const add = useBuildingStore(s => s.addLegalCounsel);
+  const update = useBuildingStore(s => s.updateLegalCounsel);
+  const c = counsel.find(x => x.id === id);
+  const [f, setF] = useState({ firm: c?.firm ?? '', attorney: c?.attorney ?? '', email: c?.email ?? '', phone: c?.phone ?? '', specialty: c?.specialty ?? '' });
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(v => ({ ...v, [k]: e.target.value }));
+  const ok = !!(f.firm.trim() || f.attorney.trim());
+  return (
+    <form aria-label={c ? `Edit ${c.firm || c.attorney}` : 'Add legal counsel'} onSubmit={e => { e.preventDefault(); if (!ok) return; if (c) update(c.id, f); else add(f); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+      <Field label="Firm" className="min-w-[180px] flex-1"><input value={f.firm} onChange={set('firm')} className={INPUT} /></Field>
+      <Field label="Attorney" className="w-[180px]"><input value={f.attorney} onChange={set('attorney')} className={INPUT} /></Field>
+      <Field label="Email" className="w-[200px]"><input type="email" value={f.email} onChange={set('email')} className={INPUT} /></Field>
+      <Field label="Phone" className="w-[140px]"><input value={f.phone} onChange={set('phone')} className={INPUT} /></Field>
+      <Field label="Specialty" className="w-[190px]"><input value={f.specialty} onChange={set('specialty')} placeholder="HOA / condominium law" className={INPUT} /></Field>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!ok}>{c ? 'Save' : 'Add'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+    </form>
+  );
+}
+
 export default function DirectoryTab({ snap, section, onSection, isBoard }: { snap: BuildingSnapshot; section?: string; onSection: (s: string) => void; isBoard: boolean }) {
   const navigate = useNavigate();
   const units = useFinancialStore(s => s.units);
@@ -68,6 +111,8 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const counsel = useBuildingStore(s => s.legalCounsel);
   const vendors = useBuildingStore(s => s.vendors);
   const removeBoardMember = useBuildingStore(s => s.removeBoardMember);
+  const updateManagement = useBuildingStore(s => s.updateManagement);
+  const removeCounsel = useBuildingStore(s => s.removeLegalCounsel);
   const staff = usePayrollStore(s => s.staff);
   const invites = useAuthStore(s => s.buildingInvites);
   const members = useAuthStore(s => s.buildingMembers);
@@ -80,6 +125,8 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const [q, setQ] = useState('');
   const [inviting, setInviting] = useState(false);
   const [editingBoard, setEditingBoard] = useState<string | null>(null);
+  const [editingManager, setEditingManager] = useState(false);
+  const [editingCounsel, setEditingCounsel] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const current: Section = section === 'people' ? 'board' : (['units', 'board', 'management', 'staff', 'emergency'] as string[]).includes(section ?? '') ? (section as Section) : 'units';
   const pending = invites.filter(i => i.status === 'pending');
@@ -200,13 +247,25 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
 
         <div className="flex flex-col gap-3">
           <Card id="dir-management" aria-label="Management and counsel" className="gap-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Management and counsel</SectionLabel><label className="flex items-center gap-1.5 text-xs text-ux2-muted"><input type="checkbox" checked={!!management.company} readOnly /> Property manager</label></div>
-            <Inner className="flex items-center justify-between gap-3">
-              <Cell title={management.company ? `${management.company} · property manager` : 'Self-managed · no property manager'} note={management.company ? `${management.contact}${management.title ? ` · ${management.title}` : ''} · ${management.phone} · ${management.hours}` : 'PM scorecard: n/a. Add a Property Manager Seat to add one; the scorecard (response time, bills on time, owner replies) appears in Community.'} />
-              <Chip tone={management.company ? 'sage' : 'ghost'}>{management.company ? 'On' : 'Off'}</Chip>
-            </Inner>
-            {counsel.map(c => <Inner key={c.id} className="flex items-center justify-between gap-3"><Cell title={`${c.firm} · counsel`} note={`${c.attorney}${c.specialty ? ` · ${c.specialty}` : ''} · ${c.phone}`} /><Chip tone="ghost">Board only</Chip></Inner>)}
-            {counsel.length === 0 && <Why>No legal counsel on file.</Why>}
+            <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Management and counsel</SectionLabel><Chip tone={management.company ? 'sage' : 'ghost'}>{management.company ? 'Managed' : 'Self-managed'}</Chip></div>
+            {editingManager ? <ManagementForm onClose={() => setEditingManager(false)} /> : (
+              <Inner className="flex items-center justify-between gap-3">
+                <Cell title={management.company ? `${management.company} · property manager` : 'Self-managed · no property manager'} note={management.company ? [management.contact && `${management.contact}${management.title ? ` · ${management.title}` : ''}`, management.email, management.phone, management.hours].filter(Boolean).join(' · ') || 'No contact details yet' : 'The board runs the building. Add a manager here if you hire one.'} />
+                {isBoard && (management.company
+                  ? <RowMenu label="More for the property manager" items={[{ label: 'Edit', onSelect: () => setEditingManager(true) }, { label: 'Give them a sign-in', onSelect: () => navigate('/admin/users') }, { label: 'Remove · back to self-managed', onSelect: () => updateManagement({ ...EMPTY_MANAGEMENT }), danger: true }]} />
+                  : <Button size="sm" variant="ghost" onClick={() => setEditingManager(true)}>Add a property manager</Button>)}
+              </Inner>
+            )}
+            {counsel.map(c => editingCounsel === c.id ? <CounselForm key={c.id} id={c.id} onClose={() => setEditingCounsel(null)} /> : (
+              <Inner key={c.id} className="flex items-center justify-between gap-3">
+                <Cell title={`${c.firm || c.attorney} · counsel`} note={[c.firm ? c.attorney : '', c.specialty, c.email, c.phone].filter(Boolean).join(' · ')} />
+                <span className="flex shrink-0 items-center gap-1.5"><Chip tone="ghost">Board only</Chip>{isBoard && <RowMenu label={`More for ${c.firm || c.attorney}`} items={[{ label: 'Edit', onSelect: () => setEditingCounsel(c.id) }, { label: 'Remove', onSelect: () => removeCounsel(c.id), danger: true }]} />}</span>
+              </Inner>
+            ))}
+            {counsel.length === 0 && editingCounsel !== 'new' && <Why>No legal counsel on file.</Why>}
+            {editingCounsel === 'new' && <CounselForm onClose={() => setEditingCounsel(null)} />}
+            {isBoard && editingCounsel !== 'new' && <Button size="sm" variant="ghost" className="self-start" onClick={() => setEditingCounsel('new')}>Add legal counsel</Button>}
+            {isBoard && <Why>Recording a manager or counsel here doesn't give them a sign-in. To let the manager work in the app, invite them as Property manager in <button type="button" onClick={() => navigate('/admin/users')} className="font-semibold text-ux2-teal hover:underline">Users</button>. The manager's after-hours line goes on the emergency card.</Why>}
           </Card>
           <Card id="dir-staff" aria-label="Staff" className="gap-2.5">
             <SectionLabel>Staff · {staff.length}</SectionLabel>
