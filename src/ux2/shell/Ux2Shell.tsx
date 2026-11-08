@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useTenantContext } from '@/components/TenantProvider';
 import Ux2TopNav from './Ux2TopNav';
 import Ux2BottomNav from './Ux2BottomNav';
 import CaseDock, { useCaseDock } from './CaseDock';
 import { cn } from '@/lib/formatters';
+import { watchObligationCases } from '../runbook/obligationCases';
 
 /**
  * The redesign's shell. Phase 0 renders the production pages inside it: same
@@ -14,6 +16,8 @@ export default function Ux2Shell() {
   const tenant = useTenantContext();
   // While a case is docked the page keeps room at the bottom, so the dock never covers the last row.
   const docked = !!useCaseDock();
+  // A case for an obligation that closes as resolved marks the obligation done.
+  useEffect(() => watchObligationCases(), []);
   return (
     <div className="ux2 ux2-page flex min-h-screen flex-col">
       {tenant.isDemo && (

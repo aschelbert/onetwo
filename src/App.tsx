@@ -7,6 +7,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import Ux2Shell from '@/ux2/shell/Ux2Shell';
 import HomePage from '@/ux2/home/HomePage';
 import SetupPage from '@/ux2/setup/SetupPage';
+import ObligationStart from '@/ux2/runbook/ObligationStart';
 import FundsPage from '@/ux2/funds/FundsPage';
 import PayPage from '@/ux2/funds/PayPage';
 import CommunityModule from '@/ux2/community/CommunityModule';
@@ -221,6 +222,7 @@ export default function App() {
         <Route element={<RequireAuth><TenantProvider><Ux2Shell /></TenantProvider></RequireAuth>}>
           <Route path="/home" element={<ErrorBoundary fallbackLevel="page"><HomePage /></ErrorBoundary>} />
           <Route path="/setup" element={<ErrorBoundary fallbackLevel="page"><SetupPage /></ErrorBoundary>} />
+          <Route path="/obligations/start" element={<ErrorBoundary fallbackLevel="page"><ObligationStart /></ErrorBoundary>} />
           <Route path="/dashboard" element={<RedirectKeepQuery to="/home" />} />
           <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
           <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />
