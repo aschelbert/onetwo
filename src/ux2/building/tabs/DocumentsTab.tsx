@@ -9,6 +9,7 @@ import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, 
 import { dayLabel } from '../../home/calendar';
 import { documentsSummary, insuranceStatus, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
+import { DOC_CATALOGUE, entryFor, fileDocument, type CatalogueEntry } from '@/features/building/documentCatalogue';
 
 type Group = 'governing' | 'policies' | 'insurance' | 'reserve' | 'reports' | 'minutes' | 'contracts';
 type Filter = 'all' | Group;
@@ -28,6 +29,8 @@ interface DocRow {
   missing?: boolean;
   status?: { label: string; tone: 'red' | 'amber' | 'sage' | 'ghost' };
   legal?: LegalDocument;
+  /** A required document with nothing on file: Add file creates it under this entry's name. */
+  expected?: CatalogueEntry;
   open?: () => void;
 }
 
@@ -40,11 +43,9 @@ function groupOf(d: LegalDocument): Group {
 
 const monthYear = (iso: string) => { if (!iso) return ''; const d = new Date(iso.slice(0, 10) + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); };
 
-function UploadForm({ doc, onClose }: { doc?: LegalDocument; onClose: () => void }) {
-  const addDoc = useBuildingStore(s => s.addLegalDocument);
+function UploadForm({ doc, defaultName, onClose }: { doc?: LegalDocument; defaultName?: string; onClose: () => void }) {
   const attach = useBuildingStore(s => s.addLegalDocAttachment);
-  const docs = useBuildingStore(s => s.legalDocuments);
-  const [name, setName] = useState(doc?.name ?? '');
+  const [name, setName] = useState(doc?.name ?? defaultName ?? '');
   const [version, setVersion] = useState(doc ? '' : '');
   const [file, setFile] = useState<File | null>(null);
   return (
@@ -56,9 +57,8 @@ function UploadForm({ doc, onClose }: { doc?: LegalDocument; onClose: () => void
         if (doc) { if (att) attach(doc.id, att); }
         else {
           if (!name) return;
-          addDoc({ name, version: version || '1.0', size: att?.size ?? '', status: 'current' });
-          const created = useBuildingStore.getState().legalDocuments.find(d => d.name === name && !docs.some(x => x.id === d.id));
-          if (created && att) attach(created.id, att);
+          // The same document already on file (Bylaws, "Bylaws (amended 2019)") gets this file as a new version.
+          fileDocument(name, { version: version || '1.0', attachment: att ?? undefined });
         }
         onClose();
       }}
@@ -88,11 +88,29 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
 
   const rows = useMemo<DocRow[]>(() => {
     const out: DocRow[] = [];
+    const latestOf = (d: LegalDocument) => [...d.attachments].sort((a, b) => (b.uploadedAt || '').localeCompare(a.uploadedAt || ''))[0];
+    // One row per document: copies with the same catalogue entry (or, outside the catalogue, the same name)
+    // collapse into the newest copy that has a file.
+    const buckets = new Map<string, { entry?: CatalogueEntry; docs: LegalDocument[] }>();
     for (const d of snap.legalDocuments) {
-      const latest = [...d.attachments].sort((a, b) => (b.uploadedAt || '').localeCompare(a.uploadedAt || ''))[0];
-      const g = groupOf(d);
-      out.push({ id: d.id, group: g, name: d.name, note: `${d.version}${latest ? ` · ${latest.name}` : ''}`, version: d.version, audience: 'Everyone', updated: latest ? monthYear(latest.uploadedAt) : 'Never uploaded', updatedIso: latest?.uploadedAt, file: !!latest, missing: !latest, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d });
+      const entry = entryFor(d.name);
+      const k = entry ? `cat:${entry.key}` : `name:${d.name.trim().toLowerCase()}`;
+      const b = buckets.get(k) ?? { entry, docs: [] };
+      b.docs.push(d);
+      buckets.set(k, b);
     }
+    const pushDoc = (d: LegalDocument, copies: number, entry?: CatalogueEntry) => {
+      const latest = latestOf(d);
+      const extra = copies > 1 ? ` · ${copies - 1} other ${copies - 1 === 1 ? 'copy' : 'copies'}` : '';
+      out.push({ id: d.id, group: entry?.group ?? groupOf(d), name: entry?.label ?? d.name, note: `${entry ? `${entry.note} · ` : ''}${latest ? latest.name : d.version}${extra}`, version: d.version, audience: entry?.audience ?? 'Everyone', updated: latest ? monthYear(latest.uploadedAt) : 'Never uploaded', updatedIso: latest?.uploadedAt, file: !!latest, missing: !latest, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d });
+    };
+    const best = (docs: LegalDocument[]) => [...docs].sort((a, b) => Number(!!latestOf(b)) - Number(!!latestOf(a)) || (latestOf(b)?.uploadedAt || '').localeCompare(latestOf(a)?.uploadedAt || ''))[0];
+    for (const entry of DOC_CATALOGUE) {
+      const b = buckets.get(`cat:${entry.key}`);
+      if (b) pushDoc(best(b.docs), b.docs.length, entry);
+      else if (entry.required) out.push({ id: `need:${entry.key}`, group: entry.group, name: entry.label, note: entry.note, version: '', audience: entry.audience, updated: 'Never uploaded', file: false, missing: true, expected: entry });
+    }
+    for (const [k, b] of buckets) if (k.startsWith('name:')) pushDoc(best(b.docs), b.docs.length);
     for (const p of ins) {
       const pol = snap.insurance.find(x => x.id === p.id)!;
       const latest = [...(pol.attachments ?? [])].sort((a, b) => (b.uploadedAt || '').localeCompare(a.uploadedAt || ''))[0];
@@ -112,7 +130,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
     .filter(r => !q || `${r.name} ${r.note}`.toLowerCase().includes(q.toLowerCase()));
   const groups = ORDER.filter(g => shown.some(r => r.group === g));
   const needs = [
-    ...rows.filter(r => r.missing && r.group !== 'contracts').slice(0, 2).map(r => ({ id: r.id, title: `${r.name} ${r.group === 'governing' && /rule/i.test(r.name) ? 'are' : 'is'} missing`, detail: `Its obligation stays open until the file is on file${/rule/i.test(r.name) ? ' · blocks "Publish house rules to owners"' : ''}`, chip: <Chip tone="red">Add file</Chip>, go: () => setUploading(r.id) })),
+    ...rows.filter(r => r.missing && r.group !== 'contracts').slice(0, 2).map(r => ({ id: r.id, title: `${r.name} ${/rules|plats|regulations/i.test(r.name) ? 'are' : 'is'} missing`, detail: `Its obligation stays open until the file is on file${/rule/i.test(r.name) ? ' · blocks "Publish house rules to owners"' : ''}`, chip: <Chip tone="red">Add file</Chip>, go: () => setUploading(r.id) })),
     ...ins.filter(p => p.state !== 'current').slice(0, 1).map(p => ({ id: `cert:${p.id}`, title: `Insurance certificates ${p.state === 'lapsed' ? 'expired' : 'expire'} ${dayLabel(p.expires)}`, detail: 'New certificates arrive from the renewal runbook', chip: <Chip tone={p.state === 'lapsed' ? 'red' : 'amber'}>{p.state === 'lapsed' ? 'Expired' : `${p.daysLeft} days`}</Chip>, go: () => navigate('/building?section=insurance') })),
     ...docs.reviewDue.slice(0, 1).map(d => ({ id: `rev:${d.id}`, title: `${d.name} is due for review`, detail: 'The reviewed version closes its obligation', chip: <Chip tone="amber">Review due</Chip>, go: () => updateDoc(d.id, { status: 'current' }) })),
   ].slice(0, 3);
@@ -162,7 +180,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
                             : <Button size="sm" variant="ghost" disabled={!r.file} onClick={() => setUploading(uploading === r.id ? null : r.id)}>{r.file ? 'Download' : 'Add file'}</Button>}
                         </Td>
                       </tr>
-                      {uploading === r.id && r.legal && <tr><td colSpan={5} className="px-3 py-2"><UploadForm doc={r.legal} onClose={() => setUploading(null)} /></td></tr>}
+                      {uploading === r.id && (r.legal || r.expected) && <tr><td colSpan={5} className="px-3 py-2"><UploadForm doc={r.legal} defaultName={r.expected?.label} onClose={() => setUploading(null)} /></td></tr>}
                     </Fragment>
                   ))}
                 </Fragment>
