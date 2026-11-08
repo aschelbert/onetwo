@@ -151,6 +151,10 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   documents; an owner reaches their own unit (tenant_users.unit, set when
   they accept an invitation that names it). An upload whose row can't be
   saved removes its file; a delete removes the row first, then the file.
+  Move history: an owner reports a move for their unit (deposit, access,
+  inspection and insurance start pending and stay the board's to settle;
+  migration 038); a move that can't be saved keeps the form with a message.
+  Board members and property managers manage every move.
 - **User Management** · People with access / Invites / Roles tiles, Members
   table (role chips, Change role / Reset password / Resend welcome / Remove
   in the row menu), Invite (one person or bulk, inline), Audit log,

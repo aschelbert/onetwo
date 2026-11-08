@@ -151,17 +151,29 @@ function MoveHistory({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot }
   const [type, setType] = useState<'in' | 'out'>('out');
   const [date, setDate] = useState('');
   const [win, setWin] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
   const numbers = units.map(u => u.unit.number);
   const mine = events.filter(e => numbers.includes(e.unitNumber)).sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
   return (
     <Card aria-label="Move history" className="gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Move history</SectionLabel>{!open && <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>Report a move</Button>}</div>
       {open && (
-        <form aria-label="Report a move" onSubmit={e => { e.preventDefault(); if (!date) return; void add({ unitNumber: units[0].unit.number, moveType: type, scheduledDate: date, timeWindow: win || null, elevatorSlot: null, depositAmount: 0, depositStatus: 'pending', accessStatus: 'pending', insuranceConfirmed: false, inspectionStatus: 'pending', residentName: snap.viewer.name, moverName: null, caseId: null, notes: null }); setOpen(false); setDate(''); setWin(''); }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+        <form aria-label="Report a move" onSubmit={async e => {
+          e.preventDefault();
+          if (!date || saving) return;
+          setSaving(true); setFailed(false);
+          const created = await add({ unitNumber: units[0].unit.number, moveType: type, scheduledDate: date, timeWindow: win || null, elevatorSlot: null, depositAmount: 0, depositStatus: 'pending', accessStatus: 'pending', insuranceConfirmed: false, inspectionStatus: 'pending', residentName: snap.viewer.name, moverName: null, caseId: null, notes: null });
+          setSaving(false);
+          // Keep what was typed when it didn't save, so it can be sent again.
+          if (!created) { setFailed(true); return; }
+          setOpen(false); setDate(''); setWin('');
+        }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
           <Field label="Move" className="w-[140px]"><select aria-label="Move type" value={type} onChange={e => setType(e.target.value as 'in' | 'out')} className={INPUT}><option value="out">Out</option><option value="in">In</option></select></Field>
           <Field label="Date" className="w-[170px]"><input type="date" aria-label="Move date" value={date} onChange={e => setDate(e.target.value)} className={INPUT} /></Field>
           <Field label="Window" className="w-[170px]"><input aria-label="Time window" value={win} onChange={e => setWin(e.target.value)} placeholder="9am to noon" className={INPUT} /></Field>
-          <div className="flex gap-2"><Button type="submit" size="sm">Report</Button><Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button></div>
+          <div className="flex gap-2"><Button type="submit" size="sm" disabled={saving}>{saving ? 'Sending…' : 'Report'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setOpen(false); setFailed(false); }}>Cancel</Button></div>
+          {failed && <span role="alert" className="basis-full text-[13px] font-semibold text-ux2-red-ink">The move couldn't be saved. Try again; if it keeps failing, ask the board to link your account to unit {units[0].unit.number}.</span>}
         </form>
       )}
       {mine.map(e => <Inner key={e.id} data-move={e.id} className="flex flex-wrap items-center justify-between gap-3"><Cell title={`Move ${e.moveType} · ${dayLabel(e.scheduledDate)}`} note={`${e.timeWindow ? `${e.timeWindow} · ` : ''}${e.elevatorSlot ? 'elevator booked' : 'elevator not booked'} · deposit ${e.depositStatus}${units.length > 1 ? ` · ${e.unitNumber}` : ''}`} /><Chip tone={e.insuranceConfirmed ? 'sage' : 'amber'}>{e.insuranceConfirmed ? 'Insured' : 'Insurance pending'}</Chip></Inner>)}

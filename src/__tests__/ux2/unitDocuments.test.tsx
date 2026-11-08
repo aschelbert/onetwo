@@ -71,3 +71,22 @@ describe('Documents for this unit', () => {
     expect(upload).toHaveBeenCalledWith('301', expect.any(File), 'other', true, viewer, expect.any(String));
   });
 });
+
+describe('Move history', () => {
+  beforeEach(() => { localStorage.clear(); useAuthStore.setState({ currentRole: 'RESIDENT' }); });
+
+  it('keeps the form and says so when a move could not be saved, and closes it once it is', async () => {
+    const add = vi.fn().mockResolvedValueOnce(null).mockImplementation(async (e: object) => ({ ...e, id: 'mv1', createdAt: '2026-11-08T00:00:00Z' }));
+    useFinancialStore.setState({ tenantId: 't1', moveEvents: [], addMoveEvent: add });
+    renderUnit();
+    const card = document.querySelector('[aria-label="Move history"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'Report a move' }));
+    fireEvent.change(within(card).getByLabelText('Move date'), { target: { value: '2026-12-15' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Report' }));
+    expect((await within(card).findByRole('alert')).textContent).toMatch(/couldn't be saved/);
+    expect((within(card).getByLabelText('Move date') as HTMLInputElement).value).toBe('2026-12-15');
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ unitNumber: '301', moveType: 'out', scheduledDate: '2026-12-15', depositStatus: 'pending', insuranceConfirmed: false }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Report' }));
+    await waitFor(() => expect(within(card).queryByRole('form', { name: 'Report a move' })).toBeNull());
+  });
+});
