@@ -6,7 +6,7 @@
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { DOC_CATALOGUE, entryFor, placeFile, sameDocument, setFilePlaces, unplaceFile } from '@/features/building/documentCatalogue';
+import { DOC_CATALOGUE, entryFor, pathOf, placeFile, sameDocument, setFilePlaces, unplaceFile } from '@/features/building/documentCatalogue';
 import { resolve, unitKey, type DocType, type FieldScalar, type Item, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
 
 const num = (v: FieldScalar | undefined): number | null => {
@@ -165,7 +165,7 @@ export function setupDocName(doc: SetupDoc, type: DocType): string {
 }
 
 const yearOf = (name: string) => /\b(19|20)\d{2}\b/.exec(name)?.[0];
-const fileOf = (doc: SetupDoc) => ({ name: doc.name, size: sizeOf(doc), type: doc.mediaType || 'application/pdf', fileId: doc.id, ...(doc.historical ? { period: doc.period ?? yearOf(doc.name) } : {}) });
+const fileOf = (doc: SetupDoc) => ({ name: doc.name, size: sizeOf(doc), type: doc.mediaType || 'application/pdf', fileId: doc.id, path: pathOf(doc.id), ...(doc.historical ? { period: doc.period ?? yearOf(doc.name) } : {}) });
 
 /** The documents a setup document is filed under: the ones the person chose, else its catalogue name. */
 export const coversOf = (doc: SetupDoc, type: DocType = doc.docType ?? 'other') => (doc.covers?.length ? doc.covers : [setupDocName(doc, type)]);
@@ -187,7 +187,7 @@ export function placeSetupDocument(doc: SetupDoc, covers: string[], historical =
   if (!names.length) { unfileSetupDocument(doc); return { filedAs: undefined, covers: [] }; }
   const file = fileOf({ ...doc, historical });
   // A change between current and past re-files it, so the files it replaced are restored or archived to match.
-  if (historical !== !!doc.historical) unplaceFile(file);
+  if (historical !== !!doc.historical) unplaceFile(file, [], false);
   const ids = setFilePlaces(names, file, { past: historical, version: yearOf(doc.name) });
   return { filedAs: ids[0], covers: names };
 }

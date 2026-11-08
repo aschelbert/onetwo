@@ -11,6 +11,7 @@ import { documentsSummary, insuranceStatus, type BuildingSnapshot } from '../met
 import type { BuildingTab } from '../BuildingModule';
 import { DOC_CATALOGUE, DOC_GROUP_LABEL, currentFile, deleteFile, entryFor, groupOf, pastFiles, placeFile, replacedBy, restoreFile, type CatalogueEntry } from '@/features/building/documentCatalogue';
 import { DocumentPicker } from '../DocumentPicker';
+import { canStoreFiles, downloadDocumentFile, uploadDocumentFile } from '@/lib/services/documentFiles';
 
 type Group = 'governing' | 'policies' | 'insurance' | 'reserve' | 'reports' | 'minutes' | 'contracts';
 type Filter = 'all' | Group;
@@ -34,6 +35,8 @@ interface DocRow {
   expected?: CatalogueEntry;
   /** Earlier versions (replaced files and past versions), newest first. */
   past?: LegalDocFile[];
+  /** The stored file behind the row, when there is one. */
+  download?: { path: string; name: string };
   open?: () => void;
 }
 
@@ -62,6 +65,8 @@ function UploadForm({ start, onClose }: { start?: string[]; onClose: () => void 
   const [when, setWhen] = useState<'current' | 'past'>('current');
   const [version, setVersion] = useState('');
   const [replaced, setReplaced] = useState<'archive' | 'delete' | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const nf = file ? { name: file.name, size: sizeLabel(file.size), type: file.type || 'application/pdf' } : null;
   const replacing = nf && when === 'current' ? replacedBy(names, nf) : [];
   const pick = (f: File | null) => {
@@ -73,11 +78,20 @@ function UploadForm({ start, onClose }: { start?: string[]; onClose: () => void 
   return (
     <form
       aria-label={start?.length ? `Add a file to ${start.join(', ')}` : 'Upload a document'}
-      onSubmit={e => {
+      onSubmit={async e => {
         e.preventDefault();
-        if (!nf || !ready) return;
-        const year = /\b(19|20)\d{2}\b/.exec(version || file!.name)?.[0];
-        const ids = placeFile(names, { ...nf, ...(when === 'past' ? { period: version || year } : {}) }, { past: when === 'past', replaced: replaced ?? 'archive', version: version || year });
+        if (!nf || !ready || !file || saving) return;
+        const year = /\b(19|20)\d{2}\b/.exec(version || file.name)?.[0];
+        // Store the file first, so the document never lists a file that isn't there.
+        const fileId = `f-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        let path: string | undefined;
+        if (canStoreFiles()) {
+          setSaving(true); setError('');
+          path = (await uploadDocumentFile(fileId, file)) ?? undefined;
+          setSaving(false);
+          if (!path) { setError("The file couldn't be uploaded. Check your connection and try again."); return; }
+        }
+        const ids = placeFile(names, { ...nf, fileId, path, ...(when === 'past' ? { period: version || year } : {}) }, { past: when === 'past', replaced: replaced ?? 'archive', version: version || year });
         if (when === 'current' && version) for (const id of ids) updateDoc(id, { version });
         onClose();
       }}
@@ -106,8 +120,19 @@ function UploadForm({ start, onClose }: { start?: string[]; onClose: () => void 
           </span>
         </div>
       )}
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!ready}>{when === 'past' ? 'Add past version' : 'Upload'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      {error && <div role="alert" className="text-[13px] font-semibold text-ux2-red-ink">{error}</div>}
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!ready || saving}>{saving ? 'Uploading…' : when === 'past' ? 'Add past version' : 'Upload'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
     </form>
+  );
+}
+
+/** Downloads a stored file through a short-lived link. */
+function DownloadButton({ path, name }: { path: string; name: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  return (
+    <Button size="sm" variant="ghost" aria-label={`Download ${name}`} disabled={state === 'busy'} onClick={async () => { setState('busy'); setState((await downloadDocumentFile(path, name)) ? 'idle' : 'failed'); }}>
+      {state === 'busy' ? 'Opening…' : state === 'failed' ? "Couldn't open · retry" : 'Download'}
+    </Button>
   );
 }
 
@@ -118,6 +143,7 @@ function EarlierVersions({ doc, files, isBoard }: { doc: LegalDocument; files: L
       {files.map((f, i) => (
         <li key={`${f.name}-${f.uploadedAt}-${i}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-ux2-line bg-white px-3 py-2 text-[13px]">
           <span className="min-w-0 flex-1"><b className="font-semibold">{f.name}</b> <span className="text-ux2-muted">· {f.period ? `${f.period} · ` : ''}added {monthYear(f.uploadedAt)}{f.archived && f.archived !== f.uploadedAt ? ` · archived ${monthYear(f.archived)}` : ''}</span></span>
+          {f.path && <DownloadButton path={f.path} name={f.name} />}
           {isBoard && <Button size="sm" variant="ghost" onClick={() => restoreFile(doc.id, f)}>Make current</Button>}
           {isBoard && <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(`Delete ${f.name}? This can't be undone.`)) deleteFile(doc.id, f); }}>Delete</Button>}
         </li>
@@ -159,7 +185,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
       const earlier = past.length ? ` · ${past.length} earlier ${past.length === 1 ? 'version' : 'versions'}` : '';
       // A required document with only past versions is still missing its current one.
       const missing = !cur && (!past.length || !!entry?.required);
-      out.push({ id: d.id, group: entry?.group ?? groupOf(d.name), name: entry?.label ?? d.name, note: `${entry ? `${entry.note} · ` : ''}${cur ? cur.name : past.length ? 'past versions only' : d.version}${earlier}${extra}`, version: d.version, audience: entry?.audience ?? 'Everyone', updated: cur ? monthYear(cur.uploadedAt) : past.length ? monthYear(past[0].uploadedAt) : 'Never uploaded', updatedIso: cur?.uploadedAt, file: !!cur, missing, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d, past });
+      out.push({ id: d.id, group: entry?.group ?? groupOf(d.name), name: entry?.label ?? d.name, note: `${entry ? `${entry.note} · ` : ''}${cur ? cur.name : past.length ? 'past versions only' : d.version}${cur && !cur.path && canStoreFiles() ? ' · added before files were stored: add it again to download' : ''}${earlier}${extra}`, version: d.version, audience: entry?.audience ?? 'Everyone', updated: cur ? monthYear(cur.uploadedAt) : past.length ? monthYear(past[0].uploadedAt) : 'Never uploaded', updatedIso: cur?.uploadedAt, file: !!cur, missing, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d, past, download: cur?.path ? { path: cur.path, name: cur.name } : undefined });
     };
     const score = (d: LegalDocument) => (currentFile(d) ? 2 : d.attachments.length ? 1 : 0);
     const best = (docs: LegalDocument[]) => [...docs].sort((a, b) => score(b) - score(a) || (currentFile(b)?.uploadedAt || '').localeCompare(currentFile(a)?.uploadedAt || ''))[0];
@@ -177,7 +203,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
     for (const r of reports) out.push({ id: `rep:${r.id}`, group: 'reports', name: r.name, note: `${r.periodLabel} · generated by ${r.generatedBy}`, version: r.periodLabel, audience: 'Everyone', updated: monthYear(r.generatedAt), updatedIso: r.generatedAt, file: true, open: () => navigate('/funds?tab=statements') });
     for (const a of archives) out.push({ id: `arch:${a.id}`, group: 'reports', name: `Annual archive · ${a.label.split(' (')[0]}`, note: 'financial statements and the year in review', version: a.label.split(' (')[0], audience: 'Everyone', updated: monthYear(a.createdAt), updatedIso: a.createdAt, file: true, open: () => navigate('/funds?tab=statements') });
     out.push({ id: 'minutes', group: 'minutes', name: 'Minutes archive', note: 'every approved set of board and annual meeting minutes', version: 'with the meetings', audience: 'Everyone', updated: '', file: true, open: () => navigate('/community?tab=meetings') });
-    for (const c of contracts) out.push({ id: `con:${c.id}`, group: 'contracts', name: c.title, note: `${c.vendorName} · ${c.status === 'expired' ? `ended ${dayLabel(c.endDate)}` : `ends ${dayLabel(c.endDate)}`}`, version: `${c.startDate.slice(0, 4)}–${c.endDate.slice(2, 4)}`, audience: 'Board', updated: monthYear(c.startDate), updatedIso: c.startDate, file: c.attachments.length > 0, status: c.status === 'expired' ? { label: 'Lapsed', tone: 'red' } : undefined, open: () => navigate('/building?tab=contracts') });
+    for (const c of contracts) out.push({ id: `con:${c.id}`, group: 'contracts', name: c.title, note: `${c.vendorName} · ${c.status === 'expired' ? `ended ${dayLabel(c.endDate)}` : `ends ${dayLabel(c.endDate)}`}`, version: `${c.startDate.slice(0, 4)}–${c.endDate.slice(2, 4)}`, audience: 'Board', updated: monthYear(c.startDate), updatedIso: c.startDate, file: c.attachments.length > 0, status: c.status === 'expired' ? { label: 'Lapsed', tone: 'red' } : undefined, download: c.attachments[0]?.path ? { path: c.attachments[0].path, name: c.attachments[0].name } : undefined, open: () => navigate('/building?tab=contracts') });
     return out;
   }, [snap.legalDocuments, snap.insurance, ins, reports, archives, contracts, navigate]);
 
@@ -246,6 +272,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
                         <Td className="whitespace-nowrap text-ux2-muted">{r.updated || '—'}{r.status && <Chip tone={r.status.tone} className="ml-1.5">{r.status.label}</Chip>}</Td>
                         <Td num>
                           <span className="inline-flex flex-wrap justify-end gap-1.5">
+                            {r.download && <DownloadButton path={r.download.path} name={r.download.name} />}
                             {!!r.past?.length && <Button size="sm" variant="ghost" aria-expanded={openPast === r.id} onClick={() => setOpenPast(openPast === r.id ? null : r.id)}>Earlier · {r.past.length}</Button>}
                             {r.missing && isBoard ? <Button size="sm" onClick={() => setUploading(uploading === r.id ? null : r.id)}>{/rule/i.test(r.name) ? 'Add rules' : 'Add file'}</Button>
                               : r.open ? <Button size="sm" variant="ghost" onClick={r.open}>{r.group === 'minutes' ? 'Open in Community' : 'Open'}</Button>

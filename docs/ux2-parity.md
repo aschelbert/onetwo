@@ -82,6 +82,15 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   current file, whether to archive the old one (kept under Earlier) or
   delete it. Earlier lists past versions with Make current and Delete. The
   form and the earlier versions open above the table, at full width.
+  Files are stored in the private `building-documents` bucket
+  (`<tenant_id>/<file_id>/<name>`, migration 036; `lib/services/documentFiles.ts`):
+  everyone in the building downloads (a 60-second signed link), board
+  members upload and delete. Upload stores the file before filing it (an
+  error keeps the form open); setup stores each file as it's filed. One
+  file on several documents is one object, deleted only when no document
+  uses it. Files added before storage show "add it again to download".
+  Setup's vendor contract files are stored too and download from the
+  Vendor contracts rows.
 - **Obligations** · This month / By role / By category / Filings / Ongoing /
   Duties and roles pills, four compact counts, the month's table with
   expandable rows (why it matters, if missed, how to; Mark done and Mark

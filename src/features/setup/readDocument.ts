@@ -13,6 +13,9 @@
 import { READER_VERSION, type DocType, type SetupDoc } from './setupModel';
 import { useSetupStore } from './useSetupStore';
 import { fileSetupDocument, placeSetupDocument, retypeSetupDocument } from './applySetup';
+import { pathOf, setFilePath } from '@/features/building/documentCatalogue';
+import { canStoreFiles, uploadDocumentFile } from '@/lib/services/documentFiles';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { parseCsv, readSheets, type Cell } from './importSpreadsheet';
 import { detectType, extractFromPages, foundIn } from './extractText';
 
@@ -38,6 +41,17 @@ export function guessType(name: string): DocType {
 }
 
 const text = new Map<string, { pages: string[][]; paged: boolean }>();
+/** The files added this visit, so one filed later (Keep a copy) can still be stored. */
+const added = new Map<string, File>();
+
+/** Store a filed document's file (building-documents bucket) once, and record where on every document it's filed under. */
+function store(id: string): void {
+  const file = added.get(id);
+  if (!file || !canStoreFiles() || pathOf(id)) return;
+  if (!useBuildingStore.getState().legalDocuments.some(d => d.attachments.some(a => a.fileId === id))) return;
+  added.delete(id); // one upload per file
+  void uploadDocumentFile(id, file).then(path => { if (path) setFilePath(id, path); else added.set(id, file); });
+}
 const newId = () => `sd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const titleOf = (name: string) => name.replace(/\.[a-z0-9]+$/i, '').replace(/_+/g, ' ').trim();
 
@@ -69,10 +83,12 @@ export async function addOne(file: File, past?: PastOptions): Promise<void> {
   const base: SetupDoc = { id, name: file.name, size: file.size, mediaType: file.type, status: 'reading', addedAt: new Date().toISOString() };
   addDoc(base);
   if (file.size > MAX_FILE_BYTES) { updateDoc(id, { status: 'error', error: 'This file is over 25 MB. Split it, or keep just the pages that matter.' }); return; }
+  added.set(id, file);
 
   if (past) {
     const doc: SetupDoc & { docType: DocType } = { ...base, docType: past.docType, covers: past.covers, historical: true, period: /\b(19|20)\d{2}\b/.exec(file.name)?.[0] };
     const filedAs = fileSetupDocument(doc) ?? undefined;
+    store(id);
     updateDoc(id, { status: 'filed', docType: past.docType, covers: past.covers, historical: true, period: doc.period, filedAs, note: `Filed as a past version${doc.period ? ` (${doc.period})` : ''} under ${past.covers.join(', ')} in Building › Documents.` });
     return;
   }
@@ -91,6 +107,7 @@ export async function addOne(file: File, past?: PastOptions): Promise<void> {
   let docType = guessType(file.name);
   let filedAs = fileSetupDocument({ ...base, docType }) ?? undefined;
   updateDoc(id, { filedAs });
+  store(id);
   const lower = file.name.toLowerCase();
   try {
     if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
@@ -133,6 +150,7 @@ export async function addFiles(list: File[], past?: PastOptions): Promise<void> 
 export function setCovers(doc: SetupDoc, covers: string[], historical = !!doc.historical): void {
   const placed = placeSetupDocument(doc, covers, historical);
   useSetupStore.getState().updateDoc(doc.id, { ...placed, historical, period: historical ? doc.period ?? /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] : doc.period });
+  store(doc.id);
 }
 
 /** Read pasted text (copied from a document, an email, a web page). */
