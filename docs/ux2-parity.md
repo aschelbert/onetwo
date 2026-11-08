@@ -143,6 +143,18 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   Statements and receipts, Unit details, Documents for this unit (Upload),
   Move history (Report a move inline), Requests from this unit, Owner
   responsibilities, Link a unit. No embedded My Unit page.
+  Documents for this unit lists what the board shared (visible to owner)
+  and what the owner added, each with Download (a 60-second signed link)
+  and Delete for the owner's own uploads; a failed upload says so. Files
+  are in the private `unit-documents` bucket at `<tenant>/<unit>/<time>-<name>`
+  (migration 037). Board members and property managers reach every unit's
+  documents; an owner reaches their own unit (tenant_users.unit, set when
+  they accept an invitation that names it). An upload whose row can't be
+  saved removes its file; a delete removes the row first, then the file.
+  Move history: an owner reports a move for their unit (deposit, access,
+  inspection and insurance start pending and stay the board's to settle;
+  migration 038); a move that can't be saved keeps the form with a message.
+  Board members and property managers manage every move.
 - **User Management** · People with access / Invites / Roles tiles, Members
   table (role chips, Change role / Reset password / Resend welcome / Remove
   in the row menu), Invite (one person or bulk, inline), Audit log,

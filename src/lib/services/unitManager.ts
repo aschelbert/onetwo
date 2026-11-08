@@ -39,11 +39,12 @@ export async function uploadUnitDocument(
 ): Promise<UnitDocument | null> {
   if (!supabase) return null;
 
-  // Upload file to storage
-  const path = `${tenantId}/${unitNumber}/${Date.now()}-${file.name}`;
+  // Upload file to storage (private unit-documents bucket, migration 037): <tenant>/<unit>/<time>-<name>
+  const safe = file.name.replace(/[^\w.\-() ]+/g, '_').trim() || 'file';
+  const path = `${tenantId}/${unitNumber}/${Date.now()}-${safe}`;
   const { error: storageError } = await supabase.storage
     .from('unit-documents')
-    .upload(path, file);
+    .upload(path, file, { contentType: file.type || undefined });
   if (storageError) { logDbError('uploadUnitDocument storage error:', storageError); return null; }
 
   // Insert record
@@ -61,25 +62,32 @@ export async function uploadUnitDocument(
     })
     .select()
     .single();
-  if (error) { logDbError('uploadUnitDocument insert error:', error); return null; }
+  if (error) {
+    logDbError('uploadUnitDocument insert error:', error);
+    // Don't leave a file behind that no document points to.
+    await supabase.storage.from('unit-documents').remove([path]);
+    return null;
+  }
   return rowToUnitDocument(data);
 }
 
 export async function deleteUnitDocument(id: string, storagePath: string): Promise<boolean> {
   if (!supabase) return false;
-  // Delete from storage
-  await supabase.storage.from('unit-documents').remove([storagePath]);
-  // Delete record
-  const { error } = await supabase.from('unit_documents').delete().eq('id', id);
+  // The record first: if it can't be deleted (not yours to delete), the file stays with it.
+  const { data, error } = await supabase.from('unit_documents').delete().eq('id', id).select('id');
   if (error) { logDbError('deleteUnitDocument error:', error); return false; }
+  if (!data?.length) return false;
+  const { error: storageError } = await supabase.storage.from('unit-documents').remove([storagePath]);
+  if (storageError) logDbError('deleteUnitDocument storage error:', storageError);
   return true;
 }
 
-export async function getDocumentSignedUrl(storagePath: string): Promise<string | null> {
+/** A short-lived link to a unit document; with a file name, it downloads under that name. */
+export async function getDocumentSignedUrl(storagePath: string, filename?: string): Promise<string | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.storage
     .from('unit-documents')
-    .createSignedUrl(storagePath, 3600); // 1 hour
+    .createSignedUrl(storagePath, 60, filename ? { download: filename } : undefined);
   if (error) { logDbError('getDocumentSignedUrl error:', error); return null; }
   return data?.signedUrl || null;
 }
