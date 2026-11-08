@@ -105,7 +105,9 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   reserve study, financial review, 1120-H, fire and elevator inspections)
   and every filing open that situation's main path; any other obligation
   opens a case of its own how-to list as a checklist (each item with its
-  assists: where it's done, a tool, or a panel) and a step to record it.
+  assists: where it's done, a tool, or a panel; every how-to item has one,
+  the evacuation routes item the floor plans on file and a notice to
+  residents) and a step to record it.
   One open case per obligation: after Start, the button says Continue · n
   of m. Closing the case as Resolved marks the obligation done, or the
   filing filed with the case as proof; closing it any other way leaves it

@@ -45,7 +45,7 @@ describe('starting an obligation', () => {
     for (const sit of Object.values(OBLIGATION_SITUATIONS)) expect(categoryOf(sit), sit).toBeTruthy();
   });
 
-  it('gives nearly every how-to item a place in the app where it is done', () => {
+  it('gives every how-to item a place in the app where it is done', () => {
     const misses: string[] = [];
     let total = 0;
     for (const it of items) {
@@ -57,7 +57,10 @@ describe('starting an obligation', () => {
       }
     }
     expect(total).toBeGreaterThan(150);
-    expect(misses.length, misses.join('\n')).toBeLessThanOrEqual(2);
+    expect(misses).toEqual([]);
+    const evac = resolveCheck('Review evacuation routes and assembly points', { catId: 'maintenance', sitId: 'obligation-m5', step: 'Work through: Emergency preparedness plan updated', hasUnit: false });
+    expect(evac.rule).toBe('evacuation');
+    expect(evac.assists.map(a => a.label)).toEqual(['Review the floor plans on file', 'Post the routes to residents']);
   });
 });
 
