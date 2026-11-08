@@ -179,7 +179,10 @@ begin
 end $$;
 
 -- A Stripe Checkout tied to one invoice completed: settle that invoice.
-create or replace function reconcile_unit_payment(p_stripe_session_id text, p_stripe_payment_intent_id text)
+-- The hand-made version on existing databases had a parameter default, which
+-- create or replace cannot remove, so it is dropped first.
+drop function if exists reconcile_unit_payment(text, text);
+create function reconcile_unit_payment(p_stripe_session_id text, p_stripe_payment_intent_id text)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare

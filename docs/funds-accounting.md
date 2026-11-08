@@ -88,11 +88,16 @@ Deploy notes:
 
 - Apply migrations 043 and 044. 044 is `create or replace`, so a database
   that already had `reconcile_unit_payment` by hand keeps working.
-- Subscribe the Stripe webhook endpoint to `invoice.paid` as well as
-  `checkout.session.completed` and `charge.refunded`. Payments land on the
-  building's connected account, so the endpoint must receive connected
-  account events (Stripe Dashboard → Webhooks → "Listen to events on
-  Connected accounts").
+- Stripe needs two webhook endpoints pointing at `stripe-webhook`, both
+  subscribed to `checkout.session.completed`, `invoice.paid` and
+  `charge.refunded`: the platform account's, and one created with "Listen to
+  events on Connected accounts", because payments land on each building's
+  connected account. The function accepts an event signed by either secret
+  (`STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET`); when neither
+  matches it verifies the event by fetching it from Stripe, on the connected
+  account when the event names one, so a missing second secret costs one API
+  call per event rather than a lost payment. Test (sandbox) and live mode
+  each need their own pair.
 - Apply migration 046: the scheduled billing cycle and the payment order.
   It enables `pg_cron` and schedules `onetwo-billing-cycle` daily; if the
   migration only raises a notice about pg_cron, enable the extension under
