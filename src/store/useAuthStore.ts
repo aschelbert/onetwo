@@ -24,6 +24,7 @@ interface AuthState {
   addMember: (member: BuildingMember) => void;
   removeMember: (id: string) => void;
   updateMemberRole: (id: string, role: Role) => void;
+  updateMemberUnit: (id: string, unit: string) => void;
   addInvite: (invite: BuildingInvite) => void;
   revokeInvite: (id: string) => void;
   inviteMember: (email: string, role: Role, unit?: string) => void;
@@ -143,6 +144,13 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     set((state) => ({
       buildingMembers: state.buildingMembers.map((m) =>
         m.id === id ? { ...m, role } : m
+      ),
+    })),
+
+  updateMemberUnit: (id, unit) =>
+    set((state) => ({
+      buildingMembers: state.buildingMembers.map((m) =>
+        m.id === id ? { ...m, unit } : m
       ),
     })),
 
