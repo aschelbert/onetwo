@@ -7,7 +7,24 @@
  * JavaScript (Map.prototype.getOrInsertComputed, Uint8Array.fromBase64…) that
  * Safari doesn't have yet, so reading failed there. The legacy build carries
  * polyfills for them.
+ *
+ * Text is read from the page's text stream with a reader loop rather than
+ * pdf.js's getTextContent(), which iterates the stream with `for await`;
+ * Safari's ReadableStream isn't async-iterable, so that threw a TypeError.
  */
+
+type TextItem = { str?: string; transform: number[]; width: number };
+/** A page's text items, read with getReader() (works in every browser). */
+async function pageText(page: { streamTextContent: () => ReadableStream<{ items: unknown[] }> }): Promise<{ items: TextItem[] }> {
+  const reader = page.streamTextContent().getReader();
+  const items: TextItem[] = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value?.items) items.push(...(value.items as TextItem[]));
+  }
+  return { items };
+}
 export async function pdfLines(file: File): Promise<string[][]> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const { default: workerUrl } = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url');
@@ -17,11 +34,11 @@ export async function pdfLines(file: File): Promise<string[][]> {
   const pages: string[][] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
-    const content = await page.getTextContent();
+    const content = await pageText(page);
     // Group text pieces into lines by their baseline, then order each line left to right.
     const rows = new Map<number, { x: number; s: string; w: number }[]>();
     for (const item of content.items) {
-      if (!('str' in item) || !item.str.trim()) continue;
+      if (typeof item.str !== 'string' || !item.str.trim()) continue;
       const y = Math.round(item.transform[5] / 2) * 2;
       const row = rows.get(y) ?? [];
       row.push({ x: item.transform[4], s: item.str, w: item.width });
