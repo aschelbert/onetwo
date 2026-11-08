@@ -81,7 +81,8 @@ interface Props {
   openEdit: (id: string, data: Record<string, string>) => void;
   openAddMaint: (assetId: string) => void;
   openEditMaint: (id: string, data: Record<string, string>) => void;
-  navigateToTab?: (tab: string) => void;
+  /** Switch the parent Building page to one of its tabs. */
+  navigateToTab?: (tab: 'insurance' | 'units') => void;
 }
 
 export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMaint, openEditMaint, navigateToTab }: Props) {
@@ -561,7 +562,7 @@ export default function AssetsTab({ store, isBoard, openAdd, openEdit, openAddMa
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => navigateToTab?.('vendors')} className="text-[10px] text-accent-600 hover:text-accent-700 font-medium">View</button>
+                    <button onClick={() => { setSelectedAssetId(null); setSubView('vendors'); }} className="text-[10px] text-accent-600 hover:text-accent-700 font-medium">View</button>
                     {isBoard && (
                       <button
                         onClick={() => {

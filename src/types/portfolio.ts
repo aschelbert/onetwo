@@ -17,11 +17,11 @@ export interface ManagementCompany {
 
 export interface ManagementCompanyUser {
   id: string;
-  company_id: string;
+  management_company_id: string;
   user_id: string;
   role: PMRole;
   status: PMUserStatus;
-  display_name: string;
+  name: string | null;
   created_at: string;
 }
 
