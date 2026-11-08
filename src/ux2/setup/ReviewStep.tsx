@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/formatters';
 import { Button, Chip } from '../components';
 import { Link } from 'react-router-dom';
-import { DOC_KINDS, FIELD_LABEL, SECTIONS, SECTION_GOES, coverage, isClear, itemSummary, pathFor, readByOlderReader, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
+import { DOC_KINDS, FIELD_LABEL, SECTIONS, SECTION_GOES, coverage, isClear, itemSummary, missingFee, pathFor, readByOlderReader, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { applyItem } from '@/features/setup/applySetup';
 import { useSetup } from './useSetup';
@@ -26,13 +26,16 @@ function SourceLine({ sources }: { sources: Source[] }) {
   );
 }
 
-function ItemCard({ item }: { item: Item }) {
+function ItemCard({ item, fee = '', onFee }: { item: Item; fee?: string; onFee?: (v: string) => void }) {
   const decision = useSetupStore(s => s.decisions[item.key]);
   const decide = useSetupStore(s => s.decide);
   const undo = useSetupStore(s => s.undo);
   const [picks, setPicks] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState(false);
   const [edits, setEdits] = useState<Record<string, string>>({});
+  // A unit with no monthly amount in any document: enter it here before accepting.
+  const setFee = (v: string) => onFee?.(v);
+  const noFee = missingFee(item);
   const conflicted = item.conflicts.length > 0;
   const fields = Object.entries(item.fields);
   const plain = fields.find(([f]) => !item.conflicts.includes(f))?.[1][0]?.sources;
@@ -43,15 +46,18 @@ function ItemCard({ item }: { item: Item }) {
       const orig = item.fields[f]?.[0]?.value;
       typed[f] = typeof orig === 'number' && v.trim() !== '' && !Number.isNaN(Number(v.replace(/[$,%]/g, ''))) ? Number(v.replace(/[$,%]/g, '')) : v;
     }
-    const savedTo = applyItem(item, picks, editing ? typed : undefined);
-    decide(item.key, { status: 'accepted', picks, edits: editing ? typed : undefined, savedTo });
+    const feeNum = Number(fee.replace(/[$,\s]/g, ''));
+    const all: Record<string, FieldScalar> = { ...(editing ? typed : {}), ...(noFee && fee.trim() && !Number.isNaN(feeNum) ? { monthlyFee: feeNum } : {}) };
+    const extra = Object.keys(all).length ? all : undefined;
+    const savedTo = applyItem(item, picks, extra);
+    decide(item.key, { status: 'accepted', picks, edits: extra, savedTo });
     setEditing(false);
   };
 
   if (decision) {
     return (
       <div data-setup-item={item.key} data-decision={decision.status} className="flex flex-wrap items-center gap-3 rounded-2xl border border-ux2-line bg-white px-4 py-2.5 text-sm">
-        <span className="min-w-0 flex-1"><b className="font-semibold">{item.label}</b> <span className="text-ux2-muted">· {decision.status === 'accepted' ? itemSummary(item, decision.picks) : 'skipped'}</span></span>
+        <span className="min-w-0 flex-1"><b className="font-semibold">{item.label}</b> <span className="text-ux2-muted">· {decision.status === 'accepted' ? itemSummary(item, decision.picks, decision.edits) : 'skipped'}</span></span>
         {decision.status === 'accepted'
           ? (pathFor(decision.savedTo)
             ? <Link to={pathFor(decision.savedTo)!} className="inline-flex items-center gap-1 rounded-full bg-ux2-sage-tint px-[11px] py-[6px] text-xs font-semibold text-ux2-sage hover:underline">Saved to {decision.savedTo} ↗</Link>
@@ -68,6 +74,7 @@ function ItemCard({ item }: { item: Item }) {
         <b className="font-semibold">{item.label}</b>
         {conflicted && <Chip tone="red">Documents disagree</Chip>}
         {!conflicted && item.lowConfidence && <Chip tone="amber">Check the source</Chip>}
+        {noFee && <Chip tone="amber">No monthly amount</Chip>}
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         {editing ? (
@@ -97,6 +104,12 @@ function ItemCard({ item }: { item: Item }) {
               </>
             )}
             {conflicted && item.conflicts.includes('value') && <p className="m-0 text-xs text-ux2-muted">Not sure which is current? Pick one now and change it later.</p>}
+            {noFee && (
+              <label className="flex flex-wrap items-center gap-2 text-xs text-ux2-muted">Monthly assessment for this unit $
+                <input inputMode="decimal" aria-label={`Monthly assessment for ${item.label}`} className="h-9 w-28 rounded-[10px] border border-ux2-line-strong bg-white px-3 text-sm text-ux2-ink" placeholder="e.g. 412" value={fee} onChange={e => setFee(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') accept(); }} />
+                <span>optional now; you can set it later in Fill the gaps</span>
+              </label>
+            )}
           </>
         )}
       </div>
@@ -158,6 +171,7 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
   const sections = useMemo(() => SECTIONS.map(sec => ({ ...sec, all: s.items.filter(i => i.section === sec.id) })).filter(sec => sec.all.length > 0), [s.items]);
   const firstOpen = sections.find(sec => sec.all.some(i => !s.decisions[i.key]))?.id ?? sections[0]?.id;
   const [chosen, setChosen] = useState<Section | null>(null);
+  const [fees, setFees] = useState<Record<string, string>>({});
   // Stay on the section you are in when its last item is decided; the "done" bar offers the next one.
   useEffect(() => { if (!chosen && firstOpen) setChosen(firstOpen); }, [chosen, firstOpen]);
   const current = sections.find(sec => sec.id === (chosen ?? firstOpen));
@@ -177,7 +191,14 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
   const pendingIn = current.all.filter(i => !s.decisions[i.key]);
   const clearIn = pendingIn.filter(isClear);
   const needLook = pendingIn.length - clearIn.length;
-  const acceptClear = () => { for (const it of clearIn) decide(it.key, { status: 'accepted', savedTo: applyItem(it) }); };
+  const acceptClear = () => {
+    for (const it of clearIn) {
+      // A monthly amount typed into a unit's card goes in with the bulk accept too.
+      const n = Number((fees[it.key] ?? '').replace(/[$,\s]/g, ''));
+      const edits = missingFee(it) && fees[it.key]?.trim() && !Number.isNaN(n) ? { monthlyFee: n } : undefined;
+      decide(it.key, { status: 'accepted', edits, savedTo: applyItem(it, undefined, edits) });
+    }
+  };
   const nextSection = sections.find(sec => sec.id !== current.id && sec.all.some(i => !s.decisions[i.key]));
 
   return (
@@ -204,9 +225,12 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
           <h2 id="review-h" className="flex-1 text-xl font-medium">{current.label} <span className="text-sm text-ux2-muted">· {current.all.length} found{needLook ? ` · ${needLook} need${needLook === 1 ? 's' : ''} a look` : ''}</span></h2>
           {clearIn.length > 1 && <Button variant="plum" onClick={acceptClear}>Accept the {clearIn.length} that match</Button>}
         </div>
-        {[...pendingIn.filter(i => !isClear(i)), ...pendingIn.filter(isClear)].map(it => <ItemCard key={it.key} item={it} />)}
-        {current.all.filter(i => s.decisions[i.key]).map(it => <ItemCard key={it.key} item={it} />)}
         <p className="m-0 text-[13px] text-ux2-muted">Accepted items go to <b className="font-semibold text-ux2-ink">{SECTION_GOES[current.id]}</b>.</p>
+        {current.id === 'units' && pendingIn.some(missingFee) && (
+          <p className="m-0 rounded-xl bg-ux2-amber-tint px-3 py-2 text-[13px] text-ux2-amber">{pendingIn.filter(missingFee).length} of these units have no monthly amount in your documents. Enter each one below as you accept it, or accept them now and set the amounts in Fill the gaps, unit by unit, by ownership % or the same for each.</p>
+        )}
+        {[...pendingIn.filter(i => !isClear(i)), ...pendingIn.filter(isClear)].map(it => <ItemCard key={it.key} item={it} fee={fees[it.key] ?? ''} onFee={v => setFees(x => ({ ...x, [it.key]: v }))} />)}
+        {current.all.filter(i => s.decisions[i.key]).map(it => <ItemCard key={it.key} item={it} />)}
         {pendingIn.length === 0 && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-ux2-sage-tint px-4 py-3 text-sm text-ux2-sage">
             <span className="flex-1 font-semibold">{current.label} is done.</span>

@@ -64,6 +64,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const [profile, setProfile] = useState({ name: b.name, street: b.address.street, city: b.address.city, state: b.address.state, zip: b.address.zip });
   const [member, setMember] = useState({ name: '', role: 'President', email: '' });
   const [sameFee, setSameFee] = useState('');
+  const [splitTotal, setSplitTotal] = useState('');
   const [balances, setBalances] = useState({ operating: '', reserve: '' });
   const [fees, setFees] = useState({ dueDay: String(f.hoaDueDay ?? 1), lateFee: f.lateFeeEnabled ? String(f.lateFeeAmount) : '', grace: String(f.lateFeeGraceDays) });
   const [feesSaved, setFeesSaved] = useState(false);
@@ -99,6 +100,8 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     b.updateAddress({ street: profile.street.trim(), city: profile.city.trim(), state: profile.state.trim(), zip: profile.zip.trim() });
   };
   const addMember = () => { if (member.name.trim()) { b.addBoardMember({ name: member.name.trim(), role: member.role, email: member.email.trim(), phone: '', term: '' }); setMember({ name: '', role: 'Director', email: '' }); } };
+  const pctReady = units.length > 0 && Math.abs(pctTotal - 100) < 0.5;
+  const splitTyped = () => { const t = Number(splitTotal.replace(/[$,\s]/g, '')); if (t > 0) for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(t * (u.votingPct / 100) * 100) / 100 }); };
   const split = () => { for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(monthlyTotal * (u.votingPct / 100) * 100) / 100 }); };
   const applySame = () => { const n = Number(sameFee.replace(/[$,]/g, '')); if (n > 0) for (const u of unassessed) f.updateUnit(u.number, { monthlyFee: n }); };
   const saveBalances = () => {
@@ -212,12 +215,36 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
         </div>
         <Gap id="assessment" required done={s.ess.assessment} title="Monthly assessment for every unit" note={units.length ? `${unassessed.length} of ${units.length} units have no monthly amount yet.` : 'Add units first.'}>
           {canSplit && <Button size="sm" variant="plum" onClick={split}>Split {fmt(monthlyTotal)} a month by ownership %</Button>}
+          {!canSplit && pctReady && (
+            <span className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="sp-total">Total monthly assessments for the building</label>
+              <input id="sp-total" inputMode="decimal" className={cn(INPUT, 'w-36')} placeholder="$ total a month" value={splitTotal} onChange={e => setSplitTotal(e.target.value)} />
+              <Button size="sm" variant="ghost" onClick={splitTyped}>Split by ownership %</Button>
+            </span>
+          )}
           {units.length > 0 && (
             <span className="flex items-center gap-2">
               <label className="sr-only" htmlFor="sp-same">Same monthly amount for each unit</label>
               <input id="sp-same" className={cn(INPUT, 'w-28')} placeholder="$ per unit" value={sameFee} onChange={e => setSameFee(e.target.value)} />
-              <Button size="sm" variant={canSplit ? 'ghost' : 'plum'} onClick={applySame}>Same for each</Button>
+              <Button size="sm" variant="ghost" onClick={applySame}>Same for each</Button>
             </span>
+          )}
+          {unassessed.length > 0 && (
+            <div className="basis-full" data-unit-fees>
+              <div className="mb-1.5 text-xs font-semibold text-ux2-muted">Or unit by unit</div>
+              <ul className="m-0 grid max-h-[360px] list-none grid-cols-1 gap-1.5 overflow-auto p-0 sm:grid-cols-2">
+                {unassessed.map(u => (
+                  <li key={u.number} className="flex items-center gap-2 rounded-xl border border-ux2-line bg-ux2-surface px-3 py-1.5 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate"><b className="font-semibold">{u.number}</b>{u.owner ? <span className="text-ux2-muted"> · {u.owner}</span> : null}{u.votingPct ? <span className="text-ux2-muted"> · {u.votingPct}%</span> : null}</span>
+                    <label className="flex items-center gap-1 text-xs text-ux2-muted">$
+                      <input inputMode="decimal" aria-label={`Monthly assessment for ${u.number}`} className="h-9 w-24 rounded-[10px] border border-ux2-line-strong bg-white px-2 text-sm text-ux2-ink" placeholder="a month"
+                        onBlur={e => { const n = Number(e.target.value.replace(/[$,\s]/g, '')); if (e.target.value.trim() && n > 0) f.updateUnit(u.number, { monthlyFee: n }); }}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </Gap>
         <Gap id="board" required done={s.ess.board} title="At least one board member" note="Usually found in the annual meeting minutes.">
