@@ -93,4 +93,8 @@ export const navigation: Record<Role, NavItem[]> = {
     { id: 'association-team', label: 'Association Team', path: '/association-team', icon: 'user-mgmt' },
     { id: 'archives', label: 'The Archives', path: '/archives', icon: 'archives' },
   ],
+  // Management-company users live in the Portfolio shell (/portfolio), not the tenant modules.
+  PM_COMPANY: [
+    { id: 'portfolio', label: 'Property Portfolio', path: '/portfolio', icon: 'dashboard' },
+  ],
 };

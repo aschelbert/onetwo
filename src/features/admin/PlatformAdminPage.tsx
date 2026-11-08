@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, FEATURE_GROUPS, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
-import { TIERS } from '@/lib/tiers';
+import { TIERS, type SubscriptionTier as BillingTier } from '@/lib/tiers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
@@ -23,6 +23,9 @@ const STATUS_BADGE: Record<string, string> = {
 };
 const TIER_BADGE: Record<string, string> = { compliance_pro: 'bg-accent-100 text-accent-700', community_plus: 'bg-ink-100 text-ink-600', management_suite: 'bg-sage-100 text-sage-700' };
 const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+// Legacy admin tiers -> billing tiers in lib/tiers (same monthly price). management_suite has no billing counterpart.
+const BILLING_TIER: Record<SubscriptionTier, BillingTier | null> = { compliance_pro: 'self_managed', community_plus: 'facilities', management_suite: null };
+const annualPrice = (tier: SubscriptionTier) => TIERS.find(t => t.id === BILLING_TIER[tier])?.annual ?? TIER_PRICES[tier] * 12;
 const TIER_LABELS: Record<string, string> = { compliance_pro: 'Compliance Pro', community_plus: 'Community Plus', management_suite: 'Management Suite' };
 const TIER_COLORS: Record<string, string> = { compliance_pro: '#c42030', community_plus: '#6b7280', management_suite: '#16a34a' };
 const FEATURE_LABELS: Record<string, string> = {
@@ -399,7 +402,7 @@ export default function PlatformAdminPage() {
                         <div className="flex items-baseline gap-2 mb-3">
                           <span className="text-2xl font-bold text-ink-900">{fmt(TIER_PRICES[tier])}</span>
                           <span className="text-sm text-ink-400">/mo</span>
-                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(TIERS.find(t => t.id === tier)?.annual ?? TIER_PRICES[tier] * 12)}/yr</span>
+                          <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(annualPrice(tier))}/yr</span>
                         </div>
                         <p className="text-xs text-ink-500">{count} tenancies · {TENANT_ROLES.length} roles</p>
                       </div>
