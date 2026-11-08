@@ -223,18 +223,20 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
   const create = useFinancialStore(s => s.createUnitInvoice);
   const [unit, setUnit] = useState(units[0]?.number ?? '');
   const [type, setType] = useState<UnitInvoice['type']>('fee');
+  const [fund, setFund] = useState<'reserve' | 'operating'>('reserve');
   const [amount, setAmount] = useState('');
   const [desc, setDesc] = useState('');
   const [due, setDue] = useState('');
   return (
     <form
       aria-label="New invoice"
-      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; create(unit, type, n, desc || 'Invoice', undefined, due || undefined); onClose(); }}
+      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; create(unit, type, n, desc || 'Invoice', undefined, due || undefined, type === 'special_assessment' ? { fund } : undefined); onClose(); }}
       className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
     >
       <div className="w-full text-sm font-semibold text-ux2-ink">New invoice · fee, assessment, repair or amenity</div>
       <Field label="Unit" className="w-[120px]"><select value={unit} onChange={e => setUnit(e.target.value)} className={INPUT}>{units.map(u => <option key={u.number} value={u.number}>{u.number} · {u.owner}</option>)}</select></Field>
       <Field label="Type" className="w-[170px]"><select value={type} onChange={e => setType(e.target.value as UnitInvoice['type'])} className={INPUT}><option value="fee">Fee or repair charge</option><option value="special_assessment">Special assessment</option><option value="amenity_fee">Amenity fee</option><option value="monthly">Dues</option></select></Field>
+      {type === 'special_assessment' && <Field label="For" className="w-[200px]"><select aria-label="Assessment fund" value={fund} onChange={e => setFund(e.target.value as 'reserve' | 'operating')} className={INPUT}><option value="reserve">A major repair · reserve fund</option><option value="operating">An operating shortfall</option></select></Field>}
       <Field label="Amount" className="w-[120px]"><input inputMode="decimal" placeholder="$" value={amount} onChange={e => setAmount(e.target.value)} className={INPUT} /></Field>
       <Field label="What for" className="min-w-[180px] flex-1"><input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Repair charge · door closer" className={INPUT} /></Field>
       <Field label="Due" className="w-[150px]"><input type="date" value={due} onChange={e => setDue(e.target.value)} className={INPUT} /></Field>
@@ -244,15 +246,17 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
 }
 
 function invoiceStatus(i: UnitInvoice, today: string) {
-  if (i.status === 'paid') return <Chip tone="sage">Paid{i.paidDate ? ` ${dayLabel(i.paidDate)}` : ''}{i.paymentMethod ? ` · ${isOnline(i.paymentMethod) ? 'autopay' : i.paymentMethod}` : ''}</Chip>;
-  if (i.status === 'overdue' || i.dueDate < today) { const d = Math.max(1, Math.round((Date.parse(today) - Date.parse(i.dueDate)) / 86400000)); return <Chip tone="red">Overdue · {d} d</Chip>; }
-  return <Chip tone="ghost">Open</Chip>;
+  if (i.status === 'paid') return <Chip tone="sage">Paid{i.paidDate ? ` ${dayLabel(i.paidDate)}` : ''}{i.paymentMethod ? ` · ${i.paymentMethod === 'credit' ? 'from credit' : isOnline(i.paymentMethod) ? 'online' : i.paymentMethod}` : ''}</Chip>;
+  const part = (i.paidAmount ?? 0) > 0 ? ` · ${fmt(i.paidAmount!)} paid` : '';
+  if (i.status === 'overdue' || i.dueDate < today) { const d = Math.max(1, Math.round((Date.parse(today) - Date.parse(i.dueDate)) / 86400000)); return <Chip tone="red">Overdue · {d} d{part}</Chip>; }
+  return <Chip tone={part ? 'amber' : 'ghost'}>{part ? `Part paid${part}` : 'Open'}</Chip>;
 }
 
 function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSnapshot; onLedger: () => void; creating: boolean; setCreating: (v: boolean) => void }) {
   const [filter, setFilter] = useState<InvoiceFilter>('all');
   const [all, setAll] = useState(false);
   const payUnitInvoice = useFinancialStore(s => s.payUnitInvoice);
+  const voidUnitInvoice = useFinancialStore(s => s.voidUnitInvoice);
   const month = snap.today.slice(0, 7);
   const live = useMemo(() => snap.unitInvoices.filter(i => i.status !== 'void').sort((a, b) => b.createdDate.localeCompare(a.createdDate)), [snap.unitInvoices]);
   const thisMonth = live.filter(i => i.createdDate.startsWith(month));
@@ -282,11 +286,11 @@ function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSn
                 <Td>{typeLabel[i.type]}<span className="text-ux2-muted"> · {i.description}</span></Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{dayLabel(i.createdDate)}</Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{i.dueDate ? dayLabel(i.dueDate) : '–'}</Td>
-                <Td num className="font-semibold">{fmt(i.amount)}</Td>
+                <Td num className="font-semibold">{fmt(i.amount)}{i.fund === 'operating' && i.type === 'special_assessment' ? <span className="block text-[11px] font-normal text-ux2-muted">operating</span> : null}</Td>
                 <Td>{invoiceStatus(i, snap.today)}</Td>
                 <Td num>
                   <RowMenu label={`More for ${i.id}`} items={[
-                    ...(i.status !== 'paid' ? [{ label: 'Record a payment', onSelect: () => payUnitInvoice(i.id, 'check') }] : []),
+                    ...(i.status !== 'paid' ? [{ label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
                     { label: 'Open the unit ledger', onSelect: onLedger },
                   ]} />
                 </Td>
@@ -295,7 +299,7 @@ function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSn
           </tbody>
         </Table>
       )}
-      <Why>Dues invoices are created by billing on the {ordinal(snap.hoaDueDay)}; fees, special assessments, repair charges and amenity bookings are created here or by their runbook. The row menu offers Record a payment and Open the unit ledger.</Why>
+      <Why>Dues invoices are created by the billing run on the 1st, due on the {ordinal(snap.hoaDueDay)}; fees, special assessments, repair charges and amenity bookings are created here or by their runbook. Every charge raises the unit's balance; a payment from the unit ledger settles dues first, then special assessments, then fees, oldest first. Cancelling a charge reverses it in the ledger; a paid charge is refunded under Online payments.</Why>
       {rows.length > 8 && <Button size="sm" variant="ghost" className="self-start" onClick={() => setAll(v => !v)}>{all ? 'Show fewer' : `Show the other ${rows.length - 8}`}</Button>}
     </Card>
   );

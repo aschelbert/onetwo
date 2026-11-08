@@ -16,6 +16,7 @@ import { fmt } from '@/lib/formatters';
 import { Button, Card, Cell, Chip, Inner, KV, PillTabs, RowMenu, SectionLabel, Table, Td, Th, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { behind, monthName, type FundsSnapshot } from '../metrics';
+import { fiscalYearStart, fundOf, type Fund } from '@/lib/ledger';
 
 const SENT_KEY = 'onetwo-ux2-packets-sent';
 const readSent = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem(SENT_KEY) || '{}'); } catch { return {}; } };
@@ -40,7 +41,12 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
   const getBalanceSheet = useFinancialStore(s => s.getBalanceSheet);
   const getIncomeStatement = useFinancialStore(s => s.getIncomeStatement);
   const getBudgetVariance = useFinancialStore(s => s.getBudgetVariance);
+  const getFundStatements = useFinancialStore(s => s.getFundStatements);
   const getAcctName = useFinancialStore(s => s.getAcctName);
+  const acctBalance = useFinancialStore(s => s.acctBalance);
+  const coa = useFinancialStore(s => s.chartOfAccounts);
+  const closedThrough = useFinancialStore(s => s.closedThrough);
+  const closeBooksThrough = useFinancialStore(s => s.closeBooksThrough);
   const ledger = useFinancialStore(s => s.generalLedger);
   const building = useBuildingStore();
   const addAnnouncement = useComplianceStore(s => s.addAnnouncement);
@@ -57,13 +63,20 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
   const thisYear = snap.today.slice(0, 4);
   const thisMonth = snap.today.slice(0, 7);
   const bs = getBalanceSheet() as { assets: Record<string, number>; liabilities: Record<string, number>; equity: Record<string, number> };
-  const is = getIncomeStatement(`${thisYear}-01-01`, snap.today) as IS;
+  const fyStart = fiscalYearStart(snap.today, building.details?.fiscalYearEnd || '12-31');
+  const fs = getFundStatements(fyStart, snap.today);
+  const is = getIncomeStatement(fyStart, snap.today) as IS;
   const variance = getBudgetVariance() as { id: string; name: string; budgeted: number; actual: number; variance: number; pct: number }[];
   const behindUnits = behind(snap);
   const receivable = (bs.assets.assessmentsAR ?? 0) + (bs.assets.specialAR ?? 0) + (bs.assets.lateFeesAR ?? 0) + (bs.assets.insuranceAR ?? 0);
-  const owns = (bs.assets.operating ?? 0) + (bs.assets.reserves ?? 0) + (bs.assets.pettyCash ?? 0) + receivable + (bs.assets.prepaid ?? 0);
-  const owes = (bs.liabilities.payable ?? 0) + (bs.liabilities.prepaidAssessments ?? 0) + (bs.liabilities.deposits ?? 0) + (bs.liabilities.accrued ?? 0);
-  const funds = (bs.equity.operatingFund ?? 0) + (bs.equity.reserveFund ?? 0) + (bs.equity.retained ?? 0);
+  const owns = fs.total.assets;
+  const owes = fs.total.liabilities;
+  const funds = fs.total.fundBalance;
+  // Every account with a balance, in its fund's column: the full balance sheet.
+  const byType = (type: 'asset' | 'liability') => coa.filter(a => a.parent && a.type === type).map(a => ({ a, bal: acctBalance(a.num), fund: fundOf(a) })).filter(x => Math.abs(x.bal) >= 0.005);
+  const col = (fund: Fund, x: { bal: number; fund: Fund }) => (x.fund === fund ? fmt(x.bal) : '');
+  const transferOut = Math.max(0, -fs.operating.period.transfersIn);
+  const priorEnd = (() => { const [y, m] = snap.today.split('-').map(Number); return new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10); })();
   const dues = lines(is.income).find(l => /dues|assessment/i.test(l.name));
   const billed = snap.unitInvoices.filter(i => i.type === 'monthly' && i.createdDate.startsWith(thisYear) && i.status !== 'void').reduce((t, i) => t + i.amount, 0);
   const stillOwed = behindUnits.reduce((t, b) => t + b.amount, 0);
@@ -106,7 +119,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
     const row = (l: Line) => `<tr><td>${l.num} ${esc(l.name)}</td><td align="right">${fmt(l.amount)}</td></tr>`;
     return `<!doctype html><meta charset="utf-8"><title>${esc(building.name)} · ${monthName(key, true)} statement packet</title><style>body{font:14px/1.5 system-ui;max-width:760px;margin:40px auto;color:#1A1F25}h1{font-size:22px}h2{font-size:15px;margin-top:28px}table{width:100%;border-collapse:collapse}td,th{padding:4px 6px;border-bottom:1px solid #E3E8EE;text-align:left}</style>
 <h1>${esc(building.name)} · ${monthName(key, true)} statement packet</h1><p>Balance sheet as of ${monthEnd(key)}, income statement for the month, budget variance year to date, and the month's ledger.</p>
-<h2>Balance sheet</h2><table><tr><td>Operating cash</td><td align="right">${fmt(bs.assets.operating ?? 0)}</td></tr><tr><td>Reserves</td><td align="right">${fmt(bs.assets.reserves ?? 0)}</td></tr><tr><td>Owed by owners</td><td align="right">${fmt(receivable)}</td></tr><tr><th>Total owns</th><th align="right">${fmt(owns)}</th></tr><tr><td>Bills awaiting payment</td><td align="right">${fmt(bs.liabilities.payable ?? 0)}</td></tr><tr><th>Total owes</th><th align="right">${fmt(owes)}</th></tr><tr><td>Operating fund</td><td align="right">${fmt(bs.equity.operatingFund ?? 0)}</td></tr><tr><td>Reserve fund</td><td align="right">${fmt(bs.equity.reserveFund ?? 0)}</td></tr><tr><th>Total fund balances</th><th align="right">${fmt(funds)}</th></tr></table>
+<h2>Balance sheet by fund</h2><table><tr><th></th><th align="right">Operating</th><th align="right">Reserve</th><th align="right">Total</th></tr><tr><td>Cash in the bank</td><td align="right">${fmt((bs.assets.operating ?? 0) + (bs.assets.pettyCash ?? 0))}</td><td align="right">${fmt(bs.assets.reserves ?? 0)}</td><td align="right">${fmt((bs.assets.operating ?? 0) + (bs.assets.pettyCash ?? 0) + (bs.assets.reserves ?? 0))}</td></tr><tr><td>Owed by owners</td><td align="right">${fmt(receivable - (bs.assets.specialAR ?? 0))}</td><td align="right">${fmt(bs.assets.specialAR ?? 0)}</td><td align="right">${fmt(receivable)}</td></tr><tr><th>Total owns</th><th align="right">${fmt(fs.operating.assets)}</th><th align="right">${fmt(fs.reserve.assets)}</th><th align="right">${fmt(owns)}</th></tr><tr><td>Bills awaiting payment</td><td align="right">${fmt(bs.liabilities.payable ?? 0)}</td><td></td><td align="right">${fmt(bs.liabilities.payable ?? 0)}</td></tr><tr><td>Dues paid ahead by owners</td><td align="right">${fmt(bs.liabilities.prepaidAssessments ?? 0)}</td><td></td><td align="right">${fmt(bs.liabilities.prepaidAssessments ?? 0)}</td></tr><tr><th>Total owes</th><th align="right">${fmt(fs.operating.liabilities)}</th><th align="right">${fmt(fs.reserve.liabilities)}</th><th align="right">${fmt(owes)}</th></tr><tr><td>Fund balance at the start of the year</td><td align="right">${fmt(fs.operating.openingBalance)}</td><td align="right">${fmt(fs.reserve.openingBalance)}</td><td align="right">${fmt(fs.total.openingBalance)}</td></tr><tr><td>Income less expenses this year</td><td align="right">${fmt(fs.operating.period.revenue - fs.operating.period.expenses)}</td><td align="right">${fmt(fs.reserve.period.revenue - fs.reserve.period.expenses)}</td><td align="right">${fmt(fs.total.period.revenue - fs.total.period.expenses)}</td></tr><tr><td>Moved between the funds</td><td align="right">${fmt(fs.operating.period.transfersIn)}</td><td align="right">${fmt(fs.reserve.period.transfersIn)}</td><td align="right">${fmt(fs.total.period.transfersIn)}</td></tr><tr><th>Fund balance today</th><th align="right">${fmt(fs.operating.fundBalance)}</th><th align="right">${fmt(fs.reserve.fundBalance)}</th><th align="right">${fmt(funds)}</th></tr></table>
 <h2>Income statement · ${monthName(key, true)}</h2><table>${lines(s.income).map(row).join('')}<tr><th>Total income</th><th align="right">${fmt(s.totalIncome)}</th></tr>${lines(s.expenses).map(row).join('')}<tr><th>Total expenses</th><th align="right">${fmt(s.totalExpenses)}</th></tr><tr><th>Net</th><th align="right">${fmt(s.netIncome)}</th></tr></table>
 <h2>Budget variance · year to date</h2><table><tr><th>Line</th><th align="right">Budget</th><th align="right">Actual</th><th align="right">Variance</th></tr>${variance.map(v => `<tr><td>${esc(v.name)}</td><td align="right">${fmt(v.budgeted)}</td><td align="right">${fmt(v.actual)}</td><td align="right">${fmt(v.variance)}</td></tr>`).join('')}</table>
 <h2>Ledger · ${entries.length} entries</h2><table><tr><th>Date</th><th>Memo</th><th>Debit</th><th>Credit</th><th align="right">Amount</th></tr>${entries.map(e => `<tr><td>${e.date}</td><td>${esc(e.memo)}</td><td>${e.debitAcct} ${esc(getAcctName(e.debitAcct))}</td><td>${e.creditAcct} ${esc(getAcctName(e.creditAcct))}</td><td align="right">${fmt(e.amount)}</td></tr>`).join('')}</table>`;
@@ -137,34 +150,43 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card aria-label="Balance sheet">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">What the building owns and owes</span><span className="text-xs text-ux2-muted">Balance sheet · as of {dayLabel(snap.today)}</span></div>
-          <Inner className="py-1">
-            <SectionLabel>Owns</SectionLabel>
-            <KV label={<>Operating cash <span className="text-ux2-muted">· 1010</span></>}>{fmt(bs.assets.operating ?? 0)}</KV>
-            <KV label={<>Reserves <span className="text-ux2-muted">· 1020</span></>}>{fmt(bs.assets.reserves ?? 0)}</KV>
-            <KV label={<>Owed by owners <span className="text-ux2-muted">· {behindUnits.length} unit{behindUnits.length === 1 ? '' : 's'}</span></>}>{fmt(receivable)}</KV>
-            {fullBs && <><KV label="Petty cash · 1030">{fmt(bs.assets.pettyCash ?? 0)}</KV><KV label="Prepaid expenses · 1200">{fmt(bs.assets.prepaid ?? 0)}</KV></>}
-            <KV label={<b>Total</b>}>{fmt(owns)}</KV>
-          </Inner>
-          <Inner className="py-1">
-            <SectionLabel>Owes</SectionLabel>
-            <KV label={<>Bills awaiting payment <span className="text-ux2-muted">· 2010</span></>}>{fmt(bs.liabilities.payable ?? 0)}</KV>
-            {fullBs && <><KV label="Prepaid assessments · 2020">{fmt(bs.liabilities.prepaidAssessments ?? 0)}</KV><KV label="Deposits held · 2030">{fmt(bs.liabilities.deposits ?? 0)}</KV><KV label="Accrued expenses · 2040">{fmt(bs.liabilities.accrued ?? 0)}</KV></>}
-            <KV label={<b>Total</b>}>{fmt(owes)}</KV>
-          </Inner>
-          <Inner className="py-1">
-            <SectionLabel>Fund balances</SectionLabel>
-            <KV label="Operating fund">{fmt(bs.equity.operatingFund ?? 0)}</KV>
-            <KV label="Reserve fund">{fmt(bs.equity.reserveFund ?? 0)}</KV>
-            {fullBs && <KV label="Retained surplus">{fmt(bs.equity.retained ?? 0)}</KV>}
-            <KV label={<b>Total</b>}>{fmt(funds)}</KV>
-          </Inner>
-          <div><Button size="sm" variant="ghost" onClick={() => setFullBs(v => !v)}>{fullBs ? 'Show the short balance sheet' : 'Open the full balance sheet'}</Button></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">What the building owns and owes</span><span className="text-xs text-ux2-muted">Balance sheet by fund · as of {dayLabel(snap.today)}</span></div>
+          <Table minWidth={480}>
+            <thead><tr><Th>&nbsp;</Th><Th num>Operating</Th><Th num>Reserve</Th><Th num>Total</Th></tr></thead>
+            <tbody>
+              <tr><Td colSpan={4}><SectionLabel>Owns</SectionLabel></Td></tr>
+              {fullBs ? byType('asset').map(x => <tr key={x.a.num}><Td>{x.a.name} <span className="text-ux2-muted">· {x.a.num}</span></Td><Td num>{col('operating', x)}</Td><Td num>{col('reserve', x)}</Td><Td num>{fmt(x.bal)}</Td></tr>) : (
+                <>
+                  <tr><Td>Cash in the bank</Td><Td num>{fmt((bs.assets.operating ?? 0) + (bs.assets.pettyCash ?? 0))}</Td><Td num>{fmt(bs.assets.reserves ?? 0)}</Td><Td num>{fmt((bs.assets.operating ?? 0) + (bs.assets.pettyCash ?? 0) + (bs.assets.reserves ?? 0))}</Td></tr>
+                  <tr><Td>Owed by owners <span className="text-ux2-muted">· {behindUnits.length} unit{behindUnits.length === 1 ? '' : 's'} behind</span></Td><Td num>{fmt(receivable - (bs.assets.specialAR ?? 0))}</Td><Td num>{fmt(bs.assets.specialAR ?? 0)}</Td><Td num>{fmt(receivable)}</Td></tr>
+                </>
+              )}
+              <tr><Td><b>Total owns</b></Td><Td num><b>{fmt(fs.operating.assets)}</b></Td><Td num><b>{fmt(fs.reserve.assets)}</b></Td><Td num><b>{fmt(owns)}</b></Td></tr>
+              <tr><Td colSpan={4}><SectionLabel>Owes</SectionLabel></Td></tr>
+              {fullBs ? byType('liability').map(x => <tr key={x.a.num}><Td>{x.a.name} <span className="text-ux2-muted">· {x.a.num}</span></Td><Td num>{col('operating', x)}</Td><Td num>{col('reserve', x)}</Td><Td num>{fmt(x.bal)}</Td></tr>) : (
+                <>
+                  <tr><Td>Bills awaiting payment</Td><Td num>{fmt(bs.liabilities.payable ?? 0)}</Td><Td num></Td><Td num>{fmt(bs.liabilities.payable ?? 0)}</Td></tr>
+                  <tr><Td>Dues paid ahead by owners</Td><Td num>{fmt(bs.liabilities.prepaidAssessments ?? 0)}</Td><Td num></Td><Td num>{fmt(bs.liabilities.prepaidAssessments ?? 0)}</Td></tr>
+                </>
+              )}
+              <tr><Td><b>Total owes</b></Td><Td num><b>{fmt(fs.operating.liabilities)}</b></Td><Td num><b>{fmt(fs.reserve.liabilities)}</b></Td><Td num><b>{fmt(owes)}</b></Td></tr>
+              <tr><Td colSpan={4}><SectionLabel>Fund balances · what is left after the bills</SectionLabel></Td></tr>
+              <tr><Td>At the start of the year</Td><Td num>{fmt(fs.operating.openingBalance)}</Td><Td num>{fmt(fs.reserve.openingBalance)}</Td><Td num>{fmt(fs.total.openingBalance)}</Td></tr>
+              <tr><Td>Income less expenses this year</Td><Td num>{fmt(fs.operating.period.revenue - fs.operating.period.expenses)}</Td><Td num>{fmt(fs.reserve.period.revenue - fs.reserve.period.expenses)}</Td><Td num>{fmt(fs.total.period.revenue - fs.total.period.expenses)}</Td></tr>
+              <tr><Td>Moved between the funds this year</Td><Td num>{fmt(fs.operating.period.transfersIn)}</Td><Td num>{fmt(fs.reserve.period.transfersIn)}</Td><Td num>{fmt(fs.total.period.transfersIn)}</Td></tr>
+              <tr><Td><b>Fund balance today</b></Td><Td num><b>{fmt(fs.operating.fundBalance)}</b></Td><Td num><b>{fmt(fs.reserve.fundBalance)}</b></Td><Td num><b>{fmt(funds)}</b></Td></tr>
+            </tbody>
+          </Table>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setFullBs(v => !v)}>{fullBs ? 'Show the short balance sheet' : 'Open the full balance sheet'}</Button>
+            <Chip tone={fs.total.ties ? 'sage' : 'red'}>{fs.total.ties ? 'Owns − owes = fund balances ✓' : 'Does not tie: an account is missing from the chart'}</Chip>
+          </div>
+          <Why>Two funds, as association accounting requires: the operating fund pays the bills, the reserve fund saves for major repairs. Money moved between them shows on its own line. Each fund's total owns less owes equals its fund balance, so the statement ties without a year-end close.</Why>
         </Card>
 
         <Card aria-label="Income statement">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">What came in and went out</span><span className="text-xs text-ux2-muted">Income statement · Jan 1 to {dayLabel(snap.today)}</span></div>
-          <div className="flex items-baseline gap-2"><span className={`font-display text-[34px] font-semibold leading-none tracking-[-0.02em] ${is.netIncome >= 0 ? 'text-ux2-sage' : 'text-ux2-red-ink'}`}>{is.netIncome >= 0 ? '+' : '−'}{fmt(Math.abs(is.netIncome))}</span><span className="text-sm text-ux2-muted">net income to date</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">What came in and went out</span><span className="text-xs text-ux2-muted">Income statement · this fiscal year to {dayLabel(snap.today)}</span></div>
+          <div className="flex items-baseline gap-2"><span className={`font-display text-[34px] font-semibold leading-none tracking-[-0.02em] ${is.netIncome >= 0 ? 'text-ux2-sage' : 'text-ux2-red-ink'}`}>{is.netIncome >= 0 ? '+' : '−'}{fmt(Math.abs(is.netIncome))}</span><span className="text-sm text-ux2-muted">income less expenses, both funds</span></div>
           {fullIs !== 'variance' ? (
             <>
               <Inner className="py-1">
@@ -175,8 +197,13 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
               <Inner className="py-1">
                 <SectionLabel>Expenses</SectionLabel>
                 {fullIs === 'full' ? lines(is.expenses).map(l => <KV key={l.num} label={l.name}>{fmt(l.amount)}</KV>) : <KV label={<>The {variance.length} budget lines</>}>{fmt(is.totalExpenses)}</KV>}
-                <KV label={<>Set aside for reserves <span className="text-ux2-muted">· {fmt(snap.annualReserveContribution / 12)} a month</span></>}>{fmt(Math.round(snap.annualReserveContribution / 12) * Number(thisMonth.slice(5, 7)))}</KV>
                 <KV label={<b>Total expenses</b>}>{fmt(is.totalExpenses)}</KV>
+              </Inner>
+              <Inner className="py-1">
+                <SectionLabel>Operating fund, after the reserve transfer</SectionLabel>
+                <KV label="Operating income less expenses">{fmt(fs.operating.period.revenue - fs.operating.period.expenses)}</KV>
+                <KV label={<>Moved to reserves <span className="text-ux2-muted">· not an expense; it stays the building's money</span></>}>{transferOut ? `(${fmt(transferOut)})` : fmt(0)}</KV>
+                <KV label={<b>Change in the operating fund</b>}>{fmt(fs.operating.period.net)}</KV>
               </Inner>
             </>
           ) : (
@@ -215,7 +242,11 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
         </Table>
         <div className="flex flex-wrap items-center justify-between gap-2">
           {months.length > 5 ? <Button size="sm" variant="ghost" onClick={() => setShowAllMonths(v => !v)}>{showAllMonths ? 'Show fewer' : `${months.length - 5} more`}</Button> : <span />}
-          <Why>Monthly income and expenses include the reserve set-aside. The packet posts to the Community notices when sent; owners can also pull it from their own statement. Bylaws: statements to owners within 15 days of close.</Why>
+          <span className="flex flex-wrap items-center gap-2">
+            <Chip tone={closedThrough ? 'navy' : 'ghost'}>{closedThrough ? `Books closed through ${dayLabel(closedThrough)}` : 'No month closed yet'}</Chip>
+            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(priorEnd); setNote(`Books closed through ${dayLabel(priorEnd)}. Entries on or before that date are locked; a correction posts as a reversal dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
+          </span>
+          <Why>The reserve transfer shows on its own line, not as an expense. The packet posts to the Community notices when sent; owners can also pull it from their own statement. Bylaws: statements to owners within 15 days of close. Closing a month locks it; a correction is a reversing entry dated today.</Why>
         </div>
       </Card>
 

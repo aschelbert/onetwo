@@ -223,15 +223,23 @@ export function budgetSummary(s: FundsSnapshot) {
   };
 }
 
-/** Reserve funding and the next big replacement. */
+/**
+ * Reserve funding and the next big replacement. "Funded" is the reserve
+ * fund's cash in the ledger; the per-component set-aside is the planning
+ * split of that cash, and whatever is not split is `unallocated`.
+ */
 export function reserveSummary(s: FundsSnapshot) {
   const needed = s.reserves.reduce((t, r) => t + r.estimatedCost, 0);
-  const funded = s.reserves.reduce((t, r) => t + r.currentFunding, 0);
+  const allocated = s.reserves.reduce((t, r) => t + r.currentFunding, 0);
+  const funded = Math.round(s.reservesCash * 100) / 100;
   const year = Number(s.today.slice(0, 4));
   const next = [...s.reserves].filter(r => !r.isContingency).sort((a, b) => a.yearsRemaining - b.yearsRemaining)[0];
   return {
     needed,
     funded,
+    allocated,
+    /** Reserve cash not yet split across the components (negative when the split claims more than the bank holds). */
+    unallocated: Math.round((funded - allocated) * 100) / 100,
     pct: needed > 0 ? Math.round((funded / needed) * 100) : 0,
     gap: Math.max(0, needed - funded),
     monthly: Math.round(s.annualReserveContribution / 12),

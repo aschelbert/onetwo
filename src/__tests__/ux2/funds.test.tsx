@@ -191,6 +191,10 @@ describe('Funds', () => {
     expect(document.querySelector('[aria-label="Monthly statement packets"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Taxes and filings"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Accountant access"]')).toBeTruthy();
+    // The balance sheet shows both funds and ties.
+    const bs = document.querySelector('[aria-label="Balance sheet"]') as HTMLElement;
+    expect(within(bs).getAllByRole('columnheader').map(h => h.textContent?.trim())).toEqual(['', 'Operating', 'Reserve', 'Total']);
+    expect(within(bs).getByText('Owns − owes = fund balances ✓')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Budget variance report' }));
     expect(within(document.querySelector('[aria-label="Income statement"]') as HTMLElement).getByText('Variance')).toBeTruthy();
     const send = screen.queryAllByRole('button', { name: 'Send to owners' })[0];
