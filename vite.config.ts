@@ -6,7 +6,7 @@ import path from 'path'
 
 // Routes that should serve app.html instead of index.html (marketing)
 const APP_ROUTES = [
-  '/login', '/reset-password', '/dashboard', '/home', '/setup', '/financial', '/funds', '/issues',
+  '/login', '/reset-password', '/dashboard', '/home', '/setup', '/obligations', '/financial', '/funds', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
   '/admin', '/portfolio', '/support', '/subscription', '/association-team', '/cases',

@@ -76,6 +76,8 @@ export interface Obligation {
   kind?: 'filing' | 'obligation';
   completed?: boolean;
   howToCount?: number;
+  /** The open case working through it, with how far along it is (checklist items, else steps). */
+  openCase?: { id: string; done: number; total: number };
 }
 
 export interface CaseStep {
@@ -252,14 +254,17 @@ export function generateCards(input: CardInput, ctx: CardContext): CardSet {
       kind: filing ? 'filing' : 'obligation',
       refId: o.id,
       title: o.task,
-      why: status === 'overdue' ? `${Math.abs(d)} days late · ${o.role}` : `Due ${o.due} · ${o.role}`,
+      why: `${status === 'overdue' ? `${Math.abs(d)} days late` : `Due ${o.due}`} · ${o.role}${o.openCase ? ' · in progress' : ''}`,
       due: o.due,
       daysLeft: d,
       status,
       roles: rolesForObligation(o.role),
       dimension: 'Compliance',
       points: o.critical ? 3 : 2,
-      action: { label: filing ? 'Mark filed' : 'Open the steps', path: `/boardroom?tab=runbook&item=${encodeURIComponent(o.id)}` },
+      // Start opens a case that walks through the steps; once open, the card picks up where it was left.
+      action: o.openCase
+        ? { label: `Continue · ${o.openCase.done} of ${o.openCase.total}`, path: `/issues?view=case:${encodeURIComponent(o.openCase.id)}` }
+        : { label: filing ? 'Start the filing' : 'Start', path: `/obligations/start?kind=${filing ? 'filing' : 'obligation'}&id=${encodeURIComponent(o.id)}` },
       priority: base + (d ?? 0) / 1000,
     });
   }

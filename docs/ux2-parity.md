@@ -97,6 +97,20 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   filed with proof inline), the duties view with the three duty cards, Who
   carries what, one card per officer, the Member at Large and Every unit
   owner cards. No embedded Governance Calendar or Duties page.
+  Start / Continue (board, every open row; also the action on Home's "Up
+  next" obligation and filing cards): Start goes to `/obligations/start`,
+  which opens the case that works through it and lands on its steps
+  (`ux2/runbook/obligationCases.ts`). An obligation that is a runbook the
+  case wizard has (annual meeting, election, board meetings, budget,
+  reserve study, financial review, 1120-H, fire and elevator inspections)
+  and every filing open that situation's main path; any other obligation
+  opens a case of its own how-to list as a checklist (each item with its
+  assists: where it's done, a tool, or a panel) and a step to record it.
+  One open case per obligation: after Start, the button says Continue · n
+  of m. Closing the case as Resolved marks the obligation done, or the
+  filing filed with the case as proof; closing it any other way leaves it
+  open. The cards used to link to `/boardroom?tab=runbook&item=…`, which
+  landed on the obligations list without the item.
 - **Contracts** · heading with Request bids / Add a vendor (inline), Needs
   you (Countersign opens the renewal inline; Turn on bids flips the runbook
   switch), vendors table with the bids switch, Bids and Paperwork on file

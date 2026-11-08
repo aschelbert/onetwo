@@ -44,6 +44,7 @@
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/home", "destination": "/app.html" },
     { "source": "/setup", "destination": "/app.html" },
+    { "source": "/obligations/:path*", "destination": "/app.html" },
     { "source": "/funds", "destination": "/app.html" },
     { "source": "/financial", "destination": "/app.html" },
     { "source": "/issues", "destination": "/app.html" },

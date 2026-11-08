@@ -2399,7 +2399,7 @@ interface IssuesState {
   addIssueComm: (issueId: string, comm: Omit<CaseComm, 'id'>) => void;
 
   // Case actions
-  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string; customSteps?: { s: string; t?: string; d?: string; detail?: string }[] }, tenantId?: string) => string;
+  createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string; customSteps?: { s: string; t?: string; d?: string; detail?: string; ck?: string[] }[] }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
@@ -2605,6 +2605,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         id: 's' + i, s: st.s, done: false, doneDate: null, userNotes: '',
         ...(st.t && { t: st.t }),
         ...(st.detail && { detail: st.detail }),
+        ...(st.ck && st.ck.length > 0 && { checks: hydrateChecks(st.ck) }),
       }));
     } else {
       const cat = CATS.find(x => x.id === data.catId);
