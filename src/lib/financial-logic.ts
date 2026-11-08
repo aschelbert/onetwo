@@ -57,6 +57,7 @@ export function computeAcctBalance(
   const isDebitNormal = acct.type === 'asset' || acct.type === 'expense';
   let bal = 0;
   generalLedger.forEach(e => {
+    if (e.status === 'void') return;
     if (e.debitAcct === acctNum) bal += e.amount;
     if (e.creditAcct === acctNum) bal -= e.amount;
   });

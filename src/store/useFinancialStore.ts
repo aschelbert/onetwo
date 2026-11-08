@@ -4,6 +4,7 @@ import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } from '@/lib/financial-logic';
+import { balanceOf, fiscalYearStart, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
@@ -53,7 +54,20 @@ interface FinancialState {
   setGlPage: (page: number) => void;
 
   // GL engine
+  /** Post one balanced entry. Throws LockedPeriodError when `date` falls in a closed period. */
   glPost: (date: string, memo: string, debitAcct: string, creditAcct: string, amount: number, source: GLEntry['source'], sourceId: string | null) => GLEntry;
+  /** Post the mirror of an entry: on its own date when that month is open, else dated today. Returns null when already reversed. */
+  reverseEntry: (id: string, reason: string, today?: string) => GLEntry | null;
+  /** Mark an entry void so it stops counting; only for entries in an open period. */
+  voidEntry: (id: string, reason?: string) => boolean;
+  /** The books are closed through this date; nothing posts on or before it. */
+  closedThrough: string | null;
+  /** Close the books through a date (must be before today), or pass null to reopen. */
+  closeBooksThrough: (date: string | null, today?: string) => void;
+  canPostOn: (date: string) => boolean;
+  /** Set which fund an account belongs to. */
+  setAcctFund: (num: string, fund: Fund | null) => void;
+  getFundStatements: (from?: string, to?: string) => ReturnType<typeof fundStatements>;
   seedGeneralLedger: () => void;
 
   // Account helpers
@@ -192,8 +206,11 @@ function syncSettings() {
     lateFeeEnabled: s.lateFeeEnabled,
     lateFeeAmount: s.lateFeeAmount,
     lateFeeGraceDays: s.lateFeeGraceDays,
+    closedThrough: s.closedThrough,
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
+
+const todayIso = () => new Date().toISOString().split('T')[0];
 
 /** Database rows have UUIDs. A budget line or reserve item added here keeps a local id until its insert returns. */
 const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -267,6 +284,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.lateFeeAmount = data.settings.lateFeeAmount;
       updates.lateFeeGraceDays = data.settings.lateFeeGraceDays;
       updates.lastLateFeeRun = data.settings.lastLateFeeRun;
+      updates.closedThrough = data.settings.closedThrough;
     }
     if (Object.keys(updates).length > 0) set(updates);
   },
@@ -278,6 +296,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   // ─── GL Engine ─────────────────────────────────────
   glPost: (date, memo, debitAcct, creditAcct, amount, source, sourceId) => {
     const state = get();
+    if (isLocked(date, state.closedThrough)) throw new LockedPeriodError(date, state.closedThrough!);
     const entry: GLEntry = {
       id: 'GL' + state.glNextId,
       date,
@@ -296,6 +315,52 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       if (tid) financialSvc.createGLEntry(tid, entry);
     }
     return entry;
+  },
+
+  reverseEntry: (id, reason, today = todayIso()) => {
+    const s = get();
+    const original = s.generalLedger.find(e => e.id === id);
+    if (!original || original.status === 'void' || reversalsOf(id, s.generalLedger).length > 0) return null;
+    const date = isLocked(original.date, s.closedThrough) ? today : original.date;
+    const r = reversalOf(original, date, reason);
+    return s.glPost(r.date, r.memo, r.debitAcct, r.creditAcct, r.amount, r.source, r.sourceId);
+  },
+
+  voidEntry: (id, reason) => {
+    const s = get();
+    const e = s.generalLedger.find(x => x.id === id);
+    if (!e || e.status === 'void' || isLocked(e.date, s.closedThrough)) return false;
+    set(st => ({ generalLedger: st.generalLedger.map(x => (x.id === id ? { ...x, status: 'void' as const } : x)) }));
+    if (isBackendEnabled) {
+      const tid = s.tenantId || getActiveTenantId();
+      if (tid) financialSvc.setGLEntryStatus(tid, id, 'void', reason).catch(err => console.error('[syncWrite] setGLEntryStatus failed:', err));
+    }
+    return true;
+  },
+
+  closedThrough: null,
+  closeBooksThrough: (date, today = todayIso()) => {
+    if (date !== null && date >= today) throw new Error('The books can only be closed through a day before today.');
+    set({ closedThrough: date });
+    syncSettings();
+  },
+  canPostOn: (date) => !isLocked(date, get().closedThrough),
+
+  setAcctFund: (num, fund) => {
+    set(s => ({ chartOfAccounts: s.chartOfAccounts.map(a => (a.num === num ? { ...a, fund: fund ?? undefined } : a)) }));
+    if (isBackendEnabled) {
+      const s = get();
+      const entry = s.chartOfAccounts.find(a => a.num === num);
+      const tid = s.tenantId || getActiveTenantId();
+      if (entry && tid) financialSvc.upsertCoAEntry(tid, entry);
+    }
+  },
+
+  getFundStatements: (from, to) => {
+    const s = get();
+    const end = to ?? todayIso();
+    const start = from ?? fiscalYearStart(end, useBuildingStore.getState().details?.fiscalYearEnd || '12-31');
+    return fundStatements(s.chartOfAccounts, s.generalLedger, start, end);
   },
 
   seedGeneralLedger: () => {
@@ -377,13 +442,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   acctBalance: (acctNum) => {
     const acct = get().chartOfAccounts.find((a) => a.num === acctNum);
     if (!acct) return 0;
-    const isDebitNormal = acct.type === 'asset' || acct.type === 'expense';
-    let bal = 0;
-    get().generalLedger.forEach((e) => {
-      if (e.debitAcct === acctNum) bal += e.amount;
-      if (e.creditAcct === acctNum) bal -= e.amount;
-    });
-    return isDebitNormal ? bal : -bal;
+    return balanceOf(acctNum, acct.type, get().generalLedger);
   },
 
   acctGroupBalance: (parentNum) => {
@@ -415,18 +474,27 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     };
     liabilities.total = liabilities.payable + liabilities.prepaidAssessments + liabilities.deposits + liabilities.accrued;
 
+    // Fund balances carry the result to date (revenue − expenses, plus transfers), so assets = liabilities + equity
+    // without a year-end close. `retained` is the 3030 account alone, kept out of the operating fund figure so
+    // operating + reserve + retained still adds to the total.
+    const { chartOfAccounts, generalLedger } = get();
+    const op = fundTotals('operating', chartOfAccounts, generalLedger);
+    const rs = fundTotals('reserve', chartOfAccounts, generalLedger);
+    const retained = acctBalance('3030');
     const equity = {
-      operatingFund: acctBalance('3010'), reserveFund: acctBalance('3020'),
-      retained: acctBalance('3030'), total: 0,
+      operatingFund: Math.round((op.fundBalance - retained) * 100) / 100, reserveFund: rs.fundBalance,
+      retained, total: 0,
+      /** Revenue less expenses to date across both funds, the part of equity not yet closed to a fund balance account. */
+      resultToDate: Math.round((op.revenue - op.expenses + rs.revenue - rs.expenses) * 100) / 100,
     };
-    equity.total = equity.operatingFund + equity.reserveFund + equity.retained;
+    equity.total = Math.round((op.fundBalance + rs.fundBalance) * 100) / 100;
 
-    return { assets, liabilities, equity };
+    return { assets, liabilities, equity, funds: { operating: op, reserve: rs } };
   },
 
   getIncomeStatement: (startDate, endDate) => {
     const { generalLedger, getAcctsByType } = get();
-    const entries = generalLedger.filter((e) => e.date >= startDate && e.date <= endDate);
+    const entries = generalLedger.filter((e) => e.status !== 'void' && e.date >= startDate && e.date <= endDate);
     const income: Record<string, { name: string; amount: number }> = {};
     const expenses: Record<string, { name: string; amount: number }> = {};
 
@@ -1028,6 +1096,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lateFeeAmount: state.lateFeeAmount,
     lateFeeGraceDays: state.lateFeeGraceDays,
     glAccountMapping: state.glAccountMapping,
+    closedThrough: state.closedThrough,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

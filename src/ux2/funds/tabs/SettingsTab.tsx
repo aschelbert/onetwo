@@ -70,10 +70,13 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   );
 }
 
-function QuickEntry({ kind, onDone, today }: { kind: QuickKind; onDone: () => void; today: string }) {
+function QuickEntry({ kind, onDone, today }: { kind: QuickKind; onDone: (note?: string) => void; today: string }) {
   const coa = useFinancialStore(s => s.chartOfAccounts);
   const postManual = useFinancialStore(s => s.postManualEntry);
   const postTransfer = useFinancialStore(s => s.postTransfer);
+  const canPostOn = useFinancialStore(s => s.canPostOn);
+  const closedThrough = useFinancialStore(s => s.closedThrough);
+  const [error, setError] = useState<string | null>(null);
   const accts = coa.filter(a => a.parent);
   const expense = accts.filter(a => a.type === 'expense');
   const income = accts.filter(a => a.type === 'income');
@@ -91,6 +94,7 @@ function QuickEntry({ kind, onDone, today }: { kind: QuickKind; onDone: () => vo
     e.preventDefault();
     const amt = Number(amount);
     if (!amt || amt <= 0) return;
+    if (!canPostOn(date)) { setError(`The books are closed through ${dayLabel(closedThrough!)}. Date this entry today; the memo can name the month it belongs to.`); return; }
     const memo = who.trim() || label;
     if (kind === 'vendor') postManual(date, memo, acct, '1010', amt);
     else if (kind === 'refund') postManual(date, memo, '1010', acct, amt);
@@ -107,8 +111,9 @@ function QuickEntry({ kind, onDone, today }: { kind: QuickKind; onDone: () => vo
       <Field label={kind === 'custom' ? 'Memo' : 'Who, and why'} className="min-w-[220px] flex-1"><input aria-label="Who and why" value={who} onChange={e => setWho(e.target.value)} placeholder={kind === 'vendor' ? 'Heating Co · boiler service' : kind === 'toReserves' ? 'November reserve contribution' : label} className={INPUT} /></Field>
       {needsAcct && <Field label={kind === 'vendor' ? 'Expense line' : 'Refunded from'} className="w-[220px]"><select aria-label="Account" value={acct} onChange={e => setAcct(e.target.value)} className={INPUT}>{expense.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></Field>}
       {kind === 'custom' && <><Field label="Debit" className="w-[220px]"><select aria-label="Debit account" value={debit} onChange={e => setDebit(e.target.value)} className={INPUT}>{accts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></Field><Field label="Credit" className="w-[220px]"><select aria-label="Credit account" value={credit} onChange={e => setCredit(e.target.value)} className={INPUT}>{accts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></Field></>}
-      <Field label="Date" className="w-[160px]"><input type="date" aria-label="Date" value={date} onChange={e => setDate(e.target.value)} className={INPUT} /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm">Post</Button><Button type="button" size="sm" variant="ghost" onClick={onDone}>Cancel</Button></div>
+      <Field label="Date" className="w-[160px]"><input type="date" aria-label="Date" value={date} onChange={e => { setDate(e.target.value); setError(null); }} className={INPUT} /></Field>
+      <div className="flex gap-2"><Button type="submit" size="sm">Post</Button><Button type="button" size="sm" variant="ghost" onClick={() => onDone('cancel')}>Cancel</Button></div>
+      {error &&<div role="alert" className="basis-full text-xs font-semibold text-ux2-red-ink">{error}</div>}
       <Why className="basis-full">{kind === 'custom' ? 'Both sides are shown and must balance.' : `${label}: the two accounts are picked for you${kind === 'vendor' ? ' (the expense line and operating cash)' : kind === 'toReserves' || kind === 'fromReserves' ? ' (operating cash and reserves)' : ''}.`}</Why>
     </form>
   );
@@ -124,6 +129,9 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
   const updateCoAAccount = useFinancialStore(s => s.updateCoAAccount);
   const mapping = useFinancialStore(s => s.glAccountMapping);
   const setMapping = useFinancialStore(s => s.setGlAccountMapping);
+  const closedThrough = useFinancialStore(s => s.closedThrough);
+  const closeBooksThrough = useFinancialStore(s => s.closeBooksThrough);
+  const reverseEntry = useFinancialStore(s => s.reverseEntry);
   const budgetCategories = useFinancialStore(s => s.budgetCategories);
   const fees = useFeeScheduleStore(s => s.fees);
   const updateFee = useFeeScheduleStore(s => s.updateFee);
@@ -160,8 +168,9 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   }, [ledger, view, thisMonth, q, getAcctName]);
   const visible = older ? entries : entries.slice(0, 8);
-  const lastClosedMonth = useMemo(() => { const m = new Date(`${snap.today}T00:00:00`); m.setMonth(m.getMonth() - 1); return m.toISOString().slice(0, 7); }, [snap.today]);
-  const closedEntries = ledger.filter(e => e.date < `${thisMonth}-01`).length;
+  const priorEnd = useMemo(() => { const [y, m] = snap.today.split('-').map(Number); return new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10); }, [snap.today]);
+  const closedEntries = closedThrough ? ledger.filter(e => e.date <= closedThrough).length : 0;
+  const locked = (date: string) => !!closedThrough && date <= closedThrough;
 
   const tiers = useMemo(() => { const m = new Map<number, number>(); snap.units.forEach(u => m.set(u.monthlyFee, (m.get(u.monthlyFee) ?? 0) + 1)); return Array.from(m.entries()).sort((a, b) => a[0] - b[0]); }, [snap.units]);
   const lineMaps = budgetCategories.map(c => ({ name: c.name, acct: coa.find(a => a.budgetCat === c.id) }));
@@ -183,6 +192,11 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       <Card id="ledger-card" aria-label="Ledger">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><span className="text-[17px] font-semibold text-ux2-ink">Ledger</span><span className="ml-2 text-xs text-ux2-muted">{ledger.length.toLocaleString()} entries · {closedEntries.toLocaleString()} in closed months · every bill, payment and transfer ends up here</span></div>
+          <span className="flex flex-wrap items-center gap-2" aria-label="Books closed through">
+            <Chip tone={closedThrough ? 'navy' : 'ghost'}>{closedThrough ? `Closed through ${dayLabel(closedThrough)}` : 'No month closed yet'}</Chip>
+            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(priorEnd); setNote(`Books closed through ${dayLabel(priorEnd)}. Entries on or before that date are locked; a correction posts dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
+            {closedThrough && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(null); setNote('Books reopened. Every month can be posted to again.'); }}>Reopen</Button>}
+          </span>
         </div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <PillTabs size="filter" surface="white" aria-label="Ledger views" value={view} onChange={setView} tabs={[{ id: 'month', label: dayLabel(`${thisMonth}-01`).replace(/ \d+$/, '') }, { id: 'payments', label: 'Payments' }, { id: 'bills', label: 'Bills' }, { id: 'transfers', label: 'Transfers' }, { id: 'manual', label: 'By hand' }, { id: 'all', label: 'All accounts' }]} />
@@ -191,14 +205,14 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
         <div className="flex flex-col gap-1.5">
           <SectionLabel>Quick entries</SectionLabel>
           <div className="flex flex-wrap gap-1.5">{QUICK.map(k => <button key={k.id} type="button" onClick={() => setQuick(v => (v === k.id ? null : k.id))} className={`h-9 rounded-full border px-3.5 text-xs font-semibold ${quick === k.id ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink hover:bg-ux2-surface'}`}>{k.label}</button>)}</div>
-          {quick && <QuickEntry kind={quick} today={snap.today} onDone={() => { setQuick(null); setNote('Posted. Entries in a closed month are locked; a correction is a new entry dated today.'); }} />}
+          {quick && <QuickEntry kind={quick} today={snap.today} onDone={(n) => { setQuick(null); if (n !== 'cancel') setNote('Posted. Entries in a closed month are locked; a correction is a new entry dated today.'); }} />}
           <Why>A quick entry asks only for the amount, who, and why; it picks the two accounts for you. Custom entry shows both sides and must balance.</Why>
         </div>
         <Table minWidth={900}>
           <thead><tr><Th>Date</Th><Th>What</Th><Th>Accounts</Th><Th num>Amount</Th><Th>Source</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
           <tbody>
             {visible.map(e => {
-              const locked = e.date < `${thisMonth}-01`;
+              const isLockedEntry = locked(e.date);
               return (
                 <tr key={e.id} data-entry={e.id}>
                   <Td>{dayLabel(e.date)}</Td>
@@ -206,8 +220,8 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
                   <Td><span className="text-ux2-ink">{e.debitAcct} {getAcctName(e.debitAcct)}</span> <span className="text-ux2-muted">←</span> <span className="text-ux2-ink">{e.creditAcct} {getAcctName(e.creditAcct)}</span></Td>
                   <Td num>{fmt(e.amount)}</Td>
                   <Td>{SOURCE_LABEL[e.source] ?? e.source}</Td>
-                  <Td><Chip tone={locked ? 'navy' : 'sage'}>{locked ? 'Locked' : 'Posted'}</Chip></Td>
-                  <Td num><RowMenu label={`Actions for ${e.id}`} items={[...(e.source === 'expense' || e.source === 'payroll' ? [{ label: 'Open the bill', onSelect: () => onGo?.('expenses', 'bills') }] : []), ...(e.source === 'payment' || e.source === 'fee' || e.source === 'assessment' || e.source === 'refund' ? [{ label: 'Open the unit', onSelect: () => onGo?.('income', 'ledger') }] : []), { label: `Entries on ${e.debitAcct}`, onSelect: () => { setView('all'); setQ(getAcctName(e.debitAcct)); } }, ...(locked ? [] : [{ label: 'Reverse with a new entry', onSelect: () => setQuick('custom') }])]} /></Td>
+                  <Td><Chip tone={isLockedEntry ? 'navy' : 'sage'}>{isLockedEntry ? 'Locked' : 'Posted'}</Chip></Td>
+                  <Td num><RowMenu label={`Actions for ${e.id}`} items={[...(e.source === 'expense' || e.source === 'payroll' ? [{ label: 'Open the bill', onSelect: () => onGo?.('expenses', 'bills') }] : []), ...(e.source === 'payment' || e.source === 'fee' || e.source === 'assessment' || e.source === 'refund' ? [{ label: 'Open the unit', onSelect: () => onGo?.('income', 'ledger') }] : []), { label: `Entries on ${e.debitAcct}`, onSelect: () => { setView('all'); setQ(getAcctName(e.debitAcct)); } }, { label: isLockedEntry ? 'Reverse with an entry dated today' : 'Reverse this entry', onSelect: () => { const r = reverseEntry(e.id, 'Reversed from the ledger'); setNote(r ? `${e.id} reversed by ${r.id}${isLockedEntry ? ', dated today because that month is closed' : ''}.` : `${e.id} was already reversed.`); } }]} /></Td>
                 </tr>
               );
             })}
@@ -216,7 +230,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
         </Table>
         <div className="flex flex-wrap items-center justify-between gap-2">
           {entries.length > 8 ? <Button size="sm" variant="ghost" onClick={() => setOlder(v => !v)}>{older ? 'Show fewer' : `Older entries · ${(entries.length - 8).toLocaleString()}`}</Button> : <span />}
-          <Why>Entries in a closed month ({dayLabel(`${lastClosedMonth}-01`).replace(/ \d+$/, '')} and earlier) are locked; a correction is a new entry dated today. The row menu opens the bill, the unit, or the account behind an entry. Stripe fees are recorded with each payout.</Why>
+          <Why>{closedThrough ? `Entries dated ${dayLabel(closedThrough)} or earlier are locked; a correction is a reversing entry dated today.` : 'No month is closed yet, so any entry can still be reversed on its own date. Close a month once its packet is out.'} The row menu opens the bill, the unit, or the account behind an entry, or reverses it. Stripe fees are recorded with each payout.</Why>
         </div>
       </Card>
 

@@ -25,6 +25,9 @@ export interface ReserveItem {
   isContingency: boolean;
 }
 
+/** The two funds an association keeps (ASC 972): day-to-day money, and money set aside for major repairs and replacements. */
+export type Fund = 'operating' | 'reserve';
+
 export interface ChartOfAccountsEntry {
   num: string;
   name: string;
@@ -33,6 +36,8 @@ export interface ChartOfAccountsEntry {
   parent: string | null;
   budgetCat?: string;
   reserveItem?: string;
+  /** Which fund the account belongs to; unset means the default for its code (see `fundOf`). */
+  fund?: Fund;
 }
 
 export interface GLEntry {

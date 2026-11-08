@@ -181,6 +181,7 @@ export function rowToCoA(r: Record<string, unknown>): ChartOfAccountsEntry {
     parent: (r.parent as string) || null,
     budgetCat: (r.budget_cat as string) || undefined,
     reserveItem: (r.reserve_item as string) || undefined,
+    fund: (r.fund as ChartOfAccountsEntry['fund']) || undefined,
   };
 }
 
@@ -200,7 +201,7 @@ export async function upsertCoAEntry(tenantId: string, entry: ChartOfAccountsEnt
   const { error } = await supabase.from('chart_of_accounts').upsert({
     tenant_id: tenantId, num: entry.num, name: entry.name, type: entry.type,
     sub: entry.sub, parent: entry.parent, budget_cat: entry.budgetCat || null,
-    reserve_item: entry.reserveItem || null,
+    reserve_item: entry.reserveItem || null, fund: entry.fund || null,
   }, { onConflict: 'tenant_id,num' });
   if (error) { logDbError('upsertCoAEntry error:', error); return false; }
   return true;
@@ -249,6 +250,16 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
     source: entry.source, source_id: entry.sourceId, posted: entry.posted, status: entry.status,
   });
   if (error) { logDbError('createGLEntry error:', error); return false; }
+  return true;
+}
+
+/** Mark an entry void (it stops counting everywhere) or posted again. */
+export async function setGLEntryStatus(tenantId: string, localId: string, status: GLEntry['status'], reason?: string): Promise<boolean> {
+  if (!supabase) return false;
+  const row: Record<string, unknown> = { status };
+  if (reason !== undefined) row.reason = reason;
+  const { error } = await supabase.from('general_ledger').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  if (error) { logDbError('setGLEntryStatus error:', error); return false; }
   return true;
 }
 
@@ -412,6 +423,8 @@ export interface FinancialSettingsRow {
   lateFeeAmount: number;
   lateFeeGraceDays: number;
   lastLateFeeRun: string | null;
+  /** The books are closed through this date (YYYY-MM-DD); nothing posts on or before it. */
+  closedThrough: string | null;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -434,6 +447,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     lateFeeAmount: Number(data.late_fee_amount ?? 25),
     lateFeeGraceDays: Number(data.late_fee_grace_days ?? 15),
     lastLateFeeRun: (data.last_late_fee_run as string) || null,
+    closedThrough: (data.closed_through as string) || null,
   };
 }
 
@@ -450,6 +464,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.lateFeeAmount !== undefined) row.late_fee_amount = s.lateFeeAmount;
   if (s.lateFeeGraceDays !== undefined) row.late_fee_grace_days = s.lateFeeGraceDays;
   if (s.lastLateFeeRun !== undefined) row.last_late_fee_run = s.lastLateFeeRun;
+  if (s.closedThrough !== undefined) row.closed_through = s.closedThrough;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
