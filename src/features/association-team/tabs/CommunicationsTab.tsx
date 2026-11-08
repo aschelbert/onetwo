@@ -239,8 +239,9 @@ export default function CommunicationsTab() {
 
   // ─── Realtime ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!supabase || !activeChannelId) return;
-    const channel = supabase
+    const sb = supabase;
+    if (!sb || !activeChannelId) return;
+    const channel = sb
       .channel(`team-msgs-${activeChannelId}`)
       .on('postgres_changes', {
         event: 'INSERT',
@@ -258,7 +259,7 @@ export default function CommunicationsTab() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { sb.removeChannel(channel); };
   }, [activeChannelId, tenantUserId, markAsRead, fetchUnreadCounts]);
 
   // ─── Auto-scroll ──────────────────────────────────────────────
