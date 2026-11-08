@@ -219,6 +219,9 @@ const RULES: Rule[] = [
   { name: 'resale-certificate', re: /mytax|certificate of resale|resale certificate|certificate request/i, assists: [ext(EXT.mytax, 'MyTax.DC.gov'), T.upload] },
   { name: 'filing', re: /filing|biennial|annual report|registration|dlcp|dcra|corporate|good standing|registered agent|articles of incorporation|record(ing)? (the |a )?(lien|amendment|document)|recorder of deeds|recording (cover|fee)/i,
     assists: c => /recorder|record(ing)? (the |a )?(lien|amendment|document)|recording/i.test(c.step + ' ') ? [P.filings, ext(EXT.recorder, 'DC Recorder of Deeds')] : [P.filings, ext(EXT.dlcp, 'DC Licensing (DLCP)')] },
+  // Before inspections, which also match "fire": a fire drill or exit is an evacuation item.
+  { name: 'evacuation', re: /evacuat|assembly (point|area)|muster|egress|exit (route|sign|map|plan)|escape route|emergency (exit|route|plan|preparedness|procedure)|fire (drill|exit|escape)|shelter[- ]in[- ]place|stairwell/i,
+    assists: [panel('documents', 'Review the floor plans on file'), tool('send-comm', 'Post the routes to residents')] },
   { name: 'inspection', re: /inspect|elevator|boiler|fire|sprinkler|alarm|backflow|extinguisher|structural|facade|fa[cç]ade|roof|hvac|plumbing|electrical|equipment|asset|mold|asbestos|lead\b|radon|water (damage|intrusion|leak)|leak|crack|foundation|balcon|garage|pool|safety (equipment|hazard|issue)|hazard|condition (assessment|report)|poor condition/i,
     assists: [P.assets, route(ROUTES.obligations, 'Open Building › Obligations')] },
 
