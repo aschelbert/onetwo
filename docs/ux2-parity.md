@@ -161,6 +161,13 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   Permissions matrix. Live tenants read `tenant_users` and `invitations`
   and send through `send-invite`; demo tenants use the auth store. No
   embedded User Management page.
+  Link to unit (row menu, the board): picks one of the building's units for a
+  member, or clears it, through `set_member_unit` (migration 040), which
+  checks the caller is on the building's board and the unit exists. A member
+  with no unit is linked automatically when their sign-in email is the owner
+  email on exactly one unit, when they join, when a unit's owner email is
+  saved, and once for existing members (040); an owner of several units is
+  left for the board to pick.
 - **Subscription** · Plan / Add-ons (toggles) / Billing (interval pills,
   Portal) tiles, Plans (Move up / down), Invoices table, Who can change
   this, Cancel (type the building's name). Live tenants call
