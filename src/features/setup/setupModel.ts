@@ -271,15 +271,23 @@ export interface Decision { status: 'accepted' | 'skipped'; picks?: Record<strin
 export function resolve(item: Item, picks?: Record<string, number>, edits?: Record<string, FieldScalar>): Record<string, FieldScalar> {
   const out: Record<string, FieldScalar> = {};
   for (const [f, vals] of Object.entries(item.fields)) out[f] = edits?.[f] ?? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].value;
+  // Values the person added that no document had (a unit's monthly amount).
+  for (const [f, v] of Object.entries(edits ?? {})) if (!(f in out) && v !== '') out[f] = v;
   return out;
 }
+
+/** A unit with no monthly assessment from any document. */
+export const missingFee = (it: Item) => it.section === 'units' && !it.fields.monthlyFee;
 
 /** An item that can go in with the bulk accept: one value per field and nothing read with low confidence. */
 export const isClear = (it: Item) => it.conflicts.length === 0 && !it.lowConfidence;
 
 /** One line that says what an item holds. */
-export function itemSummary(it: Item, picks?: Record<string, number>): string {
-  const v = (f: string) => { const vals = it.fields[f]; return vals ? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].display : null; };
+export function itemSummary(it: Item, picks?: Record<string, number>, edits?: Record<string, FieldScalar>): string {
+  const v = (f: string) => {
+    if (edits?.[f] !== undefined && edits[f] !== '') return displayOf(f, edits[f]);
+    const vals = it.fields[f]; return vals ? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].display : null;
+  };
   switch (it.section) {
     case 'units': return [v('owner'), v('ownershipPct'), v('monthlyFee') && `${v('monthlyFee')} a month`].filter(Boolean).join(' · ');
     case 'board': return [v('role'), v('email'), v('termEnds') && `term ends ${v('termEnds')}`].filter(Boolean).join(' · ');

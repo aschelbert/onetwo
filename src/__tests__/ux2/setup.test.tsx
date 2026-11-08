@@ -364,6 +364,45 @@ describe('Setup screens', () => {
     expect(parseUnitLines('Unit,Owner,% Interest\n2A,Shah Priya,4.1%').units).toEqual([{ number: '2A', owner: 'Shah Priya', email: '', votingPct: 4.1, monthlyFee: null }]);
   });
 
+  it('asks for a monthly amount for each unit that has none, in review and in Fill the gaps', () => {
+    useSetupStore.setState({ docs: [bylaws] }); // bylaws give 1A and 1B their ownership % but no monthly amounts
+    renderSetup('/setup?step=review');
+    expect(screen.getByText(/2 of these units have no monthly amount/)).toBeTruthy();
+    const a = document.querySelector('[data-setup-item="unit:1a"]') as HTMLElement;
+    expect(within(a).getByText('No monthly amount')).toBeTruthy();
+    fireEvent.change(within(a).getByLabelText('Monthly assessment for Unit 1A'), { target: { value: '$412.50' } });
+    fireEvent.click(within(a).getByRole('button', { name: 'Accept' }));
+    expect(useFinancialStore.getState().units.find(u => u.number === '1A')).toMatchObject({ votingPct: 50, monthlyFee: 412.5 });
+    expect(document.querySelector('[data-setup-item="unit:1a"]')?.textContent).toMatch(/50% · \$412.5 a month/);
+    const b = document.querySelector('[data-setup-item="unit:1b"]') as HTMLElement;
+    fireEvent.click(within(b).getByRole('button', { name: 'Accept' }));
+    expect(useFinancialStore.getState().units.find(u => u.number === '1B')?.monthlyFee).toBe(0);
+  });
+
+  it('keeps a monthly amount typed into a unit when the matching units are accepted together', () => {
+    const third: SetupDoc = { ...bylaws, id: 'd9', result: { ...bylaws.result!, facts: [], units: [...bylaws.result!.units, { ...bylaws.result!.units[0], unit: '1C' }] } };
+    useSetupStore.setState({ docs: [third] });
+    renderSetup('/setup?step=review');
+    fireEvent.change(screen.getByLabelText('Monthly assessment for Unit 1B'), { target: { value: '300' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept the 3 that match' }));
+    const fee = (n: string) => useFinancialStore.getState().units.find(u => u.number === n)?.monthlyFee;
+    expect([fee('1A'), fee('1B'), fee('1C')]).toEqual([0, 300, 0]);
+  });
+
+  it('sets the missing monthly amounts unit by unit, or splits a typed total by ownership %', () => {
+    const unit = (number: string, votingPct: number, monthlyFee = 0) => ({ number, owner: '', email: '', phone: '', monthlyFee, votingPct, status: 'ACTIVE' as const, balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] });
+    useFinancialStore.setState({ units: [unit('1A', 60), unit('1B', 40)] });
+    renderSetup('/setup?step=finish');
+    const gap = document.querySelector('[data-gap="assessment"]') as HTMLElement;
+    const fee1a = within(gap).getByLabelText('Monthly assessment for 1A');
+    fireEvent.change(fee1a, { target: { value: '500' } });
+    fireEvent.blur(fee1a);
+    expect(useFinancialStore.getState().units.find(u => u.number === '1A')?.monthlyFee).toBe(500);
+    fireEvent.change(within(gap).getByLabelText('Total monthly assessments for the building'), { target: { value: '$1,000' } });
+    fireEvent.click(within(gap).getByRole('button', { name: 'Split by ownership %' }));
+    expect(useFinancialStore.getState().units.map(u => u.monthlyFee)).toEqual([600, 400]);
+  });
+
   it('reads pasted invite lists and sends each person with their role, seat and unit', () => {
     const { invites, skipped } = parseInviteLines('4B  Ana Rivera  ana@example.com\nbo@example.com, vice president\nsam@example.com super\njust a name', ['4B', '12']);
     expect(invites.map(i => [i.email, i.access, i.seat, i.unit])).toEqual([['ana@example.com', 'owner', null, '4B'], ['bo@example.com', 'board', 'vice_president', null], ['sam@example.com', 'staff', null, null]]);
