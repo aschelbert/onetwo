@@ -11,6 +11,7 @@ import MailingSettingsTab from '@/features/building/tabs/MailingSettingsTab';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
+import { PAYMENT_ORDER_LABEL, type PaymentOrder } from '@/lib/financial-logic';
 import type { GLEntry } from '@/types/financial';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, SearchInput, SectionLabel, Table, Td, Th, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -45,6 +46,8 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const runLateFees = useFinancialStore(s => s.runLateFees);
   const autoReserveTransfer = useFinancialStore(s => s.autoReserveTransfer);
   const setAutoReserveTransfer = useFinancialStore(s => s.setAutoReserveTransfer);
+  const paymentOrder = useFinancialStore(s => s.paymentOrder);
+  const setPaymentOrder = useFinancialStore(s => s.setPaymentOrder);
   const [day, setDay] = useState(String(snap.hoaDueDay));
   const [amount, setAmount] = useState(String(snap.lateFee.amount));
   const [grace, setGrace] = useState(String(snap.lateFee.graceDays));
@@ -57,7 +60,7 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   };
   return (
     <Card id="billing-rules" aria-label="Billing rules">
-      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Billing rules</span><span className="flex items-center gap-2"><span className="text-xs text-ux2-muted">runs when a board member opens the app</span><Button size="sm" variant="ghost" onClick={runNow}>Run billing now</Button></span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Billing rules</span><span className="flex items-center gap-2"><span className="text-xs text-ux2-muted">runs every morning, and when a board member opens the app</span><Button size="sm" variant="ghost" onClick={runNow}>Run billing now</Button></span></div>
       {ran && <Inner className="flex items-center justify-between gap-3 text-sm text-ux2-ink" role="status"><span>{ran}</span><button type="button" className="text-xs text-ux2-muted hover:underline" onClick={() => setRan(null)}>Dismiss</button></Inner>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Inner className="flex flex-col gap-2">
@@ -80,6 +83,10 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
           <div className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => setLateFeeSettings(true, Number(amount) || 0, Number(grace) || 0)}>Save and turn on</Button>{snap.lateFee.enabled && <Button size="sm" variant="ghost" onClick={() => setLateFeeSettings(false, snap.lateFee.amount, snap.lateFee.graceDays)}>Turn off</Button>}</div>
         </Inner>
       </div>
+      <Inner className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0"><div className="text-sm font-semibold text-ux2-ink">A payment goes to: {PAYMENT_ORDER_LABEL[paymentOrder].toLowerCase()}</div><p className="m-0 text-xs text-ux2-muted">Oldest due first within each kind. Dues first is what most collection policies (and several state laws) require; oldest first treats every charge the same.</p></div>
+        <label className="flex items-center gap-2 text-xs text-ux2-muted">Order<select aria-label="Payment order" value={paymentOrder} onChange={e => setPaymentOrder(e.target.value as PaymentOrder)} className={`${INPUT} !h-9 !w-[300px]`}>{(Object.keys(PAYMENT_ORDER_LABEL) as PaymentOrder[]).map(k => <option key={k} value={k}>{PAYMENT_ORDER_LABEL[k]}</option>)}</select></label>
+      </Inner>
     </Card>
   );
 }

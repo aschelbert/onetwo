@@ -1,10 +1,11 @@
 /**
  * Runs the billing cycle when a board member or manager opens the app: this
  * month's dues if billing is on and they are not billed yet, then late fees
- * on dues past their grace period. Once per day per browser; the store's
- * own guards (one dues invoice per unit and month, one fee per dues
- * invoice) make a second run harmless anyway. There is no scheduled job in
- * this stack yet, so this is where "runs on its own" happens.
+ * on dues past their grace period. Once per day per browser. The database
+ * runs the same cycle every morning (run_billing_cycle_all, migration 046);
+ * this is the fallback for a day the job has not reached yet, and the
+ * store's guards (one dues invoice per unit and month, one fee per dues
+ * invoice, one transfer per month) make a second run harmless.
  */
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';

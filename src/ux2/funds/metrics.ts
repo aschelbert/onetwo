@@ -46,6 +46,8 @@ export interface FundsSnapshot {
   stripeOnboardingComplete: boolean;
   /** This year's operating spend by month (Jan first), from the budget lines' expenses. */
   spendByMonth?: number[];
+  /** First day of the current fiscal year (calendar year when absent). */
+  fiscalYearStart?: string;
 }
 
 export const ONLINE_METHODS = ['stripe', 'card', 'online'];
@@ -209,7 +211,9 @@ export function bills(s: FundsSnapshot) {
 export function budgetSummary(s: FundsSnapshot) {
   const total = s.budget.reduce((t, b) => t + b.budgeted, 0);
   const spent = s.budget.reduce((t, b) => t + b.actual, 0);
-  const month = Number(s.today.slice(5, 7));
+  // Months of the fiscal year elapsed so far, the current one included.
+  const start = s.fiscalYearStart ?? `${s.today.slice(0, 4)}-01-01`;
+  const month = Math.min(12, Math.max(1, (Number(s.today.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(s.today.slice(5, 7)) - Number(start.slice(5, 7)) + 1));
   const expectedPct = Math.round((month / 12) * 100);
   const over = s.budget.filter(b => b.budgeted > 0 && b.actual > b.budgeted).map(b => ({ ...b, overBy: b.actual - b.budgeted }));
   return {

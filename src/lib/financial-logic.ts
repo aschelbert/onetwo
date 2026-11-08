@@ -88,12 +88,20 @@ export function legacyOwed(u: Unit, invoices: UnitInvoice[]): number {
   return Math.max(0, Math.round((u.balance - open) * 100) / 100);
 }
 
-/** The order a payment is applied in: dues, then special assessments, then fees; oldest due first within each. */
+/**
+ * How a payment is applied across a unit's open charges. `dues-first`: dues,
+ * then special assessments, then fees, oldest due first within each (the
+ * default; several states require assessments to be paid before fees).
+ * `oldest-first`: the oldest due charge first, whatever its kind.
+ */
+export type PaymentOrder = 'dues-first' | 'oldest-first';
+export const PAYMENT_ORDER_LABEL: Record<PaymentOrder, string> = { 'dues-first': 'Dues first, then special assessments, then fees', 'oldest-first': 'Oldest charge first, whatever it is' };
 export const APPLICATION_ORDER: Record<UnitInvoice['type'], number> = { monthly: 0, special_assessment: 1, fee: 2, amenity_fee: 2 };
-export function openInvoicesInOrder(unitNum: string, invoices: UnitInvoice[]): UnitInvoice[] {
+export function openInvoicesInOrder(unitNum: string, invoices: UnitInvoice[], order: PaymentOrder = 'dues-first'): UnitInvoice[] {
+  const rank = (i: UnitInvoice) => (order === 'oldest-first' ? 0 : APPLICATION_ORDER[i.type]);
   return invoices
     .filter(i => i.unitNumber === unitNum && invoiceRemaining(i) > 0)
-    .sort((a, b) => APPLICATION_ORDER[a.type] - APPLICATION_ORDER[b.type] || a.dueDate.localeCompare(b.dueDate) || a.createdDate.localeCompare(b.createdDate));
+    .sort((a, b) => rank(a) - rank(b) || a.dueDate.localeCompare(b.dueDate) || a.createdDate.localeCompare(b.createdDate));
 }
 
 /**

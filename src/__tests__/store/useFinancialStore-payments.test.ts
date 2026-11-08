@@ -42,6 +42,15 @@ describe('recordUnitPayment', () => {
     expect(unitOf(U).payments[0]).toMatchObject({ amount: 1000, method: 'check', date: '2026-10-05' });
   });
 
+  it('the building can choose oldest charge first instead', () => {
+    useFinancialStore.setState({ paymentOrder: 'oldest-first' });
+    const fee = st().imposeLateFee(U, 25, 'Late · Sept', { date: '2026-09-16', dueDate: '2026-09-16' });
+    const dues = st().createUnitInvoice(U, 'monthly', 450, 'Dues · October', undefined, '2026-10-01', { date: '2026-10-01' });
+    const r = st().recordUnitPayment(U, 100, 'check', { date: '2026-10-05' });
+    expect(r.applied).toEqual([{ invoiceId: fee.id, amount: 25 }, { invoiceId: dues.id, amount: 75 }]);
+    useFinancialStore.setState({ paymentOrder: 'dues-first' });
+  });
+
   it('credits each charge\'s own receivable account', () => {
     st().imposeLateFee(U, 25, 'Late');
     st().addSpecialAssessment(U, 600, 'Roof');

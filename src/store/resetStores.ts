@@ -74,6 +74,7 @@ export function resetStoresForRealTenant() {
     lastLateFeeRun: null,
     closedThrough: null,
     autoReserveTransfer: true,
+    paymentOrder: 'dues-first',
     glAccountMapping: { ...DEFAULT_GL_MAPPING },
   });
 

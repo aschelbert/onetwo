@@ -22,9 +22,13 @@ engine), `src/lib/billingCycle.ts` (what runs on its own),
   balance is everything charged less everything paid; it is negative when
   the owner has paid ahead.
 - **Payments apply in order.** Dues, then special assessments, then fees,
-  oldest due first; part payments are allowed. Any balance with no invoice
-  behind it (brought over from before the register) comes next. Whatever is
-  left is a prepaid credit (Cr 2020), which the next charge uses first.
+  oldest due first within each; part payments are allowed. Billing rules
+  can switch this to "oldest charge first, whatever it is"; the choice is
+  saved on the building and the server functions follow it. Any balance with
+  no invoice behind it (brought over from before the register) comes next.
+  Whatever is left is a prepaid credit (Cr 2020), which the next charge uses
+  first. "Return the paid-ahead credit" on a unit's row gives it back
+  (Dr 2020 / Cr bank).
 - **Fees and waivers.** A late fee is an invoice (Dr 1130 / Cr 4030). Waiving
   it voids the invoice and reverses income and receivable. A fee from before
   the register (no invoice) is reversed in the ledger and marked waived.
@@ -45,8 +49,11 @@ engine), `src/lib/billingCycle.ts` (what runs on its own),
 
 ## What runs on its own
 
-When a board member or manager opens the app (there is no scheduled job in
-this stack yet; `useBillingCycle` runs once a day per browser):
+Every morning at 06:15 UTC a pg_cron job runs `run_billing_cycle_all()` in
+the database (migration 046), for every building with billing or late fees
+on. The same cycle also runs when a board member or manager opens the app
+(`useBillingCycle`, once a day per browser) as a fallback. Both are
+idempotent on the same keys, so a day that gets both posts once. The cycle:
 
 1. If automatic billing is on and this month is not billed yet, every unit
    with a monthly amount gets its dues invoice, dated the 1st, due on the
@@ -86,6 +93,12 @@ Deploy notes:
   building's connected account, so the endpoint must receive connected
   account events (Stripe Dashboard → Webhooks → "Listen to events on
   Connected accounts").
+- Apply migration 046: the scheduled billing cycle and the payment order.
+  It enables `pg_cron` and schedules `onetwo-billing-cycle` daily; if the
+  migration only raises a notice about pg_cron, enable the extension under
+  Database → Extensions and run the schedule block again, or call
+  `select run_billing_cycle_all()` from any daily scheduler. Billing still
+  runs when a board member opens the app until then.
 - Apply migration 045 as well: it saves the building's "Where things post"
   mapping on `financial_settings` and makes the server functions read it,
   with the app's defaults as the fallback, so a building that remaps an

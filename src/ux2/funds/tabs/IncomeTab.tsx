@@ -94,6 +94,7 @@ function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units:
 }
 
 function UnitRow({ u, b, onPanel, onCase }: { u: Unit; b?: BehindUnit; onPanel: (p: Panel) => void; onCase: () => void }) {
+  const refundCredit = useFinancialStore(s => s.refundCredit);
   const tint = b ? (b.daysPastDue > 60 ? 'bg-ux2-red-tint/60' : 'bg-ux2-amber-tint/60') : '';
   return (
     <tr className={tint}>
@@ -111,6 +112,7 @@ function UnitRow({ u, b, onPanel, onCase }: { u: Unit; b?: BehindUnit; onPanel: 
             { label: 'Record a payment', onSelect: () => onPanel({ kind: 'payment', unit: u.number }) },
             { label: 'Add a fee', onSelect: () => onPanel({ kind: 'fee', unit: u.number }) },
             { label: 'Add a special assessment', onSelect: () => onPanel({ kind: 'assessment', unit: u.number }) },
+            ...(u.balance < 0 ? [{ label: `Return the ${fmt(-u.balance)} paid ahead`, onSelect: () => { refundCredit(u.number, -u.balance, 'Returned to the owner'); } }] : []),
             { label: 'Open a case', onSelect: onCase },
           ]}
         />

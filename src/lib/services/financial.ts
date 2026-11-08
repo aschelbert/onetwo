@@ -1,6 +1,7 @@
 import { supabase, logDbError } from '@/lib/supabase';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
+import type { PaymentOrder } from '@/lib/financial-logic';
 
 // ── Units (composite PK: tenant_id + number) ──
 
@@ -435,6 +436,7 @@ export interface FinancialSettingsRow {
   /** The books are closed through this date (YYYY-MM-DD); nothing posts on or before it. */
   closedThrough: string | null;
   autoReserveTransfer: boolean;
+  paymentOrder: PaymentOrder;
   /** "Where things post": the building's account mapping, so the server posts to the same accounts as the app. */
   glAccountMapping: Record<string, string> | null;
 }
@@ -461,6 +463,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     lastLateFeeRun: (data.last_late_fee_run as string) || null,
     closedThrough: (data.closed_through as string) || null,
     autoReserveTransfer: (data.auto_reserve_transfer as boolean) ?? true,
+    paymentOrder: data.payment_order === 'oldest-first' ? 'oldest-first' : 'dues-first',
     glAccountMapping: (data.gl_account_mapping as Record<string, string>) || null,
   };
 }
@@ -481,6 +484,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.closedThrough !== undefined) row.closed_through = s.closedThrough;
   if (s.autoReserveTransfer !== undefined) row.auto_reserve_transfer = s.autoReserveTransfer;
   if (s.glAccountMapping !== undefined) row.gl_account_mapping = s.glAccountMapping;
+  if (s.paymentOrder !== undefined) row.payment_order = s.paymentOrder;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;

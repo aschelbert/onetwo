@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
-import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping } from '@/lib/financial-logic';
+import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping, type PaymentOrder } from '@/lib/financial-logic';
 import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
@@ -163,6 +163,9 @@ interface FinancialState {
   /** Post the monthly reserve transfer (annual contribution ÷ 12) with each billing run. */
   autoReserveTransfer: boolean;
   setAutoReserveTransfer: (enabled: boolean) => void;
+  /** How a payment is applied across a unit's open charges. */
+  paymentOrder: PaymentOrder;
+  setPaymentOrder: (order: PaymentOrder) => void;
   /** Bill every unit's dues for a month (this month by default). Bills each unit once per month. */
   runMonthlyBilling: (period?: string, today?: string) => BillingRunSummary;
   /** Charge the late fee on every dues invoice past its grace period that has none yet. Returns how many. */
@@ -294,6 +297,7 @@ function syncSettings() {
     lastBillingRun: s.lastBillingRun,
     lastLateFeeRun: s.lastLateFeeRun,
     autoReserveTransfer: s.autoReserveTransfer,
+    paymentOrder: s.paymentOrder,
     glAccountMapping: { ...DEFAULT_GL_MAPPING, ...s.glAccountMapping },
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
@@ -374,6 +378,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.lastLateFeeRun = data.settings.lastLateFeeRun;
       updates.closedThrough = data.settings.closedThrough;
       updates.autoReserveTransfer = data.settings.autoReserveTransfer;
+      updates.paymentOrder = data.settings.paymentOrder;
       // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
       if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
@@ -1027,7 +1032,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (!unit || !(amount > 0)) return result;
     let left = r2(amount);
     const changed = new Map<string, Partial<UnitInvoice>>();
-    for (const inv of openInvoicesInOrder(unitNum, s.unitInvoices)) {
+    for (const inv of openInvoicesInOrder(unitNum, s.unitInvoices, s.paymentOrder)) {
       if (left <= 0) break;
       const take = r2(Math.min(left, invoiceRemaining(inv)));
       const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
@@ -1177,6 +1182,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   autoReserveTransfer: true,
   setAutoReserveTransfer: (enabled) => {
     set({ autoReserveTransfer: enabled });
+    syncSettings();
+  },
+  paymentOrder: 'dues-first',
+  setPaymentOrder: (order) => {
+    set({ paymentOrder: order });
     syncSettings();
   },
 
@@ -1480,6 +1490,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lastBillingRun: state.lastBillingRun,
     lastLateFeeRun: state.lastLateFeeRun,
     autoReserveTransfer: state.autoReserveTransfer,
+    paymentOrder: state.paymentOrder,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,
