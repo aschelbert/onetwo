@@ -1,7 +1,8 @@
 // PM module TypeScript types — mirrors the Phase 2 database schema
 
-export type PMRole = 'admin' | 'manager' | 'viewer';
-export type PMUserStatus = 'active' | 'invited' | 'deactivated';
+// Values enforced by CHECK constraints on management_company_users.
+export type PMRole = 'senior_pm' | 'pm_staff' | 'readonly';
+export type PMUserStatus = 'active' | 'invited' | 'suspended' | 'removed';
 export type PMTaskStatus = 'open' | 'in_progress' | 'completed' | 'overdue';
 export type PMTaskCategory = 'maintenance' | 'inspection' | 'compliance' | 'financial' | 'communication' | 'other';
 export type PMLogCategory = 'maintenance' | 'inspection' | 'incident' | 'vendor' | 'communication' | 'financial' | 'compliance' | 'general';
@@ -9,9 +10,11 @@ export type PMLogCategory = 'maintenance' | 'inspection' | 'incident' | 'vendor'
 export interface ManagementCompany {
   id: string;
   name: string;
-  contact_email: string | null;
-  contact_phone: string | null;
-  address: Record<string, string> | null;
+  slug: string;
+  status: string;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_phone: string | null;
   created_at: string;
 }
 
@@ -21,15 +24,16 @@ export interface ManagementCompanyUser {
   user_id: string;
   role: PMRole;
   status: PMUserStatus;
-  name: string | null;
+  name: string;
+  email: string;
   created_at: string;
 }
 
 export interface ManagementCompanyTenant {
   id: string;
-  company_id: string;
+  management_company_id: string;
   tenant_id: string;
-  assigned_at: string;
+  added_at: string;
   tenant?: {
     id: string;
     name: string;
@@ -40,9 +44,11 @@ export interface ManagementCompanyTenant {
 
 export interface ManagementCompanyAssignment {
   id: string;
-  company_tenant_id: string;
-  user_id: string;
-  assigned_at: string;
+  management_company_id: string;
+  tenant_id: string;
+  management_company_user_id: string;
+  self_assigned: boolean;
+  created_at: string;
 }
 
 export interface PMTask {
