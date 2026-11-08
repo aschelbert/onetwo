@@ -107,7 +107,7 @@ export async function addOne(file: File): Promise<void> {
       ? 'Filed. This PDF is password protected, so its text can\'t be read. Save a copy without the password and add it again, or paste the key sections into "Paste text".'
       : name === 'InvalidPDFException'
         ? 'Filed. This file isn\'t a readable PDF (it may be damaged). Try saving it again as PDF, or paste the key sections into "Paste text".'
-        : `Filed. Its text couldn't be read (${name || (err instanceof Error ? err.message : 'unknown error')}). Paste the key sections into "Paste text", or add them in Fill the gaps.`;
+        : `Filed. Its text couldn't be read (${[name, err instanceof Error ? err.message : ''].filter(Boolean).join(': ') || 'unknown error'}). Paste the key sections into "Paste text", or add them in Fill the gaps.`;
     updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note });
     return;
   }
