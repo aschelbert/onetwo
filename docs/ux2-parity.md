@@ -168,6 +168,14 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   email on exactly one unit, when they join, when a unit's owner email is
   saved, and once for existing members (040); an owner of several units is
   left for the board to pick.
+  Change role and Remove go through `set_member_role` and `remove_member`
+  (migration 041): board members of the building (or a platform admin)
+  change or remove another member; not themselves, not the account owner
+  (ownership transfer), and never the last board member. Leaving the board
+  clears the seat. Remove deletes the membership, so the access goes (a
+  status of inactive was ignored by the sign-in lookup and most policies);
+  the unit, ledger and votes stay, and messages and tasks keep the author's
+  name (their membership links are cleared). Refusals show on the page.
 - **Subscription** · Plan / Add-ons (toggles) / Billing (interval pills,
   Portal) tiles, Plans (Move up / down), Invoices table, Who can change
   this, Cancel (type the building's name). Live tenants call
