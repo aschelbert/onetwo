@@ -205,8 +205,15 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
         <h2 className="m-0 text-lg font-medium text-ux2-ink">Reserves</h2>
         <Chip tone="ghost">Reserve study {res.next ? `· next update due Mar 31` : ''}</Chip>
       </div>
-      <div><span className="text-[28px] font-semibold tracking-[-0.03em] text-ux2-ink">{fmt(res.funded)}</span><span className="text-sm text-ux2-muted"> · {res.pct}% of {fmt(res.needed)}</span></div>
+      <div><span className="text-[28px] font-semibold tracking-[-0.03em] text-ux2-ink">{fmt(res.funded)}</span><span className="text-sm text-ux2-muted"> in the reserve account · {res.pct}% of {fmt(res.needed)}</span></div>
       <Bar pct={res.pct} tone={res.pct < 50 ? 'red' : 'teal'} label={`${res.pct} percent funded`} />
+      {res.unallocated !== 0 && (
+        <Inner className="text-[13px] text-ux2-ink" aria-label="Reserve allocation">
+          {res.unallocated > 0
+            ? <><b className="font-semibold">{fmt(res.unallocated)} not yet set aside for a component.</b> <span className="text-ux2-muted">The reserve account holds {fmt(res.funded)}; the items below claim {fmt(res.allocated)}. Edit an item's set-aside so the split adds up.</span></>
+            : <><b className="font-semibold text-ux2-red-ink">The items claim {fmt(-res.unallocated)} more than the reserve account holds.</b> <span className="text-ux2-muted">The account has {fmt(res.funded)} in the ledger{res.funded === 0 ? ' (enter the opening balances under Accounts and ledger if the money is there)' : ''}; the set-asides below add up to {fmt(res.allocated)}.</span></>}
+        </Inner>
+      )}
       {items.length === 0 ? <Inner className="text-sm text-ux2-muted">No reserve items yet. Add the roof, boiler and elevator with their replacement year.</Inner> : (
         <Table minWidth={640}>
           <thead><tr><Th>Asset</Th><Th>Replace</Th><Th num>Cost</Th><Th num>Set aside</Th><Th num>Funded</Th></tr></thead>
@@ -259,7 +266,7 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
           </span>
         </div>
       </div>
-      <Why>Recommended means: fund the next replacement fully from dues alone, based on remaining life and the gap. Items with nothing set aside are treated as repairs until they are reserved.</Why>
+      <Why>Funded is the reserve account's balance in the ledger; Set aside is how that money is split across the items, a plan rather than a posting. Recommended means: fund the next replacement fully from dues alone, based on remaining life and the gap. Items with nothing set aside are treated as repairs until they are reserved.</Why>
     </Card>
   );
 }

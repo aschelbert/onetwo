@@ -14,9 +14,11 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore, type InviteAccess } from '@/features/setup/useSetupStore';
 import { ACCESS_OPTIONS, EMAIL_RE, SEATS, accessLabel, invitePayload, parseInviteLines, readRole } from '@/features/setup/invites';
-import { applyBudgetTemplate, postOpening } from '@/features/setup/applySetup';
+import { applyBudgetTemplate } from '@/features/setup/applySetup';
 import { resolve } from '@/features/setup/setupModel';
+import { isOpeningEntry } from '@/lib/financial-logic';
 import { Button, Chip } from '../components';
+import OpeningBalances from '../funds/OpeningBalances';
 import { useSetup } from './useSetup';
 import UnitsEditor from './UnitsEditor';
 
@@ -65,7 +67,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const [member, setMember] = useState({ name: '', role: 'President', email: '' });
   const [sameFee, setSameFee] = useState('');
   const [splitTotal, setSplitTotal] = useState('');
-  const [balances, setBalances] = useState({ operating: '', reserve: '' });
+  const [openingOpen, setOpeningOpen] = useState(false);
   const [fees, setFees] = useState({ dueDay: String(f.hoaDueDay ?? 1), lateFee: f.lateFeeEnabled ? String(f.lateFeeAmount) : '', grace: String(f.lateFeeGraceDays) });
   const [feesSaved, setFeesSaved] = useState(false);
   const [inviteOff, setInviteOff] = useState<string[]>([]);
@@ -88,7 +90,11 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const monthlyTotal = monthlyTotalItem ? Number(resolve(monthlyTotalItem, s.decisions[monthlyTotalItem.key]?.picks).value) || 0 : 0;
   const pctTotal = units.reduce((t, u) => t + (u.votingPct || 0), 0);
   const canSplit = monthlyTotal > 0 && units.length > 0 && Math.abs(pctTotal - 100) < 0.5;
-  const openingDone = f.generalLedger.some(e => /opening .*balance/i.test(e.memo ?? ''));
+  const openingDone = f.generalLedger.some(e => isOpeningEntry(e) || /opening .*balance/i.test(e.memo ?? ''));
+  const asOfItem = s.items.find(i => i.key === 'fact:balance_as_of' && s.decisions[i.key]?.status === 'accepted');
+  const asOfRaw = asOfItem ? String(resolve(asOfItem, s.decisions[asOfItem.key]?.picks).value ?? '') : '';
+  const asOfDefault = /^\d{4}-\d{2}-\d{2}$/.test(asOfRaw) ? asOfRaw : (() => { const d = new Date(asOfRaw); return asOfRaw && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : null; })();
+  const today = new Date().toISOString().slice(0, 10);
   const annualFromUnits = units.reduce((t, u) => t + (u.monthlyFee || 0), 0) * 12;
   const noEmail = units.filter(u => u.owner && !u.email);
   const boardWithEmail = b.board.filter(m => m.email);
@@ -104,12 +110,6 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const splitTyped = () => { const t = Number(splitTotal.replace(/[$,\s]/g, '')); if (t > 0) for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(t * (u.votingPct / 100) * 100) / 100 }); };
   const split = () => { for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(monthlyTotal * (u.votingPct / 100) * 100) / 100 }); };
   const applySame = () => { const n = Number(sameFee.replace(/[$,]/g, '')); if (n > 0) for (const u of unassessed) f.updateUnit(u.number, { monthlyFee: n }); };
-  const saveBalances = () => {
-    const op = Number(balances.operating.replace(/[$,]/g, '')); const rs = Number(balances.reserve.replace(/[$,]/g, ''));
-    if (op > 0) postOpening('operating', op);
-    if (rs > 0) postOpening('reserve', rs);
-  };
-
   const saveFees = () => {
     const due = Number(fees.dueDay); const fee = Number(fees.lateFee.replace(/[$,]/g, '')); const grace = Number(fees.grace);
     if (due >= 1 && due <= 28) f.setHoaDueDay(due);
@@ -273,13 +273,11 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={saveFees}>Save</Button>
           </span>
         </Gap>
-        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements: today's balances in the operating and reserve accounts.">
-          <span className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="sp-op">Operating balance</label><input id="sp-op" className={cn(INPUT, 'w-32')} placeholder="Operating $" value={balances.operating} onChange={e => setBalances(x => ({ ...x, operating: e.target.value }))} />
-            <label className="sr-only" htmlFor="sp-rs">Reserve balance</label><input id="sp-rs" className={cn(INPUT, 'w-32')} placeholder="Reserve $" value={balances.reserve} onChange={e => setBalances(x => ({ ...x, reserve: e.target.value }))} />
-            <Button size="sm" variant="plum" onClick={saveBalances}>Save</Button>
-          </span>
+        <Gap id="balances" done={openingDone} title="Opening balances · the state of the books" note="As of one cutover date: the bank balances, what each owner owed or had paid ahead, and the bills not yet paid. Posts to the ledger and closes the books through that date.">
+          <Button size="sm" variant="plum" aria-expanded={openingOpen} onClick={() => setOpeningOpen(o => !o)}>{openingOpen ? 'Hide' : 'Enter the opening balances'}</Button>
         </Gap>
+        {openingDone && !openingOpen && <div className="-mt-1 pl-1"><Button size="sm" variant="ghost" aria-expanded={openingOpen} onClick={() => setOpeningOpen(true)}>Review or re-enter the opening balances</Button></div>}
+        {openingOpen && <div className="rounded-2xl border border-ux2-line bg-white px-4 py-3"><OpeningBalances today={today} defaultAsOf={asOfDefault} /></div>}
         <Gap id="budget" done={f.budgetCategories.length > 0} title="This year's budget" note={f.budgetCategories.length ? `${f.budgetCategories.length} budget lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : annualFromUnits ? `Not uploaded. Start from a template sized to ${fmt(annualFromUnits)} a year of assessments, then adjust the lines in Funds › Planning.` : 'Upload it, or set assessments first and start from a template.'}>
           {annualFromUnits > 0 && <Button size="sm" variant="plum" onClick={() => applyBudgetTemplate(annualFromUnits)}>Use the template</Button>}
           <Button size="sm" variant="ghost" onClick={onDocuments}>Add the budget</Button>

@@ -37,7 +37,8 @@ export function unitSummaries(s: MeSnapshot): UnitSummary[] {
   const year = s.today.slice(0, 4);
   const dueDay = Math.min(Math.max(s.hoaDueDay || 1, 1), 28);
   return s.units.filter(u => s.viewer.linkedUnits.includes(u.number)).map(unit => {
-    const fees = unit.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0);
+    // Fees with an invoice are in the balance already; only fees from before the register add to it.
+    const fees = unit.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0);
     const assessments = unit.specialAssessments.filter(a => !a.paid).reduce((t, a) => t + a.amount, 0);
     const openInvoices = s.unitInvoices.filter(i => i.unitNumber === unit.number && (i.status === 'sent' || i.status === 'overdue')).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     const [y, m, d] = s.today.split('-').map(Number);

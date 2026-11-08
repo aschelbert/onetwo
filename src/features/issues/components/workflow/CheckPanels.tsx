@@ -88,16 +88,17 @@ function UnitLedger({ unit }: { unit?: string }) {
   const invoices = useFinancialStore(s => s.unitInvoices);
   const u = unit ? units.find(x => x.number === unit) : undefined;
   if (!u) return <Delinquency note="This case has no unit attached; here is everyone with a balance." />;
-  const fees = u.lateFees.filter(f => !f.waived);
+  const fees = u.lateFees.filter(f => !f.waived && !f.paid);
+  const legacyFees = fees.filter(f => !f.invoiceId);
   const sa = u.specialAssessments.filter(a => !a.paid);
   const open = invoices.filter(i => i.unitNumber === u.number && (i.status === 'sent' || i.status === 'overdue'));
   const rows: ReactNode[][] = [
-    ['Balance (dues)', fmt(Math.max(0, u.balance))],
-    ...fees.map(f => [`Late fee · ${f.date} · ${f.reason}`, fmt(f.amount)]),
-    ...sa.map(a => [`Special assessment · ${a.reason}`, fmt(a.amount)]),
-    ...open.map(i => [`Invoice ${i.id} · ${i.description} · due ${i.dueDate}`, fmt(i.amount)]),
+    ['Balance (all open charges)', fmt(Math.max(0, u.balance))],
+    ...legacyFees.map(f => [`Late fee · ${f.date} · ${f.reason}`, fmt(f.amount)]),
+    ...sa.map(a => [`Includes special assessment · ${a.reason}`, fmt(a.amount)]),
+    ...open.map(i => [`Includes invoice ${i.id} · ${i.description} · due ${i.dueDate}`, fmt(i.amount - (i.paidAmount ?? 0))]),
   ];
-  const total = Math.max(0, u.balance) + fees.reduce((t, f) => t + f.amount, 0) + sa.reduce((t, a) => t + a.amount, 0);
+  const total = Math.max(0, u.balance) + legacyFees.reduce((t, f) => t + f.amount, 0);
   const pays = [...u.payments].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
   return (
     <Frame title={`Unit ${u.number} ledger · ${u.owner}`} to={ROUTES.ledger} toLabel="Open Funds › Income"

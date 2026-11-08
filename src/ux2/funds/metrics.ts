@@ -46,6 +46,8 @@ export interface FundsSnapshot {
   stripeOnboardingComplete: boolean;
   /** This year's operating spend by month (Jan first), from the budget lines' expenses. */
   spendByMonth?: number[];
+  /** First day of the current fiscal year (calendar year when absent). */
+  fiscalYearStart?: string;
 }
 
 export const ONLINE_METHODS = ['stripe', 'card', 'online'];
@@ -69,9 +71,13 @@ export function healthLabel(score: number): 'Healthy' | 'Fair' | 'At risk' {
   return score >= 80 ? 'Healthy' : score >= 60 ? 'Fair' : 'At risk';
 }
 
+/** Fees owed on top of the balance: only fees from before the invoice register, which never went into it. A fee with an invoice is already in `balance`. */
 export function unpaidFees(u: Unit): number {
-  return u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0);
+  return u.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0);
 }
+
+/** Money the owner has paid ahead. */
+export const creditOf = (u: Unit) => Math.max(0, -u.balance);
 
 export function openAssessments(u: Unit): number {
   return u.specialAssessments.filter(a => !a.paid).reduce((t, a) => t + a.amount, 0);
@@ -205,7 +211,9 @@ export function bills(s: FundsSnapshot) {
 export function budgetSummary(s: FundsSnapshot) {
   const total = s.budget.reduce((t, b) => t + b.budgeted, 0);
   const spent = s.budget.reduce((t, b) => t + b.actual, 0);
-  const month = Number(s.today.slice(5, 7));
+  // Months of the fiscal year elapsed so far, the current one included.
+  const start = s.fiscalYearStart ?? `${s.today.slice(0, 4)}-01-01`;
+  const month = Math.min(12, Math.max(1, (Number(s.today.slice(0, 4)) - Number(start.slice(0, 4))) * 12 + Number(s.today.slice(5, 7)) - Number(start.slice(5, 7)) + 1));
   const expectedPct = Math.round((month / 12) * 100);
   const over = s.budget.filter(b => b.budgeted > 0 && b.actual > b.budgeted).map(b => ({ ...b, overBy: b.actual - b.budgeted }));
   return {
@@ -219,15 +227,23 @@ export function budgetSummary(s: FundsSnapshot) {
   };
 }
 
-/** Reserve funding and the next big replacement. */
+/**
+ * Reserve funding and the next big replacement. "Funded" is the reserve
+ * fund's cash in the ledger; the per-component set-aside is the planning
+ * split of that cash, and whatever is not split is `unallocated`.
+ */
 export function reserveSummary(s: FundsSnapshot) {
   const needed = s.reserves.reduce((t, r) => t + r.estimatedCost, 0);
-  const funded = s.reserves.reduce((t, r) => t + r.currentFunding, 0);
+  const allocated = s.reserves.reduce((t, r) => t + r.currentFunding, 0);
+  const funded = Math.round(s.reservesCash * 100) / 100;
   const year = Number(s.today.slice(0, 4));
   const next = [...s.reserves].filter(r => !r.isContingency).sort((a, b) => a.yearsRemaining - b.yearsRemaining)[0];
   return {
     needed,
     funded,
+    allocated,
+    /** Reserve cash not yet split across the components (negative when the split claims more than the bank holds). */
+    unallocated: Math.round((funded - allocated) * 100) / 100,
     pct: needed > 0 ? Math.round((funded / needed) * 100) : 0,
     gap: Math.max(0, needed - funded),
     monthly: Math.round(s.annualReserveContribution / 12),

@@ -97,7 +97,9 @@ describe('funds metrics', () => {
 
   it('finds the reserve gap and the next big repair', () => {
     const r = reserveSummary(snap);
-    expect(r).toMatchObject({ needed: 480000, funded: 246800, pct: 51, monthly: 2400, recommendedMonthly: 5925, onSchedule: false });
+    expect(r).toMatchObject({ needed: 480000, funded: 246800, allocated: 246800, unallocated: 0, pct: 51, monthly: 2400, recommendedMonthly: 5925, onSchedule: false });
+    // Funded is the reserve account's cash; the per-item set-aside is a split of it.
+    expect(reserveSummary({ ...snap, reservesCash: 250000 })).toMatchObject({ funded: 250000, allocated: 246800, unallocated: 3200, pct: 52 });
     expect(r.next).toEqual({ name: 'Roof', year: 2029, cost: 410000, funded: 196800 });
     expect(monthsOfCash(snap)).toEqual({ months: 69.4, monthlyOut: 2050 });
   });

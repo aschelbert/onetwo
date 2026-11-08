@@ -49,18 +49,21 @@ function WorkOrderForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ReceiveInvoiceForm({ candidates, initial, onClose }: { candidates: WorkOrder[]; initial?: string; onClose: () => void }) {
+function ReceiveInvoiceForm({ candidates, initial, today, onClose }: { candidates: WorkOrder[]; initial?: string; today: string; onClose: () => void }) {
   const receive = useFinancialStore(s => s.receiveInvoice);
   const [id, setId] = useState(initial ?? candidates[0]?.id ?? '');
   const [num, setNum] = useState('');
   const [amount, setAmount] = useState(() => String(candidates.find(w => w.id === (initial ?? candidates[0]?.id))?.amount ?? ''));
+  const [date, setDate] = useState(today);
   return (
-    <form aria-label="Receive an invoice" onSubmit={e => { e.preventDefault(); if (!id) return; receive(id, num || 'INV', Number(amount) || 0); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+    <form aria-label="Receive an invoice" onSubmit={e => { e.preventDefault(); if (!id) return; receive(id, num || 'INV', Number(amount) || 0, date || undefined); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <div className="w-full text-sm font-semibold text-ux2-ink">Receive an invoice · against an approved work order</div>
       <Field label="Work order" className="min-w-[240px] flex-1"><select value={id} onChange={e => { setId(e.target.value); const w = candidates.find(c => c.id === e.target.value); if (w) setAmount(String(w.amount)); }} className={INPUT}>{candidates.map(w => <option key={w.id} value={w.id}>{w.id} · {w.title}</option>)}</select></Field>
       <Field label="Invoice #" className="w-[150px]"><input value={num} onChange={e => setNum(e.target.value)} placeholder="INV 4471" className={INPUT} /></Field>
       <Field label="Amount" className="w-[120px]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} className={INPUT} /></Field>
+      <Field label="Invoice date" className="w-[160px]"><input type="date" value={date} onChange={e => setDate(e.target.value)} className={INPUT} /></Field>
       <div className="flex gap-2"><Button type="submit" size="sm" disabled={!id || candidates.length === 0}>Receive</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      <Why className="basis-full">The expense is booked the day the invoice arrives, under its budget line, and sits in Bills to pay until it is paid.</Why>
     </form>
   );
 }
@@ -95,7 +98,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
           <Button size="sm" className="h-9" onClick={() => bl.within.forEach(w => pay(w.id))} disabled={bl.within.length === 0}>Approve all {bl.within.length} within budget</Button>
         </div>
       </div>
-      {form && <ReceiveInvoiceForm key={form.id ?? 'any'} candidates={bl.approved} initial={form.id} onClose={() => setForm(null)} />}
+      {form && <ReceiveInvoiceForm key={form.id ?? 'any'} candidates={bl.approved} initial={form.id} today={snap.today} onClose={() => setForm(null)} />}
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{filter === 'toapprove' ? 'Nothing is waiting for approval.' : 'Nothing here.'}</Inner> : (
         <Table>
           <thead><tr><Th>Bill</Th><Th>Vendor</Th><Th>Budget line</Th><Th num>Amount</Th><Th>Due</Th><Th>Status</Th><Th aria-label="Approve" /><Th aria-label="Actions" /></tr></thead>
@@ -267,7 +270,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
         </div>
       </div>
       {creating && <WorkOrderForm onClose={() => setCreating(false)} />}
-      {receive && <ReceiveInvoiceForm key={receive} candidates={bl.approved} initial={receive} onClose={() => setReceive(null)} />}
+      {receive && <ReceiveInvoiceForm key={receive} candidates={bl.approved} initial={receive} today={snap.today} onClose={() => setReceive(null)} />}
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">No work orders here.</Inner> : (
         <Table>
           <thead><tr><Th>Work order</Th><Th>Vendor</Th><Th>Budget line</Th><Th num>Amount</Th><Th>Opened</Th><Th>Status</Th><Th aria-label="Action" /><Th aria-label="Actions" /></tr></thead>

@@ -12,17 +12,19 @@ const StripeIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
 
 export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
   const store = useFinancialStore();
-  const { hoaDueDay, recordUnitPayment, markSpecialAssessmentPaid, stripeConnectId, stripeOnboardingComplete, unitInvoices } = store;
+  const { hoaDueDay, recordUnitPayment, markSpecialAssessmentPaid, payUnitInvoice, stripeConnectId, stripeOnboardingComplete, unitInvoices } = store;
   const [recurringSetup, setRecurringSetup] = useState(false);
   const [modal, setModal] = useState<null | 'setupRecurring'>(null);
   const [page, setPage] = useState(0);
 
   const stripeReady = stripeConnectId && stripeOnboardingComplete;
-  const unpaidFees = activeUnit.lateFees.filter(f => !f.waived);
-  const totalLateFees = unpaidFees.reduce((s, f) => s + f.amount, 0);
+  const unpaidFees = activeUnit.lateFees.filter(f => !f.waived && !f.paid);
+  // Fees with an invoice are already in the balance; only fees from before the register add to it.
+  const totalLateFees = unpaidFees.filter(f => !f.invoiceId).reduce((s, f) => s + f.amount, 0);
   const unpaidSA = activeUnit.specialAssessments.filter(a => !a.paid);
   const totalSA = unpaidSA.reduce((s, a) => s + a.amount, 0);
-  const totalOwed = activeUnit.balance + totalLateFees;
+  const totalOwed = Math.max(0, activeUnit.balance) + totalLateFees;
+  const credit = Math.max(0, -activeUnit.balance);
   const today = new Date().toISOString().split('T')[0];
   const overdueInvoices = unitInvoices.filter(
     i => i.unitNumber === activeUnit.number && i.status !== 'paid' && i.status !== 'void' && i.dueDate < today
@@ -104,17 +106,18 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
               <div className="flex justify-between text-sm"><span className="text-ink-500">Monthly Assessment</span><span className="font-medium">{fmt(activeUnit.monthlyFee)}</span></div>
               {(activeUnit.balance - totalSA) > activeUnit.monthlyFee && <div className="flex justify-between text-sm"><span className="text-ink-500">Past Due Balance</span><span className="font-medium text-red-600">{fmt(activeUnit.balance - totalSA - activeUnit.monthlyFee)}</span></div>}
               {totalLateFees > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Late Fees</span><span className="font-medium text-red-600">{fmt(totalLateFees)}</span></div>}
-              {totalSA > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Special Assessments</span><span className="font-medium text-amber-600">{fmt(totalSA)}</span></div>}
+              {totalSA > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Special Assessments (included)</span><span className="font-medium text-amber-600">{fmt(totalSA)}</span></div>}
+              {credit > 0 && <div className="flex justify-between text-sm"><span className="text-ink-500">Paid ahead</span><span className="font-medium text-sage-600">{fmt(credit)} credit</span></div>}
               <div className="border-t pt-2 mt-2">
                 <div className="flex justify-between"><span className="font-semibold text-ink-900">Total Due</span><span className="font-display text-2xl font-bold text-ink-900">{fmt(totalOwed)}</span></div>
               </div>
             </div>
             {totalOwed > 0 ? (
-              <button onClick={() => handleStripePayment(totalOwed, `Unit ${activeUnit.number} — Full Balance`, () => { recordUnitPayment(activeUnit.number, totalOwed, 'stripe'); unpaidSA.forEach(sa => markSpecialAssessmentPaid(activeUnit.number, sa.id)); })} className="w-full mt-3 py-3.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-base transition-all hover:shadow-md flex items-center justify-center gap-2">
+              <button onClick={() => handleStripePayment(totalOwed, `Unit ${activeUnit.number} — Full Balance`, () => { recordUnitPayment(activeUnit.number, totalOwed, 'stripe'); })} className="w-full mt-3 py-3.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-base transition-all hover:shadow-md flex items-center justify-center gap-2">
                 <StripeIcon /> Pay {fmt(totalOwed)} Now
               </button>
             ) : (
-              <div className="text-center mt-3 py-3 text-sage-600 font-medium text-sm">✓ No balance due — you're all set!</div>
+              <div className="text-center mt-3 py-3 text-sage-600 font-medium text-sm">✓ No balance due — you're all set!{credit > 0 ? ` Your ${fmt(credit)} credit goes toward your next dues.` : ''}</div>
             )}
           </div>
 
@@ -178,7 +181,7 @@ export default function MyBalanceTab({ activeUnit }: { activeUnit: Unit }) {
                   <p className="text-xs text-ink-400">{lf.date} · {fmt(lf.amount)}</p>
                 </div>
                 {stripeReady ? (
-                  <button onClick={() => handleStripePayment(lf.amount, `Late Fee: ${lf.reason}`, () => recordUnitPayment(activeUnit.number, lf.amount, 'stripe'))} className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5">
+                  <button onClick={() => handleStripePayment(lf.amount, `Late Fee: ${lf.reason}`, () => { if (lf.invoiceId) payUnitInvoice(lf.invoiceId, 'stripe'); else recordUnitPayment(activeUnit.number, lf.amount, 'stripe'); })} className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5">
                     <StripeIcon className="w-3 h-3" /> Pay {fmt(lf.amount)}
                   </button>
                 ) : (

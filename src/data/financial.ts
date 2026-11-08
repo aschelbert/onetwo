@@ -115,7 +115,10 @@ export interface WorkOrder {
   acctNum: string; amount: number; status: 'draft' | 'approved' | 'invoiced' | 'paid';
   caseId: string | null; createdDate: string; approvedDate: string | null;
   invoiceNum: string | null; invoiceDate: string | null; paidDate: string | null;
+  /** The payment entry (Dr payable / Cr bank once accrued; Dr expense / Cr bank for bills from before accrual). */
   glEntryId: string | null; attachments: Array<{name:string;type:string;date:string;size:string}>;
+  /** The entry posted when the invoice arrived (Dr expense / Cr accounts payable). Absent on bills invoiced before accrual. */
+  accrualGlEntryId?: string | null;
 }
 
 export const seedWorkOrders: WorkOrder[] = [
