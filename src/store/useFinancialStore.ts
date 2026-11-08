@@ -194,6 +194,11 @@ function syncSettings() {
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
 
+/** Database rows have UUIDs. A budget line or reserve item added here keeps a local id until its insert returns. */
+const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+/** Removed before their insert returned: deleted as soon as it does. */
+const removedBeforeSaved = new Set<string>();
+
 export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
   tenantId: null,
   budgetCategories: seedBudgetCategories,
@@ -518,8 +523,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (isBackendEnabled) {
       const tid = get().tenantId || getActiveTenantId();
       if (tid) financialSvc.createBudgetCategory(tid, cat).then(dbRow => {
+        if (dbRow && removedBeforeSaved.delete(id)) { financialSvc.deleteBudgetCategory(dbRow.id); return; }
         if (dbRow) {
+          const latest = get().budgetCategories.find(x => x.id === id);
           set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+          // Anything changed while it was being saved goes up now.
+          if (latest && (latest.name !== cat.name || latest.budgeted !== cat.budgeted)) financialSvc.updateBudgetCategory(dbRow.id, { name: latest.name, budgeted: latest.budgeted });
           // Update any building assets referencing the old local ID
           const bStore = useBuildingStore.getState();
           bStore.assets.filter(a => a.budgetCategoryId === id).forEach(a => {
@@ -539,14 +548,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         c.id === id ? { ...c, ...updates } : c
       ),
     }));
-    if (isBackendEnabled) financialSvc.updateBudgetCategory(id, updates);
+    if (isBackendEnabled && isDbId(id)) financialSvc.updateBudgetCategory(id, updates);
   },
 
   deleteBudgetCategory: (id) => {
     set((s) => ({
       budgetCategories: s.budgetCategories.filter((c) => c.id !== id),
     }));
-    if (isBackendEnabled) financialSvc.deleteBudgetCategory(id);
+    if (isBackendEnabled) { if (isDbId(id)) financialSvc.deleteBudgetCategory(id); else removedBeforeSaved.add(id); }
   },
 
   setAnnualReserveContribution: (amount) => {
@@ -590,8 +599,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (isBackendEnabled) {
       const tid = get().tenantId || getActiveTenantId();
       if (tid) financialSvc.createReserveItem(tid, newItem).then(dbRow => {
+        if (dbRow && removedBeforeSaved.delete(id)) { financialSvc.deleteReserveItem(dbRow.id); return; }
         if (dbRow) {
+          const latest = get().reserveItems.find(x => x.id === id);
           set(s => ({ reserveItems: s.reserveItems.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+          // Anything changed while it was being saved goes up now.
+          if (latest) { const { id: _local, ...rest } = latest; void _local; financialSvc.updateReserveItem(dbRow.id, rest); }
           // Update any building assets referencing the old local ID
           const bStore = useBuildingStore.getState();
           bStore.assets.filter(a => a.reserveItemId === id).forEach(a => {
@@ -609,12 +622,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set((s) => ({
       reserveItems: s.reserveItems.map((i) => (i.id === id ? { ...i, ...updates } : i)),
     }));
-    if (isBackendEnabled) financialSvc.updateReserveItem(id, updates);
+    if (isBackendEnabled && isDbId(id)) financialSvc.updateReserveItem(id, updates);
   },
 
   deleteReserveItem: (id) => {
     set((s) => ({ reserveItems: s.reserveItems.filter((i) => i.id !== id) }));
-    if (isBackendEnabled) financialSvc.deleteReserveItem(id);
+    if (isBackendEnabled) { if (isDbId(id)) financialSvc.deleteReserveItem(id); else removedBeforeSaved.add(id); }
   },
 
   addUnit: (unit) => {

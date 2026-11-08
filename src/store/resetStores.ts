@@ -44,6 +44,7 @@ export function resetStoresForRealTenant() {
     insurance: [],
     vendors: [],
     assets: [],
+    governingClauses: [],
   });
 
   // The financial store is persisted under one localStorage key for every

@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore, type GoverningClause } from '@/store/useBuildingStore';
 import { cn } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -97,7 +98,26 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
 
 const PROPOSED_MAL = ['Attend every board meeting and read the packet 48 hours before', 'Vote on every motion; abstain only with a disclosed conflict', 'Back up whichever officer is out: notices, minutes or payments', 'Walk the building each quarter and log what needs attention', 'Chair one committee or project a year', "Be the owners' voice: bring requests and concerns to the agenda"];
 
+/** Clauses accepted from the bylaws or rules in setup: the section, its heading, and the words. */
+function ClauseList({ list, label }: { list: GoverningClause[]; label: string }) {
+  if (!list.length) return null;
+  return (
+    <div className="flex flex-col gap-1.5" data-clauses={label}>
+      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-plum">{label}</div>
+      {list.map(c => (
+        <details key={c.id} className="rounded-[14px] border border-ux2-plum-tint bg-white px-3 py-2 text-[13px] text-ux2-ink">
+          <summary className="cursor-pointer list-none font-semibold">{c.ref ? <span className="mr-1.5 font-normal text-ux2-muted">{c.ref}</span> : null}{c.heading}</summary>
+          <p className="m-0 mt-1.5 leading-relaxed">{c.text}</p>
+          {c.source && <p className="m-0 mt-1 text-xs text-ux2-muted">{c.source}</p>}
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot }) {
+  const clauses = useBuildingStore(s => s.governingClauses);
+  const clausesFor = (topic: GoverningClause['topic'], role?: string) => clauses.filter(c => c.topic === topic && (!role || (c.role ?? '').toLowerCase() === role.toLowerCase()));
   const duties = dutyCounts(rows);
   const loads = useMemo(() => roleLoads(rows, snap.board, snap.today), [rows, snap.board, snap.today]);
   const units = useFinancialStore(s => s.units);
@@ -139,6 +159,12 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
         </Table>
         <Why>Counts come from the obligations list. Every item has a why, a consequence and a how-to inside its Home card; the legal reference stays in grey.</Why>
       </Card>
+      {clausesFor('board').length > 0 && (
+        <Card aria-label="The board, from your bylaws" className="gap-2">
+          <div className="text-base font-semibold text-ux2-ink">The board · what your bylaws say</div>
+          <ClauseList list={clausesFor('board')} label="From your bylaws" />
+        </Card>
+      )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {['President', 'Vice President', 'Treasurer', 'Secretary'].map(role => {
           const list = byRole(role);
@@ -150,6 +176,7 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
                 <Chip tone="ghost">{list.length} obligations</Chip>
               </div>
               <div className="flex flex-col gap-1.5">{list.slice(0, 8).map(r => <div key={`${r.kind}:${r.id}`} className="rounded-[14px] border border-ux2-line bg-white px-3 py-2 text-[13px] text-ux2-ink">{r.task}</div>)}{list.length > 8 && <span className="text-xs text-ux2-muted">+{list.length - 8} more on the list</span>}{list.length === 0 && <span className="text-xs text-ux2-muted">Nothing assigned to this role.</span>}</div>
+              <ClauseList list={clausesFor('officer', role)} label="From your bylaws" />
             </Card>
           );
         })}
@@ -173,8 +200,15 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
               ['Keep contact details current; tell the board before a sale or rental', 'Within 30 days', 'ghost'],
             ].map(([t, v, tone]) => <div key={String(t)} className="flex items-center justify-between gap-2 rounded-[14px] border border-ux2-line bg-white px-3 py-2 text-[13px] text-ux2-ink"><span>{t}</span><Chip tone={tone as 'sage' | 'amber' | 'red' | 'ghost'}>{v}</Chip></div>)}
           </div>
+          <ClauseList list={clausesFor('owners')} label="From your bylaws" />
           <Why>These feed the building score, not an individual owner score. Owners see their own status on My Unit; the board sees the building-wide counts here.</Why>
         </Card>
+        {clausesFor('rules').length > 0 && (
+          <Card aria-label="Rules for residents" className="gap-2">
+            <div><div className="text-base font-semibold text-ux2-ink">Rules for residents</div><div className="text-xs text-ux2-muted">From your bylaws and rules · pets, leasing, noise, parking, alterations</div></div>
+            <ClauseList list={clausesFor('rules')} label="From your documents" />
+          </Card>
+        )}
       </div>
     </div>
   );

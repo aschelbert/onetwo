@@ -103,6 +103,21 @@ export interface BuildingAsset {
   insuredValue: number;
 }
 
+/** A clause from the bylaws or rules, accepted in setup: shown under Building › Obligations › Duties and roles. */
+export interface GoverningClause {
+  id: string;
+  topic: 'board' | 'officer' | 'owners' | 'rules';
+  role: string | null;
+  ref: string;
+  heading: string;
+  text: string;
+  /** Where it came from: document and page. */
+  source: string;
+}
+
+/** A clause accepted in this browser and not yet saved to the database. */
+const isLocalClause = (id: string) => id.startsWith('gc-');
+
 export interface BylawsConfig {
   assessmentCapPct: number;
   ownerVoteThreshold: number;
@@ -124,6 +139,10 @@ interface BuildingState {
   assets: BuildingAsset[];
   bylawsConfig: BylawsConfig;
   updateBylawsConfig: (config: Partial<BylawsConfig>) => void;
+  governingClauses: GoverningClause[];
+  /** Add or replace (same topic, role and heading) a clause. */
+  upsertGoverningClause: (c: Omit<GoverningClause, 'id'>) => void;
+  removeGoverningClause: (id: string) => void;
 
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
@@ -176,38 +195,43 @@ interface BuildingState {
 }
 
 // Sync helpers
+/** Database rows have UUIDs. A record added here keeps a local id ("ld6147ad71") until its insert returns. */
+const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+/** Records removed before their insert returned: deleted as soon as it does. */
+const removedBeforeSaved = new Set<string>();
+
 function syncBoardMember(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const m = useBuildingStore.getState().board.find(x => x.id === id);
   if (m) buildingSvc.updateBoardMember(id, m).catch(err => console.error('[syncWrite] updateBoardMember failed:', err));
 }
 function syncLegalCounsel(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const c = useBuildingStore.getState().legalCounsel.find(x => x.id === id);
   if (c) buildingSvc.updateLegalCounsel(id, c).catch(err => console.error('[syncWrite] updateLegalCounsel failed:', err));
 }
 function syncLegalDocument(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const d = useBuildingStore.getState().legalDocuments.find(x => x.id === id);
   if (d) buildingSvc.updateLegalDocument(id, d).catch(err => console.error('[syncWrite] updateLegalDocument failed:', err));
 }
 function syncInsurance(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const p = useBuildingStore.getState().insurance.find(x => x.id === id);
   if (p) buildingSvc.updateInsurancePolicy(id, p).catch(err => console.error('[syncWrite] updateInsurancePolicy failed:', err));
 }
 function syncVendor(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const v = useBuildingStore.getState().vendors.find(x => x.id === id);
   if (v) buildingSvc.updateVendor(id, v).catch(err => console.error('[syncWrite] updateVendor failed:', err));
 }
 function syncMaintenanceSchedule(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const m = useBuildingStore.getState().maintenanceSchedules.find(x => x.id === id);
   if (m) buildingSvc.updateMaintenanceSchedule(id, m).catch(err => console.error('[syncWrite] updateMaintenanceSchedule failed:', err));
 }
 function syncAsset(id: string) {
-  if (!isBackendEnabled) return;
+  if (!isBackendEnabled || !isDbId(id)) return;
   const a = useBuildingStore.getState().assets.find(x => x.id === id);
   if (a) assetsSvc.updateAsset(id, a).catch(err => console.error('[syncWrite] updateAsset failed:', err));
 }
@@ -484,6 +508,17 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     if (data.vendors) updates.vendors = data.vendors;
     if (data.maintenanceSchedules) updates.maintenanceSchedules = data.maintenanceSchedules;
     if (data.assets) updates.assets = data.assets;
+    if (data.clauses) {
+      // Clauses accepted in this browser before they were saved (no database id yet) go up now.
+      const localOnly = useBuildingStore.getState().governingClauses.filter(c => isLocalClause(c.id));
+      updates.governingClauses = [...data.clauses, ...localOnly];
+      for (const c of localOnly) {
+        const { id, ...fields } = c;
+        buildingSvc.saveGoverningClause(tenantId, fields).then(row => {
+          if (row) set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id && x.id !== row.id).concat(row) }));
+        });
+      }
+    }
     if (data.profile) {
       const current = useBuildingStore.getState().details;
       updates.details = { ...current, ...data.profile };
@@ -517,7 +552,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createBoardMember(tid, m).then(dbRow => {
-        if (dbRow) set(s => ({ board: s.board.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { buildingSvc.deleteBoardMember(dbRow.id); return; }
+        set(s => ({ board: s.board.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncBoardMember(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createBoardMember failed:', err);
         set(s => ({ board: s.board.filter(x => x.id !== id) }));
@@ -530,7 +569,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeBoardMember: (id) => {
     set(s => ({ board: s.board.filter(b => b.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteBoardMember(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteBoardMember(id); else removedBeforeSaved.add(id); }
   },
 
   addLegalCounsel: (c, tenantId?) => {
@@ -539,7 +578,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createLegalCounsel(tid, c).then(dbRow => {
-        if (dbRow) set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { buildingSvc.deleteLegalCounsel(dbRow.id); return; }
+        set(s => ({ legalCounsel: s.legalCounsel.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncLegalCounsel(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createLegalCounsel failed:', err);
         set(s => ({ legalCounsel: s.legalCounsel.filter(x => x.id !== id) }));
@@ -552,7 +595,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeLegalCounsel: (id) => {
     set(s => ({ legalCounsel: s.legalCounsel.filter(x => x.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteLegalCounsel(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteLegalCounsel(id); else removedBeforeSaved.add(id); }
   },
 
   addLegalDocument: (d, tenantId?) => {
@@ -561,7 +604,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createLegalDocument(tid, d).then(dbRow => {
-        if (dbRow) set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { buildingSvc.deleteLegalDocument(dbRow.id); return; }
+        set(s => ({ legalDocuments: s.legalDocuments.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncLegalDocument(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createLegalDocument failed:', err);
         set(s => ({ legalDocuments: s.legalDocuments.filter(x => x.id !== id) }));
@@ -574,7 +621,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeLegalDocument: (id) => {
     set(s => ({ legalDocuments: s.legalDocuments.filter(x => x.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteLegalDocument(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteLegalDocument(id); else removedBeforeSaved.add(id); }
   },
   addLegalDocAttachment: (docId, attachment) => {
     set(s => ({
@@ -595,7 +642,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createInsurancePolicy(tid, p).then(dbRow => {
-        if (dbRow) set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { buildingSvc.deleteInsurancePolicy(dbRow.id); return; }
+        set(s => ({ insurance: s.insurance.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncInsurance(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createInsurancePolicy failed:', err);
         set(s => ({ insurance: s.insurance.filter(x => x.id !== id) }));
@@ -608,7 +659,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeInsurance: (id) => {
     set(s => ({ insurance: s.insurance.filter(x => x.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteInsurancePolicy(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteInsurancePolicy(id); else removedBeforeSaved.add(id); }
   },
   addInsuranceAttachment: (policyId, attachment) => {
     set(s => ({
@@ -629,7 +680,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createVendor(tid, v).then(dbRow => {
-        if (dbRow) set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { buildingSvc.deleteVendor(dbRow.id); return; }
+        set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncVendor(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createVendor failed:', err);
         set(s => ({ vendors: s.vendors.filter(x => x.id !== id) }));
@@ -642,7 +697,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeVendor: (id) => {
     set(s => ({ vendors: s.vendors.filter(x => x.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteVendor(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteVendor(id); else removedBeforeSaved.add(id); }
   },
   toggleVendorStatus: (id) => {
     set(s => ({ vendors: s.vendors.map(x => x.id === id ? { ...x, status: x.status === 'active' ? 'inactive' : 'active' } : x) }));
@@ -659,6 +714,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       buildingSvc.createMaintenanceSchedule(tid, m).then(dbRow => {
+        if (dbRow && removedBeforeSaved.delete(id)) { buildingSvc.deleteMaintenanceSchedule(dbRow.id); return; }
         if (dbRow) {
           set(s => ({
             maintenanceSchedules: s.maintenanceSchedules.map(x => x.id === id ? { ...x, id: dbRow.id } : x),
@@ -672,6 +728,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
           useBuildingStore.getState().assets
             .filter(a => a.maintenanceScheduleIds.includes(dbRow.id))
             .forEach(a => syncAsset(a.id));
+          syncMaintenanceSchedule(dbRow.id);
         }
       }).catch(err => {
         console.error('[syncWrite] createMaintenanceSchedule failed:', err);
@@ -685,7 +742,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeMaintenanceSchedule: (id) => {
     set(s => ({ maintenanceSchedules: s.maintenanceSchedules.filter(x => x.id !== id) }));
-    if (isBackendEnabled) buildingSvc.deleteMaintenanceSchedule(id);
+    if (isBackendEnabled) { if (isDbId(id)) buildingSvc.deleteMaintenanceSchedule(id); else removedBeforeSaved.add(id); }
   },
 
   addAsset: (a, tenantId?) => {
@@ -694,7 +751,11 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
       assetsSvc.createAsset(tid, a).then(dbRow => {
-        if (dbRow) set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        if (removedBeforeSaved.delete(id)) { assetsSvc.deleteAsset(dbRow.id); return; }
+        set(s => ({ assets: s.assets.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        // Anything changed while it was being saved (an attachment, an edit) goes up now.
+        syncAsset(dbRow.id);
       }).catch(err => {
         console.error('[syncWrite] createAsset failed:', err);
         set(s => ({ assets: s.assets.filter(x => x.id !== id) }));
@@ -707,7 +768,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
   removeAsset: (id) => {
     set(s => ({ assets: s.assets.filter(x => x.id !== id) }));
-    if (isBackendEnabled) assetsSvc.deleteAsset(id);
+    if (isBackendEnabled) { if (isDbId(id)) assetsSvc.deleteAsset(id); else removedBeforeSaved.add(id); }
   },
   addConditionAssessment: (assetId, assessment) => {
     set(s => ({
@@ -743,6 +804,24 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
   },
 
   updateBylawsConfig: (config) => set(s => ({ bylawsConfig: { ...s.bylawsConfig, ...config } })),
+  governingClauses: [],
+  upsertGoverningClause: (c) => {
+    const same = (x: GoverningClause) => x.topic === c.topic && (x.role ?? '') === (c.role ?? '') && x.heading.toLowerCase() === c.heading.toLowerCase();
+    const existing = useBuildingStore.getState().governingClauses.find(same);
+    const id = existing?.id ?? `gc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    set(s => ({ governingClauses: existing ? s.governingClauses.map(x => (same(x) ? { ...x, ...c } : x)) : [...s.governingClauses, { id, ...c }] }));
+    // Saved for the whole board; the database id replaces the local one.
+    const tid = getActiveTenantId();
+    if (isBackendEnabled && tid) {
+      buildingSvc.saveGoverningClause(tid, c, isLocalClause(id) ? undefined : id).then(row => {
+        if (row) set(s => ({ governingClauses: s.governingClauses.map(x => (x.id === id ? row : x)) }));
+      }).catch(err => console.error('[syncWrite] saveGoverningClause failed:', err));
+    }
+  },
+  removeGoverningClause: (id) => {
+    set(s => ({ governingClauses: s.governingClauses.filter(x => x.id !== id) }));
+    if (isBackendEnabled && !isLocalClause(id)) buildingSvc.deleteGoverningClause(id);
+  },
 }), {
   name: 'onetwo-building',
   version: 4,
@@ -759,6 +838,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     maintenanceSchedules: state.maintenanceSchedules,
     assets: state.assets,
     bylawsConfig: state.bylawsConfig,
+    governingClauses: state.governingClauses,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

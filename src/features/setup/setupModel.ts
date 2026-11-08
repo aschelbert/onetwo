@@ -35,6 +35,9 @@ export interface BoardRow extends SourceBits { name: string; role: string; email
 export interface InsuranceRow extends SourceBits { type: string; carrier: string; policyNumber: string | null; coverage: string | null; premium: number | null; expires: string | null }
 export interface VendorRow extends SourceBits { name: string; service: string; contact: string | null; phone: string | null; email: string | null; contractEnds: string | null; annualCost: number | null }
 export interface BudgetRow extends SourceBits { category: string; annualAmount: number }
+/** A clause of the bylaws or rules: board duties, an officer's duties, what owners must do, or a rule for residents. */
+export type ClauseTopic = 'board' | 'officer' | 'owners' | 'rules';
+export interface ClauseRow extends SourceBits { topic: ClauseTopic; role: string | null; ref: string; heading: string; text: string }
 export interface ReserveRow extends SourceBits { component: string; estimatedCost: number | null; usefulLifeYears: number | null; remainingLifeYears: number | null }
 
 export interface ReadResult {
@@ -49,9 +52,18 @@ export interface ReadResult {
   vendors: VendorRow[];
   budget: BudgetRow[];
   reserves: ReserveRow[];
+  /** Clauses (bylaws, declaration, rules); absent for spreadsheets. */
+  clauses?: ClauseRow[];
 }
 
-export type DocStatus = 'reading' | 'read' | 'error';
+/** reading: being opened; read: items found to review; filed: kept in Building › Documents with nothing found; error: couldn't be opened. */
+/** Bumped when the reader learns to find more (3: clauses, content coverage). */
+export const READER_VERSION = 3;
+
+/** A document read by an earlier reader, so it may hold more than it shows (spreadsheets are matched the same way still). */
+export const readByOlderReader = (d: SetupDoc) => !!d.result && (d.reader ?? 0) < READER_VERSION && !/\.(csv|xlsx)$/i.test(d.name);
+
+export type DocStatus = 'reading' | 'read' | 'filed' | 'error';
 export interface SetupDoc {
   id: string;
   name: string;
@@ -61,15 +73,26 @@ export interface SetupDoc {
   error?: string;
   addedAt: string;
   result?: ReadResult;
+  /** What the document is (guessed from the name for filed documents; the person can change it). */
+  docType?: DocType;
+  /** A line about what happened (for filed documents). */
+  note?: string;
+  /** Text pasted in rather than a file. */
+  pasted?: boolean;
+  /** Which version of the reader read it; older readings miss what was added since. */
+  reader?: number;
   /** Filed in Building › Documents (the legal document id). */
   filedAs?: string;
 }
 
-export type Section = 'profile' | 'rules' | 'units' | 'board' | 'insurance' | 'vendors' | 'budget' | 'reserves' | 'accounts';
+export type Section = 'profile' | 'rules' | 'units' | 'board' | 'duties' | 'obligations' | 'houserules' | 'insurance' | 'vendors' | 'budget' | 'reserves' | 'accounts';
 export const SECTIONS: { id: Section; label: string }[] = [
   { id: 'profile', label: 'Building profile' },
   { id: 'units', label: 'Units and ownership' },
   { id: 'board', label: 'Board and officers' },
+  { id: 'duties', label: 'Board and officer duties' },
+  { id: 'obligations', label: 'Owner obligations' },
+  { id: 'houserules', label: 'Rules for residents' },
   { id: 'rules', label: 'Rules and money' },
   { id: 'accounts', label: 'Bank balances' },
   { id: 'insurance', label: 'Insurance' },
@@ -107,17 +130,20 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
   insurance: 'Insurance', contract: 'Contract', owner_list: 'Owner list', minutes: 'Meeting minutes', other: 'Other document',
 };
 
-/** What to upload, and what each kind fills in: the checklist on the Documents step. */
-export const DOC_KINDS: { id: string; label: string; types: DocType[]; fills: string[] }[] = [
-  { id: 'governing', label: 'Declaration and bylaws', types: ['bylaws', 'declaration'], fills: ['Units and ownership %', 'Board size and terms', 'Quorum and notice rules', 'Assessment due day', 'Late fees'] },
-  { id: 'owners', label: 'Owner list', types: ['owner_list'], fills: ['Units', 'Owners and contacts', 'Mailing addresses', 'Invites'] },
-  { id: 'budget', label: "This year's budget", types: ['budget'], fills: ['Budget lines by category', 'Monthly assessment per unit'] },
-  { id: 'statements', label: 'Year-end financial statement or bank statements', types: ['financial_statement', 'bank_statement'], fills: ['Operating and reserve accounts', 'Opening balances'] },
-  { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], fills: ['Reserve components', 'Useful life and cost'] },
-  { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], fills: ['Policies and limits', 'Renewal dates → Obligations'] },
-  { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], fills: ['Vendors', 'Terms and renewals → Contracts'] },
-  { id: 'rules', label: 'Rules and regulations', types: ['rules'], fills: ['Pet and rental rules', 'Fines'] },
-  { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], fills: ['Board and officers', 'Term end dates'] },
+/**
+ * What to upload. Spreadsheets (`imports`) become items to review; the rest
+ * are filed in Building › Documents and their settings asked in Fill the gaps.
+ */
+export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[] }[] = [
+  { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Board and officer duties', 'Owner obligations', 'Rules for residents', 'Quorum and notice rules', 'Assessment due day', 'Late fees', 'Unit ownership table'] },
+  { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Invites'] },
+  { id: 'budget', label: "This year's budget (Excel, CSV or PDF)", types: ['budget'], imports: true, fills: ['Budget lines by category'] },
+  { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], imports: true, fills: ['Board and officers'] },
+  { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Rules for residents', 'Fines', 'Late fees'] },
+  { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], imports: true, fills: ['Carrier and policy number', 'Limits', 'Renewal date'] },
+  { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], imports: true, fills: ['Reserve components', 'Useful life and cost'] },
+  { id: 'statements', label: 'Bank or year-end statements', types: ['financial_statement', 'bank_statement'], imports: true, fills: ['Opening balances'] },
+  { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], imports: false, fills: ['Kept in Building › Documents'] },
 ];
 
 // ── Items ──────────────────────────────────────────────────────────
@@ -142,7 +168,7 @@ export const FIELD_LABEL: Record<string, string> = {
   monthlyFee: 'Monthly assessment', role: 'Office', termEnds: 'Term ends', carrier: 'Carrier', policyNumber: 'Policy number',
   coverage: 'Coverage', premium: 'Premium', expires: 'Expires', service: 'Service', contact: 'Contact', contractEnds: 'Contract ends',
   annualCost: 'Annual cost', annualAmount: 'Annual amount', estimatedCost: 'Replacement cost', usefulLifeYears: 'Useful life',
-  remainingLifeYears: 'Years left',
+  remainingLifeYears: 'Years left', text: 'Clause', ref: 'Section',
 };
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
@@ -215,6 +241,15 @@ export function buildItems(docs: SetupDoc[]): Item[] {
       if (!l.category?.trim()) continue;
       addValue(get(`budget:${keyPart(l.category)}`, 'budget', l.category.trim()), 'annualAmount', l.annualAmount, src(l));
     }
+    for (const c of r.clauses ?? []) {
+      const section: Section = c.topic === 'owners' ? 'obligations' : c.topic === 'rules' ? 'houserules' : 'duties';
+      const label = c.role && c.heading.toLowerCase().replace(/-/g, ' ') === c.role.toLowerCase() ? `${c.role} duties` : `${c.role ? `${c.role} · ` : ''}${c.heading}`;
+      const it = get(`clause:${c.topic}:${keyPart(`${c.role ?? ''} ${c.heading}`)}`, section, label);
+      const s = src(c);
+      addValue(it, 'text', c.text, s);
+      if (c.ref) addValue(it, 'ref', c.ref, s);
+      if (c.role) addValue(it, 'role', c.role, s);
+    }
     for (const x of r.reserves ?? []) {
       if (!x.component?.trim()) continue;
       const it = get(`reserve:${keyPart(x.component)}`, 'reserves', x.component.trim());
@@ -236,21 +271,32 @@ export interface Decision { status: 'accepted' | 'skipped'; picks?: Record<strin
 export function resolve(item: Item, picks?: Record<string, number>, edits?: Record<string, FieldScalar>): Record<string, FieldScalar> {
   const out: Record<string, FieldScalar> = {};
   for (const [f, vals] of Object.entries(item.fields)) out[f] = edits?.[f] ?? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].value;
+  // Values the person added that no document had (a unit's monthly amount).
+  for (const [f, v] of Object.entries(edits ?? {})) if (!(f in out) && v !== '') out[f] = v;
   return out;
 }
+
+/** A unit with no monthly assessment from any document. */
+export const missingFee = (it: Item) => it.section === 'units' && !it.fields.monthlyFee;
 
 /** An item that can go in with the bulk accept: one value per field and nothing read with low confidence. */
 export const isClear = (it: Item) => it.conflicts.length === 0 && !it.lowConfidence;
 
 /** One line that says what an item holds. */
-export function itemSummary(it: Item, picks?: Record<string, number>): string {
-  const v = (f: string) => { const vals = it.fields[f]; return vals ? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].display : null; };
+export function itemSummary(it: Item, picks?: Record<string, number>, edits?: Record<string, FieldScalar>): string {
+  const v = (f: string) => {
+    if (edits?.[f] !== undefined && edits[f] !== '') return displayOf(f, edits[f]);
+    const vals = it.fields[f]; return vals ? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].display : null;
+  };
   switch (it.section) {
     case 'units': return [v('owner'), v('ownershipPct'), v('monthlyFee') && `${v('monthlyFee')} a month`].filter(Boolean).join(' · ');
     case 'board': return [v('role'), v('email'), v('termEnds') && `term ends ${v('termEnds')}`].filter(Boolean).join(' · ');
     case 'insurance': return [v('carrier'), v('coverage'), v('expires') && `expires ${v('expires')}`].filter(Boolean).join(' · ');
     case 'vendors': return [v('service'), v('contact'), v('contractEnds') && `contract ends ${v('contractEnds')}`].filter(Boolean).join(' · ');
     case 'budget': return `${v('annualAmount')} a year`;
+    case 'duties':
+    case 'obligations':
+    case 'houserules': { const t = v('text') ?? ''; return `${v('ref') ? `${v('ref')} · ` : ''}${t.length > 240 ? `${t.slice(0, 239)}…` : t}`; }
     case 'reserves': return [v('estimatedCost'), v('usefulLifeYears') && `${v('usefulLifeYears')} life`, v('remainingLifeYears') && `${v('remainingLifeYears')} left`].filter(Boolean).join(' · ');
     default: return v('value') ?? '';
   }
@@ -285,4 +331,73 @@ export function progress(docs: SetupDoc[], items: Item[], decided: number, ess: 
   const reviewPart = items.length === 0 ? (docs.length ? 1 : 0) : decided / items.length;
   const essPart = Object.values(ess).filter(Boolean).length / 4;
   return Math.round((docsPart * 0.2 + reviewPart * 0.4 + essPart * 0.4) * 100);
+}
+
+// ── What a document holds, and where it goes ──────────────────────
+
+/** Where accepted items land in the app (the confirmation after Accept links here). */
+export const DESTINATIONS: { match: RegExp; path: string }[] = [
+  { match: /^Building profile/, path: '/building' },
+  { match: /^Building › Directory/, path: '/building?tab=directory' },
+  { match: /^Funds › Accounts and ledger · billing rules/, path: '/funds?tab=settings' },
+  { match: /^Funds › opening balance/, path: '/funds?tab=settings&section=ledger' },
+  { match: /^Building › Obligations · duties and roles/, path: '/building?tab=obligations&section=duties' },
+  { match: /^Building › Documents · insurance/, path: '/building?tab=documents&section=certificates' },
+  { match: /^Building › Contracts/, path: '/building?tab=contracts' },
+  { match: /^Funds › Planning · budget/, path: '/funds?tab=planning&section=budget' },
+  { match: /^Funds › Planning · reserves/, path: '/funds?tab=planning&section=reserves' },
+];
+export const pathFor = (savedTo?: string) => (savedTo ? DESTINATIONS.find(d => d.match.test(savedTo))?.path : undefined);
+
+/** Where each review section's items go, said once at the top of the section. */
+export const SECTION_GOES: Record<Section, string> = {
+  profile: 'Building profile',
+  units: 'Building › Directory · units',
+  board: 'Building › Directory · board',
+  duties: 'Building › Obligations · duties and roles',
+  obligations: 'Building › Obligations · duties and roles',
+  houserules: 'Building › Obligations · duties and roles',
+  rules: 'Funds › Accounts and ledger · billing rules, and Building › Obligations · duties and roles',
+  accounts: 'Funds › opening balance',
+  insurance: 'Building › Documents · insurance',
+  vendors: 'Building › Contracts',
+  budget: 'Funds › Planning · budget',
+  reserves: 'Funds › Planning · reserves',
+};
+
+const MONEY_FACTS: FactKey[] = ['late_fee', 'grace_period_days', 'assessment_due_day'];
+const RULE_FACTS: FactKey[] = ['pet_rule', 'rental_rule', 'fine_amount'];
+const BALANCE_FACTS: FactKey[] = ['operating_balance', 'reserve_balance', 'balance_as_of'];
+
+export interface Coverage { kind: string; label: string; count: number; unit: string; pages: string; goes: string }
+
+const pageSpan = (rows: { page: number | null }[]) => {
+  const ps = [...new Set(rows.map(r => r.page).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  if (!ps.length) return '';
+  return ps.length === 1 ? `p.${ps[0]}` : ps[ps.length - 1] - ps[0] === ps.length - 1 ? `pp.${ps[0]}–${ps[ps.length - 1]}` : `pp.${ps.slice(0, 4).join(', ')}${ps.length > 4 ? '…' : ''}`;
+};
+
+/**
+ * Which of the documents setup asks for this one actually contains, judged by
+ * what was read from it, not by its name. Bylaws often hold an ownership
+ * table (the owner list), use restrictions (the rules) and the officers.
+ */
+export function coverage(r: ReadResult): Coverage[] {
+  const clauses = r.clauses ?? [];
+  const governing = [...r.facts.filter(f => !RULE_FACTS.includes(f.key) && !BALANCE_FACTS.includes(f.key)), ...clauses.filter(c => c.topic !== 'rules')];
+  const rules = [...r.facts.filter(f => RULE_FACTS.includes(f.key)), ...clauses.filter(c => c.topic === 'rules')];
+  const balances = r.facts.filter(f => BALANCE_FACTS.includes(f.key));
+  const out: Coverage[] = [];
+  const add = (kind: string, rows: { page: number | null }[], unit: string, goes: string) => {
+    if (rows.length) out.push({ kind, label: DOC_KINDS.find(k => k.id === kind)?.label.replace(/ \(.*\)$/, '') ?? kind, count: rows.length, unit, pages: pageSpan(rows), goes });
+  };
+  add('governing', governing, governing.length === 1 ? 'setting or clause' : 'settings and clauses', r.facts.some(f => MONEY_FACTS.includes(f.key)) ? 'Billing rules · Duties and roles' : 'Duties and roles');
+  add('owners', r.units, r.units.length === 1 ? 'unit' : 'units', 'Building › Directory');
+  add('minutes', r.board, r.board.length === 1 ? 'board member' : 'board members', 'Building › Directory');
+  add('rules', rules, rules.length === 1 ? 'rule' : 'rules', 'Duties and roles · Rules for residents');
+  add('budget', r.budget, r.budget.length === 1 ? 'budget line' : 'budget lines', 'Funds › Planning');
+  add('insurance', r.insurance, r.insurance.length === 1 ? 'policy' : 'policies', 'Building › Documents');
+  add('reserves', r.reserves, r.reserves.length === 1 ? 'reserve item' : 'reserve items', 'Funds › Planning');
+  add('statements', balances, 'balances', 'Funds › opening balance');
+  return out;
 }

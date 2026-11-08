@@ -12,11 +12,13 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
-import { useSetupStore } from '@/features/setup/useSetupStore';
+import { useSetupStore, type InviteAccess } from '@/features/setup/useSetupStore';
+import { ACCESS_OPTIONS, EMAIL_RE, SEATS, accessLabel, invitePayload, parseInviteLines, readRole } from '@/features/setup/invites';
 import { applyBudgetTemplate, postOpening } from '@/features/setup/applySetup';
-import { itemSummary, resolve } from '@/features/setup/setupModel';
+import { resolve } from '@/features/setup/setupModel';
 import { Button, Chip } from '../components';
 import { useSetup } from './useSetup';
+import UnitsEditor from './UnitsEditor';
 
 const INPUT = 'h-10 rounded-[10px] border border-ux2-line-strong bg-white px-3 text-sm text-ux2-ink';
 const Done = () => <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-ux2-sage text-white"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span>;
@@ -62,8 +64,20 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const [profile, setProfile] = useState({ name: b.name, street: b.address.street, city: b.address.city, state: b.address.state, zip: b.address.zip });
   const [member, setMember] = useState({ name: '', role: 'President', email: '' });
   const [sameFee, setSameFee] = useState('');
+  const [splitTotal, setSplitTotal] = useState('');
   const [balances, setBalances] = useState({ operating: '', reserve: '' });
+  const [fees, setFees] = useState({ dueDay: String(f.hoaDueDay ?? 1), lateFee: f.lateFeeEnabled ? String(f.lateFeeAmount) : '', grace: String(f.lateFeeGraceDays) });
+  const [feesSaved, setFeesSaved] = useState(false);
   const [inviteOff, setInviteOff] = useState<string[]>([]);
+  const invites = useSetupStore(x => x.invites);
+  const addInvites = useSetupStore(x => x.addInvites);
+  const removeInvite = useSetupStore(x => x.removeInvite);
+  const markInvitesSent = useSetupStore(x => x.markInvitesSent);
+  const [person, setPerson] = useState<{ email: string; access: InviteAccess; seat: string; unit: string }>({ email: '', access: 'owner', seat: 'director', unit: '' });
+  const [personError, setPersonError] = useState('');
+  const [unitsOpen, setUnitsOpen] = useState(f.units.length === 0);
+  const [pasting, setPasting] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const [inviteOwners, setInviteOwners] = useState(true);
   const [note, setNote] = useState<{ tone: 'sage' | 'red'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -78,14 +92,16 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const annualFromUnits = units.reduce((t, u) => t + (u.monthlyFee || 0), 0) * 12;
   const noEmail = units.filter(u => u.owner && !u.email);
   const boardWithEmail = b.board.filter(m => m.email);
-  const ownersWithEmail = units.filter(u => u.email);
-  const rulesOnFile = s.items.filter(i => s.decisions[i.key]?.savedTo === 'Rules on file');
+  const sentEmails = new Set(useSetupStore.getState().invites.filter(i => i.sentAt).map(i => i.email));
+  const ownersWithEmail = units.filter(u => u.email && !sentEmails.has(u.email.toLowerCase()));
 
   const saveProfile = () => {
     if (profile.name.trim()) b.updateName(profile.name.trim());
     b.updateAddress({ street: profile.street.trim(), city: profile.city.trim(), state: profile.state.trim(), zip: profile.zip.trim() });
   };
   const addMember = () => { if (member.name.trim()) { b.addBoardMember({ name: member.name.trim(), role: member.role, email: member.email.trim(), phone: '', term: '' }); setMember({ name: '', role: 'Director', email: '' }); } };
+  const pctReady = units.length > 0 && Math.abs(pctTotal - 100) < 0.5;
+  const splitTyped = () => { const t = Number(splitTotal.replace(/[$,\s]/g, '')); if (t > 0) for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(t * (u.votingPct / 100) * 100) / 100 }); };
   const split = () => { for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(monthlyTotal * (u.votingPct / 100) * 100) / 100 }); };
   const applySame = () => { const n = Number(sameFee.replace(/[$,]/g, '')); if (n > 0) for (const u of unassessed) f.updateUnit(u.number, { monthlyFee: n }); };
   const saveBalances = () => {
@@ -94,12 +110,55 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     if (rs > 0) postOpening('reserve', rs);
   };
 
-  const inviteBoard = async () => {
-    const list = boardWithEmail.filter(m => !inviteOff.includes(m.id)).map(m => ({ email: m.email, role: 'board_member' }));
+  const saveFees = () => {
+    const due = Number(fees.dueDay); const fee = Number(fees.lateFee.replace(/[$,]/g, '')); const grace = Number(fees.grace);
+    if (due >= 1 && due <= 28) f.setHoaDueDay(due);
+    f.setLateFeeSettings(fee > 0, fee > 0 ? fee : f.lateFeeAmount, grace >= 0 ? grace : f.lateFeeGraceDays);
+    setFeesSaved(true);
+  };
+
+  const addPerson = () => {
+    const email = person.email.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) { setPersonError('Enter an email address.'); return; }
+    if (invites.some(i => i.email === email)) { setPersonError('Already on the list.'); return; }
+    const unitOk = ACCESS_OPTIONS.find(a => a.id === person.access)?.unit;
+    addInvites([{ email, access: person.access, seat: person.access === 'board' ? person.seat : null, unit: unitOk && person.unit.trim() ? person.unit.trim().toUpperCase() : null }]);
+    setPerson(p => ({ ...p, email: '', unit: '' }));
+    setPersonError('');
+  };
+  const addPasted = () => {
+    const { invites: found, skipped } = parseInviteLines(pasteText, units.map(u => u.number));
+    addInvites(found);
+    setPasteText('');
+    setPasting(false);
+    setNote(skipped.length ? { tone: 'red', text: `Added ${found.length}. ${skipped.length} line${skipped.length === 1 ? ' has' : 's have'} no email and ${skipped.length === 1 ? 'was' : 'were'} skipped: ${skipped.slice(0, 2).join(' · ')}${skipped.length > 2 ? '…' : ''}` } : { tone: 'sage', text: `Added ${found.length} ${found.length === 1 ? 'person' : 'people'} to the list.` });
+  };
+
+  // Board members already on the roster (with an email) join the same send; the roster's office becomes their seat.
+  const rosterToSend = boardWithEmail.filter(m => !inviteOff.includes(m.id) && !invites.some(i => i.email === m.email.toLowerCase()));
+  const queued = invites.filter(i => !i.sentAt);
+  const toSendCount = queued.length + (invitedBoard ? 0 : rosterToSend.length);
+
+  const sendAll = async () => {
+    const roster = invitedBoard ? [] : rosterToSend.map(m => ({ email: m.email.toLowerCase(), access: 'board' as const, seat: readRole(m.role).seat ?? 'director', unit: null }));
+    const list = [...queued, ...roster];
     if (!list.length) return;
     setBusy(true); setNote(null);
-    try { await sendInvites(list, viewer.name); setInvitedBoard(true); setNote({ tone: 'sage', text: `${list.length} board invitation${list.length === 1 ? '' : 's'} sent.` }); }
-    catch (e) { setNote({ tone: 'red', text: e instanceof Error ? e.message : 'Invitations could not be sent.' }); }
+    try {
+      await sendInvites(list.map(invitePayload), viewer.name);
+      const at = new Date().toISOString();
+      addInvites(roster);
+      markInvitesSent(list.map(i => i.email), at);
+      if (roster.length) setInvitedBoard(true);
+      // An owner invited to a unit that has no email on file: keep the email on the unit too.
+      for (const i of list) {
+        if ((i.access === 'owner' || i.access === 'board') && i.unit) {
+          const u = units.find(x => x.number.toLowerCase() === i.unit!.toLowerCase());
+          if (u && !u.email) f.updateUnit(u.number, { email: i.email });
+        }
+      }
+      setNote({ tone: 'sage', text: `${list.length} invitation${list.length === 1 ? '' : 's'} sent.` });
+    } catch (e) { setNote({ tone: 'red', text: e instanceof Error ? e.message : 'Invitations could not be sent.' }); }
     finally { setBusy(false); }
   };
 
@@ -109,9 +168,9 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
       if (inviteOwners && ownersWithEmail.length) await sendInvites(ownersWithEmail.map(u => ({ email: u.email, role: 'resident', unit: u.number })), viewer.name);
       await tenant.updateOnboardingStep('buildingProfileComplete', true);
       await tenant.updateOnboardingStep('unitsConfigured', true);
-      if (s.docs.some(d => d.result && ['bylaws', 'declaration'].includes(d.result.docType))) await tenant.updateOnboardingStep('bylawsUploaded', true);
+      if (s.docs.some(d => d.docType === 'bylaws' || d.docType === 'declaration')) await tenant.updateOnboardingStep('bylawsUploaded', true);
       if (f.budgetCategories.length) await tenant.updateOnboardingStep('financialSetupDone', true);
-      if (invitedBoard || inviteOwners) await tenant.updateOnboardingStep('firstUserInvited', true);
+      if (invitedBoard || inviteOwners || invites.some(i => i.sentAt)) await tenant.updateOnboardingStep('firstUserInvited', true);
       await tenant.updateOnboardingStep('goLive', true);
       navigate('/home');
     } catch (e) {
@@ -147,18 +206,45 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={saveProfile}>Save</Button>
           </span>
         </Gap>
-        <Gap id="units" required done={s.ess.units} title="Units and owners" note="Best from your owner list (Excel or CSV); or add them in Building › Directory.">
-          <Button size="sm" variant="plum" onClick={onDocuments}>Upload the owner list</Button>
-          <Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=directory')}>Add by hand</Button>
+        <Gap id="units" required done={s.ess.units} title="Units and owners" note={units.length ? `${units.length} units · add more or edit them below` : 'Add them below, or import your owner list (Excel, CSV or PDF) in step 1.'}>
+          <Button size="sm" variant="ghost" onClick={onDocuments}>Import the owner list</Button>
         </Gap>
+        <div className="flex flex-col gap-2">
+          <Button size="sm" variant="ghost" className="self-start" aria-expanded={unitsOpen} onClick={() => setUnitsOpen(o => !o)}>{unitsOpen ? 'Hide units' : units.length ? `Add or edit units (${units.length})` : 'Add units by hand'}</Button>
+          {unitsOpen && <UnitsEditor />}
+        </div>
         <Gap id="assessment" required done={s.ess.assessment} title="Monthly assessment for every unit" note={units.length ? `${unassessed.length} of ${units.length} units have no monthly amount yet.` : 'Add units first.'}>
           {canSplit && <Button size="sm" variant="plum" onClick={split}>Split {fmt(monthlyTotal)} a month by ownership %</Button>}
+          {!canSplit && pctReady && (
+            <span className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="sp-total">Total monthly assessments for the building</label>
+              <input id="sp-total" inputMode="decimal" className={cn(INPUT, 'w-36')} placeholder="$ total a month" value={splitTotal} onChange={e => setSplitTotal(e.target.value)} />
+              <Button size="sm" variant="ghost" onClick={splitTyped}>Split by ownership %</Button>
+            </span>
+          )}
           {units.length > 0 && (
             <span className="flex items-center gap-2">
               <label className="sr-only" htmlFor="sp-same">Same monthly amount for each unit</label>
               <input id="sp-same" className={cn(INPUT, 'w-28')} placeholder="$ per unit" value={sameFee} onChange={e => setSameFee(e.target.value)} />
-              <Button size="sm" variant={canSplit ? 'ghost' : 'plum'} onClick={applySame}>Same for each</Button>
+              <Button size="sm" variant="ghost" onClick={applySame}>Same for each</Button>
             </span>
+          )}
+          {unassessed.length > 0 && (
+            <div className="basis-full" data-unit-fees>
+              <div className="mb-1.5 text-xs font-semibold text-ux2-muted">Or unit by unit</div>
+              <ul className="m-0 grid max-h-[360px] list-none grid-cols-1 gap-1.5 overflow-auto p-0 sm:grid-cols-2">
+                {unassessed.map(u => (
+                  <li key={u.number} className="flex items-center gap-2 rounded-xl border border-ux2-line bg-ux2-surface px-3 py-1.5 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate"><b className="font-semibold">{u.number}</b>{u.owner ? <span className="text-ux2-muted"> · {u.owner}</span> : null}{u.votingPct ? <span className="text-ux2-muted"> · {u.votingPct}%</span> : null}</span>
+                    <label className="flex items-center gap-1 text-xs text-ux2-muted">$
+                      <input inputMode="decimal" aria-label={`Monthly assessment for ${u.number}`} className="h-9 w-24 rounded-[10px] border border-ux2-line-strong bg-white px-2 text-sm text-ux2-ink" placeholder="a month"
+                        onBlur={e => { const n = Number(e.target.value.replace(/[$,\s]/g, '')); if (e.target.value.trim() && n > 0) f.updateUnit(u.number, { monthlyFee: n }); }}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </Gap>
         <Gap id="board" required done={s.ess.board} title="At least one board member" note="Usually found in the annual meeting minutes.">
@@ -170,7 +256,15 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={addMember}>Add</Button>
           </span>
         </Gap>
-        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements. Type today's balances, or upload a statement.">
+        <Gap id="fees" done={feesSaved} title="Due day and late fee" note="From your bylaws or collection policy: the day assessments are due, and the fee once a payment is late.">
+          <span className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-due">Due day<input id="sp-due" inputMode="numeric" className={cn(INPUT, 'w-16')} value={fees.dueDay} onChange={e => setFees(x => ({ ...x, dueDay: e.target.value }))} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-fee">Late fee $<input id="sp-fee" inputMode="decimal" className={cn(INPUT, 'w-20')} placeholder="none" value={fees.lateFee} onChange={e => setFees(x => ({ ...x, lateFee: e.target.value }))} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-ux2-muted" htmlFor="sp-grace">after<input id="sp-grace" inputMode="numeric" className={cn(INPUT, 'w-16')} value={fees.grace} onChange={e => setFees(x => ({ ...x, grace: e.target.value }))} />days</label>
+            <Button size="sm" variant="plum" onClick={saveFees}>Save</Button>
+          </span>
+        </Gap>
+        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements: today's balances in the operating and reserve accounts.">
           <span className="flex flex-wrap items-center gap-2">
             <label className="sr-only" htmlFor="sp-op">Operating balance</label><input id="sp-op" className={cn(INPUT, 'w-32')} placeholder="Operating $" value={balances.operating} onChange={e => setBalances(x => ({ ...x, operating: e.target.value }))} />
             <label className="sr-only" htmlFor="sp-rs">Reserve balance</label><input id="sp-rs" className={cn(INPUT, 'w-32')} placeholder="Reserve $" value={balances.reserve} onChange={e => setBalances(x => ({ ...x, reserve: e.target.value }))} />
@@ -179,27 +273,79 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
         </Gap>
         <Gap id="budget" done={f.budgetCategories.length > 0} title="This year's budget" note={f.budgetCategories.length ? `${f.budgetCategories.length} budget lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : annualFromUnits ? `Not uploaded. Start from a template sized to ${fmt(annualFromUnits)} a year of assessments, then adjust the lines in Funds › Planning.` : 'Upload it, or set assessments first and start from a template.'}>
           {annualFromUnits > 0 && <Button size="sm" variant="plum" onClick={() => applyBudgetTemplate(annualFromUnits)}>Use the template</Button>}
-          <Button size="sm" variant="ghost" onClick={onDocuments}>Upload the budget</Button>
+          <Button size="sm" variant="ghost" onClick={onDocuments}>Add the budget</Button>
         </Gap>
         <Gap id="emails" done={units.length > 0 && noEmail.length === 0} title={noEmail.length ? `Emails for ${noEmail.length} owner${noEmail.length === 1 ? '' : 's'}` : 'Owner emails'} note={noEmail.length ? `${noEmail.length === 1 ? 'Unit' : 'Units'} ${noEmail.slice(0, 4).map(u => u.number).join(', ')}${noEmail.length > 4 ? '…' : ''} ${noEmail.length === 1 ? 'gets' : 'get'} paper notices until you add an email.` : 'Every owner with a unit has an email.'}>
-          <Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=directory')}>Add in Directory</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setUnitsOpen(true); window.setTimeout(() => document.querySelector('[data-units-editor]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }}>Add them in the units list</Button>
         </Gap>
       </section>
 
-      <section id="setup-invite" aria-labelledby="invite-h" className="flex scroll-mt-4 flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
+      <section id="setup-invite" aria-labelledby="invite-h" className="flex scroll-mt-4 flex-col gap-3 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
         <div className="flex flex-wrap items-center gap-2.5">
           <h2 id="invite-h" className="flex-1 text-xl font-medium">4 · Invite people <span className="text-sm text-ux2-muted">· optional, you can do it after going live</span></h2>
-          {boardWithEmail.length > 0 && <Button variant="plum" disabled={busy} onClick={() => void inviteBoard()}>{invitedBoard ? 'Send again' : `Send ${boardWithEmail.filter(m => !inviteOff.includes(m.id)).length} board invites`}</Button>}
+          {toSendCount > 0 && <Button variant="plum" disabled={busy} onClick={() => void sendAll()}>{busy ? 'Sending…' : `Send ${toSendCount} invitation${toSendCount === 1 ? '' : 's'}`}</Button>}
         </div>
-        {boardWithEmail.length === 0 && <p className="m-0 text-sm text-ux2-muted">Add board members with an email (in the gaps above, or from your minutes) and they show here.</p>}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {boardWithEmail.map(m => (
-            <label key={m.id} className="flex min-h-[44px] items-center gap-3 rounded-[14px] border border-ux2-line bg-white px-3.5 py-2.5 text-sm">
-              <input type="checkbox" checked={!inviteOff.includes(m.id)} onChange={e => setInviteOff(x => (e.target.checked ? x.filter(id => id !== m.id) : [...x, m.id]))} className="h-[18px] w-[18px] shrink-0 accent-[#4F46A8]" />
-              <span className="min-w-0 flex-1"><b className="font-semibold">{m.name}</b> <span className="text-ux2-muted">· {m.role} · {m.email}</span></span>
+        <p className="m-0 text-[13px] text-ux2-muted">Each person gets an email with a one-time code. Their role and unit are set when they accept: owners and residents see their unit, board members their seat.</p>
+
+        <div className="flex flex-col gap-2 rounded-2xl border border-ux2-line bg-white px-4 py-3" data-invite-form>
+          <div className="text-sm font-semibold">Add someone</div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs text-ux2-muted">Email
+              <input type="email" className={INPUT} placeholder="name@example.com" value={person.email} onChange={e => { setPerson(p => ({ ...p, email: e.target.value })); setPersonError(''); }} onKeyDown={e => { if (e.key === 'Enter') addPerson(); }} />
             </label>
-          ))}
+            <label className="flex flex-col gap-1 text-xs text-ux2-muted">Role
+              <select className={cn(INPUT, 'w-44')} value={person.access} onChange={e => setPerson(p => ({ ...p, access: e.target.value as InviteAccess }))}>
+                {ACCESS_OPTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+              </select>
+            </label>
+            {person.access === 'board' && (
+              <label className="flex flex-col gap-1 text-xs text-ux2-muted">Seat
+                <select className={cn(INPUT, 'w-40')} value={person.seat} onChange={e => setPerson(p => ({ ...p, seat: e.target.value }))}>
+                  {SEATS.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
+                </select>
+              </label>
+            )}
+            {ACCESS_OPTIONS.find(a => a.id === person.access)?.unit && (
+              <label className="flex flex-col gap-1 text-xs text-ux2-muted">Unit{person.access === 'board' ? ' (if an owner)' : ''}
+                <input list="setup-unit-list" className={cn(INPUT, 'w-28')} placeholder="e.g. 4B" value={person.unit} onChange={e => setPerson(p => ({ ...p, unit: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addPerson(); }} />
+              </label>
+            )}
+            <datalist id="setup-unit-list">{units.map(u => <option key={u.number} value={u.number}>{u.owner}</option>)}</datalist>
+            <Button size="sm" variant="plum" className="h-10" onClick={addPerson}>Add</Button>
+          </div>
+          {personError && <span role="alert" className="text-xs text-ux2-red-ink">{personError}</span>}
+          <div>
+            <Button size="sm" variant="ghost" aria-expanded={pasting} onClick={() => setPasting(p => !p)}>{pasting ? 'Close' : 'Add several at once'}</Button>
+          </div>
+          {pasting && (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-ux2-muted" htmlFor="setup-invite-paste">One person per line: an email, then the role and unit in any order, e.g. "ana@example.com, treasurer, 4B" or "jo@example.com tenant unit 12". Lines without a role are owners.</label>
+              <textarea id="setup-invite-paste" rows={5} className="w-full rounded-xl border border-ux2-line-strong px-3 py-2 text-sm" value={pasteText} onChange={e => setPasteText(e.target.value)} />
+              <Button size="sm" variant="plum" className="self-start" disabled={!pasteText.trim()} onClick={addPasted}>Add these</Button>
+            </div>
+          )}
         </div>
+
+        {(invites.length > 0 || boardWithEmail.length > 0) && (
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="People to invite">
+            {invites.map(i => (
+              <li key={i.id} data-invite={i.email} className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-2.5 text-sm">
+                <span className="min-w-[220px] flex-1 break-words"><b className="font-semibold">{i.email}</b> <span className="text-ux2-muted">· {accessLabel(i)}{i.unit ? ` · Unit ${i.unit}` : ''}</span></span>
+                {i.sentAt ? <Chip tone="sage">Sent</Chip> : <Chip tone="plum">Not sent yet</Chip>}
+                {!i.sentAt && <Button size="sm" variant="ghost" aria-label={`Remove ${i.email}`} onClick={() => removeInvite(i.id)}>Remove</Button>}
+              </li>
+            ))}
+            {boardWithEmail.filter(m => !invites.some(i => i.email === m.email.toLowerCase())).map(m => (
+              <li key={m.id}>
+                <label className="flex min-h-[44px] flex-wrap items-center gap-2.5 rounded-[14px] border border-ux2-line bg-white px-3.5 py-2.5 text-sm">
+                  <input type="checkbox" checked={!inviteOff.includes(m.id)} disabled={invitedBoard} onChange={e => setInviteOff(x => (e.target.checked ? x.filter(id => id !== m.id) : [...x, m.id]))} className="h-[18px] w-[18px] shrink-0 accent-[#4F46A8]" />
+                  <span className="min-w-[200px] flex-1 break-words"><b className="font-semibold">{m.name}</b> <span className="text-ux2-muted">· {m.role} · {m.email} · from the board roster</span></span>
+                  {invitedBoard ? <Chip tone="sage">Sent</Chip> : <Chip tone="plum">Not sent yet</Chip>}
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
         {note && <div role="status" className={cn('rounded-xl px-3 py-2 text-sm', note.tone === 'sage' ? 'bg-ux2-sage-tint text-ux2-sage' : 'bg-ux2-red-tint text-ux2-red-ink')}>{note.text}</div>}
       </section>
 
@@ -231,12 +377,6 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
           <div>Insurance renewals, contract ends and reserve items show up as duties on the calendar.</div>
           <div>Your building score starts, from what's already in place.</div>
           <div>Anything you left for later can still be done in each module.</div>
-          {rulesOnFile.length > 0 && (
-            <>
-              <div className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-white/70">Rules on file from your documents</div>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">{rulesOnFile.map(i => <li key={i.key}><b className="font-semibold">{i.label}:</b> {itemSummary(i, s.decisions[i.key]?.picks)}</li>)}</ul>
-            </>
-          )}
         </div>
       </section>
     </div>
