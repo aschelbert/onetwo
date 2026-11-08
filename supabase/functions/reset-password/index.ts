@@ -28,6 +28,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // The app's own email (Mailjet) isn't set up: tell the page, which asks Supabase Auth to send its
+    // built-in reset email instead. Answered before any lookup, so it says nothing about whether the user exists.
+    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
+      return new Response(JSON.stringify({ success: true, fallback: true }), {
+        status: 200, headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     // Use Supabase Admin API to generate a password recovery link
     const genRes = await fetch(`${SB_URL}/auth/v1/admin/generate_link`, {
       method: "POST",
