@@ -74,7 +74,23 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   a Missing row with Add file for each required document not on file
   (declaration, bylaws, rules, plats and plans, collections policy, reserve
   study). This is where documents setup didn't cover show up afterwards.
-  Uploading a document the building already has adds it as a new version.
+  Versions: a document's current version is its newest file that isn't
+  archived. Upload (and New version / Add file on a row) asks which
+  documents the file is (one file can be several: bylaws holding the rules
+  and a pets policy are filed once under each), whether it's the current
+  version or a past one (history, replaces nothing), and, when it replaces a
+  current file, whether to archive the old one (kept under Earlier) or
+  delete it. Earlier lists past versions with Make current and Delete. The
+  form and the earlier versions open above the table, at full width.
+  Files are stored in the private `building-documents` bucket
+  (`<tenant_id>/<file_id>/<name>`, migration 036; `lib/services/documentFiles.ts`):
+  everyone in the building downloads (a 60-second signed link), board
+  members upload and delete. Upload stores the file before filing it (an
+  error keeps the form open); setup stores each file as it's filed. One
+  file on several documents is one object, deleted only when no document
+  uses it. Files added before storage show "add it again to download".
+  Setup's vendor contract files are stored too and download from the
+  Vendor contracts rows.
 - **Obligations** · This month / By role / By category / Filings / Ongoing /
   Duties and roles pills, four compact counts, the month's table with
   expandable rows (why it matters, if missed, how to; Mark done and Mark
@@ -127,6 +143,18 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   Statements and receipts, Unit details, Documents for this unit (Upload),
   Move history (Report a move inline), Requests from this unit, Owner
   responsibilities, Link a unit. No embedded My Unit page.
+  Documents for this unit lists what the board shared (visible to owner)
+  and what the owner added, each with Download (a 60-second signed link)
+  and Delete for the owner's own uploads; a failed upload says so. Files
+  are in the private `unit-documents` bucket at `<tenant>/<unit>/<time>-<name>`
+  (migration 037). Board members and property managers reach every unit's
+  documents; an owner reaches their own unit (tenant_users.unit, set when
+  they accept an invitation that names it). An upload whose row can't be
+  saved removes its file; a delete removes the row first, then the file.
+  Move history: an owner reports a move for their unit (deposit, access,
+  inspection and insurance start pending and stay the board's to settle;
+  migration 038); a move that can't be saved keeps the form with a message.
+  Board members and property managers manage every move.
 - **User Management** · People with access / Invites / Roles tiles, Members
   table (role chips, Change role / Reset password / Resend welcome / Remove
   in the row menu), Invite (one person or bulk, inline), Audit log,
@@ -306,7 +334,19 @@ everything is read in the browser, so a document costs nothing to read.
        the same file is never filed twice, so adding again or Start over
        doesn't duplicate it. The type can be changed, which moves the file
        and reads the text again with that kind's rules. Remove takes the
-       file back out of Building › Documents.
+       file back out of Building › Documents and restores what it replaced.
+     - Under each document: Filed as (Change opens the same document
+       picker as Building › Documents), "Also in it?" suggestions from its
+       text (a rules article, pets or rentals clause, late-fee rules, a
+       reserve schedule), each confirmed with a tap, never filed on a guess,
+       and Past version (history, left out of what's read in). What a file
+       replaced is archived, with Delete instead.
+     - Optional · vendor contracts: vendor, what for, start and end dates,
+       yearly amount, renews itself, file; added to Building › Contracts
+       with the vendor.
+     - Optional · past documents: past minutes, budgets, financial
+       statements and audits, tax returns, earlier reserve studies. Each is
+       filed as an earlier version (with its year) and not read in.
   2. *Review what we found* opens with an assessment: for each document,
      which of the requested documents its content covers (bylaws often
      hold the owner list as an ownership exhibit, and the rules as use

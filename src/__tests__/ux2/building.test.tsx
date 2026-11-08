@@ -161,9 +161,29 @@ describe('Building', () => {
         expect(row).toContain('Missing');
       }
       expect(rows.some(r => r.startsWith('Pets policy'))).toBe(false);
-      const declaration = within(lib).getAllByRole('row').find(r => r.textContent?.startsWith('Declaration'))!;
-      fireEvent.click(within(declaration).getByRole('button', { name: 'Add file' }));
-      expect((within(lib).getByPlaceholderText('Rules and regulations') as HTMLInputElement).value).toBe('Declaration (CC&Rs)');
+      const row = (name: string) => within(lib).getAllByRole('row').find(r => r.textContent?.startsWith(name))!;
+      fireEvent.click(within(row('Declaration')).getByRole('button', { name: 'Add file' }));
+      const addForm = within(lib).getByRole('form', { name: 'Add a file to Declaration (CC&Rs)' });
+      expect((within(addForm).getByRole('checkbox', { name: 'Declaration (CC&Rs)' }) as HTMLInputElement).checked).toBe(true);
+      fireEvent.click(within(addForm).getByRole('button', { name: 'Cancel' }));
+
+      // A new bylaws file that also holds the rules: it replaces the current bylaws, which the person archives.
+      fireEvent.click(within(row('Bylaws')).getByRole('button', { name: 'New version' }));
+      const form = within(lib).getByRole('form', { name: 'Add a file to Bylaws' });
+      fireEvent.change(form.querySelector('input[type="file"]')!, { target: { files: [new File(['x'], 'Bylaws 2026 with rules.pdf', { type: 'application/pdf' })] } });
+      fireEvent.click(within(form).getByRole('checkbox', { name: 'Rules and regulations' }));
+      const prompt = within(form).getByRole('group', { name: 'What it replaces' });
+      expect(prompt.textContent).toContain('1302 R St NW_Bylaws.pdf');
+      expect((within(form).getByRole('button', { name: 'Upload' }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(within(prompt).getByRole('radio', { name: /Archive/ }));
+      fireEvent.click(within(form).getByRole('button', { name: 'Upload' }));
+      const docs = useBuildingStore.getState().legalDocuments;
+      const bylawsDoc = docs.find(d => d.id === 'a')!;
+      expect(bylawsDoc.attachments.map(f => [f.name, !!f.archived])).toEqual([['1302 R St NW_Bylaws.pdf', true], ['Bylaws 2026 with rules.pdf', false]]);
+      expect(docs.find(d => d.name === 'Rules and regulations')?.attachments.map(f => f.name)).toEqual(['Bylaws 2026 with rules.pdf']);
+      expect(row('Rules and regulations').textContent).not.toContain('Missing');
+      fireEvent.click(within(row('Bylaws')).getByRole('button', { name: 'Earlier · 1' }));
+      expect(within(lib).getByRole('list', { name: 'Earlier versions of Bylaws · 1302 R St NW_Bylaws' }).textContent).toContain('1302 R St NW_Bylaws.pdf');
     } finally {
       useBuildingStore.setState({ legalDocuments: prev });
     }

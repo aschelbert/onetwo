@@ -139,8 +139,9 @@ interface FinancialState {
 
   // Unit Documents
   fetchUnitDocuments: (tenantId: string) => Promise<void>;
-  uploadDocument: (unitNumber: string, file: File, docType: string, visibleToOwner: boolean, uploadedBy: string | null, uploadedByName: string | null) => Promise<void>;
-  deleteDocument: (id: string, storagePath: string) => Promise<void>;
+  /** True when the file was stored and its row saved. */
+  uploadDocument: (unitNumber: string, file: File, docType: string, visibleToOwner: boolean, uploadedBy: string | null, uploadedByName: string | null) => Promise<boolean>;
+  deleteDocument: (id: string, storagePath: string) => Promise<boolean>;
 
   // Move Events
   fetchMoveEvents: (tenantId: string) => Promise<void>;
@@ -916,13 +917,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
   uploadDocument: async (unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName) => {
     const tenantId = get().tenantId;
-    if (!tenantId) return;
+    if (!tenantId) return false;
     const doc = await unitMgrSvc.uploadUnitDocument(tenantId, unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName);
     if (doc) set(s => ({ unitDocuments: [doc, ...s.unitDocuments] }));
+    return !!doc;
   },
   deleteDocument: async (id, storagePath) => {
     const ok = await unitMgrSvc.deleteUnitDocument(id, storagePath);
     if (ok) set(s => ({ unitDocuments: s.unitDocuments.filter(d => d.id !== id) }));
+    return ok;
   },
 
   // Move Events

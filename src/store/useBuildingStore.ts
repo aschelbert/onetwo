@@ -17,9 +17,26 @@ export interface ManagementInfo {
 export interface LegalCounsel {
   id: string; firm: string; attorney: string; email: string; phone: string; specialty: string;
 }
+/**
+ * A file on a legal document. The current version is the newest file that
+ * isn't archived; archived files are earlier versions kept as history.
+ */
+export interface LegalDocFile {
+  name: string; size: string; uploadedAt: string; type: string;
+  /** The same file filed under several documents (bylaws that also hold the rules) shares this id. */
+  fileId?: string;
+  /** When it became an earlier version (replaced, or added as a past version). */
+  archived?: string;
+  /** The file that replaced it, so taking that file back out restores this one. */
+  archivedBy?: string;
+  /** The year or period a past version is for ("2024"). */
+  period?: string;
+  /** Where the file is stored (building-documents bucket); files added before storage have none. */
+  path?: string;
+}
 export interface LegalDocument {
   id: string; name: string; version: string; size: string; status: 'current' | 'review-due';
-  attachments: Array<{ name: string; size: string; uploadedAt: string; type: string }>;
+  attachments: LegalDocFile[];
 }
 export interface InsurancePolicy {
   id: string; type: string; carrier: string; coverage: string; premium: string; expires: string; policyNum: string;

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { getDocumentSignedUrl } from '@/lib/services/unitManager';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Tile, TileRow, Table, Th, Td, Cell, KV, Why, Field, INPUT } from '../../components';
@@ -89,29 +90,54 @@ function DuesThisYear({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot 
   );
 }
 
+/** A first guess at what an owner's upload is, from its name. */
+const guessUnitDocType = (name: string) => (/insur|ho-?6|\bcoi\b/i.test(name) ? 'insurance' : /lease|rental/i.test(name) ? 'lease' : /inspect/i.test(name) ? 'inspection' : 'other');
+
 function UnitDocuments({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot }) {
   const navigate = useNavigate();
   const docs = useFinancialStore(s => s.unitDocuments);
   const upload = useFinancialStore(s => s.uploadDocument);
+  const remove = useFinancialStore(s => s.deleteDocument);
   const tenantId = useFinancialStore(s => s.tenantId);
   const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const numbers = units.map(u => u.unit.number);
-  const mine = docs.filter(d => numbers.includes(d.unitNumber) && d.visibleToOwner);
-  const rows = [
-    ...units.filter(u => u.unit.moveIn).map(u => ({ id: `deed-${u.unit.number}`, title: 'Deed', note: `Recorded ${dayLabel(u.unit.moveIn!)} · from the unit record${units.length > 1 ? ` · ${u.unit.number}` : ''}`, status: 'On file' })),
-    ...mine.map(d => ({ id: d.id, title: d.filename.replace(/\.[a-z0-9]+$/i, ''), note: `${d.docType.replace(/_/g, ' ')} · uploaded ${dayLabel(d.createdAt.slice(0, 10))}${d.uploadedByName ? ` by ${d.uploadedByName}` : ''}${units.length > 1 ? ` · ${d.unitNumber}` : ''}`, status: 'On file' })),
-  ];
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // What the board shared with the owner, and what the owner added themselves.
+  const mine = docs.filter(d => numbers.includes(d.unitNumber) && (d.visibleToOwner || d.uploadedBy === snap.viewer.id));
+  const download = async (path: string, name: string) => {
+    setBusy(path);
+    const url = await getDocumentSignedUrl(path, name);
+    setBusy(null);
+    if (!url) { setNote(`${name} couldn't be opened. Try again in a moment.`); return; }
+    const a = document.createElement('a'); a.href = url; a.download = name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  };
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f) return;
     if (!tenantId) { setNote('Uploads keep to a live building; the demo keeps the list as it is.'); return; }
-    void upload(units[0].unit.number, f, 'other', true, snap.viewer.id, snap.viewer.name).then(() => setNote(`${f.name} is on file.`));
+    setBusy('upload'); setNote(null);
+    const ok = await upload(units[0].unit.number, f, guessUnitDocType(f.name), true, snap.viewer.id, snap.viewer.name);
+    setBusy(null);
+    setNote(ok ? `${f.name} is on file.` : `${f.name} couldn't be uploaded. Check your connection and try again; if it keeps failing, ask the board to link your account to unit ${units[0].unit.number}.`);
   };
   return (
     <Card aria-label="Documents for this unit" className="gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Documents for this unit</SectionLabel><label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Upload<input type="file" aria-label="Upload a unit document" className="sr-only" onChange={onFile} /></label></div>
-      {rows.length === 0 && <Inner className="text-sm text-ux2-muted">Nothing on file yet. The deed, the HO-6 certificate and pet or vehicle registrations go here.</Inner>}
-      {rows.map(r => <Inner key={r.id} className="flex flex-wrap items-center justify-between gap-3"><Cell title={r.title} note={r.note} /><Chip tone="sage">{r.status}</Chip></Inner>)}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SectionLabel>Documents for this unit</SectionLabel>
+        <label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">{busy === 'upload' ? 'Uploading…' : 'Upload'}<input type="file" aria-label="Upload a unit document" className="sr-only" disabled={busy === 'upload'} onChange={e => { void onFile(e); }} /></label>
+      </div>
+      {units.filter(u => u.unit.moveIn).map(u => <Inner key={`deed-${u.unit.number}`} className="flex flex-wrap items-center justify-between gap-3"><Cell title="Deed" note={`Recorded ${dayLabel(u.unit.moveIn!)} · from the unit record${units.length > 1 ? ` · ${u.unit.number}` : ''}`} /><Chip tone="sage">On file</Chip></Inner>)}
+      {mine.map(d => (
+        <Inner key={d.id} className="flex flex-wrap items-center justify-between gap-3">
+          <Cell title={d.filename.replace(/\.[a-z0-9]+$/i, '')} note={`${d.docType.replace(/_/g, ' ')} · uploaded ${dayLabel(d.createdAt.slice(0, 10))}${d.uploadedByName ? ` by ${d.uploadedByName}` : ''}${units.length > 1 ? ` · ${d.unitNumber}` : ''}`} />
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="ghost" aria-label={`Download ${d.filename}`} disabled={busy === d.storagePath} onClick={() => { void download(d.storagePath, d.filename); }}>{busy === d.storagePath ? 'Opening…' : 'Download'}</Button>
+            {(d.uploadedBy === snap.viewer.id || snap.viewer.isBoard) && <Button size="sm" variant="ghost" aria-label={`Delete ${d.filename}`} onClick={() => { if (window.confirm(`Delete ${d.filename}? This can't be undone.`)) void remove(d.id, d.storagePath).then(ok => { if (!ok) setNote(`${d.filename} couldn't be deleted.`); }); }}>Delete</Button>}
+          </span>
+        </Inner>
+      ))}
+      {!mine.length && !units.some(u => u.unit.moveIn) && <Inner className="text-sm text-ux2-muted">Nothing on file yet. The deed, the HO-6 certificate and pet or vehicle registrations go here.</Inner>}
       {note && <Why>{note}</Why>}
       <Why>Building-wide documents, the bylaws, CC&Rs and policies, live in <button type="button" className="font-semibold text-ux2-ink underline" onClick={() => navigate('/building?tab=documents')}>Building › Documents</button>.</Why>
     </Card>
@@ -125,17 +151,29 @@ function MoveHistory({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot }
   const [type, setType] = useState<'in' | 'out'>('out');
   const [date, setDate] = useState('');
   const [win, setWin] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
   const numbers = units.map(u => u.unit.number);
   const mine = events.filter(e => numbers.includes(e.unitNumber)).sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
   return (
     <Card aria-label="Move history" className="gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Move history</SectionLabel>{!open && <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>Report a move</Button>}</div>
       {open && (
-        <form aria-label="Report a move" onSubmit={e => { e.preventDefault(); if (!date) return; void add({ unitNumber: units[0].unit.number, moveType: type, scheduledDate: date, timeWindow: win || null, elevatorSlot: null, depositAmount: 0, depositStatus: 'pending', accessStatus: 'pending', insuranceConfirmed: false, inspectionStatus: 'pending', residentName: snap.viewer.name, moverName: null, caseId: null, notes: null }); setOpen(false); setDate(''); setWin(''); }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+        <form aria-label="Report a move" onSubmit={async e => {
+          e.preventDefault();
+          if (!date || saving) return;
+          setSaving(true); setFailed(false);
+          const created = await add({ unitNumber: units[0].unit.number, moveType: type, scheduledDate: date, timeWindow: win || null, elevatorSlot: null, depositAmount: 0, depositStatus: 'pending', accessStatus: 'pending', insuranceConfirmed: false, inspectionStatus: 'pending', residentName: snap.viewer.name, moverName: null, caseId: null, notes: null });
+          setSaving(false);
+          // Keep what was typed when it didn't save, so it can be sent again.
+          if (!created) { setFailed(true); return; }
+          setOpen(false); setDate(''); setWin('');
+        }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
           <Field label="Move" className="w-[140px]"><select aria-label="Move type" value={type} onChange={e => setType(e.target.value as 'in' | 'out')} className={INPUT}><option value="out">Out</option><option value="in">In</option></select></Field>
           <Field label="Date" className="w-[170px]"><input type="date" aria-label="Move date" value={date} onChange={e => setDate(e.target.value)} className={INPUT} /></Field>
           <Field label="Window" className="w-[170px]"><input aria-label="Time window" value={win} onChange={e => setWin(e.target.value)} placeholder="9am to noon" className={INPUT} /></Field>
-          <div className="flex gap-2"><Button type="submit" size="sm">Report</Button><Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button></div>
+          <div className="flex gap-2"><Button type="submit" size="sm" disabled={saving}>{saving ? 'Sending…' : 'Report'}</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setOpen(false); setFailed(false); }}>Cancel</Button></div>
+          {failed && <span role="alert" className="basis-full text-[13px] font-semibold text-ux2-red-ink">The move couldn't be saved. Try again; if it keeps failing, ask the board to link your account to unit {units[0].unit.number}.</span>}
         </form>
       )}
       {mine.map(e => <Inner key={e.id} data-move={e.id} className="flex flex-wrap items-center justify-between gap-3"><Cell title={`Move ${e.moveType} · ${dayLabel(e.scheduledDate)}`} note={`${e.timeWindow ? `${e.timeWindow} · ` : ''}${e.elevatorSlot ? 'elevator booked' : 'elevator not booked'} · deposit ${e.depositStatus}${units.length > 1 ? ` · ${e.unitNumber}` : ''}`} /><Chip tone={e.insuranceConfirmed ? 'sage' : 'amber'}>{e.insuranceConfirmed ? 'Insured' : 'Insurance pending'}</Chip></Inner>)}

@@ -34,7 +34,8 @@ export interface VendorContract {
   amount: number;
   status: 'active' | 'expired' | 'pending';
   autoRenew: boolean;
-  attachments: Array<{ name: string; size: string }>;
+  /** `path`: where the file is stored (building-documents bucket). */
+  attachments: Array<{ name: string; size: string; path?: string }>;
   notes: string;
 }
 

@@ -12,7 +12,10 @@
  */
 import { READER_VERSION, type DocType, type SetupDoc } from './setupModel';
 import { useSetupStore } from './useSetupStore';
-import { fileSetupDocument, retypeSetupDocument } from './applySetup';
+import { fileSetupDocument, placeSetupDocument, retypeSetupDocument } from './applySetup';
+import { pathOf, setFilePath } from '@/features/building/documentCatalogue';
+import { canStoreFiles, uploadDocumentFile } from '@/lib/services/documentFiles';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { parseCsv, readSheets, type Cell } from './importSpreadsheet';
 import { detectType, extractFromPages, foundIn } from './extractText';
 
@@ -38,6 +41,17 @@ export function guessType(name: string): DocType {
 }
 
 const text = new Map<string, { pages: string[][]; paged: boolean }>();
+/** The files added this visit, so one filed later (Keep a copy) can still be stored. */
+const added = new Map<string, File>();
+
+/** Store a filed document's file (building-documents bucket) once, and record where on every document it's filed under. */
+function store(id: string): void {
+  const file = added.get(id);
+  if (!file || !canStoreFiles() || pathOf(id)) return;
+  if (!useBuildingStore.getState().legalDocuments.some(d => d.attachments.some(a => a.fileId === id))) return;
+  added.delete(id); // one upload per file
+  void uploadDocumentFile(id, file).then(path => { if (path) setFilePath(id, path); else added.set(id, file); });
+}
 const newId = () => `sd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const titleOf = (name: string) => name.replace(/\.[a-z0-9]+$/i, '').replace(/_+/g, ' ').trim();
 
@@ -59,13 +73,25 @@ function applyReading(id: string, pages: string[][], paged: boolean, docType: Do
   updateDoc(id, n ? { status: 'read', result, docType, reader: READER_VERSION } : { status: 'filed', result: undefined, docType, reader: READER_VERSION, note: 'Filed. Its text was read but no settings, lists or sections setup recognises were found. Paste a section into "Paste text", or add them in Fill the gaps.' });
 }
 
+/** A past version, added from step 1's history list: filed under one document as history, not read. */
+export interface PastOptions { docType: DocType; covers: string[] }
+
 /** Add one file. */
-export async function addOne(file: File): Promise<void> {
+export async function addOne(file: File, past?: PastOptions): Promise<void> {
   const { addDoc, updateDoc } = useSetupStore.getState();
   const id = newId();
   const base: SetupDoc = { id, name: file.name, size: file.size, mediaType: file.type, status: 'reading', addedAt: new Date().toISOString() };
   addDoc(base);
   if (file.size > MAX_FILE_BYTES) { updateDoc(id, { status: 'error', error: 'This file is over 25 MB. Split it, or keep just the pages that matter.' }); return; }
+  added.set(id, file);
+
+  if (past) {
+    const doc: SetupDoc & { docType: DocType } = { ...base, docType: past.docType, covers: past.covers, historical: true, period: /\b(19|20)\d{2}\b/.exec(file.name)?.[0] };
+    const filedAs = fileSetupDocument(doc) ?? undefined;
+    store(id);
+    updateDoc(id, { status: 'filed', docType: past.docType, covers: past.covers, historical: true, period: doc.period, filedAs, note: `Filed as a past version${doc.period ? ` (${doc.period})` : ''} under ${past.covers.join(', ')} in Building › Documents.` });
+    return;
+  }
 
   if (isSpreadsheet(file.name)) {
     try {
@@ -81,6 +107,7 @@ export async function addOne(file: File): Promise<void> {
   let docType = guessType(file.name);
   let filedAs = fileSetupDocument({ ...base, docType }) ?? undefined;
   updateDoc(id, { filedAs });
+  store(id);
   const lower = file.name.toLowerCase();
   try {
     if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
@@ -88,7 +115,7 @@ export async function addOne(file: File): Promise<void> {
       const pages = await pdfLines(file);
       if (!pages.some(p => p.length)) { updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note: 'Filed. This PDF is a scan: it has no text layer to read. Paste the key sections into "Paste text", or add them in Fill the gaps.' }); return; }
       docType = detectType(pages, docType);
-      if (docType !== guessType(file.name)) { filedAs = retypeSetupDocument({ ...base, filedAs }, docType); updateDoc(id, { filedAs }); }
+      if (docType !== guessType(file.name)) { const placed = retypeSetupDocument({ ...base, filedAs }, docType, guessType(file.name)); filedAs = placed.filedAs; updateDoc(id, placed); }
       text.set(id, { pages, paged: true });
       applyReading(id, pages, true, docType, file.name);
       return;
@@ -115,8 +142,15 @@ export async function addOne(file: File): Promise<void> {
 }
 
 /** Add several files, in order. */
-export async function addFiles(list: File[]): Promise<void> {
-  for (const f of list) await addOne(f);
+export async function addFiles(list: File[], past?: PastOptions): Promise<void> {
+  for (const f of list) await addOne(f, past);
+}
+
+/** Change which documents one file is (bylaws that also hold the rules), or whether it's a past version. */
+export function setCovers(doc: SetupDoc, covers: string[], historical = !!doc.historical): void {
+  const placed = placeSetupDocument(doc, covers, historical);
+  useSetupStore.getState().updateDoc(doc.id, { ...placed, historical, period: historical ? doc.period ?? /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] : doc.period });
+  store(doc.id);
 }
 
 /** Read pasted text (copied from a document, an email, a web page). */
@@ -133,8 +167,7 @@ export function addPastedText(raw: string, docType: DocType, label: string): voi
 
 /** Change what a document is: renames it in Building › Documents and, when its text is at hand, reads it again with that kind's rules. */
 export function retype(doc: SetupDoc, docType: DocType): void {
-  const filedAs = retypeSetupDocument(doc, docType);
-  if (filedAs !== doc.filedAs) useSetupStore.getState().updateDoc(doc.id, { filedAs });
+  useSetupStore.getState().updateDoc(doc.id, retypeSetupDocument(doc, docType));
   const t = text.get(doc.id);
   if (t) applyReading(doc.id, t.pages, t.paged, docType, doc.name);
   else useSetupStore.getState().updateDoc(doc.id, { docType });

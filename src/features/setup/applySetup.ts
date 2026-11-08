@@ -6,7 +6,7 @@
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { DOC_CATALOGUE, entryFor, fileDocument, sameDocument, unfileDocument } from '@/features/building/documentCatalogue';
+import { DOC_CATALOGUE, entryFor, pathOf, placeFile, sameDocument, setFilePlaces, unplaceFile } from '@/features/building/documentCatalogue';
 import { resolve, unitKey, type DocType, type FieldScalar, type Item, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
 
 const num = (v: FieldScalar | undefined): number | null => {
@@ -164,37 +164,74 @@ export function setupDocName(doc: SetupDoc, type: DocType): string {
   return entry?.label ?? `${DOC_TYPE_LABEL[type] ?? 'Document'} · ${titleOf(doc)}`;
 }
 
+const yearOf = (name: string) => /\b(19|20)\d{2}\b/.exec(name)?.[0];
+const fileOf = (doc: SetupDoc) => ({ name: doc.name, size: sizeOf(doc), type: doc.mediaType || 'application/pdf', fileId: doc.id, path: pathOf(doc.id), ...(doc.historical ? { period: doc.period ?? yearOf(doc.name) } : {}) });
+
+/** The documents a setup document is filed under: the ones the person chose, else its catalogue name. */
+export const coversOf = (doc: SetupDoc, type: DocType = doc.docType ?? 'other') => (doc.covers?.length ? doc.covers : [setupDocName(doc, type)]);
+
 /**
- * File a document in Building › Documents under its catalogue name. A building
- * that already has that document gets this file as a new version of it, so
- * adding the bylaws twice (or again after Start over) leaves one Bylaws.
- * Returns the document id.
+ * File a document in Building › Documents under its catalogue name (or the
+ * documents the person said it is). A building that already has that
+ * document gets this file as its current version, the old one kept as an
+ * earlier version; a past version is added as history. Adding the same file
+ * again changes nothing. Returns the first document's id.
  */
 export function fileSetupDocument(doc: SetupDoc & { docType: DocType }): string | null {
-  const year = /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] ?? String(new Date().getFullYear());
-  return fileDocument(setupDocName(doc, doc.docType), { version: year, attachment: { name: doc.name, size: sizeOf(doc), type: doc.mediaType || 'application/pdf' } });
+  return placeFile(coversOf(doc, doc.docType), fileOf(doc), { past: doc.historical, version: yearOf(doc.name) })[0] ?? null;
 }
 
-/** Change what a filed document is: moves its file to the document it now is. Returns where it is filed. */
-export function retypeSetupDocument(doc: SetupDoc, type: DocType): string | undefined {
-  if (!doc.filedAs) return undefined;
-  const filed = useBuildingStore.getState().legalDocuments.find(d => d.id === doc.filedAs);
-  if (!filed) return doc.filedAs;
-  const name = setupDocName(doc, type);
-  if (sameDocument(filed.name, name)) return filed.id;
-  const others = filed.attachments.filter(a => a.name !== doc.name);
-  // A document holding only this file, with nothing else under the new name: rename it in place.
-  if (!others.length && !useBuildingStore.getState().legalDocuments.some(d => d.id !== filed.id && sameDocument(d.name, name))) {
-    useBuildingStore.getState().updateLegalDocument(filed.id, { name });
-    return filed.id;
-  }
-  unfileDocument(filed.id, doc.name);
-  return fileSetupDocument({ ...doc, docType: type }) ?? undefined;
+/** File one setup document under exactly these documents (one upload for bylaws that also hold the rules). */
+export function placeSetupDocument(doc: SetupDoc, covers: string[], historical = !!doc.historical): { filedAs?: string; covers: string[] } {
+  const names = [...new Set(covers)].filter(Boolean);
+  if (!names.length) { unfileSetupDocument(doc); return { filedAs: undefined, covers: [] }; }
+  const file = fileOf({ ...doc, historical });
+  // A change between current and past re-files it, so the files it replaced are restored or archived to match.
+  if (historical !== !!doc.historical) unplaceFile(file, [], false);
+  const ids = setFilePlaces(names, file, { past: historical, version: yearOf(doc.name) });
+  return { filedAs: ids[0], covers: names };
 }
 
-/** Take a removed setup document's file back out of Building › Documents. */
+/** Change what a document is: its catalogue name follows the new kind. Returns where it is filed. */
+export function retypeSetupDocument(doc: SetupDoc, type: DocType, from: DocType = doc.docType ?? 'other'): { filedAs?: string; covers: string[] } {
+  const before = setupDocName(doc, from), after = setupDocName(doc, type);
+  const covers = [...new Set(coversOf(doc, from).map(n => (n === before ? after : n)))];
+  if (!doc.filedAs) return { filedAs: undefined, covers };
+  return placeSetupDocument(doc, covers);
+}
+
+/** Take a removed setup document's file back out of Building › Documents (what it replaced becomes current again). */
 export function unfileSetupDocument(doc: SetupDoc) {
-  if (doc.filedAs) unfileDocument(doc.filedAs, doc.name);
+  unplaceFile({ fileId: doc.id, name: doc.name });
+}
+
+/**
+ * Other documents this one's text suggests it also is: bylaws with a rules
+ * article, a pets or rentals clause, late-fee rules, a reserve schedule. The
+ * person confirms each one; none is filed on a guess.
+ */
+export function suggestedCovers(doc: SetupDoc): { name: string; why: string }[] {
+  const r = doc.result;
+  if (!r || doc.historical) return [];
+  const have = coversOf(doc);
+  const out: { name: string; why: string }[] = [];
+  const page = (rows: { page: number | null }[]) => { const p = rows.map(x => x.page).filter((n): n is number => n !== null); return p.length ? ` · p.${Math.min(...p)}` : ''; };
+  const add = (key: string, why: string) => {
+    const e = DOC_CATALOGUE.find(x => x.key === key);
+    if (e && !have.some(n => sameDocument(n, e.label)) && !out.some(o => o.name === e.label)) out.push({ name: e.label, why });
+  };
+  const rules = [...r.facts.filter(f => ['pet_rule', 'rental_rule', 'fine_amount'].includes(f.key)), ...(r.clauses ?? []).filter(c => c.topic === 'rules')];
+  if (rules.length) add('rules', `${rules.length} ${rules.length === 1 ? 'rule' : 'rules'} for residents${page(rules)}`);
+  const pets = r.facts.filter(f => f.key === 'pet_rule');
+  if (pets.length) add('pets', `a pets clause${page(pets)}`);
+  const rentals = r.facts.filter(f => f.key === 'rental_rule');
+  if (rentals.length) add('rentals', `a rentals clause${page(rentals)}`);
+  const fees = r.facts.filter(f => ['late_fee', 'grace_period_days'].includes(f.key));
+  if (fees.length) add('collections', `late fee and grace period${page(fees)}`);
+  if (r.reserves.length) add('reserve-study', `${r.reserves.length} reserve components${page(r.reserves)}`);
+  if (r.insurance.length) add('insurance', `${r.insurance.length} insurance ${r.insurance.length === 1 ? 'policy' : 'policies'}${page(r.insurance)}`);
+  if (r.budget.length && doc.docType !== 'budget') add('budget', `${r.budget.length} budget lines${page(r.budget)}`);
+  return out;
 }
 
 /** A starting budget sized to the building: common lines split from the monthly assessments. */
