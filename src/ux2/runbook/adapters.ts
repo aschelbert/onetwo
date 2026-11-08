@@ -210,8 +210,8 @@ export function buildCardInput(s: StoreSnapshot): CardInput {
   const bucket = (units: Unit[], days: number) => {
     for (const u of units) {
       const open = s.cases.find(c => c.status !== 'closed' && c.unit === u.number && isCollectionsCase(c));
-      const fees = u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0);
-      delinquencies.push({ unitId: u.number, unitLabel: `Unit ${u.number}`, daysPastDue: days, amount: Math.max(0, u.balance + fees), caseId: open?.id });
+      const fees = u.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0);
+      delinquencies.push({ unitId: u.number, unitLabel: `Unit ${u.number}`, daysPastDue: days, amount: Math.max(0, u.balance) + fees, caseId: open?.id });
     }
   };
   bucket(s.aging.days90plus, 90);
@@ -231,7 +231,7 @@ export function buildCardInput(s: StoreSnapshot): CardInput {
       if (openInvoices.length > 0) {
         payment = { unitLabel: `Unit ${unit.number}`, amount: openInvoices.reduce((t, i) => t + i.amount - (i.paidAmount || 0), 0), due: openInvoices[0].dueDate, autopay: false };
       } else if (unit.balance > 0) {
-        const fees = unit.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0);
+        const fees = unit.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0);
         payment = { unitLabel: `Unit ${unit.number}`, amount: unit.balance + fees, due: s.today, autopay: false };
       } else if (unit.monthlyFee > 0 && v.role === 'RESIDENT') {
         const due = nextDuesDate(s.today, s.hoaDueDay);

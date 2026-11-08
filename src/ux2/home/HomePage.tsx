@@ -291,7 +291,7 @@ export default function HomePage() {
   }, [fin.reserveItems, fin.units, snapshot.cases]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const myUnits = fin.units.filter(u => viewer.linkedUnits.includes(u.number));
-  const myBalance = myUnits.reduce((s, u) => s + u.balance + u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0), 0);
+  const myBalance = myUnits.reduce((s, u) => s + Math.max(0, u.balance) + u.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0), 0);
   const dated = useMemo(() => [...set.forYou, ...set.waitingOnOthers, ...set.upcoming].filter(c => c.due), [set]);
   const [params, setParams] = useSearchParams();
   const view: 'feed' | 'calendar' = params.get('view') === 'calendar' ? 'calendar' : 'feed';

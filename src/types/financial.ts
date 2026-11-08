@@ -67,8 +67,10 @@ export interface Unit {
   bedrooms: number;
   parking: string | null;
   payments: Array<{ date: string; amount: number; method: string; note: string }>;
-  lateFees: Array<{ date: string; amount: number; reason: string; waived: boolean }>;
-  specialAssessments: Array<{ id: string; date: string; amount: number; reason: string; paid: boolean; paidDate: string | null }>;
+  /** Fees on the unit. A fee with an `invoiceId` is a charge in the invoice register and part of `balance`; one without is from before the register and is owed on top of `balance`. */
+  lateFees: Array<{ date: string; amount: number; reason: string; waived: boolean; invoiceId?: string; paid?: boolean }>;
+  /** Special assessments on the unit; each is also an invoice when `invoiceId` is set. Always part of `balance`. */
+  specialAssessments: Array<{ id: string; date: string; amount: number; reason: string; paid: boolean; paidDate: string | null; invoiceId?: string }>;
   stripeCustomerId?: string | null;
 }
 
@@ -107,11 +109,17 @@ export interface UnitInvoice {
   type: 'fee' | 'special_assessment' | 'monthly' | 'amenity_fee';
   description: string;
   amount: number;
+  /** sent: open (possibly part paid, see paidAmount) · paid: settled in full · overdue: open past due · void: cancelled or waived. */
   status: 'sent' | 'paid' | 'overdue' | 'void';
   createdDate: string;
   dueDate: string;
   paidDate: string | null;
+  /** Paid so far; less than `amount` while a payment is partial. */
   paidAmount: number | null;
+  /** Which fund a special assessment belongs to (reserve by default). */
+  fund?: Fund | null;
+  /** The dues invoice a late fee was charged for, so the fee is charged once. */
+  forInvoiceId?: string | null;
   paymentMethod: string | null;
   stripePaymentLink: string | null;
   glEntryId: string | null;

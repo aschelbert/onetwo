@@ -69,9 +69,13 @@ export function healthLabel(score: number): 'Healthy' | 'Fair' | 'At risk' {
   return score >= 80 ? 'Healthy' : score >= 60 ? 'Fair' : 'At risk';
 }
 
+/** Fees owed on top of the balance: only fees from before the invoice register, which never went into it. A fee with an invoice is already in `balance`. */
 export function unpaidFees(u: Unit): number {
-  return u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0);
+  return u.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0);
 }
+
+/** Money the owner has paid ahead. */
+export const creditOf = (u: Unit) => Math.max(0, -u.balance);
 
 export function openAssessments(u: Unit): number {
   return u.specialAssessments.filter(a => !a.paid).reduce((t, a) => t + a.amount, 0);

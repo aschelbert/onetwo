@@ -100,7 +100,7 @@ function UnitRow({ u, b, onPanel, onCase }: { u: Unit; b?: BehindUnit; onPanel: 
       <Td className="font-semibold">{u.number}</Td>
       <Td>{u.owner || 'Vacant'}{u.status === 'FOR_SALE' && <span className="text-xs text-ux2-muted"> · for sale</span>}{u.status === 'UNDER_CONTRACT' && u.moveIn && <span className="text-xs text-ux2-muted"> · move-in {dayLabel(u.moveIn)}</span>}</Td>
       <Td num>{fmt(u.monthlyFee)}</Td>
-      <Td num className={b ? 'font-semibold text-ux2-red-ink' : ''}>{fmt(Math.max(0, u.balance) + unpaidFees(u) + openAssessments(u))}</Td>
+      <Td num className={b ? 'font-semibold text-ux2-red-ink' : u.balance < 0 ? 'text-ux2-sage' : ''}>{u.balance < 0 && !unpaidFees(u) ? `${fmt(-u.balance)} credit` : fmt(Math.max(0, u.balance) + unpaidFees(u))}</Td>
       <Td num className="text-ux2-muted">{feesAndSA(u)}</Td>
       <Td><UnitStatus u={u} b={b} /></Td>
       <Td className="text-ux2-muted"><LastPayment u={u} /></Td>

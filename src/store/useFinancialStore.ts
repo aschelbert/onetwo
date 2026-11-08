@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
-import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, type GLAccountMapping } from '@/lib/financial-logic';
+import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, legacyOwed, openInvoicesInOrder, type GLAccountMapping } from '@/lib/financial-logic';
 import { balanceOf, fiscalYearStart, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
@@ -110,8 +110,16 @@ interface FinancialState {
   approveWorkOrder: (id: string) => void;
   receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
   payWorkOrder: (id: string) => void;
-  createUnitInvoice: (unitNum: string, type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly', amount: number, description: string, caseId?: string, dueDate?: string) => UnitInvoice;
-  payUnitInvoice: (invoiceId: string, method: string) => void;
+
+  // ── Charges to units: the receivables sub-ledger. One invoice per charge; the unit's balance follows. ──
+  /** Charge a unit. Posts Dr receivable / Cr income (unless `post: false`), applies any prepaid credit, and raises the balance. */
+  createUnitInvoice: (unitNum: string, type: UnitInvoice['type'], amount: number, description: string, caseId?: string, dueDate?: string, opts?: InvoiceOptions) => UnitInvoice;
+  /** Pay one charge (in full, or `amount` of it). */
+  payUnitInvoice: (invoiceId: string, method: string, opts?: { date?: string; amount?: number }) => void;
+  /** Cancel what is still open on a charge: reverses the income and receivable for the unpaid part. */
+  voidUnitInvoice: (invoiceId: string, reason: string) => boolean;
+  /** Turn a balance no invoice stands behind (brought over from before the register) into one invoice, without posting again. */
+  billOutstandingBalance: (unitNum: string) => UnitInvoice | null;
 
   // CoA mutations
   addCoASection: (num: string, name: string, type: string) => void;
@@ -124,11 +132,17 @@ interface FinancialState {
   postTransfer: (date: string, memo: string, fromAcct: string, toAcct: string, amount: number) => void;
 
   // Unit payment mutations
-  recordUnitPayment: (unitNum: string, amount: number, method: string) => void;
-  waiveLateFee: (unitNum: string, feeIndex: number) => void;
-  imposeLateFee: (unitNum: string, amount: number, reason: string) => void;
-  addSpecialAssessment: (unitNum: string, amount: number, reason: string) => void;
-  markSpecialAssessmentPaid: (unitNum: string, assessmentId: string) => void;
+  /** Apply a payment: dues first, then special assessments, then fees, oldest due first; then any balance with no invoice behind it; the rest is a prepaid credit. */
+  recordUnitPayment: (unitNum: string, amount: number, method: string, opts?: { date?: string }) => PaymentApplication;
+  /** Waive a fee: voids its invoice (or reverses a fee from before the register). */
+  waiveLateFee: (unitNum: string, feeIndex: number, reason?: string) => void;
+  /** Charge a late fee: one invoice, one posting. */
+  imposeLateFee: (unitNum: string, amount: number, reason: string, opts?: { forInvoiceId?: string | null; date?: string; dueDate?: string }) => UnitInvoice;
+  /** Charge a special assessment: one invoice, one posting, in the reserve fund unless told otherwise. */
+  addSpecialAssessment: (unitNum: string, amount: number, reason: string, opts?: { dueDate?: string; fund?: Fund }) => UnitInvoice;
+  markSpecialAssessmentPaid: (unitNum: string, assessmentId: string, method?: string) => void;
+  /** Return money the owner paid ahead. */
+  refundCredit: (unitNum: string, amount: number, reason: string) => GLEntry | null;
 
   // Stripe
   stripeConnectId: string | null;
@@ -148,7 +162,7 @@ interface FinancialState {
   lastLateFeeRun: string | null;
   setLateFeeSettings: (enabled: boolean, amount: number, graceDays: number) => void;
 
-  // Refund
+  // Refund a paid charge that was wrong: the money goes back and the income is reversed; the charge is void.
   refundUnitInvoice: (invoiceId: string, reason: string) => void;
 
   // Unit Documents
@@ -162,6 +176,32 @@ interface FinancialState {
   addMoveEvent: (event: Omit<MoveEvent, 'id' | 'createdAt'>) => Promise<MoveEvent | null>;
   updateMoveEvent: (id: string, updates: Partial<MoveEvent>) => Promise<void>;
 }
+
+export interface InvoiceOptions {
+  /** Which fund a special assessment belongs to (reserve by default). */
+  fund?: Fund | null;
+  /** The dues invoice a late fee is for. */
+  forInvoiceId?: string | null;
+  /** The charge date (today by default). */
+  date?: string;
+  /** False when the amount is already in the ledger (a balance brought forward): the invoice is recorded, nothing is posted, the balance stays. */
+  post?: boolean;
+}
+
+export interface PaymentApplication {
+  applied: { invoiceId: string; amount: number }[];
+  /** Applied to a balance no invoice stands behind. */
+  toBalance: number;
+  /** Left over, kept as a prepaid credit. */
+  toCredit: number;
+  total: number;
+}
+
+const r2 = (n: number) => { const r = Math.round(n * 100) / 100; return r === 0 ? 0 : r; };
+const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+/** The mapping with defaults for keys added since it was saved. */
+const mappingOf = (m: GLAccountMapping): GLAccountMapping => ({ ...DEFAULT_GL_MAPPING, ...m });
+const invoiceSource = (type: UnitInvoice['type']): GLEntry['source'] => (type === 'fee' || type === 'amenity_fee' ? 'fee' : 'assessment');
 
 // ── Sync helpers ──
 
@@ -821,41 +861,89 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     get().glPost(date, memo, toAcct, fromAcct, amount, 'transfer', null);
   },
 
-  recordUnitPayment: (unitNum, amount, method) => {
-    const today = new Date().toISOString().split('T')[0];
-    const m = get().glAccountMapping;
-    get().glPost(today, `Payment received - Unit ${unitNum}`, m.bankAccount, m.assessmentsReceivable, amount, 'payment', unitNum);
-    set(s => ({
-      units: s.units.map(u => u.number === unitNum ? {
+  recordUnitPayment: (unitNum, amount, method, opts: { date?: string } = {}) => {
+    const date = opts.date ?? todayIso();
+    const s = get();
+    const m = mappingOf(s.glAccountMapping);
+    const unit = s.units.find(u => u.number === unitNum);
+    const result: PaymentApplication = { applied: [], toBalance: 0, toCredit: 0, total: r2(amount) };
+    if (!unit || !(amount > 0)) return result;
+    let left = r2(amount);
+    const changed = new Map<string, Partial<UnitInvoice>>();
+    for (const inv of openInvoicesInOrder(unitNum, s.unitInvoices)) {
+      if (left <= 0) break;
+      const take = r2(Math.min(left, invoiceRemaining(inv)));
+      const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+      const gl = s.glPost(date, `Payment received - Invoice ${inv.id} Unit ${unitNum}`, m.bankAccount, arAcct, take, 'payment', unitNum);
+      const paid = r2((inv.paidAmount ?? 0) + take);
+      const full = paid >= inv.amount - 0.005;
+      changed.set(inv.id, { paidAmount: paid, status: full ? 'paid' : inv.status, paidDate: full ? date : inv.paidDate, paymentMethod: method, paymentGlEntryId: gl.id });
+      result.applied.push({ invoiceId: inv.id, amount: take });
+      left = r2(left - take);
+    }
+    if (left > 0) {
+      // A balance brought over from before the register, with no invoice behind it.
+      const toBal = r2(Math.min(left, legacyOwed(unit, s.unitInvoices)));
+      if (toBal > 0) {
+        s.glPost(date, `Payment received - Unit ${unitNum}`, m.bankAccount, m.assessmentsReceivable, toBal, 'payment', unitNum);
+        result.toBalance = toBal;
+        left = r2(left - toBal);
+      }
+    }
+    if (left > 0) {
+      s.glPost(date, `Paid ahead - Unit ${unitNum}`, m.bankAccount, m.prepaidAssessments, left, 'payment', unitNum);
+      result.toCredit = left;
+    }
+    const note = result.applied.length
+      ? `${result.applied.map(a => a.invoiceId).join(', ')}${result.toCredit ? ` · ${result.toCredit.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} credit` : ''}`
+      : result.toCredit && !result.toBalance ? 'Paid ahead' : `Payment via ${method}`;
+    const paidInvoiceIds = new Set([...changed.entries()].filter(([, c]) => c.status === 'paid').map(([id]) => id));
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (changed.has(i.id) ? { ...i, ...changed.get(i.id) } : i)),
+      units: st.units.map(u => u.number === unitNum ? {
         ...u,
-        balance: Math.max(0, u.balance - amount),
-        payments: [...u.payments, { date: today, amount, method, note: `Payment via ${method}` }],
+        balance: r2(u.balance - amount),
+        payments: [...u.payments, { date, amount: r2(amount), method, note }],
+        lateFees: u.lateFees.map(f => (f.invoiceId && paidInvoiceIds.has(f.invoiceId) ? { ...f, paid: true } : f)),
+        specialAssessments: u.specialAssessments.map(a => (a.invoiceId && paidInvoiceIds.has(a.invoiceId) ? { ...a, paid: true, paidDate: date } : a)),
       } : u),
+    }));
+    if (isBackendEnabled) for (const [id, c] of changed) if (isDbId(id)) financialSvc.updateUnitInvoice(id, c);
+    syncUnit(unitNum);
+    return result;
+  },
+
+  waiveLateFee: (unitNum, feeIndex, reason = 'Waived by the board') => {
+    const s = get();
+    const unit = s.units.find(u => u.number === unitNum);
+    const fee = unit?.lateFees[feeIndex];
+    if (!unit || !fee || fee.waived) return;
+    if (fee.invoiceId) {
+      const inv = s.unitInvoices.find(i => i.id === fee.invoiceId);
+      if (inv && isOpenInvoice(inv)) { s.voidUnitInvoice(inv.id, reason); return; }
+      if (inv && inv.status === 'paid') return; // already paid: a refund, not a waiver
+    } else {
+      // A fee from before the register: its posting was Dr fees owed / Cr late fee income. Reverse it.
+      const m = mappingOf(s.glAccountMapping);
+      s.glPost(todayIso(), `Late fee waived - Unit ${unitNum}: ${reason}`, m.lateFeeRevenue, m.lateFeeReceivable, fee.amount, 'fee', unitNum);
+    }
+    set(st => ({
+      units: st.units.map(u => u.number === unitNum ? { ...u, lateFees: u.lateFees.map((f, i) => (i === feeIndex ? { ...f, waived: true } : f)) } : u),
     }));
     syncUnit(unitNum);
   },
 
-  waiveLateFee: (unitNum, feeIndex) => {
+  imposeLateFee: (unitNum, amount, reason, opts: { forInvoiceId?: string | null; date?: string; dueDate?: string } = {}) => {
+    const date = opts.date ?? todayIso();
+    const inv = get().createUnitInvoice(unitNum, 'fee', amount, reason, undefined, opts.dueDate ?? date, { date, forInvoiceId: opts.forInvoiceId ?? null });
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
-        lateFees: u.lateFees.map((f, i) => i === feeIndex ? { ...f, waived: true } : f),
+        lateFees: [...u.lateFees, { date, amount, reason, waived: false, invoiceId: inv.id, paid: inv.status === 'paid' }],
       } : u),
     }));
     syncUnit(unitNum);
-  },
-
-  imposeLateFee: (unitNum, amount, reason) => {
-    const today = new Date().toISOString().split('T')[0];
-    const m = get().glAccountMapping;
-    get().glPost(today, `Late fee assessed - Unit ${unitNum}`, m.lateFeeReceivable, m.lateFeeRevenue, amount, 'fee', unitNum);
-    set(s => ({
-      units: s.units.map(u => u.number === unitNum ? {
-        ...u,
-        lateFees: [...u.lateFees, { date: today, amount, reason, waived: false }],
-      } : u),
-    }));
-    syncUnit(unitNum);
+    return inv;
   },
 
   updateUnit: (unitNum, updates) => {
@@ -875,36 +963,51 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     }
   },
 
-  addSpecialAssessment: (unitNum, amount, reason) => {
-    const today = new Date().toISOString().split('T')[0];
+  addSpecialAssessment: (unitNum, amount, reason, opts: { dueDate?: string; fund?: Fund } = {}) => {
+    const today = todayIso();
     const id = generateLocalId('sa-');
-    const m = get().glAccountMapping;
-    get().glPost(today, `Special assessment - Unit ${unitNum}: ${reason}`, m.specialAssessmentsReceivable, m.specialAssessmentRevenue, amount, 'assessment', unitNum);
+    const inv = get().createUnitInvoice(unitNum, 'special_assessment', amount, reason, undefined, opts.dueDate, { fund: opts.fund ?? 'reserve' });
     set(s => ({
       units: s.units.map(u => u.number === unitNum ? {
         ...u,
-        balance: u.balance + amount,
-        specialAssessments: [...u.specialAssessments, { id, date: today, amount, reason, paid: false, paidDate: null }],
+        specialAssessments: [...u.specialAssessments, { id, date: today, amount, reason, paid: inv.status === 'paid', paidDate: inv.paidDate, invoiceId: inv.id }],
+      } : u),
+    }));
+    syncUnit(unitNum);
+    return inv;
+  },
+
+  markSpecialAssessmentPaid: (unitNum, assessmentId, method = 'check') => {
+    const today = todayIso();
+    const unit = get().units.find(u => u.number === unitNum);
+    const sa = unit?.specialAssessments.find(a => a.id === assessmentId);
+    if (!sa || sa.paid) return;
+    if (sa.invoiceId && get().unitInvoices.some(i => i.id === sa.invoiceId)) { get().payUnitInvoice(sa.invoiceId, method); return; }
+    // An assessment from before the register: it is in the balance; post the payment and settle it.
+    const m = mappingOf(get().glAccountMapping);
+    get().glPost(today, `Special assessment payment - Unit ${unitNum}`, m.bankAccount, m.specialAssessmentsReceivable, sa.amount, 'payment', unitNum);
+    set(s => ({
+      units: s.units.map(u => u.number === unitNum ? {
+        ...u,
+        balance: r2(u.balance - sa.amount),
+        payments: [...u.payments, { date: today, amount: sa.amount, method, note: `Special assessment · ${sa.reason}` }],
+        specialAssessments: u.specialAssessments.map(a => a.id === assessmentId ? { ...a, paid: true, paidDate: today } : a),
       } : u),
     }));
     syncUnit(unitNum);
   },
 
-  markSpecialAssessmentPaid: (unitNum, assessmentId) => {
-    const today = new Date().toISOString().split('T')[0];
-    const unit = get().units.find(u => u.number === unitNum);
-    const sa = unit?.specialAssessments.find(a => a.id === assessmentId);
-    if (!sa || sa.paid) return;
-    const m = get().glAccountMapping;
-    get().glPost(today, `Special assessment payment - Unit ${unitNum}`, m.bankAccount, m.specialAssessmentsReceivable, sa.amount, 'payment', unitNum);
-    set(s => ({
-      units: s.units.map(u => u.number === unitNum ? {
-        ...u,
-        balance: Math.max(0, u.balance - sa.amount),
-        specialAssessments: u.specialAssessments.map(a => a.id === assessmentId ? { ...a, paid: true, paidDate: today } : a),
-      } : u),
-    }));
+  refundCredit: (unitNum, amount, reason) => {
+    const s = get();
+    const unit = s.units.find(u => u.number === unitNum);
+    if (!unit) return null;
+    const take = r2(Math.min(amount, creditOf(unit)));
+    if (take <= 0) return null;
+    const m = mappingOf(s.glAccountMapping);
+    const entry = s.glPost(todayIso(), `Credit returned - Unit ${unitNum}: ${reason}`, m.prepaidAssessments, m.bankAccount, take, 'refund', unitNum);
+    set(st => ({ units: st.units.map(u => u.number === unitNum ? { ...u, balance: r2(u.balance + take) } : u) }));
     syncUnit(unitNum);
+    return entry;
   },
 
   // Billing automation
@@ -933,32 +1036,33 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
 
   // Refund
   refundUnitInvoice: (invoiceId, reason) => {
-    const today = new Date().toISOString().split('T')[0];
-    const inv = get().unitInvoices.find(i => i.id === invoiceId);
-    if (!inv || inv.status !== 'paid') return;
+    const today = todayIso();
+    const s = get();
+    const inv = s.unitInvoices.find(i => i.id === invoiceId);
+    const paid = inv ? r2(inv.paidAmount ?? (inv.status === 'paid' ? inv.amount : 0)) : 0;
+    if (!inv || inv.status === 'void' || paid <= 0) return;
 
-    // Post reversal GL entry: debit AR, credit bank (cash)
-    const m = get().glAccountMapping;
-    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? m.lateFeeReceivable : inv.type === 'special_assessment' ? m.specialAssessmentsReceivable : m.assessmentsReceivable;
-    const glEntry = get().glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}`, arAcct, m.bankAccount, inv.amount, 'refund', inv.unitNumber);
+    // The charge was wrong: the money goes back (Dr income / Cr bank) and whatever was still open is cancelled.
+    const m = mappingOf(s.glAccountMapping);
+    const { arAcct, revenueAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+    const glEntry = s.glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, m.bankAccount, paid, 'refund', inv.unitNumber);
+    const remaining = invoiceRemaining(inv);
+    if (remaining > 0) s.glPost(today, `Void - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, arAcct, remaining, invoiceSource(inv.type), inv.unitNumber);
 
-    // Update invoice in state
-    set(s => ({
-      unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
-        ...i,
-        status: 'void' as const,
-        refundAmount: inv.amount,
-        refundDate: today,
-        refundReason: reason,
-        refundGlEntryId: glEntry?.id || null,
-      } : i),
-      units: s.units.map(u => u.number === inv.unitNumber ? {
+    const patch: Partial<UnitInvoice> = { status: 'void', refundAmount: paid, refundDate: today, refundReason: reason, refundGlEntryId: glEntry.id };
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, ...patch } : i)),
+      units: st.units.map(u => u.number === inv.unitNumber ? {
         ...u,
-        balance: u.balance + inv.amount,
+        // The paid part was already out of the balance; only the cancelled remainder comes off now.
+        balance: r2(u.balance - remaining),
+        lateFees: u.lateFees.map(f => (f.invoiceId === invoiceId ? { ...f, waived: true } : f)),
+        specialAssessments: u.specialAssessments.filter(a => a.invoiceId !== invoiceId),
       } : u),
     }));
+    if (remaining > 0) syncUnit(inv.unitNumber);
 
-    // Call refund edge function (handles Stripe refund + server-side DB updates)
+    // The edge function issues the Stripe refund and records the same entry server side.
     if (isBackendEnabled && supabase) {
       supabase.functions.invoke('refund-unit-payment', {
         body: { invoiceId, reason },
@@ -1019,58 +1123,116 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   // Unit Invoices
-  createUnitInvoice: (unitNum, type, amount, description, caseId?, dueDate?) => {
-    const today = new Date().toISOString().split('T')[0];
-    const effectiveDueDate = dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  createUnitInvoice: (unitNum, type, amount, description, caseId?, dueDate?, opts: InvoiceOptions = {}) => {
+    const s = get();
+    const date = opts.date ?? todayIso();
+    const effectiveDueDate = dueDate || addDays(date, 30);
     const id = generateLocalId('INV-U');
-    const m = get().glAccountMapping;
-    const { arAcct: glAcct, revenueAcct: glRev } = getGLAccountsForInvoice(type, m);
-    const glEntry = get().glPost(today, `Invoice ${id} - Unit ${unitNum}: ${description}`, glAcct, glRev, amount, type === 'fee' ? 'fee' : 'assessment', unitNum);
+    const m = mappingOf(s.glAccountMapping);
+    const fund = type === 'special_assessment' ? (opts.fund ?? 'reserve') : null;
+    const { arAcct, revenueAcct } = getGLAccountsForInvoice(type, m, fund);
+    const post = opts.post !== false;
+    const amt = r2(amount);
+    const glEntry = post ? s.glPost(date, `Invoice ${id} - Unit ${unitNum}: ${description}`, arAcct, revenueAcct, amt, invoiceSource(type), unitNum) : null;
+    // Money the owner paid ahead pays the new charge first.
+    const unit = s.units.find(u => u.number === unitNum);
+    const credit = post && unit ? r2(Math.min(creditOf(unit), amt)) : 0;
+    if (credit > 0) s.glPost(date, `Prepaid credit applied - Invoice ${id} Unit ${unitNum}`, m.prepaidAssessments, arAcct, credit, 'payment', unitNum);
+    const settled = credit >= amt - 0.005;
     const invoice: UnitInvoice = {
-      id, unitNumber: unitNum, type, description, amount,
-      status: 'sent', createdDate: today, dueDate: effectiveDueDate, paidDate: null,
-      paidAmount: null, paymentMethod: null, stripePaymentLink: null,
+      id, unitNumber: unitNum, type, description, amount: amt,
+      status: settled ? 'paid' : 'sent', createdDate: date, dueDate: effectiveDueDate, paidDate: settled ? date : null,
+      paidAmount: credit > 0 ? credit : null, paymentMethod: credit > 0 ? 'credit' : null, stripePaymentLink: null,
       glEntryId: glEntry?.id || null, paymentGlEntryId: null,
+      fund, forInvoiceId: opts.forInvoiceId ?? null,
       ...(caseId ? { caseId } : {}),
     };
-    set(s => ({ unitInvoices: [...s.unitInvoices, invoice] }));
+    set(st => ({
+      unitInvoices: [...st.unitInvoices, invoice],
+      units: post ? st.units.map(u => (u.number === unitNum ? { ...u, balance: r2(u.balance + amt) } : u)) : st.units,
+    }));
+    if (post) syncUnit(unitNum);
     if (isBackendEnabled) {
-      const tid = get().tenantId || getActiveTenantId();
+      const tid = s.tenantId || getActiveTenantId();
       if (tid) financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
-        if (dbRow) set(s => ({ unitInvoices: s.unitInvoices.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
+        if (!dbRow) return;
+        // The row has its database id now: the invoice, and everything that names it, follow.
+        const latest = get().unitInvoices.find(x => x.id === id);
+        set(st => ({
+          unitInvoices: st.unitInvoices.map(x => (x.id === id ? { ...x, id: dbRow.id } : x.forInvoiceId === id ? { ...x, forInvoiceId: dbRow.id } : x)),
+          units: st.units.map(u => u.number === unitNum ? {
+            ...u,
+            lateFees: u.lateFees.map(f => (f.invoiceId === id ? { ...f, invoiceId: dbRow.id } : f)),
+            specialAssessments: u.specialAssessments.map(a => (a.invoiceId === id ? { ...a, invoiceId: dbRow.id } : a)),
+          } : u),
+        }));
+        // A payment that landed while the insert was in flight goes up now.
+        if (latest && (latest.status !== invoice.status || latest.paidAmount !== invoice.paidAmount)) financialSvc.updateUnitInvoice(dbRow.id, { status: latest.status, paidAmount: latest.paidAmount, paidDate: latest.paidDate, paymentMethod: latest.paymentMethod, paymentGlEntryId: latest.paymentGlEntryId });
+        syncUnit(unitNum);
       }).catch(err => {
         console.error('[syncWrite] createUnitInvoice failed:', err);
-        set(s => ({ unitInvoices: s.unitInvoices.filter(x => x.id !== id) }));
       });
     }
     return invoice;
   },
 
-  payUnitInvoice: (invoiceId, method) => {
-    const today = new Date().toISOString().split('T')[0];
-    const inv = get().unitInvoices.find(i => i.id === invoiceId);
-    if (!inv || inv.status === 'paid') return;
-    const m = get().glAccountMapping;
-    const arAcct = inv.type === 'fee' || inv.type === 'amenity_fee' ? m.lateFeeReceivable : inv.type === 'special_assessment' ? m.specialAssessmentsReceivable : m.assessmentsReceivable;
-    const glEntry = get().glPost(today, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, m.bankAccount, arAcct, inv.amount, 'payment', inv.unitNumber);
-    set(s => ({
-      unitInvoices: s.unitInvoices.map(i => i.id === invoiceId ? {
-        ...i, status: 'paid' as const, paidDate: today, paidAmount: inv.amount,
-        paymentMethod: method, paymentGlEntryId: glEntry?.id || null,
-      } : i),
-      units: s.units.map(u => u.number === inv.unitNumber ? {
+  payUnitInvoice: (invoiceId, method, opts: { date?: string; amount?: number } = {}) => {
+    const date = opts.date ?? todayIso();
+    const s = get();
+    const inv = s.unitInvoices.find(i => i.id === invoiceId);
+    if (!inv || !isOpenInvoice(inv)) return;
+    const remaining = invoiceRemaining(inv);
+    const take = r2(Math.min(opts.amount ?? remaining, remaining));
+    if (take <= 0) return;
+    const m = mappingOf(s.glAccountMapping);
+    const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+    const glEntry = s.glPost(date, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, m.bankAccount, arAcct, take, 'payment', inv.unitNumber);
+    const paid = r2((inv.paidAmount ?? 0) + take);
+    const full = paid >= inv.amount - 0.005;
+    const patch: Partial<UnitInvoice> = { status: full ? 'paid' : inv.status, paidDate: full ? date : inv.paidDate, paidAmount: paid, paymentMethod: method, paymentGlEntryId: glEntry.id };
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, ...patch } : i)),
+      units: st.units.map(u => u.number === inv.unitNumber ? {
         ...u,
-        balance: Math.max(0, u.balance - inv.amount),
-        payments: [...u.payments, { date: today, amount: inv.amount, method, note: `Invoice ${inv.id}` }],
+        balance: r2(u.balance - take),
+        payments: [...u.payments, { date, amount: take, method, note: `Invoice ${inv.id}` }],
+        lateFees: full ? u.lateFees.map(f => (f.invoiceId === invoiceId ? { ...f, paid: true } : f)) : u.lateFees,
+        specialAssessments: full ? u.specialAssessments.map(a => (a.invoiceId === invoiceId ? { ...a, paid: true, paidDate: date } : a)) : u.specialAssessments,
       } : u),
     }));
-    if (isBackendEnabled) {
-      financialSvc.updateUnitInvoice(invoiceId, {
-        status: 'paid', paidDate: today, paidAmount: inv.amount,
-        paymentMethod: method, paymentGlEntryId: glEntry?.id || null,
-      });
-      syncUnit(inv.unitNumber);
-    }
+    if (isBackendEnabled && isDbId(invoiceId)) financialSvc.updateUnitInvoice(invoiceId, patch);
+    syncUnit(inv.unitNumber);
+  },
+
+  voidUnitInvoice: (invoiceId, reason) => {
+    const s = get();
+    const inv = s.unitInvoices.find(i => i.id === invoiceId);
+    if (!inv || !isOpenInvoice(inv)) return false;
+    const remaining = invoiceRemaining(inv);
+    const m = mappingOf(s.glAccountMapping);
+    const { arAcct, revenueAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+    if (remaining > 0) s.glPost(todayIso(), `Void - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, arAcct, remaining, invoiceSource(inv.type), inv.unitNumber);
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, status: 'void' as const, refundReason: reason } : i)),
+      units: st.units.map(u => u.number === inv.unitNumber ? {
+        ...u,
+        balance: r2(u.balance - remaining),
+        lateFees: u.lateFees.map(f => (f.invoiceId === invoiceId ? { ...f, waived: true } : f)),
+        specialAssessments: u.specialAssessments.filter(a => a.invoiceId !== invoiceId),
+      } : u),
+    }));
+    if (isBackendEnabled && isDbId(invoiceId)) financialSvc.updateUnitInvoice(invoiceId, { status: 'void', refundReason: reason });
+    syncUnit(inv.unitNumber);
+    return true;
+  },
+
+  billOutstandingBalance: (unitNum) => {
+    const s = get();
+    const unit = s.units.find(u => u.number === unitNum);
+    if (!unit) return null;
+    const owed = legacyOwed(unit, s.unitInvoices);
+    if (owed <= 0) return null;
+    return s.createUnitInvoice(unitNum, 'monthly', owed, 'Balance brought forward', undefined, todayIso(), { post: false });
   },
 }), {
   name: 'onetwo-financial',

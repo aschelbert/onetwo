@@ -345,6 +345,8 @@ export function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
     dueDate: r.due_date as string,
     paidDate: (r.paid_date as string) || null,
     paidAmount: r.paid_amount != null ? Number(r.paid_amount) : null,
+    fund: (r.fund as UnitInvoice['fund']) || null,
+    forInvoiceId: (r.for_invoice_id as string) || null,
     paymentMethod: (r.payment_method as string) || null,
     stripePaymentLink: (r.stripe_payment_link as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
@@ -383,6 +385,8 @@ export async function createUnitInvoice(tenantId: string, inv: UnitInvoice): Pro
       payment_gl_entry_id: inv.paymentGlEntryId,
       stripe_checkout_session_id: inv.stripeCheckoutSessionId || null,
       stripe_payment_intent_id: inv.stripePaymentIntentId || null,
+      fund: inv.fund || null,
+      for_invoice_id: inv.forInvoiceId || null,
     })
     .select()
     .single();
@@ -394,6 +398,8 @@ export async function updateUnitInvoice(id: string, updates: Partial<UnitInvoice
   if (!supabase) return false;
   const row: Record<string, unknown> = {};
   if (updates.status !== undefined) row.status = updates.status;
+  if (updates.dueDate !== undefined) row.due_date = updates.dueDate;
+  if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.paidDate !== undefined) row.paid_date = updates.paidDate;
   if (updates.paidAmount !== undefined) row.paid_amount = updates.paidAmount;
   if (updates.paymentMethod !== undefined) row.payment_method = updates.paymentMethod;

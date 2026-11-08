@@ -244,7 +244,11 @@ export default function PaymentsManager() {
                   <span className="font-bold text-red-600 text-sm">{fmt(u.balance)}</span>
                   {stripeReady && (
                     <button onClick={async () => {
-                      const invoice = store.createUnitInvoice(u.number, 'monthly', u.balance, `Outstanding balance — Unit ${u.number}`);
+                      // The balance is already in the ledger: send a link for the open invoices, turning any part
+                      // with no invoice behind it into one first, without posting the amount a second time.
+                      const existing = store.unitInvoices.filter(i => i.unitNumber === u.number && (i.status === 'sent' || i.status === 'overdue'));
+                      const invoice = store.billOutstandingBalance(u.number) ?? existing[0];
+                      if (!invoice) return;
                       if (supabase) {
                         try {
                           await supabase.functions.invoke('send-unit-invoice', {
@@ -253,9 +257,9 @@ export default function PaymentsManager() {
                               unitNumber: u.number,
                               ownerName: u.owner,
                               ownerEmail: u.email,
-                              amount: u.balance,
-                              description: `Outstanding balance — Unit ${u.number}`,
-                              type: 'monthly',
+                              amount: invoice.amount - (invoice.paidAmount ?? 0),
+                              description: invoice.description,
+                              type: invoice.type,
                               buildingName: building.name,
                               stripeConnectId: store.stripeConnectId,
                               tenantId: store.tenantId,
