@@ -70,9 +70,11 @@ export function insuranceStatus(s: BuildingSnapshot, warnDays = 60): InsuranceSt
 }
 
 export function documentsSummary(s: BuildingSnapshot) {
-  const withFile = s.legalDocuments.filter(d => d.attachments && d.attachments.length > 0);
+  // An archived file is an earlier version; the document is on file when it has a current one.
+  const hasCurrent = (d: BuildingSnapshot['legalDocuments'][number]) => (d.attachments ?? []).some(a => !a.archived);
+  const withFile = s.legalDocuments.filter(hasCurrent);
   const reviewDue = s.legalDocuments.filter(d => d.status === 'review-due');
-  const missingFile = s.legalDocuments.filter(d => !d.attachments || d.attachments.length === 0);
+  const missingFile = s.legalDocuments.filter(d => !hasCurrent(d));
   const certificates = s.insurance.filter(p => p.attachments && p.attachments.length > 0).length;
   return { total: s.legalDocuments.length, withFile: withFile.length, reviewDue, missingFile, certificates, policies: s.insurance.length };
 }

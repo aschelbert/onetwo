@@ -126,19 +126,21 @@ function ItemCard({ item, fee = '', onFee }: { item: Item; fee?: string; onFee?:
 function Assessment({ onDocuments }: { onDocuments: () => void }) {
   const s = useSetup();
   if (!s.docs.length) return null;
-  const covered = new Set(s.docs.flatMap(d => (d.result ? coverage(d.result).map(c => c.kind) : [])));
+  const covered = new Set(s.docs.flatMap(d => (d.result && !d.historical ? coverage(d.result).map(c => c.kind) : [])));
   const missing = DOC_KINDS.filter(k => k.imports && !covered.has(k.id));
   return (
     <section aria-labelledby="assess-h" data-widget="setup-assessment" className="flex flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
       <h2 id="assess-h" className="m-0 text-lg font-medium">What we found in your documents, and where it goes</h2>
       {s.docs.map(d => {
-        const cov = d.result ? coverage(d.result) : [];
+        const cov = d.result && !d.historical ? coverage(d.result) : [];
         return (
           <div key={d.id} data-assess-doc={d.name} className="flex flex-col gap-1.5 rounded-2xl border border-ux2-line bg-white px-4 py-3">
             <div className="text-sm"><b className="font-semibold">{d.name}</b>{d.result?.pageCount ? <span className="text-ux2-muted"> · {d.result.pageCount} pages</span> : null}</div>
             {d.status === 'reading' && <span className="text-[13px] text-ux2-muted">Still opening…</span>}
             {d.status === 'error' && <span className="text-[13px] text-ux2-red-ink">{d.error}</span>}
-            {d.status === 'filed' && <span className="text-[13px] text-ux2-amber">{d.note ?? 'Filed in Building › Documents; nothing was read from it.'}</span>}
+            {d.historical ? <span className="text-[13px] text-ux2-muted">Past version{d.period ? ` (${d.period})` : ''} · kept as history, not read into the building</span>
+              : d.status === 'filed' && <span className="text-[13px] text-ux2-amber">{d.note ?? 'Filed in Building › Documents; nothing was read from it.'}</span>}
+            {d.filedAs && d.covers && d.covers.length > 1 && <span className="text-[13px] text-ux2-muted">Filed once under {d.covers.join(', ')}</span>}
             {d.status === 'read' && cov.length === 0 && <span className="text-[13px] text-ux2-muted">Nothing found that setup can use.</span>}
             {readByOlderReader(d) && <span className="text-[13px] text-ux2-amber">Read by an earlier version of setup, so board duties, owner obligations and rules weren't looked for. Remove it in step 1 and add it again.</span>}
             {cov.length > 0 && (

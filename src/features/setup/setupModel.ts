@@ -81,8 +81,14 @@ export interface SetupDoc {
   pasted?: boolean;
   /** Which version of the reader read it; older readings miss what was added since. */
   reader?: number;
-  /** Filed in Building › Documents (the legal document id). */
+  /** Filed in Building › Documents (the first legal document it's filed under). */
   filedAs?: string;
+  /** The documents this one file is, by name ("Bylaws", "Rules and regulations"): one upload for a document that holds several. */
+  covers?: string[];
+  /** A past version (last year's budget, earlier minutes): filed as history, not read into the building. */
+  historical?: boolean;
+  /** The year or period a past version is for. */
+  period?: string;
 }
 
 export type Section = 'profile' | 'rules' | 'units' | 'board' | 'duties' | 'obligations' | 'houserules' | 'insurance' | 'vendors' | 'budget' | 'reserves' | 'accounts';
@@ -134,7 +140,7 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
  * What to upload. Spreadsheets (`imports`) become items to review; the rest
  * are filed in Building › Documents and their settings asked in Fill the gaps.
  */
-export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[] }[] = [
+export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[]; optional?: boolean }[] = [
   { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Board and officer duties', 'Owner obligations', 'Rules for residents', 'Quorum and notice rules', 'Assessment due day', 'Late fees', 'Unit ownership table'] },
   { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Invites'] },
   { id: 'budget', label: "This year's budget (Excel, CSV or PDF)", types: ['budget'], imports: true, fills: ['Budget lines by category'] },
@@ -143,7 +149,19 @@ export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: 
   { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], imports: true, fills: ['Carrier and policy number', 'Limits', 'Renewal date'] },
   { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], imports: true, fills: ['Reserve components', 'Useful life and cost'] },
   { id: 'statements', label: 'Bank or year-end statements', types: ['financial_statement', 'bank_statement'], imports: true, fills: ['Opening balances'] },
-  { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], imports: false, fills: ['Kept in Building › Documents'] },
+];
+
+/**
+ * Optional in step 1: past documents kept as history (each is filed as an
+ * earlier version under its document, and not read into the building), and
+ * vendor contracts (added to Building › Contracts).
+ */
+export const HISTORY_KINDS: { id: string; label: string; entry: string; docType: DocType; hint: string }[] = [
+  { id: 'past-minutes', label: 'Past meeting minutes', entry: 'minutes', docType: 'minutes', hint: 'board and annual meetings from earlier years' },
+  { id: 'past-budgets', label: 'Past budgets', entry: 'budget', docType: 'budget', hint: 'approved budgets from earlier years' },
+  { id: 'past-financials', label: 'Past financial statements and audits', entry: 'financials', docType: 'financial_statement', hint: 'year-end statements, bank statements, audits' },
+  { id: 'past-tax', label: 'Tax returns', entry: 'tax', docType: 'other', hint: 'federal and state returns' },
+  { id: 'past-reserves', label: 'Earlier reserve studies', entry: 'reserve-study', docType: 'reserve_study', hint: 'studies before the current one' },
 ];
 
 // ── Items ──────────────────────────────────────────────────────────
@@ -203,7 +221,8 @@ export function buildItems(docs: SetupDoc[]): Item[] {
   };
   for (const d of docs) {
     const r = d.result;
-    if (d.status !== 'read' || !r) continue;
+    // A past version (last year's budget, old minutes) is kept as history, not read into the building.
+    if (d.status !== 'read' || !r || d.historical) continue;
     const src = (row: SourceBits): Source => ({ docId: d.id, docName: r.title || d.name, page: row.page, quote: row.quote, confidence: row.confidence });
     for (const f of r.facts ?? []) {
       if (!FACT_LABEL[f.key]) continue;

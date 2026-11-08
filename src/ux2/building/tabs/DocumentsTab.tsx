@@ -1,6 +1,6 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBuildingStore, type LegalDocument } from '@/store/useBuildingStore';
+import { useBuildingStore, type LegalDocFile, type LegalDocument } from '@/store/useBuildingStore';
 import { useReportsStore } from '@/store/useReportsStore';
 import { useArchiveStore } from '@/store/useArchiveStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
@@ -9,11 +9,12 @@ import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, 
 import { dayLabel } from '../../home/calendar';
 import { documentsSummary, insuranceStatus, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
-import { DOC_CATALOGUE, entryFor, fileDocument, type CatalogueEntry } from '@/features/building/documentCatalogue';
+import { DOC_CATALOGUE, DOC_GROUP_LABEL, currentFile, deleteFile, entryFor, groupOf, pastFiles, placeFile, replacedBy, restoreFile, type CatalogueEntry } from '@/features/building/documentCatalogue';
+import { DocumentPicker } from '../DocumentPicker';
 
 type Group = 'governing' | 'policies' | 'insurance' | 'reserve' | 'reports' | 'minutes' | 'contracts';
 type Filter = 'all' | Group;
-const GROUP_LABEL: Record<Group, string> = { governing: 'Governing documents', policies: 'Policies', insurance: 'Insurance certificates', reserve: 'Reserve study', reports: 'Annual reports', minutes: 'Minutes', contracts: 'Vendor contracts' };
+const GROUP_LABEL: Record<Group, string> = DOC_GROUP_LABEL;
 const ORDER: Group[] = ['governing', 'policies', 'insurance', 'reserve', 'reports', 'minutes', 'contracts'];
 
 interface DocRow {
@@ -31,45 +32,97 @@ interface DocRow {
   legal?: LegalDocument;
   /** A required document with nothing on file: Add file creates it under this entry's name. */
   expected?: CatalogueEntry;
+  /** Earlier versions (replaced files and past versions), newest first. */
+  past?: LegalDocFile[];
   open?: () => void;
 }
 
-function groupOf(d: LegalDocument): Group {
-  const n = d.name.toLowerCase();
-  if (/reserve study/.test(n)) return 'reserve';
-  if (/bylaw|cc&r|covenant|declaration|deed|articles/.test(n)) return 'governing';
-  return 'policies';
-}
 
 const monthYear = (iso: string) => { if (!iso) return ''; const d = new Date(iso.slice(0, 10) + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); };
 
-function UploadForm({ doc, defaultName, onClose }: { doc?: LegalDocument; defaultName?: string; onClose: () => void }) {
-  const attach = useBuildingStore(s => s.addLegalDocAttachment);
-  const [name, setName] = useState(doc?.name ?? defaultName ?? '');
-  const [version, setVersion] = useState(doc ? '' : '');
+/** Brings what it wraps into view when it opens (a form opened from a row further down). */
+function InView({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
+  return <div ref={ref}>{children}</div>;
+}
+
+const sizeLabel = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/**
+ * Upload a file: which documents it is (one file can be several), whether it's
+ * the current version or a past one kept as history, and, when it replaces a
+ * current file, whether the old one is archived or deleted.
+ */
+function UploadForm({ start, onClose }: { start?: string[]; onClose: () => void }) {
+  useBuildingStore(s => s.legalDocuments); // what it would replace follows the library
+  const updateDoc = useBuildingStore(s => s.updateLegalDocument);
   const [file, setFile] = useState<File | null>(null);
+  const [names, setNames] = useState<string[]>(start ?? []);
+  const [when, setWhen] = useState<'current' | 'past'>('current');
+  const [version, setVersion] = useState('');
+  const [replaced, setReplaced] = useState<'archive' | 'delete' | null>(null);
+  const nf = file ? { name: file.name, size: sizeLabel(file.size), type: file.type || 'application/pdf' } : null;
+  const replacing = nf && when === 'current' ? replacedBy(names, nf) : [];
+  const pick = (f: File | null) => {
+    setFile(f);
+    // A first guess from the file's name; the person confirms it.
+    if (f && !names.length) { const e = entryFor(f.name.replace(/\.[a-z0-9]+$/i, '')); if (e) setNames([e.label]); }
+  };
+  const ready = !!nf && names.length > 0 && (!replacing.length || !!replaced);
   return (
     <form
-      aria-label={doc ? `Add file to ${doc.name}` : 'Upload a document'}
+      aria-label={start?.length ? `Add a file to ${start.join(', ')}` : 'Upload a document'}
       onSubmit={e => {
         e.preventDefault();
-        const att = file ? { name: file.name, size: `${Math.max(1, Math.round(file.size / 1024))} KB`, type: file.type || 'application/pdf' } : null;
-        if (doc) { if (att) attach(doc.id, att); }
-        else {
-          if (!name) return;
-          // The same document already on file (Bylaws, "Bylaws (amended 2019)") gets this file as a new version.
-          fileDocument(name, { version: version || '1.0', attachment: att ?? undefined });
-        }
+        if (!nf || !ready) return;
+        const year = /\b(19|20)\d{2}\b/.exec(version || file!.name)?.[0];
+        const ids = placeFile(names, { ...nf, ...(when === 'past' ? { period: version || year } : {}) }, { past: when === 'past', replaced: replaced ?? 'archive', version: version || year });
+        if (when === 'current' && version) for (const id of ids) updateDoc(id, { version });
         onClose();
       }}
-      className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
+      className="flex flex-col gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
     >
-      <div className="w-full text-sm font-semibold text-ux2-ink">{doc ? `${doc.name} · add the file` : 'Upload · a new version keeps the old one underneath it with its date'}</div>
-      {!doc && <Field label="Document" className="min-w-[200px] flex-1"><input value={name} onChange={e => setName(e.target.value)} placeholder="Rules and regulations" className={INPUT} /></Field>}
-      {!doc && <Field label="Version" className="w-[140px]"><input value={version} onChange={e => setVersion(e.target.value)} placeholder="2026 · v1" className={INPUT} /></Field>}
-      <Field label="File" className="min-w-[220px]"><input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} className="text-sm font-normal" /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={doc ? !file : !name}>{doc ? 'Add file' : 'Upload'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      <div className="text-sm font-semibold text-ux2-ink">{start?.length ? `${start.join(', ')} · add a file` : 'Upload a document'}</div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="File" className="min-w-[220px]"><input type="file" onChange={e => pick(e.target.files?.[0] ?? null)} className="text-sm font-normal" /></Field>
+        <div role="radiogroup" aria-label="Which version" className="flex flex-wrap gap-3 text-[13px]">
+          <label className="flex items-center gap-1.5"><input type="radio" name="when" checked={when === 'current'} onChange={() => setWhen('current')} />Current version</label>
+          <label className="flex items-center gap-1.5"><input type="radio" name="when" checked={when === 'past'} onChange={() => setWhen('past')} />Past version <span className="text-ux2-muted">· kept as history, replaces nothing</span></label>
+        </div>
+        <Field label={when === 'past' ? 'Year or period' : 'Version or date'} className="w-[150px]"><input value={version} onChange={e => setVersion(e.target.value)} placeholder={when === 'past' ? '2024' : '2026 · amended'} className={INPUT} /></Field>
+      </div>
+      <DocumentPicker value={names} onChange={setNames} />
+      {replacing.length > 0 && (
+        <div role="group" aria-label="What it replaces" className="flex flex-col gap-1.5 rounded-xl bg-ux2-amber-tint/60 px-3 py-2.5 text-[13px]">
+          <b className="font-semibold text-ux2-ink">This replaces what's on file now</b>
+          <ul className="m-0 list-disc pl-5 text-ux2-ink">
+            {replacing.map(r => <li key={r.doc.id}>{r.doc.name}: {r.files.map(f => `${f.name}${f.uploadedAt ? ` (${monthYear(f.uploadedAt)})` : ''}`).join(', ')}</li>)}
+          </ul>
+          <span className="text-ux2-muted">What should happen to {replacing.reduce((n, r) => n + r.files.length, 0) === 1 ? 'it' : 'them'}?</span>
+          <span className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-1.5"><input type="radio" name="replaced" checked={replaced === 'archive'} onChange={() => setReplaced('archive')} />Archive · keep as an earlier version</label>
+            <label className="flex items-center gap-1.5"><input type="radio" name="replaced" checked={replaced === 'delete'} onChange={() => setReplaced('delete')} />Delete it</label>
+          </span>
+        </div>
+      )}
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!ready}>{when === 'past' ? 'Add past version' : 'Upload'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
     </form>
+  );
+}
+
+/** A document's earlier versions: replaced files and past versions, each can be made current again or deleted. */
+function EarlierVersions({ doc, files, isBoard }: { doc: LegalDocument; files: LegalDocFile[]; isBoard: boolean }) {
+  return (
+    <ul aria-label={`Earlier versions of ${doc.name}`} className="m-0 flex list-none flex-col gap-1.5 p-0">
+      {files.map((f, i) => (
+        <li key={`${f.name}-${f.uploadedAt}-${i}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-ux2-line bg-white px-3 py-2 text-[13px]">
+          <span className="min-w-0 flex-1"><b className="font-semibold">{f.name}</b> <span className="text-ux2-muted">· {f.period ? `${f.period} · ` : ''}added {monthYear(f.uploadedAt)}{f.archived && f.archived !== f.uploadedAt ? ` · archived ${monthYear(f.archived)}` : ''}</span></span>
+          {isBoard && <Button size="sm" variant="ghost" onClick={() => restoreFile(doc.id, f)}>Make current</Button>}
+          {isBoard && <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(`Delete ${f.name}? This can't be undone.`)) deleteFile(doc.id, f); }}>Delete</Button>}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -85,12 +138,12 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
   const [audience, setAudience] = useState<'all' | 'owners'>('all');
   const [q, setQ] = useState('');
   const [uploading, setUploading] = useState<string | null>(null);
+  const [openPast, setOpenPast] = useState<string | null>(null);
 
   const rows = useMemo<DocRow[]>(() => {
     const out: DocRow[] = [];
-    const latestOf = (d: LegalDocument) => [...d.attachments].sort((a, b) => (b.uploadedAt || '').localeCompare(a.uploadedAt || ''))[0];
     // One row per document: copies with the same catalogue entry (or, outside the catalogue, the same name)
-    // collapse into the newest copy that has a file.
+    // collapse into the newest copy that has a current file.
     const buckets = new Map<string, { entry?: CatalogueEntry; docs: LegalDocument[] }>();
     for (const d of snap.legalDocuments) {
       const entry = entryFor(d.name);
@@ -100,11 +153,16 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
       buckets.set(k, b);
     }
     const pushDoc = (d: LegalDocument, copies: number, entry?: CatalogueEntry) => {
-      const latest = latestOf(d);
+      const cur = currentFile(d);
+      const past = pastFiles(d);
       const extra = copies > 1 ? ` · ${copies - 1} other ${copies - 1 === 1 ? 'copy' : 'copies'}` : '';
-      out.push({ id: d.id, group: entry?.group ?? groupOf(d), name: entry?.label ?? d.name, note: `${entry ? `${entry.note} · ` : ''}${latest ? latest.name : d.version}${extra}`, version: d.version, audience: entry?.audience ?? 'Everyone', updated: latest ? monthYear(latest.uploadedAt) : 'Never uploaded', updatedIso: latest?.uploadedAt, file: !!latest, missing: !latest, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d });
+      const earlier = past.length ? ` · ${past.length} earlier ${past.length === 1 ? 'version' : 'versions'}` : '';
+      // A required document with only past versions is still missing its current one.
+      const missing = !cur && (!past.length || !!entry?.required);
+      out.push({ id: d.id, group: entry?.group ?? groupOf(d.name), name: entry?.label ?? d.name, note: `${entry ? `${entry.note} · ` : ''}${cur ? cur.name : past.length ? 'past versions only' : d.version}${earlier}${extra}`, version: d.version, audience: entry?.audience ?? 'Everyone', updated: cur ? monthYear(cur.uploadedAt) : past.length ? monthYear(past[0].uploadedAt) : 'Never uploaded', updatedIso: cur?.uploadedAt, file: !!cur, missing, status: d.status === 'review-due' ? { label: 'Review due', tone: 'amber' } : undefined, legal: d, past });
     };
-    const best = (docs: LegalDocument[]) => [...docs].sort((a, b) => Number(!!latestOf(b)) - Number(!!latestOf(a)) || (latestOf(b)?.uploadedAt || '').localeCompare(latestOf(a)?.uploadedAt || ''))[0];
+    const score = (d: LegalDocument) => (currentFile(d) ? 2 : d.attachments.length ? 1 : 0);
+    const best = (docs: LegalDocument[]) => [...docs].sort((a, b) => score(b) - score(a) || (currentFile(b)?.uploadedAt || '').localeCompare(currentFile(a)?.uploadedAt || ''))[0];
     for (const entry of DOC_CATALOGUE) {
       const b = buckets.get(`cat:${entry.key}`);
       if (b) pushDoc(best(b.docs), b.docs.length, entry);
@@ -134,6 +192,9 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
     ...ins.filter(p => p.state !== 'current').slice(0, 1).map(p => ({ id: `cert:${p.id}`, title: `Insurance certificates ${p.state === 'lapsed' ? 'expired' : 'expire'} ${dayLabel(p.expires)}`, detail: 'New certificates arrive from the renewal runbook', chip: <Chip tone={p.state === 'lapsed' ? 'red' : 'amber'}>{p.state === 'lapsed' ? 'Expired' : `${p.daysLeft} days`}</Chip>, go: () => navigate('/building?section=insurance') })),
     ...docs.reviewDue.slice(0, 1).map(d => ({ id: `rev:${d.id}`, title: `${d.name} is due for review`, detail: 'The reviewed version closes its obligation', chip: <Chip tone="amber">Review due</Chip>, go: () => updateDoc(d.id, { status: 'current' }) })),
   ].slice(0, 3);
+  // A row's upload form and earlier versions open above the table, at full width (the table scrolls sideways on a phone).
+  const uploadRow = rows.find(r => r.id === uploading && (r.legal || r.expected));
+  const pastRow = rows.find(r => r.id === openPast);
   const storage = snap.legalDocuments.reduce((t, d) => t + d.attachments.reduce((u, a) => { const m = /([\d.]+)\s*(KB|MB)/i.exec(a.size); return u + (m ? Number(m[1]) * (m[2].toUpperCase() === 'MB' ? 1024 : 1) : 0); }, 0), 0);
 
   return (
@@ -160,6 +221,15 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
       </div>
 
       <Card aria-label="Document library" className="gap-2.5">
+        {uploadRow && <InView key={`up:${uploadRow.id}`}><UploadForm start={[uploadRow.name]} onClose={() => setUploading(null)} /></InView>}
+        {pastRow?.legal && pastRow.past && (
+          <InView key={`past:${pastRow.id}`}>
+            <div className="flex flex-col gap-2 rounded-[14px] border border-ux2-line bg-ux2-surface px-3.5 py-3">
+              <div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold text-ux2-ink">{pastRow.name} · earlier versions</span><Button size="sm" variant="ghost" onClick={() => setOpenPast(null)}>Close</Button></div>
+              <EarlierVersions doc={pastRow.legal} files={pastRow.past} isBoard={isBoard} />
+            </div>
+          </InView>
+        )}
         {shown.length === 0 ? <Inner className="text-sm text-ux2-muted">No document matches.</Inner> : (
           <Table minWidth={760}>
             <thead><tr><Th>Document</Th><Th>Version / date</Th><Th>Who can see</Th><Th>Last updated</Th><Th num>Download</Th></tr></thead>
@@ -175,12 +245,15 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
                         <Td><Chip tone={r.audience === 'Everyone' ? 'teal' : 'ghost'}>{r.audience}</Chip></Td>
                         <Td className="whitespace-nowrap text-ux2-muted">{r.updated || '—'}{r.status && <Chip tone={r.status.tone} className="ml-1.5">{r.status.label}</Chip>}</Td>
                         <Td num>
-                          {r.missing && isBoard ? <Button size="sm" onClick={() => setUploading(uploading === r.id ? null : r.id)}>{/rule/i.test(r.name) ? 'Add rules' : 'Add file'}</Button>
-                            : r.open ? <Button size="sm" variant="ghost" onClick={r.open}>{r.group === 'minutes' ? 'Open in Community' : 'Open'}</Button>
-                            : <Button size="sm" variant="ghost" disabled={!r.file} onClick={() => setUploading(uploading === r.id ? null : r.id)}>{r.file ? 'Download' : 'Add file'}</Button>}
+                          <span className="inline-flex flex-wrap justify-end gap-1.5">
+                            {!!r.past?.length && <Button size="sm" variant="ghost" aria-expanded={openPast === r.id} onClick={() => setOpenPast(openPast === r.id ? null : r.id)}>Earlier · {r.past.length}</Button>}
+                            {r.missing && isBoard ? <Button size="sm" onClick={() => setUploading(uploading === r.id ? null : r.id)}>{/rule/i.test(r.name) ? 'Add rules' : 'Add file'}</Button>
+                              : r.open ? <Button size="sm" variant="ghost" onClick={r.open}>{r.group === 'minutes' ? 'Open in Community' : 'Open'}</Button>
+                              : r.legal && isBoard ? <Button size="sm" variant="ghost" onClick={() => setUploading(uploading === r.id ? null : r.id)}>New version</Button>
+                              : null}
+                          </span>
                         </Td>
                       </tr>
-                      {uploading === r.id && (r.legal || r.expected) && <tr><td colSpan={5} className="px-3 py-2"><UploadForm doc={r.legal} defaultName={r.expected?.label} onClose={() => setUploading(null)} /></td></tr>}
                     </Fragment>
                   ))}
                 </Fragment>
@@ -188,7 +261,7 @@ export default function DocumentsTab({ snap, section, isBoard }: { snap: Buildin
             </tbody>
           </Table>
         )}
-        <Why>Uploading a new version keeps the old one underneath it with its date. "Who can see" is Everyone or Board; owners never see contracts or the D&O certificate. Minutes live in Community because meetings do; this row is the way in.</Why>
+        <Why>One file can be several documents: tick each one it holds (bylaws with the rules and a pets policy in them) and it's filed once under all of them. A new current version asks whether to archive the one it replaces (kept under Earlier, with its date) or delete it; a past version (last year's budget, old minutes) is added as history and replaces nothing. "Who can see" is Everyone or Board; owners never see contracts or the D&O certificate. Minutes live in Community because meetings do; this row is the way in.</Why>
       </Card>
       <Why>A document with a date on it closes the obligation it proves. Those closures show in <button type="button" onClick={() => navigate('/building?tab=obligations')} className="font-semibold text-ux2-teal hover:underline">Obligations</button>, in the Board Room decision trail and as Pulse items on Home; this page is just the library.</Why>
 
