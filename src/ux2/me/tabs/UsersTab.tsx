@@ -119,8 +119,10 @@ function usePeople(viewerName: string, viewerEmail: string) {
   };
   const changeRole = async (p: Person, role: Role) => {
     if (!live) { store.updateMemberRole(p.id, role); return; }
-    const { error } = await supabase!.from('tenant_users').update({ role: role.toLowerCase() }).eq('id', p.id);
-    setNote(error ? `Role not changed: ${error.message}` : `${p.name} is now ${ACCESS_LABEL[accessFor(role, p.boardTitle, p.you)]}.`);
+    // The board can't update tenant_users directly; set_member_role checks the caller and keeps a board in place (041).
+    const { data, error } = await supabase!.rpc('set_member_role', { p_member_id: p.id, p_role: role.toLowerCase() });
+    const result = data as { success?: boolean; error?: string } | null;
+    setNote(error || !result?.success ? `Role not changed: ${error?.message ?? result?.error ?? 'try again'}` : `${p.name} is now ${ACCESS_LABEL[accessFor(role, role === 'BOARD_MEMBER' ? p.boardTitle : null, p.you)]}.`);
     await load();
   };
   /** Link a member to one of the building's units, or clear it ('' ). The board only; the database checks (040). */
@@ -134,8 +136,10 @@ function usePeople(viewerName: string, viewerEmail: string) {
   };
   const remove = async (p: Person) => {
     if (!live) { store.removeMember(p.id); return; }
-    const { error } = await supabase!.from('tenant_users').update({ status: 'inactive' }).eq('id', p.id);
-    setNote(error ? `Not removed: ${error.message}` : `${p.name} can no longer sign in. Their unit, ledger and votes stay.`);
+    // remove_member deletes the membership, so the access goes with it (041).
+    const { data, error } = await supabase!.rpc('remove_member', { p_member_id: p.id });
+    const result = data as { success?: boolean; error?: string } | null;
+    setNote(error || !result?.success ? `Not removed: ${error?.message ?? result?.error ?? 'try again'}` : `${p.name} no longer has access to this building. Their unit, ledger and votes stay.`);
     await load();
   };
 
@@ -250,7 +254,7 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
                   <Td><Chip tone={ACCESS_TONE[p.access]}>{ACCESS_LABEL[p.access]}</Chip></Td>
                   <Td>{p.you ? 'Now' : p.lastActive ? dayLabel(p.lastActive) : '—'}</Td>
                   <Td>{p.status === 'active' ? 'Active' : p.status}</Td>
-                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, ...(snap.viewer.isBoard ? [{ label: p.unit ? 'Change unit' : 'Link to unit', onSelect: () => { setLinking(p); setLinkTo(p.unit); } }] : []), { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page; the link goes to ${p.email}.`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? Their unit, ledger and votes stay; only the sign-in goes.`)) void remove(p); } }]} />}</Td>
+                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, ...(snap.viewer.isBoard ? [{ label: p.unit ? 'Change unit' : 'Link to unit', onSelect: () => { setLinking(p); setLinkTo(p.unit); } }] : []), { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page; the link goes to ${p.email}.`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? They lose access to this building. Their unit, ledger and votes stay.`)) void remove(p); } }]} />}</Td>
                 </tr>
               ))}
               {visible.length === 0 && <tr><Td colSpan={6}><span className="text-ux2-muted">{loading ? 'Loading members…' : 'No one matches.'}</span></Td></tr>}
@@ -280,7 +284,7 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
           </Inner>
         )}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Why>The row menu offers Change role, Link to unit (the board), Reset password, Resend welcome, and Remove. A member's unit decides what they see as an owner: that unit's documents, moves and My Unit. Someone who signs in with the email on a unit's owner record is linked to it automatically. Removing someone keeps their unit, ledger and votes; only the sign-in goes.</Why>
+          <Why>The row menu offers Change role, Link to unit (the board), Reset password, Resend welcome, and Remove. A member's unit decides what they see as an owner: that unit's documents, moves and My Unit. Someone who signs in with the email on a unit's owner record is linked to it automatically. Removing someone takes away their access to this building and keeps their unit, ledger and votes. The account owner changes through ownership transfer, and the building always keeps one board member.</Why>
           {shown.length > 8 && <Button size="sm" variant="ghost" onClick={() => setShowAll(v => !v)}>{showAll ? 'Show fewer' : `Show ${shown.length - 8} more`}</Button>}
         </div>
       </Card>
