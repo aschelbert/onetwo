@@ -403,6 +403,18 @@ describe('Setup screens', () => {
     expect(useFinancialStore.getState().units.map(u => u.monthlyFee)).toEqual([600, 400]);
   });
 
+  it('says so when going live fails instead of leaving the building half live', async () => {
+    const unit = { number: '1A', owner: 'Ana Rivera', email: '', phone: '', monthlyFee: 400, votingPct: 100, status: 'ACTIVE' as const, balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] };
+    useFinancialStore.setState({ units: [unit], budgetCategories: [] });
+    useBuildingStore.setState({ name: 'Maple Court', address: { street: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' }, board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: '', phone: '', term: '' }] });
+    tenant.updateOnboardingStep.mockImplementation(async (step: string) => { if (step === 'goLive') throw new Error("The building couldn't be set live: permission denied"); });
+    renderSetup('/setup?step=finish');
+    fireEvent.click(screen.getByRole('button', { name: 'Go live' }));
+    expect(await screen.findByText("The building couldn't be set live: permission denied")).toBeTruthy();
+    expect(screen.queryByTestId('home')).toBeNull();
+    tenant.updateOnboardingStep.mockImplementation(async () => {});
+  });
+
   it('reads pasted invite lists and sends each person with their role, seat and unit', () => {
     const { invites, skipped } = parseInviteLines('4B  Ana Rivera  ana@example.com\nbo@example.com, vice president\nsam@example.com super\njust a name', ['4B', '12']);
     expect(invites.map(i => [i.email, i.access, i.seat, i.unit])).toEqual([['ana@example.com', 'owner', null, '4B'], ['bo@example.com', 'board', 'vice_president', null], ['sam@example.com', 'staff', null, null]]);
