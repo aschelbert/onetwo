@@ -10,7 +10,7 @@
  * The text of each file is kept in memory for this visit, so changing what a
  * document is reads it again with that kind's rules.
  */
-import type { DocType, SetupDoc } from './setupModel';
+import { READER_VERSION, type DocType, type SetupDoc } from './setupModel';
 import { useSetupStore } from './useSetupStore';
 import { fileSetupDocument, retypeSetupDocument } from './applySetup';
 import { parseCsv, readSheets, type Cell } from './importSpreadsheet';
@@ -56,7 +56,7 @@ function applyReading(id: string, pages: string[][], paged: boolean, docType: Do
   const result = extractFromPages(pages, { title: titleOf(name), docType, paged });
   const n = foundIn(result);
   result.summary = n ? `${n} found` : '';
-  updateDoc(id, n ? { status: 'read', result, docType } : { status: 'filed', result: undefined, docType, note: 'Filed. No settings or lists found in its text; add them in Fill the gaps.' });
+  updateDoc(id, n ? { status: 'read', result, docType, reader: READER_VERSION } : { status: 'filed', result: undefined, docType, reader: READER_VERSION, note: 'Filed. Its text was read but no settings, lists or sections setup recognises were found. Paste a section into "Paste text", or add them in Fill the gaps.' });
 }
 
 /** Add one file. */
@@ -71,7 +71,7 @@ export async function addOne(file: File): Promise<void> {
     try {
       const result = readSheets(await sheetsOf(file), titleOf(file.name));
       if ('error' in result) { updateDoc(id, { status: 'error', error: result.error }); return; }
-      updateDoc(id, { status: 'read', result, docType: result.docType });
+      updateDoc(id, { status: 'read', result, docType: result.docType, reader: READER_VERSION });
     } catch {
       updateDoc(id, { status: 'error', error: "This spreadsheet couldn't be opened. Save it as CSV or Excel (.xlsx) and try again." });
     }
@@ -86,7 +86,7 @@ export async function addOne(file: File): Promise<void> {
     if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
       const { pdfLines } = await import('./pdfText');
       const pages = await pdfLines(file);
-      if (!pages.some(p => p.length)) { updateDoc(id, { status: 'filed', docType, note: 'Filed. This looks like a scan with no text to read; add its settings in Fill the gaps.' }); return; }
+      if (!pages.some(p => p.length)) { updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note: 'Filed. This PDF is a scan: it has no text layer to read. Paste the key sections into "Paste text", or add them in Fill the gaps.' }); return; }
       docType = detectType(pages, docType);
       if (docType !== guessType(file.name)) retypeSetupDocument({ ...base, filedAs }, docType);
       text.set(id, { pages, paged: true });

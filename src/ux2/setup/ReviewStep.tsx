@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/formatters';
 import { Button, Chip } from '../components';
 import { Link } from 'react-router-dom';
-import { DOC_KINDS, FIELD_LABEL, SECTIONS, SECTION_GOES, coverage, isClear, itemSummary, pathFor, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
+import { DOC_KINDS, FIELD_LABEL, SECTIONS, SECTION_GOES, coverage, isClear, itemSummary, pathFor, readByOlderReader, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { applyItem } from '@/features/setup/applySetup';
 import { useSetup } from './useSetup';
@@ -112,28 +112,33 @@ function ItemCard({ item }: { item: Item }) {
 /** What each document turned out to hold, which of the requested documents that covers, and where it goes. */
 function Assessment({ onDocuments }: { onDocuments: () => void }) {
   const s = useSetup();
-  const read = s.docs.filter(d => d.result);
-  if (!read.length) return null;
-  const covered = new Set(read.flatMap(d => coverage(d.result!).map(c => c.kind)));
+  if (!s.docs.length) return null;
+  const covered = new Set(s.docs.flatMap(d => (d.result ? coverage(d.result).map(c => c.kind) : [])));
   const missing = DOC_KINDS.filter(k => k.imports && !covered.has(k.id));
   return (
     <section aria-labelledby="assess-h" data-widget="setup-assessment" className="flex flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
       <h2 id="assess-h" className="m-0 text-lg font-medium">What we found in your documents, and where it goes</h2>
-      {read.map(d => {
-        const cov = coverage(d.result!);
+      {s.docs.map(d => {
+        const cov = d.result ? coverage(d.result) : [];
         return (
           <div key={d.id} data-assess-doc={d.name} className="flex flex-col gap-1.5 rounded-2xl border border-ux2-line bg-white px-4 py-3">
-            <div className="text-sm"><b className="font-semibold">{d.name}</b>{d.result!.pageCount ? <span className="text-ux2-muted"> · {d.result!.pageCount} pages</span> : null}</div>
-            {cov.length === 0 && <span className="text-[13px] text-ux2-muted">Nothing found that setup can use.</span>}
-            <ul className="m-0 flex list-none flex-col gap-1 p-0">
-              {cov.map(c => (
-                <li key={c.kind} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-                  <Chip tone="plum" className="px-2 py-1">{c.label}</Chip>
-                  <span>{c.count} {c.unit}{c.pages ? <span className="text-ux2-muted"> · {c.pages}</span> : null}</span>
-                  <span className="text-ux2-muted">→ {c.goes}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="text-sm"><b className="font-semibold">{d.name}</b>{d.result?.pageCount ? <span className="text-ux2-muted"> · {d.result.pageCount} pages</span> : null}</div>
+            {d.status === 'reading' && <span className="text-[13px] text-ux2-muted">Still opening…</span>}
+            {d.status === 'error' && <span className="text-[13px] text-ux2-red-ink">{d.error}</span>}
+            {d.status === 'filed' && <span className="text-[13px] text-ux2-amber">{d.note ?? 'Filed in Building › Documents; nothing was read from it.'}</span>}
+            {d.status === 'read' && cov.length === 0 && <span className="text-[13px] text-ux2-muted">Nothing found that setup can use.</span>}
+            {readByOlderReader(d) && <span className="text-[13px] text-ux2-amber">Read by an earlier version of setup, so board duties, owner obligations and rules weren't looked for. Remove it in step 1 and add it again.</span>}
+            {cov.length > 0 && (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {cov.map(c => (
+                  <li key={c.kind} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                    <Chip tone="plum" className="px-2 py-1">{c.label}</Chip>
+                    <span>{c.count} {c.unit}{c.pages ? <span className="text-ux2-muted"> · {c.pages}</span> : null}</span>
+                    <span className="text-ux2-muted">→ {c.goes}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         );
       })}
@@ -159,9 +164,12 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
 
   if (!current) {
     return (
+      <div className="flex flex-col gap-[18px]">
+      <Assessment onDocuments={onDocuments} />
       <div className="flex flex-col items-start gap-3 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
         <p className="m-0 text-sm text-ux2-muted">Nothing found to review yet. Add your bylaws, owner list or budget (PDF, spreadsheet or pasted text) and what they hold shows here.</p>
         <div className="flex gap-2"><Button variant="plum" onClick={onDocuments}>Add documents</Button><Button variant="ghost" onClick={onDone}>Fill the gaps</Button></div>
+      </div>
       </div>
     );
   }

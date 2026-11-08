@@ -281,6 +281,27 @@ describe('Setup screens', () => {
     expect(useSetupStore.getState().decisions['fact:annual_meeting_month'].status).toBe('skipped');
   });
 
+  it('assesses every document on step 2, including ones only filed, and flags readings from an earlier version', () => {
+    const scan: SetupDoc = { id: 's', name: 'Bylaws-scan.pdf', size: 1, mediaType: 'application/pdf', status: 'filed', addedAt: '', docType: 'bylaws', note: 'Filed. This PDF is a scan: it has no text layer to read.' };
+    const old: SetupDoc = { ...bylaws, id: 'o', name: 'Old-bylaws.pdf' };
+    useSetupStore.setState({ docs: [scan, old] });
+    renderSetup('/setup?step=review');
+    const a = document.querySelector('[data-widget="setup-assessment"]') as HTMLElement;
+    expect(within(a.querySelector('[data-assess-doc="Bylaws-scan.pdf"]') as HTMLElement).getByText(/scan: it has no text layer/)).toBeTruthy();
+    expect(within(a.querySelector('[data-assess-doc="Old-bylaws.pdf"]') as HTMLElement).getByText(/Read by an earlier version of setup/)).toBeTruthy();
+  });
+
+  it('sends items accepted before they had a home in the app back to review', async () => {
+    const migrate = useSetupStore.persist.getOptions().migrate!;
+    const out = await migrate({ docs: [], decisions: {
+      'fact:annual_meeting_month': { status: 'accepted', savedTo: 'Rules on file', at: '' },
+      'fact:late_fee': { status: 'accepted', savedTo: 'Funds settings · late fees', at: '' },
+      'unit:1a': { status: 'accepted', savedTo: 'Building › Directory · units', at: '' },
+      'fact:pet_rule': { status: 'skipped', at: '' },
+    } }, 1) as { decisions: Record<string, unknown> };
+    expect(Object.keys(out.decisions).sort()).toEqual(['fact:pet_rule', 'unit:1a']);
+  });
+
   it('fills the gaps in place and only lets the building go live with the four essentials', () => {
     renderSetup('/setup?step=finish');
     const live = screen.getByRole('button', { name: /Go live · 4 essentials left/ });

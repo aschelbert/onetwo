@@ -7,7 +7,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Decision, SetupDoc } from './setupModel';
+import { pathFor, type Decision, type SetupDoc } from './setupModel';
 
 interface SetupState {
   docs: SetupDoc[];
@@ -43,7 +43,16 @@ export const useSetupStore = create<SetupState>()(persist((set) => ({
   reset: () => set({ ...EMPTY }),
 }), {
   name: 'onetwo-setup',
-  version: 1,
+  version: 2,
+  // v2: items accepted before every item had a home in the app (old destinations such as "Rules on file")
+  // go back to review, so accepting them again puts them where they now belong.
+  migrate: (persisted, version) => {
+    const st = (persisted ?? {}) as Partial<SetupState>;
+    if (version < 2 && st.decisions) {
+      st.decisions = Object.fromEntries(Object.entries(st.decisions).filter(([, d]) => d.status === 'skipped' || !!pathFor(d.savedTo)));
+    }
+    return st as SetupState;
+  },
   // A document still "reading" when the page closed never finished: show it as failed so it can be read again.
   onRehydrateStorage: () => (state) => {
     if (!state) return;

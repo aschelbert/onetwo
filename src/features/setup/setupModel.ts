@@ -57,6 +57,12 @@ export interface ReadResult {
 }
 
 /** reading: being opened; read: items found to review; filed: kept in Building › Documents with nothing found; error: couldn't be opened. */
+/** Bumped when the reader learns to find more (3: clauses, content coverage). */
+export const READER_VERSION = 3;
+
+/** A document read by an earlier reader, so it may hold more than it shows (spreadsheets are matched the same way still). */
+export const readByOlderReader = (d: SetupDoc) => !!d.result && (d.reader ?? 0) < READER_VERSION && !/\.(csv|xlsx)$/i.test(d.name);
+
 export type DocStatus = 'reading' | 'read' | 'filed' | 'error';
 export interface SetupDoc {
   id: string;
@@ -73,6 +79,8 @@ export interface SetupDoc {
   note?: string;
   /** Text pasted in rather than a file. */
   pasted?: boolean;
+  /** Which version of the reader read it; older readings miss what was added since. */
+  reader?: number;
   /** Filed in Building › Documents (the legal document id). */
   filedAs?: string;
 }

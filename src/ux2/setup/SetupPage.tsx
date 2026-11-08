@@ -14,7 +14,7 @@ import { cn } from '@/lib/formatters';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button, Card, Chip } from '../components';
-import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, coverage, type DocType, type SetupDoc } from '@/features/setup/setupModel';
+import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, coverage, readByOlderReader, type DocType, type SetupDoc } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { ACCEPT, addFiles, addPastedText, isSpreadsheet, retype as retypeDoc } from '@/features/setup/readDocument';
 import { useSetup } from './useSetup';
@@ -92,6 +92,7 @@ function foundCount(d: SetupDoc) {
 function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand: () => void }) {
   const s = useSetup();
   const removeDoc = useSetupStore(x => x.removeDoc);
+  const resetSetup = useSetupStore(x => x.reset);
   const input = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
 
@@ -160,6 +161,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
                   </span>
                   {d.result && <span className="mt-1.5 flex flex-wrap gap-1.5">{coverage(d.result).map(c => <Chip key={c.kind} tone="plum" className="px-2 py-1">{c.label} · {c.count}</Chip>)}</span>}
                   {d.status === 'error' && <span className="block text-[13px] text-ux2-red-ink">{d.error}</span>}
+                  {readByOlderReader(d) && <span className="block text-[13px] text-ux2-amber">Read by an earlier version of setup. Remove it and add it again to find board duties, owner obligations and rules.</span>}
                 </span>
                 {(d.status === 'filed' || (d.status === 'read' && !isSpreadsheet(d.name))) && (
                   <label className="flex items-center gap-2 text-xs text-ux2-muted">What is it?
@@ -227,6 +229,13 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
           <p className="m-0 text-sm leading-relaxed text-ux2-muted">Skip to the essentials and type them in. You can add documents later.</p>
           <Button variant="ghost" className="self-start" onClick={onByHand}>Set it up by hand</Button>
         </Card>
+        {s.docs.length > 0 && (
+          <Card tone="white">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Start over</div>
+            <p className="m-0 text-sm leading-relaxed text-ux2-muted">Clears this page's documents and review decisions. What you already accepted stays in the building.</p>
+            <Button variant="ghost" className="self-start" onClick={() => { if (window.confirm('Clear the documents and decisions on this page? What you accepted stays in the building.')) resetSetup(); }}>Start over</Button>
+          </Card>
+        )}
       </aside>
     </div>
   );
