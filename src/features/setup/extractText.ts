@@ -446,19 +446,23 @@ export function extractFromPages(pages: string[][], opts: { title: string; docTy
   const paged = opts.paged ?? true;
   const t = opts.docType;
   const all = sentences(pages, paged);
+  const found = ['bylaws', 'declaration', 'rules', 'other'].includes(t) ? clauses(pages, paged, t) : [];
+  // A pets or leasing section is read as a whole clause; don't also offer its first sentence as a setting.
+  const ruleHeads = found.filter(c => c.topic === 'rules').map(c => c.heading.toLowerCase()).join(' ');
+  const facts0 = facts(all).filter(f => !(f.key === 'pet_rule' && /pet|animal/.test(ruleHeads)) && !(f.key === 'rental_rule' && /leas|rent/.test(ruleHeads)));
   return {
     docType: t,
     title: opts.title,
     pageCount: paged ? pages.length : null,
     summary: '',
-    facts: facts(all),
+    facts: facts0,
     units: ['owner_list', 'declaration', 'bylaws', 'other'].includes(t) ? units(pages, paged, t === 'owner_list') : [],
     board: board(pages, paged),
     insurance: t === 'insurance' ? insurance(pages, paged, opts.title) : [],
     vendors: [],
     budget: t === 'budget' ? budget(pages, paged) : [],
     reserves: t === 'reserve_study' ? reserves(pages, paged) : [],
-    clauses: ['bylaws', 'declaration', 'rules', 'other'].includes(t) ? clauses(pages, paged, t) : [],
+    clauses: found,
   };
 }
 

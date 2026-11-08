@@ -56,18 +56,19 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
         case 'floors': { const n = num(value); if (n) b.updateDetails({ floors: n }); return 'Building profile'; }
         case 'building_type': b.updateDetails({ type: text(value) }); return 'Building profile';
         case 'fiscal_year_end': { const md = monthDay(text(value)); if (md) b.updateDetails({ fiscalYearEnd: md }); return 'Building profile'; }
-        case 'management_company': b.updateManagement({ company: text(value) }); return 'Building › Directory';
-        case 'late_fee': { const n = num(value); if (n !== null) f.setLateFeeSettings(true, n, f.lateFeeGraceDays); return 'Funds settings · late fees'; }
-        case 'grace_period_days': { const n = num(value); if (n !== null) f.setLateFeeSettings(f.lateFeeEnabled, f.lateFeeAmount, n); return 'Funds settings · late fees'; }
-        case 'assessment_due_day': { const n = num(value); if (n && n >= 1 && n <= 28) f.setHoaDueDay(n); return 'Funds settings · due day'; }
-        case 'owner_quorum_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ quorumPct: n }); return 'Bylaws settings'; }
-        case 'owner_vote_threshold_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ ownerVoteThreshold: n }); return 'Bylaws settings'; }
-        case 'assessment_cap_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ assessmentCapPct: n }); return 'Bylaws settings'; }
-        case 'board_spending_limit': { const n = num(value); if (n !== null) b.updateBylawsConfig({ boardSpendingLimit: n }); return 'Bylaws settings'; }
+        case 'management_company': b.updateManagement({ company: text(value) }); return 'Building › Directory · management';
+        case 'late_fee': { const n = num(value); if (n !== null) f.setLateFeeSettings(true, n, f.lateFeeGraceDays); return 'Funds › Accounts and ledger · billing rules'; }
+        case 'grace_period_days': { const n = num(value); if (n !== null) f.setLateFeeSettings(f.lateFeeEnabled, f.lateFeeAmount, n); return 'Funds › Accounts and ledger · billing rules'; }
+        case 'assessment_due_day': { const n = num(value); if (n && n >= 1 && n <= 28) f.setHoaDueDay(n); return 'Funds › Accounts and ledger · billing rules'; }
+        case 'owner_quorum_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ quorumPct: n }); return governanceClause(item, 'board', picks, edits); }
+        case 'owner_vote_threshold_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ ownerVoteThreshold: n }); return governanceClause(item, 'board', picks, edits); }
+        case 'assessment_cap_pct': { const n = num(value); if (n !== null) b.updateBylawsConfig({ assessmentCapPct: n }); return governanceClause(item, 'board', picks, edits); }
+        case 'board_spending_limit': { const n = num(value); if (n !== null) b.updateBylawsConfig({ boardSpendingLimit: n }); return governanceClause(item, 'board', picks, edits); }
         case 'operating_balance': { const n = num(value); if (n) postOpening('operating', n); return 'Funds › opening balance'; }
         case 'reserve_balance': { const n = num(value); if (n) postOpening('reserve', n); return 'Funds › opening balance'; }
-        // Kept with setup's record of the building's rules (shown on the go-live step).
-        default: return 'Rules on file';
+        // Rules for residents and the rest of the governance settings: shared clauses on Duties and roles.
+        case 'pet_rule': case 'rental_rule': case 'fine_amount': return governanceClause(item, 'rules', picks, edits);
+        default: return governanceClause(item, 'board', picks, edits);
       }
     }
     case 'units': {
@@ -93,7 +94,7 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
       const p = { type: item.label, carrier: text(v.carrier), coverage: text(v.coverage), premium: num(v.premium) !== null ? `$${num(v.premium)!.toLocaleString('en-US')}` : '', expires: text(v.expires), policyNum: text(v.policyNumber) };
       const existing = b.insurance.find(x => x.type.trim().toLowerCase() === item.label.trim().toLowerCase());
       if (existing) b.updateInsurance(existing.id, p); else b.addInsurance(p);
-      return 'Building › Obligations · insurance';
+      return 'Building › Documents · insurance';
     }
     case 'vendors': {
       const vd = { name: item.label, service: text(v.service), contact: text(v.contact), phone: text(v.phone), email: text(v.email), contract: text(v.contractEnds), status: 'active' as const };
@@ -124,6 +125,20 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
     }
   }
   return 'Saved';
+}
+
+/** A governance setting or rule read from the bylaws, kept as a shared clause so the board and owners see it under Duties and roles. */
+function governanceClause(item: Item, topic: 'board' | 'rules', picks?: Record<string, number>, edits?: Record<string, FieldScalar>): string {
+  const vals = item.fields.value ?? [];
+  const picked = vals[Math.min(picks?.value ?? 0, Math.max(0, vals.length - 1))];
+  const chosen = picked && edits?.value !== undefined ? { ...picked, display: String(edits.value) } : picked;
+  const src = chosen?.sources[0];
+  useBuildingStore.getState().upsertGoverningClause({
+    topic, role: null, ref: src?.page ? `p.${src.page}` : '', heading: item.label,
+    text: [chosen?.display, src?.quote && src.quote !== chosen?.display ? `“${src.quote.replace(/^Row \d+: /, '')}”` : ''].filter(Boolean).join(' · '),
+    source: src ? `${src.docName}${src.page ? ` p.${src.page}` : ''}` : '',
+  });
+  return 'Building › Obligations · duties and roles';
 }
 
 /** Opening balance into the operating (1010 → 3010) or reserve (1020 → 3020) fund. */

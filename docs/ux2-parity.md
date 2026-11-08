@@ -295,13 +295,21 @@ everything is read in the browser, so a document costs nothing to read.
      - Word files, photos and scanned PDFs with no text are filed only.
      - Every file is filed in Building › Documents, named by its type; the
        type can be changed, which reads the text again with that kind's rules.
-  2. *Review what we found*: readings merge into items by what they
+  2. *Review what we found* opens with an assessment: for each document,
+     which of the requested documents its content covers (bylaws often
+     hold the owner list as an ownership exhibit, and the rules as use
+     restrictions), with counts, pages, and where each part goes in the
+     app (`setupModel.coverage`). Step 1's checklist credits the same
+     content ("Found in Bylaws.pdf (p.38): 24 units"). Each section says
+     where its accepted items go, and every saved confirmation links there
+     (`pathFor`). Governance settings with no field of their own (quorum,
+     notice, meeting month, board size and terms, pets, rentals, fines)
+     are saved as shared clauses on Duties and roles.
+     Readings merge into items by what they
      describe (`setupModel.buildItems`); two documents that disagree are a
      choice, a doubtful reading is flagged. Each item shows the page and the
      sentence (or the row) it came from. Matching items accept in one click.
-     Accepting writes through the stores' own actions (`applySetup.applyItem`);
-     facts with no home in the app (board quorum, notice period, pets, ...)
-     are kept as "rules on file" and listed at go-live.
+     Accepting writes through the stores' own actions (`applySetup.applyItem`).
   3–5. *Fill the gaps · Invite people · Go live*: only what is missing,
      answered in place (address, units, monthly assessments, a board member,
      due day and late fee, opening balances, a budget template, owner

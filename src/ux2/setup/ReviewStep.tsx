@@ -8,7 +8,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/formatters';
 import { Button, Chip } from '../components';
-import { FIELD_LABEL, SECTIONS, isClear, itemSummary, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
+import { Link } from 'react-router-dom';
+import { DOC_KINDS, FIELD_LABEL, SECTIONS, SECTION_GOES, coverage, isClear, itemSummary, pathFor, type FieldScalar, type Item, type Section, type Source } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { applyItem } from '@/features/setup/applySetup';
 import { useSetup } from './useSetup';
@@ -51,7 +52,11 @@ function ItemCard({ item }: { item: Item }) {
     return (
       <div data-setup-item={item.key} data-decision={decision.status} className="flex flex-wrap items-center gap-3 rounded-2xl border border-ux2-line bg-white px-4 py-2.5 text-sm">
         <span className="min-w-0 flex-1"><b className="font-semibold">{item.label}</b> <span className="text-ux2-muted">· {decision.status === 'accepted' ? itemSummary(item, decision.picks) : 'skipped'}</span></span>
-        {decision.status === 'accepted' ? <Chip tone="sage">Saved · {decision.savedTo}</Chip> : <Chip tone="ghost">Skipped</Chip>}
+        {decision.status === 'accepted'
+          ? (pathFor(decision.savedTo)
+            ? <Link to={pathFor(decision.savedTo)!} className="inline-flex items-center gap-1 rounded-full bg-ux2-sage-tint px-[11px] py-[6px] text-xs font-semibold text-ux2-sage hover:underline">Saved to {decision.savedTo} ↗</Link>
+            : <Chip tone="sage">Saved · {decision.savedTo}</Chip>)
+          : <Chip tone="ghost">Skipped</Chip>}
         <Button size="sm" variant="ghost" onClick={() => undo(item.key)}>Change</Button>
       </div>
     );
@@ -104,6 +109,44 @@ function ItemCard({ item }: { item: Item }) {
   );
 }
 
+/** What each document turned out to hold, which of the requested documents that covers, and where it goes. */
+function Assessment({ onDocuments }: { onDocuments: () => void }) {
+  const s = useSetup();
+  const read = s.docs.filter(d => d.result);
+  if (!read.length) return null;
+  const covered = new Set(read.flatMap(d => coverage(d.result!).map(c => c.kind)));
+  const missing = DOC_KINDS.filter(k => k.imports && !covered.has(k.id));
+  return (
+    <section aria-labelledby="assess-h" data-widget="setup-assessment" className="flex flex-col gap-2.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
+      <h2 id="assess-h" className="m-0 text-lg font-medium">What we found in your documents, and where it goes</h2>
+      {read.map(d => {
+        const cov = coverage(d.result!);
+        return (
+          <div key={d.id} data-assess-doc={d.name} className="flex flex-col gap-1.5 rounded-2xl border border-ux2-line bg-white px-4 py-3">
+            <div className="text-sm"><b className="font-semibold">{d.name}</b>{d.result!.pageCount ? <span className="text-ux2-muted"> · {d.result!.pageCount} pages</span> : null}</div>
+            {cov.length === 0 && <span className="text-[13px] text-ux2-muted">Nothing found that setup can use.</span>}
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {cov.map(c => (
+                <li key={c.kind} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+                  <Chip tone="plum" className="px-2 py-1">{c.label}</Chip>
+                  <span>{c.count} {c.unit}{c.pages ? <span className="text-ux2-muted"> · {c.pages}</span> : null}</span>
+                  <span className="text-ux2-muted">→ {c.goes}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      {missing.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-ux2-muted">
+          <span>Not found in anything yet: {missing.map(k => k.label.replace(/ \(.*\)$/, '')).join(', ')}.</span>
+          <Button size="sm" variant="ghost" onClick={onDocuments}>Add documents</Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void; onDocuments: () => void }) {
   const s = useSetup();
   const decide = useSetupStore(x => x.decide);
@@ -130,6 +173,8 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
   const nextSection = sections.find(sec => sec.id !== current.id && sec.all.some(i => !s.decisions[i.key]));
 
   return (
+    <div className="flex flex-col gap-[18px]">
+    <Assessment onDocuments={onDocuments} />
     <div className="grid grid-cols-1 items-start gap-[22px] lg:grid-cols-[240px_minmax(0,1fr)]">
       <nav aria-label="What we found" className="flex gap-1.5 overflow-x-auto lg:sticky lg:top-4 lg:flex-col lg:gap-0.5 lg:overflow-visible">
         {sections.map(sec => {
@@ -153,6 +198,7 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
         </div>
         {[...pendingIn.filter(i => !isClear(i)), ...pendingIn.filter(isClear)].map(it => <ItemCard key={it.key} item={it} />)}
         {current.all.filter(i => s.decisions[i.key]).map(it => <ItemCard key={it.key} item={it} />)}
+        <p className="m-0 text-[13px] text-ux2-muted">Accepted items go to <b className="font-semibold text-ux2-ink">{SECTION_GOES[current.id]}</b>.</p>
         {pendingIn.length === 0 && (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-ux2-sage-tint px-4 py-3 text-sm text-ux2-sage">
             <span className="flex-1 font-semibold">{current.label} is done.</span>
@@ -160,6 +206,7 @@ export default function ReviewStep({ onDone, onDocuments }: { onDone: () => void
           </div>
         )}
       </section>
+    </div>
     </div>
   );
 }
