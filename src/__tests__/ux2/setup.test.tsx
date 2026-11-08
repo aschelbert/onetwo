@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-const tenant = { name: 'Maple Court', isDemo: false, status: 'onboarding', features: {}, onboarding: { goLive: false }, updateOnboardingStep: vi.fn(async () => {}) };
+const tenant = { name: 'Maple Court', isDemo: false, status: 'onboarding', features: {}, onboarding: { goLive: false }, updateOnboardingStep: vi.fn(async (_step?: string, _value?: boolean) => {}) };
 vi.mock('@/components/TenantProvider', () => ({ useTenantContext: () => tenant }));
 
 import { useAuthStore } from '@/store/useAuthStore';
@@ -407,7 +407,7 @@ describe('Setup screens', () => {
     const unit = { number: '1A', owner: 'Ana Rivera', email: '', phone: '', monthlyFee: 400, votingPct: 100, status: 'ACTIVE' as const, balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] };
     useFinancialStore.setState({ units: [unit], budgetCategories: [] });
     useBuildingStore.setState({ name: 'Maple Court', address: { street: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' }, board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: '', phone: '', term: '' }] });
-    tenant.updateOnboardingStep.mockImplementation(async (step: string) => { if (step === 'goLive') throw new Error("The building couldn't be set live: permission denied"); });
+    tenant.updateOnboardingStep.mockImplementation(async (step?: string) => { if (step === 'goLive') throw new Error("The building couldn't be set live: permission denied"); });
     renderSetup('/setup?step=finish');
     fireEvent.click(screen.getByRole('button', { name: 'Go live' }));
     expect(await screen.findByText("The building couldn't be set live: permission denied")).toBeTruthy();

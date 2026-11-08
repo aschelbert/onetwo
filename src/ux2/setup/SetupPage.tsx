@@ -17,6 +17,7 @@ import { Button, Card, Chip } from '../components';
 import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, coverage, readByOlderReader, type DocType, type SetupDoc } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { ACCEPT, addFiles, addPastedText, isSpreadsheet, retype as retypeDoc } from '@/features/setup/readDocument';
+import { unfileSetupDocument } from '@/features/setup/applySetup';
 import { useSetup } from './useSetup';
 import ReviewStep from './ReviewStep';
 import FinishStep from './FinishStep';
@@ -174,7 +175,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
                 {d.status === 'filed' && <Chip tone="plum">Filed</Chip>}
                 {d.status === 'reading' && <Chip tone="plum">Opening</Chip>}
                 {d.status === 'error' && <Chip tone="red">Not read</Chip>}
-                {d.status !== 'reading' && <Button size="sm" variant="ghost" aria-label={`Remove ${d.name}`} onClick={() => removeDoc(d.id)}>Remove</Button>}
+                {d.status !== 'reading' && <Button size="sm" variant="ghost" aria-label={`Remove ${d.name}`} onClick={() => { unfileSetupDocument(d); removeDoc(d.id); }}>Remove</Button>}
               </div>
             ))}
           </section>

@@ -67,7 +67,14 @@ line), `SearchInput`, `Why` (the small-print explanation under a list),
   Governing, Policies, Insurance, Reserve, Reports, Minutes, Contracts) with
   the Everyone + Board / What owners see switch, one grouped library table
   (Download / Open / Add file inline), Settings card. No embedded Archives
-  page.
+  page. The library follows a catalogue of the documents a building should
+  have (`features/building/documentCatalogue.ts`): one row per document,
+  matched by name ("1302 R St NW_Bylaws" and "Bylaws (amended 2019)" are
+  both Bylaws), extra copies collapsed into the newest one with a file, and
+  a Missing row with Add file for each required document not on file
+  (declaration, bylaws, rules, plats and plans, collections policy, reserve
+  study). This is where documents setup didn't cover show up afterwards.
+  Uploading a document the building already has adds it as a new version.
 - **Obligations** · This month / By role / By category / Filings / Ongoing /
   Duties and roles pills, four compact counts, the month's table with
   expandable rows (why it matters, if missed, how to; Mark done and Mark
@@ -293,8 +300,13 @@ everything is read in the browser, so a document costs nothing to read.
        column headings, in many spellings (`importSpreadsheet.ts`): owner
        lists, board rosters, budgets.
      - Word files, photos and scanned PDFs with no text are filed only.
-     - Every file is filed in Building › Documents, named by its type; the
-       type can be changed, which reads the text again with that kind's rules.
+     - Every file is filed in Building › Documents under its catalogue
+       name (Bylaws, Public offering statement, Plats and plans); a
+       document the building already has gets the file as a version, and
+       the same file is never filed twice, so adding again or Start over
+       doesn't duplicate it. The type can be changed, which moves the file
+       and reads the text again with that kind's rules. Remove takes the
+       file back out of Building › Documents.
   2. *Review what we found* opens with an assessment: for each document,
      which of the requested documents its content covers (bylaws often
      hold the owner list as an ownership exhibit, and the rules as use

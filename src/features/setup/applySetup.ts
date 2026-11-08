@@ -6,6 +6,7 @@
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { DOC_CATALOGUE, entryFor, fileDocument, sameDocument, unfileDocument } from '@/features/building/documentCatalogue';
 import { resolve, unitKey, type DocType, type FieldScalar, type Item, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
 
 const num = (v: FieldScalar | undefined): number | null => {
@@ -148,24 +149,52 @@ export function postOpening(fund: 'operating' | 'reserve', amount: number, date 
   else f.glPost(date, 'Opening reserve fund balance (setup)', '1020', '3020', amount, 'transfer', null);
 }
 
-const docName = (doc: SetupDoc, type: DocType) => `${DOC_TYPE_LABEL[type] ?? 'Document'} · ${doc.name.replace(/\.[a-z0-9]+$/i, '')}`;
+/** The catalogue entry each document kind files under, when it has one. */
+const TYPE_ENTRY: Partial<Record<DocType, string>> = { bylaws: 'bylaws', declaration: 'declaration', rules: 'rules', reserve_study: 'reserve-study' };
+const titleOf = (doc: SetupDoc) => doc.name.replace(/\.[a-z0-9]+$/i, '').replace(/_+/g, ' ').trim();
+const sizeOf = (doc: SetupDoc) => doc.size > 1024 * 1024 ? `${(doc.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(doc.size / 1024))} KB`;
 
-/** File a document in Building › Documents, named by its type so it lands in the right group. Returns the document id. */
-export function fileSetupDocument(doc: SetupDoc & { docType: DocType }): string | null {
-  const b = useBuildingStore.getState();
-  const name = docName(doc, doc.docType);
-  const year = /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] ?? String(new Date().getFullYear());
-  const size = doc.size > 1024 * 1024 ? `${(doc.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(doc.size / 1024))} KB`;
-  b.addLegalDocument({ name, version: year, size, status: 'current' });
-  const filed = [...useBuildingStore.getState().legalDocuments].reverse().find(d => d.name === name);
-  if (!filed) return null;
-  b.addLegalDocAttachment(filed.id, { name: doc.name, size, type: doc.mediaType || 'application/pdf' });
-  return filed.id;
+/**
+ * The name a setup document is filed under: the catalogue document its file
+ * name says it is ("1302 R St NW_Bylaws" → Bylaws), else the one its kind
+ * belongs to, else its kind and title.
+ */
+export function setupDocName(doc: SetupDoc, type: DocType): string {
+  const entry = entryFor(titleOf(doc)) ?? DOC_CATALOGUE.find(e => e.key === TYPE_ENTRY[type]);
+  return entry?.label ?? `${DOC_TYPE_LABEL[type] ?? 'Document'} · ${titleOf(doc)}`;
 }
 
-/** Change what a filed document is (renames it in Building › Documents). */
-export function retypeSetupDocument(doc: SetupDoc, type: DocType) {
-  if (doc.filedAs) useBuildingStore.getState().updateLegalDocument(doc.filedAs, { name: docName(doc, type) });
+/**
+ * File a document in Building › Documents under its catalogue name. A building
+ * that already has that document gets this file as a new version of it, so
+ * adding the bylaws twice (or again after Start over) leaves one Bylaws.
+ * Returns the document id.
+ */
+export function fileSetupDocument(doc: SetupDoc & { docType: DocType }): string | null {
+  const year = /\b(19|20)\d{2}\b/.exec(doc.name)?.[0] ?? String(new Date().getFullYear());
+  return fileDocument(setupDocName(doc, doc.docType), { version: year, attachment: { name: doc.name, size: sizeOf(doc), type: doc.mediaType || 'application/pdf' } });
+}
+
+/** Change what a filed document is: moves its file to the document it now is. Returns where it is filed. */
+export function retypeSetupDocument(doc: SetupDoc, type: DocType): string | undefined {
+  if (!doc.filedAs) return undefined;
+  const filed = useBuildingStore.getState().legalDocuments.find(d => d.id === doc.filedAs);
+  if (!filed) return doc.filedAs;
+  const name = setupDocName(doc, type);
+  if (sameDocument(filed.name, name)) return filed.id;
+  const others = filed.attachments.filter(a => a.name !== doc.name);
+  // A document holding only this file, with nothing else under the new name: rename it in place.
+  if (!others.length && !useBuildingStore.getState().legalDocuments.some(d => d.id !== filed.id && sameDocument(d.name, name))) {
+    useBuildingStore.getState().updateLegalDocument(filed.id, { name });
+    return filed.id;
+  }
+  unfileDocument(filed.id, doc.name);
+  return fileSetupDocument({ ...doc, docType: type }) ?? undefined;
+}
+
+/** Take a removed setup document's file back out of Building › Documents. */
+export function unfileSetupDocument(doc: SetupDoc) {
+  if (doc.filedAs) unfileDocument(doc.filedAs, doc.name);
 }
 
 /** A starting budget sized to the building: common lines split from the monthly assessments. */
