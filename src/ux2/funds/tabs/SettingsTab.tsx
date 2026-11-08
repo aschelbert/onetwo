@@ -16,6 +16,7 @@ import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, S
 import { dayLabel } from '../../home/calendar';
 import { ordinal, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
+import OpeningBalances from '../OpeningBalances';
 
 type LedgerView = 'month' | 'payments' | 'bills' | 'transfers' | 'manual' | 'all';
 const SOURCE_LABEL: Record<GLEntry['source'], string> = { manual: 'By hand', assessment: 'Billing run', payment: 'Payment', expense: 'Bill', case: 'Case', transfer: 'Transfer', fee: 'Fee', refund: 'Refund', payroll: 'Payroll' };
@@ -161,10 +162,13 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
   const [showAllLines, setShowAllLines] = useState(false);
   const [editingFee, setEditingFee] = useState<{ id: string; amount: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [openingOpen, setOpeningOpen] = useState(section === 'opening');
+  const opening = useFinancialStore(s => s.openingBalances)();
 
   useEffect(() => {
     if (!section) return;
-    const id = { accounts: 'chart-card', ledger: 'ledger-card', rules: 'billing-rules', fees: 'fees-card', mailing: 'mailing-card', mapping: 'mapping-card', bank: 'bank-card' }[section];
+    const id = { accounts: 'chart-card', ledger: 'ledger-card', rules: 'billing-rules', fees: 'fees-card', mailing: 'mailing-card', mapping: 'mapping-card', bank: 'bank-card', opening: 'opening-card' }[section];
+    if (section === 'opening') setOpeningOpen(true);
     if (id) setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, [section]);
 
@@ -320,6 +324,15 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       </Card>
 
       <BillingRules snap={snap} />
+
+      <Card id="opening-card" aria-label="Opening balances">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><span className="text-[17px] font-semibold text-ux2-ink">Opening balances</span><span className="ml-2 text-xs text-ux2-muted">{opening.asOf ? `on the books as of ${dayLabel(opening.asOf)} · ${fmt(opening.operatingCash)} operating · ${fmt(opening.reserveCash)} reserves · ${fmt(opening.owed)} owed by owners${opening.billsTotal ? ` · ${fmt(opening.billsTotal)} unpaid bills` : ''}` : 'the state of the books when the building joined: not entered yet'}</span></div>
+          <Button size="sm" variant={opening.asOf ? 'ghost' : 'primary'} aria-expanded={openingOpen} onClick={() => setOpeningOpen(v => !v)}>{openingOpen ? 'Hide' : opening.asOf ? 'Review or re-enter' : 'Enter the opening balances'}</Button>
+        </div>
+        {openingOpen && <OpeningBalances today={snap.today} />}
+        {!openingOpen && <Why>Bring the books over as of one cutover date: bank balances, what each owner owed or had paid ahead, and bills not yet paid. Posted lines are dated the cutover and the books close through it, so nothing lands before then by mistake.</Why>}
+      </Card>
 
       <Card id="bank-card" aria-label="Bank and payments">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Bank and payments</span><Chip tone={snap.stripeOnboardingComplete ? 'sage' : 'ghost'}>{snap.stripeOnboardingComplete ? 'All connected' : 'Stripe not set up'}</Chip></div>

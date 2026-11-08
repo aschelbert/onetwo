@@ -19,6 +19,7 @@ const COLUMNS: Record<string, string[]> = {
   mailing: ['mailingaddress', 'mailing', 'mailaddress', 'address', 'owneraddress'],
   ownership: ['ownership', 'ownershippct', 'ownershippercent', 'ownershippercentage', 'pct', 'percent', 'percentage', 'interest', 'percentinterest', 'percentageinterest', 'undividedinterest', 'share', 'votingpct', 'votingpercent', 'vote', 'votes'],
   monthly: ['monthly', 'monthlyassessment', 'assessment', 'monthlydues', 'dues', 'fee', 'fees', 'monthlyfee', 'hoafee', 'condofee', 'regularassessment'],
+  balance: ['balance', 'balancedue', 'balanceowed', 'amountowed', 'owed', 'owes', 'pastdue', 'arrears', 'outstanding', 'outstandingbalance', 'openbalance', 'openingbalance', 'currentbalance', 'delinquent', 'delinquency'],
   role: ['role', 'office', 'title', 'position', 'boardrole', 'officer'],
   term: ['term', 'termends', 'termend', 'termexpires', 'termexpiration', 'termthrough'],
   category: ['category', 'line', 'lineitem', 'item', 'account', 'accountname', 'description', 'expense', 'budgetline', 'budgetcategory'],
@@ -32,9 +33,14 @@ const text = (c: Cell) => (c === null || c === undefined ? '' : c instanceof Dat
 /** A money or percentage cell as a number ("$1,250.00" → 1250, "3.85%" → 3.85), or null. */
 export function toNumber(c: Cell): number | null {
   if (typeof c === 'number') return Number.isFinite(c) ? c : null;
-  const s = text(c).replace(/[$,\s%]/g, '');
+  let s = text(c).replace(/[$,\s%]/g, '');
+  // Accountants write a credit as "(450.00)" or "450.00 CR".
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
+  if (/cr$/i.test(s)) { negative = true; s = s.replace(/cr$/i, ''); }
   if (!s || !/^-?\d*\.?\d+$/.test(s)) return null;
-  return Number(s);
+  const n = Number(s);
+  return negative ? -n : n;
 }
 
 function columnOf(header: string): string | null {
@@ -42,7 +48,7 @@ function columnOf(header: string): string | null {
   if (!h) return null;
   for (const [col, names] of Object.entries(COLUMNS)) if (names.includes(h)) return col;
   // Longer headings that contain a known name ("Unit Owner Email" → email; "Percentage of Common Interest" → ownership).
-  const contains: [string, string][] = [['email', 'email'], ['phone', 'phone'], ['mailing', 'mailing'], ['interest', 'ownership'], ['ownership', 'ownership'], ['pct', 'ownership'], ['assessment', 'monthly'], ['dues', 'monthly'], ['term', 'term'], ['unit', 'unit'], ['owner', 'owner'], ['office', 'role'], ['category', 'category'], ['annual', 'annual'], ['budget', 'annual'], ['proposed', 'annual'], ['amount', 'annual']];
+  const contains: [string, string][] = [['balance', 'balance'], ['owed', 'balance'], ['arrear', 'balance'], ['pastdue', 'balance'], ['email', 'email'], ['phone', 'phone'], ['mailing', 'mailing'], ['interest', 'ownership'], ['ownership', 'ownership'], ['pct', 'ownership'], ['assessment', 'monthly'], ['dues', 'monthly'], ['term', 'term'], ['unit', 'unit'], ['owner', 'owner'], ['office', 'role'], ['category', 'category'], ['annual', 'annual'], ['budget', 'annual'], ['proposed', 'annual'], ['amount', 'annual']];
   for (const [part, col] of contains) if (h.includes(part)) return col;
   return null;
 }
@@ -79,9 +85,10 @@ export function readSheet(rows: Cell[][], title: string): ReadResult | { error: 
       if (!unit || /^total/i.test(unit)) continue;
       const monthly = cols.monthly === undefined ? null : toNumber(r[cols.monthly]);
       const pct = cols.ownership === undefined ? null : toNumber(r[cols.ownership]);
+      const balance = cols.balance === undefined ? null : toNumber(r[cols.balance]);
       const row: UnitRow = {
         unit, owner: get(r, 'owner'), email: get(r, 'email') || null, phone: get(r, 'phone') || null, mailingAddress: get(r, 'mailing') || null,
-        ownershipPct: pct, monthlyFee: monthly, page: null, quote: `Row ${line}: ${quote(r)}`,
+        ownershipPct: pct, monthlyFee: monthly, openingBalance: balance, page: null, quote: `Row ${line}: ${quote(r)}`,
         confidence: (cols.ownership !== undefined && get(r, 'ownership') && pct === null) || (cols.monthly !== undefined && get(r, 'monthly') && monthly === null) ? 'low' : 'high',
       };
       out.units.push(row);

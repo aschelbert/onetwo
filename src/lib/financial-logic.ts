@@ -15,6 +15,9 @@ export type GLAccountMapping = {
   /** Bills received and not yet paid. */
   accountsPayable: string;
   reserveBankAccount: string;
+  /** Fund balance (equity) accounts, where opening balances land. */
+  operatingFundBalance: string;
+  reserveFundBalance: string;
 };
 
 export const DEFAULT_GL_MAPPING: GLAccountMapping = {
@@ -29,7 +32,17 @@ export const DEFAULT_GL_MAPPING: GLAccountMapping = {
   prepaidAssessments: '2020',
   accountsPayable: '2010',
   reserveBankAccount: '1020',
+  operatingFundBalance: '3010',
+  reserveFundBalance: '3020',
 };
+
+// ─── Opening balances ─────────────────────────────────
+/** Every opening entry names what it is in `sourceId`: opening:cash:operating, opening:unit:4B, opening:bill:OB-1. */
+export const OPENING_PREFIX = 'opening:';
+export const isOpeningEntry = (e: GLEntry) => e.status !== 'void' && !!e.sourceId && e.sourceId.startsWith(OPENING_PREFIX);
+/** An invoice standing for a balance brought over at the cutover. */
+export const OPENING_INVOICE_MARK = 'opening';
+export const OPENING_BILL_PREFIX = 'OB-';
 
 /**
  * Returns the GL accounts (AR + revenue) for a given unit invoice type.

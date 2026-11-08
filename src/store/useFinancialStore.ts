@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
-import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, legacyOwed, openInvoicesInOrder, type GLAccountMapping } from '@/lib/financial-logic';
+import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping } from '@/lib/financial-logic';
 import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
@@ -68,6 +68,9 @@ interface FinancialState {
   canPostOn: (date: string) => boolean;
   /** Set which fund an account belongs to. */
   setAcctFund: (num: string, fund: Fund | null) => void;
+  /** Bring the books over as of a cutover date. Re-entering voids the earlier opening lines and posts fresh ones, then closes the books through the cutover. */
+  postOpeningBalances: (input: OpeningBalancesInput, today?: string) => OpeningBalancesState;
+  openingBalances: () => OpeningBalancesState;
   getFundStatements: (from?: string, to?: string) => ReturnType<typeof fundStatements>;
   seedGeneralLedger: () => void;
 
@@ -198,6 +201,35 @@ export interface InvoiceOptions {
   date?: string;
   /** False when the amount is already in the ledger (a balance brought forward): the invoice is recorded, nothing is posted, the balance stays. */
   post?: boolean;
+}
+
+/** The state of the books on the cutover date, as a treasurer finds the numbers. */
+export interface OpeningBalancesInput {
+  /** The cutover date, usually the last day of the month before the building joined. Must be before today. */
+  asOf: string;
+  operatingCash: number;
+  reserveCash: number;
+  /** Per unit: positive is owed as of the cutover, negative is paid ahead, zero is current. Units left out are not changed. */
+  units: { number: string; amount: number }[];
+  /** Vendor bills received before the cutover and not yet paid. */
+  bills: { vendor: string; description: string; amount: number; acctNum: string; invoiceNum?: string }[];
+}
+
+/** What is on the books from the cutover, read back from the ledger. */
+export interface OpeningBalancesState {
+  asOf: string | null;
+  operatingCash: number;
+  reserveCash: number;
+  units: Record<string, number>;
+  bills: WorkOrder[];
+  /** Totals the opening entries imply. */
+  owed: number;
+  prepaid: number;
+  billsTotal: number;
+  operatingFund: number;
+  reserveFund: number;
+  /** An opening balance already received a payment, so re-entering is refused. */
+  paymentsApplied: boolean;
 }
 
 export interface PaymentApplication {
@@ -410,6 +442,91 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       const tid = s.tenantId || getActiveTenantId();
       if (entry && tid) financialSvc.upsertCoAEntry(tid, entry);
     }
+  },
+
+  openingBalances: () => {
+    const s = get();
+    const m = mappingOf(s.glAccountMapping);
+    const out: OpeningBalancesState = { asOf: null, operatingCash: 0, reserveCash: 0, units: {}, bills: [], owed: 0, prepaid: 0, billsTotal: 0, operatingFund: 0, reserveFund: 0, paymentsApplied: false };
+    for (const e of s.generalLedger) {
+      if (!isOpeningEntry(e)) continue;
+      out.asOf = out.asOf && out.asOf > e.date ? out.asOf : e.date;
+      const kind = e.sourceId!.split(':')[1];
+      const key = e.sourceId!.split(':').slice(2).join(':');
+      if (kind === 'cash') { if (key === 'reserve') out.reserveCash = r2(out.reserveCash + e.amount); else out.operatingCash = r2(out.operatingCash + e.amount); }
+      else if (kind === 'unit') out.units[key] = r2((out.units[key] ?? 0) + (e.debitAcct === m.assessmentsReceivable ? e.amount : -e.amount));
+      else if (kind === 'bill') out.billsTotal = r2(out.billsTotal + e.amount);
+    }
+    out.bills = s.workOrders.filter(w => w.id.startsWith(OPENING_BILL_PREFIX));
+    for (const v of Object.values(out.units)) { if (v > 0) out.owed = r2(out.owed + v); else out.prepaid = r2(out.prepaid - v); }
+    out.operatingFund = r2(out.operatingCash + out.owed - out.prepaid - out.billsTotal);
+    out.reserveFund = out.reserveCash;
+    out.paymentsApplied = s.unitInvoices.some(i => i.forInvoiceId === OPENING_INVOICE_MARK && i.status !== 'void' && (i.paidAmount ?? 0) > 0);
+    return out;
+  },
+
+  postOpeningBalances: (input, today = todayIso()) => {
+    const s = get();
+    if (!input.asOf || input.asOf >= today) throw new Error('The cutover date must be a day before today, usually the last day of the month before you joined.');
+    const prior = s.generalLedger.filter(isOpeningEntry);
+    const priorMax = prior.reduce((mx, e) => (e.date > mx ? e.date : mx), '');
+    if (s.closedThrough && (!prior.length || s.closedThrough > priorMax)) throw new Error(`The books are closed through ${s.closedThrough}. Reopen them under Accounts and ledger before changing the opening balances.`);
+    if (get().openingBalances().paymentsApplied) throw new Error('A payment was already applied to an opening balance. Adjust that unit with a new charge or a credit instead of re-entering the opening balances.');
+    const m = mappingOf(s.glAccountMapping);
+    const touched = new Set<string>();
+    const previousLock = s.closedThrough;
+    set({ closedThrough: null });
+    try {
+      // Earlier opening lines come out first: the entries are voided, the opening invoices removed, the unpaid opening bills dropped.
+      const priorUnits = new Map<string, number>();
+      for (const e of prior) {
+        get().voidEntry(e.id, 'Opening balances re-entered');
+        const [, kind, ...rest] = e.sourceId!.split(':');
+        if (kind === 'unit') { const n = rest.join(':'); priorUnits.set(n, r2((priorUnits.get(n) ?? 0) + (e.debitAcct === m.assessmentsReceivable ? e.amount : -e.amount))); }
+      }
+      set(st => ({
+        units: st.units.map(u => (priorUnits.has(u.number) ? { ...u, balance: r2(u.balance - priorUnits.get(u.number)!) } : u)),
+        unitInvoices: st.unitInvoices.filter(i => !(i.forInvoiceId === OPENING_INVOICE_MARK && i.status !== 'void')),
+        workOrders: st.workOrders.filter(w => !(w.id.startsWith(OPENING_BILL_PREFIX) && w.status === 'invoiced')),
+      }));
+      for (const n of priorUnits.keys()) touched.add(n);
+
+      const post = get().glPost;
+      if (input.operatingCash > 0) post(input.asOf, 'Opening balance · operating account', m.bankAccount, m.operatingFundBalance, r2(input.operatingCash), 'manual', 'opening:cash:operating');
+      if (input.reserveCash > 0) post(input.asOf, 'Opening balance · reserve account', m.reserveBankAccount, m.reserveFundBalance, r2(input.reserveCash), 'manual', 'opening:cash:reserve');
+      for (const { number, amount } of input.units) {
+        const unit = get().units.find(u => u.number === number);
+        if (!unit) continue;
+        const amt = r2(amount);
+        if (amt > 0) {
+          post(input.asOf, `Opening balance owed · Unit ${number}`, m.assessmentsReceivable, m.operatingFundBalance, amt, 'assessment', `opening:unit:${number}`);
+          set(st => ({ units: st.units.map(u => (u.number === number ? { ...u, balance: amt } : u)) }));
+          get().createUnitInvoice(number, 'monthly', amt, `Balance brought forward · as of ${input.asOf}`, undefined, input.asOf, { date: input.asOf, post: false, forInvoiceId: OPENING_INVOICE_MARK });
+        } else if (amt < 0) {
+          post(input.asOf, `Opening credit · Unit ${number} paid ahead`, m.operatingFundBalance, m.prepaidAssessments, -amt, 'payment', `opening:unit:${number}`);
+          set(st => ({ units: st.units.map(u => (u.number === number ? { ...u, balance: amt } : u)) }));
+        } else {
+          set(st => ({ units: st.units.map(u => (u.number === number ? { ...u, balance: 0 } : u)) }));
+        }
+        touched.add(number);
+      }
+      let k = get().workOrders.filter(w => w.id.startsWith(OPENING_BILL_PREFIX)).reduce((mx, w) => Math.max(mx, Number(w.id.slice(OPENING_BILL_PREFIX.length)) || 0), 0);
+      for (const b of input.bills) {
+        const amt = r2(b.amount);
+        if (!(amt > 0)) continue;
+        const id = `${OPENING_BILL_PREFIX}${++k}`;
+        const entry = post(input.asOf, `Opening bill · ${b.vendor} · ${b.description}`, m.operatingFundBalance, m.accountsPayable, amt, 'expense', `opening:bill:${id}`);
+        const wo: WorkOrder = { id, title: b.description, vendor: b.vendor, description: b.description, acctNum: b.acctNum, amount: amt, status: 'invoiced', caseId: null, createdDate: input.asOf, approvedDate: input.asOf, invoiceNum: b.invoiceNum || id, invoiceDate: input.asOf, paidDate: null, glEntryId: null, attachments: [], accrualGlEntryId: entry.id };
+        set(st => ({ workOrders: [...st.workOrders, wo] }));
+        if (isBackendEnabled) { const tid = get().tenantId || getActiveTenantId(); if (tid) financialSvc.createWorkOrder(tid, wo); }
+      }
+      get().closeBooksThrough(input.asOf, today);
+    } catch (err) {
+      set({ closedThrough: previousLock });
+      throw err;
+    }
+    for (const n of touched) syncUnit(n);
+    return get().openingBalances();
   },
 
   getFundStatements: (from, to) => {

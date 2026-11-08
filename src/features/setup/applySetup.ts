@@ -6,6 +6,7 @@
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { priorMonthEnd } from '@/lib/ledger';
 import { DOC_CATALOGUE, entryFor, pathOf, placeFile, sameDocument, setFilePlaces, unplaceFile } from '@/features/building/documentCatalogue';
 import { resolve, unitKey, type DocType, type FieldScalar, type Item, type SetupDoc, DOC_TYPE_LABEL } from './setupModel';
 
@@ -67,6 +68,8 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
         case 'board_spending_limit': { const n = num(value); if (n !== null) b.updateBylawsConfig({ boardSpendingLimit: n }); return governanceClause(item, 'board', picks, edits); }
         case 'operating_balance': { const n = num(value); if (n) postOpening('operating', n); return 'Funds › opening balance'; }
         case 'reserve_balance': { const n = num(value); if (n) postOpening('reserve', n); return 'Funds › opening balance'; }
+        // The date the balances are from: the Opening balances card reads it from the accepted item.
+        case 'balance_as_of': return 'Funds › opening balance';
         // Rules for residents and the rest of the governance settings: shared clauses on Duties and roles.
         case 'pet_rule': case 'rental_rule': case 'fine_amount': return governanceClause(item, 'rules', picks, edits);
         default: return governanceClause(item, 'board', picks, edits);
@@ -80,6 +83,8 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
         ...(v.phone !== undefined ? { phone: text(v.phone) } : {}),
         ...(num(v.ownershipPct) !== null ? { votingPct: num(v.ownershipPct)! } : {}),
         ...(num(v.monthlyFee) !== null ? { monthlyFee: num(v.monthlyFee)! } : {}),
+        // What the owner owed (or had paid ahead) on the list's date; the Opening balances card posts it.
+        ...(num(v.openingBalance) !== null ? { balance: num(v.openingBalance)! } : {}),
       };
       if (existing) f.updateUnit(existing.number, patch);
       else f.addUnit({ number: item.label.replace(/^Unit\s+/, ''), owner: '', email: '', phone: '', monthlyFee: 0, votingPct: 0, status: 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, ...patch });
@@ -142,11 +147,18 @@ function governanceClause(item: Item, topic: 'board' | 'rules', picks?: Record<s
   return 'Building › Obligations · duties and roles';
 }
 
-/** Opening balance into the operating (1010 → 3010) or reserve (1020 → 3020) fund. */
-export function postOpening(fund: 'operating' | 'reserve', amount: number, date = new Date().toISOString().slice(0, 10)) {
+/**
+ * An opening cash balance read from a statement: into the operating (1010 → 3010)
+ * or reserve (1020 → 3020) fund, as an opening line the Opening balances card
+ * shows and can re-enter. Replaces an earlier line for the same account.
+ */
+export function postOpening(fund: 'operating' | 'reserve', amount: number, date?: string) {
   const f = useFinancialStore.getState();
-  if (fund === 'operating') f.glPost(date, 'Opening operating fund balance (setup)', '1010', '3010', amount, 'manual', null);
-  else f.glPost(date, 'Opening reserve fund balance (setup)', '1020', '3020', amount, 'transfer', null);
+  const asOf = date ?? priorMonthEnd(new Date().toISOString().slice(0, 10));
+  const sourceId = `opening:cash:${fund}`;
+  for (const e of f.generalLedger) if (e.status !== 'void' && e.sourceId === sourceId && f.canPostOn(e.date)) f.voidEntry(e.id, 'Opening balance re-entered');
+  if (fund === 'operating') f.glPost(f.canPostOn(asOf) ? asOf : new Date().toISOString().slice(0, 10), 'Opening balance · operating account', '1010', '3010', amount, 'manual', sourceId);
+  else f.glPost(f.canPostOn(asOf) ? asOf : new Date().toISOString().slice(0, 10), 'Opening balance · reserve account', '1020', '3020', amount, 'manual', sourceId);
 }
 
 /** The catalogue entry each document kind files under, when it has one. */
