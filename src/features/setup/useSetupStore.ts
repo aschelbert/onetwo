@@ -9,6 +9,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { pathFor, type Decision, type SetupDoc } from './setupModel';
 
+/** Who someone is invited as. Owners and residents are tied to a unit; board members to a seat. */
+export type InviteAccess = 'owner' | 'resident' | 'board' | 'property_manager' | 'staff';
+export interface SetupInvite { id: string; email: string; access: InviteAccess; seat: string | null; unit: string | null; sentAt?: string }
+
 interface SetupState {
   docs: SetupDoc[];
   decisions: Record<string, Decision>;
@@ -17,6 +21,11 @@ interface SetupState {
   /** The Home card is hidden; a chip stays in the header. */
   hidden: boolean;
   invitedBoard: boolean;
+  /** People added on the invite step, kept until sent (and after, marked sent). */
+  invites: SetupInvite[];
+  addInvites: (list: Omit<SetupInvite, 'id'>[]) => void;
+  removeInvite: (id: string) => void;
+  markInvitesSent: (emails: string[], at: string) => void;
   addDoc: (doc: SetupDoc) => void;
   updateDoc: (id: string, patch: Partial<SetupDoc>) => void;
   removeDoc: (id: string) => void;
@@ -28,7 +37,7 @@ interface SetupState {
   reset: () => void;
 }
 
-const EMPTY = { docs: [] as SetupDoc[], decisions: {} as Record<string, Decision>, later: [] as string[], hidden: false, invitedBoard: false };
+const EMPTY = { docs: [] as SetupDoc[], decisions: {} as Record<string, Decision>, later: [] as string[], hidden: false, invitedBoard: false, invites: [] as SetupInvite[] };
 
 export const useSetupStore = create<SetupState>()(persist((set) => ({
   ...EMPTY,
@@ -40,6 +49,16 @@ export const useSetupStore = create<SetupState>()(persist((set) => ({
   setLater: (id, later) => set(s => ({ later: later ? [...new Set([...s.later, id])] : s.later.filter(x => x !== id) })),
   setHidden: (hidden) => set({ hidden }),
   setInvitedBoard: (invitedBoard) => set({ invitedBoard }),
+  addInvites: (list) => set(s => {
+    const have = new Set(s.invites.map(i => i.email.toLowerCase()));
+    const fresh = list.filter(i => !have.has(i.email.toLowerCase()) && (have.add(i.email.toLowerCase()), true));
+    return { invites: [...s.invites, ...fresh.map(i => ({ ...i, id: `inv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` }))] };
+  }),
+  removeInvite: (id) => set(s => ({ invites: s.invites.filter(i => i.id !== id) })),
+  markInvitesSent: (emails, at) => set(s => {
+    const sent = new Set(emails.map(e => e.toLowerCase()));
+    return { invites: s.invites.map(i => (sent.has(i.email.toLowerCase()) ? { ...i, sentAt: at } : i)) };
+  }),
   reset: () => set({ ...EMPTY }),
 }), {
   name: 'onetwo-setup',
@@ -48,6 +67,7 @@ export const useSetupStore = create<SetupState>()(persist((set) => ({
   // go back to review, so accepting them again puts them where they now belong.
   migrate: (persisted, version) => {
     const st = (persisted ?? {}) as Partial<SetupState>;
+    if (!st.invites) st.invites = [];
     if (version < 2 && st.decisions) {
       st.decisions = Object.fromEntries(Object.entries(st.decisions).filter(([, d]) => d.status === 'skipped' || !!pathFor(d.savedTo)));
     }

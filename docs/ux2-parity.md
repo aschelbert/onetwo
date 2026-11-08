@@ -310,7 +310,16 @@ everything is read in the browser, so a document costs nothing to read.
      choice, a doubtful reading is flagged. Each item shows the page and the
      sentence (or the row) it came from. Matching items accept in one click.
      Accepting writes through the stores' own actions (`applySetup.applyItem`).
-  3–5. *Fill the gaps · Invite people · Go live*: only what is missing,
+  3–5. *Fill the gaps · Invite people · Go live*. Units can be added by
+     hand right here (`UnitsEditor`): one at a time, a range (101–112, 1A–1F),
+     or a pasted list in any column order (`unitEntry.ts`), then edited in a
+     table or removed, with the ownership total checked against 100%.
+     Invite people takes any email with a role (owner, resident or tenant,
+     board member with a seat, property manager, staff) and a unit, one at a
+     time or pasted (`invites.ts`); the list is kept until sent and marked
+     sent, the board roster joins the same send, an owner's email fills an
+     empty unit email, and go-live doesn't re-invite anyone.
+     Only what is missing,
      answered in place (address, units, monthly assessments, a board member,
      due day and late fee, opening balances, a budget template, owner
      emails). Board invites go through `send-invite`; owners are invited at
