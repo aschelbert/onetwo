@@ -1248,14 +1248,30 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const inv = s.unitInvoices.find(i => i.id === invoiceId);
     const paid = inv ? r2(inv.paidAmount ?? (inv.status === 'paid' ? inv.amount : 0)) : 0;
     if (!inv || inv.status === 'void' || paid <= 0) return;
+    const remaining = invoiceRemaining(inv);
 
-    // The charge was wrong: the money goes back (Dr income / Cr bank) and whatever was still open is cancelled.
+    // With a live backend the server does it all: the Stripe refund, then the same entries posted once by
+    // refund_unit_invoice. The screen shows the result straight away and the ledger reloads behind it.
+    if (isBackendEnabled && supabase && isDbId(invoiceId)) {
+      set(st => ({
+        unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, status: 'void' as const, refundAmount: paid, refundDate: today, refundReason: reason } : i)),
+        units: st.units.map(u => u.number === inv.unitNumber ? { ...u, balance: r2(u.balance - remaining), lateFees: u.lateFees.map(f => (f.invoiceId === invoiceId ? { ...f, waived: true } : f)), specialAssessments: u.specialAssessments.filter(a => a.invoiceId !== invoiceId) } : u),
+      }));
+      const tid = s.tenantId || getActiveTenantId();
+      supabase.functions.invoke('refund-unit-payment', { body: { invoiceId, reason } })
+        .then(({ data, error }) => {
+          if (error || data?.error) console.error('refund-unit-payment error:', error ?? data?.error);
+          if (tid) return get().loadFromDb(tid);
+        })
+        .catch(err => console.error('refund-unit-payment error:', err));
+      return;
+    }
+
+    // Local books (demo, tests): the charge was wrong, so the money goes back (Dr income / Cr bank) and whatever was still open is cancelled.
     const m = mappingOf(s.glAccountMapping);
     const { arAcct, revenueAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
     const glEntry = s.glPost(today, `Refund - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, m.bankAccount, paid, 'refund', inv.unitNumber);
-    const remaining = invoiceRemaining(inv);
     if (remaining > 0) s.glPost(today, `Void - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, arAcct, remaining, invoiceSource(inv.type), inv.unitNumber);
-
     const patch: Partial<UnitInvoice> = { status: 'void', refundAmount: paid, refundDate: today, refundReason: reason, refundGlEntryId: glEntry.id };
     set(st => ({
       unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, ...patch } : i)),
@@ -1267,14 +1283,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         specialAssessments: u.specialAssessments.filter(a => a.invoiceId !== invoiceId),
       } : u),
     }));
-    if (remaining > 0) syncUnit(inv.unitNumber);
-
-    // The edge function issues the Stripe refund and records the same entry server side.
-    if (isBackendEnabled && supabase) {
-      supabase.functions.invoke('refund-unit-payment', {
-        body: { invoiceId, reason },
-      }).catch(err => console.error('refund-unit-payment error:', err));
-    }
   },
 
   // Stripe Connect

@@ -53,19 +53,23 @@ Deno.serve(async (req) => {
     }
     const user = await userRes.json();
 
-    // Authz: confirm caller is a board_member and get tenant_id
+    // Authz: any member of the building may pay (checkout, autopay, billing portal);
+    // only a board member may create or inspect the building's Stripe account.
     const tu = await sbQuery("GET", "tenant_users", {
       "user_id": `eq.${user.id}`,
-      "role": "eq.board_member",
-      "select": "tenant_id",
+      "select": "tenant_id,role",
+      "limit": "1",
     });
     if (!tu?.tenant_id) {
-      return jsonResponse({ error: "Only board members can manage Stripe Connect" }, 403);
+      return jsonResponse({ error: "You are not a member of a building" }, 403);
     }
     const tenantId = tu.tenant_id;
 
     const body = await req.json();
     const { action, buildingName, returnUrl, amount, description, unitNumber, stripeConnectId: bodyConnectId, customerId } = body;
+    if ((action === "create" || action === "check_status") && tu.role !== "board_member") {
+      return jsonResponse({ error: "Only board members can manage Stripe Connect" }, 403);
+    }
     const effectiveReturnUrl = returnUrl || `${SITE_URL}/building?tab=payments`;
 
     // ═══ ACTION: create ═══
@@ -227,7 +231,9 @@ Deno.serve(async (req) => {
       params.append("line_items[0][price_data][product_data][name]", description || "HOA Payment");
       params.append("line_items[0][quantity]", "1");
       params.append("payment_intent_data[application_fee_amount]", String(Math.round((amount || 0) * 100 * 0.029)));
+      // The webhook posts the payment to the unit's ledger from these.
       if (unitNumber) params.append("metadata[unit_number]", unitNumber);
+      params.append("metadata[tenant_id]", tenantId);
 
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
         method: "POST",
@@ -271,7 +277,11 @@ Deno.serve(async (req) => {
       params.append("line_items[0][price_data][recurring][interval]", "month");
       params.append("line_items[0][quantity]", "1");
       params.append("subscription_data[application_fee_percent]", "2.9");
+      // On the session and on the subscription itself, so every month's invoice.paid names the unit.
       if (unitNumber) params.append("metadata[unit_number]", unitNumber);
+      params.append("metadata[tenant_id]", tenantId);
+      if (unitNumber) params.append("subscription_data[metadata][unit_number]", unitNumber);
+      params.append("subscription_data[metadata][tenant_id]", tenantId);
 
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
         method: "POST",
