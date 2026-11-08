@@ -14,7 +14,7 @@ import { cn } from '@/lib/formatters';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button, Card, Chip } from '../components';
-import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, type DocType, type SetupDoc } from '@/features/setup/setupModel';
+import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, coverage, type DocType, type SetupDoc } from '@/features/setup/setupModel';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { ACCEPT, addFiles, addPastedText, isSpreadsheet, retype as retypeDoc } from '@/features/setup/readDocument';
 import { useSetup } from './useSetup';
@@ -97,11 +97,13 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
 
   const add = (list: FileList | null) => { if (list?.length) void addFiles(Array.from(list)); };
   const byKind = (types: DocType[]) => s.docs.filter(d => d.docType && types.includes(d.docType) && (d.status === 'read' || d.status === 'filed'));
+  // A kind is also covered when its content was found inside another document (an ownership exhibit in the bylaws).
+  const foundIn = (kind: string) => s.docs.flatMap(d => (d.result ? coverage(d.result).filter(c => c.kind === kind).map(c => ({ doc: d, c })) : []));
   const items = buildItems(s.docs);
   const counts = (sec: string) => items.filter(i => i.section === sec).length;
   const summary = [
     counts('profile') + counts('rules') + counts('accounts') && `${counts('profile') + counts('rules') + counts('accounts')} settings`, counts('units') && `${counts('units')} units`,
-    counts('board') && `${counts('board')} board members`, counts('insurance') && `${counts('insurance')} policies`, counts('budget') && `${counts('budget')} budget lines`, counts('reserves') && `${counts('reserves')} reserve items`,
+    counts('board') && `${counts('board')} board members`, counts('duties') + counts('obligations') + counts('houserules') && `${counts('duties') + counts('obligations') + counts('houserules')} clauses (duties, owner obligations, rules)`, counts('insurance') && `${counts('insurance')} policies`, counts('budget') && `${counts('budget')} budget lines`, counts('reserves') && `${counts('reserves')} reserve items`,
   ].filter(Boolean).join(' · ');
   const retype = (d: SetupDoc, t: DocType) => retypeDoc(d, t);
   const [pasting, setPasting] = useState(false);
@@ -156,6 +158,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
                   <span className="block text-[13px] text-ux2-muted">
                     {d.status === 'read' && d.result ? `${DOC_TYPE_LABEL[d.result.docType]} · ${d.result.pageCount ? `${d.result.pageCount} pages · ` : ''}${foundCount(d)} found to review${d.filedAs ? ' · filed in Building › Documents' : ''}` : d.status === 'filed' ? (d.note ?? 'Filed in Building › Documents') : fmtSize(d.size)}
                   </span>
+                  {d.result && <span className="mt-1.5 flex flex-wrap gap-1.5">{coverage(d.result).map(c => <Chip key={c.kind} tone="plum" className="px-2 py-1">{c.label} · {c.count}</Chip>)}</span>}
                   {d.status === 'error' && <span className="block text-[13px] text-ux2-red-ink">{d.error}</span>}
                 </span>
                 {(d.status === 'filed' || (d.status === 'read' && !isSpreadsheet(d.name))) && (
@@ -180,7 +183,9 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
           <span className="text-[13px] text-ux2-muted">Each one fills in the parts of the app listed under it</span>
         </div>
         {DOC_KINDS.map(k => {
-          const got = byKind(k.types);
+          const typed = byKind(k.types);
+          const found = foundIn(k.id).filter(x => !typed.includes(x.doc));
+          const got = [...typed, ...found.map(x => x.doc)];
           return (
             <div key={k.id} data-doc-kind={k.id} className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-2xl border border-ux2-line bg-white px-4 py-3.5">
               <span aria-hidden="true" className={cn('grid h-9 w-9 place-items-center rounded-[10px]', got.length ? 'bg-ux2-sage-tint text-ux2-sage' : 'border border-dashed border-ink-300 bg-ux2-surface text-ux2-muted')}>
@@ -188,7 +193,8 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
               </span>
               <span className="min-w-0">
                 <b className="font-semibold">{k.label}</b>
-                {got.length > 0 && <span className="text-[13px] text-ux2-muted"> · {got.map(d => d.name).join(', ')}</span>}
+                {typed.length > 0 && <span className="text-[13px] text-ux2-muted"> · {typed.map(d => d.name).join(', ')}</span>}
+                {found.length > 0 && <span className="block text-[13px] text-ux2-sage">Found in {found.map(x => `${x.doc.name}${x.c.pages ? ` (${x.c.pages})` : ''}: ${x.c.count} ${x.c.unit}`).join('; ')}</span>}
                 <span className="mt-1.5 flex flex-wrap gap-1.5">{k.fills.map(f => <span key={f} className={cn('rounded-full border px-2 py-1 text-[11px] font-semibold', k.imports ? 'border-ux2-plum/30 bg-ux2-plum-tint text-ux2-plum' : 'border-ux2-line bg-ux2-surface text-ink-700')}>{f}</span>)}</span>
               </span>
               {got.length ? <Chip tone="sage">{got.some(d => d.status === 'read') ? 'Read' : 'Filed'}</Chip> : <Button size="sm" variant="ghost" onClick={() => input.current?.click()}>Add</Button>}

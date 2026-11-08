@@ -134,6 +134,7 @@ export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: 
   { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Rules for residents', 'Fines', 'Late fees'] },
   { id: 'insurance', label: 'Insurance declarations pages', types: ['insurance'], imports: true, fills: ['Carrier and policy number', 'Limits', 'Renewal date'] },
   { id: 'reserves', label: 'Reserve study', types: ['reserve_study'], imports: true, fills: ['Reserve components', 'Useful life and cost'] },
+  { id: 'statements', label: 'Bank or year-end statements', types: ['financial_statement', 'bank_statement'], imports: true, fills: ['Opening balances'] },
   { id: 'contracts', label: 'Management and vendor contracts', types: ['contract'], imports: false, fills: ['Kept in Building › Documents'] },
 ];
 
@@ -314,4 +315,73 @@ export function progress(docs: SetupDoc[], items: Item[], decided: number, ess: 
   const reviewPart = items.length === 0 ? (docs.length ? 1 : 0) : decided / items.length;
   const essPart = Object.values(ess).filter(Boolean).length / 4;
   return Math.round((docsPart * 0.2 + reviewPart * 0.4 + essPart * 0.4) * 100);
+}
+
+// ── What a document holds, and where it goes ──────────────────────
+
+/** Where accepted items land in the app (the confirmation after Accept links here). */
+export const DESTINATIONS: { match: RegExp; path: string }[] = [
+  { match: /^Building profile/, path: '/building' },
+  { match: /^Building › Directory/, path: '/building?tab=directory' },
+  { match: /^Funds › Accounts and ledger · billing rules/, path: '/funds?tab=settings' },
+  { match: /^Funds › opening balance/, path: '/funds?tab=settings&section=ledger' },
+  { match: /^Building › Obligations · duties and roles/, path: '/building?tab=obligations&section=duties' },
+  { match: /^Building › Documents · insurance/, path: '/building?tab=documents&section=certificates' },
+  { match: /^Building › Contracts/, path: '/building?tab=contracts' },
+  { match: /^Funds › Planning · budget/, path: '/funds?tab=planning&section=budget' },
+  { match: /^Funds › Planning · reserves/, path: '/funds?tab=planning&section=reserves' },
+];
+export const pathFor = (savedTo?: string) => (savedTo ? DESTINATIONS.find(d => d.match.test(savedTo))?.path : undefined);
+
+/** Where each review section's items go, said once at the top of the section. */
+export const SECTION_GOES: Record<Section, string> = {
+  profile: 'Building profile',
+  units: 'Building › Directory · units',
+  board: 'Building › Directory · board',
+  duties: 'Building › Obligations · duties and roles',
+  obligations: 'Building › Obligations · duties and roles',
+  houserules: 'Building › Obligations · duties and roles',
+  rules: 'Funds › Accounts and ledger · billing rules, and Building › Obligations · duties and roles',
+  accounts: 'Funds › opening balance',
+  insurance: 'Building › Documents · insurance',
+  vendors: 'Building › Contracts',
+  budget: 'Funds › Planning · budget',
+  reserves: 'Funds › Planning · reserves',
+};
+
+const MONEY_FACTS: FactKey[] = ['late_fee', 'grace_period_days', 'assessment_due_day'];
+const RULE_FACTS: FactKey[] = ['pet_rule', 'rental_rule', 'fine_amount'];
+const BALANCE_FACTS: FactKey[] = ['operating_balance', 'reserve_balance', 'balance_as_of'];
+
+export interface Coverage { kind: string; label: string; count: number; unit: string; pages: string; goes: string }
+
+const pageSpan = (rows: { page: number | null }[]) => {
+  const ps = [...new Set(rows.map(r => r.page).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  if (!ps.length) return '';
+  return ps.length === 1 ? `p.${ps[0]}` : ps[ps.length - 1] - ps[0] === ps.length - 1 ? `pp.${ps[0]}–${ps[ps.length - 1]}` : `pp.${ps.slice(0, 4).join(', ')}${ps.length > 4 ? '…' : ''}`;
+};
+
+/**
+ * Which of the documents setup asks for this one actually contains, judged by
+ * what was read from it, not by its name. Bylaws often hold an ownership
+ * table (the owner list), use restrictions (the rules) and the officers.
+ */
+export function coverage(r: ReadResult): Coverage[] {
+  const clauses = r.clauses ?? [];
+  const governing = [...r.facts.filter(f => !RULE_FACTS.includes(f.key) && !BALANCE_FACTS.includes(f.key)), ...clauses.filter(c => c.topic !== 'rules')];
+  const rules = [...r.facts.filter(f => RULE_FACTS.includes(f.key)), ...clauses.filter(c => c.topic === 'rules')];
+  const balances = r.facts.filter(f => BALANCE_FACTS.includes(f.key));
+  const out: Coverage[] = [];
+  const add = (kind: string, rows: { page: number | null }[], unit: string, goes: string) => {
+    if (rows.length) out.push({ kind, label: DOC_KINDS.find(k => k.id === kind)?.label.replace(/ \(.*\)$/, '') ?? kind, count: rows.length, unit, pages: pageSpan(rows), goes });
+  };
+  add('governing', governing, governing.length === 1 ? 'setting or clause' : 'settings and clauses', r.facts.some(f => MONEY_FACTS.includes(f.key)) ? 'Billing rules · Duties and roles' : 'Duties and roles');
+  add('owners', r.units, r.units.length === 1 ? 'unit' : 'units', 'Building › Directory');
+  add('minutes', r.board, r.board.length === 1 ? 'board member' : 'board members', 'Building › Directory');
+  add('rules', rules, rules.length === 1 ? 'rule' : 'rules', 'Duties and roles · Rules for residents');
+  add('budget', r.budget, r.budget.length === 1 ? 'budget line' : 'budget lines', 'Funds › Planning');
+  add('insurance', r.insurance, r.insurance.length === 1 ? 'policy' : 'policies', 'Building › Documents');
+  add('reserves', r.reserves, r.reserves.length === 1 ? 'reserve item' : 'reserve items', 'Funds › Planning');
+  add('statements', balances, 'balances', 'Funds › opening balance');
+  return out;
 }

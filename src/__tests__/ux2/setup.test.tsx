@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSetupStore } from '@/features/setup/useSetupStore';
-import { buildItems, essentials, isClear, progress, resolve, type ReadResult, type SetupDoc } from '@/features/setup/setupModel';
+import { buildItems, coverage, essentials, isClear, pathFor, progress, resolve, type ReadResult, type SetupDoc } from '@/features/setup/setupModel';
 import { applyItem, monthDay } from '@/features/setup/applySetup';
 import { addPastedText } from '@/features/setup/readDocument';
 import { extractFromPages, wordNumber } from '@/features/setup/extractText';
@@ -81,7 +81,7 @@ describe('Setup model', () => {
 describe('Applying accepted items', () => {
   beforeEach(() => {
     useFinancialStore.setState({ units: [], budgetCategories: [] });
-    useBuildingStore.setState({ board: [] });
+    useBuildingStore.setState({ board: [], governingClauses: [] });
   });
 
   it('writes units, budget lines, board members and late-fee settings through the stores', () => {
@@ -100,7 +100,8 @@ describe('Applying accepted items', () => {
 
     applyItem(items.find(i => i.key === 'fact:late_fee')!, { value: 0 });
     expect(useFinancialStore.getState()).toMatchObject({ lateFeeEnabled: true, lateFeeAmount: 25 });
-    expect(applyItem(items.find(i => i.key === 'fact:annual_meeting_month')!)).toBe('Rules on file');
+    expect(applyItem(items.find(i => i.key === 'fact:annual_meeting_month')!)).toBe('Building › Obligations · duties and roles');
+    expect(useBuildingStore.getState().governingClauses.find(c => c.heading === 'Annual meeting')).toMatchObject({ topic: 'board', text: expect.stringMatching(/^March/) });
   });
 
   it('imports spreadsheets by their headings, whatever they are called', () => {
@@ -189,6 +190,18 @@ describe('Reading text without AI', () => {
     expect(within(card('The board, from your bylaws')).getByText('Powers and Duties')).toBeTruthy();
   });
 
+  it('judges what a document holds by its content: bylaws with an ownership exhibit and use restrictions cover the owner list and the rules', () => {
+    const pages = [
+      ['ARTICLE VI ASSESSMENTS', 'Section 6.2. Any installment not paid within fifteen (15) days after the due date shall incur a late charge of twenty-five dollars ($25.00).'],
+      ['ARTICLE VIII USE RESTRICTIONS', 'Section 8.1. Pets. No more than two (2) pets may be kept in any unit.'],
+      ['Exhibit B Percentage Interests', '101  Rivera, Ana  33.34%', '102  Okafor, James  33.33%', '103  Chen, David  33.33%'],
+    ];
+    const r = extractFromPages(pages, { title: 'Bylaws', docType: 'bylaws' });
+    expect(coverage(r).map(c => [c.kind, c.count, c.pages])).toEqual([['governing', 2, 'p.1'], ['owners', 3, 'p.3'], ['rules', 1, 'p.2']]);
+    expect(pathFor('Funds › Accounts and ledger · billing rules')).toBe('/funds?tab=settings');
+    expect(pathFor('Building › Obligations · duties and roles')).toBe('/building?tab=obligations&section=duties');
+  });
+
   it('reads pasted text into items to review', () => {
     useSetupStore.getState().reset();
     addPastedText(BYLAWS.flat().join('\n'), 'bylaws', 'Bylaws excerpt');
@@ -244,10 +257,14 @@ describe('Setup screens', () => {
   it('reviews what was found: accept the matches together, settle a disagreement, and save into the building', () => {
     useSetupStore.setState({ docs: [bylaws, rules, ownersDoc] });
     renderSetup('/setup?step=review');
+    const assessment = document.querySelector('[data-widget="setup-assessment"]') as HTMLElement;
+    expect(within(assessment).getByText(/Not found in anything yet:/)).toBeTruthy();
+    expect(within(assessment.querySelector('[data-assess-doc="Owners.xlsx"]') as HTMLElement).getByText('Owner list')).toBeTruthy();
     // Units first: 1A matches across the owner list and bylaws; 1B (bylaws only) has no owner yet but is clear.
     fireEvent.click(screen.getByRole('button', { name: 'Accept the 2 that match' }));
     expect(useFinancialStore.getState().units.map(u => u.number).sort()).toEqual(['1A', '1B']);
     expect(document.querySelector('[data-setup-item="unit:1a"]')?.getAttribute('data-decision')).toBe('accepted');
+    expect(within(document.querySelector('[data-setup-item="unit:1a"]') as HTMLElement).getByRole('link', { name: /Saved to Building › Directory · units/ }).getAttribute('href')).toBe('/building?tab=directory');
 
     fireEvent.click(screen.getByRole('button', { name: /Rules and money/ }));
     const late = document.querySelector('[data-setup-item="fact:late_fee"]') as HTMLElement;

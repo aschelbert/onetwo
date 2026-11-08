@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { applyBudgetTemplate, postOpening } from '@/features/setup/applySetup';
-import { itemSummary, resolve } from '@/features/setup/setupModel';
+import { resolve } from '@/features/setup/setupModel';
 import { Button, Chip } from '../components';
 import { useSetup } from './useSetup';
 
@@ -81,7 +81,6 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const noEmail = units.filter(u => u.owner && !u.email);
   const boardWithEmail = b.board.filter(m => m.email);
   const ownersWithEmail = units.filter(u => u.email);
-  const rulesOnFile = s.items.filter(i => s.decisions[i.key]?.savedTo === 'Rules on file');
 
   const saveProfile = () => {
     if (profile.name.trim()) b.updateName(profile.name.trim());
@@ -248,12 +247,6 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
           <div>Insurance renewals, contract ends and reserve items show up as duties on the calendar.</div>
           <div>Your building score starts, from what's already in place.</div>
           <div>Anything you left for later can still be done in each module.</div>
-          {rulesOnFile.length > 0 && (
-            <>
-              <div className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-white/70">Rules on file from your documents</div>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">{rulesOnFile.map(i => <li key={i.key}><b className="font-semibold">{i.label}:</b> {itemSummary(i, s.decisions[i.key]?.picks)}</li>)}</ul>
-            </>
-          )}
         </div>
       </section>
     </div>
