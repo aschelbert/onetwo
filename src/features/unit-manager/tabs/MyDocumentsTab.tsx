@@ -34,7 +34,7 @@ export default function MyDocumentsTab({ activeUnit }: { activeUnit: Unit }) {
   };
 
   const handleDownload = async (storagePath: string, filename: string) => {
-    const url = await getDocumentSignedUrl(storagePath);
+    const url = await getDocumentSignedUrl(storagePath, filename);
     if (url) {
       const a = document.createElement('a');
       a.href = url;
