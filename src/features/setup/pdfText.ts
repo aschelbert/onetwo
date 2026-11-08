@@ -2,10 +2,15 @@
  * The text of a PDF, page by page and line by line, pulled out in the
  * browser with pdf.js (loaded only when a PDF is added). Scanned PDFs with no
  * text layer come back empty.
+ *
+ * The legacy build is used on purpose: the standard build calls brand-new
+ * JavaScript (Map.prototype.getOrInsertComputed, Uint8Array.fromBase64…) that
+ * Safari doesn't have yet, so reading failed there. The legacy build carries
+ * polyfills for them.
  */
 export async function pdfLines(file: File): Promise<string[][]> {
-  const pdfjs = await import('pdfjs-dist');
-  const { default: workerUrl } = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { default: workerUrl } = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url');
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
   const doc = await task.promise;
