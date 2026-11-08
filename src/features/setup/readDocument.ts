@@ -100,8 +100,15 @@ export async function addOne(file: File): Promise<void> {
       applyReading(id, pages, false, docType, file.name);
       return;
     }
-  } catch {
-    updateDoc(id, { status: 'filed', docType, note: "Filed. Its text couldn't be read; add its settings in Fill the gaps." });
+  } catch (err) {
+    console.error('[setup] reading failed for', file.name, err);
+    const name = (err as { name?: string })?.name ?? '';
+    const note = name === 'PasswordException'
+      ? 'Filed. This PDF is password protected, so its text can\'t be read. Save a copy without the password and add it again, or paste the key sections into "Paste text".'
+      : name === 'InvalidPDFException'
+        ? 'Filed. This file isn\'t a readable PDF (it may be damaged). Try saving it again as PDF, or paste the key sections into "Paste text".'
+        : `Filed. Its text couldn't be read (${name || (err instanceof Error ? err.message : 'unknown error')}). Paste the key sections into "Paste text", or add them in Fill the gaps.`;
+    updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note });
     return;
   }
   updateDoc(id, { status: 'filed', docType, note: lower.match(/\.docx?$/) ? 'Filed. Save Word files as PDF to have their text read.' : 'Filed in Building › Documents.' });
