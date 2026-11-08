@@ -11,7 +11,15 @@ import { pathFor, type Decision, type SetupDoc } from './setupModel';
 
 /** Who someone is invited as. Owners and residents are tied to a unit; board members to a seat. */
 export type InviteAccess = 'owner' | 'resident' | 'board' | 'property_manager' | 'staff';
-export interface SetupInvite { id: string; email: string; access: InviteAccess; seat: string | null; unit: string | null; sentAt?: string }
+export interface SetupInvite {
+  id: string; email: string; access: InviteAccess; seat: string | null; unit: string | null;
+  /** When the invitation was created (it can be accepted with its code from then on). */
+  sentAt?: string;
+  /** The invitation code, to share by hand when the email didn't go out. */
+  code?: string;
+  /** False when the invitation was created but not emailed (no email service in this environment, or it failed). */
+  emailed?: boolean;
+}
 
 interface SetupState {
   docs: SetupDoc[];
@@ -26,6 +34,8 @@ interface SetupState {
   addInvites: (list: Omit<SetupInvite, 'id'>[]) => void;
   removeInvite: (id: string) => void;
   markInvitesSent: (emails: string[], at: string) => void;
+  /** Record what send-invite did for each person: the code, and whether the email went out. */
+  recordInviteResults: (results: { email: string; code?: string; sent: boolean }[], at: string) => void;
   addDoc: (doc: SetupDoc) => void;
   updateDoc: (id: string, patch: Partial<SetupDoc>) => void;
   removeDoc: (id: string) => void;
@@ -58,6 +68,10 @@ export const useSetupStore = create<SetupState>()(persist((set) => ({
   markInvitesSent: (emails, at) => set(s => {
     const sent = new Set(emails.map(e => e.toLowerCase()));
     return { invites: s.invites.map(i => (sent.has(i.email.toLowerCase()) ? { ...i, sentAt: at } : i)) };
+  }),
+  recordInviteResults: (results, at) => set(s => {
+    const by = new Map(results.map(r => [r.email.toLowerCase(), r]));
+    return { invites: s.invites.map(i => { const r = by.get(i.email.toLowerCase()); return r ? { ...i, sentAt: at, code: r.code ?? i.code, emailed: r.sent } : i; }) };
   }),
   reset: () => set({ ...EMPTY }),
 }), {
