@@ -4,7 +4,7 @@ import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, legacyOwed, openInvoicesInOrder, type GLAccountMapping } from '@/lib/financial-logic';
-import { balanceOf, fiscalYearStart, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
+import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
@@ -109,8 +109,10 @@ interface FinancialState {
   // Work Orders
   createWorkOrder: (wo: { title: string; vendor: string; amount: number; acctNum: string; caseId?: string }) => void;
   approveWorkOrder: (id: string) => void;
-  receiveInvoice: (id: string, invoiceNum: string, amount: number) => void;
-  payWorkOrder: (id: string) => void;
+  /** The vendor's invoice arrived: the expense is booked now (Dr expense line / Cr accounts payable), on the invoice date. */
+  receiveInvoice: (id: string, invoiceNum: string, amount: number, invoiceDate?: string) => void;
+  /** Pay a bill: clears the payable (Dr accounts payable / Cr bank). A bill invoiced before accrual posts Dr expense / Cr bank, as before. */
+  payWorkOrder: (id: string, paidDate?: string) => void;
 
   // ── Charges to units: the receivables sub-ledger. One invoice per charge; the unit's balance follows. ──
   /** Charge a unit. Posts Dr receivable / Cr income (unless `post: false`), applies any prepaid credit, and raises the balance. */
@@ -576,10 +578,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   },
 
   getBudgetVariance: () => {
-    const { budgetCategories, chartOfAccounts, acctBalance, getCategorySpent } = get();
+    const { budgetCategories, chartOfAccounts, generalLedger, getCategorySpent } = get();
+    // Actuals are this fiscal year's, not all time: the budget is a year's budget.
+    const today = todayIso();
+    const fyStart = fiscalYearStart(today, useBuildingStore.getState().details?.fiscalYearEnd || '12-31');
+    const thisYear = generalLedger.filter(e => e.date >= fyStart && e.date <= today);
     return budgetCategories.map((cat) => {
       const glAcct = chartOfAccounts.find((a) => a.budgetCat === cat.id);
-      const actual = glAcct ? acctBalance(glAcct.num) : getCategorySpent(cat);
+      const actual = glAcct ? balanceOf(glAcct.num, glAcct.type, thisYear) : getCategorySpent(cat);
       const budgeted = cat.budgeted;
       const variance = budgeted - actual;
       const pct = budgeted > 0 ? Math.round((actual / budgeted) * 100) : 0;
@@ -800,23 +806,40 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     syncWorkOrder(id);
   },
 
-  receiveInvoice: (id, invoiceNum, amount) => {
-    set((s) => ({
-      workOrders: s.workOrders.map((w) =>
-        w.id === id && w.status === 'approved' ? { ...w, status: 'invoiced' as const, invoiceNum, amount } : w
+  receiveInvoice: (id, invoiceNum, amount, invoiceDate) => {
+    const s = get();
+    const wo = s.workOrders.find((w) => w.id === id);
+    if (!wo || wo.status !== 'approved') return;
+    const today = todayIso();
+    const date = invoiceDate && !isLocked(invoiceDate, s.closedThrough) ? invoiceDate : today;
+    const m = mappingOf(s.glAccountMapping);
+    const amt = r2(amount);
+    // Accrual: the expense belongs to the month the bill arrived, whether or not it is paid yet.
+    const entry = amt > 0 ? s.glPost(date, `${wo.title} — ${wo.vendor} · invoice ${invoiceNum}${wo.caseId ? ' (' + wo.caseId + ')' : ''}`, wo.acctNum, m.accountsPayable, amt, wo.caseId ? 'case' : 'expense', wo.caseId || invoiceNum) : null;
+    set((st) => ({
+      workOrders: st.workOrders.map((w) =>
+        w.id === id ? { ...w, status: 'invoiced' as const, invoiceNum, amount: amt, invoiceDate: invoiceDate ?? today, accrualGlEntryId: entry?.id ?? null } : w
       ),
     }));
     syncWorkOrder(id);
   },
 
-  payWorkOrder: (id) => {
-    const wo = get().workOrders.find((w) => w.id === id);
+  payWorkOrder: (id, paidDate = todayIso()) => {
+    const s = get();
+    const wo = s.workOrders.find((w) => w.id === id);
     if (!wo || wo.status !== 'invoiced') return;
-    const paidDate = new Date().toISOString().split('T')[0];
-    const m = get().glAccountMapping;
-    const entry = get().glPost(paidDate, `${wo.title} — ${wo.vendor}${wo.caseId ? ' (' + wo.caseId + ')' : ''}`, wo.acctNum, m.bankAccount, wo.amount, wo.caseId ? 'case' : 'expense', wo.caseId || wo.invoiceNum);
-    set((s) => ({
-      workOrders: s.workOrders.map((w) =>
+    const m = mappingOf(s.glAccountMapping);
+    // A reserve expense is paid from the reserve bank account.
+    const acct = s.chartOfAccounts.find(a => a.num === wo.acctNum);
+    const bank = fundOf(acct, wo.acctNum) === 'reserve' ? m.reserveBankAccount : m.bankAccount;
+    const memo = `${wo.title} — ${wo.vendor}${wo.invoiceNum ? ` · invoice ${wo.invoiceNum}` : ''}${wo.caseId ? ' (' + wo.caseId + ')' : ''}`;
+    const source: GLEntry['source'] = wo.caseId ? 'case' : 'expense';
+    // Accrued bills clear the payable; bills invoiced before accrual book the expense now, as they always did.
+    const entry = wo.accrualGlEntryId
+      ? s.glPost(paidDate, `Paid · ${memo}`, m.accountsPayable, bank, wo.amount, source, wo.caseId || wo.invoiceNum)
+      : s.glPost(paidDate, memo, wo.acctNum, bank, wo.amount, source, wo.caseId || wo.invoiceNum);
+    set((st) => ({
+      workOrders: st.workOrders.map((w) =>
         w.id === id ? { ...w, status: 'paid' as const, paidDate, glEntryId: entry.id } : w
       ),
     }));

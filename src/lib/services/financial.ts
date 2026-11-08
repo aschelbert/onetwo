@@ -282,6 +282,7 @@ export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
     paidDate: (r.paid_date as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
     attachments: (r.attachments || []) as WorkOrder['attachments'],
+    accrualGlEntryId: (r.accrual_gl_entry_id as string) || null,
   };
 }
 
@@ -305,6 +306,7 @@ export async function createWorkOrder(tenantId: string, wo: WorkOrder): Promise<
     approved_date: wo.approvedDate, invoice_num: wo.invoiceNum,
     invoice_date: wo.invoiceDate, paid_date: wo.paidDate,
     gl_entry_id: wo.glEntryId, attachments: wo.attachments,
+    accrual_gl_entry_id: wo.accrualGlEntryId || null,
   });
   if (error) { logDbError('createWorkOrder error:', error); return false; }
   return true;
@@ -326,6 +328,7 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.paidDate !== undefined) row.paid_date = updates.paidDate;
   if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
+  if (updates.accrualGlEntryId !== undefined) row.accrual_gl_entry_id = updates.accrualGlEntryId;
   const { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
   if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;
