@@ -76,6 +76,25 @@ describe('Me', () => {
     expect(invites[invites.length - 1]).toMatchObject({ email: 'new.owner@example.com', role: 'BOARD_MEMBER', status: 'pending' });
   });
 
+  it('User Management lets the board link a member to a unit, or clear it', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    const units = useFinancialStore.getState().units;
+    const target = units.find(u => u.number !== '204')!.number;
+    renderAt('/admin/users');
+    const row = document.querySelector('[data-member="user2"]') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Actions for Sarah Johnson' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Change unit' }));
+    const panel = document.querySelector('[aria-label="Link to a unit"]') as HTMLElement;
+    const select = within(panel).getByLabelText('Unit for Sarah Johnson') as HTMLSelectElement;
+    expect(select.value).toBe('204');
+    expect(within(select).getAllByRole('option').length).toBe(units.length + (units.some(u => u.number === '204') ? 1 : 2));
+    fireEvent.change(select, { target: { value: target } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+    expect(useAuthStore.getState().buildingMembers.find(m => m.id === 'user2')?.unit).toBe(target);
+    expect(screen.getByText(`Sarah Johnson is linked to unit ${target}.`)).toBeTruthy();
+    useAuthStore.getState().updateMemberUnit('user2', '204');
+  });
+
   it('Subscription shows the plan, add-ons, billing, plans, invoices and cancel for a board member only', () => {
     renderAt('/subscription');
     expect(screen.getAllByText('Plan').length).toBeGreaterThan(0);

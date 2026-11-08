@@ -119,18 +119,31 @@ function usePeople(viewerName: string, viewerEmail: string) {
   };
   const changeRole = async (p: Person, role: Role) => {
     if (!live) { store.updateMemberRole(p.id, role); return; }
-    const { error } = await supabase!.from('tenant_users').update({ role: role.toLowerCase() }).eq('id', p.id);
-    setNote(error ? `Role not changed: ${error.message}` : `${p.name} is now ${ACCESS_LABEL[accessFor(role, p.boardTitle, p.you)]}.`);
+    // The board can't update tenant_users directly; set_member_role checks the caller and keeps a board in place (041).
+    const { data, error } = await supabase!.rpc('set_member_role', { p_member_id: p.id, p_role: role.toLowerCase() });
+    const result = data as { success?: boolean; error?: string } | null;
+    setNote(error || !result?.success ? `Role not changed: ${error?.message ?? result?.error ?? 'try again'}` : `${p.name} is now ${ACCESS_LABEL[accessFor(role, role === 'BOARD_MEMBER' ? p.boardTitle : null, p.you)]}.`);
+    await load();
+  };
+  /** Link a member to one of the building's units, or clear it ('' ). The board only; the database checks (040). */
+  const linkUnit = async (p: Person, unit: string) => {
+    if (!live) { store.updateMemberUnit(p.id, unit); setNote(unit ? `${p.name} is linked to unit ${unit}.` : `${p.name} is no longer linked to a unit.`); return; }
+    const { data, error } = await supabase!.rpc('set_member_unit', { p_member_id: p.id, p_unit: unit || null });
+    const result = data as { success?: boolean; error?: string; unit?: string | null } | null;
+    if (error || !result?.success) { setNote(`Not linked: ${error?.message ?? result?.error ?? 'try again'}`); return; }
+    setNote(result.unit ? `${p.name} is linked to unit ${result.unit}. They now see that unit's documents and moves.` : `${p.name} is no longer linked to a unit.`);
     await load();
   };
   const remove = async (p: Person) => {
     if (!live) { store.removeMember(p.id); return; }
-    const { error } = await supabase!.from('tenant_users').update({ status: 'inactive' }).eq('id', p.id);
-    setNote(error ? `Not removed: ${error.message}` : `${p.name} can no longer sign in. Their unit, ledger and votes stay.`);
+    // remove_member deletes the membership, so the access goes with it (041).
+    const { data, error } = await supabase!.rpc('remove_member', { p_member_id: p.id });
+    const result = data as { success?: boolean; error?: string } | null;
+    setNote(error || !result?.success ? `Not removed: ${error?.message ?? result?.error ?? 'try again'}` : `${p.name} no longer has access to this building. Their unit, ledger and votes stay.`);
     await load();
   };
 
-  return { live, loading, people, pending, note, setNote, invite, revoke, resend, changeRole, remove };
+  return { live, loading, people, pending, note, setNote, invite, revoke, resend, changeRole, linkUnit, remove };
 }
 
 function addDays(iso: string, n: number): string {
@@ -147,7 +160,7 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
   const navigate = useNavigate();
   const tenant = useTenantContext();
   const units = useFinancialStore(s => s.units);
-  const { live, loading, people, pending, note, setNote, invite, revoke, resend, changeRole, remove } = usePeople(snap.viewer.name, snap.viewer.email);
+  const { live, loading, people, pending, note, setNote, invite, revoke, resend, changeRole, linkUnit, remove } = usePeople(snap.viewer.name, snap.viewer.email);
   const [filter, setFilter] = useState<'all' | 'board' | 'owners' | 'staff'>('all');
   const [q, setQ] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -159,6 +172,8 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
   const [bulk, setBulk] = useState('');
   const [bulkRole, setBulkRole] = useState('resident');
   const [changing, setChanging] = useState<Person | null>(null);
+  const [linking, setLinking] = useState<Person | null>(null);
+  const [linkTo, setLinkTo] = useState('');
 
   const active = people.filter(p => p.status === 'active');
   const owners = active.filter(p => p.role === 'RESIDENT').length;
@@ -239,7 +254,7 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
                   <Td><Chip tone={ACCESS_TONE[p.access]}>{ACCESS_LABEL[p.access]}</Chip></Td>
                   <Td>{p.you ? 'Now' : p.lastActive ? dayLabel(p.lastActive) : '—'}</Td>
                   <Td>{p.status === 'active' ? 'Active' : p.status}</Td>
-                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page; the link goes to ${p.email}.`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? Their unit, ledger and votes stay; only the sign-in goes.`)) void remove(p); } }]} />}</Td>
+                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, ...(snap.viewer.isBoard ? [{ label: p.unit ? 'Change unit' : 'Link to unit', onSelect: () => { setLinking(p); setLinkTo(p.unit); } }] : []), { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page; the link goes to ${p.email}.`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? They lose access to this building. Their unit, ledger and votes stay.`)) void remove(p); } }]} />}</Td>
                 </tr>
               ))}
               {visible.length === 0 && <tr><Td colSpan={6}><span className="text-ux2-muted">{loading ? 'Loading members…' : 'No one matches.'}</span></Td></tr>}
@@ -254,8 +269,22 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
             <Button size="sm" variant="ghost" onClick={() => setChanging(null)}>Cancel</Button>
           </Inner>
         )}
+        {linking && (
+          <Inner aria-label="Link to a unit" className="flex flex-wrap items-end gap-2">
+            <Field label={`Unit for ${linking.name}`} className="min-w-[220px]">
+              <select value={linkTo} onChange={e => setLinkTo(e.target.value)} className={INPUT} aria-label={`Unit for ${linking.name}`}>
+                <option value="">No unit</option>
+                {linking.unit && !units.some(u => u.number === linking.unit) && <option value={linking.unit}>{linking.unit} · not in the unit list</option>}
+                {[...units].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })).map(u => <option key={u.number} value={u.number}>{u.number}{u.owner ? ` · ${u.owner}` : ''}{people.some(o => o.id !== linking.id && o.status === 'active' && o.unit === u.number) ? ' · linked to someone' : ''}</option>)}
+              </select>
+            </Field>
+            <Button size="sm" disabled={linkTo === linking.unit} onClick={() => { void linkUnit(linking, linkTo); setLinking(null); }}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setLinking(null)}>Cancel</Button>
+            {units.length === 0 && <span className="basis-full text-[13px] text-ux2-muted">This building has no units yet. Add them in setup (Add or edit units) or Building › Directory first.</span>}
+          </Inner>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Why>The row menu offers Change role, Reset password, Resend welcome, and Remove. Removing someone keeps their unit, ledger and votes; only the sign-in goes.</Why>
+          <Why>The row menu offers Change role, Link to unit (the board), Reset password, Resend welcome, and Remove. A member's unit decides what they see as an owner: that unit's documents, moves and My Unit. Someone who signs in with the email on a unit's owner record is linked to it automatically. Removing someone takes away their access to this building and keeps their unit, ledger and votes. The account owner changes through ownership transfer, and the building always keeps one board member.</Why>
           {shown.length > 8 && <Button size="sm" variant="ghost" onClick={() => setShowAll(v => !v)}>{showAll ? 'Show fewer' : `Show ${shown.length - 8} more`}</Button>}
         </div>
       </Card>
