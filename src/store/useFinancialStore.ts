@@ -5,6 +5,7 @@ import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, legacyOwed, openInvoicesInOrder, type GLAccountMapping } from '@/lib/financial-logic';
 import { balanceOf, fiscalYearStart, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
+import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
@@ -154,6 +155,15 @@ interface FinancialState {
   autoBillingEnabled: boolean;
   lastBillingRun: string | null;
   setAutoBilling: (enabled: boolean) => void;
+  /** Post the monthly reserve transfer (annual contribution ÷ 12) with each billing run. */
+  autoReserveTransfer: boolean;
+  setAutoReserveTransfer: (enabled: boolean) => void;
+  /** Bill every unit's dues for a month (this month by default). Bills each unit once per month. */
+  runMonthlyBilling: (period?: string, today?: string) => BillingRunSummary;
+  /** Charge the late fee on every dues invoice past its grace period that has none yet. Returns how many. */
+  runLateFees: (today?: string) => number;
+  /** What runs on its own when a board member opens the app: this month's billing if due, then late fees. */
+  runBillingCycle: (today?: string) => BillingRunSummary | null;
 
   // Late fee settings
   lateFeeEnabled: boolean;
@@ -247,6 +257,9 @@ function syncSettings() {
     lateFeeAmount: s.lateFeeAmount,
     lateFeeGraceDays: s.lateFeeGraceDays,
     closedThrough: s.closedThrough,
+    lastBillingRun: s.lastBillingRun,
+    lastLateFeeRun: s.lastLateFeeRun,
+    autoReserveTransfer: s.autoReserveTransfer,
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
 
@@ -325,6 +338,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.lateFeeGraceDays = data.settings.lateFeeGraceDays;
       updates.lastLateFeeRun = data.settings.lastLateFeeRun;
       updates.closedThrough = data.settings.closedThrough;
+      updates.autoReserveTransfer = data.settings.autoReserveTransfer;
     }
     if (Object.keys(updates).length > 0) set(updates);
   },
@@ -1017,6 +1031,59 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ autoBillingEnabled: enabled });
     syncSettings();
   },
+  autoReserveTransfer: true,
+  setAutoReserveTransfer: (enabled) => {
+    set({ autoReserveTransfer: enabled });
+    syncSettings();
+  },
+
+  runMonthlyBilling: (period, today = todayIso()) => {
+    const s = get();
+    const p = period ?? periodKey(today);
+    const summary: BillingRunSummary = { period: p, billed: 0, amount: 0, alreadyBilled: 0, noAmount: 0, reserveTransfer: 0, lateFees: 0 };
+    // Dues post on the 1st; when that day is already in a closed month they post today, named for their month.
+    const date = isLocked(billingDate(p), s.closedThrough) ? today : billingDate(p);
+    const due = duesDueDate(p, s.hoaDueDay);
+    for (const u of s.units) {
+      if (!(u.monthlyFee > 0)) { summary.noAmount++; continue; }
+      if (get().unitInvoices.some(i => i.unitNumber === u.number && i.status !== 'void' && isDuesInvoiceFor(i, p))) { summary.alreadyBilled++; continue; }
+      get().createUnitInvoice(u.number, 'monthly', u.monthlyFee, duesDescription(p), undefined, due, { date });
+      summary.billed++;
+      summary.amount = r2(summary.amount + u.monthlyFee);
+    }
+    const monthly = r2(s.annualReserveContribution / 12);
+    if (s.autoReserveTransfer && monthly > 0) {
+      const memo = reserveTransferMemo(p);
+      if (!get().generalLedger.some(e => e.status !== 'void' && e.source === 'transfer' && e.memo === memo)) {
+        const m = mappingOf(s.glAccountMapping);
+        get().glPost(date, memo, m.reserveBankAccount, m.bankAccount, monthly, 'transfer', null);
+        summary.reserveTransfer = monthly;
+      }
+    }
+    set({ lastBillingRun: new Date(`${today}T12:00:00Z`).toISOString() });
+    syncSettings();
+    return summary;
+  },
+
+  runLateFees: (today = todayIso()) => {
+    const s = get();
+    if (!s.lateFeeEnabled || !(s.lateFeeAmount > 0)) return 0;
+    const due = lateFeesDue(today, s.unitInvoices, s.lateFeeGraceDays);
+    for (const inv of due) {
+      get().imposeLateFee(inv.unitNumber, s.lateFeeAmount, `Late fee · ${inv.description.replace(/^Dues · /, '')}`, { forInvoiceId: inv.id, date: today, dueDate: today });
+    }
+    if (due.length) { set({ lastLateFeeRun: new Date(`${today}T12:00:00Z`).toISOString() }); syncSettings(); }
+    return due.length;
+  },
+
+  runBillingCycle: (today = todayIso()) => {
+    const s = get();
+    const period = billingDue(today, s.autoBillingEnabled, s.lastBillingRun);
+    const summary = period ? get().runMonthlyBilling(period, today) : null;
+    const fees = get().runLateFees(today);
+    if (summary) { summary.lateFees = fees; return summary; }
+    return fees ? { period: periodKey(today), billed: 0, amount: 0, alreadyBilled: 0, noAmount: 0, reserveTransfer: 0, lateFees: fees } : null;
+  },
 
   // Late fee settings
   lateFeeEnabled: false,
@@ -1259,6 +1326,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lateFeeGraceDays: state.lateFeeGraceDays,
     glAccountMapping: state.glAccountMapping,
     closedThrough: state.closedThrough,
+    lastBillingRun: state.lastBillingRun,
+    lastLateFeeRun: state.lastLateFeeRun,
+    autoReserveTransfer: state.autoReserveTransfer,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

@@ -6,6 +6,7 @@ import Ux2BottomNav from './Ux2BottomNav';
 import CaseDock, { useCaseDock } from './CaseDock';
 import { cn } from '@/lib/formatters';
 import { watchObligationCases } from '../runbook/obligationCases';
+import { useBillingCycle } from '../funds/useBillingCycle';
 
 /**
  * The redesign's shell. Phase 0 renders the production pages inside it: same
@@ -18,6 +19,8 @@ export default function Ux2Shell() {
   const docked = !!useCaseDock();
   // A case for an obligation that closes as resolved marks the obligation done.
   useEffect(() => watchObligationCases(), []);
+  // Dues billing and late fees run when a board member opens the app (not in the read-only demo).
+  useBillingCycle(!tenant.isDemo);
   return (
     <div className="ux2 ux2-page flex min-h-screen flex-col">
       {tenant.isDemo && (

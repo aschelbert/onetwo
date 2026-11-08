@@ -40,12 +40,24 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const setHoaDueDay = useFinancialStore(s => s.setHoaDueDay);
   const setAutoBilling = useFinancialStore(s => s.setAutoBilling);
   const setLateFeeSettings = useFinancialStore(s => s.setLateFeeSettings);
+  const runMonthlyBilling = useFinancialStore(s => s.runMonthlyBilling);
+  const runLateFees = useFinancialStore(s => s.runLateFees);
+  const autoReserveTransfer = useFinancialStore(s => s.autoReserveTransfer);
+  const setAutoReserveTransfer = useFinancialStore(s => s.setAutoReserveTransfer);
   const [day, setDay] = useState(String(snap.hoaDueDay));
   const [amount, setAmount] = useState(String(snap.lateFee.amount));
   const [grace, setGrace] = useState(String(snap.lateFee.graceDays));
+  const [ran, setRan] = useState<string | null>(null);
+  const monthlyTransfer = Math.round(snap.annualReserveContribution / 12);
+  const runNow = () => {
+    const r = runMonthlyBilling(undefined, snap.today);
+    const fees = runLateFees(snap.today);
+    setRan(`${r.billed ? `Billed ${r.billed} unit${r.billed === 1 ? '' : 's'} · ${fmt(r.amount)}` : `Every unit already has this month's dues invoice`}${r.noAmount ? ` · ${r.noAmount} with no monthly amount` : ''}${r.reserveTransfer ? ` · ${fmt(r.reserveTransfer)} moved to reserves` : ''}${fees ? ` · ${fees} late fee${fees === 1 ? '' : 's'} charged` : ''}.`);
+  };
   return (
     <Card id="billing-rules" aria-label="Billing rules">
-      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Billing rules</span><span className="text-xs text-ux2-muted">runs on its own</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Billing rules</span><span className="flex items-center gap-2"><span className="text-xs text-ux2-muted">runs when a board member opens the app</span><Button size="sm" variant="ghost" onClick={runNow}>Run billing now</Button></span></div>
+      {ran && <Inner className="flex items-center justify-between gap-3 text-sm text-ux2-ink" role="status"><span>{ran}</span><button type="button" className="text-xs text-ux2-muted hover:underline" onClick={() => setRan(null)}>Dismiss</button></Inner>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Inner className="flex flex-col gap-2">
           <div className="text-sm font-semibold text-ux2-ink">Dues are due on the {ordinal(snap.hoaDueDay)}</div>
@@ -54,8 +66,9 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
         </Inner>
         <Inner className="flex flex-col gap-2">
           <div className="text-sm font-semibold text-ux2-ink">Automatic billing · {snap.autoBillingEnabled ? 'On' : 'Off'}</div>
-          <p className="text-xs text-ux2-muted">{snap.autoBillingEnabled ? `Every unit is invoiced on the ${ordinal(snap.hoaDueDay)}${snap.lastBillingRun ? ` · last ran ${snap.lastBillingRun.slice(0, 10)}` : ''}.` : 'Invoices are raised by hand from the unit ledger.'}</p>
-          <div><Button size="sm" variant={snap.autoBillingEnabled ? 'ghost' : 'primary'} onClick={() => setAutoBilling(!snap.autoBillingEnabled)}>{snap.autoBillingEnabled ? 'Turn off' : 'Turn on'}</Button></div>
+          <p className="text-xs text-ux2-muted">{snap.autoBillingEnabled ? `Every unit gets its dues invoice on the 1st, due on the ${ordinal(snap.hoaDueDay)}${snap.lastBillingRun ? ` · last ran ${snap.lastBillingRun.slice(0, 10)}` : ''}.` : 'Dues invoices are created by hand from the unit ledger, or with Run billing now.'}</p>
+          <div className="flex flex-wrap gap-2"><Button size="sm" variant={snap.autoBillingEnabled ? 'ghost' : 'primary'} onClick={() => setAutoBilling(!snap.autoBillingEnabled)}>{snap.autoBillingEnabled ? 'Turn off' : 'Turn on'}</Button></div>
+          <label className="flex items-center gap-2 text-xs text-ux2-muted"><input type="checkbox" checked={autoReserveTransfer} onChange={e => setAutoReserveTransfer(e.target.checked)} />Move {fmt(monthlyTransfer)} to reserves with each billing run</label>
         </Inner>
         <Inner className="flex flex-col gap-2">
           <div className="text-sm font-semibold text-ux2-ink">Late fee · {snap.lateFee.enabled ? `$${snap.lateFee.amount} after ${snap.lateFee.graceDays} days` : 'Off'}</div>

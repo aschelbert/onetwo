@@ -11,7 +11,8 @@ alter table chart_of_accounts
     check (fund in ('operating', 'reserve'));
 
 alter table financial_settings
-  add column if not exists closed_through date;
+  add column if not exists closed_through date,
+  add column if not exists auto_reserve_transfer boolean not null default true;
 
 alter table work_orders
   add column if not exists accrual_gl_entry_id text;

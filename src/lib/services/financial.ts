@@ -431,6 +431,7 @@ export interface FinancialSettingsRow {
   lastLateFeeRun: string | null;
   /** The books are closed through this date (YYYY-MM-DD); nothing posts on or before it. */
   closedThrough: string | null;
+  autoReserveTransfer: boolean;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -454,6 +455,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     lateFeeGraceDays: Number(data.late_fee_grace_days ?? 15),
     lastLateFeeRun: (data.last_late_fee_run as string) || null,
     closedThrough: (data.closed_through as string) || null,
+    autoReserveTransfer: (data.auto_reserve_transfer as boolean) ?? true,
   };
 }
 
@@ -471,6 +473,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.lateFeeGraceDays !== undefined) row.late_fee_grace_days = s.lateFeeGraceDays;
   if (s.lastLateFeeRun !== undefined) row.last_late_fee_run = s.lastLateFeeRun;
   if (s.closedThrough !== undefined) row.closed_through = s.closedThrough;
+  if (s.autoReserveTransfer !== undefined) row.auto_reserve_transfer = s.autoReserveTransfer;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;

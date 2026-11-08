@@ -73,6 +73,7 @@ export function resetStoresForRealTenant() {
     lateFeeGraceDays: 15,
     lastLateFeeRun: null,
     closedThrough: null,
+    autoReserveTransfer: true,
     glAccountMapping: { ...DEFAULT_GL_MAPPING },
   });
 
