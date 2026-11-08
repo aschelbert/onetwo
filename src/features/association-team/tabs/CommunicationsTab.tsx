@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, getActiveTenantId, logDbError } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { openTeamAttachment, removeTeamAttachment, uploadTeamAttachment } from '@/lib/services/teamAttachments';
 
 // ─── Types ──────────────────────────────────────────────────────
 interface TeamChannel {
@@ -26,6 +27,22 @@ interface TeamMessage {
   attachment_name: string | null;
   read_by: string[];
   created_at: string;
+}
+
+// ─── Attachments ────────────────────────────────────────────────
+/** Opens a private attachment through a 60-second signed link. */
+function AttachmentLink({ stored, name }: { stored: string; name: string }) {
+  const [state, setState] = useState<'idle' | 'opening' | 'failed'>('idle');
+  return (
+    <button
+      type="button"
+      disabled={state === 'opening'}
+      onClick={async () => { setState('opening'); setState((await openTeamAttachment(stored, name)) ? 'idle' : 'failed'); }}
+      className="inline-flex items-center gap-1 mt-1.5 text-xs text-teal-700 hover:underline disabled:opacity-60"
+    >
+      📎 {name}{state === 'opening' ? ' · opening…' : state === 'failed' ? " · couldn't open, try again" : ''}
+    </button>
+  );
 }
 
 // ─── Role config ────────────────────────────────────────────────
@@ -259,18 +276,14 @@ export default function CommunicationsTab() {
     let attachmentName: string | null = null;
 
     if (attachFile) {
-      const ext = attachFile.name.split('.').pop() || 'bin';
-      const path = `${tenantId}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage
-        .from('team-attachments')
-        .upload(path, attachFile);
-      if (!error) {
-        const { data: urlData } = supabase.storage
-          .from('team-attachments')
-          .getPublicUrl(path);
-        attachmentUrl = urlData.publicUrl;
-        attachmentName = attachFile.name;
+      // Private bucket (migration 039): the message keeps the storage path, and the file opens through a signed link.
+      attachmentUrl = await uploadTeamAttachment(tenantId, attachFile);
+      if (!attachmentUrl) {
+        setSendError(`${attachFile.name} couldn't be uploaded. Try again, or send the message without it.`);
+        setSending(false);
+        return;
       }
+      attachmentName = attachFile.name;
     }
 
     // Append the saved row ourselves: realtime is the fast path, not the only one.
@@ -287,6 +300,7 @@ export default function CommunicationsTab() {
     }).select().single();
     if (sendErr) {
       logDbError('team_messages insert', sendErr);
+      if (attachmentUrl) void removeTeamAttachment(attachmentUrl);
       setSendError(sendErr.message);
       setSending(false);
       return;
@@ -514,16 +528,7 @@ export default function CommunicationsTab() {
                       isMe ? 'bg-cyan-50 text-ink-900' : 'bg-ink-50 text-ink-900'
                     }`}>
                       <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                      {msg.attachment_url && (
-                        <a
-                          href={msg.attachment_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-1.5 text-xs text-teal-700 hover:underline"
-                        >
-                          📎 {msg.attachment_name || 'Attachment'}
-                        </a>
-                      )}
+                      {msg.attachment_url && <AttachmentLink stored={msg.attachment_url} name={msg.attachment_name || 'Attachment'} />}
                     </div>
                     {isMe && (
                       <div className="mt-0.5">

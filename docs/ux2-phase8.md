@@ -88,6 +88,15 @@ What was wrong on staging, and what changed:
   for ever. It now says the intercom runs on the live backend. A failed
   channel load or a failed send is shown instead of swallowed.
 - The rail stacks above the messages on a phone.
+- Attachments are private (migration 039; `lib/services/teamAttachments.ts`).
+  The 032 policies compared the folder with `tenant_users.name` (fixed in
+  036), and the bucket was public, so files opened for anyone with the link;
+  production also had broad `team_attachments_*` policies, now dropped. The
+  message keeps the storage path (`<tenant>/<uuid>-<name>`), and a file opens
+  through a 60-second signed link for team members who can see the message
+  (a channel restricted to a role stays restricted) or who uploaded it. An
+  upload that fails stops the send with a message; a send that fails after
+  the upload removes the file. Messages saved with a public URL still open.
 
 ## Redirects
 
