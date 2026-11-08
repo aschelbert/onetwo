@@ -93,8 +93,23 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     goLive: 'go_live',
   };
 
+  /**
+   * Record an onboarding step. Going live sets the building's status first and
+   * checks that the row really changed (an update RLS filters out returns no
+   * error, just no rows); only then is the checklist ticked. A failed go-live
+   * throws, so the caller can say so instead of leaving the building half live.
+   */
   const updateOnboardingStep = useCallback(async (step: keyof OnboardingState, value: boolean) => {
     if (!supabase || tenant.isDemo) return;
+    const goingLive = step === 'goLive' && value;
+
+    if (goingLive) {
+      const { data, error: statusError } = await supabase.from('tenants').update({ status: 'active' }).eq('id', tenant.id).select('id');
+      if (statusError || !data?.length) {
+        console.warn('Failed to set the building live:', statusError ?? 'no row updated');
+        throw new Error(statusError ? `The building couldn't be set live: ${statusError.message}` : "The building couldn't be set live: your account isn't allowed to change it.");
+      }
+    }
 
     const { error } = await supabase
       .from('onboarding_checklists')
@@ -103,16 +118,11 @@ export default function TenantProvider({ children }: { children: React.ReactNode
 
     if (error) {
       console.warn('Failed to update onboarding step:', error);
+      if (goingLive) throw new Error(`Going live did not finish: ${error.message}`);
       return;
     }
 
-    // If going live, also update tenant status to 'active'
-    if (step === 'goLive' && value) {
-      await supabase.from('tenants').update({ status: 'active' }).eq('id', tenant.id);
-      setTenant(prev => ({ ...prev, status: 'active', onboarding: { ...prev.onboarding, [step]: value } }));
-    } else {
-      setTenant(prev => ({ ...prev, onboarding: { ...prev.onboarding, [step]: value } }));
-    }
+    setTenant(prev => ({ ...prev, ...(goingLive ? { status: 'active' } : {}), onboarding: { ...prev.onboarding, [step]: value } }));
   }, [tenant.id, tenant.isDemo]);
 
   // Load a specific tenant's data into the context and all stores
