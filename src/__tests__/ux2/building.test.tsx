@@ -135,4 +135,37 @@ describe('Building', () => {
       useAuthStore.setState({ currentRole: prev });
     }
   });
+
+  it('Documents shows one row per document, collapses copies, and lists required documents that are missing', async () => {
+    const { useBuildingStore } = await import('@/store/useBuildingStore');
+    const prev = useBuildingStore.getState().legalDocuments;
+    const file = (name: string) => ({ name, size: '2 MB', uploadedAt: '2026-11-01', type: 'application/pdf' });
+    useBuildingStore.setState({ legalDocuments: [
+      { id: 'a', name: 'Bylaws · 1302 R St NW_Bylaws', version: '2019', size: '2 MB', status: 'current', attachments: [file('1302 R St NW_Bylaws.pdf')] },
+      { id: 'b', name: 'Bylaws · 1302 R St NW_Bylaws', version: '2026', size: '2 MB', status: 'current', attachments: [] },
+      { id: 'c', name: 'Bylaws (amended 2019)', version: '2019', size: '2 MB', status: 'current', attachments: [] },
+      { id: 'd', name: 'Other document · Public Offering Statement', version: '2026', size: '1 MB', status: 'current', attachments: [file('Public Offering Statement.pdf')] },
+    ] });
+    try {
+      renderAt('/building?tab=documents');
+      const lib = document.querySelector('[aria-label="Document library"]') as HTMLElement;
+      const rows = within(lib).getAllByRole('row').filter(r => r.querySelectorAll('td').length > 1).map(r => r.textContent ?? '');
+      const bylaws = rows.filter(r => r.startsWith('Bylaws'));
+      expect(bylaws).toHaveLength(1);
+      expect(bylaws[0]).toContain('2 other copies');
+      expect(bylaws[0]).not.toContain('Missing');
+      expect(rows.some(r => r.startsWith('Public offering statement'))).toBe(true);
+      for (const need of ['Declaration (CC&Rs)', 'Rules and regulations', 'Plats and plans', 'Collections policy', 'Reserve study']) {
+        const row = rows.find(r => r.startsWith(need));
+        expect(row, need).toBeTruthy();
+        expect(row).toContain('Missing');
+      }
+      expect(rows.some(r => r.startsWith('Pets policy'))).toBe(false);
+      const declaration = within(lib).getAllByRole('row').find(r => r.textContent?.startsWith('Declaration'))!;
+      fireEvent.click(within(declaration).getByRole('button', { name: 'Add file' }));
+      expect((within(lib).getByPlaceholderText('Rules and regulations') as HTMLInputElement).value).toBe('Declaration (CC&Rs)');
+    } finally {
+      useBuildingStore.setState({ legalDocuments: prev });
+    }
+  });
 });

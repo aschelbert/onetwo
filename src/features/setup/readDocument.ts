@@ -79,7 +79,7 @@ export async function addOne(file: File): Promise<void> {
   }
 
   let docType = guessType(file.name);
-  const filedAs = fileSetupDocument({ ...base, docType }) ?? undefined;
+  let filedAs = fileSetupDocument({ ...base, docType }) ?? undefined;
   updateDoc(id, { filedAs });
   const lower = file.name.toLowerCase();
   try {
@@ -88,7 +88,7 @@ export async function addOne(file: File): Promise<void> {
       const pages = await pdfLines(file);
       if (!pages.some(p => p.length)) { updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note: 'Filed. This PDF is a scan: it has no text layer to read. Paste the key sections into "Paste text", or add them in Fill the gaps.' }); return; }
       docType = detectType(pages, docType);
-      if (docType !== guessType(file.name)) retypeSetupDocument({ ...base, filedAs }, docType);
+      if (docType !== guessType(file.name)) { filedAs = retypeSetupDocument({ ...base, filedAs }, docType); updateDoc(id, { filedAs }); }
       text.set(id, { pages, paged: true });
       applyReading(id, pages, true, docType, file.name);
       return;
@@ -133,7 +133,8 @@ export function addPastedText(raw: string, docType: DocType, label: string): voi
 
 /** Change what a document is: renames it in Building › Documents and, when its text is at hand, reads it again with that kind's rules. */
 export function retype(doc: SetupDoc, docType: DocType): void {
-  retypeSetupDocument(doc, docType);
+  const filedAs = retypeSetupDocument(doc, docType);
+  if (filedAs !== doc.filedAs) useSetupStore.getState().updateDoc(doc.id, { filedAs });
   const t = text.get(doc.id);
   if (t) applyReading(doc.id, t.pages, t.paged, docType, doc.name);
   else useSetupStore.getState().updateDoc(doc.id, { docType });
