@@ -12,6 +12,8 @@ import { useSetupStore } from '@/features/setup/useSetupStore';
 import { buildItems, coverage, essentials, isClear, pathFor, progress, resolve, type ReadResult, type SetupDoc } from '@/features/setup/setupModel';
 import { applyItem, monthDay } from '@/features/setup/applySetup';
 import { addPastedText } from '@/features/setup/readDocument';
+import { invitePayload, parseInviteLines } from '@/features/setup/invites';
+import { parseUnitLines, unitRange } from '@/features/setup/unitEntry';
 import { extractFromPages, wordNumber } from '@/features/setup/extractText';
 import { readSheet, parseCsv } from '@/features/setup/importSpreadsheet';
 import SetupPage from '@/ux2/setup/SetupPage';
@@ -302,6 +304,75 @@ describe('Setup screens', () => {
     expect(Object.keys(out.decisions).sort()).toEqual(['fact:pet_rule', 'unit:1a']);
   });
 
+  it('adds people to invite with a role and unit, one at a time or from a pasted list', () => {
+    useFinancialStore.setState({ units: [{ number: '4B', owner: 'Rivera, Ana', email: '', phone: '', monthlyFee: 400, votingPct: 50, status: 'ACTIVE', balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] }] });
+    renderSetup('/setup?step=finish');
+    const form = document.querySelector('[data-invite-form]') as HTMLElement;
+    fireEvent.change(within(form).getByLabelText('Email'), { target: { value: 'not-an-email' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Add' }));
+    expect(within(form).getByRole('alert').textContent).toMatch(/Enter an email/);
+
+    fireEvent.change(within(form).getByLabelText('Email'), { target: { value: 'Ana@Example.com' } });
+    fireEvent.change(within(form).getByLabelText('Role'), { target: { value: 'board' } });
+    fireEvent.change(within(form).getByLabelText('Seat'), { target: { value: 'treasurer' } });
+    fireEvent.change(within(form).getByLabelText(/^Unit/), { target: { value: '4b' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Add' }));
+    expect(useSetupStore.getState().invites).toEqual([expect.objectContaining({ email: 'ana@example.com', access: 'board', seat: 'treasurer', unit: '4B' })]);
+    expect(document.querySelector('[data-invite="ana@example.com"]')?.textContent).toMatch(/Treasurer · Unit 4B.*Not sent yet/);
+
+    fireEvent.click(within(form).getByRole('button', { name: 'Add several at once' }));
+    fireEvent.change(within(form).getByLabelText(/One person per line/), { target: { value: 'jo@example.com tenant unit 12\nmgr@acme.com, property manager\nno email here' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Add these' }));
+    expect(useSetupStore.getState().invites.map(i => [i.email, i.access, i.unit])).toEqual([['ana@example.com', 'board', '4B'], ['jo@example.com', 'resident', '12'], ['mgr@acme.com', 'property_manager', null]]);
+    expect(screen.getByRole('status').textContent).toMatch(/1 line has no email/);
+    expect(screen.getByRole('button', { name: 'Send 3 invitations' })).toBeTruthy();
+  });
+
+  it('adds units by hand: one, a range, or a pasted list, then edits and removes them', () => {
+    renderSetup('/setup?step=finish');
+    const ed = document.querySelector('[data-units-editor]') as HTMLElement; // open by default with no units
+    fireEvent.change(within(ed).getByLabelText('Unit'), { target: { value: '4b' } });
+    fireEvent.change(within(ed).getByLabelText('Owner'), { target: { value: 'Ana Rivera' } });
+    fireEvent.change(within(ed).getByLabelText('Ownership %'), { target: { value: '50' } });
+    fireEvent.change(within(ed).getByLabelText('Monthly $'), { target: { value: '$412' } });
+    fireEvent.click(within(ed).getByRole('button', { name: 'Add unit' }));
+    expect(useFinancialStore.getState().units).toEqual([expect.objectContaining({ number: '4B', owner: 'Ana Rivera', votingPct: 50, monthlyFee: 412 })]);
+
+    fireEvent.click(within(ed).getByRole('tab', { name: 'Add a range' }));
+    fireEvent.change(within(ed).getByLabelText('First unit'), { target: { value: '101' } });
+    fireEvent.change(within(ed).getByLabelText('Last unit'), { target: { value: '103' } });
+    fireEvent.click(within(ed).getByRole('button', { name: 'Add 3 units' }));
+    expect(useFinancialStore.getState().units.map(u => u.number).sort()).toEqual(['101', '102', '103', '4B']);
+
+    fireEvent.click(within(ed).getByRole('tab', { name: 'Paste a list' }));
+    fireEvent.change(within(ed).getByLabelText(/One unit per line/), { target: { value: '101, Okafor James, james@example.com, 25%, $300\n5C  Chen David  0.25\nno unit here' } });
+    fireEvent.click(within(ed).getByRole('button', { name: 'Add these units' }));
+    const u = (n: string) => useFinancialStore.getState().units.find(x => x.number === n);
+    expect(u('101')).toMatchObject({ owner: 'Okafor James', email: 'james@example.com', votingPct: 25, monthlyFee: 300 });
+    expect(u('5C')).toMatchObject({ owner: 'Chen David', votingPct: 25 });
+    expect(within(ed).getByRole('status').textContent).toMatch(/1 added, 1 updated. 1 line has no unit number/);
+    expect(within(ed).getByText('Ownership adds to 100%')).toBeTruthy();
+
+    fireEvent.change(within(ed).getByLabelText('Email for 4B'), { target: { value: 'ana@example.com' } });
+    fireEvent.blur(within(ed).getByLabelText('Email for 4B'));
+    expect(u('4B')?.email).toBe('ana@example.com');
+    fireEvent.click(within(ed).getByRole('button', { name: 'Remove unit 103' }));
+    expect(u('103')).toBeUndefined();
+    expect(unitRange('1A', '1D')).toEqual(['1A', '1B', '1C', '1D']);
+    expect(unitRange('A-01', 'A-03')).toEqual(['A-01', 'A-02', 'A-03']);
+    expect(unitRange('101', '9')).toBeNull();
+    expect(parseUnitLines('Unit,Owner,% Interest\n2A,Shah Priya,4.1%').units).toEqual([{ number: '2A', owner: 'Shah Priya', email: '', votingPct: 4.1, monthlyFee: null }]);
+  });
+
+  it('reads pasted invite lists and sends each person with their role, seat and unit', () => {
+    const { invites, skipped } = parseInviteLines('4B  Ana Rivera  ana@example.com\nbo@example.com, vice president\nsam@example.com super\njust a name', ['4B', '12']);
+    expect(invites.map(i => [i.email, i.access, i.seat, i.unit])).toEqual([['ana@example.com', 'owner', null, '4B'], ['bo@example.com', 'board', 'vice_president', null], ['sam@example.com', 'staff', null, null]]);
+    expect(skipped).toEqual(['just a name']);
+    expect(invitePayload({ email: 'Ana@Example.com', access: 'board', seat: 'treasurer', unit: '4B' })).toEqual({ email: 'ana@example.com', role: 'board_member', unit: '4B', roleKey: 'treasurer' });
+    expect(invitePayload({ email: 'jo@example.com', access: 'resident', seat: null, unit: '12' })).toEqual({ email: 'jo@example.com', role: 'resident', unit: '12' });
+    expect(invitePayload({ email: 'd@example.com', access: 'board', seat: 'director', unit: null })).toEqual({ email: 'd@example.com', role: 'board_member' });
+  });
+
   it('fills the gaps in place and only lets the building go live with the four essentials', () => {
     renderSetup('/setup?step=finish');
     const live = screen.getByRole('button', { name: /Go live · 4 essentials left/ });
@@ -317,7 +388,7 @@ describe('Setup screens', () => {
     fireEvent.change(within(board).getByLabelText('Email'), { target: { value: 'ana@example.com' } });
     fireEvent.click(within(board).getByRole('button', { name: 'Add' }));
     expect(useBuildingStore.getState().board).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Send 1 board invites' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Send 1 invitation' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Go live · 2 essentials left/ })).toBeTruthy();
   });
 });
