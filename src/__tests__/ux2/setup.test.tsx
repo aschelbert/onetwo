@@ -442,4 +442,50 @@ describe('Setup screens', () => {
     expect(screen.getByRole('button', { name: 'Send 1 invitation' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Go live · 2 essentials left/ })).toBeTruthy();
   });
+
+  it('step 1: one file filed under several documents, past versions as history, and vendor contracts', async () => {
+    const { useVendorTrackerStore } = await import('@/store/useVendorTrackerStore');
+    const { fileSetupDocument } = await import('@/features/setup/applySetup');
+    useBuildingStore.setState({ legalDocuments: [], vendors: [] });
+    const withRules: SetupDoc = { ...bylaws, result: { ...bylaws.result!, clauses: [{ topic: 'rules', role: null, ref: '12', heading: 'Noise', text: 'Quiet hours after 10pm', page: 30, quote: 'q', confidence: 'high' }] } };
+    const filedAs = fileSetupDocument({ ...withRules, docType: 'bylaws' })!;
+    useSetupStore.setState({ docs: [{ ...withRules, docType: 'bylaws', filedAs }] });
+    renderSetup('/setup?step=documents');
+    const row = document.querySelector(`[data-filed-as="${bylaws.id}"]`) as HTMLElement;
+    expect(row.textContent).toContain('Filed as');
+    expect(within(row).getByText('Bylaws')).toBeTruthy();
+    fireEvent.click(within(row).getByRole('button', { name: /\+ Rules and regulations/ }));
+    expect(useSetupStore.getState().docs[0].covers).toEqual(['Bylaws', 'Rules and regulations']);
+    expect(useBuildingStore.getState().legalDocuments.map(d => [d.name, d.attachments.map(a => a.name)])).toEqual([['Bylaws', ['Bylaws.pdf']], ['Rules and regulations', ['Bylaws.pdf']]]);
+    // The rules no longer count as missing in "What to add", and the picker shows both ticked.
+    fireEvent.click(within(row).getByRole('button', { name: 'Change' }));
+    expect((within(row).getByRole('checkbox', { name: 'Rules and regulations' }) as HTMLInputElement).checked).toBe(true);
+
+    // Past documents: history, not read in.
+    const past = screen.getByRole('region', { name: 'Past documents' });
+    expect(within(past).getByText('Past budgets')).toBeTruthy();
+    const input = within(past).getByLabelText('Add past files') as HTMLInputElement;
+    fireEvent.click(within(past.querySelector('[data-history-kind="past-budgets"]') as HTMLElement).getByRole('button', { name: 'Add' }));
+    fireEvent.change(input, { target: { files: [new File(['a,b'], 'Budget 2024.csv', { type: 'text/csv' })] } });
+    await vi.waitFor(() => expect(useSetupStore.getState().docs.some(d => d.historical)).toBe(true));
+    const pastDoc = useSetupStore.getState().docs.find(d => d.historical)!;
+    expect(pastDoc).toEqual(expect.objectContaining({ status: 'filed', covers: ['Budgets'], period: '2024' }));
+    const budgets = useBuildingStore.getState().legalDocuments.find(d => d.name === 'Budgets')!;
+    expect(budgets.attachments.map(a => [a.name, !!a.archived, a.period])).toEqual([['Budget 2024.csv', true, '2024']]);
+
+    // Vendor contracts go to Building › Contracts with their vendor.
+    const before = useVendorTrackerStore.getState().contracts.length;
+    const contracts = screen.getByRole('region', { name: 'Vendor contracts' });
+    fireEvent.click(within(contracts).getByRole('button', { name: 'Add a contract' }));
+    const form = within(contracts).getByRole('form', { name: 'Add a vendor contract' });
+    fireEvent.change(within(form).getByLabelText('Vendor'), { target: { value: 'Acme Elevator' } });
+    fireEvent.change(within(form).getByLabelText('For'), { target: { value: 'Elevator maintenance' } });
+    fireEvent.change(within(form).getByLabelText('Starts'), { target: { value: '2026-01-01' } });
+    fireEvent.change(within(form).getByLabelText('Ends'), { target: { value: '2027-12-31' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Add contract' }));
+    expect(useVendorTrackerStore.getState().contracts.length).toBe(before + 1);
+    expect(useVendorTrackerStore.getState().contracts[0]).toEqual(expect.objectContaining({ vendorName: 'Acme Elevator', title: 'Elevator maintenance contract', endDate: '2027-12-31', status: 'active' }));
+    expect(useBuildingStore.getState().vendors.map(v => v.name)).toEqual(['Acme Elevator']);
+    expect(within(contracts).getByText('Acme Elevator')).toBeTruthy();
+  });
 });

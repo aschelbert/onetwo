@@ -18,6 +18,7 @@ import { DOC_KINDS, DOC_TYPE_LABEL, buildItems, coverage, readByOlderReader, typ
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { ACCEPT, addFiles, addPastedText, isSpreadsheet, retype as retypeDoc } from '@/features/setup/readDocument';
 import { unfileSetupDocument } from '@/features/setup/applySetup';
+import { FiledAs, PastDocuments, VendorContracts } from './DocFiling';
 import { useSetup } from './useSetup';
 import ReviewStep from './ReviewStep';
 import FinishStep from './FinishStep';
@@ -98,9 +99,9 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
   const [drag, setDrag] = useState(false);
 
   const add = (list: FileList | null) => { if (list?.length) void addFiles(Array.from(list)); };
-  const byKind = (types: DocType[]) => s.docs.filter(d => d.docType && types.includes(d.docType) && (d.status === 'read' || d.status === 'filed'));
+  const byKind = (types: DocType[]) => s.docs.filter(d => !d.historical && d.docType && types.includes(d.docType) && (d.status === 'read' || d.status === 'filed'));
   // A kind is also covered when its content was found inside another document (an ownership exhibit in the bylaws).
-  const foundIn = (kind: string) => s.docs.flatMap(d => (d.result ? coverage(d.result).filter(c => c.kind === kind).map(c => ({ doc: d, c })) : []));
+  const foundIn = (kind: string) => s.docs.flatMap(d => (d.result && !d.historical ? coverage(d.result).filter(c => c.kind === kind).map(c => ({ doc: d, c })) : []));
   const items = buildItems(s.docs);
   const counts = (sec: string) => items.filter(i => i.section === sec).length;
   const summary = [
@@ -176,6 +177,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
                 {d.status === 'reading' && <Chip tone="plum">Opening</Chip>}
                 {d.status === 'error' && <Chip tone="red">Not read</Chip>}
                 {d.status !== 'reading' && <Button size="sm" variant="ghost" aria-label={`Remove ${d.name}`} onClick={() => { unfileSetupDocument(d); removeDoc(d.id); }}>Remove</Button>}
+                <FiledAs doc={d} />
               </div>
             ))}
           </section>
@@ -204,6 +206,8 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
             </div>
           );
         })}
+        <VendorContracts />
+        <PastDocuments />
       </div>
 
       <aside className="flex flex-col gap-3.5">
