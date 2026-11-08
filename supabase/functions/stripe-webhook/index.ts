@@ -5,7 +5,9 @@
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
+// Two endpoints deliver here: the platform account's and the connected-accounts one (payments land on each
+// building's connected account). Each has its own signing secret; an event is accepted if either signs it.
+const WEBHOOK_SECRETS = [Deno.env.get("STRIPE_WEBHOOK_SECRET") || "", Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET") || ""].filter(Boolean);
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
 // Supabase REST helper (service role bypasses RLS)
@@ -91,24 +93,28 @@ Deno.serve(async (req) => {
 
   const body = await req.text();
 
-  // Verify webhook signature (primary: HMAC, fallback: Stripe API retrieval)
-  const sigValid = await verifyStripeSignature(body, signature, WEBHOOK_SECRET);
+  // Verify webhook signature (primary: HMAC with any known secret, fallback: Stripe API retrieval)
+  let sigValid = false;
+  for (const secret of WEBHOOK_SECRETS) {
+    if (await verifyStripeSignature(body, signature, secret)) { sigValid = true; break; }
+  }
   // deno-lint-ignore no-explicit-any
   let event: any;
 
   if (sigValid) {
     event = JSON.parse(body);
   } else if (STRIPE_KEY) {
-    // Fallback: verify the event by retrieving it from Stripe's API.
+    // Fallback: verify the event by retrieving it from Stripe's API. What Stripe returns is what we act on, never
+    // the posted body. An event from a connected account lives on that account, so the lookup names it.
     try {
       const raw = JSON.parse(body);
       if (raw.id && typeof raw.id === "string" && raw.id.startsWith("evt_")) {
-        const stripeRes = await fetch(`https://api.stripe.com/v1/events/${raw.id}`, {
-          headers: { "Authorization": `Bearer ${STRIPE_KEY}` },
-        });
+        const headers: Record<string, string> = { "Authorization": `Bearer ${STRIPE_KEY}` };
+        if (raw.account && typeof raw.account === "string" && raw.account.startsWith("acct_")) headers["Stripe-Account"] = raw.account;
+        const stripeRes = await fetch(`https://api.stripe.com/v1/events/${raw.id}`, { headers });
         if (stripeRes.ok) {
           event = await stripeRes.json();
-          console.log("Signature failed but event verified via Stripe API");
+          console.log(`Signature failed but event verified via Stripe API${raw.account ? ` (connected account ${raw.account})` : ""}`);
         }
       }
     } catch {
