@@ -1,10 +1,13 @@
 /**
- * Accounts and ledger (the Funds gear), to the Funds-Settings board, one
- * scrolling page: Needs you, the Ledger with its filter pills, quick entries
- * and custom entry, the Chart of accounts (add and rename in place), Where
- * things post (the GL mapping), the Fee schedule, Billing rules, and Bank
- * and payments. The Mailing card keeps its production settings panel at the
- * foot. Every write goes through the financial and fee-schedule stores.
+ * Accounts and ledger (the Funds gear), to the Funds-Settings board. A
+ * sub-navigation splits it into five pages: Ledger (with the books' closing,
+ * quick entries and the opening balances), Chart of Accounts, GL mapping
+ * (where things post), Fees & Billing (the fee schedule and billing rules),
+ * and Bank & Mail (bank and payments, and the mailing card with its
+ * production settings panel). A "Needs you" banner for unmatched bills sits
+ * above whichever page is open. Deep links (`?section=rules`, `=opening`,
+ * `=mailing`, …) open the page that holds the card and scroll to it. Every
+ * write goes through the financial and fee-schedule stores.
  */
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import MailingSettingsTab from '@/features/building/tabs/MailingSettingsTab';
@@ -21,6 +24,17 @@ import type { FundsTab } from '../FundsPage';
 import OpeningBalances from '../OpeningBalances';
 
 type LedgerView = 'month' | 'payments' | 'bills' | 'transfers' | 'manual' | 'all';
+/** The gear's sub-navigation: one group per pill, each a page of cards. */
+export type SettingsGroup = 'ledger' | 'accounts' | 'mapping' | 'billing' | 'bank';
+export const GROUPS: { id: SettingsGroup; label: string }[] = [
+  { id: 'ledger', label: 'Ledger' },
+  { id: 'accounts', label: 'Chart of Accounts' },
+  { id: 'mapping', label: 'GL mapping' },
+  { id: 'billing', label: 'Fees & Billing' },
+  { id: 'bank', label: 'Bank & Mail' },
+];
+/** Deep-link sections (`?section=`) → the group that shows them; a group id is its own section. */
+export const GROUP_OF: Record<string, SettingsGroup> = { ledger: 'ledger', opening: 'ledger', accounts: 'accounts', mapping: 'mapping', billing: 'billing', rules: 'billing', fees: 'billing', bank: 'bank', mailing: 'bank' };
 const SOURCE_LABEL: Record<GLEntry['source'], string> = { manual: 'By hand', assessment: 'Billing run', payment: 'Payment', expense: 'Bill', case: 'Case', transfer: 'Transfer', fee: 'Fee', refund: 'Refund', payroll: 'Payroll' };
 const SECTION_LABEL: Record<string, string> = { asset: 'Owns', liability: 'Owes', equity: 'Fund balances', income: 'Income', expense: 'Expenses' };
 const MAPPING_LABELS: { key: string; label: string; types: string[] }[] = [
@@ -180,6 +194,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
     if (id) setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, [section]);
 
+  const group: SettingsGroup = GROUP_OF[section ?? ''] ?? 'ledger';
   const thisMonth = snap.today.slice(0, 7);
   // Accounts, sections (header rows), and the accounts grouped under the section at the top of their parent chain.
   const { accts, sections, grouped } = useMemo(() => {
@@ -223,6 +238,9 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       )}
       {note && <Inner className="flex items-center justify-between gap-3 text-sm text-ux2-ink"><span>{note}</span><button type="button" className="text-xs text-ux2-muted hover:underline" onClick={() => setNote(null)}>Dismiss</button></Inner>}
 
+      <PillTabs aria-label="Accounts and ledger sections" surface="white" value={group} onChange={g => onSection(g)} tabs={GROUPS} />
+
+      {group === 'ledger' && (<>
       <Card id="ledger-card" aria-label="Ledger">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><span className="text-[17px] font-semibold text-ux2-ink">Ledger</span><span className="ml-2 text-xs text-ux2-muted">{ledger.length.toLocaleString()} entries · {closedEntries.toLocaleString()} in closed months · every bill, payment and transfer ends up here</span></div>
@@ -268,62 +286,75 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
-        <Card id="chart-card" aria-label="Chart of accounts">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div><span className="text-[17px] font-semibold text-ux2-ink">Chart of accounts</span><span className="ml-2 text-xs text-ux2-muted">{accts.length} accounts in {sections.length} sections</span></div>
-            <span className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => setAdding(v => (v === 'account' ? null : 'account'))}>Add an account</Button><Button size="sm" variant="ghost" onClick={() => setAdding(v => (v === 'section' ? null : 'section'))}>Add a section</Button></span>
-          </div>
-          {adding && (
-            <form aria-label={adding === 'account' ? 'Add an account' : 'Add a section'} onSubmit={e => { e.preventDefault(); if (!newAcct.num || !newAcct.name) return; if (adding === 'account') { const parent = sections.find(s => s.num === newAcct.parent) ?? sections.find(s => s.num[0] === newAcct.num[0]); if (!parent) return; addCoAAccount(newAcct.num, newAcct.name, parent.num, parent.sub); } else addCoASection(newAcct.num, newAcct.name, { '1': 'asset', '2': 'liability', '3': 'equity', '4': 'income' }[newAcct.num[0]] ?? 'expense'); setAdding(null); setNewAcct({ num: '', name: '', parent: '' }); }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
-              <Field label="Code" className="w-[120px]"><input aria-label="Code" value={newAcct.num} onChange={e => setNewAcct(v => ({ ...v, num: e.target.value }))} placeholder="5036" className={INPUT} /></Field>
-              <Field label="Name" className="min-w-[200px] flex-1"><input aria-label="Name" value={newAcct.name} onChange={e => setNewAcct(v => ({ ...v, name: e.target.value }))} className={INPUT} /></Field>
-              {adding === 'account' && <Field label="Section" className="w-[220px]"><select aria-label="Section" value={newAcct.parent} onChange={e => setNewAcct(v => ({ ...v, parent: e.target.value }))} className={INPUT}><option value="">By the code's first digit</option>{sections.map(s => <option key={s.num} value={s.num}>{s.num} · {s.name}</option>)}</select></Field>}
-              <div className="flex gap-2"><Button type="submit" size="sm">Add</Button><Button type="button" size="sm" variant="ghost" onClick={() => setAdding(null)}>Cancel</Button></div>
-            </form>
-          )}
-          <Table minWidth={620}>
-            <thead><tr><Th>Code</Th><Th>Account</Th><Th>Fund</Th><Th num>Balance</Th><Th><span className="sr-only">Rename</span></Th></tr></thead>
-            <tbody>
-              {grouped.map(g => (
-                <Fragment key={g.section?.num ?? 'other'}>
-                  <tr data-section={g.section?.num ?? 'other'}><Td colSpan={5}><span className="text-xs font-semibold uppercase tracking-wide text-ux2-muted">{g.section ? `${g.section.num} · ${g.section.name} · ${SECTION_LABEL[g.section.type] ?? g.section.type}` : 'Not in a section'} · {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}</span></Td></tr>
-                  {g.accounts.map(a => (
-                    <tr key={a.num} data-account={a.num}>
-                      <Td><span className="font-mono text-xs">{a.num}</span></Td>
-                      <Td>{renaming?.num === a.num ? (
-                        <form onSubmit={e => { e.preventDefault(); if (renaming.name.trim()) updateCoAAccount(a.num, renaming.name.trim(), true); setRenaming(null); }} className="flex items-center gap-2"><input aria-label={`Rename ${a.num}`} value={renaming.name} onChange={e => setRenaming({ num: a.num, name: e.target.value })} className={`${INPUT} !h-9`} /><Button type="submit" size="sm">Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button></form>
-                      ) : <Cell title={a.name} note={a.sub && a.sub !== a.type ? a.sub : undefined} />}</Td>
-                      <Td>{fundOf(a) === 'reserve' ? 'Reserve' : 'Operating'}</Td>
-                      <Td num>{fmt(acctBalance(a.num))}</Td>
-                      <Td num>{renaming?.num !== a.num && <Button size="sm" variant="ghost" onClick={() => setRenaming({ num: a.num, name: a.name })}>Rename</Button>}</Td>
-                    </tr>
-                  ))}
-                </Fragment>
-              ))}
-              {accts.length === 0 && <tr><Td colSpan={5}><span className="text-ux2-muted">No accounts yet. The default chart is written the first time the building loads; reload, or add accounts by hand.</span></Td></tr>}
-            </tbody>
-          </Table>
-          <Why>Sections: Owns (1000s), Owes (2000s), Fund balances (3000s), Income (4000s), Expenses (5000s operating, 6000s reserve). Each account belongs to the operating or the reserve fund. Balances are year to date for income and expenses, today for the rest. An account with entries can be renamed but not deleted.</Why>
-        </Card>
+      <Card id="opening-card" aria-label="Opening balances">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><span className="text-[17px] font-semibold text-ux2-ink">Opening balances</span><span className="ml-2 text-xs text-ux2-muted">{opening.asOf ? `on the books as of ${dayLabel(opening.asOf)} · ${fmt(opening.operatingCash)} operating · ${fmt(opening.reserveCash)} reserves · ${fmt(opening.owed)} owed by owners${opening.billsTotal ? ` · ${fmt(opening.billsTotal)} unpaid bills` : ''}` : 'the state of the books when the building joined: not entered yet'}</span></div>
+          <Button size="sm" variant={opening.asOf ? 'ghost' : 'primary'} aria-expanded={openingOpen} onClick={() => setOpeningOpen(v => !v)}>{openingOpen ? 'Hide' : opening.asOf ? 'Review or re-enter' : 'Enter the opening balances'}</Button>
+        </div>
+        {openingOpen && <OpeningBalances today={snap.today} />}
+        {!openingOpen && <Why>Bring the books over as of one cutover date: bank balances, what each owner owed or had paid ahead, and bills not yet paid. Posted lines are dated the cutover and the books close through it, so nothing lands before then by mistake.</Why>}
+      </Card>
+      </>)}
 
-        <Card id="mapping-card" aria-label="Where things post">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Where things post</span><span className="text-xs text-ux2-muted">GL mapping</span></div>
-          <div className="flex flex-col gap-1.5">
-            {MAPPING_LABELS.map(m => (
-              <label key={m.key} className="flex items-center justify-between gap-3 text-sm text-ux2-ink"><span>{m.label}</span><select aria-label={m.label} value={draftMap[m.key] ?? ''} onChange={e => setDraftMap(d => ({ ...d, [m.key]: e.target.value }))} className={`${INPUT} !h-9 !w-[200px]`}>{accts.filter(a => m.types.includes(a.type)).map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></label>
+      {group === 'accounts' && (
+      <Card id="chart-card" aria-label="Chart of accounts">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><span className="text-[17px] font-semibold text-ux2-ink">Chart of accounts</span><span className="ml-2 text-xs text-ux2-muted">{accts.length} accounts in {sections.length} sections</span></div>
+          <span className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => setAdding(v => (v === 'account' ? null : 'account'))}>Add an account</Button><Button size="sm" variant="ghost" onClick={() => setAdding(v => (v === 'section' ? null : 'section'))}>Add a section</Button></span>
+        </div>
+        {adding && (
+          <form aria-label={adding === 'account' ? 'Add an account' : 'Add a section'} onSubmit={e => { e.preventDefault(); if (!newAcct.num || !newAcct.name) return; if (adding === 'account') { const parent = sections.find(s => s.num === newAcct.parent) ?? sections.find(s => s.num[0] === newAcct.num[0]); if (!parent) return; addCoAAccount(newAcct.num, newAcct.name, parent.num, parent.sub); } else addCoASection(newAcct.num, newAcct.name, { '1': 'asset', '2': 'liability', '3': 'equity', '4': 'income' }[newAcct.num[0]] ?? 'expense'); setAdding(null); setNewAcct({ num: '', name: '', parent: '' }); }} className="flex flex-wrap items-end gap-2 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+            <Field label="Code" className="w-[120px]"><input aria-label="Code" value={newAcct.num} onChange={e => setNewAcct(v => ({ ...v, num: e.target.value }))} placeholder="5036" className={INPUT} /></Field>
+            <Field label="Name" className="min-w-[200px] flex-1"><input aria-label="Name" value={newAcct.name} onChange={e => setNewAcct(v => ({ ...v, name: e.target.value }))} className={INPUT} /></Field>
+            {adding === 'account' && <Field label="Section" className="w-[220px]"><select aria-label="Section" value={newAcct.parent} onChange={e => setNewAcct(v => ({ ...v, parent: e.target.value }))} className={INPUT}><option value="">By the code's first digit</option>{sections.map(s => <option key={s.num} value={s.num}>{s.num} · {s.name}</option>)}</select></Field>}
+            <div className="flex gap-2"><Button type="submit" size="sm">Add</Button><Button type="button" size="sm" variant="ghost" onClick={() => setAdding(null)}>Cancel</Button></div>
+          </form>
+        )}
+        <Table minWidth={620}>
+          <thead><tr><Th>Code</Th><Th>Account</Th><Th>Fund</Th><Th num>Balance</Th><Th><span className="sr-only">Rename</span></Th></tr></thead>
+          <tbody>
+            {grouped.map(g => (
+              <Fragment key={g.section?.num ?? 'other'}>
+                <tr data-section={g.section?.num ?? 'other'}><Td colSpan={5}><span className="text-xs font-semibold uppercase tracking-wide text-ux2-muted">{g.section ? `${g.section.num} · ${g.section.name} · ${SECTION_LABEL[g.section.type] ?? g.section.type}` : 'Not in a section'} · {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}</span></Td></tr>
+                {g.accounts.map(a => (
+                  <tr key={a.num} data-account={a.num}>
+                    <Td><span className="font-mono text-xs">{a.num}</span></Td>
+                    <Td>{renaming?.num === a.num ? (
+                      <form onSubmit={e => { e.preventDefault(); if (renaming.name.trim()) updateCoAAccount(a.num, renaming.name.trim(), true); setRenaming(null); }} className="flex items-center gap-2"><input aria-label={`Rename ${a.num}`} value={renaming.name} onChange={e => setRenaming({ num: a.num, name: e.target.value })} className={`${INPUT} !h-9`} /><Button type="submit" size="sm">Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button></form>
+                    ) : <Cell title={a.name} note={a.sub && a.sub !== a.type ? a.sub : undefined} />}</Td>
+                    <Td>{fundOf(a) === 'reserve' ? 'Reserve' : 'Operating'}</Td>
+                    <Td num>{fmt(acctBalance(a.num))}</Td>
+                    <Td num>{renaming?.num !== a.num && <Button size="sm" variant="ghost" onClick={() => setRenaming({ num: a.num, name: a.name })}>Rename</Button>}</Td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
-          </div>
-          <SectionLabel>Budget lines to expense accounts</SectionLabel>
-          <Inner className="py-1">
-            {(showAllLines ? lineMaps : lineMaps.slice(0, 4)).map(l => <KV key={l.name} label={l.name}>{l.acct ? l.acct.num : 'by category'}</KV>)}
-            {lineMaps.length > 4 && <button type="button" className="pt-1 text-xs font-semibold text-ux2-ink underline" onClick={() => setShowAllLines(v => !v)}>{showAllLines ? 'Show fewer' : `${lineMaps.length - 4} more lines · Show all`}</button>}
-          </Inner>
-          <div><Button size="sm" onClick={() => { setMapping(draftMap as never); setNote('Mapping saved. It affects new entries only.'); }}>Save mapping</Button></div>
-          <Why>Changing a mapping affects new entries only. Most buildings never touch it.</Why>
-        </Card>
-      </div>
+            {accts.length === 0 && <tr><Td colSpan={5}><span className="text-ux2-muted">No accounts yet. The default chart is written the first time the building loads; reload, or add accounts by hand.</span></Td></tr>}
+          </tbody>
+        </Table>
+        <Why>Sections: Owns (1000s), Owes (2000s), Fund balances (3000s), Income (4000s), Expenses (5000s operating, 6000s reserve). Each account belongs to the operating or the reserve fund. Balances are year to date for income and expenses, today for the rest. An account with entries can be renamed but not deleted.</Why>
+      </Card>
+      )}
 
+      {group === 'mapping' && (
+      <Card id="mapping-card" aria-label="Where things post">
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Where things post</span><span className="text-xs text-ux2-muted">GL mapping</span></div>
+        <div className="flex flex-col gap-1.5">
+          {MAPPING_LABELS.map(m => (
+            <label key={m.key} className="flex items-center justify-between gap-3 text-sm text-ux2-ink"><span>{m.label}</span><select aria-label={m.label} value={draftMap[m.key] ?? ''} onChange={e => setDraftMap(d => ({ ...d, [m.key]: e.target.value }))} className={`${INPUT} !h-9 !w-[200px]`}>{accts.filter(a => m.types.includes(a.type)).map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}</select></label>
+          ))}
+        </div>
+        <SectionLabel>Budget lines to expense accounts</SectionLabel>
+        <Inner className="py-1">
+          {(showAllLines ? lineMaps : lineMaps.slice(0, 4)).map(l => <KV key={l.name} label={l.name}>{l.acct ? l.acct.num : 'by category'}</KV>)}
+          {lineMaps.length > 4 && <button type="button" className="pt-1 text-xs font-semibold text-ux2-ink underline" onClick={() => setShowAllLines(v => !v)}>{showAllLines ? 'Show fewer' : `${lineMaps.length - 4} more lines · Show all`}</button>}
+        </Inner>
+        <div><Button size="sm" onClick={() => { setMapping(draftMap as never); setNote('Mapping saved. It affects new entries only.'); }}>Save mapping</Button></div>
+        <Why>Changing a mapping affects new entries only. Most buildings never touch it.</Why>
+      </Card>
+      )}
+
+      {group === 'billing' && (<>
       <Card id="fees-card" aria-label="Fee schedule">
         <div className="flex flex-wrap items-center justify-between gap-2"><div><span className="text-[17px] font-semibold text-ux2-ink">Fee schedule</span><span className="ml-2 text-xs text-ux2-muted">What billing charges on the {ordinal(snap.hoaDueDay)}</span></div><span className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => onGo?.('income', 'ledger')}>Edit tiers</Button><Button size="sm" variant="ghost" onClick={() => document.getElementById('billing-rules')?.scrollIntoView({ behavior: 'smooth' })}>Edit late fee</Button><Button size="sm" variant="ghost" onClick={() => onGo?.('planning', 'draft')}>{Number(snap.today.slice(0, 4)) + 1} dues</Button></span></div>
         <Table minWidth={720}>
@@ -347,30 +378,25 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       </Card>
 
       <BillingRules snap={snap} />
+      </>)}
 
-      <Card id="opening-card" aria-label="Opening balances">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><span className="text-[17px] font-semibold text-ux2-ink">Opening balances</span><span className="ml-2 text-xs text-ux2-muted">{opening.asOf ? `on the books as of ${dayLabel(opening.asOf)} · ${fmt(opening.operatingCash)} operating · ${fmt(opening.reserveCash)} reserves · ${fmt(opening.owed)} owed by owners${opening.billsTotal ? ` · ${fmt(opening.billsTotal)} unpaid bills` : ''}` : 'the state of the books when the building joined: not entered yet'}</span></div>
-          <Button size="sm" variant={opening.asOf ? 'ghost' : 'primary'} aria-expanded={openingOpen} onClick={() => setOpeningOpen(v => !v)}>{openingOpen ? 'Hide' : opening.asOf ? 'Review or re-enter' : 'Enter the opening balances'}</Button>
-        </div>
-        {openingOpen && <OpeningBalances today={snap.today} />}
-        {!openingOpen && <Why>Bring the books over as of one cutover date: bank balances, what each owner owed or had paid ahead, and bills not yet paid. Posted lines are dated the cutover and the books close through it, so nothing lands before then by mistake.</Why>}
-      </Card>
-
+      {group === 'bank' && (<>
       <Card id="bank-card" aria-label="Bank and payments">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Bank and payments</span><Chip tone={snap.stripeOnboardingComplete ? 'sage' : 'ghost'}>{snap.stripeOnboardingComplete ? 'All connected' : 'Stripe not set up'}</Chip></div>
         <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="Stripe" note={snap.stripeOnboardingComplete ? `owners pay by card or bank · ${autopayUnits} units paying online · payouts land in 1010 the next business day` : 'owners pay by card or bank once the account is connected'} /><Chip tone={snap.stripeOnboardingComplete ? 'sage' : 'amber'}>{snap.stripeOnboardingComplete ? 'Connected' : 'Not set up'}</Chip></Inner>
         <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title={`${getAcctName('1010') || 'Operating checking'} · 1010`} note={`ledger balance ${fmt(acctBalance('1010'))} · a bank feed is on the roadmap; until then the ledger is the record`} /><Chip tone="ghost">Ledger</Chip></Inner>
         <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title={`${getAcctName('1020') || 'Reserve money market'} · 1020`} note={`ledger balance ${fmt(acctBalance('1020'))}`} /><Chip tone="ghost">Ledger</Chip></Inner>
         <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => onGo?.('payments')}>Online payments · Stripe</Button><Button size="sm" variant="ghost" onClick={() => setNote('Bank feeds are not connected yet; balances come from the ledger.')}>Reconnect a bank</Button></div>
-        <Why>Bills approved on Expenses are paid from 1010 on their due date. Transfers between the two accounts post as ledger entries; a manual transfer uses "Moved money to reserves" above.</Why>
+        <Why>Bills approved on Expenses are paid from 1010 on their due date. Transfers between the two accounts post as ledger entries; a manual transfer uses "Moved money to reserves" on the Ledger page.</Why>
       </Card>
 
       <Card id="mailing-card" aria-label="Mailing card">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Mailing card</span><span className="text-xs text-ux2-muted">the card that pays for printed letters</span></div>
         <div className="ux2-legacy"><MailingSettingsTab /></div>
-        <Why>Section links still work: <button type="button" className="underline" onClick={() => onSection('ledger')}>ledger</button>, <button type="button" className="underline" onClick={() => onSection('accounts')}>accounts</button>, <button type="button" className="underline" onClick={() => onSection('fees')}>fees</button>.</Why>
+        <Why>Jump to the <button type="button" className="underline" onClick={() => onSection('ledger')}>ledger</button>, the <button type="button" className="underline" onClick={() => onSection('accounts')}>chart of accounts</button> or the <button type="button" className="underline" onClick={() => onSection('fees')}>fee schedule</button>.</Why>
       </Card>
+      </>)}
+
     </div>
   );
 }
