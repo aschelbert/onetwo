@@ -104,6 +104,11 @@ Deploy notes:
   Database → Extensions and run the schedule block again, or call
   `select run_billing_cycle_all()` from any daily scheduler. Billing still
   runs when a board member opens the app until then.
+- Apply migration 047: every building gets the default chart of accounts.
+  Until it, the chart lived only in the browser and a real building showed an
+  empty chart, unnamed ledger entries and an empty posting mapping. The
+  migration backfills buildings with no accounts, a trigger seeds each new
+  building, and the app writes the chart itself on first load as a fallback.
 - Apply migration 045 as well: it saves the building's "Where things post"
   mapping on `financial_settings` and makes the server functions read it,
   with the app's defaults as the fallback, so a building that remaps an

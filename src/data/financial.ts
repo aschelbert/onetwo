@@ -93,6 +93,15 @@ export const seedChartOfAccounts: ChartOfAccountsEntry[] = [
   {num:'6050',name:'Contingency',type:'expense',sub:'reserve',parent:'6000',reserveItem:'res5'},
 ];
 
+/**
+ * The chart a real building starts with: the seed chart without the links to
+ * the sample budget categories and reserve items, which a real building does
+ * not have. Written to the database the first time a building with no chart
+ * is loaded (see `loadFromDb`), and mirrored by `seed_chart_of_accounts` in
+ * migration 047 for buildings created from then on.
+ */
+export const defaultChartOfAccounts: ChartOfAccountsEntry[] = seedChartOfAccounts.map(({ budgetCat: _b, reserveItem: _r, ...a }) => a);
+
 export const seedUnits: Unit[] = [
   {number:'101',owner:'Sarah Johnson',email:'sarah.j@example.com',phone:'202-555-0101',monthlyFee:450,votingPct:2.1,status:'ACTIVE',balance:0,moveIn:'2019-06-15',sqft:850,bedrooms:1,parking:'P-101',payments:[{date:'2026-01-05',amount:450,method:'ACH',note:''},{date:'2026-02-03',amount:450,method:'ACH',note:''}],lateFees:[],specialAssessments:[]},
   {number:'102',owner:'Mike Davis',email:'mike.d@example.com',phone:'202-555-0102',monthlyFee:475,votingPct:2.2,status:'ACTIVE',balance:0,moveIn:'2020-03-01',sqft:900,bedrooms:1,parking:'P-102',payments:[{date:'2026-01-04',amount:475,method:'check',note:'#4521'},{date:'2026-02-02',amount:475,method:'check',note:'#4589'}],lateFees:[],specialAssessments:[]},

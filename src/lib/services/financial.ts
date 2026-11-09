@@ -208,6 +208,18 @@ export async function upsertCoAEntry(tenantId: string, entry: ChartOfAccountsEnt
   return true;
 }
 
+/** Writes many chart rows at once; used to give a building its default chart. */
+export async function upsertCoAEntries(tenantId: string, entries: ChartOfAccountsEntry[]): Promise<boolean> {
+  if (!supabase || entries.length === 0) return false;
+  const { error } = await supabase.from('chart_of_accounts').upsert(entries.map(entry => ({
+    tenant_id: tenantId, num: entry.num, name: entry.name, type: entry.type,
+    sub: entry.sub, parent: entry.parent, budget_cat: entry.budgetCat || null,
+    reserve_item: entry.reserveItem || null, fund: entry.fund || null,
+  })), { onConflict: 'tenant_id,num' });
+  if (error) { logDbError('upsertCoAEntries error:', error); return false; }
+  return true;
+}
+
 export async function deleteCoAEntry(tenantId: string, num: string): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from('chart_of_accounts').delete().eq('tenant_id', tenantId).eq('num', num);
