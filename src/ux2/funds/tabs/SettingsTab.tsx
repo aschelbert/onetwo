@@ -6,13 +6,14 @@
  * and payments. The Mailing card keeps its production settings panel at the
  * foot. Every write goes through the financial and fee-schedule stores.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import MailingSettingsTab from '@/features/building/tabs/MailingSettingsTab';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
 import { PAYMENT_ORDER_LABEL, type PaymentOrder } from '@/lib/financial-logic';
-import type { GLEntry } from '@/types/financial';
+import { fundOf } from '@/lib/ledger';
+import type { ChartOfAccountsEntry, GLEntry } from '@/types/financial';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, SearchInput, SectionLabel, Table, Td, Th, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { ordinal, type FundsSnapshot } from '../metrics';
@@ -180,8 +181,17 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
   }, [section]);
 
   const thisMonth = snap.today.slice(0, 7);
-  const accts = coa.filter(a => a.parent);
-  const sections = coa.filter(a => !a.parent);
+  // Accounts, sections (header rows), and the accounts grouped under the section at the top of their parent chain.
+  const { accts, sections, grouped } = useMemo(() => {
+    const accts = coa.filter(a => a.parent);
+    const sections = coa.filter(a => !a.parent);
+    const byNum = new Map(coa.map(a => [a.num, a]));
+    const sectionOf = (a: ChartOfAccountsEntry) => { let p: ChartOfAccountsEntry | undefined = a; const seen = new Set<string>(); while (p?.parent && !seen.has(p.num)) { seen.add(p.num); p = byNum.get(p.parent); } return p && !p.parent ? p : undefined; };
+    const groups: { section?: ChartOfAccountsEntry; accounts: ChartOfAccountsEntry[] }[] = sections.map(s => ({ section: s, accounts: [] }));
+    const other: { section?: ChartOfAccountsEntry; accounts: ChartOfAccountsEntry[] } = { accounts: [] };
+    accts.forEach(a => { const sec = sectionOf(a); (groups.find(g => g.section?.num === sec?.num) ?? other).accounts.push(a); });
+    return { accts, sections, grouped: [...groups.filter(g => g.accounts.length), ...(other.accounts.length ? [other] : [])] };
+  }, [coa]);
   const waiting = snap.workOrders.filter(w => w.status === 'invoiced');
 
   const entries = useMemo(() => {
@@ -273,22 +283,28 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
             </form>
           )}
           <Table minWidth={620}>
-            <thead><tr><Th>Code</Th><Th>Account</Th><Th>Section</Th><Th num>Balance</Th><Th><span className="sr-only">Rename</span></Th></tr></thead>
+            <thead><tr><Th>Code</Th><Th>Account</Th><Th>Fund</Th><Th num>Balance</Th><Th><span className="sr-only">Rename</span></Th></tr></thead>
             <tbody>
-              {accts.map(a => (
-                <tr key={a.num} data-account={a.num}>
-                  <Td><span className="font-mono text-xs">{a.num}</span></Td>
-                  <Td>{renaming?.num === a.num ? (
-                    <form onSubmit={e => { e.preventDefault(); if (renaming.name.trim()) updateCoAAccount(a.num, renaming.name.trim(), true); setRenaming(null); }} className="flex items-center gap-2"><input aria-label={`Rename ${a.num}`} value={renaming.name} onChange={e => setRenaming({ num: a.num, name: e.target.value })} className={`${INPUT} !h-9`} /><Button type="submit" size="sm">Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button></form>
-                  ) : <Cell title={a.name} note={a.sub && a.sub !== a.type ? a.sub : undefined} />}</Td>
-                  <Td>{SECTION_LABEL[a.type] ?? a.type}{a.sub && /bank|receivable/i.test(a.sub) ? ` · ${a.sub}` : ''}</Td>
-                  <Td num>{fmt(acctBalance(a.num))}</Td>
-                  <Td num>{renaming?.num !== a.num && <Button size="sm" variant="ghost" onClick={() => setRenaming({ num: a.num, name: a.name })}>Rename</Button>}</Td>
-                </tr>
+              {grouped.map(g => (
+                <Fragment key={g.section?.num ?? 'other'}>
+                  <tr data-section={g.section?.num ?? 'other'}><Td colSpan={5}><span className="text-xs font-semibold uppercase tracking-wide text-ux2-muted">{g.section ? `${g.section.num} · ${g.section.name} · ${SECTION_LABEL[g.section.type] ?? g.section.type}` : 'Not in a section'} · {g.accounts.length} account{g.accounts.length === 1 ? '' : 's'}</span></Td></tr>
+                  {g.accounts.map(a => (
+                    <tr key={a.num} data-account={a.num}>
+                      <Td><span className="font-mono text-xs">{a.num}</span></Td>
+                      <Td>{renaming?.num === a.num ? (
+                        <form onSubmit={e => { e.preventDefault(); if (renaming.name.trim()) updateCoAAccount(a.num, renaming.name.trim(), true); setRenaming(null); }} className="flex items-center gap-2"><input aria-label={`Rename ${a.num}`} value={renaming.name} onChange={e => setRenaming({ num: a.num, name: e.target.value })} className={`${INPUT} !h-9`} /><Button type="submit" size="sm">Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button></form>
+                      ) : <Cell title={a.name} note={a.sub && a.sub !== a.type ? a.sub : undefined} />}</Td>
+                      <Td>{fundOf(a) === 'reserve' ? 'Reserve' : 'Operating'}</Td>
+                      <Td num>{fmt(acctBalance(a.num))}</Td>
+                      <Td num>{renaming?.num !== a.num && <Button size="sm" variant="ghost" onClick={() => setRenaming({ num: a.num, name: a.name })}>Rename</Button>}</Td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
+              {accts.length === 0 && <tr><Td colSpan={5}><span className="text-ux2-muted">No accounts yet. The default chart is written the first time the building loads; reload, or add accounts by hand.</span></Td></tr>}
             </tbody>
           </Table>
-          <Why>Sections: Owns (1000s), Owes (2000s), Fund balances (3000s), Income (4000s), Expenses (5000s). Balances are year to date for income and expenses, today for the rest. An account with entries can be renamed but not deleted.</Why>
+          <Why>Sections: Owns (1000s), Owes (2000s), Fund balances (3000s), Income (4000s), Expenses (5000s operating, 6000s reserve). Each account belongs to the operating or the reserve fund. Balances are year to date for income and expenses, today for the rest. An account with entries can be renamed but not deleted.</Why>
         </Card>
 
         <Card id="mapping-card" aria-label="Where things post">

@@ -169,7 +169,14 @@ describe('Funds', () => {
     renderAt('/funds?tab=settings&section=rules');
     expect(document.querySelector('[aria-label="Billing rules"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Chart of accounts"]')).toBeTruthy();
+    const chart = document.querySelector('[aria-label="Chart of accounts"]') as HTMLElement;
+    expect(chart).toBeTruthy();
+    // The chart is grouped under its section rows, each account showing its fund.
+    const sectionRows = Array.from(chart.querySelectorAll('tr[data-section]')).map(r => r.getAttribute('data-section'));
+    expect(sectionRows).toEqual(['1000', '2000', '3000', '4000', '5000', '6000']);
+    expect(within(chart).getByText(/1000 · Assets · Owns/)).toBeTruthy();
+    expect(within(chart.querySelector('tr[data-account="1020"]') as HTMLElement).getByText('Reserve')).toBeTruthy();
+    expect(within(chart.querySelector('tr[data-account="1010"]') as HTMLElement).getByText('Operating')).toBeTruthy();
     expect(document.querySelector('[aria-label="Where things post"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Fee schedule"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-mailing')).toBeTruthy();

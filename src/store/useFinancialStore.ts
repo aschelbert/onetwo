@@ -7,7 +7,7 @@ import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining
 import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
-import { seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
+import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { generateLocalId } from '@/lib/generateId';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -344,8 +344,18 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (data.budgetCategories) updates.budgetCategories = data.budgetCategories;
     if (data.reserveItems) updates.reserveItems = data.reserveItems;
     if (data.chartOfAccounts) {
-      updates.chartOfAccounts = data.chartOfAccounts;
-      updates.acctStatus = Object.fromEntries(data.chartOfAccounts.map(a => [a.num, true]));
+      let chart = data.chartOfAccounts;
+      if (!chart.some(a => a.parent)) {
+        // A building with no chart yet (the default chart used to live only in the browser) gets the default
+        // one, written to the database so every screen can name its accounts. Sections the board already
+        // added are kept.
+        const have = new Set(chart.map(a => a.num));
+        const missing = defaultChartOfAccounts.filter(a => !have.has(a.num));
+        chart = [...chart, ...missing].sort((a, b) => a.num.localeCompare(b.num));
+        if (missing.length) financialSvc.upsertCoAEntries(tenantId, missing);
+      }
+      updates.chartOfAccounts = chart;
+      updates.acctStatus = Object.fromEntries(chart.map(a => [a.num, true]));
     }
     if (data.generalLedger) {
       updates.generalLedger = data.generalLedger;
