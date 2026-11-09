@@ -21,6 +21,7 @@ import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
+import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
 export interface OnboardingState {
@@ -243,6 +244,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           useScorecardStore.getState().loadFromDb(tenantInfo.id),
           usePayrollStore.getState().loadFromDb(tenantInfo.id),
           useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
+          useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
         ]);
       }
     }
@@ -430,6 +432,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
             useScorecardStore.getState().loadFromDb(tenantInfo.id),
             usePayrollStore.getState().loadFromDb(tenantInfo.id),
             useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
+            useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
           ]);
         }
 

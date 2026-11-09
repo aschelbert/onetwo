@@ -8,7 +8,7 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { lateFeeAsScheduleItem, useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -122,12 +122,13 @@ function Delinquency({ note }: { note?: string }) {
 }
 
 function Fees() {
-  const fees = useFeeScheduleStore(s => s.fees).filter(f => f.enabled);
+  const schedule = useFeeScheduleStore(s => s.fees);
   const fin = useFinancialStore();
+  const fees = [...(fin.lateFeeEnabled ? [lateFeeAsScheduleItem(fin)] : []), ...schedule.filter(f => f.enabled)];
   return (
     <Frame title="Fee schedule" to={ROUTES.fees} toLabel="Open the fee schedule"
-      note={fin.lateFeeEnabled ? `Late fee ${fmt(fin.lateFeeAmount)} after ${fin.lateFeeGraceDays} days.` : 'No automatic late fee is set.'}>
-      <Rows head={['Fee', 'Amount', 'When']} rows={fees.map(f => [f.name, f.amountType === 'percentage' ? `${f.amount}%` : fmt(f.amount), f.frequency])} empty="No fees set. Add them in Funds › Accounts and ledger › Fee schedule." />
+      note={fin.lateFeeEnabled ? `Late fee ${fmt(fin.lateFeeAmount)} after ${fin.lateFeeGraceDays} days, set under Billing rules.` : 'No automatic late fee is set.'}>
+      <Rows head={['Fee', 'Amount', 'When']} rows={fees.map(f => [f.name, f.amountType === 'percentage' ? `${f.amount}%` : fmt(f.amount), f.frequency])} empty="No fees set. Add them in Funds › Accounts and ledger › Fees & Billing." />
     </Frame>
   );
 }

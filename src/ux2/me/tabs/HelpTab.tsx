@@ -13,7 +13,8 @@ import SupportPage from '@/features/support/SupportPage';
 import { GUIDES } from '@/features/support/HowItWorksPage';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { lateFeeAsScheduleItem, useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { adminSupabase } from '@/lib/adminSupabase';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
@@ -68,7 +69,12 @@ function useThreads() {
 export default function HelpTab({ snap }: { snap: MeSnapshot }) {
   const navigate = useNavigate();
   const building = useBuildingStore();
-  const fees = useFeeScheduleStore(s => s.fees);
+  const schedule = useFeeScheduleStore(s => s.fees);
+  const lateFeeEnabled = useFinancialStore(s => s.lateFeeEnabled);
+  const lateFeeAmount = useFinancialStore(s => s.lateFeeAmount);
+  const lateFeeGraceDays = useFinancialStore(s => s.lateFeeGraceDays);
+  // The late fee is set under Billing rules; it reads here next to the schedule.
+  const fees = useMemo(() => [...(lateFeeEnabled ? [lateFeeAsScheduleItem({ lateFeeEnabled, lateFeeAmount, lateFeeGraceDays })] : []), ...schedule], [schedule, lateFeeEnabled, lateFeeAmount, lateFeeGraceDays]);
   const currentRole = useAuthStore(s => s.currentRole);
   const { live, open, create } = useThreads();
   const [q, setQ] = useState('');

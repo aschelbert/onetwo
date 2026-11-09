@@ -8,7 +8,6 @@ import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocke
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
-import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { generateLocalId } from '@/lib/generateId';
 import { useBuildingStore } from '@/store/useBuildingStore';
 
@@ -1256,12 +1255,6 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   setLateFeeSettings: (enabled, amount, graceDays) => {
     set({ lateFeeEnabled: enabled, lateFeeAmount: amount, lateFeeGraceDays: graceDays });
     syncSettings();
-    // Sync late fee amount to fee schedule store
-    const feeStore = useFeeScheduleStore.getState();
-    const lateFee = feeStore.getFeeByName('Late Fee');
-    if (lateFee && lateFee.amount !== amount) {
-      feeStore.updateFee(lateFee.id, { amount });
-    }
   },
 
   // Refund

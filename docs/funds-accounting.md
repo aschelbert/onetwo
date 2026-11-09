@@ -104,6 +104,12 @@ Deploy notes:
   Database → Extensions and run the schedule block again, or call
   `select run_billing_cycle_all()` from any daily scheduler. Billing still
   runs when a board member opens the app until then.
+- Apply migration 048: the fee schedule moves into the database
+  (`fee_schedule`, one row per fee per building). Until it, the schedule
+  lived only in each browser. The migration backfills the defaults for
+  every building, a trigger seeds each new one, and the app writes the
+  defaults itself on first load as a fallback. The late fee is not a row:
+  Billing rules are its only home, and the schedule shows it from there.
 - Apply migration 047: every building gets the default chart of accounts.
   Until it, the chart lived only in the browser and a real building showed an
   empty chart, unnamed ledger entries and an empty posting mapping. The
