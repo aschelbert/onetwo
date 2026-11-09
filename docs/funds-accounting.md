@@ -77,7 +77,7 @@ The database posts every online payment, once, through functions in
 | --- | --- | --- |
 | `checkout.session.completed` with `invoice_id` metadata (a payment link) | `reconcile_unit_payment(session, intent)` | Settles that invoice |
 | `checkout.session.completed` with `unit_number` + `tenant_id` (the Pay page) | `record_unit_payment(...)` | Applies the amount in order, idempotent on the session id |
-| `invoice.paid` (autopay) | `record_unit_payment(...)` | Same, idempotent on the Stripe invoice id |
+| `invoice.paid` (an owner's dues autopay, a subscription on the building's connected account) | `record_unit_payment(...)` | Same, idempotent on the Stripe invoice id. The unit comes from the subscription's metadata, read from wherever the API version puts it on the invoice, or from the subscription itself |
 | `charge.refunded` (made in Stripe) | `refund_unit_invoice(...)` | Posts the refund the way the app does |
 
 The refund made from the app goes through the `refund-unit-payment` edge

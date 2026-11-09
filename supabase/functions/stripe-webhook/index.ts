@@ -85,6 +85,39 @@ async function verifyStripeSignature(payload: string, sigHeader: string, secret:
   }
 }
 
+// The unit and building a subscription invoice is for. connect-stripe-account puts them on the subscription's
+// metadata; Stripe copies that onto each invoice, but where depends on the API version: `parent.subscription_details`
+// (2025-03-31 and later), `subscription_details` (earlier), or the line items. If none carries it, the subscription
+// itself is fetched (on the connected account the event came from).
+// deno-lint-ignore no-explicit-any
+async function unitMetadataOf(invoice: any, account?: string): Promise<Record<string, string>> {
+  const hasUnit = (m: unknown): m is Record<string, string> =>
+    !!m && typeof m === "object" && !!(m as Record<string, string>).unit_number && !!(m as Record<string, string>).tenant_id;
+  const candidates = [
+    invoice.parent?.subscription_details?.metadata,
+    invoice.subscription_details?.metadata,
+    invoice.metadata,
+    // deno-lint-ignore no-explicit-any
+    ...((invoice.lines?.data || []) as any[]).map((l) => l.metadata),
+  ];
+  for (const m of candidates) if (hasUnit(m)) return m;
+  const subId = invoice.parent?.subscription_details?.subscription || invoice.subscription;
+  if (STRIPE_KEY && typeof subId === "string" && subId.startsWith("sub_")) {
+    try {
+      const headers: Record<string, string> = { "Authorization": `Bearer ${STRIPE_KEY}` };
+      if (account && typeof account === "string" && account.startsWith("acct_")) headers["Stripe-Account"] = account;
+      const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subId}`, { headers });
+      if (res.ok) {
+        const sub = await res.json();
+        if (hasUnit(sub.metadata)) return sub.metadata;
+      }
+    } catch (err) {
+      console.error("Subscription lookup failed:", err);
+    }
+  }
+  return {};
+}
+
 Deno.serve(async (req) => {
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
@@ -179,7 +212,7 @@ Deno.serve(async (req) => {
       // endpoint to receive connected-account events.
       case "invoice.paid": {
         const invoice = event.data.object;
-        const meta = invoice.subscription_details?.metadata || invoice.metadata || {};
+        const meta = await unitMetadataOf(invoice, event.account);
         if (!meta.unit_number || !meta.tenant_id || !invoice.amount_paid) {
           console.log("invoice.paid without a unit in its metadata, skipping");
           break;
