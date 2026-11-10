@@ -61,7 +61,7 @@ export function accountState(account: Record<string, unknown>): StripeAccountSta
   return {
     chargesEnabled: account.charges_enabled === true,
     detailsSubmitted: account.details_submitted === true,
-    requirementsDue: [...(req.currently_due ?? []), ...(req.past_due ?? [])],
+    requirementsDue: [...new Set([...(req.currently_due ?? []), ...(req.past_due ?? [])])],
   };
 }
 
