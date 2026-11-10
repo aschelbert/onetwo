@@ -19,6 +19,7 @@
  * redirect there.
  *
  * Deep links: `/boardroom?tab=open|inbox|runbooks|outbox|tasks|intercom`,
+ * `/boardroom?tab=runbooks&runbook=<id>` lands on one runbook's row,
  * `/boardroom?view=case:<id>`, `/boardroom?view=new&cat=<catId>&sit=<sitId>`.
  * `/issues?view=case:<id>` (Home's links) resolves here too.
  */
@@ -73,7 +74,7 @@ export default function BoardRoomModule() {
   const go = (next: BoardRoomTab) => {
     setParams(prev => {
       const p = new URLSearchParams(prev);
-      p.delete('view'); p.delete('cat'); p.delete('sit');
+      p.delete('view'); p.delete('cat'); p.delete('sit'); p.delete('runbook');
       if (next === 'open') p.delete('tab'); else p.set('tab', next);
       if (next === 'inbox') p.set('caseTab', 'issues'); else p.delete('caseTab');
       return p;

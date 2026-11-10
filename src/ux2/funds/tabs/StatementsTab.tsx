@@ -232,7 +232,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
                 <Td num>{m.open ? '–' : fmt(m.income)}</Td><Td num>{m.open ? '–' : fmt(m.expenses)}</Td><Td num>{m.open ? '–' : `${m.net >= 0 ? '+' : '−'}${fmt(Math.abs(m.net))}`}</Td>
                 <Td>{m.open ? <Chip tone="ghost">Not yet</Chip> : m.entries === 0 ? <Chip tone="ghost">Nothing to send</Chip> : sent[m.key] ? <Chip tone="sage">Sent {dayLabel(sent[m.key])}</Chip> : <Chip tone="navy">Ready to send</Chip>}</Td>
                 <Td num>
-                  {m.open ? <Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks')}>Month close runbook</Button> : m.entries === 0 ? null : (
+                  {m.open ? <Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Month close runbook</Button> : m.entries === 0 ? null : (
                     <span className="flex justify-end gap-1.5"><Button size="sm" variant="ghost" onClick={() => download(`${building.name.replace(/\s+/g, '-')}-${m.key}-packet.html`, packetHtml(m.key))}>Download</Button>{sent[m.key] ? <RowMenu label={`Actions for ${m.label}`} items={[{ label: 'Send again', onSelect: () => sendToOwners(m.key) }, { label: 'Open the ledger for this month', onSelect: () => navigate('/funds?tab=settings&section=ledger') }]} /> : <Button size="sm" onClick={() => sendToOwners(m.key)}>Send to owners</Button>}</span>
                   )}
                 </Td>

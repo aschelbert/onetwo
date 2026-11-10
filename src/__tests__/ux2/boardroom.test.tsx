@@ -116,6 +116,19 @@ describe('Board Room', () => {
     }
   });
 
+  it('Runbooks deep link lands on the named runbook even when it has no case open', () => {
+    renderAt('/boardroom?tab=runbooks&runbook=month-close');
+    const row = document.querySelector('tr[data-runbook="month-close"]') as HTMLElement;
+    expect(row).toBeTruthy();
+    expect(row.getAttribute('data-focus')).toBe('1');
+    expect(document.querySelectorAll('tr[data-runbook]').length).toBeGreaterThanOrEqual(1);
+    if (within(row).queryByRole('button', { name: 'Open a case' })) {
+      expect(document.querySelector('[data-focus-note]')?.textContent).toContain('Month close');
+      fireEvent.click(screen.getByRole('button', { name: 'Open a case now' }));
+      expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/financial-review');
+    }
+  });
+
   it('Outbox shows alerts, drafts, templates and delivery without the production communications tab; New letter composes', () => {
     renderAt('/boardroom?tab=outbox');
     expect(screen.queryByTestId('legacy-comms')).toBeNull();

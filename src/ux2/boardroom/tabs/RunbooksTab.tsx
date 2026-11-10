@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/formatters';
 import { Card, Chip, PillTabs, SectionLabel, Table, Th, Td, Cell, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -73,11 +74,22 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   const list = useMemo(() => runbookStatuses(snap), [snap]);
   const sum = runbooksSummary(list);
   const setOn = useRunbookSwitches(s => s.setOn);
-  const [show, setShow] = useState<'open' | 'all'>('open');
+  // Deep link (`?runbook=month-close`) from Funds › Statements and the like: land on that
+  // runbook's row even when it has no case open, which the default filter would hide.
+  const [params] = useSearchParams();
+  const focusId = params.get('runbook');
+  const focus = focusId ? list.find(r => r.def.id === focusId) : undefined;
+  const [show, setShow] = useState<'open' | 'all'>(focus && focus.openCases.length === 0 ? 'all' : 'open');
   const shown = show === 'all' ? list : list.filter(r => r.openCases.length > 0);
 
+  useEffect(() => {
+    if (!focus) return;
+    if (focus.openCases.length === 0) setShow('all');
+    document.querySelector<HTMLElement>(`tr[data-runbook="${focus.def.id}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [focus]);
+
   const Row = ({ r }: { r: RunbookStatus }) => (
-    <tr data-runbook={r.def.id} className={r.on ? '' : 'opacity-70'}>
+    <tr data-runbook={r.def.id} data-focus={focus?.def.id === r.def.id ? '1' : undefined} className={cn(r.on ? '' : 'opacity-70', focus?.def.id === r.def.id && 'bg-ux2-teal-tint/40')}>
       <Td><Cell title={r.def.name} note={r.def.visibility === 'owners' ? 'Owners see this' : 'Board only · the unit sees its own view'} /></Td>
       <Td className="text-ux2-muted">{r.def.trigger}</Td>
       <Td num>{r.def.steps}</Td>
@@ -117,6 +129,12 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
           <SectionLabel>All runbooks</SectionLabel>
           <span className="text-xs text-ux2-muted">{show === 'all' ? `All ${sum.total}` : `With an open case · ${sum.withOpenCase.length}`} · on by default · switching one off keeps the playbook for manual cases</span>
         </div>
+        {focus && focus.openCases.length === 0 && (
+          <p className="m-0 text-sm text-ux2-muted" data-focus-note>
+            <b className="text-ux2-ink">{focus.def.name}</b> has nothing running right now. It starts {focus.def.trigger.charAt(0).toLowerCase() + focus.def.trigger.slice(1)}{focus.lastRan ? `; it last ran ${dayLabel(focus.lastRan.date)}` : ' and has not run yet'}.
+            {focus.def.sitId && focus.def.catId && <> <button type="button" onClick={() => onNewCase({ catId: focus.def.catId!, sitId: focus.def.sitId! })} className="font-semibold text-ux2-teal hover:underline">Open a case now</button></>}
+          </p>
+        )}
         {shown.length === 0 ? <p className="m-0 text-sm text-ux2-muted">No runbook has a case open. <button type="button" onClick={() => setShow('all')} className="font-semibold text-ux2-teal hover:underline">Show all {sum.total}</button></p> : (
           <Table minWidth={820}>
             <thead><tr><Th>Runbook</Th><Th>Starts when</Th><Th num>Steps</Th><Th>Automated</Th><Th>Last ran</Th><Th num>On</Th></tr></thead>
