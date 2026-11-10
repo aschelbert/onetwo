@@ -1,7 +1,9 @@
 /**
- * Setup steps 3–5 on one page: fill the gaps (only what the documents
+ * Setup steps 3, 5 and 6 on one page: fill the gaps (only what the documents
  * didn't cover, answered here), invite people (optional, prefilled from the
- * board), go live (the four essentials). Owners are invited at go-live, so
+ * board), go live (the four essentials, with online payments and the other
+ * optional pieces listed as "also set up"). Step 4, Get paid online, has its
+ * own page so Stripe can return to it. Owners are invited at go-live, so
  * their first look is a finished building.
  */
 import { useState } from 'react';
@@ -19,6 +21,7 @@ import { resolve } from '@/features/setup/setupModel';
 import { isOpeningEntry } from '@/lib/financial-logic';
 import { Button, Chip } from '../components';
 import OpeningBalances from '../funds/OpeningBalances';
+import { paymentsStatus } from '../funds/paymentPrefs';
 import { useSetup } from './useSetup';
 import UnitsEditor from './UnitsEditor';
 
@@ -53,7 +56,7 @@ async function sendInvites(invitees: { email: string; role: string; unit?: strin
   return data as { total?: number; sent?: number; invitations?: { email: string; code?: string; sent: boolean; error?: string }[] };
 }
 
-export default function FinishStep({ onReview, onDocuments }: { onReview: () => void; onDocuments: () => void }) {
+export default function FinishStep({ onReview, onDocuments, onPayments }: { onReview: () => void; onDocuments: () => void; onPayments?: () => void }) {
   const s = useSetup();
   const navigate = useNavigate();
   const tenant = useTenantContext();
@@ -178,7 +181,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
       await tenant.updateOnboardingStep('buildingProfileComplete', true);
       await tenant.updateOnboardingStep('unitsConfigured', true);
       if (s.docs.some(d => d.docType === 'bylaws' || d.docType === 'declaration')) await tenant.updateOnboardingStep('bylawsUploaded', true);
-      if (f.budgetCategories.length) await tenant.updateOnboardingStep('financialSetupDone', true);
+      if (f.budgetCategories.length || payments === 'on') await tenant.updateOnboardingStep('financialSetupDone', true);
       if (invitedBoard || inviteOwners || invites.some(i => i.sentAt)) await tenant.updateOnboardingStep('firstUserInvited', true);
       await tenant.updateOnboardingStep('goLive', true);
       navigate('/home');
@@ -187,12 +190,20 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     } finally { setBusy(false); }
   };
 
+  const payments = paymentsStatus(f.stripeConnectId, f.stripeOnboardingComplete);
   const essentials = [
     { done: s.ess.profile, label: 'Building name and address' },
     { done: s.ess.units, label: units.length ? `${units.length} units with owners` : 'Units and owners' },
     { done: s.ess.board, label: b.board.length ? `${b.board.length} board member${b.board.length === 1 ? '' : 's'}` : 'At least one board member' },
     { done: s.ess.assessment, label: 'Monthly assessment for every unit' },
   ];
+  // Optional pieces, shown with their state so the board knows what owners will meet on day one.
+  const alsoSetUp = [
+    { id: 'payments', state: payments === 'on' ? 'done' : payments === 'pending' ? 'pending' : 'todo', label: payments === 'on' ? 'Online payments · Stripe connected' : payments === 'pending' ? 'Online payments · Stripe verifying' : 'Online payments · not set up', note: payments === 'on' ? 'owners can pay by card or bank from day one' : payments === 'pending' ? 'usually 1 to 2 days · owners pay by check until Stripe confirms' : 'owners pay by check · connect Stripe in step 4, now or after going live' },
+    { id: 'budget', state: f.budgetCategories.length ? 'done' : 'todo', label: "This year's budget", note: f.budgetCategories.length ? `${f.budgetCategories.length} lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : 'not added' },
+    { id: 'balances', state: openingDone ? 'done' : 'todo', label: 'Opening balances', note: openingDone ? 'posted to the ledger' : 'not entered' },
+    { id: 'fees', state: f.lateFeeEnabled || feesSaved ? 'done' : 'todo', label: 'Due day and late fee', note: `due on the ${f.hoaDueDay ?? 1}${['th', 'st', 'nd', 'rd'][((f.hoaDueDay ?? 1) % 100 - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][(f.hoaDueDay ?? 1) % 100] ?? 'th'}${f.lateFeeEnabled ? ` · ${fmt(f.lateFeeAmount)} after ${f.lateFeeGraceDays} days` : ' · no late fee'}` },
+  ] as const;
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -289,7 +300,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
 
       <section id="setup-invite" aria-labelledby="invite-h" className="flex scroll-mt-4 flex-col gap-3 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h2 id="invite-h" className="flex-1 text-xl font-medium">4 · Invite people <span className="text-sm text-ux2-muted">· optional, you can do it after going live</span></h2>
+          <h2 id="invite-h" className="flex-1 text-xl font-medium">5 · Invite people <span className="text-sm text-ux2-muted">· optional, you can do it after going live</span></h2>
           {toSendCount > 0 && <Button variant="plum" disabled={busy} onClick={() => void sendAll()}>{busy ? 'Sending…' : `Send ${toSendCount} invitation${toSendCount === 1 ? '' : 's'}`}</Button>}
         </div>
         <p className="m-0 text-[13px] text-ux2-muted">Each person gets an email with a one-time code. Their role and unit are set when they accept: owners and residents see their unit, board members their seat.</p>
@@ -362,12 +373,28 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
 
       <section id="setup-live" aria-labelledby="live-h" className="grid scroll-mt-4 grid-cols-1 gap-[18px] rounded-[22px] bg-ux2-plum p-6 text-white md:grid-cols-2">
         <div className="flex flex-col gap-2.5">
-          <h2 id="live-h" className="text-[22px] font-medium">5 · Go live</h2>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+          <h2 id="live-h" className="text-[22px] font-medium">6 · Go live</h2>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">Needed</div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm" aria-label="Needed to go live">
             {essentials.map(e => (
               <li key={e.label} className="flex items-center gap-2.5">
                 {e.done ? <span aria-hidden="true" className="grid h-[22px] w-[22px] place-items-center rounded-full bg-white text-ux2-plum"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span> : <span aria-hidden="true" className="h-[22px] w-[22px] rounded-full border-[1.5px] border-white/60" />}
                 <span>{e.label}{!e.done && <span className="sr-only"> (not done)</span>}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">Also set up</div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm" aria-label="Also set up">
+            {alsoSetUp.map(e => (
+              <li key={e.id} data-also={e.id} data-state={e.state} className="flex items-start gap-2.5">
+                {e.state === 'done' ? <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-white text-ux2-plum"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span>
+                  : e.state === 'pending' ? <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-white/80"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+                    : <span aria-hidden="true" className="h-[22px] w-[22px] shrink-0 rounded-full border-[1.5px] border-white/60" />}
+                <span className="min-w-0 flex-1">
+                  {e.id === 'payments' && e.state !== 'done' && onPayments ? <button type="button" onClick={onPayments} className="font-semibold underline-offset-2 hover:underline">{e.label}</button> : <span className={e.state === 'done' ? '' : 'font-semibold'}>{e.label}</span>}
+                  <span className="block text-xs text-white/80">{e.note}</span>
+                  {e.state !== 'done' && <span className="sr-only"> ({e.state === 'pending' ? 'pending' : 'not done'})</span>}
+                </span>
               </li>
             ))}
           </ul>
@@ -385,6 +412,9 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
         <div className="flex flex-col gap-2 text-sm leading-relaxed text-white/90">
           <div className="text-xs font-semibold uppercase tracking-[0.08em] text-white/70">When you go live</div>
           <div>Owners get their invitation{inviteOwners ? '' : ' when you send it'}, and see the building as you've set it up.</div>
+          {payments === 'on' && <div>Their unit page offers "Pay online or set up autopay" from the first visit; checks still work for anyone who prefers them.</div>}
+          {payments === 'pending' && <div className="flex flex-col gap-1 rounded-[14px] bg-white/[0.12] px-3.5 py-3"><span><b className="font-semibold">Online payments switch on by themselves.</b> The moment Stripe confirms, usually within 2 days, every owner's unit page offers "Pay online or set up autopay" and they get a Home card and an email saying so.</span><span className="text-[13px] text-white/80">Until then the unit page says pay by check, and you record checks by hand as before.</span></div>}
+          {payments === 'off' && <div>Owners pay by check until Stripe is connected; you can do that in step 4 now, or later from Funds › Online payments.</div>}
           <div>Insurance renewals, contract ends and reserve items show up as duties on the calendar.</div>
           <div>Your building score starts, from what's already in place.</div>
           <div>Anything you left for later can still be done in each module.</div>

@@ -6,22 +6,17 @@
  * Connect goes through the `connect-stripe-account` edge function, the same
  * call the production Payments manager made; refunds through the store.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { supabase } from '@/lib/supabase';
 import { fmt } from '@/lib/formatters';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, RowMenu, SectionLabel, Table, Td, Th, Tile, TileRow, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { collected, monthName, ONLINE_METHODS, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
-
-const PREFS_KEY = 'onetwo-ux2-payments-prefs';
-interface Prefs { passFees: boolean; dues: boolean; assessments: boolean; fees: boolean; ach: boolean; paused: boolean }
-const DEFAULT_PREFS: Prefs = { passFees: false, dues: true, assessments: true, fees: true, ach: true, paused: false };
-const readPrefs = (): Prefs => { try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return DEFAULT_PREFS; } };
+import { Toggle, connectStripe, usePaymentPrefs, type Prefs } from '../paymentPrefs';
 
 const isCard = (m: string) => /card|stripe|online/i.test(m);
 const isBank = (m: string) => /ach|bank/i.test(m);
@@ -29,13 +24,6 @@ const feeFor = (amount: number, method: string) => (isCard(method) ? amount * 0.
 const nextTuesday = (iso: string) => { const d = new Date(`${iso}T00:00:00`); const add = (9 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + add); return d.toISOString().slice(0, 10); };
 const lastTuesday = (iso: string) => { const d = new Date(`${iso}T00:00:00`); const back = (d.getDay() + 5) % 7 || 7; d.setDate(d.getDate() - back); return d.toISOString().slice(0, 10); };
 
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? 'bg-ux2-navy' : 'bg-ux2-line-strong'}`}>
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
-    </button>
-  );
-}
 
 interface PaymentRow { id: string; date: string; unit: string; owner: string; what: string; how: string; amount: number; status: string; tone: 'sage' | 'red' | 'ghost' | 'amber'; invoiceId?: string; refundable: boolean }
 
@@ -45,16 +33,12 @@ export default function PaymentsTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
   const role = useAuthStore(s => s.currentRole);
   const addAnnouncement = useComplianceStore(s => s.addAnnouncement);
   const stripeId = useFinancialStore(s => s.stripeConnectId);
-  const setStripeConnect = useFinancialStore(s => s.setStripeConnect);
-  const setStripeOnboarding = useFinancialStore(s => s.setStripeOnboarding);
   const refund = useFinancialStore(s => s.refundUnitInvoice);
   const getAcctName = useFinancialStore(s => s.getAcctName);
-  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs());
+  const { prefs, set } = usePaymentPrefs();
   const [refunding, setRefunding] = useState<{ id: string; reason: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* private window */ } }, [prefs]);
-  const set = (k: keyof Prefs, v: boolean) => setPrefs(p => ({ ...p, [k]: v }));
 
   const col = collected(snap);
   const month = col.month;
@@ -88,14 +72,11 @@ export default function PaymentsTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
   const autopayUnits = new Set([...byCard, ...byBank].map(p => p.unit)).size;
 
   const connect = async (action: 'create' | 'check_status') => {
-    if (!supabase) { setNote('Connecting Stripe needs the live backend; the demo building shows the flow only.'); return; }
     setBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke('connect-stripe-account', { body: action === 'create' ? { action, buildingName: building.name, returnUrl: window.location.href } : { action, returnUrl: window.location.href } });
-      if (error) throw error;
-      if (data?.stripeConnectId) setStripeConnect(data.stripeConnectId);
-      if (data?.onboardingComplete) { setStripeOnboarding(true); setNote('Stripe confirmed the account. Owners can pay online.'); }
-      else if (data?.onboardingUrl) window.location.href = data.onboardingUrl;
+      const data = await connectStripe(action, building.name);
+      if (data.onboardingComplete) setNote('Stripe confirmed the account. Owners can pay online.');
+      else if (data.onboardingUrl) window.location.href = data.onboardingUrl;
     } catch (e: any) { setNote(e?.message || 'Stripe did not answer. Try again in a minute.'); } finally { setBusy(false); }
   };
   const inviteCheckPayers = () => {
@@ -191,7 +172,7 @@ export default function PaymentsTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
       {!ready && (
         <>
           <Card tone="navy" aria-label="Get paid online">
-            <SectionLabel className="text-white/[0.66]">Get paid online · Runbook · New building setup, step 6 of 9</SectionLabel>
+            <SectionLabel className="text-white/[0.66]">Get paid online · Runbook · Setup, step 4 of 6</SectionLabel>
             <div className="text-[22px] font-semibold leading-tight">Collect dues and assessments through Stripe</div>
             <p className="text-sm text-white/[0.85]">Owners pay by card or bank from their unit page; money lands in the operating account every week; the ledger posts itself. Until this is done, owners keep paying by check and you record each one by hand.</p>
             <div><Button size="sm" disabled={busy} className="!bg-white !text-ux2-navy" onClick={() => void connect(stripeId ? 'check_status' : 'create')}>{stripeId ? 'Finish setup' : 'Connect with Stripe'}</Button></div>
