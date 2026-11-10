@@ -54,6 +54,8 @@ export interface BuildingDetails {
   parking: string; architect: string; contractor: string; amenities: string[];
   entityType: 'incorporated' | 'unincorporated';
   fiscalYearEnd: string; // MM-DD format, e.g. '12-31'
+  /** How often the bylaws have the board meet, in days (every two months when unset); the Board meeting cycle runbook reads it. */
+  boardMeetingEveryDays?: number;
 }
 
 export interface MaintenanceSchedule {
@@ -263,6 +265,7 @@ export const useBuildingStore = create<BuildingState>()(persist((set) => ({
     amenities: ['Community Room','Fitness Center','Rooftop Deck','Secure Lobby','Elevator (2)','Package Room'],
     entityType: 'incorporated',
     fiscalYearEnd: '12-31',
+    boardMeetingEveryDays: 61,
   },
   board: [
     { id: 'bm1', name: 'Robert Mitchell', role: 'President', email: 'robert@example.com', phone: '202-555-0401', term: 'Jan 2025 – Dec 2026' },

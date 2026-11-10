@@ -11,13 +11,18 @@ import type { CaseTrackerCase } from '@/types/issues';
 /** Where this case came from, truthfully: the runbook itself, a request, an obligation, or a person. */
 function startedHow(c: CaseTrackerCase, trigger: string): string {
   const t = trigger.charAt(0).toLowerCase() + trigger.slice(1);
-  if (c.source === 'runbook') return `Started itself · ${t}`;
+  if (c.source === 'runbook' || /^Opened by the .+ runbook on /.test(c.notes)) return `Started itself · ${t}`;
   if (c.source === 'issue') return 'Opened from an owner request';
   if (c.source === 'obligation' || c.source === 'filing') return 'Opened from an obligation';
   return `Opened by hand · meant to start ${t}`;
 }
 
 const SETTINGS_RULES = '/funds?tab=settings&section=rules';
+/** Where a wired runbook's own setting lives. */
+const SETTING_OF: Record<string, { label: string; path: string }> = {
+  'month-close': { label: 'Change the day', path: SETTINGS_RULES },
+  'board-meeting': { label: 'Change the cadence', path: '/building' },
+};
 
 type StepState = 'done' | 'person' | 'auto' | 'pending';
 
@@ -106,7 +111,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   const Row = ({ r }: { r: RunbookStatus }) => (
     <tr data-runbook={r.def.id} data-focus={focus?.def.id === r.def.id ? '1' : undefined} className={cn(r.on ? '' : 'opacity-70', focus?.def.id === r.def.id && 'bg-ux2-teal-tint/40')}>
       <Td><Cell title={r.def.name} note={r.def.visibility === 'owners' ? 'Owners see this' : 'Board only · the unit sees its own view'} /></Td>
-      <Td className="text-ux2-muted">{r.trigger}{r.def.id === MONTH_CLOSE_ID && <> · <button type="button" onClick={() => navigate(SETTINGS_RULES)} className="font-semibold text-ux2-teal hover:underline">Change the day</button></>}{!r.def.wired && <span className="block text-[11px]">Opens by hand today</span>}</Td>
+      <Td className="text-ux2-muted">{r.trigger}{SETTING_OF[r.def.id] && <> · <button type="button" onClick={() => navigate(SETTING_OF[r.def.id].path)} className="font-semibold text-ux2-teal hover:underline">{SETTING_OF[r.def.id].label}</button></>}{!r.def.wired && <span className="block text-[11px]">Opens by hand today</span>}</Td>
       <Td num>{r.def.steps}</Td>
       <Td><Chip tone="teal">{r.def.automated} of {r.def.steps}</Chip></Td>
       <Td>
