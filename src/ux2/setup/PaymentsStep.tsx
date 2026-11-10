@@ -4,9 +4,10 @@
  * Three states: nothing yet (one click starts Stripe's hosted onboarding,
  * which returns here), an account Stripe is still verifying (the board sets
  * the payment rules meanwhile; status is re-checked on arrival), and
- * connected. Optional throughout: "Later" moves the Home card on, and
- * nothing here blocks going live. Same call and rules as Funds › Online
- * payments (`paymentPrefs`), so the two screens always agree.
+ * connected. Optional throughout: "Later" moves the Home card on to step 5
+ * (Send letters by mail), and nothing here blocks going live. Same call and
+ * rules as Funds › Online payments (`paymentPrefs`), so the two screens
+ * always agree.
  */
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -195,7 +196,7 @@ export default function PaymentsStep({ onBack, onNext }: { onBack: () => void; o
         <span className="text-[13px] text-ux2-muted">{status === 'off' ? '' : 'Nothing here blocks going live.'}</span>
         <span className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={onBack}>Back to Fill the gaps</Button>
-          <Button variant={status === 'off' ? 'ghost' : 'plum'} onClick={onNext}>{status === 'off' ? 'Skip to Invite people' : 'Continue to Invite people'}</Button>
+          <Button variant={status === 'off' ? 'ghost' : 'plum'} onClick={onNext}>{status === 'off' ? 'Skip to Send letters by mail' : 'Continue to Send letters by mail'}</Button>
         </span>
       </div>
     </div>
