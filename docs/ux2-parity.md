@@ -329,8 +329,8 @@ everything is read in the browser, so a document costs nothing to read.
 
 - **Home card** (`ux2/setup/SetupCard.tsx`): plum, at the top of Home while
   the tenant is `onboarding` and not live, for everyone but residents. One
-  next action, progress, the five steps. "Hide for now" leaves a chip.
-- **/setup** (`ux2/setup/SetupPage.tsx`, `?step=documents|review|finish`;
+  next action, progress, the seven steps. "Hide for now" leaves a chip.
+- **/setup** (`ux2/setup/SetupPage.tsx`, `?step=documents|review|payments|mail|finish`;
   listed in `vite.config.ts` APP_ROUTES and the `vercel.json` rewrites):
   1. *Documents* (`features/setup/readDocument.ts`):
      - PDFs: text pulled out with pdf.js (`pdfText.ts`), then read with rules
@@ -400,8 +400,18 @@ everything is read in the browser, so a document costs nothing to read.
      and lets the board set the payment rules meanwhile (the same rules and
      call as Funds › Online payments, from `funds/paymentPrefs`). Optional:
      "Later" moves the Home card on, and nothing here blocks going live. The
-     Home card's sixth step and Go live's "Also set up" list show its state.
-  3, 5–6. *Fill the gaps · Invite people · Go live*. Units can be added by
+     Home card's fourth step and Go live's "Also set up" list show its state.
+  5. *Send letters by mail* (`MailStep`), its own page like Stripe
+     (`?step=mail`). LetterStream Partnership mode: the board opens the
+     building's own LetterStream account through our partner link (from the
+     `connect-letterstream` status call; "not configured yet" until the
+     secret is set), pastes the account's API ID and key, and the step
+     verifies and saves them server-side through `useMailStore`, the same
+     store as Funds › Accounts and ledger › Bank & Mail. Shows what to have
+     ready and the estimated per-letter prices; LetterStream bills the
+     building, never ONE two. Optional: "Later" moves the Home card on. The
+     Home card's fifth step and Go live's "Also set up" list show its state.
+  3, 6–7. *Fill the gaps · Invite people · Go live*. Units can be added by
      hand right here (`UnitsEditor`): one at a time, a range (101–112, 1A–1F),
      or a pasted list in any column order (`unitEntry.ts`), then edited in a
      table or removed, with the ownership total checked against 100%.

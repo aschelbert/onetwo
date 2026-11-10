@@ -15,6 +15,7 @@ import { addPastedText } from '@/features/setup/readDocument';
 import { invitePayload, parseInviteLines } from '@/features/setup/invites';
 import { parseUnitLines, unitRange } from '@/features/setup/unitEntry';
 import { monthlyFeeEstimate, paymentsStatus, PREFS_KEY } from '@/ux2/funds/paymentPrefs';
+import { useMailStore } from '@/store/useMailStore';
 import { extractFromPages, wordNumber } from '@/features/setup/extractText';
 import { readSheet, parseCsv } from '@/features/setup/importSpreadsheet';
 import SetupPage from '@/ux2/setup/SetupPage';
@@ -526,23 +527,26 @@ describe('Setup · Get paid online (Stripe)', () => {
     expect(monthlyFeeEstimate([unit('1', 400), unit('2', 400), unit('3', 0)])).toEqual({ dues: 800, byCard: 24, byBank: 6 });
   });
 
-  it('is the sixth step: after the gaps are filled the Home card points at it, and Later moves on to Go live', () => {
+  it('is the fourth step: after the gaps are filled the Home card points at it, and Later moves on to letters by mail, then Go live', () => {
     useSetupStore.setState({ docs: [{ id: 'f1', name: 'Minutes.pdf', size: 1000, mediaType: 'application/pdf', status: 'filed', addedAt: '2026-11-07' }] });
     renderSetup('/home');
     const card = document.querySelector('[data-widget="setup-card"]') as HTMLElement;
     const steps = within(card).getByRole('list', { name: 'Setup steps' });
-    expect(within(steps).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Documents1 added', '2Review what we found', 'Fill the gapsDone', '4Get paid onlineOptional · about 10 min', '5Invite peopleOptional', '6Go live']);
+    expect(within(steps).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Documents1 added', '2Review what we found', 'Fill the gapsDone', '4Get paid onlineOptional · about 10 min', '5Send letters by mailOptional · about 5 min', '6Invite peopleOptional', '7Go live']);
     expect(within(card).getByRole('button', { name: 'Set up online payments' })).toBeTruthy();
     expect(within(card).getByText(/connect Stripe so owners can pay dues/)).toBeTruthy();
     act(() => useSetupStore.getState().setLater('payments', true));
-    expect(within(card).getByRole('button', { name: 'Go live' })).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'Set up letters by mail' })).toBeTruthy();
     expect(within(steps).getAllByRole('listitem')[3].textContent).toContain('Later');
+    act(() => useSetupStore.getState().setLater('mail', true));
+    expect(within(card).getByRole('button', { name: 'Go live' })).toBeTruthy();
+    expect(within(steps).getAllByRole('listitem')[4].textContent).toContain('Later');
   });
 
   it('step 4 before connecting: one action, what to have ready, and what it costs for this building', async () => {
     renderSetup('/setup?step=payments');
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['1Documents', '2Review what we found', '3Fill the gaps', '4Get paid online', '5Invite people', '6Go live']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['1Documents', '2Review what we found', '3Fill the gaps', '4Get paid online', '5Send letters by mail', '6Invite people', '7Go live']);
     expect(within(nav).getByRole('button', { name: /Get paid online/ }).getAttribute('aria-current')).toBe('step');
     const step = document.querySelector('[data-step="payments"]') as HTMLElement;
     expect(step.getAttribute('data-payments-status')).toBe('off');
@@ -552,10 +556,10 @@ describe('Setup · Get paid online (Stripe)', () => {
     // Without the live backend the click explains itself instead of failing silently.
     fireEvent.click(within(step).getByRole('button', { name: /Connect with Stripe/ }));
     expect((await within(step).findByRole('status')).textContent).toMatch(/needs the live backend/);
-    // Later: remembered, and the page moves on to inviting people.
+    // Later: remembered, and the page moves on to the next optional step, letters by mail.
     fireEvent.click(within(step).getByRole('button', { name: 'Later' }));
     expect(useSetupStore.getState().later).toContain('payments');
-    expect(screen.getByRole('heading', { name: /5 · Invite people/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /5 · Send letters by mail/ })).toBeTruthy();
   });
 
   it('back from Stripe: shows verification pending, the account, and the rules shared with Funds › Online payments', () => {
@@ -573,13 +577,13 @@ describe('Setup · Get paid online (Stripe)', () => {
     fireEvent.click(within(rules).getByRole('switch', { name: 'Bank account (ACH) as well as cards' }));
     fireEvent.click(within(rules).getByRole('radio', { name: 'The owner, at checkout' }));
     expect(JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')).toMatchObject({ ach: false, passFees: true });
-    expect(within(step).getByRole('button', { name: 'Continue to Invite people' })).toBeTruthy();
+    expect(within(step).getByRole('button', { name: 'Continue to Send letters by mail' })).toBeTruthy();
   });
 
   it('go live lists online payments under "also set up" with its state, and never requires it', () => {
     useFinancialStore.setState({ stripeConnectId: 'acct_1SAbCdEfGhx7', stripeOnboardingComplete: false });
     renderSetup('/setup?step=finish');
-    expect(screen.getByRole('heading', { name: '6 · Go live' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '7 · Go live' })).toBeTruthy();
     const also = screen.getByRole('list', { name: 'Also set up' });
     const pay = within(also).getByRole('button', { name: 'Online payments · Stripe verifying' });
     expect(pay.closest('[data-also="payments"]')?.getAttribute('data-state')).toBe('pending');
@@ -594,5 +598,73 @@ describe('Setup · Get paid online (Stripe)', () => {
     const lists = screen.getAllByRole('list', { name: 'Also set up' });
     expect(lists[lists.length - 1].querySelector('[data-also="payments"]')?.getAttribute('data-state')).toBe('done');
     expect(screen.getByText(/offers "Pay online or set up autopay" from the first visit/)).toBeTruthy();
+  });
+});
+
+describe('Setup · Send letters by mail (LetterStream)', () => {
+  /** A building with the essentials in place and Stripe left for later, so letters by mail are the next thing to do. */
+  beforeEach(() => {
+    localStorage.clear();
+    useSetupStore.getState().reset();
+    useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
+    useFinancialStore.setState({ units: [unit('1A', 400), unit('1B', 400)], budgetCategories: [], stripeConnectId: null, stripeOnboardingComplete: false });
+    useBuildingStore.setState({ board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: 'ana@example.com', phone: '', term: '' }], name: 'Maple Court', address: { street: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' } });
+    useMailStore.getState().updateMailingSettings({ letterstreamConnected: false, letterstreamApiIdMasked: '', letterstreamStatus: '', letterstreamConnectedAt: '', letterstreamPartnerUrl: '' });
+    useSetupStore.getState().setLater('payments', true);
+  });
+
+  it('is the fifth step: the Home card points at it once payments are handled, and Later moves on to Go live', () => {
+    useSetupStore.setState({ docs: [{ id: 'f1', name: 'Minutes.pdf', size: 1000, mediaType: 'application/pdf', status: 'filed', addedAt: '2026-11-07' }] });
+    renderSetup('/home');
+    const card = document.querySelector('[data-widget="setup-card"]') as HTMLElement;
+    expect(within(card).getByRole('button', { name: 'Set up letters by mail' })).toBeTruthy();
+    expect(within(card).getByText(/open the building's LetterStream account/)).toBeTruthy();
+    act(() => useSetupStore.getState().setLater('mail', true));
+    expect(within(card).getByRole('button', { name: 'Go live' })).toBeTruthy();
+  });
+
+  it('step 5 before connecting: the partner link, what to have ready, what it costs, and the keys form; Later moves on', () => {
+    renderSetup('/setup?step=mail');
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    expect(within(nav).getByRole('button', { name: /Send letters by mail/ }).getAttribute('aria-current')).toBe('step');
+    const step = document.querySelector('[data-step="mail"]') as HTMLElement;
+    expect(step.getAttribute('data-mail-status')).toBe('off');
+    expect(within(step).getByRole('heading', { level: 3 }).textContent).toBe("Open the building's LetterStream account");
+    // No partner link configured yet: say so rather than open nothing.
+    expect(within(step).getByText(/Partner link not configured yet/)).toBeTruthy();
+    expect(within(step).getAllByText('Have it handy')).toHaveLength(3);
+    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$8\.34.*Monthly or setup fee.*None/);
+    // Empty keys are refused before anything is sent.
+    fireEvent.click(within(step).getByRole('button', { name: 'Connect LetterStream' }));
+    expect(within(step).getByRole('status').textContent).toMatch(/Paste both the API ID and the API key/);
+    fireEvent.click(within(step).getByRole('button', { name: 'Later' }));
+    expect(useSetupStore.getState().later).toContain('mail');
+    expect(screen.getByRole('heading', { name: /6 · Invite people/ })).toBeTruthy();
+  });
+
+  it('connected: shows the account with the masked API ID and the Continue button; go live lists it under "also set up"', () => {
+    useMailStore.getState().updateMailingSettings({ letterstreamConnected: true, letterstreamApiIdMasked: '••••9876', letterstreamStatus: 'verified', letterstreamConnectedAt: '2026-11-10T00:00:00Z' });
+    renderSetup('/setup?step=mail');
+    const step = document.querySelector('[data-step="mail"]') as HTMLElement;
+    expect(step.getAttribute('data-mail-status')).toBe('on');
+    const account = within(step).getByLabelText('LetterStream account');
+    expect(account.textContent).toContain('Maple Court · API ID ••••9876');
+    expect(account.textContent).toContain('Verified');
+    expect(within(step).getByRole('button', { name: 'Continue to Invite people' })).toBeTruthy();
+
+    renderSetup('/setup?step=finish');
+    const lists = screen.getAllByRole('list', { name: 'Also set up' });
+    expect(lists[lists.length - 1].querySelector('[data-also="mail"]')?.getAttribute('data-state')).toBe('done');
+    expect(screen.getByText(/print and mail from the building's LetterStream account/)).toBeTruthy();
+  });
+
+  it('go live links letters by mail under "also set up" when it is not set up, and never requires it', () => {
+    renderSetup('/setup?step=finish');
+    const also = screen.getByRole('list', { name: 'Also set up' });
+    const mail = within(also).getByRole('button', { name: 'Letters by mail · not set up' });
+    expect(mail.closest('[data-also="mail"]')?.getAttribute('data-state')).toBe('todo');
+    expect((screen.getByRole('button', { name: 'Go live' }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(mail);
+    expect(document.querySelector('[data-step="mail"]')).toBeTruthy();
   });
 });
