@@ -11,7 +11,7 @@
  * counts instead.
  *
  * The database opens the same case every morning (run_reserve_study,
- * migration 059); the app fills in the playbook and ticks it.
+ * migration 063); the app fills in the playbook and ticks it.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

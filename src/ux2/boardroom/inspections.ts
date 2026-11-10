@@ -13,7 +13,7 @@
  * the entry, and once the entry is completed, the scheduling and the visit.
  * A case the board opened from the Home obligation for that system counts.
  *
- * The database opens the same cases every morning (migration 055); the app
+ * The database opens the same cases every morning (migration 059); the app
  * fills in the playbook steps and ticks them when it loads the case.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';

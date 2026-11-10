@@ -7,7 +7,7 @@
  * hand, or from the budget obligation on Home, counts instead.
  *
  * The database runs the same job every morning (run_annual_budget,
- * migration 053); the step texts here and there must stay the same.
+ * migration 057); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

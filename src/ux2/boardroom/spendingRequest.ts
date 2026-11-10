@@ -8,7 +8,7 @@
  * The request keeps the case's id.
  *
  * The database runs the same job every morning (run_spending_request,
- * migration 057); the step texts here and there must stay the same.
+ * migration 061); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

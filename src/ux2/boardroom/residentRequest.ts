@@ -8,7 +8,7 @@
  * request is in progress or answered, the close once it is resolved.
  *
  * The database opens the same case every morning (run_resident_request,
- * migration 056); the step texts here and there must stay the same.
+ * migration 060); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

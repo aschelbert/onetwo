@@ -7,7 +7,7 @@
  * case per vendor, by name.
  *
  * The database opens the same case every morning (run_vendor_onboarding,
- * migration 058); the step texts here and there must stay the same.
+ * migration 062); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

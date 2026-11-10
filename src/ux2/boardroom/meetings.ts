@@ -17,7 +17,7 @@
  *    and minutes steps as they land.
  *
  * Both use the case wizard's own situations, so the steps are the wizard's.
- * The database opens the same cases every morning (migration 054); the app
+ * The database opens the same cases every morning (migration 058); the app
  * ticks the steps when it loads them.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';

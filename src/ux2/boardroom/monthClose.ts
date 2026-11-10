@@ -7,7 +7,7 @@
  * closed by hand before its day never gets a case.
  *
  * The database runs the same job every morning (run_month_close_all,
- * migration 051), so the case opens even when nobody opens the app that
+ * migration 055), so the case opens even when nobody opens the app that
  * day; this is the fallback, and either side finds the other's case. The
  * step texts here and in that migration must stay the same.
  *

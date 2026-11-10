@@ -317,7 +317,7 @@ grant execute on function run_runbooks_all(date) to service_role;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Every morning at 06:30 UTC, after the billing cycle: the one job for every
--- wired runbook replaces the month-close-only job from migration 051.
+-- wired runbook replaces the month-close-only job from migration 055.
 -- ────────────────────────────────────────────────────────────────────────────
 
 do $$

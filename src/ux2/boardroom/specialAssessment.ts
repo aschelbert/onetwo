@@ -9,7 +9,7 @@
  * opened by hand counts instead.
  *
  * The database runs the same job every morning (run_special_assessment,
- * migration 058); the step texts here and there must stay the same.
+ * migration 062); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

@@ -6,7 +6,7 @@
  * policy starts a fresh case for its next expiry and nothing else.
  *
  * The database runs the same job every morning (run_insurance_renewal,
- * migration 052); the step texts here and there must stay the same.
+ * migration 056); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useBuildingStore, type InsurancePolicy } from '@/store/useBuildingStore';

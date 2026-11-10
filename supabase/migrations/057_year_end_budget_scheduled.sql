@@ -251,4 +251,4 @@ grant execute on function run_year_end_close(uuid, date) to service_role;
 grant execute on function run_year_end_close_all(date) to service_role;
 grant execute on function run_annual_budget(uuid, date) to service_role;
 grant execute on function run_annual_budget_all(date) to service_role;
--- The onetwo-runbooks job from migration 052 calls run_runbooks_all(), so it picks these up with no change.
+-- The onetwo-runbooks job from migration 056 calls run_runbooks_all(), so it picks these up with no change.

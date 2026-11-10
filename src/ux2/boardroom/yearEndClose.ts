@@ -6,7 +6,7 @@
  * are already closed never gets one.
  *
  * The database runs the same job every morning (run_year_end_close,
- * migration 053); the step texts here and there must stay the same.
+ * migration 057); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';

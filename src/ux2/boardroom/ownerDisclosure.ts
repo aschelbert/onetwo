@@ -8,7 +8,7 @@
  * opened from the Home obligation (r3) counts instead.
  *
  * The database runs the same job every morning (run_owner_disclosure,
- * migration 055); the step texts here and there must stay the same.
+ * migration 059); the step texts here and there must stay the same.
  */
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
