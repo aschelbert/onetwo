@@ -72,11 +72,12 @@ export default function MyUnitPage({ embedded }: { embedded?: boolean } = {}) {
   }
 
   const activeUnit = selectedUnit ? myUnits.find(u => u.number === selectedUnit) || myUnits[0] : myUnits[0];
-  const unpaidFees = activeUnit.lateFees.filter(f => !f.waived);
-  const totalLateFees = unpaidFees.reduce((s, f) => s + f.amount, 0);
+  const unpaidFees = activeUnit.lateFees.filter(f => !f.waived && !f.paid);
+  // Fees with an invoice are already in the balance; only fees from before the register add to it.
+  const totalLateFees = unpaidFees.filter(f => !f.invoiceId).reduce((s, f) => s + f.amount, 0);
   const unpaidSA = activeUnit.specialAssessments.filter(a => !a.paid);
   const totalSA = unpaidSA.reduce((s, a) => s + a.amount, 0);
-  const totalOwed = activeUnit.balance + totalLateFees;
+  const totalOwed = Math.max(0, activeUnit.balance) + totalLateFees;
   const totalPaid = activeUnit.payments.reduce((s, p) => s + p.amount, 0);
   const today = new Date().toISOString().split('T')[0];
   const overdueInvoices = store.unitInvoices.filter(

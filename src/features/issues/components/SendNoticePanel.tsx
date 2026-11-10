@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { CaseTrackerCase } from '@/types/issues';
 import type { MailDeliveryMethod, PostalAddress } from '@/types/mail';
-import { PRICING, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod } from '@/types/mail';
+import { ESTIMATE_NOTE, PRICING, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod } from '@/types/mail';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -119,7 +119,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
     [deliveryMethod, pageCount, includeReturnEnvelope],
   );
 
-  const hasPaymentMethod = !!mailStore.mailingSettings.stripePaymentMethodId;
+  // The letter goes into the building's own LetterStream account; without one there is nowhere to send it.
+  const letterstreamConnected = mailStore.mailingSettings.letterstreamConnected;
 
   const handleSend = async () => {
     if (!selectedTemplate) return;
@@ -132,6 +133,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
         tenantId: 'demo',
         templateId: selectedTemplate.id,
         templateName: selectedTemplate.name,
+        subject: selectedTemplate.subject,
+        body: previewBody,
         recipient: { name: recipientName, address: recipientAddress },
         deliveryMethod,
         pageCount,
@@ -326,7 +329,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
 
           {/* Cost Summary */}
           <div className="bg-ink-50 border border-ink-200 rounded-lg p-4 space-y-2">
-            <h3 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Cost Summary</h3>
+            <h3 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Estimated Postage</h3>
             <div className="flex justify-between text-sm">
               <span className="text-ink-600">{formatDeliveryMethod(deliveryMethod)}</span>
               <span className="text-ink-900 font-medium">${(cost.baseCostCents / 100).toFixed(2)}</span>
@@ -348,16 +351,16 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
               <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
             </div>
             <p className="text-[11px] text-ink-400">
-              {mailStore.mailingSettings.cardLast4
-                ? `Charged to ${mailStore.mailingSettings.senderName} via saved card ending ${mailStore.mailingSettings.cardLast4}`
-                : 'No card on file'}
+              {letterstreamConnected
+                ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s LetterStream account (${mailStore.mailingSettings.letterstreamApiIdMasked || 'connected'}).`
+                : ESTIMATE_NOTE}
             </p>
           </div>
 
-          {/* Payment warning */}
-          {!hasPaymentMethod && (
+          {/* Not connected warning */}
+          {!letterstreamConnected && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-amber-800 font-medium">No payment method on file. Add one in Settings → Mailing.</p>
+              <p className="text-xs text-amber-800 font-medium">The building's LetterStream account isn't connected. A board member connects it under Settings → Mailing.</p>
             </div>
           )}
 
@@ -371,10 +374,10 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
             </button>
             <button
               onClick={() => setShowReview(true)}
-              disabled={!selectedTemplate || !hasPaymentMethod}
+              disabled={!selectedTemplate || !letterstreamConnected}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Review & Send — ${(cost.totalCents / 100).toFixed(2)}
+              Review & Send — est. ${(cost.totalCents / 100).toFixed(2)}
             </button>
           </div>
           </>) : (
@@ -449,7 +452,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
 
               {/* Cost Summary */}
               <div className="bg-ink-50 border border-ink-200 rounded-lg p-4 space-y-2">
-                <h3 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Cost Summary</h3>
+                <h3 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-2">Estimated Postage</h3>
                 <div className="flex justify-between text-sm">
                   <span className="text-ink-600">{formatDeliveryMethod(deliveryMethod)}</span>
                   <span className="text-ink-900 font-medium">${(cost.baseCostCents / 100).toFixed(2)}</span>
@@ -472,9 +475,9 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                   <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
                 </div>
                 <p className="text-[11px] text-ink-400">
-                  {mailStore.mailingSettings.cardLast4
-                ? `Charged to ${mailStore.mailingSettings.senderName} via saved card ending ${mailStore.mailingSettings.cardLast4}`
-                : 'No card on file'}
+                  {letterstreamConnected
+                    ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s LetterStream account (${mailStore.mailingSettings.letterstreamApiIdMasked || 'connected'}). It mails once paid for there, or at once from a prepaid balance.`
+                    : ESTIMATE_NOTE}
                 </p>
               </div>
 
@@ -495,10 +498,10 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                 </button>
                 <button
                   onClick={handleSend}
-                  disabled={sending || !hasPaymentMethod}
+                  disabled={sending || !letterstreamConnected}
                   className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {sending ? 'Sending...' : `Confirm & Send — $${(cost.totalCents / 100).toFixed(2)}`}
+                  {sending ? 'Sending...' : `Confirm & Send — est. $${(cost.totalCents / 100).toFixed(2)}`}
                 </button>
               </div>
             </div>

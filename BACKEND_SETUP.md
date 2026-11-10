@@ -119,7 +119,7 @@ supabase functions deploy provision-tenant
 
 ```bash
 cd ~/onetwo
-npm install @supabase/supabase-js @stripe/stripe-js @chargebee/chargebee-js
+npm install @supabase/supabase-js @chargebee/chargebee-js
 ```
 
 ### Step 5: Configure Environment Variables
@@ -131,7 +131,6 @@ cp .env.example .env.local
 # Edit .env.local with your values:
 # VITE_SUPABASE_URL=https://xxx.supabase.co
 # VITE_SUPABASE_ANON_KEY=eyJ...
-# VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 # VITE_CB_SITE=onetwo-test
 ```
 
@@ -139,7 +138,6 @@ cp .env.example .env.local
 Go to Vercel Dashboard → Project → Settings → Environment Variables and add:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_STRIPE_PUBLISHABLE_KEY`
 - `VITE_CB_SITE`
 - All `VITE_CB_PRICE_*` variables
 
@@ -226,11 +224,66 @@ do not yet have an active Chargebee subscription:
 
 ### Stripe Connect (Owner Payments)
 
-Stripe is still used for owner-facing payments (assessment collection, postage fees, etc.)
-via Stripe Connect. Each tenant connects their own Stripe account so that payments from
-unit owners are deposited directly into the association's bank account.
+Stripe is still used for owner-facing payments (assessment collection) via Stripe
+Connect. Each tenant connects their own Stripe account so that payments from unit
+owners are deposited directly into the association's bank account.
 
 This is separate from the Chargebee subscription billing described above.
+
+**Connecting a building** happens in setup (step 4, *Get paid online*) or under
+Funds › Online payments, through `connect-stripe-account`. Stripe takes 1 to 2 days
+to verify an association. Three paths notice when it does, all through
+`supabase/functions/_shared/stripeAccount.ts`, so the building is marked verified and
+the board is told exactly once:
+
+1. **The board clicks Check now** (`connect-stripe-account`, action `check_status`).
+2. **Stripe's `account.updated` webhook** on the connected-accounts endpoint
+   (`stripe-webhook`). In the Stripe Dashboard → Developers → Webhooks, add
+   `account.updated` to the endpoint that *listens to events on Connected accounts*
+   (the one signed with `STRIPE_CONNECT_WEBHOOK_SECRET`).
+3. **The daily sweep** (`stripe-account-status`), scheduled by migration 053 with
+   pg_cron at 06:45 UTC through pg_net. The job authenticates with a random shared
+   secret the migration generates into Vault (`stripe_status_cron_secret`), which the
+   function reads back through a service-role-only RPC; the service role key never
+   enters the database. The one thing to create once per project is the URL the job
+   calls:
+
+   ```sql
+   select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'project_url');
+   ```
+
+   Where pg_cron or pg_net is unavailable, have an outside scheduler POST to
+   `/functions/v1/stripe-account-status` once a day with the Vault secret (or a
+   `CRON_SECRET` function secret, which overrides it) in an `x-cron-secret` header.
+
+On verification the board member who connected (or every board member, if unknown)
+gets a confirmation email through Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`),
+and a pinned "Pay online or set up autopay" announcement is posted for owners.
+
+```bash
+supabase functions deploy connect-stripe-account
+supabase functions deploy stripe-webhook --no-verify-jwt
+supabase functions deploy stripe-account-status
+```
+
+### LetterStream (Printed Mail)
+
+Printed letters go through LetterStream in **Partnership mode**. Each building opens
+its own LetterStream account through our partner link (`LETTERSTREAM_PARTNER_URL`),
+pastes the account's API ID and key under Settings → Mailing, and LetterStream bills
+the building directly for every letter. The platform never charges a card for postage.
+
+- Credentials live in `letterstream_accounts` (RLS on, no policies: service role only).
+- `connect-letterstream` saves, verifies, reports and removes a building's credentials.
+- `send-mail` renders the notice to PDF and pushes it into the building's account; the
+  job mails once the building pays for it there (or at once from a prepaid balance).
+- `check-mail-status` reads the job's status back with the building's credentials.
+
+LetterStream shares its API guide only with approved partner accounts. The wire format
+lives in one file, `supabase/functions/_shared/letterstream.ts`; confirm the endpoint,
+signature and field names against the guide before going live. API access is a
+LetterStream subscription on the partner account, and new API enrollment was paused by
+LetterStream until late November 2026.
 
 ---
 

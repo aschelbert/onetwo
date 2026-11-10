@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { fiscalYearStart } from '@/lib/ledger';
 import { todayIso } from '../runbook/adapters';
 import type { FundsSnapshot } from './metrics';
 
@@ -11,6 +13,7 @@ export function useFundsSnapshot(today: string = todayIso()): FundsSnapshot {
     autoBillingEnabled, lastBillingRun, lateFeeEnabled, lateFeeAmount, lateFeeGraceDays,
     stripeConnectId, stripeOnboardingComplete, budgetCategories, generalLedger,
   } = fin;
+  const fiscalYearEnd = useBuildingStore(s => s.details?.fiscalYearEnd) || '12-31';
   return useMemo(() => {
     const bs = fin.getBalanceSheet() as { assets: { operating: number; reserves: number } };
     const budget = (fin.getBudgetVariance() as { id?: string; name: string; budgeted: number; actual: number; acctNum?: string }[])
@@ -36,6 +39,7 @@ export function useFundsSnapshot(today: string = todayIso()): FundsSnapshot {
       stripeConnected: !!stripeConnectId,
       stripeOnboardingComplete,
       spendByMonth,
+      fiscalYearStart: fiscalYearStart(today, fiscalYearEnd),
     };
-  }, [today, units, unitInvoices, workOrders, reserveItems, annualReserveContribution, hoaDueDay, autoBillingEnabled, lastBillingRun, lateFeeEnabled, lateFeeAmount, lateFeeGraceDays, stripeConnectId, stripeOnboardingComplete, budgetCategories, generalLedger]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [today, units, unitInvoices, workOrders, reserveItems, annualReserveContribution, hoaDueDay, autoBillingEnabled, lastBillingRun, lateFeeEnabled, lateFeeAmount, lateFeeGraceDays, stripeConnectId, stripeOnboardingComplete, budgetCategories, generalLedger, fiscalYearEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 }

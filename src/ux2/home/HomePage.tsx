@@ -283,15 +283,16 @@ export default function HomePage() {
 
   const kpis = useMemo(() => {
     const reserveNeeded = fin.reserveItems.reduce((s, i) => s + i.estimatedCost, 0);
-    const reserveFunded = fin.reserveItems.reduce((s, i) => s + i.currentFunding, 0);
+    // What the reserve account holds in the ledger, not the planning split typed on each item.
+    const reserveFunded = (fin.getBalanceSheet() as { assets: { reserves: number } }).assets.reserves;
     const reservePct = reserveNeeded > 0 ? Math.round((reserveFunded / reserveNeeded) * 100) : 0;
     const income = fin.getIncomeMetrics() as { collectionRate: number; monthlyCollected: number; monthlyExpected: number; delinquentUnits: number };
     const openCases = snapshot.cases.filter(c => c.status === 'open').length;
     return { reservePct, reserveFunded, income, openCases };
-  }, [fin.reserveItems, fin.units, snapshot.cases]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fin.reserveItems, fin.units, fin.generalLedger, snapshot.cases]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const myUnits = fin.units.filter(u => viewer.linkedUnits.includes(u.number));
-  const myBalance = myUnits.reduce((s, u) => s + u.balance + u.lateFees.filter(f => !f.waived).reduce((t, f) => t + f.amount, 0), 0);
+  const myBalance = myUnits.reduce((s, u) => s + Math.max(0, u.balance) + u.lateFees.filter(f => !f.waived && !f.paid && !f.invoiceId).reduce((t, f) => t + f.amount, 0), 0);
   const dated = useMemo(() => [...set.forYou, ...set.waitingOnOthers, ...set.upcoming].filter(c => c.due), [set]);
   const [params, setParams] = useSearchParams();
   const view: 'feed' | 'calendar' = params.get('view') === 'calendar' ? 'calendar' : 'feed';

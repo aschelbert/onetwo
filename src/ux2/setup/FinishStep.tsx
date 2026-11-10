@@ -1,8 +1,11 @@
 /**
- * Setup steps 3–5 on one page: fill the gaps (only what the documents
+ * Setup steps 3, 6 and 7 on one page: fill the gaps (only what the documents
  * didn't cover, answered here), invite people (optional, prefilled from the
- * board), go live (the four essentials). Owners are invited at go-live, so
- * their first look is a finished building.
+ * board), go live (the four essentials, with online payments, letters by
+ * mail and the other optional pieces listed as "also set up"). Step 4, Get
+ * paid online, has its own page so Stripe can return to it; step 5, Send
+ * letters by mail, likewise. Owners are invited at go-live, so their first
+ * look is a finished building.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,9 +17,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore, type InviteAccess } from '@/features/setup/useSetupStore';
 import { ACCESS_OPTIONS, EMAIL_RE, SEATS, accessLabel, invitePayload, parseInviteLines, readRole } from '@/features/setup/invites';
-import { applyBudgetTemplate, postOpening } from '@/features/setup/applySetup';
+import { applyBudgetTemplate } from '@/features/setup/applySetup';
 import { resolve } from '@/features/setup/setupModel';
+import { isOpeningEntry } from '@/lib/financial-logic';
 import { Button, Chip } from '../components';
+import OpeningBalances from '../funds/OpeningBalances';
+import { paymentsStatus } from '../funds/paymentPrefs';
 import { useSetup } from './useSetup';
 import UnitsEditor from './UnitsEditor';
 
@@ -51,7 +57,7 @@ async function sendInvites(invitees: { email: string; role: string; unit?: strin
   return data as { total?: number; sent?: number; invitations?: { email: string; code?: string; sent: boolean; error?: string }[] };
 }
 
-export default function FinishStep({ onReview, onDocuments }: { onReview: () => void; onDocuments: () => void }) {
+export default function FinishStep({ onReview, onDocuments, onPayments, onMail }: { onReview: () => void; onDocuments: () => void; onPayments?: () => void; onMail?: () => void }) {
   const s = useSetup();
   const navigate = useNavigate();
   const tenant = useTenantContext();
@@ -65,7 +71,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const [member, setMember] = useState({ name: '', role: 'President', email: '' });
   const [sameFee, setSameFee] = useState('');
   const [splitTotal, setSplitTotal] = useState('');
-  const [balances, setBalances] = useState({ operating: '', reserve: '' });
+  const [openingOpen, setOpeningOpen] = useState(false);
   const [fees, setFees] = useState({ dueDay: String(f.hoaDueDay ?? 1), lateFee: f.lateFeeEnabled ? String(f.lateFeeAmount) : '', grace: String(f.lateFeeGraceDays) });
   const [feesSaved, setFeesSaved] = useState(false);
   const [inviteOff, setInviteOff] = useState<string[]>([]);
@@ -88,7 +94,11 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const monthlyTotal = monthlyTotalItem ? Number(resolve(monthlyTotalItem, s.decisions[monthlyTotalItem.key]?.picks).value) || 0 : 0;
   const pctTotal = units.reduce((t, u) => t + (u.votingPct || 0), 0);
   const canSplit = monthlyTotal > 0 && units.length > 0 && Math.abs(pctTotal - 100) < 0.5;
-  const openingDone = f.generalLedger.some(e => /opening .*balance/i.test(e.memo ?? ''));
+  const openingDone = f.generalLedger.some(e => isOpeningEntry(e) || /opening .*balance/i.test(e.memo ?? ''));
+  const asOfItem = s.items.find(i => i.key === 'fact:balance_as_of' && s.decisions[i.key]?.status === 'accepted');
+  const asOfRaw = asOfItem ? String(resolve(asOfItem, s.decisions[asOfItem.key]?.picks).value ?? '') : '';
+  const asOfDefault = /^\d{4}-\d{2}-\d{2}$/.test(asOfRaw) ? asOfRaw : (() => { const d = new Date(asOfRaw); return asOfRaw && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : null; })();
+  const today = new Date().toISOString().slice(0, 10);
   const annualFromUnits = units.reduce((t, u) => t + (u.monthlyFee || 0), 0) * 12;
   const noEmail = units.filter(u => u.owner && !u.email);
   const boardWithEmail = b.board.filter(m => m.email);
@@ -104,12 +114,6 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
   const splitTyped = () => { const t = Number(splitTotal.replace(/[$,\s]/g, '')); if (t > 0) for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(t * (u.votingPct / 100) * 100) / 100 }); };
   const split = () => { for (const u of units) f.updateUnit(u.number, { monthlyFee: Math.round(monthlyTotal * (u.votingPct / 100) * 100) / 100 }); };
   const applySame = () => { const n = Number(sameFee.replace(/[$,]/g, '')); if (n > 0) for (const u of unassessed) f.updateUnit(u.number, { monthlyFee: n }); };
-  const saveBalances = () => {
-    const op = Number(balances.operating.replace(/[$,]/g, '')); const rs = Number(balances.reserve.replace(/[$,]/g, ''));
-    if (op > 0) postOpening('operating', op);
-    if (rs > 0) postOpening('reserve', rs);
-  };
-
   const saveFees = () => {
     const due = Number(fees.dueDay); const fee = Number(fees.lateFee.replace(/[$,]/g, '')); const grace = Number(fees.grace);
     if (due >= 1 && due <= 28) f.setHoaDueDay(due);
@@ -178,7 +182,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
       await tenant.updateOnboardingStep('buildingProfileComplete', true);
       await tenant.updateOnboardingStep('unitsConfigured', true);
       if (s.docs.some(d => d.docType === 'bylaws' || d.docType === 'declaration')) await tenant.updateOnboardingStep('bylawsUploaded', true);
-      if (f.budgetCategories.length) await tenant.updateOnboardingStep('financialSetupDone', true);
+      if (f.budgetCategories.length || payments === 'on') await tenant.updateOnboardingStep('financialSetupDone', true);
       if (invitedBoard || inviteOwners || invites.some(i => i.sentAt)) await tenant.updateOnboardingStep('firstUserInvited', true);
       await tenant.updateOnboardingStep('goLive', true);
       navigate('/home');
@@ -187,12 +191,21 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
     } finally { setBusy(false); }
   };
 
+  const payments = paymentsStatus(f.stripeConnectId, f.stripeOnboardingComplete);
   const essentials = [
     { done: s.ess.profile, label: 'Building name and address' },
     { done: s.ess.units, label: units.length ? `${units.length} units with owners` : 'Units and owners' },
     { done: s.ess.board, label: b.board.length ? `${b.board.length} board member${b.board.length === 1 ? '' : 's'}` : 'At least one board member' },
     { done: s.ess.assessment, label: 'Monthly assessment for every unit' },
   ];
+  // Optional pieces, shown with their state so the board knows what owners will meet on day one.
+  const alsoSetUp = [
+    { id: 'payments', state: payments === 'on' ? 'done' : payments === 'pending' ? 'pending' : 'todo', label: payments === 'on' ? 'Online payments · Stripe connected' : payments === 'pending' ? 'Online payments · Stripe verifying' : 'Online payments · not set up', note: payments === 'on' ? 'owners can pay by card or bank from day one' : payments === 'pending' ? 'usually 1 to 2 days · owners pay by check until Stripe confirms' : 'owners pay by check · connect Stripe in step 4, now or after going live' },
+    { id: 'mail', state: s.mail === 'on' ? 'done' : 'todo', label: s.mail === 'on' ? 'Letters by mail · LetterStream connected' : 'Letters by mail · not set up', note: s.mail === 'on' ? "certified notices print and mail from the building's own account" : 'letters print at the building · connect LetterStream in step 5, now or after going live' },
+    { id: 'budget', state: f.budgetCategories.length ? 'done' : 'todo', label: "This year's budget", note: f.budgetCategories.length ? `${f.budgetCategories.length} lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : 'not added' },
+    { id: 'balances', state: openingDone ? 'done' : 'todo', label: 'Opening balances', note: openingDone ? 'posted to the ledger' : 'not entered' },
+    { id: 'fees', state: f.lateFeeEnabled || feesSaved ? 'done' : 'todo', label: 'Due day and late fee', note: `due on the ${f.hoaDueDay ?? 1}${['th', 'st', 'nd', 'rd'][((f.hoaDueDay ?? 1) % 100 - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][(f.hoaDueDay ?? 1) % 100] ?? 'th'}${f.lateFeeEnabled ? ` · ${fmt(f.lateFeeAmount)} after ${f.lateFeeGraceDays} days` : ' · no late fee'}` },
+  ] as const;
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -273,13 +286,11 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
             <Button size="sm" variant="plum" onClick={saveFees}>Save</Button>
           </span>
         </Gap>
-        <Gap id="balances" done={openingDone} title="Bank accounts and opening balances" note="From your last bank statements: today's balances in the operating and reserve accounts.">
-          <span className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="sp-op">Operating balance</label><input id="sp-op" className={cn(INPUT, 'w-32')} placeholder="Operating $" value={balances.operating} onChange={e => setBalances(x => ({ ...x, operating: e.target.value }))} />
-            <label className="sr-only" htmlFor="sp-rs">Reserve balance</label><input id="sp-rs" className={cn(INPUT, 'w-32')} placeholder="Reserve $" value={balances.reserve} onChange={e => setBalances(x => ({ ...x, reserve: e.target.value }))} />
-            <Button size="sm" variant="plum" onClick={saveBalances}>Save</Button>
-          </span>
+        <Gap id="balances" done={openingDone} title="Opening balances · the state of the books" note="As of one cutover date: the bank balances, what each owner owed or had paid ahead, and the bills not yet paid. Posts to the ledger and closes the books through that date.">
+          <Button size="sm" variant="plum" aria-expanded={openingOpen} onClick={() => setOpeningOpen(o => !o)}>{openingOpen ? 'Hide' : 'Enter the opening balances'}</Button>
         </Gap>
+        {openingDone && !openingOpen && <div className="-mt-1 pl-1"><Button size="sm" variant="ghost" aria-expanded={openingOpen} onClick={() => setOpeningOpen(true)}>Review or re-enter the opening balances</Button></div>}
+        {openingOpen && <div className="rounded-2xl border border-ux2-line bg-white px-4 py-3"><OpeningBalances today={today} defaultAsOf={asOfDefault} /></div>}
         <Gap id="budget" done={f.budgetCategories.length > 0} title="This year's budget" note={f.budgetCategories.length ? `${f.budgetCategories.length} budget lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : annualFromUnits ? `Not uploaded. Start from a template sized to ${fmt(annualFromUnits)} a year of assessments, then adjust the lines in Funds › Planning.` : 'Upload it, or set assessments first and start from a template.'}>
           {annualFromUnits > 0 && <Button size="sm" variant="plum" onClick={() => applyBudgetTemplate(annualFromUnits)}>Use the template</Button>}
           <Button size="sm" variant="ghost" onClick={onDocuments}>Add the budget</Button>
@@ -291,7 +302,7 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
 
       <section id="setup-invite" aria-labelledby="invite-h" className="flex scroll-mt-4 flex-col gap-3 rounded-[22px] border border-ux2-line bg-ux2-surface px-[22px] py-5">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h2 id="invite-h" className="flex-1 text-xl font-medium">4 · Invite people <span className="text-sm text-ux2-muted">· optional, you can do it after going live</span></h2>
+          <h2 id="invite-h" className="flex-1 text-xl font-medium">6 · Invite people <span className="text-sm text-ux2-muted">· optional, you can do it after going live</span></h2>
           {toSendCount > 0 && <Button variant="plum" disabled={busy} onClick={() => void sendAll()}>{busy ? 'Sending…' : `Send ${toSendCount} invitation${toSendCount === 1 ? '' : 's'}`}</Button>}
         </div>
         <p className="m-0 text-[13px] text-ux2-muted">Each person gets an email with a one-time code. Their role and unit are set when they accept: owners and residents see their unit, board members their seat.</p>
@@ -364,12 +375,30 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
 
       <section id="setup-live" aria-labelledby="live-h" className="grid scroll-mt-4 grid-cols-1 gap-[18px] rounded-[22px] bg-ux2-plum p-6 text-white md:grid-cols-2">
         <div className="flex flex-col gap-2.5">
-          <h2 id="live-h" className="text-[22px] font-medium">5 · Go live</h2>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+          <h2 id="live-h" className="text-[22px] font-medium">7 · Go live</h2>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">Needed</div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm" aria-label="Needed to go live">
             {essentials.map(e => (
               <li key={e.label} className="flex items-center gap-2.5">
                 {e.done ? <span aria-hidden="true" className="grid h-[22px] w-[22px] place-items-center rounded-full bg-white text-ux2-plum"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span> : <span aria-hidden="true" className="h-[22px] w-[22px] rounded-full border-[1.5px] border-white/60" />}
                 <span>{e.label}{!e.done && <span className="sr-only"> (not done)</span>}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">Also set up</div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm" aria-label="Also set up">
+            {alsoSetUp.map(e => (
+              <li key={e.id} data-also={e.id} data-state={e.state} className="flex items-start gap-2.5">
+                {e.state === 'done' ? <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-white text-ux2-plum"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg></span>
+                  : e.state === 'pending' ? <span aria-hidden="true" className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border-[1.5px] border-white/80"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+                    : <span aria-hidden="true" className="h-[22px] w-[22px] shrink-0 rounded-full border-[1.5px] border-white/60" />}
+                <span className="min-w-0 flex-1">
+                  {e.id === 'payments' && e.state !== 'done' && onPayments ? <button type="button" onClick={onPayments} className="font-semibold underline-offset-2 hover:underline">{e.label}</button>
+                    : e.id === 'mail' && e.state !== 'done' && onMail ? <button type="button" onClick={onMail} className="font-semibold underline-offset-2 hover:underline">{e.label}</button>
+                      : <span className={e.state === 'done' ? '' : 'font-semibold'}>{e.label}</span>}
+                  <span className="block text-xs text-white/80">{e.note}</span>
+                  {e.state !== 'done' && <span className="sr-only"> ({e.state === 'pending' ? 'pending' : 'not done'})</span>}
+                </span>
               </li>
             ))}
           </ul>
@@ -387,6 +416,10 @@ export default function FinishStep({ onReview, onDocuments }: { onReview: () => 
         <div className="flex flex-col gap-2 text-sm leading-relaxed text-white/90">
           <div className="text-xs font-semibold uppercase tracking-[0.08em] text-white/70">When you go live</div>
           <div>Owners get their invitation{inviteOwners ? '' : ' when you send it'}, and see the building as you've set it up.</div>
+          {payments === 'on' && <div>Their unit page offers "Pay online or set up autopay" from the first visit; checks still work for anyone who prefers them.</div>}
+          {payments === 'pending' && <div className="flex flex-col gap-1 rounded-[14px] bg-white/[0.12] px-3.5 py-3"><span><b className="font-semibold">Online payments switch on by themselves.</b> The moment Stripe confirms, usually within 2 days, every owner's unit page offers "Pay online or set up autopay" and they get a Home card and an email saying so.</span><span className="text-[13px] text-white/80">Until then the unit page says pay by check, and you record checks by hand as before.</span></div>}
+          {payments === 'off' && <div>Owners pay by check until Stripe is connected; you can do that in step 4 now, or later from Funds › Online payments.</div>}
+          {s.mail === 'on' ? <div>Certified notices and letters print and mail from the building's LetterStream account, with tracking on the case.</div> : <div>Letters print at the building until LetterStream is connected; you can do that in step 5 now, or later from Funds › Accounts and ledger › Bank & Mail.</div>}
           <div>Insurance renewals, contract ends and reserve items show up as duties on the calendar.</div>
           <div>Your building score starts, from what's already in place.</div>
           <div>Anything you left for later can still be done in each module.</div>

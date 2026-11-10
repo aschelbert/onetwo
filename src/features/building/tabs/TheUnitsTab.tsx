@@ -228,8 +228,8 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
     const amount = parseFloat(f('amount'));
     const reason = f('reason') || 'Late payment';
     setSending(true);
-    store.imposeLateFee(selected, amount, reason);
-    const invoice = store.createUnitInvoice(selected, 'fee', amount, `Late Fee: ${reason}`);
+    // One charge, one posting: the fee is the invoice.
+    const invoice = store.imposeLateFee(selected, amount, `Late Fee: ${reason}`);
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Late Fee: ${reason}`, 'fee');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
@@ -245,8 +245,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
     const amount = parseFloat(f('amount'));
     const reason = f('reason');
     setSending(true);
-    store.addSpecialAssessment(selected, amount, reason);
-    const invoice = store.createUnitInvoice(selected, 'special_assessment', amount, `Special Assessment: ${reason}`, undefined, f('dueDate') || undefined);
+    const invoice = store.addSpecialAssessment(selected, amount, `Special Assessment: ${reason}`, { dueDate: f('dueDate') || undefined });
     const result = await sendInvoiceEmail(invoice.id, selected, amount, `Special Assessment: ${reason}`, 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === selected);
@@ -264,8 +263,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
     setSending(true);
     let sentCount = 0;
     for (const unitNum of selectedUnits) {
-      store.addSpecialAssessment(unitNum, amount, reason);
-      const invoice = store.createUnitInvoice(unitNum, 'special_assessment', amount, `Special Assessment: ${reason}`, undefined, f('dueDate') || undefined);
+      const invoice = store.addSpecialAssessment(unitNum, amount, `Special Assessment: ${reason}`, { dueDate: f('dueDate') || undefined });
       const result = await sendInvoiceEmail(invoice.id, unitNum, amount, `Special Assessment: ${reason}`, 'special_assessment');
       if (result.sent) sentCount++;
     }
@@ -277,8 +275,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
     if (!f('unitNum') || !f('amount') || !f('description')) return alert('All fields required.');
     const amount = parseFloat(f('amount'));
     setSending(true);
-    store.addSpecialAssessment(f('unitNum'), amount, f('description'));
-    const invoice = store.createUnitInvoice(f('unitNum'), 'special_assessment', amount, f('description'), undefined, f('dueDate') || undefined);
+    const invoice = store.addSpecialAssessment(f('unitNum'), amount, f('description'), { dueDate: f('dueDate') || undefined });
     const result = await sendInvoiceEmail(invoice.id, f('unitNum'), amount, f('description'), 'special_assessment');
     setSending(false);
     const unit = store.units.find(u => u.number === f('unitNum'));

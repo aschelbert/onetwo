@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -165,14 +165,21 @@ describe('Funds', () => {
     expect(sw.getAttribute('aria-checked')).toBe('true');
   });
 
-  it('Accounts and ledger posts a quick entry through the store, renames an account and keeps the mailing card', () => {
+  it('Accounts and ledger has five pages under the gear; a deep link opens the page that holds its card', () => {
     renderAt('/funds?tab=settings&section=rules');
+    const nav = screen.getByRole('navigation', { name: 'Accounts and ledger sections' });
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Ledger', 'Chart of Accounts', 'GL mapping', 'Fees & Billing', 'Bank & Mail']);
+    // ?section=rules lands on Fees & Billing: the fee schedule and billing rules, nothing from the other pages.
     expect(document.querySelector('[aria-label="Billing rules"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Chart of accounts"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Where things post"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Fee schedule"]')).toBeTruthy();
-    expect(screen.getByTestId('legacy-mailing')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Ledger"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Chart of accounts"]')).toBeNull();
+    expect(screen.queryByTestId('legacy-mailing')).toBeNull();
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'Ledger' }));
+    expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Opening balances"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Billing rules"]')).toBeNull();
     const before = useFinancialStore.getState().generalLedger.length;
     fireEvent.click(screen.getByRole('button', { name: 'Moved money to reserves' }));
     const form = screen.getByRole('form', { name: 'Moved money to reserves' });
@@ -181,6 +188,33 @@ describe('Funds', () => {
     const gl = useFinancialStore.getState().generalLedger;
     expect(gl.length).toBe(before + 1);
     expect(gl[gl.length - 1]).toMatchObject({ debitAcct: '1020', creditAcct: '1010', amount: 2400, source: 'transfer' });
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'Chart of Accounts' }));
+    const chart = document.querySelector('[aria-label="Chart of accounts"]') as HTMLElement;
+    expect(chart).toBeTruthy();
+    // The chart is grouped under its section rows, each account showing its fund.
+    const sectionRows = Array.from(chart.querySelectorAll('tr[data-section]')).map(r => r.getAttribute('data-section'));
+    expect(sectionRows).toEqual(['1000', '2000', '3000', '4000', '5000', '6000']);
+    expect(within(chart).getByText(/1000 · Assets · Owns/)).toBeTruthy();
+    expect(within(chart.querySelector('tr[data-account="1020"]') as HTMLElement).getByText('Reserve')).toBeTruthy();
+    expect(within(chart.querySelector('tr[data-account="1010"]') as HTMLElement).getByText('Operating')).toBeTruthy();
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'GL mapping' }));
+    expect(document.querySelector('[aria-label="Where things post"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Chart of accounts"]')).toBeNull();
+
+    fireEvent.click(within(nav).getByRole('button', { name: 'Bank & Mail' }));
+    expect(document.querySelector('[aria-label="Bank and payments"]')).toBeTruthy();
+    expect(screen.getByTestId('legacy-mailing')).toBeTruthy();
+  });
+
+  it('Accounts and ledger opens on the Ledger page without a section, and ?section=opening opens the opening balances', () => {
+    renderAt('/funds?tab=settings');
+    expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
+    cleanup();
+    renderAt('/funds?tab=settings&section=opening');
+    expect(document.querySelector('[aria-label="Ledger"]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeTruthy();
   });
 
   it('Statements shows the balance sheet, income statement, packets, filings and accountant cards; a packet posts as a notice', () => {
@@ -191,6 +225,10 @@ describe('Funds', () => {
     expect(document.querySelector('[aria-label="Monthly statement packets"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Taxes and filings"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Accountant access"]')).toBeTruthy();
+    // The balance sheet shows both funds and ties.
+    const bs = document.querySelector('[aria-label="Balance sheet"]') as HTMLElement;
+    expect(within(bs).getAllByRole('columnheader').map(h => h.textContent?.trim())).toEqual(['', 'Operating', 'Reserve', 'Total']);
+    expect(within(bs).getByText('Owns − owes = fund balances ✓')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Budget variance report' }));
     expect(within(document.querySelector('[aria-label="Income statement"]') as HTMLElement).getByText('Variance')).toBeTruthy();
     const send = screen.queryAllByRole('button', { name: 'Send to owners' })[0];

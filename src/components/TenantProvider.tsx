@@ -21,6 +21,8 @@ import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
+import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { useMailStore } from '@/store/useMailStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
 export interface OnboardingState {
@@ -243,6 +245,9 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           useScorecardStore.getState().loadFromDb(tenantInfo.id),
           usePayrollStore.getState().loadFromDb(tenantInfo.id),
           useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
+          useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
+          // Whether the building's own LetterStream account is connected (the keys stay server-side).
+          useMailStore.getState().loadMailingSettings(tenantInfo.id).catch(() => { /* mail stays "not connected" until the function answers */ }),
         ]);
       }
     }
@@ -430,6 +435,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
             useScorecardStore.getState().loadFromDb(tenantInfo.id),
             usePayrollStore.getState().loadFromDb(tenantInfo.id),
             useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
+            useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
+            useMailStore.getState().loadMailingSettings(tenantInfo.id).catch(() => { /* mail stays "not connected" until the function answers */ }),
           ]);
         }
 

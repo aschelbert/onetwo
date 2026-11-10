@@ -35,6 +35,7 @@ export default function PayPage() {
 
   const fees = unpaidFees(unit);
   const sa = openAssessments(unit);
+  const credit = Math.max(0, -unit.balance);
   const total = Math.max(0, unit.balance) + fees;
   const open = unitInvoices.filter(i => i.unitNumber === unit.number && (i.status === 'sent' || i.status === 'overdue'));
 
@@ -54,7 +55,7 @@ export default function PayPage() {
       </header>
 
       <TileRow>
-        <Tile tone={total > 0 ? 'navy' : 'teal'} label="Balance" meta={`Unit ${unit.number}`} value={fmt(total)} sub={total > 0 ? `${fmt(Math.max(0, unit.balance))} dues and charges${fees ? ` · ${fmt(fees)} late fees` : ''}${sa ? ` · ${fmt(sa)} special assessment open` : ''}` : 'Paid up · nothing due'} className="min-h-[150px]" />
+        <Tile tone={total > 0 ? 'navy' : 'teal'} label="Balance" meta={`Unit ${unit.number}`} value={fmt(total)} sub={total > 0 ? `${fmt(Math.max(0, unit.balance))} dues and charges${fees ? ` · ${fmt(fees)} late fees` : ''}${sa ? ` · includes ${fmt(sa)} special assessment` : ''}` : credit > 0 ? `Paid up · ${fmt(credit)} credit goes toward your next dues` : 'Paid up · nothing due'} className="min-h-[150px]" />
         <Tile tone="grey" label="Monthly dues" value={fmt(unit.monthlyFee)} sub={`Due on the ${ordinal(hoaDueDay)} · autopay takes it unless you pay early`} className="min-h-[150px]" />
         <Tile tone="grey" label="Open invoices" value={open.length} sub={open.length ? open.slice(0, 3).map(i => `${i.description} · ${fmt(i.amount)}`).join(' · ') : 'Nothing open on this unit'} className="min-h-[150px]">
           {open.some(i => i.status === 'overdue') && <Chip tone="red">Overdue</Chip>}

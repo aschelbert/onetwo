@@ -30,7 +30,11 @@ export const FACT_KEYS = [
 export type FactKey = typeof FACT_KEYS[number];
 
 export interface FactRow extends SourceBits { key: FactKey; value: string; number: number | null }
-export interface UnitRow extends SourceBits { unit: string; owner: string; email: string | null; phone: string | null; mailingAddress: string | null; ownershipPct: number | null; monthlyFee: number | null }
+export interface UnitRow extends SourceBits {
+  unit: string; owner: string; email: string | null; phone: string | null; mailingAddress: string | null; ownershipPct: number | null; monthlyFee: number | null;
+  /** What the owner owed on the list's date (negative when paid ahead). */
+  openingBalance?: number | null;
+}
 export interface BoardRow extends SourceBits { name: string; role: string; email: string | null; phone: string | null; termEnds: string | null }
 export interface InsuranceRow extends SourceBits { type: string; carrier: string; policyNumber: string | null; coverage: string | null; premium: number | null; expires: string | null }
 export interface VendorRow extends SourceBits { name: string; service: string; contact: string | null; phone: string | null; email: string | null; contractEnds: string | null; annualCost: number | null }
@@ -142,7 +146,7 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
  */
 export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[]; optional?: boolean }[] = [
   { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Board and officer duties', 'Owner obligations', 'Rules for residents', 'Quorum and notice rules', 'Assessment due day', 'Late fees', 'Unit ownership table'] },
-  { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Invites'] },
+  { id: 'owners', label: 'Owner list (Excel, CSV or PDF)', types: ['owner_list'], imports: true, fills: ['Units', 'Owners and contacts', 'Ownership %', 'Monthly assessments', 'Balances owed', 'Invites'] },
   { id: 'budget', label: "This year's budget (Excel, CSV or PDF)", types: ['budget'], imports: true, fills: ['Budget lines by category'] },
   { id: 'minutes', label: 'Minutes of the last annual meeting', types: ['minutes'], imports: true, fills: ['Board and officers'] },
   { id: 'rules', label: 'Rules and regulations', types: ['rules'], imports: true, fills: ['Rules for residents', 'Fines', 'Late fees'] },
@@ -183,7 +187,7 @@ export interface Item {
 
 export const FIELD_LABEL: Record<string, string> = {
   value: 'Value', owner: 'Owner', email: 'Email', phone: 'Phone', mailingAddress: 'Mailing address', ownershipPct: 'Ownership',
-  monthlyFee: 'Monthly assessment', role: 'Office', termEnds: 'Term ends', carrier: 'Carrier', policyNumber: 'Policy number',
+  monthlyFee: 'Monthly assessment', openingBalance: 'Balance owed', role: 'Office', termEnds: 'Term ends', carrier: 'Carrier', policyNumber: 'Policy number',
   coverage: 'Coverage', premium: 'Premium', expires: 'Expires', service: 'Service', contact: 'Contact', contractEnds: 'Contract ends',
   annualCost: 'Annual cost', annualAmount: 'Annual amount', estimatedCost: 'Replacement cost', usefulLifeYears: 'Useful life',
   remainingLifeYears: 'Years left', text: 'Clause', ref: 'Section',
@@ -193,6 +197,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigi
 function displayOf(field: string, v: FieldScalar): string {
   if (typeof v === 'string') return v;
   if (field === 'ownershipPct') return `${v}%`;
+  if (field === 'openingBalance') return v < 0 ? `${money(-v)} credit` : v === 0 ? 'Current' : money(v);
   if (['monthlyFee', 'premium', 'annualCost', 'annualAmount', 'estimatedCost'].includes(field)) return money(v);
   if (field === 'usefulLifeYears' || field === 'remainingLifeYears') return `${v} years`;
   return String(v);
@@ -235,6 +240,7 @@ export function buildItems(docs: SetupDoc[]): Item[] {
       const s = src(u);
       addValue(it, 'owner', u.owner, s); addValue(it, 'email', u.email, s); addValue(it, 'phone', u.phone, s);
       addValue(it, 'mailingAddress', u.mailingAddress, s); addValue(it, 'ownershipPct', u.ownershipPct, s); addValue(it, 'monthlyFee', u.monthlyFee, s);
+      addValue(it, 'openingBalance', u.openingBalance, s);
     }
     for (const b of r.board ?? []) {
       if (!b.name?.trim()) continue;
@@ -308,7 +314,7 @@ export function itemSummary(it: Item, picks?: Record<string, number>, edits?: Re
     const vals = it.fields[f]; return vals ? vals[Math.min(picks?.[f] ?? 0, vals.length - 1)].display : null;
   };
   switch (it.section) {
-    case 'units': return [v('owner'), v('ownershipPct'), v('monthlyFee') && `${v('monthlyFee')} a month`].filter(Boolean).join(' · ');
+    case 'units': return [v('owner'), v('ownershipPct'), v('monthlyFee') && `${v('monthlyFee')} a month`, v('openingBalance') && (v('openingBalance') === 'Current' ? 'current' : /credit$/.test(v('openingBalance')!) ? v('openingBalance') : `${v('openingBalance')} owed`)].filter(Boolean).join(' · ');
     case 'board': return [v('role'), v('email'), v('termEnds') && `term ends ${v('termEnds')}`].filter(Boolean).join(' · ');
     case 'insurance': return [v('carrier'), v('coverage'), v('expires') && `expires ${v('expires')}`].filter(Boolean).join(' · ');
     case 'vendors': return [v('service'), v('contact'), v('contractEnds') && `contract ends ${v('contractEnds')}`].filter(Boolean).join(' · ');
@@ -335,11 +341,13 @@ export function essentials(s: { name: string; street: string; unitCount: number;
   };
 }
 
-export type StepId = 'documents' | 'review' | 'gaps' | 'invite' | 'live';
+export type StepId = 'documents' | 'review' | 'gaps' | 'payments' | 'invite' | 'live';
+/** The six steps. Get paid online (Stripe) sits before Invite people so owners can pay from the day they are invited; it never blocks go-live. */
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'documents', label: 'Documents' },
   { id: 'review', label: 'Review what we found' },
   { id: 'gaps', label: 'Fill the gaps' },
+  { id: 'payments', label: 'Get paid online' },
   { id: 'invite', label: 'Invite people' },
   { id: 'live', label: 'Go live' },
 ];
@@ -359,7 +367,7 @@ export const DESTINATIONS: { match: RegExp; path: string }[] = [
   { match: /^Building profile/, path: '/building' },
   { match: /^Building › Directory/, path: '/building?tab=directory' },
   { match: /^Funds › Accounts and ledger · billing rules/, path: '/funds?tab=settings' },
-  { match: /^Funds › opening balance/, path: '/funds?tab=settings&section=ledger' },
+  { match: /^Funds › opening balance/, path: '/funds?tab=settings&section=opening' },
   { match: /^Building › Obligations · duties and roles/, path: '/building?tab=obligations&section=duties' },
   { match: /^Building › Documents · insurance/, path: '/building?tab=documents&section=certificates' },
   { match: /^Building › Contracts/, path: '/building?tab=contracts' },

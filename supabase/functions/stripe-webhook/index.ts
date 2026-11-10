@@ -2,10 +2,16 @@
 // Handles Stripe webhooks for unit-owner payments and refunds.
 // Subscription lifecycle is now handled by Chargebee (chargebee-webhook).
 // Zero dependencies -- raw fetch to Supabase REST API + Stripe signature via Web Crypto.
+// account.updated (from the connected-accounts endpoint) marks a building's Stripe account verified
+// the moment Stripe says so, through the same code as the board's Check now and the daily job.
+
+import { STRIPE_SETTINGS_SELECT, confirmIfVerified } from "../_shared/stripeAccount.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
+// Two endpoints deliver here: the platform account's and the connected-accounts one (payments land on each
+// building's connected account). Each has its own signing secret; an event is accepted if either signs it.
+const WEBHOOK_SECRETS = [Deno.env.get("STRIPE_WEBHOOK_SECRET") || "", Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET") || ""].filter(Boolean);
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
 // Supabase REST helper (service role bypasses RLS)
@@ -83,6 +89,39 @@ async function verifyStripeSignature(payload: string, sigHeader: string, secret:
   }
 }
 
+// The unit and building a subscription invoice is for. connect-stripe-account puts them on the subscription's
+// metadata; Stripe copies that onto each invoice, but where depends on the API version: `parent.subscription_details`
+// (2025-03-31 and later), `subscription_details` (earlier), or the line items. If none carries it, the subscription
+// itself is fetched (on the connected account the event came from).
+// deno-lint-ignore no-explicit-any
+async function unitMetadataOf(invoice: any, account?: string): Promise<Record<string, string>> {
+  const hasUnit = (m: unknown): m is Record<string, string> =>
+    !!m && typeof m === "object" && !!(m as Record<string, string>).unit_number && !!(m as Record<string, string>).tenant_id;
+  const candidates = [
+    invoice.parent?.subscription_details?.metadata,
+    invoice.subscription_details?.metadata,
+    invoice.metadata,
+    // deno-lint-ignore no-explicit-any
+    ...((invoice.lines?.data || []) as any[]).map((l) => l.metadata),
+  ];
+  for (const m of candidates) if (hasUnit(m)) return m;
+  const subId = invoice.parent?.subscription_details?.subscription || invoice.subscription;
+  if (STRIPE_KEY && typeof subId === "string" && subId.startsWith("sub_")) {
+    try {
+      const headers: Record<string, string> = { "Authorization": `Bearer ${STRIPE_KEY}` };
+      if (account && typeof account === "string" && account.startsWith("acct_")) headers["Stripe-Account"] = account;
+      const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subId}`, { headers });
+      if (res.ok) {
+        const sub = await res.json();
+        if (hasUnit(sub.metadata)) return sub.metadata;
+      }
+    } catch (err) {
+      console.error("Subscription lookup failed:", err);
+    }
+  }
+  return {};
+}
+
 Deno.serve(async (req) => {
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
@@ -91,24 +130,28 @@ Deno.serve(async (req) => {
 
   const body = await req.text();
 
-  // Verify webhook signature (primary: HMAC, fallback: Stripe API retrieval)
-  const sigValid = await verifyStripeSignature(body, signature, WEBHOOK_SECRET);
+  // Verify webhook signature (primary: HMAC with any known secret, fallback: Stripe API retrieval)
+  let sigValid = false;
+  for (const secret of WEBHOOK_SECRETS) {
+    if (await verifyStripeSignature(body, signature, secret)) { sigValid = true; break; }
+  }
   // deno-lint-ignore no-explicit-any
   let event: any;
 
   if (sigValid) {
     event = JSON.parse(body);
   } else if (STRIPE_KEY) {
-    // Fallback: verify the event by retrieving it from Stripe's API.
+    // Fallback: verify the event by retrieving it from Stripe's API. What Stripe returns is what we act on, never
+    // the posted body. An event from a connected account lives on that account, so the lookup names it.
     try {
       const raw = JSON.parse(body);
       if (raw.id && typeof raw.id === "string" && raw.id.startsWith("evt_")) {
-        const stripeRes = await fetch(`https://api.stripe.com/v1/events/${raw.id}`, {
-          headers: { "Authorization": `Bearer ${STRIPE_KEY}` },
-        });
+        const headers: Record<string, string> = { "Authorization": `Bearer ${STRIPE_KEY}` };
+        if (raw.account && typeof raw.account === "string" && raw.account.startsWith("acct_")) headers["Stripe-Account"] = raw.account;
+        const stripeRes = await fetch(`https://api.stripe.com/v1/events/${raw.id}`, { headers });
         if (stripeRes.ok) {
           event = await stripeRes.json();
-          console.log("Signature failed but event verified via Stripe API");
+          console.log(`Signature failed but event verified via Stripe API${raw.account ? ` (connected account ${raw.account})` : ""}`);
         }
       }
     } catch {
@@ -126,30 +169,74 @@ Deno.serve(async (req) => {
   try {
     switch (event.type) {
 
-      // ═══ CHECKOUT COMPLETED → Unit payment reconciliation ═══
+      // ═══ CHECKOUT COMPLETED → the payment posts to the unit's ledger ═══
+      // Every posting is done by a database function that applies the payment
+      // the way the app does (dues, then special assessments, then fees, oldest
+      // first; the rest is a credit) and is idempotent on the session id, so a
+      // webhook delivered twice posts once.
       case "checkout.session.completed": {
         const session = event.data.object;
         const meta = session.metadata || {};
-
-        // Only handle unit payment checkouts (invoice_id + tenant_id in metadata)
-        if (meta.invoice_id && meta.tenant_id) {
-          console.log(`Unit payment checkout: invoice=${meta.invoice_id} tenant=${meta.tenant_id}`);
-          try {
+        if (session.mode === "subscription") {
+          console.log("Subscription checkout: the first month posts from invoice.paid");
+          break;
+        }
+        try {
+          if (meta.invoice_id) {
+            // A payment link for one invoice (send-unit-invoice).
+            console.log(`Invoice checkout: invoice=${meta.invoice_id}`);
             const result = await sbRpc("reconcile_unit_payment", {
               p_stripe_session_id: session.id,
               p_stripe_payment_intent_id: session.payment_intent || null,
             });
             console.log("Reconciliation result:", JSON.stringify(result));
-          } catch (err) {
-            console.error("Unit payment reconciliation failed:", err);
+          } else if (meta.unit_number && meta.tenant_id && session.amount_total) {
+            // The owner paid a balance from the Pay page (connect-stripe-account create_checkout).
+            console.log(`Unit checkout: unit=${meta.unit_number} tenant=${meta.tenant_id}`);
+            const result = await sbRpc("record_unit_payment", {
+              p_tenant_id: meta.tenant_id,
+              p_unit_number: meta.unit_number,
+              p_amount: session.amount_total / 100,
+              p_method: "stripe",
+              p_reference: `stripe:${session.id}`,
+            });
+            console.log("Payment result:", JSON.stringify(result));
+          } else {
+            console.log("Checkout with no unit or invoice in its metadata, skipping (subscription provisioning handled by Chargebee)");
           }
-        } else {
-          console.log("Non-unit-payment checkout, skipping (subscription provisioning handled by Chargebee)");
+        } catch (err) {
+          console.error("Unit payment posting failed:", err);
         }
         break;
       }
 
-      // ═══ CHARGE REFUNDED ═══
+      // ═══ AUTOPAY: a subscription invoice was paid ═══
+      // connect-stripe-account puts the unit and building on the subscription's
+      // metadata, so each month's payment posts to the unit. Needs the webhook
+      // endpoint to receive connected-account events.
+      case "invoice.paid": {
+        const invoice = event.data.object;
+        const meta = await unitMetadataOf(invoice, event.account);
+        if (!meta.unit_number || !meta.tenant_id || !invoice.amount_paid) {
+          console.log("invoice.paid without a unit in its metadata, skipping");
+          break;
+        }
+        try {
+          const result = await sbRpc("record_unit_payment", {
+            p_tenant_id: meta.tenant_id,
+            p_unit_number: meta.unit_number,
+            p_amount: invoice.amount_paid / 100,
+            p_method: "stripe",
+            p_reference: `stripe:${invoice.id}`,
+          });
+          console.log("Autopay result:", JSON.stringify(result));
+        } catch (err) {
+          console.error("Autopay posting failed:", err);
+        }
+        break;
+      }
+
+      // ═══ CHARGE REFUNDED (from the Stripe dashboard; refunds from the app are posted by refund-unit-payment) ═══
       case "charge.refunded": {
         const charge = event.data.object;
         const paymentIntentId = charge.payment_intent;
@@ -157,67 +244,47 @@ Deno.serve(async (req) => {
           console.log("charge.refunded without payment_intent, skipping");
           break;
         }
-
-        // Find invoice by stripe_payment_intent_id
         const refundInvoice = await sbQuery("GET", "unit_invoices", {
           "stripe_payment_intent_id": `eq.${paymentIntentId}`,
-          "select": "id,tenant_id,unit_number,amount,status,type",
+          "select": "id,status",
         });
-
         if (!refundInvoice?.id) {
           console.log(`No invoice found for payment_intent ${paymentIntentId}`);
           break;
         }
-
         if (refundInvoice.status === "void") {
-          console.log(`Invoice ${refundInvoice.id} already voided`);
+          console.log(`Invoice ${refundInvoice.id} already refunded`);
           break;
         }
-
-        // Determine AR account
-        const refundArAcct = refundInvoice.type === "fee" || refundInvoice.type === "amenity_fee" ? "1130"
-          : refundInvoice.type === "special_assessment" ? "1120" : "1110";
-        const refundGlId = "GL" + Date.now();
-
-        // Post reversal GL entry: debit AR, credit 1010 (cash)
-        await sbQuery("POST", "general_ledger", {}, {
-          tenant_id: refundInvoice.tenant_id,
-          local_id: refundGlId,
-          date: new Date().toISOString().split("T")[0],
-          memo: `Refund - Invoice ${refundInvoice.id} Unit ${refundInvoice.unit_number}`,
-          debit_acct: refundArAcct,
-          credit_acct: "1010",
-          amount: refundInvoice.amount,
-          source: "payment",
-          source_id: refundInvoice.unit_number,
-          posted: new Date().toISOString(),
-          status: "posted",
-        });
-
-        // Update invoice to void with refund info
-        const stripeRefundId = charge.refunds?.data?.[0]?.id || null;
-        await sbQuery("PATCH", `unit_invoices?id=eq.${refundInvoice.id}`, {}, {
-          status: "void",
-          refund_amount: refundInvoice.amount,
-          refund_date: new Date().toISOString().split("T")[0],
-          refund_reason: "Stripe refund",
-          refund_gl_entry_id: refundGlId,
-          stripe_refund_id: stripeRefundId,
-        });
-
-        // Update unit balance (increase by refund amount)
-        const currentUnit = await sbQuery("GET", "units", {
-          "tenant_id": `eq.${refundInvoice.tenant_id}`,
-          "number": `eq.${refundInvoice.unit_number}`,
-          "select": "balance",
-        });
-        if (currentUnit) {
-          await sbQuery("PATCH", `units?tenant_id=eq.${refundInvoice.tenant_id}&number=eq.${refundInvoice.unit_number}`, {}, {
-            balance: (currentUnit.balance || 0) + refundInvoice.amount,
+        try {
+          const result = await sbRpc("refund_unit_invoice", {
+            p_invoice_id: refundInvoice.id,
+            p_reason: "Refunded in Stripe",
+            p_stripe_refund_id: charge.refunds?.data?.[0]?.id || null,
           });
+          console.log("Refund result:", JSON.stringify(result));
+        } catch (err) {
+          console.error("Refund posting failed:", err);
         }
+        break;
+      }
 
-        console.log(`Refund processed for invoice ${refundInvoice.id}, amount: ${refundInvoice.amount}`);
+      // ═══ ACCOUNT UPDATED → a building's Stripe account may now be verified ═══
+      // Stripe sends this for connected accounts as the review progresses. The first time it reports
+      // charges enabled and details submitted, the building is marked complete, the board is emailed
+      // and the owners' announcement is posted; later deliveries only record the check.
+      case "account.updated": {
+        const account = event.data.object;
+        const acctId = typeof account?.id === "string" ? account.id : (typeof event.account === "string" ? event.account : null);
+        if (!acctId) { console.log("account.updated without an account id"); break; }
+        const settings = await sbQuery("GET", "financial_settings", { "stripe_connect_id": `eq.${acctId}`, "select": STRIPE_SETTINGS_SELECT });
+        if (!settings?.tenant_id) { console.log(`account.updated for ${acctId}: no building has this account`); break; }
+        try {
+          const r = await confirmIfVerified(settings, account);
+          console.log(`account.updated ${acctId}: complete=${r.onboardingComplete} justVerified=${r.justVerified} emailed=${r.emailed}`);
+        } catch (err) {
+          console.error("account.updated handling failed:", err);
+        }
         break;
       }
 

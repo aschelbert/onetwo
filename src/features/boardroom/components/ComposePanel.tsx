@@ -5,7 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
-import { PRICING, formatDeliveryMethod } from '@/types/mail';
+import { ESTIMATE_NOTE, PRICING, formatDeliveryMethod } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
 import type { LetterTemplate } from '@/lib/services/letterEngine';
 import type { ComposePanelContext, DeliveryChannel, AnnouncementPriority } from '@/types/communication';
@@ -565,7 +565,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
           <div className="sticky bottom-0 bg-white border-t border-ink-100 px-6 py-4">
             {channels.mail ? (
               <div className="p-3 bg-ink-50 rounded-[10px] mb-3 text-xs text-ink-600">
-                <p className="font-semibold mb-1">Cost Summary</p>
+                <p className="font-semibold mb-1">Estimated Postage</p>
                 <div className="flex justify-between">
                   <span>{formatDeliveryMethod(mailMethod)} ({mailLetterCount} {mailLetterCount > 1 ? 'letters' : 'letter'} × ${(mailPriceCents / 100).toFixed(2)})</span>
                   <span className="font-semibold">${(mailPriceCents * mailLetterCount / 100).toFixed(2)}</span>
@@ -586,14 +586,14 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <span>${mailCostDollars.toFixed(2)}</span>
                 </div>
                 <p className="text-[10px] text-ink-400 mt-1">
-                  {mailingSettings.cardLast4
-                    ? `Charged to ${mailingSettings.senderName} via card ending ${mailingSettings.cardLast4}`
-                    : 'No card on file'}
+                  {mailingSettings.letterstreamConnected
+                    ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
+                    : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
                 </p>
               </div>
             ) : (
               <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg mb-3 text-[11px] text-emerald-700 font-medium">
-                ✓ No charges — email{scope === 'community' ? ' and announcements are' : ' is'} included
+                ✓ No postage — email{scope === 'community' ? ' and announcements are' : ' is'} included
               </div>
             )}
             <div className="flex gap-2.5">
@@ -608,7 +608,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                 disabled={!subject.trim()}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-[10px] text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {channels.mail ? `Review & Send — $${mailCostDollars.toFixed(2)}` : 'Review & Send'}
+                {channels.mail ? `Review & Send — est. $${mailCostDollars.toFixed(2)}` : 'Review & Send'}
               </button>
             </div>
           </div>
@@ -739,7 +739,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
             <div className="sticky bottom-0 bg-white border-t border-ink-100 -mx-6 px-6 py-4 mt-2">
               {channels.mail ? (
                 <div className="p-3 bg-ink-50 rounded-[10px] mb-3 text-xs text-ink-600">
-                  <p className="font-semibold mb-1">Cost Summary</p>
+                  <p className="font-semibold mb-1">Estimated Postage</p>
                   <div className="flex justify-between">
                     <span>{formatDeliveryMethod(mailMethod)} ({mailLetterCount} {mailLetterCount > 1 ? 'letters' : 'letter'} × ${(mailPriceCents / 100).toFixed(2)})</span>
                     <span className="font-semibold">${(mailPriceCents * mailLetterCount / 100).toFixed(2)}</span>
@@ -757,14 +757,14 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span>${mailCostDollars.toFixed(2)}</span>
                   </div>
                   <p className="text-[10px] text-ink-400 mt-1">
-                    {mailingSettings.cardLast4
-                    ? `Charged to ${mailingSettings.senderName} via card ending ${mailingSettings.cardLast4}`
-                    : 'No card on file'}
+                    {mailingSettings.letterstreamConnected
+                      ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
+                      : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
                   </p>
                 </div>
               ) : (
                 <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg mb-3 text-[11px] text-emerald-700 font-medium">
-                  No charges — email{scope === 'community' ? ' and announcements are' : ' is'} included
+                  No postage — email{scope === 'community' ? ' and announcements are' : ' is'} included
                 </div>
               )}
               <div className="flex gap-2.5">
@@ -779,7 +779,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   disabled={sending}
                   className="flex-1 py-2.5 bg-red-500 text-white rounded-[10px] text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {sending ? 'Sending...' : channels.mail ? `Confirm & Send — $${mailCostDollars.toFixed(2)}` : 'Confirm & Send'}
+                  {sending ? 'Sending...' : channels.mail ? `Confirm & Send — est. $${mailCostDollars.toFixed(2)}` : 'Confirm & Send'}
                 </button>
               </div>
             </div>

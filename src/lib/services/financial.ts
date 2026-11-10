@@ -1,6 +1,7 @@
 import { supabase, logDbError } from '@/lib/supabase';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
+import type { PaymentOrder } from '@/lib/financial-logic';
 
 // ── Units (composite PK: tenant_id + number) ──
 
@@ -181,6 +182,7 @@ export function rowToCoA(r: Record<string, unknown>): ChartOfAccountsEntry {
     parent: (r.parent as string) || null,
     budgetCat: (r.budget_cat as string) || undefined,
     reserveItem: (r.reserve_item as string) || undefined,
+    fund: (r.fund as ChartOfAccountsEntry['fund']) || undefined,
   };
 }
 
@@ -200,9 +202,21 @@ export async function upsertCoAEntry(tenantId: string, entry: ChartOfAccountsEnt
   const { error } = await supabase.from('chart_of_accounts').upsert({
     tenant_id: tenantId, num: entry.num, name: entry.name, type: entry.type,
     sub: entry.sub, parent: entry.parent, budget_cat: entry.budgetCat || null,
-    reserve_item: entry.reserveItem || null,
+    reserve_item: entry.reserveItem || null, fund: entry.fund || null,
   }, { onConflict: 'tenant_id,num' });
   if (error) { logDbError('upsertCoAEntry error:', error); return false; }
+  return true;
+}
+
+/** Writes many chart rows at once; used to give a building its default chart. */
+export async function upsertCoAEntries(tenantId: string, entries: ChartOfAccountsEntry[]): Promise<boolean> {
+  if (!supabase || entries.length === 0) return false;
+  const { error } = await supabase.from('chart_of_accounts').upsert(entries.map(entry => ({
+    tenant_id: tenantId, num: entry.num, name: entry.name, type: entry.type,
+    sub: entry.sub, parent: entry.parent, budget_cat: entry.budgetCat || null,
+    reserve_item: entry.reserveItem || null, fund: entry.fund || null,
+  })), { onConflict: 'tenant_id,num' });
+  if (error) { logDbError('upsertCoAEntries error:', error); return false; }
   return true;
 }
 
@@ -252,6 +266,16 @@ export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<b
   return true;
 }
 
+/** Mark an entry void (it stops counting everywhere) or posted again. */
+export async function setGLEntryStatus(tenantId: string, localId: string, status: GLEntry['status'], reason?: string): Promise<boolean> {
+  if (!supabase) return false;
+  const row: Record<string, unknown> = { status };
+  if (reason !== undefined) row.reason = reason;
+  const { error } = await supabase.from('general_ledger').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  if (error) { logDbError('setGLEntryStatus error:', error); return false; }
+  return true;
+}
+
 // ── Work Orders ──
 
 export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
@@ -271,6 +295,7 @@ export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
     paidDate: (r.paid_date as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
     attachments: (r.attachments || []) as WorkOrder['attachments'],
+    accrualGlEntryId: (r.accrual_gl_entry_id as string) || null,
   };
 }
 
@@ -294,6 +319,7 @@ export async function createWorkOrder(tenantId: string, wo: WorkOrder): Promise<
     approved_date: wo.approvedDate, invoice_num: wo.invoiceNum,
     invoice_date: wo.invoiceDate, paid_date: wo.paidDate,
     gl_entry_id: wo.glEntryId, attachments: wo.attachments,
+    accrual_gl_entry_id: wo.accrualGlEntryId || null,
   });
   if (error) { logDbError('createWorkOrder error:', error); return false; }
   return true;
@@ -315,6 +341,7 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.paidDate !== undefined) row.paid_date = updates.paidDate;
   if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
+  if (updates.accrualGlEntryId !== undefined) row.accrual_gl_entry_id = updates.accrualGlEntryId;
   const { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
   if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;
@@ -334,6 +361,8 @@ export function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
     dueDate: r.due_date as string,
     paidDate: (r.paid_date as string) || null,
     paidAmount: r.paid_amount != null ? Number(r.paid_amount) : null,
+    fund: (r.fund as UnitInvoice['fund']) || null,
+    forInvoiceId: (r.for_invoice_id as string) || null,
     paymentMethod: (r.payment_method as string) || null,
     stripePaymentLink: (r.stripe_payment_link as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
@@ -372,6 +401,8 @@ export async function createUnitInvoice(tenantId: string, inv: UnitInvoice): Pro
       payment_gl_entry_id: inv.paymentGlEntryId,
       stripe_checkout_session_id: inv.stripeCheckoutSessionId || null,
       stripe_payment_intent_id: inv.stripePaymentIntentId || null,
+      fund: inv.fund || null,
+      for_invoice_id: inv.forInvoiceId || null,
     })
     .select()
     .single();
@@ -383,6 +414,8 @@ export async function updateUnitInvoice(id: string, updates: Partial<UnitInvoice
   if (!supabase) return false;
   const row: Record<string, unknown> = {};
   if (updates.status !== undefined) row.status = updates.status;
+  if (updates.dueDate !== undefined) row.due_date = updates.dueDate;
+  if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.paidDate !== undefined) row.paid_date = updates.paidDate;
   if (updates.paidAmount !== undefined) row.paid_amount = updates.paidAmount;
   if (updates.paymentMethod !== undefined) row.payment_method = updates.paymentMethod;
@@ -412,6 +445,12 @@ export interface FinancialSettingsRow {
   lateFeeAmount: number;
   lateFeeGraceDays: number;
   lastLateFeeRun: string | null;
+  /** The books are closed through this date (YYYY-MM-DD); nothing posts on or before it. */
+  closedThrough: string | null;
+  autoReserveTransfer: boolean;
+  paymentOrder: PaymentOrder;
+  /** "Where things post": the building's account mapping, so the server posts to the same accounts as the app. */
+  glAccountMapping: Record<string, string> | null;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -434,6 +473,10 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     lateFeeAmount: Number(data.late_fee_amount ?? 25),
     lateFeeGraceDays: Number(data.late_fee_grace_days ?? 15),
     lastLateFeeRun: (data.last_late_fee_run as string) || null,
+    closedThrough: (data.closed_through as string) || null,
+    autoReserveTransfer: (data.auto_reserve_transfer as boolean) ?? true,
+    paymentOrder: data.payment_order === 'oldest-first' ? 'oldest-first' : 'dues-first',
+    glAccountMapping: (data.gl_account_mapping as Record<string, string>) || null,
   };
 }
 
@@ -450,6 +493,10 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.lateFeeAmount !== undefined) row.late_fee_amount = s.lateFeeAmount;
   if (s.lateFeeGraceDays !== undefined) row.late_fee_grace_days = s.lateFeeGraceDays;
   if (s.lastLateFeeRun !== undefined) row.last_late_fee_run = s.lastLateFeeRun;
+  if (s.closedThrough !== undefined) row.closed_through = s.closedThrough;
+  if (s.autoReserveTransfer !== undefined) row.auto_reserve_transfer = s.autoReserveTransfer;
+  if (s.glAccountMapping !== undefined) row.gl_account_mapping = s.glAccountMapping;
+  if (s.paymentOrder !== undefined) row.payment_order = s.paymentOrder;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;

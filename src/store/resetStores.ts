@@ -18,6 +18,8 @@ import { useCommunicationsStore } from './useCommunicationsStore';
 import { useAmenitiesStore } from './useAmenitiesStore';
 import { usePayrollStore } from './usePayrollStore';
 import { useTaskTrackingStore } from './useTaskTrackingStore';
+import { useFeeScheduleStore } from './useFeeScheduleStore';
+import { useLetterStore } from './useLetterStore';
 import { useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 
@@ -72,6 +74,9 @@ export function resetStoresForRealTenant() {
     lateFeeAmount: 25,
     lateFeeGraceDays: 15,
     lastLateFeeRun: null,
+    closedThrough: null,
+    autoReserveTransfer: true,
+    paymentOrder: 'dues-first',
     glAccountMapping: { ...DEFAULT_GL_MAPPING },
   });
 
@@ -110,6 +115,12 @@ export function resetStoresForRealTenant() {
   usePayrollStore.setState({ staff: [], timeEntries: [], payRuns: [], form1099s: [] });
 
   useTaskTrackingStore.setState({ tasks: [] });
+
+  // The fee schedule shows the defaults until the building's own rows load.
+  useFeeScheduleStore.getState().reset();
+
+  // Letter templates show the built-ins until the building's own rows load; its letters are its own.
+  useLetterStore.getState().reset();
   // Note: stripeAccountId, stripeOnboardingComplete on staff, and paymentMethod,
   // stripeTransferId, withholdingGlEntryId on payRuns are cleared when arrays empty.
 }

@@ -1,6 +1,8 @@
 // supabase/functions/refund-unit-payment/index.ts
 // Zero dependencies — raw fetch to Stripe API + Supabase REST API
-// Refunds a paid unit invoice: Stripe refund + GL reversal + DB updates
+// Refunds a paid unit invoice: the Stripe refund, then the database function
+// refund_unit_invoice posts the same entries the app posts (the charge was
+// wrong: Dr income / Cr bank, anything still open cancelled, invoice void).
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -72,15 +74,18 @@ Deno.serve(async (req) => {
     const invoice = await sbQuery("GET", "unit_invoices", {
       "id": `eq.${invoiceId}`,
       "tenant_id": `eq.${tenantId}`,
-      "select": "id,tenant_id,unit_number,amount,status,type,stripe_payment_intent_id,stripe_checkout_session_id",
+      "select": "id,tenant_id,unit_number,amount,paid_amount,status,type,stripe_payment_intent_id,stripe_checkout_session_id",
     });
 
     if (!invoice?.id) {
       return jsonResponse({ error: "Invoice not found" }, 404);
     }
 
-    if (invoice.status !== "paid") {
-      return jsonResponse({ error: `Invoice status is '${invoice.status}', can only refund 'paid' invoices` }, 400);
+    if (invoice.status === "void") {
+      return jsonResponse({ error: "This invoice was already refunded or cancelled" }, 400);
+    }
+    if (invoice.status !== "paid" && !(invoice.paid_amount > 0)) {
+      return jsonResponse({ error: `Nothing has been paid on this invoice (status '${invoice.status}'); void it instead of refunding` }, 400);
     }
 
     let stripeRefundId: string | null = null;
@@ -122,55 +127,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Determine AR account for GL reversal
-    const arAcct = invoice.type === "fee" || invoice.type === "amenity_fee" ? "1130"
-      : invoice.type === "special_assessment" ? "1120" : "1110";
-    const glLocalId = "GL" + Date.now();
-    const today = new Date().toISOString().split("T")[0];
-
-    // Post reversal GL entry: debit AR account, credit 1010 (cash)
-    await sbQuery("POST", "general_ledger", {}, {
-      tenant_id: tenantId,
-      local_id: glLocalId,
-      date: today,
-      memo: `Refund - Invoice ${invoice.id} Unit ${invoice.unit_number}${reason ? ': ' + reason : ''}`,
-      debit_acct: arAcct,
-      credit_acct: "1010",
-      amount: invoice.amount,
-      source: "refund",
-      source_id: invoice.unit_number,
-      posted: new Date().toISOString(),
-      status: "posted",
+    // Post it: income reversed, cash returned, anything still open cancelled, invoice void.
+    const rpcRes = await fetch(`${SB_URL}/rest/v1/rpc/refund_unit_invoice`, {
+      method: "POST",
+      headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_invoice_id: invoice.id, p_reason: reason || "Board-initiated refund", p_stripe_refund_id: stripeRefundId }),
     });
-
-    // Update invoice: mark as void with refund fields
-    await sbQuery("PATCH", `unit_invoices?id=eq.${invoice.id}`, {}, {
-      status: "void",
-      refund_amount: invoice.amount,
-      refund_date: today,
-      refund_reason: reason || "Board-initiated refund",
-      refund_gl_entry_id: glLocalId,
-      stripe_refund_id: stripeRefundId,
-    });
-
-    // Update unit balance: increase by refund amount
-    const currentUnit = await sbQuery("GET", "units", {
-      "tenant_id": `eq.${tenantId}`,
-      "number": `eq.${invoice.unit_number}`,
-      "select": "balance",
-    });
-    if (currentUnit) {
-      await sbQuery("PATCH", `units?tenant_id=eq.${tenantId}&number=eq.${invoice.unit_number}`, {}, {
-        balance: (currentUnit.balance || 0) + invoice.amount,
-      });
+    if (!rpcRes.ok) {
+      const err = await rpcRes.text();
+      console.error("refund_unit_invoice failed:", err);
+      return jsonResponse({ error: `The refund went out but could not be posted to the ledger: ${err.slice(0, 200)}`, stripeRefundId }, 500);
     }
+    const posted = await rpcRes.json();
 
     return jsonResponse({
       success: true,
       invoiceId: invoice.id,
-      refundAmount: invoice.amount,
+      refundAmount: posted?.refund_amount ?? invoice.amount,
       stripeRefundId,
-      glEntryId: glLocalId,
+      glEntryId: posted?.gl_entry_id ?? null,
     });
 
   } catch (err) {
