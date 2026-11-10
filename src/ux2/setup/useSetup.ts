@@ -15,7 +15,7 @@ import { buildItems, essentials, progress, isClear, type Item } from '@/features
 import { paymentsStatus, type PaymentsStatus } from '../funds/paymentPrefs';
 
 export type NextStep = { step: 'documents' | 'review' | 'payments' | 'mail' | 'finish'; label: string };
-/** Where the building stands with LetterStream: nothing yet, or its own account connected. */
+/** Where the building stands with its mail vendor: nothing yet, or its own account connected. */
 export type MailStatus = 'off' | 'on';
 
 export function useSetup() {
@@ -23,7 +23,7 @@ export function useSetup() {
   const decisions = useSetupStore(s => s.decisions);
   const paymentsLater = useSetupStore(s => s.later.includes('payments'));
   const mailLater = useSetupStore(s => s.later.includes('mail'));
-  const letterstreamConnected = useMailStore(s => s.mailingSettings.letterstreamConnected);
+  const mailConnected = useMailStore(s => s.mailingSettings.mailConnected && !!s.mailingSettings.mailProvider);
   const name = useBuildingStore(s => s.name);
   const street = useBuildingStore(s => s.address.street);
   const board = useBuildingStore(s => s.board);
@@ -41,7 +41,7 @@ export function useSetup() {
   const read = docs.filter(d => d.status === 'read').length;
   const clear = pending.filter(isClear);
   const payments: PaymentsStatus = paymentsStatus(stripeConnectId, stripeComplete);
-  const mail: MailStatus = letterstreamConnected ? 'on' : 'off';
+  const mail: MailStatus = mailConnected ? 'on' : 'off';
   // Online payments and printed mail are optional: they count toward the time left only until started or left for later.
   const paymentsOpen = payments === 'off' && !paymentsLater;
   const mailOpen = mail === 'off' && !mailLater;

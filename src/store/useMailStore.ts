@@ -4,27 +4,36 @@ import type {
   MailRecord,
   MailingSettings,
   MailDeliveryMethod,
+  MailProviderId,
   MailStatus,
   PostalAddress,
 } from '@/types/mail';
-import { calculateMailingCost } from '@/types/mail';
+import { MAIL_PROVIDERS, calculateMailingCost, mailProviderLabel } from '@/types/mail';
 import { useIssuesStore } from './useIssuesStore';
 import { supabase } from '@/lib/supabase';
 import { generateLocalId } from '@/lib/generateId';
 
-/** What the board sees when a letter is sent without the building's LetterStream account on file. */
-export const LETTERSTREAM_NOT_CONNECTED = "The building's LetterStream account isn't connected. Connect it under Settings → Mailing.";
+/** What the board sees when a letter is sent without the building's mail account on file. */
+export const MAIL_NOT_CONNECTED = "The building's mail account isn't connected. Connect DocuPost or LetterStream under Settings → Mailing.";
 
-/** The connect-letterstream function's answer. */
-interface LetterStreamStatus {
+/** The connect-mail-provider function's answer. */
+interface MailProviderStatus {
   connected: boolean;
-  apiIdMasked: string | null;
+  provider: MailProviderId | null;
+  credentialMasked: string | null;
   status: string | null;
   connectedAt: string | null;
-  partnerUrl: string | null;
   portalUrl: string | null;
+  signupUrl: string | null;
+  providers?: { id: MailProviderId; signupUrl: string | null }[];
   note?: string | null;
   error?: string;
+}
+
+export interface MailCredentials {
+  /** LetterStream only. */
+  apiId?: string;
+  apiKey: string;
 }
 
 interface MailState {
@@ -34,11 +43,11 @@ interface MailState {
   addMailRecord: (record: MailRecord) => void;
   updateMailRecord: (id: string, partial: Partial<MailRecord>) => void;
   getMailRecordsByCase: (caseId: string) => MailRecord[];
-  /** Ask the server whether the building's LetterStream account is connected. */
+  /** Ask the server which vendor account the building has connected. */
   loadMailingSettings: (tenantId: string) => Promise<void>;
-  /** Save the building's own LetterStream API ID and key (board only). Resolves to a note when saved but not yet verified. */
-  connectLetterStream: (apiId: string, apiKey: string) => Promise<{ note?: string }>;
-  disconnectLetterStream: () => Promise<void>;
+  /** Save the building's own vendor credentials (board only). Resolves to a note when saved but not yet verified. */
+  connectMailProvider: (provider: MailProviderId, creds: MailCredentials) => Promise<{ note?: string }>;
+  disconnectMailProvider: () => Promise<void>;
   sendNotice: (params: {
     caseId: string;
     stepId?: string;
@@ -60,12 +69,12 @@ interface MailState {
 
 const DEFAULT_SETTINGS: MailingSettings = {
   enabled: true,
-  letterstreamConnected: false,
-  letterstreamApiIdMasked: '',
-  letterstreamConnectedAt: '',
-  letterstreamStatus: '',
+  mailConnected: false,
+  mailProvider: '',
+  mailCredentialMasked: '',
+  mailConnectedAt: '',
+  mailStatus: '',
   letterstreamPartnerUrl: '',
-  letterstreamPortalUrl: 'https://secure.letterstream.com/',
   senderAddress: {
     line1: '1234 Constitution Avenue NW',
     city: 'Washington',
@@ -78,16 +87,19 @@ const DEFAULT_SETTINGS: MailingSettings = {
   glAccountPostage: '6900',
 };
 
-function fromStatus(s: LetterStreamStatus): Partial<MailingSettings> {
+function fromStatus(s: MailProviderStatus): Partial<MailingSettings> {
+  const partner = s.providers?.find(p => p.id === 'letterstream')?.signupUrl ?? (s.provider === 'letterstream' ? s.signupUrl : null);
   return {
-    letterstreamConnected: !!s.connected,
-    letterstreamApiIdMasked: s.apiIdMasked || '',
-    letterstreamConnectedAt: s.connectedAt || '',
-    letterstreamStatus: s.status || '',
-    letterstreamPartnerUrl: s.partnerUrl || '',
-    letterstreamPortalUrl: s.portalUrl || DEFAULT_SETTINGS.letterstreamPortalUrl,
+    mailConnected: !!s.connected,
+    mailProvider: s.connected && s.provider ? s.provider : '',
+    mailCredentialMasked: s.credentialMasked || '',
+    mailConnectedAt: s.connectedAt || '',
+    mailStatus: s.status || '',
+    letterstreamPartnerUrl: partner || '',
   };
 }
+
+const mask = (s: string) => `••••${s.slice(-4)}`;
 
 export const useMailStore = create<MailState>()(persist((set, get) => ({
   mailingSettings: DEFAULT_SETTINGS,
@@ -113,36 +125,39 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
 
   loadMailingSettings: async () => {
     if (!supabase) return;
-    const { data, error } = await supabase.functions.invoke('connect-letterstream', { body: { action: 'status' } });
+    const { data, error } = await supabase.functions.invoke('connect-mail-provider', { body: { action: 'status' } });
     if (error || !data || data.error) return;
-    set(s => ({ mailingSettings: { ...s.mailingSettings, ...fromStatus(data as LetterStreamStatus) } }));
+    set(s => ({ mailingSettings: { ...s.mailingSettings, ...fromStatus(data as MailProviderStatus) } }));
   },
 
-  connectLetterStream: async (apiId, apiKey) => {
+  connectMailProvider: async (provider, creds) => {
     if (!supabase) {
       // Demo mode: nothing to verify against, so just remember that it is connected.
-      set(s => ({ mailingSettings: { ...s.mailingSettings, letterstreamConnected: true, letterstreamApiIdMasked: `••••${apiId.slice(-4)}`, letterstreamConnectedAt: new Date().toISOString(), letterstreamStatus: 'unverified' } }));
-      return { note: 'Demo mode: saved locally, not verified with LetterStream.' };
+      const shown = provider === 'letterstream' ? creds.apiId || '' : creds.apiKey;
+      set(s => ({ mailingSettings: { ...s.mailingSettings, mailConnected: true, mailProvider: provider, mailCredentialMasked: mask(shown), mailConnectedAt: new Date().toISOString(), mailStatus: 'unverified' } }));
+      return { note: `Demo mode: saved locally, not verified with ${MAIL_PROVIDERS[provider].label}.` };
     }
-    const { data, error } = await supabase.functions.invoke('connect-letterstream', { body: { action: 'connect', apiId, apiKey } });
-    if (error || !data || data.error) throw new Error(data?.error || error?.message || 'Could not connect the LetterStream account');
-    set(s => ({ mailingSettings: { ...s.mailingSettings, ...fromStatus(data as LetterStreamStatus) } }));
-    return { note: (data as LetterStreamStatus).note || undefined };
+    const { data, error } = await supabase.functions.invoke('connect-mail-provider', { body: { action: 'connect', provider, apiId: creds.apiId, apiKey: creds.apiKey } });
+    if (error || !data || data.error) throw new Error(data?.error || error?.message || `Could not connect ${MAIL_PROVIDERS[provider].label}`);
+    set(s => ({ mailingSettings: { ...s.mailingSettings, ...fromStatus(data as MailProviderStatus) } }));
+    return { note: (data as MailProviderStatus).note || undefined };
   },
 
-  disconnectLetterStream: async () => {
+  disconnectMailProvider: async () => {
     if (supabase) {
-      const { data, error } = await supabase.functions.invoke('connect-letterstream', { body: { action: 'disconnect' } });
-      if (error || !data || data.error) throw new Error(data?.error || error?.message || 'Could not disconnect the LetterStream account');
+      const { data, error } = await supabase.functions.invoke('connect-mail-provider', { body: { action: 'disconnect' } });
+      if (error || !data || data.error) throw new Error(data?.error || error?.message || 'Could not disconnect the mail account');
     }
-    set(s => ({ mailingSettings: { ...s.mailingSettings, letterstreamConnected: false, letterstreamApiIdMasked: '', letterstreamConnectedAt: '', letterstreamStatus: '' } }));
+    set(s => ({ mailingSettings: { ...s.mailingSettings, mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailConnectedAt: '', mailStatus: '' } }));
   },
 
   sendNotice: async (params) => {
     const settings = get().mailingSettings;
-    const cost = calculateMailingCost(params.deliveryMethod, params.pageCount, params.includeReturnEnvelope);
+    const cost = calculateMailingCost(params.deliveryMethod, params.pageCount, params.includeReturnEnvelope, settings.mailProvider);
     const now = new Date().toISOString();
     const id = generateLocalId('mr_');
+    const vendor = mailProviderLabel(settings);
+    const portalUrl = settings.mailProvider ? MAIL_PROVIDERS[settings.mailProvider].portalUrl : '';
 
     const record: MailRecord = {
       id,
@@ -165,6 +180,7 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       emailCopy: params.emailCopy,
       emailAddress: params.emailAddress,
       mergeVariables: params.mergeVariables,
+      mailProvider: settings.mailProvider || undefined,
       createdAt: now,
     };
 
@@ -188,13 +204,13 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
 
     advanceStatus('approved', 'Notice approved for sending');
 
-    if (!settings.letterstreamConnected) {
-      advanceStatus('failed', LETTERSTREAM_NOT_CONNECTED);
-      throw new Error(LETTERSTREAM_NOT_CONNECTED);
+    if (!settings.mailConnected || !settings.mailProvider) {
+      advanceStatus('failed', MAIL_NOT_CONNECTED);
+      throw new Error(MAIL_NOT_CONNECTED);
     }
 
     if (supabase) {
-      // The server renders the PDF and pushes it into the building's LetterStream account.
+      // The server renders the PDF and pushes it into the building's vendor account.
       const { data, error } = await supabase.functions.invoke('send-mail', {
         body: {
           recipientName: params.recipient.name,
@@ -213,24 +229,25 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       if (error || data?.error) {
         const errorMsg = data?.error || error?.message || 'Send failed';
         advanceStatus('failed', errorMsg);
-        if (data?.notConnected) set(s => ({ mailingSettings: { ...s.mailingSettings, letterstreamConnected: false } }));
+        if (data?.notConnected) set(s => ({ mailingSettings: { ...s.mailingSettings, mailConnected: false, mailProvider: '' } }));
         throw new Error(errorMsg);
       }
 
       const status: MailStatus = data.status === 'awaiting-payment' ? 'awaiting-payment' : 'submitted';
-      advanceStatus(status, data.message || "Submitted to the building's LetterStream account", {
+      advanceStatus(status, data.message || `Submitted to the building's ${vendor} account`, {
         sentAt: new Date().toISOString(),
-        letterstreamJobId: data.jobId,
-        letterstreamPortalUrl: data.portalUrl || settings.letterstreamPortalUrl,
+        letterstreamJobId: data.jobId || undefined,
+        letterstreamPortalUrl: data.portalUrl || portalUrl,
         pageCount: data.pageCount || params.pageCount,
       });
     } else {
       // Demo mode: nothing is printed; say so.
       await new Promise(res => setTimeout(res, 400));
-      advanceStatus('awaiting-payment', "Submitted to the building's LetterStream account (demo, nothing was sent)", {
+      const demoStatus: MailStatus = settings.mailProvider === 'letterstream' ? 'awaiting-payment' : 'submitted';
+      advanceStatus(demoStatus, `Submitted to the building's ${vendor} account (demo, nothing was sent)`, {
         sentAt: new Date().toISOString(),
-        letterstreamJobId: generateLocalId('ls_demo_'),
-        letterstreamPortalUrl: settings.letterstreamPortalUrl,
+        letterstreamJobId: generateLocalId(`${settings.mailProvider === 'letterstream' ? 'ls' : 'dp'}_demo_`),
+        letterstreamPortalUrl: portalUrl,
       });
     }
 
@@ -240,21 +257,28 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       date: new Date().toISOString(),
       actor: 'Board',
       summary: `Sent "${params.templateName}" via ${params.deliveryMethod.replace(/-/g, ' ')} to ${params.recipient.name}`,
-      details: `Estimated postage: $${(cost.totalCents / 100).toFixed(2)}, billed by LetterStream to the building's account | Delivery method: ${params.deliveryMethod}`,
+      details: `Estimated postage: $${(cost.totalCents / 100).toFixed(2)}, billed by ${vendor} to the building's account | Delivery method: ${params.deliveryMethod}`,
     });
 
     return get().mailRecords.find(r => r.id === id)!;
   },
 }), {
   name: 'onetwo-mail',
-  version: 3,
-  // v2 kept a Stripe card on file for postage; v3 keeps the building's LetterStream connection instead.
-  migrate: (persisted) => {
+  version: 4,
+  // v2 kept a Stripe card on file; v3 a LetterStream connection; v4 any vendor (DocuPost or LetterStream).
+  migrate: (persisted, version) => {
     const p = (persisted ?? {}) as { mailingSettings?: Record<string, unknown>; mailRecords?: MailRecord[] };
     const old = p.mailingSettings ?? {};
-    const { stripePaymentMethodId: _a, stripeCustomerId: _b, cardLast4: _c, cardBrand: _d, ...kept } = old as Record<string, unknown>;
+    const {
+      stripePaymentMethodId: _a, stripeCustomerId: _b, cardLast4: _c, cardBrand: _d,
+      letterstreamConnected, letterstreamApiIdMasked, letterstreamConnectedAt, letterstreamStatus, letterstreamPortalUrl: _e,
+      ...kept
+    } = old as Record<string, unknown>;
+    const fromV3: Partial<MailingSettings> = version === 3 && letterstreamConnected
+      ? { mailConnected: true, mailProvider: 'letterstream', mailCredentialMasked: String(letterstreamApiIdMasked || ''), mailConnectedAt: String(letterstreamConnectedAt || ''), mailStatus: String(letterstreamStatus || '') }
+      : {};
     return {
-      mailingSettings: { ...DEFAULT_SETTINGS, ...kept },
+      mailingSettings: { ...DEFAULT_SETTINGS, ...kept, ...fromV3 },
       mailRecords: (p.mailRecords ?? []).map(r => (r.status as string) === 'charging' ? { ...r, status: 'failed' as MailStatus } : r),
     };
   },

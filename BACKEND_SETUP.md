@@ -266,24 +266,34 @@ supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy stripe-account-status
 ```
 
-### LetterStream (Printed Mail)
+### Printed Mail (DocuPost or LetterStream)
 
-Printed letters go through LetterStream in **Partnership mode**. Each building opens
-its own LetterStream account through our partner link (`LETTERSTREAM_PARTNER_URL`),
-pastes the account's API ID and key under Settings → Mailing, and LetterStream bills
-the building directly for every letter. The platform never charges a card for postage.
+Printed letters go through a vendor the **building** holds its own account with and pays
+directly. The platform never charges a card for postage. Two vendors are wired in:
 
-- Credentials live in `letterstream_accounts` (RLS on, no policies: service role only).
-- `connect-letterstream` saves, verifies, reports and removes a building's credentials.
-- `send-mail` renders the notice to PDF and pushes it into the building's account; the
-  job mails once the building pays for it there (or at once from a prepaid balance).
-- `check-mail-status` reads the job's status back with the building's credentials.
+- **DocuPost** (recommended): the board opens an account at docupost.com, adds funds
+  (from $10) and pastes the API token from Account settings → Developer. Public API,
+  no approval step. Letters are fetched by URL, so `send-mail` stores the rendered PDF
+  in the private `mail-letters` bucket and hands DocuPost a 7-day signed URL. DocuPost
+  has no status API; tracking lives in its dashboard. A token can only be confirmed by
+  sending, so it is saved as unverified and marked verified after the first accepted
+  letter (or invalid if DocuPost answers "Invalid API token").
+- **LetterStream** (Partnership mode): the building opens its account through our
+  partner link (`LETTERSTREAM_PARTNER_URL`) and pastes the API ID and key from My
+  Account → API Information. LetterStream shares its API guide only with approved
+  partners; the wire format lives in `supabase/functions/_shared/letterstream.ts`.
 
-LetterStream shares its API guide only with approved partner accounts. The wire format
-lives in one file, `supabase/functions/_shared/letterstream.ts`; confirm the endpoint,
-signature and field names against the guide before going live. API access is a
-LetterStream subscription on the partner account, and new API enrollment was paused by
-LetterStream until late November 2026.
+Credentials live in `mail_provider_accounts` (RLS on, no policies: service role only);
+`financial_settings.mail_connected` / `mail_provider` are the non-secret flags the app
+reads. Functions:
+
+- `connect-mail-provider`: status / connect / disconnect for the building's account.
+- `send-mail`: renders the notice to PDF and pushes it into the building's account.
+- `check-mail-status`: reads the status back (LetterStream) or points at the dashboard
+  (DocuPost).
+
+Optional secrets: `DOCUPOST_API_URL`, `DOCUPOST_PORTAL_URL`, `DOCUPOST_SIGNUP_URL`,
+`LETTERSTREAM_API_URL`, `LETTERSTREAM_PORTAL_URL`, `LETTERSTREAM_PARTNER_URL`.
 
 ---
 

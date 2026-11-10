@@ -5,7 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
-import { ESTIMATE_NOTE, PRICING, formatDeliveryMethod } from '@/types/mail';
+import { ESTIMATE_NOTE, formatDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
 import type { LetterTemplate } from '@/lib/services/letterEngine';
 import type { ComposePanelContext, DeliveryChannel, AnnouncementPriority } from '@/types/communication';
@@ -35,10 +35,10 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 // ── Mail pricing for display ────────────────────────────────
 
-const MAIL_OPTIONS: { key: MailDeliveryMethod; label: string; price: number }[] = [
-  { key: 'first-class', label: 'First Class', price: PRICING['first-class'] / 100 },
-  { key: 'certified', label: 'Certified Mail', price: PRICING['certified'] / 100 },
-  { key: 'certified-electronic-return-receipt', label: 'Certified + ERR', price: PRICING['certified-electronic-return-receipt'] / 100 },
+const MAIL_OPTIONS: { key: MailDeliveryMethod; label: string }[] = [
+  { key: 'first-class', label: 'First Class' },
+  { key: 'certified', label: 'Certified Mail' },
+  { key: 'certified-electronic-return-receipt', label: 'Certified + ERR' },
 ];
 
 function substituteVariables(text: string, values: Record<string, string>): string {
@@ -113,6 +113,8 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   }, [scopeTemplates]);
 
   // ── Cost calculation ──────────────────────────────────────
+  const PRICING = pricingFor(mailingSettings.mailProvider);
+  const vendor = mailProviderLabel(mailingSettings);
   const mailPriceCents = PRICING[mailMethod] || 0;
   const mailLetterCount = scope === 'community' ? units.length : 1;
   const estimatedPageCount = Math.max(1, Math.ceil((body || '').length / 2800));
@@ -498,7 +500,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                         {m.label}
                       </span>
                       <span className="text-xs text-ink-400">
-                        ${m.price.toFixed(2)}{scope === 'community' ? '/ea' : ''}
+                        ${((PRICING[m.key] || 0) / 100).toFixed(2)}{scope === 'community' ? '/ea' : ''}
                       </span>
                     </label>
                   ))}
@@ -586,9 +588,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <span>${mailCostDollars.toFixed(2)}</span>
                 </div>
                 <p className="text-[10px] text-ink-400 mt-1">
-                  {mailingSettings.letterstreamConnected
-                    ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
-                    : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
+                  {mailingSettings.mailConnected && mailingSettings.mailProvider
+                    ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s ${vendor} account.`
+                    : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                 </p>
               </div>
             ) : (
@@ -757,9 +759,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span>${mailCostDollars.toFixed(2)}</span>
                   </div>
                   <p className="text-[10px] text-ink-400 mt-1">
-                    {mailingSettings.letterstreamConnected
-                      ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
-                      : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
+                    {mailingSettings.mailConnected && mailingSettings.mailProvider
+                      ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s ${vendor} account.`
+                      : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                   </p>
                 </div>
               ) : (

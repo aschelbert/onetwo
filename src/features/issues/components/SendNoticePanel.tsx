@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { CaseTrackerCase } from '@/types/issues';
 import type { MailDeliveryMethod, PostalAddress } from '@/types/mail';
-import { ESTIMATE_NOTE, PRICING, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod } from '@/types/mail';
+import { ESTIMATE_NOTE, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -14,10 +14,10 @@ interface Props {
   onClose: () => void;
 }
 
-const DELIVERY_OPTIONS: { method: MailDeliveryMethod; label: string; priceCents: number }[] = [
-  { method: 'first-class', label: 'First Class', priceCents: PRICING['first-class'] },
-  { method: 'certified', label: 'Certified Mail', priceCents: PRICING['certified'] },
-  { method: 'certified-electronic-return-receipt', label: 'Certified + Electronic Return Receipt', priceCents: PRICING['certified-electronic-return-receipt'] },
+const DELIVERY_OPTIONS: { method: MailDeliveryMethod; label: string }[] = [
+  { method: 'first-class', label: 'First Class' },
+  { method: 'certified', label: 'Certified Mail' },
+  { method: 'certified-electronic-return-receipt', label: 'Certified + Electronic Return Receipt' },
 ];
 
 export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: Props) {
@@ -115,12 +115,14 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
   // Cost calculation
   const pageCount = Math.max(1, Math.ceil((previewBody || '').length / 2800));
   const cost = useMemo(
-    () => calculateMailingCost(deliveryMethod, pageCount, includeReturnEnvelope),
-    [deliveryMethod, pageCount, includeReturnEnvelope],
+    () => calculateMailingCost(deliveryMethod, pageCount, includeReturnEnvelope, mailStore.mailingSettings.mailProvider),
+    [deliveryMethod, pageCount, includeReturnEnvelope, mailStore.mailingSettings.mailProvider],
   );
 
-  // The letter goes into the building's own LetterStream account; without one there is nowhere to send it.
-  const letterstreamConnected = mailStore.mailingSettings.letterstreamConnected;
+  // The letter goes into the building's own vendor account; without one there is nowhere to send it.
+  const mailConnected = mailStore.mailingSettings.mailConnected && !!mailStore.mailingSettings.mailProvider;
+  const vendor = mailProviderLabel(mailStore.mailingSettings);
+  const PRICING = pricingFor(mailStore.mailingSettings.mailProvider);
 
   const handleSend = async () => {
     if (!selectedTemplate) return;
@@ -251,7 +253,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                         )}
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-ink-700">${(opt.priceCents / 100).toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-ink-700">${((PRICING[opt.method] || 0) / 100).toFixed(2)}</span>
                   </button>
                 );
               })}
@@ -351,16 +353,16 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
               <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
             </div>
             <p className="text-[11px] text-ink-400">
-              {letterstreamConnected
-                ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s LetterStream account (${mailStore.mailingSettings.letterstreamApiIdMasked || 'connected'}).`
+              {mailConnected
+                ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).`
                 : ESTIMATE_NOTE}
             </p>
           </div>
 
           {/* Not connected warning */}
-          {!letterstreamConnected && (
+          {!mailConnected && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-              <p className="text-xs text-amber-800 font-medium">The building's LetterStream account isn't connected. A board member connects it under Settings → Mailing.</p>
+              <p className="text-xs text-amber-800 font-medium">The building's mail account isn't connected. A board member connects DocuPost or LetterStream under Settings → Mailing.</p>
             </div>
           )}
 
@@ -374,7 +376,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
             </button>
             <button
               onClick={() => setShowReview(true)}
-              disabled={!selectedTemplate || !letterstreamConnected}
+              disabled={!selectedTemplate || !mailConnected}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Review & Send — est. ${(cost.totalCents / 100).toFixed(2)}
@@ -475,8 +477,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                   <span className="text-ink-900">${(cost.totalCents / 100).toFixed(2)}</span>
                 </div>
                 <p className="text-[11px] text-ink-400">
-                  {letterstreamConnected
-                    ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s LetterStream account (${mailStore.mailingSettings.letterstreamApiIdMasked || 'connected'}). It mails once paid for there, or at once from a prepaid balance.`
+                  {mailConnected
+                    ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).${mailStore.mailingSettings.mailProvider === 'letterstream' ? ' It mails once paid for there, or at once from a prepaid balance.' : ' It is deducted from the prepaid balance when sent.'}`
                     : ESTIMATE_NOTE}
                 </p>
               </div>
@@ -498,7 +500,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                 </button>
                 <button
                   onClick={handleSend}
-                  disabled={sending || !letterstreamConnected}
+                  disabled={sending || !mailConnected}
                   className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sending ? 'Sending...' : `Confirm & Send — est. $${(cost.totalCents / 100).toFixed(2)}`}

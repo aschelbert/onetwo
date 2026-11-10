@@ -601,7 +601,7 @@ describe('Setup · Get paid online (Stripe)', () => {
   });
 });
 
-describe('Setup · Send letters by mail (LetterStream)', () => {
+describe('Setup · Send letters by mail (DocuPost or LetterStream)', () => {
   /** A building with the essentials in place and Stripe left for later, so letters by mail are the next thing to do. */
   beforeEach(() => {
     localStorage.clear();
@@ -609,7 +609,7 @@ describe('Setup · Send letters by mail (LetterStream)', () => {
     useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
     useFinancialStore.setState({ units: [unit('1A', 400), unit('1B', 400)], budgetCategories: [], stripeConnectId: null, stripeOnboardingComplete: false });
     useBuildingStore.setState({ board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: 'ana@example.com', phone: '', term: '' }], name: 'Maple Court', address: { street: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' } });
-    useMailStore.getState().updateMailingSettings({ letterstreamConnected: false, letterstreamApiIdMasked: '', letterstreamStatus: '', letterstreamConnectedAt: '', letterstreamPartnerUrl: '' });
+    useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailStatus: '', mailConnectedAt: '', letterstreamPartnerUrl: '' });
     useSetupStore.getState().setLater('payments', true);
   });
 
@@ -618,44 +618,55 @@ describe('Setup · Send letters by mail (LetterStream)', () => {
     renderSetup('/home');
     const card = document.querySelector('[data-widget="setup-card"]') as HTMLElement;
     expect(within(card).getByRole('button', { name: 'Set up letters by mail' })).toBeTruthy();
-    expect(within(card).getByText(/open the building's LetterStream account/)).toBeTruthy();
+    expect(within(card).getByText(/open the building's mail account/)).toBeTruthy();
     act(() => useSetupStore.getState().setLater('mail', true));
     expect(within(card).getByRole('button', { name: 'Go live' })).toBeTruthy();
   });
 
-  it('step 5 before connecting: the partner link, what to have ready, what it costs, and the keys form; Later moves on', () => {
+  it('step 5 before connecting: DocuPost by default with its sign-up link and costs; LetterStream needs the partner link; Later moves on', () => {
     renderSetup('/setup?step=mail');
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
     expect(within(nav).getByRole('button', { name: /Send letters by mail/ }).getAttribute('aria-current')).toBe('step');
     const step = document.querySelector('[data-step="mail"]') as HTMLElement;
     expect(step.getAttribute('data-mail-status')).toBe('off');
-    expect(within(step).getByRole('heading', { level: 3 }).textContent).toBe("Open the building's LetterStream account");
-    // No partner link configured yet: say so rather than open nothing.
-    expect(within(step).getByText(/Partner link not configured yet/)).toBeTruthy();
+    expect(within(step).getByRole('heading', { level: 3 }).textContent).toBe("Open the building's mail account");
+    // DocuPost is picked by default: a sign-up link, a single token field, and its own estimates.
+    const vendors = within(step).getByRole('radiogroup', { name: 'Mail vendor' });
+    expect(within(vendors).getByRole('radio', { name: /DocuPost/ }).getAttribute('aria-checked')).toBe('true');
+    expect(step.getAttribute('data-mail-provider')).toBe('docupost');
+    expect(within(step).getByRole('button', { name: /Create the account at DocuPost/ })).toBeTruthy();
+    expect(within(step).getByLabelText('API token')).toBeTruthy();
+    expect(within(step).queryByLabelText('API ID')).toBeNull();
     expect(within(step).getAllByText('Have it handy')).toHaveLength(3);
-    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$8\.34.*Monthly or setup fee.*None/);
-    // Empty keys are refused before anything is sent.
-    fireEvent.click(within(step).getByRole('button', { name: 'Connect LetterStream' }));
-    expect(within(step).getByRole('status').textContent).toMatch(/Paste both the API ID and the API key/);
+    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$11\.73.*Monthly or setup fee.*None/);
+    // An empty token is refused before anything is sent.
+    fireEvent.click(within(step).getByRole('button', { name: 'Connect DocuPost' }));
+    expect(within(step).getByRole('status').textContent).toMatch(/Paste the API token/);
+    // LetterStream: two fields, its own estimates, and no partner link configured yet.
+    fireEvent.click(within(vendors).getByRole('radio', { name: /LetterStream/ }));
+    expect(within(step).getByLabelText('API ID')).toBeTruthy();
+    expect(within(step).getByText(/Partner link not configured yet/)).toBeTruthy();
+    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$8\.34/);
     fireEvent.click(within(step).getByRole('button', { name: 'Later' }));
     expect(useSetupStore.getState().later).toContain('mail');
     expect(screen.getByRole('heading', { name: /6 · Invite people/ })).toBeTruthy();
   });
 
-  it('connected: shows the account with the masked API ID and the Continue button; go live lists it under "also set up"', () => {
-    useMailStore.getState().updateMailingSettings({ letterstreamConnected: true, letterstreamApiIdMasked: '••••9876', letterstreamStatus: 'verified', letterstreamConnectedAt: '2026-11-10T00:00:00Z' });
+  it('connected: shows the account with the masked token and the Continue button; go live lists it under "also set up"', () => {
+    useMailStore.getState().updateMailingSettings({ mailConnected: true, mailProvider: 'docupost', mailCredentialMasked: '••••9876', mailStatus: 'verified', mailConnectedAt: '2026-11-10T00:00:00Z' });
     renderSetup('/setup?step=mail');
     const step = document.querySelector('[data-step="mail"]') as HTMLElement;
     expect(step.getAttribute('data-mail-status')).toBe('on');
-    const account = within(step).getByLabelText('LetterStream account');
-    expect(account.textContent).toContain('Maple Court · API ID ••••9876');
+    const account = within(step).getByLabelText('Mail account');
+    expect(account.textContent).toContain('Maple Court · token ••••9876');
+    expect(account.textContent).toContain('by DocuPost');
     expect(account.textContent).toContain('Verified');
     expect(within(step).getByRole('button', { name: 'Continue to Invite people' })).toBeTruthy();
 
     renderSetup('/setup?step=finish');
     const lists = screen.getAllByRole('list', { name: 'Also set up' });
     expect(lists[lists.length - 1].querySelector('[data-also="mail"]')?.getAttribute('data-state')).toBe('done');
-    expect(screen.getByText(/print and mail from the building's LetterStream account/)).toBeTruthy();
+    expect(screen.getByText(/print and mail from the building's DocuPost account/)).toBeTruthy();
   });
 
   it('go live links letters by mail under "also set up" when it is not set up, and never requires it', () => {
