@@ -12,6 +12,7 @@ import { ISO_DATE, REQUEST_SLA_DAYS } from '../runbook/adapters';
 import { RUNBOOKS, type RunbookDef } from './runbooks';
 import { MONTH_CLOSE_ID, monthCloseTrigger } from './monthClose';
 import { BOARD_MEETING_ID, boardCadenceDays } from './meetings';
+import { RESERVE_STUDY_ID, everyYears } from './reserveStudy';
 
 export interface BoardRoomSnapshot {
   today: string;
@@ -27,6 +28,8 @@ export interface BoardRoomSnapshot {
   monthCloseStartDay?: number;
   /** How often the bylaws have the board meet, in days (Building › Details); every two months when unset. */
   boardMeetingEveryDays?: number;
+  /** How many years a reserve study lasts (Funds › Planning › Reserves); three when unset. */
+  reserveStudyEveryYears?: number;
 }
 
 // ── Open cases ───────────────────────────────────────────────────────────────
@@ -229,7 +232,7 @@ export function runbookStatuses(s: BoardRoomSnapshot): RunbookStatus[] {
     return {
       def,
       on: !s.runbooksOff.includes(def.id),
-      trigger: def.id === MONTH_CLOSE_ID ? monthCloseTrigger(s.monthCloseStartDay ?? 1) : def.id === BOARD_MEETING_ID ? `Every ${boardCadenceDays(s)} days per the bylaws, 30 days ahead` : def.trigger,
+      trigger: def.id === MONTH_CLOSE_ID ? monthCloseTrigger(s.monthCloseStartDay ?? 1) : def.id === BOARD_MEETING_ID ? `Every ${boardCadenceDays(s)} days per the bylaws, 30 days ahead` : def.id === RESERVE_STUDY_ID ? `Every ${everyYears(s.reserveStudyEveryYears)} years, 90 days before due` : def.trigger,
       openCases,
       lastRan: closed ? { date: (closed.completedAt ?? closed.created).slice(0, 10), title: closed.title } : undefined,
     };

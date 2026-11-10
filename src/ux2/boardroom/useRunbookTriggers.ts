@@ -3,7 +3,7 @@
  * year-end close, annual budget, filings, annual meeting, board meeting
  * cycle, inspections, 1099s, owner disclosure, resident requests, moves,
  * amenity bookings, vendor bids, work orders, spending requests, vendor
- * onboarding, special assessments) when a board member or manager opens the app, and
+ * onboarding, special assessments, the reserve study) when a board member or manager opens the app, and
  * again as the data they watch changes (a payment lands, the books close, a
  * policy is renewed), so each case's automated steps tick as the work lands.
  * Everything it calls is idempotent (one case per trigger, a done step stays
@@ -36,12 +36,13 @@ import { runWorkOrders } from './workOrders';
 import { runSpendingRequests } from './spendingRequest';
 import { runVendorOnboarding } from './vendorOnboarding';
 import { runSpecialAssessments } from './specialAssessment';
+import { runReserveStudy } from './reserveStudy';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 
 /** Every wired runbook, once; each guards itself. */
 export function runRunbookTriggers(today?: string): void {
-  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure], ['resident request', runResidentRequest], ['move in or out', runMoves], ['amenity booking', runAmenityBooking], ['vendor bids', runVendorBids], ['work order', runWorkOrders], ['spending request', runSpendingRequests], ['vendor onboarding', runVendorOnboarding], ['special assessment', runSpecialAssessments]] as const) {
+  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure], ['resident request', runResidentRequest], ['move in or out', runMoves], ['amenity booking', runAmenityBooking], ['vendor bids', runVendorBids], ['work order', runWorkOrders], ['spending request', runSpendingRequests], ['vendor onboarding', runVendorOnboarding], ['special assessment', runSpecialAssessments], ['reserve study', runReserveStudy]] as const) {
     try { run(today); } catch (err) { console.error(`[runbooks] ${name} failed:`, err); }
   }
 }
@@ -73,11 +74,14 @@ export function useRunbookTriggers(enabled = true) {
   const approvals = useSpendingStore(s => s.approvals);
   const caseCount = useIssuesStore(s => s.cases);
   const contracts = useVendorTrackerStore(s => s.contracts);
+  const reserveStudyDate = useFinancialStore(s => s.reserveStudyDate);
+  const reserveStudyEveryYears = useFinancialStore(s => s.reserveStudyEveryYears);
+  const legalDocuments = useBuildingStore(s => s.legalDocuments);
   useEffect(() => {
     if (!enabled || !casesLoaded) return;
     if (role !== 'BOARD_MEMBER' && role !== 'PROPERTY_MANAGER' && role !== 'PM_COMPANY') return;
     runRunbookTriggers();
-  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders, issues, moveEvents, reservations, approvals, caseCount, contracts]);
+  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders, issues, moveEvents, reservations, approvals, caseCount, contracts, reserveStudyDate, reserveStudyEveryYears, legalDocuments]);
 }
 
 /** The old name, for the month close alone. */

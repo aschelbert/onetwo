@@ -176,6 +176,10 @@ interface FinancialState {
   /** Runbooks switched off, by id, shared with the database jobs that run them (collections, insurance renewal, month close). */
   runbooksOff: string[];
   setRunbookOff: (id: string, off: boolean) => void;
+  /** The last professional reserve study (YYYY-MM-DD, or null when none is recorded) and how many years one lasts; the Reserve study runbook reads both. */
+  reserveStudyDate: string | null;
+  reserveStudyEveryYears: number;
+  setReserveStudy: (date: string | null, everyYears?: number) => void;
   /** Bill every unit's dues for a month (this month by default). Bills each unit once per month. */
   runMonthlyBilling: (period?: string, today?: string) => BillingRunSummary;
   /** Charge the late fee on every dues invoice past its grace period that has none yet. Returns how many. */
@@ -311,6 +315,8 @@ function syncSettings() {
     monthCloseStartDay: s.monthCloseStartDay,
     monthCloseEnabled: s.monthCloseEnabled,
     runbooksOff: s.runbooksOff,
+    reserveStudyDate: s.reserveStudyDate,
+    reserveStudyEveryYears: s.reserveStudyEveryYears,
     glAccountMapping: { ...DEFAULT_GL_MAPPING, ...s.glAccountMapping },
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
@@ -405,6 +411,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.monthCloseStartDay = data.settings.monthCloseStartDay || 1;
       updates.monthCloseEnabled = data.settings.monthCloseEnabled ?? true;
       updates.runbooksOff = data.settings.runbooksOff ?? [];
+      updates.reserveStudyDate = data.settings.reserveStudyDate ?? null;
+      updates.reserveStudyEveryYears = data.settings.reserveStudyEveryYears || 3;
       // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
       if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
@@ -1232,6 +1240,14 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ monthCloseEnabled: on });
     syncSettings();
   },
+  reserveStudyDate: null,
+  reserveStudyEveryYears: 3,
+  setReserveStudy: (date, everyYears) => {
+    const d = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    const n = everyYears === undefined ? get().reserveStudyEveryYears : Math.round(Number(everyYears));
+    set({ reserveStudyDate: d, reserveStudyEveryYears: Number.isFinite(n) && n >= 1 && n <= 10 ? n : get().reserveStudyEveryYears });
+    syncSettings();
+  },
   runbooksOff: [],
   setRunbookOff: (id, off) => {
     const cur = get().runbooksOff;
@@ -1538,6 +1554,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     monthCloseStartDay: state.monthCloseStartDay,
     monthCloseEnabled: state.monthCloseEnabled,
     runbooksOff: state.runbooksOff,
+    reserveStudyDate: state.reserveStudyDate,
+    reserveStudyEveryYears: state.reserveStudyEveryYears,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

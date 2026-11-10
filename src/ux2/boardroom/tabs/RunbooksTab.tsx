@@ -22,6 +22,7 @@ const SETTINGS_RULES = '/funds?tab=settings&section=rules';
 const SETTING_OF: Record<string, { label: string; path: string }> = {
   'month-close': { label: 'Change the day', path: SETTINGS_RULES },
   'board-meeting': { label: 'Change the cadence', path: '/building' },
+  'reserve-study': { label: 'Change the dates', path: '/funds?tab=planning&section=reserves' },
 };
 
 type StepState = 'done' | 'person' | 'auto' | 'pending';

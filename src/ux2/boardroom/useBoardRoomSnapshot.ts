@@ -25,6 +25,7 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
   const off = useRunbookSwitches(s => s.off);
   const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
   const boardMeetingEveryDays = useBuildingStore(s => s.details?.boardMeetingEveryDays);
+  const reserveStudyEveryYears = useFinancialStore(s => s.reserveStudyEveryYears);
   const sharedOff = useFinancialStore(s => s.runbooksOff);
   // A wired runbook's switch is the shared setting (another board member, or the server, may have moved it).
   const runbooksOff = useMemo(() => Array.from(new Set([...off.filter(id => !WIRED.has(id)), ...sharedOff])), [off, sharedOff]);
@@ -47,5 +48,6 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
     runbooksOff,
     monthCloseStartDay,
     boardMeetingEveryDays,
-  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, runbooksOff, monthCloseStartDay, boardMeetingEveryDays]);
+    reserveStudyEveryYears,
+  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, runbooksOff, monthCloseStartDay, boardMeetingEveryDays, reserveStudyEveryYears]);
 }

@@ -6,7 +6,7 @@
  * close, annual budget, filings, the annual meeting, the board meeting cycle,
  * the inspections, the 1099s, the owner disclosure, resident requests, moves,
  * amenity bookings, vendor bids, work orders, spending requests, vendor
- * onboarding and special assessments, each from a module next to this file,
+ * onboarding, special assessments and the reserve study, each from a module next to this file,
  * with a database twin except the bookings and the bids, which live only in
  * the app); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
@@ -46,7 +46,7 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'collections', name: 'Collections', trigger: '30 days past due', steps: 5, automated: 2, sitId: 'delinquent-accounts', catId: 'financial', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 4] },
   { id: 'month-close', name: 'Month close', trigger: 'The 1st of each month', steps: 5, automated: 2, sitId: 'financial-review', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 4] },
   { id: 'annual-meeting', name: 'Annual meeting', trigger: '90 days before the deadline, 13 months after the last one', steps: 13, automated: 3, sitId: 'annual-meeting-planning', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6, 10] },
-  { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 4, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true },
+  { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 8, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 7] },
   { id: 'resale-certificate', name: 'Resale certificate', trigger: 'A unit lists for sale', steps: 5, automated: 4, sitId: 'resale-certs', catId: 'admin', visibility: 'board', defaultOn: true },
   { id: 'special-assessment', name: 'Special assessment', trigger: 'Board approves one', steps: 6, automated: 4, sitId: 'special-assessments', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 3, 4, 5] },
   { id: 'elevator-inspection', name: 'Elevator inspection', trigger: 'Certificate expiry, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
