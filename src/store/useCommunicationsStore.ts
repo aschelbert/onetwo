@@ -8,7 +8,8 @@ import type {
   AnnouncementPriority,
 } from '@/types/communication';
 import type { MailDeliveryMethod } from '@/types/mail';
-import { PRICING, calculateMailingCost } from '@/types/mail';
+import { calculateMailingCost, pricingFor } from '@/types/mail';
+import { useMailStore } from './useMailStore';
 import { useComplianceStore } from './useComplianceStore';
 import { useIssuesStore } from './useIssuesStore';
 import { generateLocalId } from '@/lib/generateId';
@@ -173,7 +174,8 @@ export const useCommunicationsStore = create<CommunicationsState>()(persist((set
       const priceKey = params.mailDeliveryMethod === 'certified-electronic-return-receipt'
         ? 'certified-electronic-return-receipt'
         : params.mailDeliveryMethod;
-      mailCostCents = (PRICING[priceKey] || 0) * params.mailLetterCount;
+      // The same estimate the compose panel showed: the connected vendor's rate.
+      mailCostCents = (pricingFor(useMailStore.getState().mailingSettings.mailProvider)[priceKey] || 0) * params.mailLetterCount;
     }
 
     const comm: Communication = {

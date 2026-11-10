@@ -6,34 +6,7 @@
 // read; the app sees the provider, a masked credential and a connected flag.
 
 import { PROVIDER_INFO, PROVIDERS, isProvider, maskCredential, verifyCredentials, type MailProviderId } from "../_shared/mailProvider.ts";
-
-const SB_URL = Deno.env.get("SUPABASE_URL") || "";
-const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
-};
-
-async function sbQuery(method: string, table: string, params?: Record<string, string>, body?: unknown, prefer?: string) {
-  const url = new URL(`${SB_URL}/rest/v1/${table}`);
-  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const headers: Record<string, string> = {
-    "apikey": SB_SERVICE_KEY,
-    "Authorization": `Bearer ${SB_SERVICE_KEY}`,
-    "Content-Type": "application/json",
-    "Prefer": prefer || (method === "POST" ? "return=representation" : "return=minimal"),
-  };
-  if (method === "GET") headers["Accept"] = "application/vnd.pgrst.object+json";
-  const res = await fetch(url.toString(), { method, headers, body: body ? JSON.stringify(body) : undefined });
-  if (method === "GET") return res.ok ? await res.json() : null;
-  return res.ok;
-}
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
-}
+import { authUser, cors, jsonResponse, membership, restGetOne, restWrite } from "../_shared/supabaseRest.ts";
 
 type Row = { provider: MailProviderId; api_id: string | null; api_key: string; status: string; connected_at: string; last_verified_at: string | null; last_error: string | null };
 
@@ -57,19 +30,18 @@ function statusPayload(row: Row | null) {
 }
 
 const SELECT = "provider,api_id,api_key,status,connected_at,last_verified_at,last_error";
+const account = (tenantId: string): Promise<Row | null> => restGetOne("mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": SELECT });
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
-    const auth = req.headers.get("Authorization") || "";
-    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { "Authorization": auth, "apikey": SB_ANON } });
-    if (!userRes.ok) return jsonResponse({ error: "Unauthorized" }, 401);
-    const user = await userRes.json();
+    const user = await authUser(req);
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const tu = await sbQuery("GET", "tenant_users", { "user_id": `eq.${user.id}`, "select": "tenant_id,role", "limit": "1" });
+    const tu = await membership(user.id);
     if (!tu?.tenant_id) return jsonResponse({ error: "You are not a member of a building" }, 403);
-    const tenantId: string = tu.tenant_id;
+    const tenantId = tu.tenant_id;
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || "status";
@@ -78,10 +50,7 @@ Deno.serve(async (req) => {
     }
 
     // ═══ status ═══
-    if (action === "status") {
-      const row = await sbQuery("GET", "mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": SELECT });
-      return jsonResponse(statusPayload(row));
-    }
+    if (action === "status") return jsonResponse(statusPayload(await account(tenantId)));
 
     // ═══ connect ═══
     if (action === "connect") {
@@ -115,17 +84,16 @@ Deno.serve(async (req) => {
         connected_at: now,
         last_verified_at: verified ? now : null,
       };
-      const ok = await sbQuery("POST", "mail_provider_accounts?on_conflict=tenant_id", {}, row, "resolution=merge-duplicates,return=minimal");
+      const ok = await restWrite("POST", "mail_provider_accounts?on_conflict=tenant_id", row, "resolution=merge-duplicates,return=minimal");
       if (!ok) return jsonResponse({ error: `Could not save the ${info.label} credentials` }, 500);
 
-      const saved = await sbQuery("GET", "mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": SELECT });
       const note = verified ? null : check.ok === "pending" ? `Saved. ${check.reason}` : `Saved, but not yet verified: ${check.reason}`;
-      return jsonResponse({ ...statusPayload(saved), verified, note });
+      return jsonResponse({ ...statusPayload(await account(tenantId)), verified, note });
     }
 
     // ═══ disconnect ═══
     if (action === "disconnect") {
-      const ok = await sbQuery("DELETE", `mail_provider_accounts?tenant_id=eq.${tenantId}`);
+      const ok = await restWrite("DELETE", `mail_provider_accounts?tenant_id=eq.${tenantId}`);
       if (!ok) return jsonResponse({ error: "Could not remove the mail account" }, 500);
       return jsonResponse(statusPayload(null));
     }
