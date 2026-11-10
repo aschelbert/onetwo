@@ -232,6 +232,40 @@ unit owners are deposited directly into the association's bank account.
 
 This is separate from the Chargebee subscription billing described above.
 
+**Connecting a building** happens in setup (step 4, *Get paid online*) or under
+Funds › Online payments, through `connect-stripe-account`. Stripe takes 1 to 2 days
+to verify an association. Three paths notice when it does, all through
+`supabase/functions/_shared/stripeAccount.ts`, so the building is marked verified and
+the board is told exactly once:
+
+1. **The board clicks Check now** (`connect-stripe-account`, action `check_status`).
+2. **Stripe's `account.updated` webhook** on the connected-accounts endpoint
+   (`stripe-webhook`). In the Stripe Dashboard → Developers → Webhooks, add
+   `account.updated` to the endpoint that *listens to events on Connected accounts*
+   (the one signed with `STRIPE_CONNECT_WEBHOOK_SECRET`).
+3. **The daily sweep** (`stripe-account-status`), scheduled by migration 050 with
+   pg_cron at 06:45 UTC through pg_net. It reads the project URL and service role
+   key from Vault; create those two secrets once per project:
+
+   ```sql
+   select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'project_url');
+   select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'service_role_key');
+   ```
+
+   Where pg_cron or pg_net is unavailable, set a `CRON_SECRET` function secret and
+   have an outside scheduler POST to `/functions/v1/stripe-account-status` once a day
+   with an `x-cron-secret` header.
+
+On verification the board member who connected (or every board member, if unknown)
+gets a confirmation email through Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`),
+and a pinned "Pay online or set up autopay" announcement is posted for owners.
+
+```bash
+supabase functions deploy connect-stripe-account
+supabase functions deploy stripe-webhook --no-verify-jwt
+supabase functions deploy stripe-account-status
+```
+
 ---
 
 ### Demo Mode Compatibility

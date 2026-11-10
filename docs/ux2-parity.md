@@ -393,7 +393,15 @@ everything is read in the browser, so a document costs nothing to read.
      choice, a doubtful reading is flagged. Each item shows the page and the
      sentence (or the row) it came from. Matching items accept in one click.
      Accepting writes through the stores' own actions (`applySetup.applyItem`).
-  3–5. *Fill the gaps · Invite people · Go live*. Units can be added by
+  4. *Get paid online* (`PaymentsStep`), its own page so Stripe's hosted
+     onboarding can return to it (`?step=payments`). One click creates the
+     association's Stripe account through `connect-stripe-account`; back from
+     Stripe the step shows "Stripe verifying", re-checks status on arrival,
+     and lets the board set the payment rules meanwhile (the same rules and
+     call as Funds › Online payments, from `funds/paymentPrefs`). Optional:
+     "Later" moves the Home card on, and nothing here blocks going live. The
+     Home card's sixth step and Go live's "Also set up" list show its state.
+  3, 5–6. *Fill the gaps · Invite people · Go live*. Units can be added by
      hand right here (`UnitsEditor`): one at a time, a range (101–112, 1A–1F),
      or a pasted list in any column order (`unitEntry.ts`), then edited in a
      table or removed, with the ownership total checked against 100%.
@@ -406,7 +414,9 @@ everything is read in the browser, so a document costs nothing to read.
      answered in place (address, units, monthly assessments, a board member,
      due day and late fee, opening balances, a budget template, owner
      emails). Board invites go through `send-invite`; owners are invited at
-     go-live (a visible checkbox). Go live needs four essentials.
+     go-live (a visible checkbox). Go live needs four essentials; online
+     payments, the budget, opening balances and the late fee are listed
+     under "Also set up" with their state.
 - The `read-setup-document` edge function from the first version is retired:
   its source is removed and the deployed copies (staging, production) are a
   stub that returns 410 and calls nothing. Delete it from the Supabase

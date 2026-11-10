@@ -341,11 +341,13 @@ export function essentials(s: { name: string; street: string; unitCount: number;
   };
 }
 
-export type StepId = 'documents' | 'review' | 'gaps' | 'invite' | 'live';
+export type StepId = 'documents' | 'review' | 'gaps' | 'payments' | 'invite' | 'live';
+/** The six steps. Get paid online (Stripe) sits before Invite people so owners can pay from the day they are invited; it never blocks go-live. */
 export const STEPS: { id: StepId; label: string }[] = [
   { id: 'documents', label: 'Documents' },
   { id: 'review', label: 'Review what we found' },
   { id: 'gaps', label: 'Fill the gaps' },
+  { id: 'payments', label: 'Get paid online' },
   { id: 'invite', label: 'Invite people' },
   { id: 'live', label: 'Go live' },
 ];

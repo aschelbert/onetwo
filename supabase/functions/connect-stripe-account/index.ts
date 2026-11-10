@@ -1,6 +1,10 @@
 // supabase/functions/connect-stripe-account/index.ts
 // Zero dependencies — raw fetch to Stripe API + Supabase REST API
-// Actions: create, check_status
+// Actions: create, check_status (plus owner-side checkout, autopay and portal actions)
+// Verification itself (marking the building complete, emailing the board, the owners' announcement)
+// lives in _shared/stripeAccount.ts, shared with stripe-webhook and the daily stripe-account-status job.
+
+import { STRIPE_SETTINGS_SELECT, accountState, confirmIfVerified } from "../_shared/stripeAccount.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -99,9 +103,12 @@ Deno.serve(async (req) => {
       const account = await acctRes.json();
       const stripeConnectId = account.id;
 
-      // Save stripe_connect_id to financial_settings
+      // Save stripe_connect_id to financial_settings, and who connected it (they get the email when Stripe verifies)
       await sbQuery("PATCH", `financial_settings?tenant_id=eq.${tenantId}`, {}, {
         stripe_connect_id: stripeConnectId,
+        stripe_onboarding_complete: false,
+        stripe_connected_by: user.id,
+        stripe_verified_at: null,
       });
 
       // Create account link for onboarding
@@ -140,7 +147,7 @@ Deno.serve(async (req) => {
       // Get existing stripe_connect_id from financial_settings
       const settings = await sbQuery("GET", "financial_settings", {
         "tenant_id": `eq.${tenantId}`,
-        "select": "stripe_connect_id,stripe_onboarding_complete",
+        "select": STRIPE_SETTINGS_SELECT,
       });
 
       if (!settings?.stripe_connect_id) {
@@ -165,16 +172,9 @@ Deno.serve(async (req) => {
       }
 
       const account = await acctRes.json();
-      const chargesEnabled = account.charges_enabled || false;
-      const detailsSubmitted = account.details_submitted || false;
-      const onboardingComplete = chargesEnabled && detailsSubmitted;
-
-      // Update financial_settings if onboarding is now complete
-      if (onboardingComplete && !settings.stripe_onboarding_complete) {
-        await sbQuery("PATCH", `financial_settings?tenant_id=eq.${tenantId}`, {}, {
-          stripe_onboarding_complete: true,
-        });
-      }
+      const { chargesEnabled, detailsSubmitted } = accountState(account);
+      // Records the check; the first time Stripe reports verified, marks the building complete and tells the board.
+      const { onboardingComplete } = await confirmIfVerified(settings, account);
 
       // If not complete, generate a new account link
       let onboardingUrl = null;

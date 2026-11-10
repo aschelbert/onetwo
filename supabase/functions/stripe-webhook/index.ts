@@ -2,6 +2,10 @@
 // Handles Stripe webhooks for unit-owner payments and refunds.
 // Subscription lifecycle is now handled by Chargebee (chargebee-webhook).
 // Zero dependencies -- raw fetch to Supabase REST API + Stripe signature via Web Crypto.
+// account.updated (from the connected-accounts endpoint) marks a building's Stripe account verified
+// the moment Stripe says so, through the same code as the board's Check now and the daily job.
+
+import { STRIPE_SETTINGS_SELECT, confirmIfVerified } from "../_shared/stripeAccount.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -261,6 +265,25 @@ Deno.serve(async (req) => {
           console.log("Refund result:", JSON.stringify(result));
         } catch (err) {
           console.error("Refund posting failed:", err);
+        }
+        break;
+      }
+
+      // ═══ ACCOUNT UPDATED → a building's Stripe account may now be verified ═══
+      // Stripe sends this for connected accounts as the review progresses. The first time it reports
+      // charges enabled and details submitted, the building is marked complete, the board is emailed
+      // and the owners' announcement is posted; later deliveries only record the check.
+      case "account.updated": {
+        const account = event.data.object;
+        const acctId = typeof account?.id === "string" ? account.id : (typeof event.account === "string" ? event.account : null);
+        if (!acctId) { console.log("account.updated without an account id"); break; }
+        const settings = await sbQuery("GET", "financial_settings", { "stripe_connect_id": `eq.${acctId}`, "select": STRIPE_SETTINGS_SELECT });
+        if (!settings?.tenant_id) { console.log(`account.updated for ${acctId}: no building has this account`); break; }
+        try {
+          const r = await confirmIfVerified(settings, account);
+          console.log(`account.updated ${acctId}: complete=${r.onboardingComplete} justVerified=${r.justVerified} emailed=${r.emailed}`);
+        } catch (err) {
+          console.error("account.updated handling failed:", err);
         }
         break;
       }
