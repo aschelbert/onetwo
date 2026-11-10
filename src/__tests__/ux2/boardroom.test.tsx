@@ -139,7 +139,9 @@ describe('Board Room', () => {
     expect(row.textContent).not.toContain('Opens by hand today');
     expect(within(row).getByRole('button', { name: 'Change the day' })).toBeTruthy();
     const collections = document.querySelector('tr[data-runbook="collections"]') as HTMLElement;
-    expect(collections.textContent).toContain('Opens by hand today');
+    expect(collections.textContent).not.toContain('Opens by hand today');
+    const elections = document.querySelector('tr[data-runbook="elections"]') as HTMLElement;
+    expect(elections.textContent).toContain('Opens by hand today');
     expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
     fireEvent.click(within(row).getByRole('button', { name: 'Change the day' }));
     expect(screen.getByTestId('elsewhere')).toBeTruthy();

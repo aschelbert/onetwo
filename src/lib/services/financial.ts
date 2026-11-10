@@ -455,6 +455,8 @@ export interface FinancialSettingsRow {
   monthCloseStartDay: number;
   /** The Month close switch on the Runbooks tab; the database job skips a building that turned it off. */
   monthCloseEnabled: boolean;
+  /** Runbooks the building switched off, by id, for every runbook the database also runs. */
+  runbooksOff: string[];
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -483,6 +485,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     glAccountMapping: (data.gl_account_mapping as Record<string, string>) || null,
     monthCloseStartDay: Number(data.month_close_start_day ?? 1) || 1,
     monthCloseEnabled: (data.month_close_enabled as boolean) ?? true,
+    runbooksOff: Array.isArray(data.runbooks_off) ? (data.runbooks_off as string[]) : [],
   };
 }
 
@@ -505,6 +508,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.paymentOrder !== undefined) row.payment_order = s.paymentOrder;
   if (s.monthCloseStartDay !== undefined) row.month_close_start_day = s.monthCloseStartDay;
   if (s.monthCloseEnabled !== undefined) row.month_close_enabled = s.monthCloseEnabled;
+  if (s.runbooksOff !== undefined) row.runbooks_off = s.runbooksOff;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;

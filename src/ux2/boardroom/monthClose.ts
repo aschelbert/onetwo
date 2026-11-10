@@ -129,7 +129,7 @@ export function runMonthClose(today: string = todayIso()): MonthCloseRun {
   const issues = useIssuesStore.getState();
   const existing = monthCloseCase(issues.cases, period);
   if (existing) { syncMonthCloseCase(existing); return { period, caseId: existing.id, opened: false }; }
-  if (!fin.monthCloseEnabled) return { period, caseId: null, opened: false };
+  if (!fin.monthCloseEnabled || fin.runbooksOff.includes(MONTH_CLOSE_ID)) return { period, caseId: null, opened: false };
   if (fin.closedThrough && fin.closedThrough >= monthEnd(`${period}-01`)) return { period, caseId: null, opened: false };
   const label = periodLabel(period);
   const id = issues.createCase({

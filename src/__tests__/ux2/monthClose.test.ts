@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { monthEnd } from '@/lib/ledger';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useMonthClose } from '@/ux2/boardroom/useMonthClose';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { useMonthClose } from '@/ux2/boardroom/useRunbookTriggers';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
@@ -21,7 +22,8 @@ const duesInvoice = (unitNumber: string, period: string): UnitInvoice => ({
 
 beforeEach(() => {
   useIssuesStore.setState({ cases: [], nextCaseNum: 1, casesLoaded: true });
-  useFinancialStore.setState({ tenantId: null, monthCloseStartDay: 1, monthCloseEnabled: true, closedThrough: null, unitInvoices: [] });
+  useFinancialStore.setState({ tenantId: null, monthCloseStartDay: 1, monthCloseEnabled: true, runbooksOff: [], closedThrough: null, unitInvoices: [], units: [] });
+  useBuildingStore.setState({ insurance: [] });
   useRunbookSwitches.setState({ off: [] });
 });
 
@@ -80,6 +82,7 @@ describe('running the runbook', () => {
   it('does nothing when the runbook is off or the month is already closed', () => {
     useRunbookSwitches.getState().setOn('month-close', false);
     expect(useFinancialStore.getState().monthCloseEnabled).toBe(false);
+    expect(useFinancialStore.getState().runbooksOff).toEqual(['month-close']);
     expect(runMonthClose('2026-11-10')).toMatchObject({ caseId: null, opened: false });
     useRunbookSwitches.getState().setOn('month-close', true);
     expect(useFinancialStore.getState().monthCloseEnabled).toBe(true);

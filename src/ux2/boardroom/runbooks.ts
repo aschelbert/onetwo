@@ -2,7 +2,8 @@
  * The runbook catalogue — the 32 runbooks from the design. A runbook that
  * maps to a production situation (`sitId` in the case wizard's CATS) opens
  * its case through the same wizard and steps. Only a runbook marked `wired`
- * starts itself today (the month close, from `monthClose.ts`); the rest
+ * starts itself today (month close, collections, insurance renewal, each
+ * from its own module next to this file, with a database twin); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -36,8 +37,8 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'move', name: 'Move in or out', trigger: 'A move is scheduled', steps: 6, automated: 3, sitId: 'scheduled-move', catId: 'admin', visibility: 'board', defaultOn: true },
   { id: 'vendor-bids', name: 'Vendor bids', trigger: 'A case step asks for quotes', steps: 6, automated: 2, sitId: 'vendor-management', catId: 'maintenance', visibility: 'board', defaultOn: false },
   { id: 'filings', name: 'Biennial report, 1120-H, D-20', trigger: 'Filing calendar', steps: 3, automated: 2, sitId: 'compliance-filing', catId: 'admin', visibility: 'owners', defaultOn: true },
-  { id: 'insurance-renewal', name: 'Insurance renewal', trigger: '60 days before a policy expires', steps: 5, automated: 3, sitId: 'insurance-claims', catId: 'legal', visibility: 'owners', defaultOn: true },
-  { id: 'collections', name: 'Collections', trigger: '30 days past due', steps: 5, automated: 3, sitId: 'delinquent-accounts', catId: 'financial', visibility: 'board', defaultOn: true },
+  { id: 'insurance-renewal', name: 'Insurance renewal', trigger: '60 days before a policy expires', steps: 5, automated: 2, sitId: 'insurance-claims', catId: 'legal', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [3, 4] },
+  { id: 'collections', name: 'Collections', trigger: '30 days past due', steps: 5, automated: 2, sitId: 'delinquent-accounts', catId: 'financial', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 4] },
   { id: 'month-close', name: 'Month close', trigger: 'The 1st of each month', steps: 5, automated: 2, sitId: 'financial-review', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 4] },
   { id: 'annual-meeting', name: 'Annual meeting', trigger: '13 months after the last one, minus notice', steps: 8, automated: 5, sitId: 'annual-meeting-planning', catId: 'governance', visibility: 'owners', defaultOn: true },
   { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 4, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true },

@@ -1,16 +1,16 @@
 /**
  * Runbook switches — which of the 32 runbooks the building has turned off.
  * Switching one off keeps its playbook for manual cases; it only stops the
- * trigger. Persisted per browser like the other stores, except the month
- * close, whose switch also lives in financial_settings for the database job.
+ * trigger. Persisted per browser like the other stores, except the wired
+ * runbooks, whose switches also live in financial_settings for the database jobs.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { RUNBOOKS } from './runbooks';
 
-/** The one runbook the server also runs: its switch is kept with the financial settings so the morning job sees it. */
-const SHARED = 'month-close';
+/** Runbooks the server also runs: their switches are kept with the financial settings so the morning job sees them. */
+const SHARED = new Set(RUNBOOKS.filter(r => r.wired).map(r => r.id));
 
 interface RunbookSwitchState {
   /** Runbook ids the building switched off. */
@@ -26,7 +26,8 @@ export const useRunbookSwitches = create<RunbookSwitchState>()(
       isOn: id => !get().off.includes(id),
       setOn: (id, on) => {
         set(s => ({ off: on ? s.off.filter(x => x !== id) : Array.from(new Set([...s.off, id])) }));
-        if (id === SHARED) useFinancialStore.getState().setMonthCloseEnabled(on);
+        if (SHARED.has(id)) useFinancialStore.getState().setRunbookOff(id, !on);
+        if (id === 'month-close') useFinancialStore.getState().setMonthCloseEnabled(on);
       },
     }),
     { name: 'onetwo-ux2-runbooks', version: 1, partialize: s => ({ off: s.off }) },
