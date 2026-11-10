@@ -21,7 +21,7 @@ const METHOD_NOTE: Record<string, string> = { 'certified': 'certified mail', 'fi
 
 function deliveryOf(l: GeneratedLetter, certifiedCents: number): { how: string; note: string } {
   const via = (l.sentVia || '').toLowerCase();
-  if (/certif/.test(via)) return { how: 'Certified mail', note: `${fmt(certifiedCents / 100)} · card on file` };
+  if (/certif/.test(via)) return { how: 'Certified mail', note: `est. ${fmt(certifiedCents / 100)} · billed by LetterStream` };
   if (/mail|print/.test(via)) return { how: 'Print and mail', note: 'print at the building' };
   if (via) return { how: l.sentVia, note: 'free · instant' };
   return { how: l.unitNumber ? 'Email, print and mail' : 'In-app and email', note: 'free · instant' };
@@ -139,7 +139,7 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
   const resend = (l: GeneratedLetter) => { void deliver(l); return addLetter({ templateId: l.templateId, templateName: l.templateName, recipient: l.recipient, unitNumber: l.unitNumber, subject: l.subject, body: l.body, status: 'sent', sentDate: new Date().toISOString().slice(0, 10), sentVia: l.sentVia, createdBy: snap.viewer.name, caseId: l.caseId ?? null }); };
   const needs = [
     ...notices.slice(0, 2).map(m => ({ id: `notice:${m.meeting.id}`, title: `Send the notice for the ${m.meeting.title} on ${dayLabel(m.meeting.date)}`, chip: <Chip tone="red">Overdue · was due {dayLabel(m.noticeDue)}</Chip>, detail: `Goes to every active member in-app and by email. The bylaws ask for 10 days; DC's minimum is 48 hours, so sending today still meets the law.`, cite: 'DC Code § 29-1101 et seq.', actions: <><Button size="sm" variant="ghost" onClick={() => navigate(`/community?tab=meetings&meeting=${m.meeting.id}`)}>Open the meeting</Button><Button size="sm" onClick={() => { void sendMeetingNotice(m.meeting, snap.viewer.name, snap.today).then(r => setSendNote({ text: r.note })); }}>Send now</Button></> })),
-    ...o.drafts.slice(0, 2).map(l => ({ id: `draft:${l.id}`, title: `Send the ${(l.subject || l.templateName).toLowerCase()}${l.unitNumber ? ` to Unit ${l.unitNumber}` : ''}`, chip: <Chip tone="amber">Draft · {deliveryOf(l, certifiedCents).how.toLowerCase()}</Chip>, detail: `${l.recipient}${l.caseId ? ` · ${l.caseId}` : ''} · drafted by ${l.createdBy} from the ${l.templateName} template.${/certif/i.test(l.sentVia) ? ` Certified mail is ${fmt(certifiedCents / 100)}, charged to the card on file; tracking is attached to the case.` : ''}`, cite: /demand|lien|collection/i.test(l.templateName) ? 'DC Code § 42-1903.13' : '', actions: <>{l.caseId ? <Button size="sm" variant="ghost" onClick={() => onOpenCase(l.caseId!)}>Open the case</Button> : <Button size="sm" variant="ghost" onClick={() => setEditing(l.id)}>Edit</Button>}<Button size="sm" onClick={() => send(l)}>{l.caseId ? 'Review and send' : 'Send now'}</Button></> })),
+    ...o.drafts.slice(0, 2).map(l => ({ id: `draft:${l.id}`, title: `Send the ${(l.subject || l.templateName).toLowerCase()}${l.unitNumber ? ` to Unit ${l.unitNumber}` : ''}`, chip: <Chip tone="amber">Draft · {deliveryOf(l, certifiedCents).how.toLowerCase()}</Chip>, detail: `${l.recipient}${l.caseId ? ` · ${l.caseId}` : ''} · drafted by ${l.createdBy} from the ${l.templateName} template.${/certif/i.test(l.sentVia) ? ` Certified mail is about ${fmt(certifiedCents / 100)}, billed by LetterStream to the building's own account; tracking is attached to the case.` : ''}`, cite: /demand|lien|collection/i.test(l.templateName) ? 'DC Code § 42-1903.13' : '', actions: <>{l.caseId ? <Button size="sm" variant="ghost" onClick={() => onOpenCase(l.caseId!)}>Open the case</Button> : <Button size="sm" variant="ghost" onClick={() => setEditing(l.id)}>Edit</Button>}<Button size="sm" onClick={() => send(l)}>{l.caseId ? 'Review and send' : 'Send now'}</Button></> })),
   ].slice(0, 3);
 
   const LetterCell = ({ l }: { l: GeneratedLetter }) => <Cell title={`${l.subject || l.templateName}${l.unitNumber ? ` · Unit ${l.unitNumber}` : ''}`} note={<>From the {l.templateName} template{l.caseId ? <> · <button type="button" className="font-semibold text-ux2-teal hover:underline" onClick={() => onOpenCase(l.caseId!)}>{l.caseId}</button></> : null}</>} />;
@@ -272,7 +272,7 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
             {[
               ['In-app', "Appears in Community and on the owner's Home · read log kept", 'Free · instant'],
               ['Email', 'To the address on file in Building › Directory · bounces come back here', 'Free · instant'],
-              ['Certified mail', 'Printed, mailed and tracked for you · required for demand letters', `${fmt(certifiedCents / 100)} · ${settings.cardLast4 ? 'card on file' : 'no card on file'}`],
+              ['Certified mail', 'Printed, mailed and tracked for you · required for demand letters', `est. ${fmt(certifiedCents / 100)} · ${settings.letterstreamConnected ? 'LetterStream connected' : 'LetterStream not connected'}`],
               ['Print and mail', 'Print at the building, mark it mailed, the porter drops it off', 'Free · you post it'],
             ].map(([how, note, cost]) => (
               <Inner key={how} className="flex items-center justify-between gap-3"><Cell title={how} note={note} /><Chip tone={/Free/.test(cost) ? 'sage' : 'amber'}>{cost}</Chip></Inner>
