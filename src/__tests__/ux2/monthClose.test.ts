@@ -135,15 +135,16 @@ describe('the shell hook', () => {
     mount(false);
     expect(useIssuesStore.getState().cases.length).toBe(0);
     mount(true);
-    const cases = useIssuesStore.getState().cases;
-    expect(cases.length).toBe(1);
-    expect(cases[0].sourceId).toMatch(/^month-close:\d{4}-\d{2}$/);
+    // The hook runs every wired runbook; the month close is the one this test watches.
+    const mine = useIssuesStore.getState().cases.filter(c => c.sourceId?.startsWith('month-close:'));
+    expect(mine.length).toBe(1);
+    expect(mine[0].sourceId).toMatch(/^month-close:\d{4}-\d{2}$/);
   });
 
   it('ticks the closed-books step as soon as the books close while the app is open', () => {
     useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
     const h = renderHook(() => useMonthClose(true));
-    const c = () => useIssuesStore.getState().cases[0];
+    const c = () => useIssuesStore.getState().cases.find(x => x.sourceId?.startsWith('month-close:'))!;
     expect(c().steps![STEP.closed].done).toBe(false);
     const period = c().sourceId!.slice('month-close:'.length);
     act(() => { useFinancialStore.getState().closeBooksThrough(`${period}-28`); });

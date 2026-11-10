@@ -2,8 +2,9 @@
  * The runbook catalogue — the 32 runbooks from the design. A runbook that
  * maps to a production situation (`sitId` in the case wizard's CATS) opens
  * its case through the same wizard and steps. Only a runbook marked `wired`
- * starts itself today (month close, collections, insurance renewal, each
- * from its own module next to this file, with a database twin); the rest
+ * starts itself today (month close, collections, insurance renewal, year-end
+ * close, annual budget, each from its own module next to this file, with a
+ * database twin); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -29,7 +30,7 @@ export interface RunbookDef {
 }
 
 export const RUNBOOKS: RunbookDef[] = [
-  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 9, automated: 5, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true },
+  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 9, automated: 2, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6] },
   { id: 'board-meeting', name: 'Board meeting cycle', trigger: 'Bylaws cadence', steps: 7, automated: 5, sitId: 'board-meetings', catId: 'governance', visibility: 'owners', defaultOn: true },
   { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 3, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true },
   { id: 'covenant-violation', name: 'Covenant violation', trigger: 'A request or inspection flags one', steps: 7, automated: 5, sitId: 'covenant-violations', catId: 'enforcement', visibility: 'board', defaultOn: true },
@@ -52,7 +53,7 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'spending-request', name: 'Spending request', trigger: 'Anything over the bylaws limit or over its line', steps: 4, automated: 3, sitId: 'capital-projects', catId: 'strategic', visibility: 'owners', defaultOn: true },
   { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
   { id: '1099', name: '1099 filing', trigger: 'January 1', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
-  { id: 'year-end', name: 'Year-end close', trigger: 'Fiscal year end', steps: 6, automated: 4, visibility: 'owners', defaultOn: true },
+  { id: 'year-end', name: 'Year-end close', trigger: 'Fiscal year end', steps: 6, automated: 2, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [2, 3] },
   { id: 'financial-review', name: 'Financial review', trigger: 'After year-end close', steps: 4, automated: 2, visibility: 'owners', defaultOn: true },
   { id: 'owner-disclosure', name: 'Owner disclosure statement', trigger: 'Annually by Mar 31', steps: 3, automated: 3, visibility: 'owners', defaultOn: true },
   { id: 'records-request', name: 'Records request', trigger: 'An owner asks for records', steps: 4, automated: 3, sitId: 'record-requests', catId: 'admin', visibility: 'board', defaultOn: true },

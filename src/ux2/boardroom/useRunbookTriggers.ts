@@ -1,5 +1,6 @@
 /**
- * Runs the wired runbooks when a board member or manager opens the app, and
+ * Runs the wired runbooks (month close, collections, insurance renewal,
+ * year-end close, annual budget) when a board member or manager opens the app, and
  * again as the data they watch changes (a payment lands, the books close, a
  * policy is renewed), so each case's automated steps tick as the work lands.
  * Everything it calls is idempotent (one case per trigger, a done step stays
@@ -11,13 +12,16 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
+import { useComplianceStore } from '@/store/useComplianceStore';
 import { runMonthClose } from './monthClose';
 import { runCollections } from './collections';
 import { runInsuranceRenewal } from './insuranceRenewal';
+import { runYearEndClose } from './yearEndClose';
+import { runAnnualBudget } from './annualBudget';
 
 /** Every wired runbook, once; each guards itself. */
 export function runRunbookTriggers(today?: string): void {
-  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal]] as const) {
+  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget]] as const) {
     try { run(today); } catch (err) { console.error(`[runbooks] ${name} failed:`, err); }
   }
 }
@@ -32,11 +36,15 @@ export function useRunbookTriggers(enabled = true) {
   const off = useFinancialStore(s => s.runbooksOff);
   const monthCloseEnabled = useFinancialStore(s => s.monthCloseEnabled);
   const insurance = useBuildingStore(s => s.insurance);
+  const fiscalYearEnd = useBuildingStore(s => s.details?.fiscalYearEnd);
+  const ledgerCount = useFinancialStore(s => s.generalLedger.length);
+  const reserveAnnual = useFinancialStore(s => s.annualReserveContribution);
+  const announcements = useComplianceStore(s => s.announcements);
   useEffect(() => {
     if (!enabled || !casesLoaded) return;
     if (role !== 'BOARD_MEMBER' && role !== 'PROPERTY_MANAGER' && role !== 'PM_COMPANY') return;
     runRunbookTriggers();
-  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance]);
+  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements]);
 }
 
 /** The old name, for the month close alone. */
