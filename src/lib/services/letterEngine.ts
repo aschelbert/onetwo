@@ -9,6 +9,8 @@ export interface LetterTemplate {
   subject: string;
   body: string;
   variables: Array<{ name: string; label: string; defaultValue: string }>;
+  /** Which built-in this row started from, if any; a template the board wrote from scratch has none. */
+  builtinKey?: string | null;
 }
 
 export interface GeneratedLetter {
@@ -36,6 +38,7 @@ function rowToTemplate(r: Record<string, unknown>): LetterTemplate {
     subject: r.subject as string,
     body: r.body as string,
     variables: (r.variables || []) as LetterTemplate['variables'],
+    builtinKey: (r.builtin_key as string) || null,
   };
 }
 
@@ -46,6 +49,7 @@ function templateToRow(t: Partial<LetterTemplate>): Record<string, unknown> {
   if (t.subject !== undefined) row.subject = t.subject;
   if (t.body !== undefined) row.body = t.body;
   if (t.variables !== undefined) row.variables = t.variables;
+  if (t.builtinKey !== undefined) row.builtin_key = t.builtinKey;
   return row;
 }
 
@@ -108,6 +112,17 @@ export async function createTemplate(tenantId: string, template: Omit<LetterTemp
     .single();
   if (error) { logDbError('createTemplate error:', error); return null; }
   return rowToTemplate(data);
+}
+
+/** Writes many templates at once and returns them with their ids; used to give a building the built-ins. */
+export async function createTemplates(tenantId: string, templates: Omit<LetterTemplate, 'id'>[]): Promise<LetterTemplate[] | null> {
+  if (!supabase || templates.length === 0) return null;
+  const { data, error } = await supabase
+    .from('letter_templates')
+    .insert(templates.map(t => ({ ...templateToRow(t), tenant_id: tenantId })))
+    .select();
+  if (error) { logDbError('createTemplates error:', error); return null; }
+  return (data || []).map(rowToTemplate);
 }
 
 export async function updateTemplate(id: string, updates: Partial<LetterTemplate>): Promise<boolean> {
