@@ -90,7 +90,7 @@ export default function PaymentsStep({ onBack, onNext }: { onBack: () => void; o
 
         {status === 'pending' && (
           <div role="status" className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#F0DDB8] bg-ux2-amber-tint px-4 py-3.5 text-sm text-ux2-ink">
-            <span className="min-w-[280px] flex-1 leading-relaxed"><b className="font-semibold">Stripe is checking the association's details.</b> This usually takes 1 to 2 days. We check each time this page opens and email you when it's done. Owners can pay online from then; until then their unit page says pay by check.</span>
+            <span className="min-w-[280px] flex-1 leading-relaxed"><b className="font-semibold">Stripe is checking the association's details.</b> This usually takes 1 to 2 days. We check each time this page opens and once a day, and email you when it's done. Owners can pay online from then; until then their unit page says pay by check.</span>
             <span className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => void connect('check_status')}>{busy ? 'Checking…' : 'Check now'}</Button>
               <Button size="sm" variant="ghost" disabled={busy} className="gap-1.5" onClick={() => void connect('check_status', true)}>Open Stripe <Ext /></Button>
