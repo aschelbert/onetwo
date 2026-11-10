@@ -1,4 +1,6 @@
-// ─── Mail Types (LetterStream Integration) ─────────────────
+// ─── Mail Types (LetterStream, Partnership mode) ───────────
+// The building holds its own LetterStream account and pays LetterStream
+// directly; the app only pushes jobs into that account.
 
 export type MailDeliveryMethod =
   | 'first-class'
@@ -9,7 +11,7 @@ export type MailDeliveryMethod =
 export type MailStatus =
   | 'draft'
   | 'approved'
-  | 'charging'
+  | 'awaiting-payment'
   | 'submitted'
   | 'processing'
   | 'mailed'
@@ -65,8 +67,8 @@ export interface MailRecord {
   includeReturnEnvelope: boolean;
   emailCopy: boolean;
   emailAddress?: string;
-  stripeChargeId?: string;
-  stripePaymentIntentId?: string;
+  /** The building's LetterStream dashboard, where the job is paid for and tracked. */
+  letterstreamPortalUrl?: string;
   mergeVariables: Record<string, string>;
   createdAt: string;
   sentAt?: string;
@@ -75,10 +77,16 @@ export interface MailRecord {
 
 export interface MailingSettings {
   enabled: boolean;
-  stripePaymentMethodId: string;
-  stripeCustomerId: string;
-  cardLast4: string;
-  cardBrand: string;
+  /** The building's own LetterStream account is connected (API ID and key on file, server side). */
+  letterstreamConnected: boolean;
+  /** Masked API ID, e.g. ••••1234. The key never reaches the browser. */
+  letterstreamApiIdMasked: string;
+  letterstreamConnectedAt: string;
+  /** 'verified' | 'unverified' | 'invalid' | '' */
+  letterstreamStatus: string;
+  /** Our partner sign-up link, from the server; the building opens its account through it. */
+  letterstreamPartnerUrl: string;
+  letterstreamPortalUrl: string;
   senderAddress: PostalAddress;
   senderName: string;
   defaultDeliveryMethod: MailDeliveryMethod;
@@ -87,6 +95,11 @@ export interface MailingSettings {
 }
 
 // ─── Pricing (cents) ─────────────────────────────────────
+// Estimates only, from LetterStream's published per-piece rates. LetterStream
+// sets the real price and charges the building's own account for it; the app
+// never bills postage.
+
+export const ESTIMATE_NOTE = "Estimate. LetterStream prices the letter and bills the building's own LetterStream account.";
 
 export const PRICING: Record<string, number> = {
   'first-class': 123,

@@ -119,7 +119,7 @@ supabase functions deploy provision-tenant
 
 ```bash
 cd ~/onetwo
-npm install @supabase/supabase-js @stripe/stripe-js @chargebee/chargebee-js
+npm install @supabase/supabase-js @chargebee/chargebee-js
 ```
 
 ### Step 5: Configure Environment Variables
@@ -131,7 +131,6 @@ cp .env.example .env.local
 # Edit .env.local with your values:
 # VITE_SUPABASE_URL=https://xxx.supabase.co
 # VITE_SUPABASE_ANON_KEY=eyJ...
-# VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 # VITE_CB_SITE=onetwo-test
 ```
 
@@ -139,7 +138,6 @@ cp .env.example .env.local
 Go to Vercel Dashboard → Project → Settings → Environment Variables and add:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_STRIPE_PUBLISHABLE_KEY`
 - `VITE_CB_SITE`
 - All `VITE_CB_PRICE_*` variables
 
@@ -226,9 +224,9 @@ do not yet have an active Chargebee subscription:
 
 ### Stripe Connect (Owner Payments)
 
-Stripe is still used for owner-facing payments (assessment collection, postage fees, etc.)
-via Stripe Connect. Each tenant connects their own Stripe account so that payments from
-unit owners are deposited directly into the association's bank account.
+Stripe is still used for owner-facing payments (assessment collection) via Stripe
+Connect. Each tenant connects their own Stripe account so that payments from unit
+owners are deposited directly into the association's bank account.
 
 This is separate from the Chargebee subscription billing described above.
 
@@ -265,6 +263,25 @@ supabase functions deploy connect-stripe-account
 supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy stripe-account-status
 ```
+
+### LetterStream (Printed Mail)
+
+Printed letters go through LetterStream in **Partnership mode**. Each building opens
+its own LetterStream account through our partner link (`LETTERSTREAM_PARTNER_URL`),
+pastes the account's API ID and key under Settings → Mailing, and LetterStream bills
+the building directly for every letter. The platform never charges a card for postage.
+
+- Credentials live in `letterstream_accounts` (RLS on, no policies: service role only).
+- `connect-letterstream` saves, verifies, reports and removes a building's credentials.
+- `send-mail` renders the notice to PDF and pushes it into the building's account; the
+  job mails once the building pays for it there (or at once from a prepaid balance).
+- `check-mail-status` reads the job's status back with the building's credentials.
+
+LetterStream shares its API guide only with approved partner accounts. The wire format
+lives in one file, `supabase/functions/_shared/letterstream.ts`; confirm the endpoint,
+signature and field names against the guide before going live. API access is a
+LetterStream subscription on the partner account, and new API enrollment was paused by
+LetterStream until late November 2026.
 
 ---
 

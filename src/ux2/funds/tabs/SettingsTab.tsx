@@ -3,8 +3,8 @@
  * sub-navigation splits it into five pages: Ledger (with the books' closing,
  * quick entries and the opening balances), Chart of Accounts, GL mapping
  * (where things post), Fees & Billing (the fee schedule and billing rules),
- * and Bank & Mail (bank and payments, and the mailing card with its
- * production settings panel). A "Needs you" banner for unmatched bills sits
+ * and Bank & Mail (bank and payments, and the building's LetterStream
+ * account with its production settings panel). A "Needs you" banner for unmatched bills sits
  * above whichever page is open. Deep links (`?section=rules`, `=opening`,
  * `=mailing`, …) open the page that holds the card and scroll to it. Every
  * write goes through the financial and fee-schedule stores.
@@ -390,8 +390,8 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
         <Why>Bills approved on Expenses are paid from 1010 on their due date. Transfers between the two accounts post as ledger entries; a manual transfer uses "Moved money to reserves" on the Ledger page.</Why>
       </Card>
 
-      <Card id="mailing-card" aria-label="Mailing card">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Mailing card</span><span className="text-xs text-ux2-muted">the card that pays for printed letters</span></div>
+      <Card id="mailing-card" aria-label="Mailing">
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Mailing</span><span className="text-xs text-ux2-muted">printed letters are billed by LetterStream to the building's own account</span></div>
         <div className="ux2-legacy"><MailingSettingsTab /></div>
         <Why>Jump to the <button type="button" className="underline" onClick={() => onSection('ledger')}>ledger</button>, the <button type="button" className="underline" onClick={() => onSection('accounts')}>chart of accounts</button> or the <button type="button" className="underline" onClick={() => onSection('fees')}>fee schedule</button>.</Why>
       </Card>
