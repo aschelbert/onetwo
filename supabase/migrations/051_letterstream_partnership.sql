@@ -1,4 +1,4 @@
--- 050_letterstream_partnership.sql
+-- 051_letterstream_partnership.sql
 -- Physical mail moves to LetterStream Partnership mode: each building holds its
 -- own LetterStream account (opened through our partner link) and pays
 -- LetterStream directly. We only push jobs into that account, so the platform

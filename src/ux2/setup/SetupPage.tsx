@@ -3,10 +3,12 @@
  *
  *  1 Documents             PDFs, pasted text and spreadsheets are read in the browser (rules, no AI); all are filed
  *  2 Review what we found  accept, edit or skip each item, with the page and words it came from
- *  3–5 Finish              fill the gaps, invite people, go live (one page; each part is short)
+ *  3 Fill the gaps         what the documents didn't cover (on the finish page)
+ *  4 Get paid online       connect the association's Stripe account; optional, its own page so Stripe can return to it
+ *  5–6 Finish              invite people, go live (with 3, one page; each part is short)
  *
- * The step is in the URL (`?step=documents|review|finish`); without one the
- * page opens on the next thing to do.
+ * The step is in the URL (`?step=documents|review|payments|finish`); without
+ * one the page opens on the next thing to do.
  */
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,13 +23,15 @@ import { unfileSetupDocument } from '@/features/setup/applySetup';
 import { FiledAs, PastDocuments, VendorContracts } from './DocFiling';
 import { useSetup } from './useSetup';
 import ReviewStep from './ReviewStep';
+import PaymentsStep from './PaymentsStep';
 import FinishStep from './FinishStep';
 
-type Step = 'documents' | 'review' | 'finish';
+type Step = 'documents' | 'review' | 'payments' | 'finish';
 const STEP_PILLS: { id: string; step: Step; label: string; anchor?: string }[] = [
   { id: 'documents', step: 'documents', label: 'Documents' },
   { id: 'review', step: 'review', label: 'Review what we found' },
   { id: 'gaps', step: 'finish', label: 'Fill the gaps', anchor: 'setup-gaps' },
+  { id: 'payments', step: 'payments', label: 'Get paid online' },
   { id: 'invite', step: 'finish', label: 'Invite people', anchor: 'setup-invite' },
   { id: 'live', step: 'finish', label: 'Go live', anchor: 'setup-live' },
 ];
@@ -41,7 +45,7 @@ export default function SetupPage() {
   const raw = params.get('step');
   // Without a step in the URL, open on the next thing to do, and stay there as things change (adding a document must not jump to Review).
   const [opened] = useState<Step>(s.next.step);
-  const step: Step = raw === 'documents' || raw === 'review' || raw === 'finish' ? raw : opened;
+  const step: Step = raw === 'documents' || raw === 'review' || raw === 'payments' || raw === 'finish' ? raw : opened;
   const go = (next: Step, anchor?: string) => {
     setParams(prev => { const q = new URLSearchParams(prev); q.set('step', next); return q; });
     window.setTimeout(() => (anchor ? document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : window.scrollTo({ top: 0 })), 50);
@@ -76,7 +80,8 @@ export default function SetupPage() {
       </nav>
       {step === 'documents' && <DocumentsStep onReview={() => go('review')} onByHand={() => go('finish')} />}
       {step === 'review' && <ReviewStep onDone={() => go('finish')} onDocuments={() => go('documents')} />}
-      {step === 'finish' && <FinishStep onReview={() => go('review')} onDocuments={() => go('documents')} />}
+      {step === 'payments' && <PaymentsStep onBack={() => go('finish', 'setup-gaps')} onNext={() => go('finish', 'setup-invite')} />}
+      {step === 'finish' && <FinishStep onReview={() => go('review')} onDocuments={() => go('documents')} onPayments={() => go('payments')} />}
     </div>
   );
 }

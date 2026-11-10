@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const tenant = { name: 'Maple Court', isDemo: false, status: 'onboarding', features: {}, onboarding: { goLive: false }, updateOnboardingStep: vi.fn(async (_step?: string, _value?: boolean) => {}) };
@@ -14,6 +14,7 @@ import { applyItem, monthDay } from '@/features/setup/applySetup';
 import { addPastedText } from '@/features/setup/readDocument';
 import { invitePayload, parseInviteLines } from '@/features/setup/invites';
 import { parseUnitLines, unitRange } from '@/features/setup/unitEntry';
+import { monthlyFeeEstimate, paymentsStatus, PREFS_KEY } from '@/ux2/funds/paymentPrefs';
 import { extractFromPages, wordNumber } from '@/features/setup/extractText';
 import { readSheet, parseCsv } from '@/features/setup/importSpreadsheet';
 import SetupPage from '@/ux2/setup/SetupPage';
@@ -229,7 +230,7 @@ describe('Setup screens', () => {
     localStorage.clear();
     useSetupStore.getState().reset();
     useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
-    useFinancialStore.setState({ units: [], budgetCategories: [] });
+    useFinancialStore.setState({ units: [], budgetCategories: [], stripeConnectId: null, stripeOnboardingComplete: false });
     useBuildingStore.setState({ board: [], name: 'Maple Court', address: { street: '', city: '', state: '', zip: '' } });
   });
 
@@ -499,5 +500,99 @@ describe('Setup screens', () => {
     renderSetup('/setup?step=finish');
     expect(document.querySelector('[data-invite="owner@example.com"]')?.textContent).toContain('Not emailed · code CON-RES-WHEZ');
     expect(document.querySelector('[data-invite="emailed@example.com"]')?.textContent).toContain('Sent');
+  });
+});
+
+const unit = (number: string, monthlyFee: number) => ({ number, owner: 'Rivera, Ana', email: 'ana@example.com', phone: '', monthlyFee, votingPct: 50, status: 'ACTIVE' as const, balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] });
+
+describe('Setup · Get paid online (Stripe)', () => {
+  /** A building with the four essentials in place, so online payments are the next thing to do. */
+  const readyBuilding = () => {
+    useFinancialStore.setState({ units: [unit('1A', 400), unit('1B', 400)], budgetCategories: [], stripeConnectId: null, stripeOnboardingComplete: false });
+    useBuildingStore.setState({ board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: 'ana@example.com', phone: '', term: '' }], name: 'Maple Court', address: { street: '12 Maple Ct', city: '', state: '', zip: '' } });
+  };
+  beforeEach(() => {
+    localStorage.clear();
+    useSetupStore.getState().reset();
+    useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
+    readyBuilding();
+  });
+
+  it('reads the Stripe state from the financial settings and sizes the fee estimate to the building', () => {
+    expect(paymentsStatus(null, false)).toBe('off');
+    expect(paymentsStatus('acct_1', false)).toBe('pending');
+    expect(paymentsStatus('acct_1', true)).toBe('on');
+    expect(paymentsStatus(null, true)).toBe('off');
+    expect(monthlyFeeEstimate([unit('1', 400), unit('2', 400), unit('3', 0)])).toEqual({ dues: 800, byCard: 24, byBank: 6 });
+  });
+
+  it('is the sixth step: after the gaps are filled the Home card points at it, and Later moves on to Go live', () => {
+    useSetupStore.setState({ docs: [{ id: 'f1', name: 'Minutes.pdf', size: 1000, mediaType: 'application/pdf', status: 'filed', addedAt: '2026-11-07' }] });
+    renderSetup('/home');
+    const card = document.querySelector('[data-widget="setup-card"]') as HTMLElement;
+    const steps = within(card).getByRole('list', { name: 'Setup steps' });
+    expect(within(steps).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Documents1 added', '2Review what we found', 'Fill the gapsDone', '4Get paid onlineOptional · about 10 min', '5Invite peopleOptional', '6Go live']);
+    expect(within(card).getByRole('button', { name: 'Set up online payments' })).toBeTruthy();
+    expect(within(card).getByText(/connect Stripe so owners can pay dues/)).toBeTruthy();
+    act(() => useSetupStore.getState().setLater('payments', true));
+    expect(within(card).getByRole('button', { name: 'Go live' })).toBeTruthy();
+    expect(within(steps).getAllByRole('listitem')[3].textContent).toContain('Later');
+  });
+
+  it('step 4 before connecting: one action, what to have ready, and what it costs for this building', async () => {
+    renderSetup('/setup?step=payments');
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['1Documents', '2Review what we found', '3Fill the gaps', '4Get paid online', '5Invite people', '6Go live']);
+    expect(within(nav).getByRole('button', { name: /Get paid online/ }).getAttribute('aria-current')).toBe('step');
+    const step = document.querySelector('[data-step="payments"]') as HTMLElement;
+    expect(step.getAttribute('data-payments-status')).toBe('off');
+    expect(within(step).getByRole('heading', { level: 3 }).textContent).toBe("Connect the association's Stripe account");
+    expect(within(step).getAllByText('Have it handy')).toHaveLength(3);
+    expect(document.querySelector('[data-fee-estimate]')?.textContent).toMatch(/For 2 units paying \$800 a month.*about \$24 a month.*about \$6 a month/);
+    // Without the live backend the click explains itself instead of failing silently.
+    fireEvent.click(within(step).getByRole('button', { name: /Connect with Stripe/ }));
+    expect((await within(step).findByRole('status')).textContent).toMatch(/needs the live backend/);
+    // Later: remembered, and the page moves on to inviting people.
+    fireEvent.click(within(step).getByRole('button', { name: 'Later' }));
+    expect(useSetupStore.getState().later).toContain('payments');
+    expect(screen.getByRole('heading', { name: /5 · Invite people/ })).toBeTruthy();
+  });
+
+  it('back from Stripe: shows verification pending, the account, and the rules shared with Funds › Online payments', () => {
+    useFinancialStore.setState({ stripeConnectId: 'acct_1SAbCdEfGhx7', stripeOnboardingComplete: false });
+    renderSetup('/setup?step=payments');
+    const step = document.querySelector('[data-step="payments"]') as HTMLElement;
+    expect(step.getAttribute('data-payments-status')).toBe('pending');
+    expect(within(step).getByText('Stripe verifying')).toBeTruthy();
+    expect(within(step).getByRole('status').textContent).toMatch(/Stripe is checking the association's details/);
+    const account = within(step).getByLabelText('Stripe account');
+    expect(account.textContent).toContain('Maple Court · acct_1S…x7');
+    expect(account.textContent).toContain('MAPLE COURT');
+    const rules = within(step).getByLabelText('What owners can pay here');
+    expect(within(rules).getByRole('switch', { name: 'Monthly dues' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(within(rules).getByRole('switch', { name: 'Bank account (ACH) as well as cards' }));
+    fireEvent.click(within(rules).getByRole('radio', { name: 'The owner, at checkout' }));
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')).toMatchObject({ ach: false, passFees: true });
+    expect(within(step).getByRole('button', { name: 'Continue to Invite people' })).toBeTruthy();
+  });
+
+  it('go live lists online payments under "also set up" with its state, and never requires it', () => {
+    useFinancialStore.setState({ stripeConnectId: 'acct_1SAbCdEfGhx7', stripeOnboardingComplete: false });
+    renderSetup('/setup?step=finish');
+    expect(screen.getByRole('heading', { name: '6 · Go live' })).toBeTruthy();
+    const also = screen.getByRole('list', { name: 'Also set up' });
+    const pay = within(also).getByRole('button', { name: 'Online payments · Stripe verifying' });
+    expect(pay.closest('[data-also="payments"]')?.getAttribute('data-state')).toBe('pending');
+    expect(screen.getByText(/Online payments switch on by themselves/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Go live' }) as HTMLButtonElement).disabled).toBe(false);
+    // The line opens step 4.
+    fireEvent.click(pay);
+    expect(document.querySelector('[data-step="payments"]')).toBeTruthy();
+
+    useFinancialStore.setState({ stripeOnboardingComplete: true });
+    renderSetup('/setup?step=finish');
+    const lists = screen.getAllByRole('list', { name: 'Also set up' });
+    expect(lists[lists.length - 1].querySelector('[data-also="payments"]')?.getAttribute('data-state')).toBe('done');
+    expect(screen.getByText(/offers "Pay online or set up autopay" from the first visit/)).toBeTruthy();
   });
 });
