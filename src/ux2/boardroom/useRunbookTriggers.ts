@@ -1,7 +1,8 @@
 /**
  * Runs the wired runbooks (month close, collections, insurance renewal,
  * year-end close, annual budget, filings, annual meeting, board meeting
- * cycle, inspections, 1099s, owner disclosure) when a board member or manager opens the app, and
+ * cycle, inspections, 1099s, owner disclosure, resident requests, moves,
+ * amenity bookings) when a board member or manager opens the app, and
  * again as the data they watch changes (a payment lands, the books close, a
  * policy is renewed), so each case's automated steps tick as the work lands.
  * Everything it calls is idempotent (one case per trigger, a done step stays
@@ -24,11 +25,15 @@ import { runAnnualMeeting, runBoardMeeting } from './meetings';
 import { runBoilerFire, runElevatorInspection } from './inspections';
 import { runForm1099 } from './form1099';
 import { runOwnerDisclosure } from './ownerDisclosure';
+import { runResidentRequest } from './residentRequest';
+import { runMoves } from './moves';
+import { runAmenityBooking } from './amenityBooking';
+import { useAmenitiesStore } from '@/store/useAmenitiesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 
 /** Every wired runbook, once; each guards itself. */
 export function runRunbookTriggers(today?: string): void {
-  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure]] as const) {
+  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure], ['resident request', runResidentRequest], ['move in or out', runMoves], ['amenity booking', runAmenityBooking]] as const) {
     try { run(today); } catch (err) { console.error(`[runbooks] ${name} failed:`, err); }
   }
 }
@@ -54,11 +59,14 @@ export function useRunbookTriggers(enabled = true) {
   const schedules = useBuildingStore(s => s.maintenanceSchedules);
   const vendors = useBuildingStore(s => s.vendors);
   const workOrders = useFinancialStore(s => s.workOrders);
+  const issues = useIssuesStore(s => s.issues);
+  const moveEvents = useFinancialStore(s => s.moveEvents);
+  const reservations = useAmenitiesStore(s => s.reservations);
   useEffect(() => {
     if (!enabled || !casesLoaded) return;
     if (role !== 'BOARD_MEMBER' && role !== 'PROPERTY_MANAGER' && role !== 'PM_COMPANY') return;
     runRunbookTriggers();
-  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders]);
+  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders, issues, moveEvents, reservations]);
 }
 
 /** The old name, for the month close alone. */

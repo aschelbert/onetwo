@@ -4,8 +4,9 @@
  * its case through the same wizard and steps. Only a runbook marked `wired`
  * starts itself today (month close, collections, insurance renewal, year-end
  * close, annual budget, filings, the annual meeting, the board meeting cycle,
- * the inspections, the 1099s and the owner disclosure, each from a module
- * next to this file, with a database twin); the rest
+ * the inspections, the 1099s, the owner disclosure, resident requests, moves
+ * and amenity bookings, each from a module next to this file, with a database
+ * twin except the bookings, which live only in the app); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -33,10 +34,10 @@ export interface RunbookDef {
 export const RUNBOOKS: RunbookDef[] = [
   { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 9, automated: 2, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6] },
   { id: 'board-meeting', name: 'Board meeting cycle', trigger: 'Bylaws cadence', steps: 5, automated: 3, sitId: 'board-meetings', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
-  { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 3, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true },
+  { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 2, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 3] },
   { id: 'covenant-violation', name: 'Covenant violation', trigger: 'A request or inspection flags one', steps: 7, automated: 5, sitId: 'covenant-violations', catId: 'enforcement', visibility: 'board', defaultOn: true },
   { id: 'elections', name: 'Elections', trigger: 'Annual meeting scheduled', steps: 8, automated: 4, sitId: 'elections', catId: 'governance', visibility: 'owners', defaultOn: true },
-  { id: 'move', name: 'Move in or out', trigger: 'A move is scheduled', steps: 6, automated: 3, sitId: 'scheduled-move', catId: 'admin', visibility: 'board', defaultOn: true },
+  { id: 'move', name: 'Move in or out', trigger: 'A move is scheduled', steps: 6, automated: 6, sitId: 'scheduled-move', catId: 'admin', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3, 4, 5] },
   { id: 'vendor-bids', name: 'Vendor bids', trigger: 'A case step asks for quotes', steps: 6, automated: 2, sitId: 'vendor-management', catId: 'maintenance', visibility: 'board', defaultOn: false },
   { id: 'filings', name: 'Biennial report, 1120-H, D-20', trigger: 'Filing calendar · 45 days before each due date', steps: 7, automated: 0, sitId: 'compliance-filing', catId: 'admin', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [] },
   { id: 'insurance-renewal', name: 'Insurance renewal', trigger: '60 days before a policy expires', steps: 5, automated: 2, sitId: 'insurance-claims', catId: 'legal', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [3, 4] },
@@ -49,7 +50,7 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'elevator-inspection', name: 'Elevator inspection', trigger: 'Certificate expiry, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
   { id: 'boiler-fire', name: 'Boiler and fire systems', trigger: 'Inspection calendar, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
   { id: 'snow', name: 'Snow and ice', trigger: 'First forecast under 32°F', steps: 3, automated: 3, visibility: 'owners', defaultOn: true },
-  { id: 'amenity-booking', name: 'Amenity booking', trigger: 'An owner books a room', steps: 4, automated: 4, sitId: 'amenities', catId: 'operations', visibility: 'owners', defaultOn: true },
+  { id: 'amenity-booking', name: 'Amenity booking', trigger: 'A booking needs the board\'s approval', steps: 4, automated: 2, sitId: 'amenities', catId: 'operations', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'work-order', name: 'Work order', trigger: 'A case step needs a vendor', steps: 5, automated: 4, sitId: 'common-area-repairs', catId: 'maintenance', visibility: 'board', defaultOn: true },
   { id: 'spending-request', name: 'Spending request', trigger: 'Anything over the bylaws limit or over its line', steps: 4, automated: 3, sitId: 'capital-projects', catId: 'strategic', visibility: 'owners', defaultOn: true },
   { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true },

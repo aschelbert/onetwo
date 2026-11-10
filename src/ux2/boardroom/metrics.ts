@@ -59,6 +59,7 @@ export function situationLabel(s: Pick<BoardRoomSnapshot, 'categories'>, c: Case
   const title = s.categories.find(x => x.id === c.catId)?.sits.find(x => x.id === c.sitId)?.title;
   if (title) return title;
   if (c.source === 'runbook' && c.sourceId) { const rb = RUNBOOKS.find(r => c.sourceId!.startsWith(`${r.id}:`)); if (rb) return rb.name; }
+  if (c.sitId.startsWith('runbook-')) { const rb = RUNBOOKS.find(r => c.sitId === `runbook-${r.id}`); if (rb) return rb.name; }
   return c.sitId;
 }
 
@@ -216,8 +217,8 @@ export interface RunbookStatus {
   lastRan?: { date: string; title: string };
 }
 
-/** A case the runbook opened itself carries `source: 'runbook'` and `sourceId: '<runbook id>:<key>'`. */
-const startedBy = (c: CaseTrackerCase, def: RunbookDef) => c.source === 'runbook' && !!c.sourceId?.startsWith(`${def.id}:`);
+/** A case the runbook opened itself carries `source: 'runbook'` and `sourceId: '<runbook id>:<key>'`, or sits on the runbook's own situation (`runbook-<id>`) when another link owns `source`, as a request's case does. */
+const startedBy = (c: CaseTrackerCase, def: RunbookDef) => (c.source === 'runbook' && !!c.sourceId?.startsWith(`${def.id}:`)) || c.sitId === `runbook-${def.id}`;
 
 export function runbookStatuses(s: BoardRoomSnapshot): RunbookStatus[] {
   return RUNBOOKS.map(def => {
