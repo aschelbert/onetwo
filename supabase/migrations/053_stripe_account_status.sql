@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- ONE two HOA - 050: Stripe account verification is noticed without a visit
+-- ONE two HOA - 053: Stripe account verification is noticed without a visit
 --
 -- A building's Stripe Connect account takes Stripe 1 to 2 days to verify. Until
 -- now the app only learned of it when a board member opened the Payments page.
@@ -13,14 +13,17 @@
 --     account.updated webhook does the same the moment it fires; the daily
 --     job is the safety net.
 --
--- The job reaches the edge function through pg_net, with the project URL and
--- service role key read from Vault. Create those two secrets once per project:
+-- The job reaches the edge function through pg_net and authenticates with a
+-- shared secret, never the service role key: this migration generates a random
+-- one into Vault (`stripe_status_cron_secret`) and the function reads it back
+-- through a service-role-only RPC, so nothing is copied anywhere by hand. The
+-- project URL is the one thing to create once per project:
 --
 --   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
---   select vault.create_secret('<service role key>', 'service_role_key');
 --
 -- Where pg_cron or pg_net is not available this migration only raises a
--- notice; schedule the function from outside with the CRON_SECRET header.
+-- notice; schedule the function from outside, sending the Vault secret (or a
+-- CRON_SECRET function secret, which overrides it) in an x-cron-secret header.
 -- ════════════════════════════════════════════════════════════════════════════
 
 alter table financial_settings
@@ -36,6 +39,31 @@ comment on column financial_settings.stripe_status_checked_at is 'When the accou
 update financial_settings
    set stripe_verified_at = coalesce(stripe_verified_at, updated_at)
  where stripe_onboarding_complete and stripe_connect_id is not null;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- The job's shared secret: generated once per project, read back only by the
+-- service role (the edge function), never by anon or authenticated.
+-- ────────────────────────────────────────────────────────────────────────────
+
+do $$
+begin
+  if not exists (select 1 from vault.secrets where name = 'stripe_status_cron_secret') then
+    perform vault.create_secret(encode(gen_random_bytes(32), 'hex'), 'stripe_status_cron_secret', 'Sent by the daily Stripe status job to the stripe-account-status edge function');
+  end if;
+exception when others then
+  raise notice 'Vault is not available here (%). Create the stripe_status_cron_secret secret once it is.', sqlerrm;
+end $$;
+
+create or replace function public.stripe_status_cron_secret()
+returns text
+language sql
+security definer
+set search_path = ''
+as $$
+  select decrypted_secret from vault.decrypted_secrets where name = 'stripe_status_cron_secret' limit 1;
+$$;
+revoke all on function public.stripe_status_cron_secret() from public, anon, authenticated;
+grant execute on function public.stripe_status_cron_secret() to service_role;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Every morning at 06:45 UTC (after the 06:15 billing cycle), where pg_cron and
@@ -55,7 +83,7 @@ begin
       url     := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/stripe-account-status',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')
+        'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'stripe_status_cron_secret')
       ),
       body    := '{"source":"cron"}'::jsonb
     )

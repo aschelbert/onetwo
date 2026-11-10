@@ -3,11 +3,14 @@
 // still awaiting verification, asks Stripe where it stands; the first time an
 // account is verified, the building is marked complete, the board is emailed
 // and the owners' announcement is posted (see _shared/stripeAccount.ts).
-// Scheduled by pg_cron (migration 050) at 06:45 UTC; can also be called for
+// Scheduled by pg_cron (migration 053) at 06:45 UTC; can also be called for
 // one building with { "tenantId": "…" }.
 //
-// Callers: the service role (Authorization: Bearer <service key>, which is
-// what the cron job sends) or a CRON_SECRET header for an outside scheduler.
+// Callers: the cron job, with the shared secret from Vault in an x-cron-secret
+// header (read back here through the service-role-only RPC
+// stripe_status_cron_secret; a CRON_SECRET function secret overrides it for an
+// outside scheduler), or the service role (Authorization: Bearer <service key>)
+// by hand.
 
 import { STRIPE_SETTINGS_SELECT, confirmIfVerified, type StripeSettings } from "../_shared/stripeAccount.ts";
 
@@ -21,16 +24,31 @@ const cors = {
 };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-function authorized(req: Request): boolean {
+/** The shared secret the cron job sends: the CRON_SECRET function secret if set, else the one migration 053 generated into Vault. */
+async function cronSecret(): Promise<string> {
+  if (CRON_SECRET) return CRON_SECRET;
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/stripe_status_cron_secret`, {
+    method: "POST",
+    headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (!res.ok) { console.error("Could not read the cron secret:", res.status); return ""; }
+  const v = await res.json();
+  return typeof v === "string" ? v : "";
+}
+
+async function authorized(req: Request): Promise<boolean> {
   const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (SB_SERVICE_KEY && bearer === SB_SERVICE_KEY) return true;
-  const secret = req.headers.get("x-cron-secret") || "";
-  return !!CRON_SECRET && secret === CRON_SECRET;
+  const given = req.headers.get("x-cron-secret") || "";
+  if (!given) return false;
+  const expected = await cronSecret();
+  return !!expected && given === expected;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!authorized(req)) return json({ error: "Unauthorized" }, 401);
+  if (!(await authorized(req))) return json({ error: "Unauthorized" }, 401);
 
   let tenantId: string | null = null;
   try { const body = await req.json(); tenantId = typeof body?.tenantId === "string" ? body.tenantId : null; } catch { /* no body: sweep */ }

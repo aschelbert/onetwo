@@ -243,18 +243,20 @@ the board is told exactly once:
    (`stripe-webhook`). In the Stripe Dashboard → Developers → Webhooks, add
    `account.updated` to the endpoint that *listens to events on Connected accounts*
    (the one signed with `STRIPE_CONNECT_WEBHOOK_SECRET`).
-3. **The daily sweep** (`stripe-account-status`), scheduled by migration 050 with
-   pg_cron at 06:45 UTC through pg_net. It reads the project URL and service role
-   key from Vault; create those two secrets once per project:
+3. **The daily sweep** (`stripe-account-status`), scheduled by migration 053 with
+   pg_cron at 06:45 UTC through pg_net. The job authenticates with a random shared
+   secret the migration generates into Vault (`stripe_status_cron_secret`), which the
+   function reads back through a service-role-only RPC; the service role key never
+   enters the database. The one thing to create once per project is the URL the job
+   calls:
 
    ```sql
    select vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'project_url');
-   select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'service_role_key');
    ```
 
-   Where pg_cron or pg_net is unavailable, set a `CRON_SECRET` function secret and
-   have an outside scheduler POST to `/functions/v1/stripe-account-status` once a day
-   with an `x-cron-secret` header.
+   Where pg_cron or pg_net is unavailable, have an outside scheduler POST to
+   `/functions/v1/stripe-account-status` once a day with the Vault secret (or a
+   `CRON_SECRET` function secret, which overrides it) in an `x-cron-secret` header.
 
 On verification the board member who connected (or every board member, if unknown)
 gets a confirmation email through Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`),
