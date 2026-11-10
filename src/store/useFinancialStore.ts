@@ -111,6 +111,8 @@ interface FinancialState {
   // Work Orders
   createWorkOrder: (wo: { title: string; vendor: string; amount: number; acctNum: string; caseId?: string }) => void;
   approveWorkOrder: (id: string) => void;
+  /** Link a work order to the case that drives it (the Work order runbook's, or a parent case). */
+  setWorkOrderCase: (id: string, caseId: string | null) => void;
   /** The vendor's invoice arrived: the expense is booked now (Dr expense line / Cr accounts payable), on the invoice date. */
   receiveInvoice: (id: string, invoiceNum: string, amount: number, invoiceDate?: string) => void;
   /** Pay a bill: clears the payable (Dr accounts payable / Cr bank). A bill invoiced before accrual posts Dr expense / Cr bank, as before. */
@@ -946,6 +948,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     }
   },
 
+  setWorkOrderCase: (id, caseId) => {
+    set((s) => ({ workOrders: s.workOrders.map((w) => (w.id === id ? { ...w, caseId } : w)) }));
+    syncWorkOrder(id);
+  },
   approveWorkOrder: (id) => {
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
