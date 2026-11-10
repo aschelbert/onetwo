@@ -3,8 +3,9 @@
  * maps to a production situation (`sitId` in the case wizard's CATS) opens
  * its case through the same wizard and steps. Only a runbook marked `wired`
  * starts itself today (month close, collections, insurance renewal, year-end
- * close, annual budget, filings, the annual meeting and the board meeting
- * cycle, each from a module next to this file, with a database twin); the rest
+ * close, annual budget, filings, the annual meeting, the board meeting cycle,
+ * the inspections, the 1099s and the owner disclosure, each from a module
+ * next to this file, with a database twin); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -45,17 +46,17 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 4, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true },
   { id: 'resale-certificate', name: 'Resale certificate', trigger: 'A unit lists for sale', steps: 5, automated: 4, sitId: 'resale-certs', catId: 'admin', visibility: 'board', defaultOn: true },
   { id: 'special-assessment', name: 'Special assessment', trigger: 'Board approves one', steps: 6, automated: 4, sitId: 'special-assessments', catId: 'financial', visibility: 'owners', defaultOn: true },
-  { id: 'elevator-inspection', name: 'Elevator inspection', trigger: 'Certificate expiry, 60 days out', steps: 4, automated: 3, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true },
-  { id: 'boiler-fire', name: 'Boiler and fire systems', trigger: 'Inspection calendar', steps: 4, automated: 3, sitId: 'preventative-maintenance', catId: 'maintenance', visibility: 'owners', defaultOn: true },
+  { id: 'elevator-inspection', name: 'Elevator inspection', trigger: 'Certificate expiry, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
+  { id: 'boiler-fire', name: 'Boiler and fire systems', trigger: 'Inspection calendar, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
   { id: 'snow', name: 'Snow and ice', trigger: 'First forecast under 32°F', steps: 3, automated: 3, visibility: 'owners', defaultOn: true },
   { id: 'amenity-booking', name: 'Amenity booking', trigger: 'An owner books a room', steps: 4, automated: 4, sitId: 'amenities', catId: 'operations', visibility: 'owners', defaultOn: true },
   { id: 'work-order', name: 'Work order', trigger: 'A case step needs a vendor', steps: 5, automated: 4, sitId: 'common-area-repairs', catId: 'maintenance', visibility: 'board', defaultOn: true },
   { id: 'spending-request', name: 'Spending request', trigger: 'Anything over the bylaws limit or over its line', steps: 4, automated: 3, sitId: 'capital-projects', catId: 'strategic', visibility: 'owners', defaultOn: true },
   { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
-  { id: '1099', name: '1099 filing', trigger: 'January 1', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
+  { id: '1099', name: '1099 filing', trigger: 'January 1, when a vendor was paid $600 or more', steps: 4, automated: 2, visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'year-end', name: 'Year-end close', trigger: 'Fiscal year end', steps: 6, automated: 2, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [2, 3] },
   { id: 'financial-review', name: 'Financial review', trigger: 'After year-end close', steps: 4, automated: 2, visibility: 'owners', defaultOn: true },
-  { id: 'owner-disclosure', name: 'Owner disclosure statement', trigger: 'Annually by Mar 31', steps: 3, automated: 3, visibility: 'owners', defaultOn: true },
+  { id: 'owner-disclosure', name: 'Owner disclosure statement', trigger: 'January 1, due Mar 31', steps: 3, automated: 2, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 2] },
   { id: 'records-request', name: 'Records request', trigger: 'An owner asks for records', steps: 4, automated: 3, sitId: 'record-requests', catId: 'admin', visibility: 'board', defaultOn: true },
   { id: 'insurance-claim', name: 'Insurance claim', trigger: 'A loss is reported', steps: 6, automated: 3, sitId: 'insurance-claims', catId: 'legal', visibility: 'board', defaultOn: true },
   { id: 'emergency-notice', name: 'Emergency notice', trigger: 'Water, power, fire or elevator out', steps: 3, automated: 3, sitId: 'emergency-situations', catId: 'maintenance', visibility: 'owners', defaultOn: true },
