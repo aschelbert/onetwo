@@ -4,7 +4,7 @@
 // Verification itself (marking the building complete, emailing the board, the owners' announcement)
 // lives in _shared/stripeAccount.ts, shared with stripe-webhook and the daily stripe-account-status job.
 
-import { STRIPE_SETTINGS_SELECT, accountState, confirmIfVerified } from "../_shared/stripeAccount.ts";
+import { STRIPE_SETTINGS_SELECT, accountState, confirmIfVerified, saveConnectedAccount } from "../_shared/stripeAccount.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -103,13 +103,13 @@ Deno.serve(async (req) => {
       const account = await acctRes.json();
       const stripeConnectId = account.id;
 
-      // Save stripe_connect_id to financial_settings, and who connected it (they get the email when Stripe verifies)
-      await sbQuery("PATCH", `financial_settings?tenant_id=eq.${tenantId}`, {}, {
-        stripe_connect_id: stripeConnectId,
-        stripe_onboarding_complete: false,
-        stripe_connected_by: user.id,
-        stripe_verified_at: null,
-      });
+      // Save the account on financial_settings (creating the row if the board never saved settings), and who
+      // connected it: they get the email when Stripe verifies. Saved before the onboarding link, so a building is
+      // never left with an account it does not know about.
+      const saved = await saveConnectedAccount(tenantId, stripeConnectId, user.id);
+      if (!saved) {
+        return jsonResponse({ error: "The Stripe account was created but could not be saved to the building. Try again." }, 500);
+      }
 
       // Create account link for onboarding
       const linkParams = new URLSearchParams();

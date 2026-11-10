@@ -56,6 +56,22 @@ async function sbGetMany<T>(table: string, query: string): Promise<T[]> {
   return res.ok ? await res.json() : [];
 }
 
+/**
+ * Record a freshly created Connect account on the building's financial
+ * settings, creating the row if the board never saved settings before (the
+ * setup step comes before any Funds settings are touched). Resets the
+ * verification fields so an earlier account's state never carries over.
+ */
+export async function saveConnectedAccount(tenantId: string, stripeConnectId: string, connectedBy: string | null): Promise<boolean> {
+  const res = await fetch(`${SB_URL}/rest/v1/financial_settings?on_conflict=tenant_id`, {
+    method: "POST",
+    headers: svcHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify({ tenant_id: tenantId, stripe_connect_id: stripeConnectId, stripe_onboarding_complete: false, stripe_connected_by: connectedBy, stripe_verified_at: null, stripe_status_checked_at: null }),
+  });
+  if (!res.ok) console.error("Saving the Stripe account on financial_settings failed:", res.status, await res.text());
+  return res.ok;
+}
+
 export function accountState(account: Record<string, unknown>): StripeAccountState {
   const req = (account.requirements ?? {}) as { currently_due?: string[]; past_due?: string[] };
   return {
