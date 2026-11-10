@@ -17,6 +17,8 @@ import { Button, Card, Cell, Chip, Inner, KV, PillTabs, RowMenu, SectionLabel, T
 import { dayLabel } from '../../home/calendar';
 import { behind, monthName, type FundsSnapshot } from '../metrics';
 import { fiscalYearStart, fundOf, type Fund } from '@/lib/ledger';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { markMonthClosePacketSent, monthCloseCase, monthCloseDue, monthClosePeriod } from '../../boardroom/monthClose';
 
 const SENT_KEY = 'onetwo-ux2-packets-sent';
 const readSent = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem(SENT_KEY) || '{}'); } catch { return {}; } };
@@ -95,7 +97,14 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
   }, [year, thisYear, thisMonth, getIncomeStatement, ledger]);
   const visibleMonths = showAllMonths ? months : months.slice(0, 5);
   const lastClosed = months.find(m => !m.open && m.entries > 0);
-  const closeBy = (key: string) => { const [y, m] = key.split('-').map(Number); const d = new Date(Date.UTC(m === 12 ? y + 1 : y, m === 12 ? 0 : m, 15)); return d.toISOString().slice(0, 10); };
+  // The packet is owed two weeks after the month close starts (the building's start day, Settings › Billing rules).
+  const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
+  const closeBy = (key: string) => monthCloseDue(key, monthCloseStartDay);
+  // The month whose close is due now, and its case if the runbook has opened one.
+  const cases = useIssuesStore(s => s.cases);
+  const closingPeriod = monthClosePeriod(snap.today, monthCloseStartDay);
+  const closingCase = monthCloseCase(cases, closingPeriod);
+  const closingStep = closingCase?.steps ? Math.min(closingCase.steps.length, closingCase.steps.filter(st => st.done).length + 1) : 0;
 
   // Taxes
   const exemptIncome = is.totalIncome;
@@ -128,6 +137,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
     const s = getIncomeStatement(`${key}-01`, monthEnd(key)) as IS;
     addAnnouncement({ title: `${monthName(key, true)} statement packet`, body: `Income ${fmt(s.totalIncome)}, expenses ${fmt(s.totalExpenses)}, net ${s.netIncome >= 0 ? '+' : '−'}${fmt(Math.abs(s.netIncome))}. Operating cash ${fmt(bs.assets.operating ?? 0)}, reserves ${fmt(bs.assets.reserves ?? 0)}. The full packet (balance sheet, income statement, budget variance, ledger) is attached to this notice and to your own statement under My Unit.`, category: 'financial', postedBy: viewer.name, postedDate: snap.today, pinned: false });
     setSent(prev => ({ ...prev, [key]: snap.today }));
+    markMonthClosePacketSent(key);
     setNote(`${monthName(key, true)} packet posted to owners as a financial notice.`);
   };
 
@@ -232,7 +242,9 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
                 <Td num>{m.open ? '–' : fmt(m.income)}</Td><Td num>{m.open ? '–' : fmt(m.expenses)}</Td><Td num>{m.open ? '–' : `${m.net >= 0 ? '+' : '−'}${fmt(Math.abs(m.net))}`}</Td>
                 <Td>{m.open ? <Chip tone="ghost">Not yet</Chip> : m.entries === 0 ? <Chip tone="ghost">Nothing to send</Chip> : sent[m.key] ? <Chip tone="sage">Sent {dayLabel(sent[m.key])}</Chip> : <Chip tone="navy">Ready to send</Chip>}</Td>
                 <Td num>
-                  {m.open ? <Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Month close runbook</Button> : m.entries === 0 ? null : (
+                  {m.open ? (closingCase && closingCase.status !== 'closed'
+                    ? <Button size="sm" variant="ghost" onClick={() => navigate(`/boardroom?view=case:${closingCase.id}`)}>{monthName(closingPeriod, true).replace(/ \d{4}$/, '')} close · step {closingStep} of {closingCase.steps?.length ?? 5}</Button>
+                    : <Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Month close runbook</Button>) : m.entries === 0 ? null : (
                     <span className="flex justify-end gap-1.5"><Button size="sm" variant="ghost" onClick={() => download(`${building.name.replace(/\s+/g, '-')}-${m.key}-packet.html`, packetHtml(m.key))}>Download</Button>{sent[m.key] ? <RowMenu label={`Actions for ${m.label}`} items={[{ label: 'Send again', onSelect: () => sendToOwners(m.key) }, { label: 'Open the ledger for this month', onSelect: () => navigate('/funds?tab=settings&section=ledger') }]} /> : <Button size="sm" onClick={() => sendToOwners(m.key)}>Send to owners</Button>}</span>
                   )}
                 </Td>

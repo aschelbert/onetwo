@@ -10,6 +10,7 @@ import type { MailRecord } from '@/types/mail';
 import { daysBetween, addDays } from '../runbook/model';
 import { ISO_DATE, REQUEST_SLA_DAYS } from '../runbook/adapters';
 import { RUNBOOKS, type RunbookDef } from './runbooks';
+import { MONTH_CLOSE_ID, monthCloseTrigger } from './monthClose';
 
 export interface BoardRoomSnapshot {
   today: string;
@@ -21,6 +22,8 @@ export interface BoardRoomSnapshot {
   mailRecords: MailRecord[];
   categories: { id: string; label: string; sits: { id: string; title: string }[] }[];
   runbooksOff: string[];
+  /** Day of the month the month close runbook starts (Funds › Settings › Billing rules); 1 when unset. */
+  monthCloseStartDay?: number;
 }
 
 // ── Open cases ───────────────────────────────────────────────────────────────
@@ -48,6 +51,14 @@ export interface CaseRow {
 
 const PRIORITY: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 
+/** The situation a case is in, by name: the wizard's title, or the runbook that started it, or the raw id. */
+export function situationLabel(s: Pick<BoardRoomSnapshot, 'categories'>, c: CaseTrackerCase): string {
+  const title = s.categories.find(x => x.id === c.catId)?.sits.find(x => x.id === c.sitId)?.title;
+  if (title) return title;
+  if (c.source === 'runbook' && c.sourceId) { const rb = RUNBOOKS.find(r => c.sourceId!.startsWith(`${r.id}:`)); if (rb) return rb.name; }
+  return c.sitId;
+}
+
 export function caseRows(s: BoardRoomSnapshot): CaseRow[] {
   return s.cases
     .filter(c => c.status !== 'closed')
@@ -56,7 +67,6 @@ export function caseRows(s: BoardRoomSnapshot): CaseRow[] {
       const idx = steps.findIndex(st => !st.done);
       const step = idx >= 0 ? steps[idx] : undefined;
       const cat = s.categories.find(x => x.id === c.catId);
-      const sit = cat?.sits.find(x => x.id === c.sitId);
       const due = c.dueDate && ISO_DATE.test(c.dueDate) ? c.dueDate : undefined;
       const d = due ? daysBetween(s.today, due) : undefined;
       let next = step?.s ?? (steps.length ? 'All steps done · close the case' : 'Add steps');
@@ -67,7 +77,7 @@ export function caseRows(s: BoardRoomSnapshot): CaseRow[] {
       return {
         c,
         category: cat?.label ?? c.catId,
-        situation: sit?.title ?? c.sitId,
+        situation: situationLabel(s, c),
         stepIndex: idx >= 0 ? idx + 1 : steps.length,
         stepTotal: steps.length,
         stepTitle: step?.s ?? '',
@@ -196,19 +206,26 @@ export function archiveRows(s: BoardRoomSnapshot): ArchiveRow[] {
 export interface RunbookStatus {
   def: RunbookDef;
   on: boolean;
+  /** What starts it, from the building's settings where the runbook reads one. */
+  trigger: string;
   /** Open cases from this runbook's situation. */
   openCases: CaseTrackerCase[];
   lastRan?: { date: string; title: string };
 }
 
+/** A case the runbook opened itself carries `source: 'runbook'` and `sourceId: '<runbook id>:<key>'`. */
+const startedBy = (c: CaseTrackerCase, def: RunbookDef) => c.source === 'runbook' && !!c.sourceId?.startsWith(`${def.id}:`);
+
 export function runbookStatuses(s: BoardRoomSnapshot): RunbookStatus[] {
   return RUNBOOKS.map(def => {
-    const matching = def.sitId ? s.cases.filter(c => c.sitId === def.sitId) : [];
+    // A case the runbook started is its own; a hand-opened case counts by situation, unless another runbook started it.
+    const matching = s.cases.filter(c => startedBy(c, def) || (!!def.sitId && c.sitId === def.sitId && c.source !== 'runbook'));
     const openCases = matching.filter(c => c.status !== 'closed');
     const closed = matching.filter(c => c.status === 'closed').sort((a, b) => (b.completedAt ?? b.created).localeCompare(a.completedAt ?? a.created))[0];
     return {
       def,
       on: !s.runbooksOff.includes(def.id),
+      trigger: def.id === MONTH_CLOSE_ID ? monthCloseTrigger(s.monthCloseStartDay ?? 1) : def.trigger,
       openCases,
       lastRan: closed ? { date: (closed.completedAt ?? closed.created).slice(0, 10), title: closed.title } : undefined,
     };
@@ -220,6 +237,7 @@ export function runbooksSummary(list: RunbookStatus[]) {
     total: list.length,
     on: list.filter(r => r.on).length,
     withOpenCase: list.filter(r => r.openCases.length > 0),
+    wired: list.filter(r => r.def.wired).length,
     automatedSteps: list.reduce((t, r) => t + r.def.automated, 0),
     steps: list.reduce((t, r) => t + r.def.steps, 0),
   };

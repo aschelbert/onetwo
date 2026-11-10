@@ -12,6 +12,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import MailingSettingsTab from '@/features/building/tabs/MailingSettingsTab';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
+import { useNavigate } from 'react-router-dom';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
 import { PAYMENT_ORDER_LABEL, type PaymentOrder } from '@/lib/financial-logic';
@@ -52,7 +54,11 @@ const QUICK: { id: QuickKind; label: string }[] = [
   { id: 'vendor', label: 'Paid a vendor' }, { id: 'refund', label: 'Received a refund' }, { id: 'toReserves', label: 'Moved money to reserves' }, { id: 'fromReserves', label: 'Moved money from reserves' }, { id: 'claim', label: 'Insurance claim paid out' }, { id: 'otherIncome', label: 'Other income' }, { id: 'custom', label: 'Custom entry' },
 ];
 
-/** Billing rules: due day, automatic billing and the late fee. */
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** '06-30' → 'Jun 30'. */
+function fyLabel(mmdd: string): string { const [m, d] = mmdd.split('-').map(Number); return MONTHS_SHORT[m - 1] ? `${MONTHS_SHORT[m - 1]} ${d}` : mmdd; }
+
+/** Billing rules: due day, automatic billing, the late fee and the month close day. */
 export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const setHoaDueDay = useFinancialStore(s => s.setHoaDueDay);
   const setAutoBilling = useFinancialStore(s => s.setAutoBilling);
@@ -63,7 +69,12 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const setAutoReserveTransfer = useFinancialStore(s => s.setAutoReserveTransfer);
   const paymentOrder = useFinancialStore(s => s.paymentOrder);
   const setPaymentOrder = useFinancialStore(s => s.setPaymentOrder);
+  const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
+  const setMonthCloseStartDay = useFinancialStore(s => s.setMonthCloseStartDay);
+  const fiscalYearEnd = useBuildingStore(s => s.details?.fiscalYearEnd) || '12-31';
+  const navigate = useNavigate();
   const [day, setDay] = useState(String(snap.hoaDueDay));
+  const [closeDay, setCloseDay] = useState(String(monthCloseStartDay));
   const [amount, setAmount] = useState(String(snap.lateFee.amount));
   const [grace, setGrace] = useState(String(snap.lateFee.graceDays));
   const [ran, setRan] = useState<string | null>(null);
@@ -77,7 +88,7 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
     <Card id="billing-rules" aria-label="Billing rules">
       <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Billing rules</span><span className="flex items-center gap-2"><span className="text-xs text-ux2-muted">runs every morning, and when a board member opens the app</span><Button size="sm" variant="ghost" onClick={runNow}>Run billing now</Button></span></div>
       {ran && <Inner className="flex items-center justify-between gap-3 text-sm text-ux2-ink" role="status"><span>{ran}</span><button type="button" className="text-xs text-ux2-muted hover:underline" onClick={() => setRan(null)}>Dismiss</button></Inner>}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Inner className="flex flex-col gap-2">
           <div className="text-sm font-semibold text-ux2-ink">Dues are due on the {ordinal(snap.hoaDueDay)}</div>
           <label className="text-xs text-ux2-muted" htmlFor="rules-day">Day of the month (1–28)</label>
@@ -96,6 +107,12 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
             <label htmlFor="rules-grace">after</label><input id="rules-grace" inputMode="numeric" value={grace} onChange={e => setGrace(e.target.value)} className={`${INPUT} !w-16`} /> days
           </div>
           <div className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => setLateFeeSettings(true, Number(amount) || 0, Number(grace) || 0)}>Save and turn on</Button>{snap.lateFee.enabled && <Button size="sm" variant="ghost" onClick={() => setLateFeeSettings(false, snap.lateFee.amount, snap.lateFee.graceDays)}>Turn off</Button>}</div>
+        </Inner>
+        <Inner className="flex flex-col gap-2" aria-label="Month close start">
+          <div className="text-sm font-semibold text-ux2-ink">Month close starts on the {ordinal(monthCloseStartDay)}</div>
+          <p className="m-0 text-xs text-ux2-muted">The Month close runbook opens its case for the month just ended on this day, with the packet due two weeks later. Move it to follow an off-cycle fiscal calendar or a bank statement that lands late. Fiscal year ends {fyLabel(fiscalYearEnd)} · <button type="button" onClick={() => navigate('/building')} className="font-semibold text-ux2-teal hover:underline">Building › Details</button>.</p>
+          <label className="text-xs text-ux2-muted" htmlFor="rules-close-day">Day of the month (1–28)</label>
+          <div className="flex gap-2"><input id="rules-close-day" inputMode="numeric" value={closeDay} onChange={e => setCloseDay(e.target.value)} className={`${INPUT} !w-20`} /><Button size="sm" variant="ghost" onClick={() => { const n = Number(closeDay); if (n >= 1 && n <= 28) setMonthCloseStartDay(n); }}>Save</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Runbook</Button></div>
         </Inner>
       </div>
       <Inner className="flex flex-wrap items-center justify-between gap-3">

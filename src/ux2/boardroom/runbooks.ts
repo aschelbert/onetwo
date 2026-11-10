@@ -1,9 +1,11 @@
 /**
- * The runbook catalogue — the 32 runbooks from the design, each waiting for
- * its trigger. A runbook that maps to a production situation (`sitId` in
- * the case wizard's CATS) opens its case through the same wizard and steps;
- * the rest are the automations the plan calls net-new and are listed so
- * the board can see what runs and switch any one off.
+ * The runbook catalogue — the 32 runbooks from the design. A runbook that
+ * maps to a production situation (`sitId` in the case wizard's CATS) opens
+ * its case through the same wizard and steps. Only a runbook marked `wired`
+ * starts itself today (the month close, from `monthClose.ts`); the rest
+ * open by hand, from a request or from an obligation, and their `trigger`
+ * and `automated` count describe the plan for each, so the board can see
+ * what is meant to run and switch any one off.
  */
 export interface RunbookDef {
   id: string;
@@ -19,6 +21,10 @@ export interface RunbookDef {
   /** Who sees the case: everyone, or the board (and the unit it concerns). */
   visibility: 'owners' | 'board';
   defaultOn: boolean;
+  /** The app starts this one itself today; without it the trigger is the plan, not a timer. */
+  wired?: boolean;
+  /** Which steps (0-based) the app does itself, when known; otherwise the track guesses from `automated`. */
+  autoSteps?: number[];
 }
 
 export const RUNBOOKS: RunbookDef[] = [
@@ -32,7 +38,7 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'filings', name: 'Biennial report, 1120-H, D-20', trigger: 'Filing calendar', steps: 3, automated: 2, sitId: 'compliance-filing', catId: 'admin', visibility: 'owners', defaultOn: true },
   { id: 'insurance-renewal', name: 'Insurance renewal', trigger: '60 days before a policy expires', steps: 5, automated: 3, sitId: 'insurance-claims', catId: 'legal', visibility: 'owners', defaultOn: true },
   { id: 'collections', name: 'Collections', trigger: '30 days past due', steps: 5, automated: 3, sitId: 'delinquent-accounts', catId: 'financial', visibility: 'board', defaultOn: true },
-  { id: 'month-close', name: 'Month close', trigger: 'The 1st of each month', steps: 5, automated: 4, sitId: 'financial-review', catId: 'financial', visibility: 'owners', defaultOn: true },
+  { id: 'month-close', name: 'Month close', trigger: 'The 1st of each month', steps: 5, automated: 2, sitId: 'financial-review', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 4] },
   { id: 'annual-meeting', name: 'Annual meeting', trigger: '13 months after the last one, minus notice', steps: 8, automated: 5, sitId: 'annual-meeting-planning', catId: 'governance', visibility: 'owners', defaultOn: true },
   { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 4, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true },
   { id: 'resale-certificate', name: 'Resale certificate', trigger: 'A unit lists for sale', steps: 5, automated: 4, sitId: 'resale-certs', catId: 'admin', visibility: 'board', defaultOn: true },

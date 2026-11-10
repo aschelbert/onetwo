@@ -165,6 +165,9 @@ interface FinancialState {
   /** How a payment is applied across a unit's open charges. */
   paymentOrder: PaymentOrder;
   setPaymentOrder: (order: PaymentOrder) => void;
+  /** Day of the month (1–28) the month close runbook opens its case for the month just ended. */
+  monthCloseStartDay: number;
+  setMonthCloseStartDay: (day: number) => void;
   /** Bill every unit's dues for a month (this month by default). Bills each unit once per month. */
   runMonthlyBilling: (period?: string, today?: string) => BillingRunSummary;
   /** Charge the late fee on every dues invoice past its grace period that has none yet. Returns how many. */
@@ -297,6 +300,7 @@ function syncSettings() {
     lastLateFeeRun: s.lastLateFeeRun,
     autoReserveTransfer: s.autoReserveTransfer,
     paymentOrder: s.paymentOrder,
+    monthCloseStartDay: s.monthCloseStartDay,
     glAccountMapping: { ...DEFAULT_GL_MAPPING, ...s.glAccountMapping },
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
@@ -388,6 +392,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.closedThrough = data.settings.closedThrough;
       updates.autoReserveTransfer = data.settings.autoReserveTransfer;
       updates.paymentOrder = data.settings.paymentOrder;
+      updates.monthCloseStartDay = data.settings.monthCloseStartDay || 1;
       // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
       if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
@@ -1198,6 +1203,13 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ paymentOrder: order });
     syncSettings();
   },
+  monthCloseStartDay: 1,
+  setMonthCloseStartDay: (day) => {
+    const n = Math.round(Number(day));
+    if (!Number.isFinite(n) || n < 1 || n > 28) return;
+    set({ monthCloseStartDay: n });
+    syncSettings();
+  },
 
   runMonthlyBilling: (period, today = todayIso()) => {
     const s = get();
@@ -1494,6 +1506,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lastLateFeeRun: state.lastLateFeeRun,
     autoReserveTransfer: state.autoReserveTransfer,
     paymentOrder: state.paymentOrder,
+    monthCloseStartDay: state.monthCloseStartDay,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
+import { useFinancialStore } from '@/store/useFinancialStore';
 
 const tenantFlags = vi.hoisted(() => ({ pmSeat: true }));
 vi.mock('@/components/TenantProvider', () => ({
@@ -127,6 +128,21 @@ describe('Board Room', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open a case now' }));
       expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/financial-review');
     }
+  });
+
+  it('Runbooks tells the truth about what starts itself: the month close row carries its day and a way to change it', () => {
+    useFinancialStore.setState({ monthCloseStartDay: 5 });
+    renderAt('/boardroom?tab=runbooks');
+    fireEvent.click(screen.getByRole('button', { name: /^All 32$/ }));
+    const row = document.querySelector('tr[data-runbook="month-close"]') as HTMLElement;
+    expect(row.textContent).toContain('The 5th of each month');
+    expect(row.textContent).not.toContain('Opens by hand today');
+    expect(within(row).getByRole('button', { name: 'Change the day' })).toBeTruthy();
+    const collections = document.querySelector('tr[data-runbook="collections"]') as HTMLElement;
+    expect(collections.textContent).toContain('Opens by hand today');
+    expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
+    fireEvent.click(within(row).getByRole('button', { name: 'Change the day' }));
+    expect(screen.getByTestId('elsewhere')).toBeTruthy();
   });
 
   it('Outbox shows alerts, drafts, templates and delivery without the production communications tab; New letter composes', () => {

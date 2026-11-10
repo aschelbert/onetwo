@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { CATS, useIssuesStore } from '@/store/useIssuesStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore } from '@/store/useMailStore';
 import { todayIso } from '../runbook/adapters';
@@ -19,6 +20,7 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
   const templates = useLetterStore(s => s.templates);
   const mailRecords = useMailStore(s => s.mailRecords);
   const off = useRunbookSwitches(s => s.off);
+  const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
   return useMemo(() => ({
     today,
     viewer: {
@@ -36,5 +38,6 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
     mailRecords,
     categories: CATS.map(c => ({ id: c.id, label: c.label, sits: c.sits.map(s => ({ id: s.id, title: s.title })) })),
     runbooksOff: off,
-  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, off]);
+    monthCloseStartDay,
+  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, off, monthCloseStartDay]);
 }

@@ -1,10 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/formatters';
 import { Card, Chip, PillTabs, SectionLabel, Table, Th, Td, Cell, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { useRunbookSwitches } from '../store';
 import { runbookStatuses, runbooksSummary, type RunbookStatus, type BoardRoomSnapshot } from '../metrics';
+import { MONTH_CLOSE_ID, nextMonthCloseStart } from '../monthClose';
+import type { CaseTrackerCase } from '@/types/issues';
+
+/** Where this case came from, truthfully: the runbook itself, a request, an obligation, or a person. */
+function startedHow(c: CaseTrackerCase, trigger: string): string {
+  const t = trigger.charAt(0).toLowerCase() + trigger.slice(1);
+  if (c.source === 'runbook') return `Started itself · ${t}`;
+  if (c.source === 'issue') return 'Opened from an owner request';
+  if (c.source === 'obligation' || c.source === 'filing') return 'Opened from an obligation';
+  return `Opened by hand · meant to start ${t}`;
+}
+
+const SETTINGS_RULES = '/funds?tab=settings&section=rules';
 
 type StepState = 'done' | 'person' | 'auto' | 'pending';
 
@@ -39,6 +52,7 @@ function stepTrack(r: RunbookStatus): { state: StepState; label: string }[] {
     let state: StepState = 'pending';
     if (i < done) state = 'done';
     else if (i === current) state = 'person';
+    else if (r.def.autoSteps) { if (r.def.autoSteps.includes(i)) state = 'auto'; }
     else if (autoLeft > 0) { state = 'auto'; autoLeft--; }
     return { state, label: label.length > 14 ? `${label.slice(0, 13)}…` : label };
   });
@@ -54,7 +68,7 @@ function RunbookCard({ r, onOpenCase }: { r: RunbookStatus; onOpenCase: (id: str
     <Card role="button" tabIndex={0} aria-label={r.def.name} onClick={() => onOpenCase(c.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCase(c.id); } }} className="cursor-pointer gap-2.5 hover:border-ux2-line-strong">
       <div className="flex items-center justify-between gap-2"><div className="text-[15px] font-semibold text-ux2-ink">{r.def.name}{unit ? ` · Unit ${unit}` : ''}</div><Chip tone="teal">{r.def.automated} of {r.def.steps} automated</Chip></div>
       <Chip tone={r.def.visibility === 'owners' ? 'sage' : 'navy'} className="self-start">{r.def.visibility === 'owners' ? 'Owners see this' : `Board only${unit ? ` · owner ${unit} sees their own view` : ''}`}</Chip>
-      <div className="text-xs text-ux2-muted">Started itself {r.def.trigger.charAt(0).toLowerCase() + r.def.trigger.slice(1)} · step {stepIdx} of {total}{c.assignedTo || c.assignedRole ? ` · ${c.assignedTo || c.assignedRole}` : ''}</div>
+      <div className="text-xs text-ux2-muted">{startedHow(c, r.trigger)} · step {stepIdx} of {total}{c.assignedTo || c.assignedRole ? ` · ${c.assignedTo || c.assignedRole}` : ''}</div>
       <div className="flex items-center">
         {track.map((s, i) => (
           <span key={i} className="flex flex-1 items-center last:flex-none">
@@ -74,6 +88,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   const list = useMemo(() => runbookStatuses(snap), [snap]);
   const sum = runbooksSummary(list);
   const setOn = useRunbookSwitches(s => s.setOn);
+  const navigate = useNavigate();
   // Deep link (`?runbook=month-close`) from Funds › Statements and the like: land on that
   // runbook's row even when it has no case open, which the default filter would hide.
   const [params] = useSearchParams();
@@ -91,13 +106,13 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   const Row = ({ r }: { r: RunbookStatus }) => (
     <tr data-runbook={r.def.id} data-focus={focus?.def.id === r.def.id ? '1' : undefined} className={cn(r.on ? '' : 'opacity-70', focus?.def.id === r.def.id && 'bg-ux2-teal-tint/40')}>
       <Td><Cell title={r.def.name} note={r.def.visibility === 'owners' ? 'Owners see this' : 'Board only · the unit sees its own view'} /></Td>
-      <Td className="text-ux2-muted">{r.def.trigger}</Td>
+      <Td className="text-ux2-muted">{r.trigger}{r.def.id === MONTH_CLOSE_ID && <> · <button type="button" onClick={() => navigate(SETTINGS_RULES)} className="font-semibold text-ux2-teal hover:underline">Change the day</button></>}{!r.def.wired && <span className="block text-[11px]">Opens by hand today</span>}</Td>
       <Td num>{r.def.steps}</Td>
       <Td><Chip tone="teal">{r.def.automated} of {r.def.steps}</Chip></Td>
       <Td>
         {r.openCases.length > 0
           ? <button type="button" onClick={() => onOpenCase(r.openCases[0].id)} className="rounded-full"><Chip tone="navy">Open now · {r.openCases[0].unit && !/^(common|n\/a)$/i.test(r.openCases[0].unit) ? `Unit ${r.openCases[0].unit}` : r.openCases[0].title.slice(0, 32)}</Chip></button>
-          : <span className="text-ux2-muted">{r.lastRan ? `${dayLabel(r.lastRan.date)} · ${r.lastRan.title}` : 'Never ran'}{r.def.sitId && r.def.catId && <> · <button type="button" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })} className="font-semibold text-ux2-teal hover:underline">Open a case</button></>}</span>}
+          : <span className="text-ux2-muted">{r.lastRan ? `${dayLabel(r.lastRan.date)} · ${r.lastRan.title}` : 'Never ran'}{r.def.id === MONTH_CLOSE_ID && r.on && <> · next starts {dayLabel(nextMonthCloseStart(snap.today, snap.monthCloseStartDay ?? 1))}</>}{r.def.sitId && r.def.catId && <> · <button type="button" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })} className="font-semibold text-ux2-teal hover:underline">Open a case</button></>}</span>}
       </Td>
       <Td num>
         <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.def.name} ${r.on ? 'on' : 'off'}`} onClick={() => setOn(r.def.id, !r.on)} className="rounded-full">
@@ -127,11 +142,11 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
       <Card aria-label="All runbooks">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SectionLabel>All runbooks</SectionLabel>
-          <span className="text-xs text-ux2-muted">{show === 'all' ? `All ${sum.total}` : `With an open case · ${sum.withOpenCase.length}`} · on by default · switching one off keeps the playbook for manual cases</span>
+          <span className="text-xs text-ux2-muted">{show === 'all' ? `All ${sum.total}` : `With an open case · ${sum.withOpenCase.length}`} · {sum.wired} start{sum.wired === 1 ? 's' : ''} itself · the rest open by hand</span>
         </div>
         {focus && focus.openCases.length === 0 && (
           <p className="m-0 text-sm text-ux2-muted" data-focus-note>
-            <b className="text-ux2-ink">{focus.def.name}</b> has nothing running right now. It starts {focus.def.trigger.charAt(0).toLowerCase() + focus.def.trigger.slice(1)}{focus.lastRan ? `; it last ran ${dayLabel(focus.lastRan.date)}` : ' and has not run yet'}.
+            <b className="text-ux2-ink">{focus.def.name}</b> has nothing running right now. {focus.def.wired ? <>It starts itself {focus.trigger.charAt(0).toLowerCase() + focus.trigger.slice(1)}{focus.def.id === MONTH_CLOSE_ID ? `, next on ${dayLabel(nextMonthCloseStart(snap.today, snap.monthCloseStartDay ?? 1))}` : ''}</> : <>It is meant to start {focus.trigger.charAt(0).toLowerCase() + focus.trigger.slice(1)}, but today it opens by hand</>}{focus.lastRan ? `; it last ran ${dayLabel(focus.lastRan.date)}` : '; it has not run yet'}.
             {focus.def.sitId && focus.def.catId && <> <button type="button" onClick={() => onNewCase({ catId: focus.def.catId!, sitId: focus.def.sitId! })} className="font-semibold text-ux2-teal hover:underline">Open a case now</button></>}
           </p>
         )}
@@ -141,7 +156,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
             <tbody>{shown.map(r => <Row key={r.def.id} r={r} />)}</tbody>
           </Table>
         )}
-        <Why>A runbook with a situation in the case wizard opens its case with the same steps the wizard creates. The others are automations the app runs on its own; switching one off only stops the trigger.</Why>
+        <Why>Month close starts itself on the building's day and ticks the steps the app can see (dues posted, books closed, packet sent). Every other runbook opens by hand, from an owner request or from an obligation today; its trigger and automated count are the plan for it. Switching one off only stops the trigger; the playbook stays for manual cases.</Why>
       </Card>
     </div>
   );

@@ -97,7 +97,7 @@ export default function BoardRoomModule() {
   const subtitle = {
     open: 'Operations for the board, manager and staff: open cases, owner requests, the runbooks that run them, and the outbox. An owner sees only a case about their own unit.',
     inbox: 'What owners have asked the board for, and the 14-day clock on each one. Owners see the status of their own request in Community › Requests.',
-    runbooks: 'All 32 are on from day one, each waiting for its trigger. Turn one off only if the building does not want it.',
+    runbooks: 'All 32 are on from day one. Month close starts itself on the building\'s day; the rest open by hand until their triggers are wired. Turn one off only if the building does not want it.',
     outbox: 'Every letter and notice the board sends, drafted from a template, delivered the way the bylaws require, and kept with proof of delivery.',
     tasks: 'The team\'s board: what the manager, staff and officers are working on, dragged from to-do to done, each linked to the case, log entry or vendor behind it.',
     intercom: 'The team\'s channels: the board, the manager and staff talking in one place, with a board-only channel. Owners never see it.',
