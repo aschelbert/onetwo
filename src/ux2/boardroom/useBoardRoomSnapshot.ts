@@ -21,6 +21,9 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
   const mailRecords = useMailStore(s => s.mailRecords);
   const off = useRunbookSwitches(s => s.off);
   const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
+  const monthCloseEnabled = useFinancialStore(s => s.monthCloseEnabled);
+  // The month close switch is the shared setting (another board member, or the server, may have moved it).
+  const runbooksOff = useMemo(() => monthCloseEnabled ? off.filter(id => id !== 'month-close') : Array.from(new Set([...off, 'month-close'])), [off, monthCloseEnabled]);
   return useMemo(() => ({
     today,
     viewer: {
@@ -37,7 +40,7 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
     templates,
     mailRecords,
     categories: CATS.map(c => ({ id: c.id, label: c.label, sits: c.sits.map(s => ({ id: s.id, title: s.title })) })),
-    runbooksOff: off,
+    runbooksOff,
     monthCloseStartDay,
-  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, off, monthCloseStartDay]);
+  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, runbooksOff, monthCloseStartDay]);
 }

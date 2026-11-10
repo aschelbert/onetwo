@@ -6,6 +6,11 @@
  * `source: 'runbook'`, `sourceId: 'month-close:YYYY-MM'`; a month already
  * closed by hand before its day never gets a case.
  *
+ * The database runs the same job every morning (run_month_close_all,
+ * migration 051), so the case opens even when nobody opens the app that
+ * day; this is the fallback, and either side finds the other's case. The
+ * step texts here and in that migration must stay the same.
+ *
  * Pure helpers first (the period, the trigger date, the steps), then the
  * store-facing `runMonthClose` that the shell's hook calls.
  */
@@ -15,7 +20,6 @@ import { addDays, isDuesInvoiceFor } from '@/lib/billingCycle';
 import { monthEnd } from '@/lib/ledger';
 import type { CaseTrackerCase } from '@/types/issues';
 import { todayIso } from '../runbook/adapters';
-import { useRunbookSwitches } from './store';
 
 export const MONTH_CLOSE_ID = 'month-close';
 export const monthCloseSourceId = (period: string) => `${MONTH_CLOSE_ID}:${period}`;
@@ -125,7 +129,7 @@ export function runMonthClose(today: string = todayIso()): MonthCloseRun {
   const issues = useIssuesStore.getState();
   const existing = monthCloseCase(issues.cases, period);
   if (existing) { syncMonthCloseCase(existing); return { period, caseId: existing.id, opened: false }; }
-  if (!useRunbookSwitches.getState().isOn(MONTH_CLOSE_ID)) return { period, caseId: null, opened: false };
+  if (!fin.monthCloseEnabled) return { period, caseId: null, opened: false };
   if (fin.closedThrough && fin.closedThrough >= monthEnd(`${period}-01`)) return { period, caseId: null, opened: false };
   const label = periodLabel(period);
   const id = issues.createCase({

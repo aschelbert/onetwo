@@ -8,8 +8,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
-import { useRunbookSwitches } from './store';
-import { MONTH_CLOSE_ID, runMonthClose } from './monthClose';
+import { runMonthClose } from './monthClose';
 
 export function useMonthClose(enabled = true) {
   const role = useAuthStore(s => s.currentRole);
@@ -17,7 +16,7 @@ export function useMonthClose(enabled = true) {
   const closedThrough = useFinancialStore(s => s.closedThrough);
   const invoiceCount = useFinancialStore(s => s.unitInvoices.length);
   const casesLoaded = useIssuesStore(s => s.casesLoaded);
-  const on = useRunbookSwitches(s => !s.off.includes(MONTH_CLOSE_ID));
+  const on = useFinancialStore(s => s.monthCloseEnabled);
   useEffect(() => {
     if (!enabled || !casesLoaded || !on) return;
     if (role !== 'BOARD_MEMBER' && role !== 'PROPERTY_MANAGER' && role !== 'PM_COMPANY') return;

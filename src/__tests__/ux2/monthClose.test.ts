@@ -21,7 +21,7 @@ const duesInvoice = (unitNumber: string, period: string): UnitInvoice => ({
 
 beforeEach(() => {
   useIssuesStore.setState({ cases: [], nextCaseNum: 1, casesLoaded: true });
-  useFinancialStore.setState({ tenantId: null, monthCloseStartDay: 1, closedThrough: null, unitInvoices: [] });
+  useFinancialStore.setState({ tenantId: null, monthCloseStartDay: 1, monthCloseEnabled: true, closedThrough: null, unitInvoices: [] });
   useRunbookSwitches.setState({ off: [] });
 });
 
@@ -79,8 +79,10 @@ describe('running the runbook', () => {
 
   it('does nothing when the runbook is off or the month is already closed', () => {
     useRunbookSwitches.getState().setOn('month-close', false);
+    expect(useFinancialStore.getState().monthCloseEnabled).toBe(false);
     expect(runMonthClose('2026-11-10')).toMatchObject({ caseId: null, opened: false });
     useRunbookSwitches.getState().setOn('month-close', true);
+    expect(useFinancialStore.getState().monthCloseEnabled).toBe(true);
     useFinancialStore.setState({ closedThrough: '2026-10-31' });
     expect(runMonthClose('2026-11-10')).toMatchObject({ caseId: null, opened: false });
     expect(useIssuesStore.getState().cases.length).toBe(0);

@@ -453,6 +453,8 @@ export interface FinancialSettingsRow {
   glAccountMapping: Record<string, string> | null;
   /** Day of the month (1–28) the month close runbook opens its case for the month just ended. */
   monthCloseStartDay: number;
+  /** The Month close switch on the Runbooks tab; the database job skips a building that turned it off. */
+  monthCloseEnabled: boolean;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -480,6 +482,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     paymentOrder: data.payment_order === 'oldest-first' ? 'oldest-first' : 'dues-first',
     glAccountMapping: (data.gl_account_mapping as Record<string, string>) || null,
     monthCloseStartDay: Number(data.month_close_start_day ?? 1) || 1,
+    monthCloseEnabled: (data.month_close_enabled as boolean) ?? true,
   };
 }
 
@@ -501,6 +504,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.glAccountMapping !== undefined) row.gl_account_mapping = s.glAccountMapping;
   if (s.paymentOrder !== undefined) row.payment_order = s.paymentOrder;
   if (s.monthCloseStartDay !== undefined) row.month_close_start_day = s.monthCloseStartDay;
+  if (s.monthCloseEnabled !== undefined) row.month_close_enabled = s.monthCloseEnabled;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
