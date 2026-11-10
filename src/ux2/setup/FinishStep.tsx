@@ -14,6 +14,8 @@ import { fmt, cn } from '@/lib/formatters';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMailStore } from '@/store/useMailStore';
+import { mailProviderLabel } from '@/types/mail';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore, type InviteAccess } from '@/features/setup/useSetupStore';
 import { ACCESS_OPTIONS, EMAIL_RE, SEATS, accessLabel, invitePayload, parseInviteLines, readRole } from '@/features/setup/invites';
@@ -192,6 +194,7 @@ export default function FinishStep({ onReview, onDocuments, onPayments, onMail }
   };
 
   const payments = paymentsStatus(f.stripeConnectId, f.stripeOnboardingComplete);
+  const mailVendor = mailProviderLabel(useMailStore.getState().mailingSettings);
   const essentials = [
     { done: s.ess.profile, label: 'Building name and address' },
     { done: s.ess.units, label: units.length ? `${units.length} units with owners` : 'Units and owners' },
@@ -201,7 +204,7 @@ export default function FinishStep({ onReview, onDocuments, onPayments, onMail }
   // Optional pieces, shown with their state so the board knows what owners will meet on day one.
   const alsoSetUp = [
     { id: 'payments', state: payments === 'on' ? 'done' : payments === 'pending' ? 'pending' : 'todo', label: payments === 'on' ? 'Online payments · Stripe connected' : payments === 'pending' ? 'Online payments · Stripe verifying' : 'Online payments · not set up', note: payments === 'on' ? 'owners can pay by card or bank from day one' : payments === 'pending' ? 'usually 1 to 2 days · owners pay by check until Stripe confirms' : 'owners pay by check · connect Stripe in step 4, now or after going live' },
-    { id: 'mail', state: s.mail === 'on' ? 'done' : 'todo', label: s.mail === 'on' ? 'Letters by mail · LetterStream connected' : 'Letters by mail · not set up', note: s.mail === 'on' ? "certified notices print and mail from the building's own account" : 'letters print at the building · connect LetterStream in step 5, now or after going live' },
+    { id: 'mail', state: s.mail === 'on' ? 'done' : 'todo', label: s.mail === 'on' ? `Letters by mail · ${mailVendor} connected` : 'Letters by mail · not set up', note: s.mail === 'on' ? `certified notices print and mail from the building's own ${mailVendor} account` : 'letters print at the building · connect DocuPost or LetterStream in step 5, now or after going live' },
     { id: 'budget', state: f.budgetCategories.length ? 'done' : 'todo', label: "This year's budget", note: f.budgetCategories.length ? `${f.budgetCategories.length} lines · ${fmt(f.budgetCategories.reduce((t, c) => t + c.budgeted, 0))} a year` : 'not added' },
     { id: 'balances', state: openingDone ? 'done' : 'todo', label: 'Opening balances', note: openingDone ? 'posted to the ledger' : 'not entered' },
     { id: 'fees', state: f.lateFeeEnabled || feesSaved ? 'done' : 'todo', label: 'Due day and late fee', note: `due on the ${f.hoaDueDay ?? 1}${['th', 'st', 'nd', 'rd'][((f.hoaDueDay ?? 1) % 100 - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][(f.hoaDueDay ?? 1) % 100] ?? 'th'}${f.lateFeeEnabled ? ` · ${fmt(f.lateFeeAmount)} after ${f.lateFeeGraceDays} days` : ' · no late fee'}` },
@@ -419,7 +422,7 @@ export default function FinishStep({ onReview, onDocuments, onPayments, onMail }
           {payments === 'on' && <div>Their unit page offers "Pay online or set up autopay" from the first visit; checks still work for anyone who prefers them.</div>}
           {payments === 'pending' && <div className="flex flex-col gap-1 rounded-[14px] bg-white/[0.12] px-3.5 py-3"><span><b className="font-semibold">Online payments switch on by themselves.</b> The moment Stripe confirms, usually within 2 days, every owner's unit page offers "Pay online or set up autopay" and they get a Home card and an email saying so.</span><span className="text-[13px] text-white/80">Until then the unit page says pay by check, and you record checks by hand as before.</span></div>}
           {payments === 'off' && <div>Owners pay by check until Stripe is connected; you can do that in step 4 now, or later from Funds › Online payments.</div>}
-          {s.mail === 'on' ? <div>Certified notices and letters print and mail from the building's LetterStream account, with tracking on the case.</div> : <div>Letters print at the building until LetterStream is connected; you can do that in step 5 now, or later from Funds › Accounts and ledger › Bank & Mail.</div>}
+          {s.mail === 'on' ? <div>Certified notices and letters print and mail from the building's {mailVendor} account, with tracking on the case.</div> : <div>Letters print at the building until a mail account (DocuPost or LetterStream) is connected; you can do that in step 5 now, or later from Funds › Accounts and ledger › Bank & Mail.</div>}
           <div>Insurance renewals, contract ends and reserve items show up as duties on the calendar.</div>
           <div>Your building score starts, from what's already in place.</div>
           <div>Anything you left for later can still be done in each module.</div>

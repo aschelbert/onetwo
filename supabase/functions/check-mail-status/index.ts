@@ -1,8 +1,9 @@
 // supabase/functions/check-mail-status/index.ts
-// Asks LetterStream where one of the building's jobs stands, using the
-// building's own credentials. Any member of the building may ask.
+// Asks the building's printed-mail vendor where one of its letters stands,
+// using the building's own credentials. Any member of the building may ask.
+// DocuPost has no status API, so for it the answer points at the dashboard.
 
-import { LetterStreamError, jobStatus, normalizeStatus } from "../_shared/letterstream.ts";
+import { PROVIDER_INFO, isProvider, jobStatus, vendorError } from "../_shared/mailProvider.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -41,22 +42,28 @@ Deno.serve(async (req) => {
     const { jobId } = await req.json();
     if (!jobId || typeof jobId !== "string") return jsonResponse({ error: "Missing jobId" }, 400);
 
-    const acct = await sbGet("letterstream_accounts", { "tenant_id": `eq.${tu.tenant_id}`, "select": "api_id,api_key" });
-    if (!acct?.api_id) return jsonResponse({ error: "The building's LetterStream account isn't connected", notConnected: true }, 400);
+    const acct = await sbGet("mail_provider_accounts", { "tenant_id": `eq.${tu.tenant_id}`, "select": "provider,api_id,api_key" });
+    if (!acct?.api_key || !isProvider(acct.provider)) return jsonResponse({ error: "The building's mail account isn't connected", notConnected: true }, 400);
+    const info = PROVIDER_INFO[acct.provider];
 
     try {
-      const s = await jobStatus({ apiId: acct.api_id, apiKey: acct.api_key }, jobId);
+      const s = await jobStatus(acct.provider, { apiId: acct.api_id || undefined, apiKey: acct.api_key }, jobId);
       return jsonResponse({
         success: true,
+        provider: acct.provider,
         jobId,
-        currentStatus: normalizeStatus(s.status),
-        letterstreamStatus: s.status,
-        trackingNumber: s.trackingNumber ?? null,
-        mailedAt: s.mailedAt ?? null,
-        deliveredAt: s.deliveredAt ?? null,
+        currentStatus: s.currentStatus,
+        vendorStatus: s.vendorStatus,
+        trackingNumber: s.trackingNumber,
+        mailedAt: s.mailedAt,
+        deliveredAt: s.deliveredAt,
+        dashboardOnly: s.dashboardOnly,
+        portalUrl: info.portalUrl,
+        message: s.dashboardOnly ? `${info.label} shows tracking in its dashboard; it has no status API.` : null,
       });
     } catch (e) {
-      if (e instanceof LetterStreamError) return jsonResponse({ error: `LetterStream: ${e.message}` }, e.httpStatus === 0 ? 502 : 422);
+      const v = vendorError(e);
+      if (v) return jsonResponse({ error: `${info.label}: ${v.message}` }, v.httpStatus === 0 ? 502 : 422);
       throw e;
     }
   } catch (err) {

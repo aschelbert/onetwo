@@ -1,6 +1,54 @@
-// ─── Mail Types (LetterStream, Partnership mode) ───────────
-// The building holds its own LetterStream account and pays LetterStream
-// directly; the app only pushes jobs into that account.
+// ─── Mail Types ─────────────────────────────────────────────
+// Printed mail goes through a vendor the building holds its own account
+// with (DocuPost or LetterStream) and pays directly; the app only pushes
+// letters into that account.
+
+export type MailProviderId = 'docupost' | 'letterstream';
+
+export interface MailProviderInfo {
+  id: MailProviderId;
+  label: string;
+  /** One line for the picker. */
+  tagline: string;
+  /** Where the building opens its own account (LetterStream's comes from the server: our partner link). */
+  signupUrl: string;
+  portalUrl: string;
+  /** Which credentials the vendor issues. */
+  credentials: ('apiId' | 'apiKey')[];
+  /** Where in the vendor's site the credentials are found. */
+  credentialHint: string;
+  /** How the building pays the vendor. */
+  billing: string;
+  /** Whether the app can read tracking back from the vendor. */
+  hasStatusApi: boolean;
+}
+
+export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
+  docupost: {
+    id: 'docupost',
+    label: 'DocuPost',
+    tagline: 'Open an account in minutes, fund it from $10, letters go out at once',
+    signupUrl: 'https://docupost.com/',
+    portalUrl: 'https://app.docupost.com/',
+    credentials: ['apiKey'],
+    credentialHint: 'Account settings → Developer → Generate API Token',
+    billing: 'Prepaid balance on the building\'s DocuPost account; each letter is deducted when sent',
+    hasStatusApi: false,
+  },
+  letterstream: {
+    id: 'letterstream',
+    label: 'LetterStream',
+    tagline: 'HOA mail specialist with signed return receipts in the account; needs our partner link',
+    signupUrl: '',
+    portalUrl: 'https://secure.letterstream.com/',
+    credentials: ['apiId', 'apiKey'],
+    credentialHint: 'My Account → API Information (only accounts opened through the partner link have it)',
+    billing: 'Paid in the building\'s LetterStream account per letter, or from a prepaid balance',
+    hasStatusApi: true,
+  },
+};
+
+export const DEFAULT_MAIL_PROVIDER: MailProviderId = 'docupost';
 
 export type MailDeliveryMethod =
   | 'first-class'
@@ -67,7 +115,9 @@ export interface MailRecord {
   includeReturnEnvelope: boolean;
   emailCopy: boolean;
   emailAddress?: string;
-  /** The building's LetterStream dashboard, where the job is paid for and tracked. */
+  /** Which vendor the letter went to. */
+  mailProvider?: MailProviderId;
+  /** The building's dashboard at the vendor, where the letter is paid for and tracked. */
   letterstreamPortalUrl?: string;
   mergeVariables: Record<string, string>;
   createdAt: string;
@@ -77,16 +127,17 @@ export interface MailRecord {
 
 export interface MailingSettings {
   enabled: boolean;
-  /** The building's own LetterStream account is connected (API ID and key on file, server side). */
-  letterstreamConnected: boolean;
-  /** Masked API ID, e.g. ••••1234. The key never reaches the browser. */
-  letterstreamApiIdMasked: string;
-  letterstreamConnectedAt: string;
+  /** The building's own vendor account is connected (credentials on file, server side). */
+  mailConnected: boolean;
+  /** Which vendor; '' until connected. */
+  mailProvider: MailProviderId | '';
+  /** Masked credential, e.g. ••••1234. The secret never reaches the browser. */
+  mailCredentialMasked: string;
+  mailConnectedAt: string;
   /** 'verified' | 'unverified' | 'invalid' | '' */
-  letterstreamStatus: string;
-  /** Our partner sign-up link, from the server; the building opens its account through it. */
+  mailStatus: string;
+  /** LetterStream's partner sign-up link, from the server; '' until configured. */
   letterstreamPartnerUrl: string;
-  letterstreamPortalUrl: string;
   senderAddress: PostalAddress;
   senderName: string;
   defaultDeliveryMethod: MailDeliveryMethod;
@@ -95,21 +146,44 @@ export interface MailingSettings {
 }
 
 // ─── Pricing (cents) ─────────────────────────────────────
-// Estimates only, from LetterStream's published per-piece rates. LetterStream
+// Estimates only, from each vendor's published per-piece rates. The vendor
 // sets the real price and charges the building's own account for it; the app
 // never bills postage.
 
-export const ESTIMATE_NOTE = "Estimate. LetterStream prices the letter and bills the building's own LetterStream account.";
+export const ESTIMATE_NOTE = "Estimate. The mail vendor prices the letter and bills the building's own account.";
 
-export const PRICING: Record<string, number> = {
-  'first-class': 123,
-  'certified': 834,
-  'certified-return-receipt': 1116,
-  'certified-electronic-return-receipt': 1116,
-  additionalPage: 12,
-  returnEnvelope: 15,
-  returnEnvelopeStamped: 98,
+/** The vendor's name for copy, or a neutral phrase before one is connected. */
+export const mailProviderLabel = (s: Pick<MailingSettings, 'mailProvider'>): string => (s.mailProvider ? MAIL_PROVIDERS[s.mailProvider].label : 'the mail vendor');
+
+/** Per-piece estimates in cents, by vendor. First page included in the base; extra pages added. */
+export const PROVIDER_PRICING: Record<MailProviderId, Record<string, number>> = {
+  // DocuPost: 95¢ letter + 30¢ B&W page + 23¢ First Class upgrade; Certified upgrade $10.25.
+  // Certified + return receipt adds USPS's return receipt fee on top; shown as the certified rate plus that.
+  docupost: {
+    'first-class': 148,
+    'certified': 1173,
+    'certified-return-receipt': 1538,
+    'certified-electronic-return-receipt': 1538,
+    additionalPage: 30,
+    returnEnvelope: 0,
+    returnEnvelopeStamped: 0,
+  },
+  // LetterStream's published per-piece rates.
+  letterstream: {
+    'first-class': 123,
+    'certified': 834,
+    'certified-return-receipt': 1116,
+    'certified-electronic-return-receipt': 1116,
+    additionalPage: 12,
+    returnEnvelope: 15,
+    returnEnvelopeStamped: 98,
+  },
 };
+
+export const pricingFor = (provider: MailProviderId | '' | undefined): Record<string, number> => PROVIDER_PRICING[provider || DEFAULT_MAIL_PROVIDER];
+
+/** The default vendor's estimates, for screens that quote before a vendor is chosen. */
+export const PRICING: Record<string, number> = PROVIDER_PRICING[DEFAULT_MAIL_PROVIDER];
 
 // ─── Utilities ───────────────────────────────────────────
 
@@ -117,10 +191,12 @@ export function calculateMailingCost(
   method: MailDeliveryMethod,
   pageCount: number,
   includeReturnEnvelope: boolean,
+  provider?: MailProviderId | '',
 ): CostBreakdown {
-  const baseCostCents = PRICING[method] || 0;
-  const additionalPagesCents = Math.max(0, pageCount - 1) * PRICING.additionalPage;
-  const returnEnvelopeCents = includeReturnEnvelope ? PRICING.returnEnvelope : 0;
+  const p = pricingFor(provider);
+  const baseCostCents = p[method] || 0;
+  const additionalPagesCents = Math.max(0, pageCount - 1) * p.additionalPage;
+  const returnEnvelopeCents = includeReturnEnvelope ? p.returnEnvelope : 0;
   const totalCents = baseCostCents + additionalPagesCents + returnEnvelopeCents;
   return { baseCostCents, additionalPagesCents, returnEnvelopeCents, totalCents };
 }
