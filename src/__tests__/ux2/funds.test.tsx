@@ -165,6 +165,22 @@ describe('Funds', () => {
     expect(sw.getAttribute('aria-checked')).toBe('true');
   });
 
+  it('Billing rules shows the day the month close starts and saves a new one', () => {
+    useFinancialStore.setState({ monthCloseStartDay: 1 });
+    renderAt('/funds?tab=settings&section=rules');
+    const card = document.querySelector('[aria-label="Month close start"]') as HTMLElement;
+    expect(card.textContent).toContain('Month close starts on the 1st');
+    fireEvent.change(within(card).getByLabelText('Day of the month (1–28)'), { target: { value: '10' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(useFinancialStore.getState().monthCloseStartDay).toBe(10);
+    expect(card.textContent).toContain('Month close starts on the 10th');
+    fireEvent.change(within(card).getByLabelText('Day of the month (1–28)'), { target: { value: '31' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(useFinancialStore.getState().monthCloseStartDay).toBe(10);
+    fireEvent.click(within(card).getByRole('button', { name: 'Runbook' }));
+    expect(screen.getByTestId('elsewhere')).toBeTruthy();
+  });
+
   it('Accounts and ledger has five pages under the gear; a deep link opens the page that holds its card', () => {
     renderAt('/funds?tab=settings&section=rules');
     const nav = screen.getByRole('navigation', { name: 'Accounts and ledger sections' });

@@ -111,6 +111,8 @@ interface FinancialState {
   // Work Orders
   createWorkOrder: (wo: { title: string; vendor: string; amount: number; acctNum: string; caseId?: string }) => void;
   approveWorkOrder: (id: string) => void;
+  /** Link a work order to the case that drives it (the Work order runbook's, or a parent case). */
+  setWorkOrderCase: (id: string, caseId: string | null) => void;
   /** The vendor's invoice arrived: the expense is booked now (Dr expense line / Cr accounts payable), on the invoice date. */
   receiveInvoice: (id: string, invoiceNum: string, amount: number, invoiceDate?: string) => void;
   /** Pay a bill: clears the payable (Dr accounts payable / Cr bank). A bill invoiced before accrual posts Dr expense / Cr bank, as before. */
@@ -165,6 +167,19 @@ interface FinancialState {
   /** How a payment is applied across a unit's open charges. */
   paymentOrder: PaymentOrder;
   setPaymentOrder: (order: PaymentOrder) => void;
+  /** Day of the month (1–28) the month close runbook opens its case for the month just ended. */
+  monthCloseStartDay: number;
+  setMonthCloseStartDay: (day: number) => void;
+  /** The Month close runbook's switch, shared with the database job that runs it every morning. */
+  monthCloseEnabled: boolean;
+  setMonthCloseEnabled: (on: boolean) => void;
+  /** Runbooks switched off, by id, shared with the database jobs that run them (collections, insurance renewal, month close). */
+  runbooksOff: string[];
+  setRunbookOff: (id: string, off: boolean) => void;
+  /** The last professional reserve study (YYYY-MM-DD, or null when none is recorded) and how many years one lasts; the Reserve study runbook reads both. */
+  reserveStudyDate: string | null;
+  reserveStudyEveryYears: number;
+  setReserveStudy: (date: string | null, everyYears?: number) => void;
   /** Bill every unit's dues for a month (this month by default). Bills each unit once per month. */
   runMonthlyBilling: (period?: string, today?: string) => BillingRunSummary;
   /** Charge the late fee on every dues invoice past its grace period that has none yet. Returns how many. */
@@ -297,6 +312,11 @@ function syncSettings() {
     lastLateFeeRun: s.lastLateFeeRun,
     autoReserveTransfer: s.autoReserveTransfer,
     paymentOrder: s.paymentOrder,
+    monthCloseStartDay: s.monthCloseStartDay,
+    monthCloseEnabled: s.monthCloseEnabled,
+    runbooksOff: s.runbooksOff,
+    reserveStudyDate: s.reserveStudyDate,
+    reserveStudyEveryYears: s.reserveStudyEveryYears,
     glAccountMapping: { ...DEFAULT_GL_MAPPING, ...s.glAccountMapping },
   }).catch(err => console.error('[syncWrite] upsertFinancialSettings failed:', err));
 }
@@ -388,6 +408,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.closedThrough = data.settings.closedThrough;
       updates.autoReserveTransfer = data.settings.autoReserveTransfer;
       updates.paymentOrder = data.settings.paymentOrder;
+      updates.monthCloseStartDay = data.settings.monthCloseStartDay || 1;
+      updates.monthCloseEnabled = data.settings.monthCloseEnabled ?? true;
+      updates.runbooksOff = data.settings.runbooksOff ?? [];
+      updates.reserveStudyDate = data.settings.reserveStudyDate ?? null;
+      updates.reserveStudyEveryYears = data.settings.reserveStudyEveryYears || 3;
       // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
       if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
@@ -931,6 +956,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     }
   },
 
+  setWorkOrderCase: (id, caseId) => {
+    set((s) => ({ workOrders: s.workOrders.map((w) => (w.id === id ? { ...w, caseId } : w)) }));
+    syncWorkOrder(id);
+  },
   approveWorkOrder: (id) => {
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
@@ -1196,6 +1225,34 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   paymentOrder: 'dues-first',
   setPaymentOrder: (order) => {
     set({ paymentOrder: order });
+    syncSettings();
+  },
+  monthCloseStartDay: 1,
+  setMonthCloseStartDay: (day) => {
+    const n = Math.round(Number(day));
+    if (!Number.isFinite(n) || n < 1 || n > 28) return;
+    set({ monthCloseStartDay: n });
+    syncSettings();
+  },
+  monthCloseEnabled: true,
+  setMonthCloseEnabled: (on) => {
+    if (get().monthCloseEnabled === on) return;
+    set({ monthCloseEnabled: on });
+    syncSettings();
+  },
+  reserveStudyDate: null,
+  reserveStudyEveryYears: 3,
+  setReserveStudy: (date, everyYears) => {
+    const d = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    const n = everyYears === undefined ? get().reserveStudyEveryYears : Math.round(Number(everyYears));
+    set({ reserveStudyDate: d, reserveStudyEveryYears: Number.isFinite(n) && n >= 1 && n <= 10 ? n : get().reserveStudyEveryYears });
+    syncSettings();
+  },
+  runbooksOff: [],
+  setRunbookOff: (id, off) => {
+    const cur = get().runbooksOff;
+    if (off === cur.includes(id)) return;
+    set({ runbooksOff: off ? [...cur, id] : cur.filter(x => x !== id) });
     syncSettings();
   },
 
@@ -1494,6 +1551,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     lastLateFeeRun: state.lastLateFeeRun,
     autoReserveTransfer: state.autoReserveTransfer,
     paymentOrder: state.paymentOrder,
+    monthCloseStartDay: state.monthCloseStartDay,
+    monthCloseEnabled: state.monthCloseEnabled,
+    runbooksOff: state.runbooksOff,
+    reserveStudyDate: state.reserveStudyDate,
+    reserveStudyEveryYears: state.reserveStudyEveryYears,
   }),
   merge: (persisted: any, current: any) => ({
     ...current,

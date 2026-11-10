@@ -2,10 +2,14 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { CATS, useIssuesStore } from '@/store/useIssuesStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore } from '@/store/useMailStore';
 import { todayIso } from '../runbook/adapters';
 import { useRunbookSwitches } from './store';
+import { RUNBOOKS } from './runbooks';
+
+const WIRED = new Set(RUNBOOKS.filter(r => r.wired).map(r => r.id));
 import type { BoardRoomSnapshot } from './metrics';
 
 /** Collect the Board Room snapshot from the issues, letters, mail and auth stores. */
@@ -19,6 +23,12 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
   const templates = useLetterStore(s => s.templates);
   const mailRecords = useMailStore(s => s.mailRecords);
   const off = useRunbookSwitches(s => s.off);
+  const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
+  const boardMeetingEveryDays = useBuildingStore(s => s.details?.boardMeetingEveryDays);
+  const reserveStudyEveryYears = useFinancialStore(s => s.reserveStudyEveryYears);
+  const sharedOff = useFinancialStore(s => s.runbooksOff);
+  // A wired runbook's switch is the shared setting (another board member, or the server, may have moved it).
+  const runbooksOff = useMemo(() => Array.from(new Set([...off.filter(id => !WIRED.has(id)), ...sharedOff])), [off, sharedOff]);
   return useMemo(() => ({
     today,
     viewer: {
@@ -35,6 +45,9 @@ export function useBoardRoomSnapshot(today: string = todayIso()): BoardRoomSnaps
     templates,
     mailRecords,
     categories: CATS.map(c => ({ id: c.id, label: c.label, sits: c.sits.map(s => ({ id: s.id, title: s.title })) })),
-    runbooksOff: off,
-  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, off]);
+    runbooksOff,
+    monthCloseStartDay,
+    boardMeetingEveryDays,
+    reserveStudyEveryYears,
+  }), [today, currentUser, currentRole, board, cases, issues, letters, templates, mailRecords, runbooksOff, monthCloseStartDay, boardMeetingEveryDays, reserveStudyEveryYears]);
 }

@@ -9,7 +9,7 @@ import { BoardVoteDisplay } from '@/features/issues/components/CaseComponents';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { Button, Card, Chip, Inner, SectionLabel } from '../../components';
 import { dayLabel } from '../../home/calendar';
-import { caseRows, type BoardRoomSnapshot } from '../metrics';
+import { caseRows, type BoardRoomSnapshot, situationLabel } from '../metrics';
 
 /**
  * The case frame: breadcrumb, the production case workspace or wizard, and
@@ -25,7 +25,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
   const [bidStep, setBidStep] = useState<number | null>(null);
   const steps = c?.steps ?? [];
   const decisionSteps = steps.map((s, i) => ({ s, i })).filter(({ s }) => !s.done && (s.isSpendingDecision || s.requiresBids || s.requiresConflictCheck));
-  const sitName = c ? snap.categories.find(x => x.id === c.catId)?.sits.find(x => x.id === c.sitId)?.title ?? c.sitId : null;
+  const sitName = c ? situationLabel(snap, c) : null;
 
   return (
     <div data-page="ux2-boardroom-case" className="flex flex-col gap-5">
@@ -94,6 +94,9 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
         <Inner className="text-xs text-ux2-muted">
           Opened from {c.source === 'filing' ? 'the filing' : 'the obligation'} {c.sourceId} on Building › Obligations. Closing this case as Resolved marks it {c.source === 'filing' ? 'filed' : 'done'} there; closing it any other way leaves it open.
         </Inner>
+      )}
+      {c && c.source === 'runbook' && c.sourceId && (
+        <Inner className="text-xs text-ux2-muted">Opened by the {c.sourceId.startsWith('month-close:') ? 'Month close' : 'runbook'} runbook on {dayLabel(c.created.slice(0, 10))}. Steps the app can see (dues posted, books closed, packet sent) tick themselves; the rest are yours. The day it starts is under Funds › Settings › Billing rules.</Inner>
       )}
       {c && c.source === 'issue' && c.sourceId && (
         <Inner className="text-xs text-ux2-muted">Opened from request {c.sourceId}. The owner follows it on Community › Requests; the 14-day reply clock runs on the Inbox. <button type="button" className="text-ux2-teal hover:underline" onClick={() => onOpenCase(c.id)}>Refresh</button></Inner>

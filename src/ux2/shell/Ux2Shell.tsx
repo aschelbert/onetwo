@@ -7,6 +7,7 @@ import CaseDock, { useCaseDock } from './CaseDock';
 import { cn } from '@/lib/formatters';
 import { watchObligationCases } from '../runbook/obligationCases';
 import { useBillingCycle } from '../funds/useBillingCycle';
+import { useRunbookTriggers } from '../boardroom/useRunbookTriggers';
 
 /**
  * The redesign's shell. Phase 0 renders the production pages inside it: same
@@ -21,6 +22,9 @@ export default function Ux2Shell() {
   useEffect(() => watchObligationCases(), []);
   // Dues billing and late fees run when a board member opens the app (not in the read-only demo).
   useBillingCycle(!tenant.isDemo);
+  // The wired runbooks (month close, collections, insurance renewal) open their cases and tick the steps the app can see.
+  // They run in the demo too: they only open cases, and the demo is where the board sees how they work.
+  useRunbookTriggers();
   return (
     <div className="ux2 ux2-page flex min-h-screen flex-col">
       {tenant.isDemo && (

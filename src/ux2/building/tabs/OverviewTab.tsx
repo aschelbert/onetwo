@@ -50,9 +50,10 @@ function DetailsForm({ snap, onClose }: { snap: BuildingSnapshot; onClose: () =>
   const [built, setBuilt] = useState(snap.details.yearBuilt);
   const [floors, setFloors] = useState(String(snap.details.floors || ''));
   const [fy, setFy] = useState(snap.details.fiscalYearEnd || '12-31');
+  const [meetEvery, setMeetEvery] = useState(String(useBuildingStore.getState().details.boardMeetingEveryDays || 61));
   const [entity, setEntity] = useState<'incorporated' | 'unincorporated'>(snap.details.entityType as 'incorporated' | 'unincorporated');
   return (
-    <form aria-label="Edit details" onSubmit={e => { e.preventDefault(); updateAddress({ street, city, state, zip }); updateDetails({ totalUnits: Number(units) || 0, yearBuilt: built, floors: Number(floors) || 0, fiscalYearEnd: fy, entityType: entity }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+    <form aria-label="Edit details" onSubmit={e => { e.preventDefault(); updateAddress({ street, city, state, zip }); updateDetails({ totalUnits: Number(units) || 0, yearBuilt: built, floors: Number(floors) || 0, fiscalYearEnd: fy, entityType: entity, boardMeetingEveryDays: Math.min(366, Math.max(7, Number(meetEvery) || 61)) }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <Field label="Street" className="min-w-[220px] flex-1"><input value={street} onChange={e => setStreet(e.target.value)} className={INPUT} /></Field>
       <Field label="City" className="w-[150px]"><input value={city} onChange={e => setCity(e.target.value)} className={INPUT} /></Field>
       <Field label="State" className="w-[80px]"><input value={state} onChange={e => setState(e.target.value)} className={INPUT} /></Field>
@@ -61,6 +62,7 @@ function DetailsForm({ snap, onClose }: { snap: BuildingSnapshot; onClose: () =>
       <Field label="Built" className="w-[90px]"><input value={built} onChange={e => setBuilt(e.target.value)} className={INPUT} /></Field>
       <Field label="Floors" className="w-[90px]"><input inputMode="numeric" value={floors} onChange={e => setFloors(e.target.value)} className={INPUT} /></Field>
       <Field label="FY ends (MM-DD)" className="w-[130px]"><input value={fy} onChange={e => setFy(e.target.value)} className={INPUT} /></Field>
+      <Field label="Board meets every (days)" className="w-[170px]"><input inputMode="numeric" value={meetEvery} onChange={e => setMeetEvery(e.target.value)} className={INPUT} /></Field>
       <Field label="Entity" className="w-[170px]"><select value={entity} onChange={e => setEntity(e.target.value as 'incorporated' | 'unincorporated')} className={INPUT}><option value="incorporated">Incorporated</option><option value="unincorporated">Unincorporated</option></select></Field>
       <div className="flex gap-2"><Button type="submit" size="sm">Save</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
     </form>
@@ -117,6 +119,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
   const schedules = useBuildingStore(s => s.maintenanceSchedules);
   const management = useBuildingStore(s => s.management);
   const counsel = useBuildingStore(s => s.legalCounsel);
+  const boardMeetingEveryDays = useBuildingStore(s => s.details.boardMeetingEveryDays || 61);
   const reserveItems = useFinancialStore(s => s.reserveItems);
   const units = useFinancialStore(s => s.units);
   const mailing = useMailStore(s => s.mailingSettings);
@@ -178,6 +181,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
             <KV label="Built">{snap.details.yearBuilt || '—'}</KV>
             <KV label="Management">{management.company || 'Self-managed'} <Chip tone="ghost" className="ml-1.5">{management.company ? management.contact || 'Manager' : 'No manager'}</Chip></KV>
             <KV label="Fiscal year ends">{fyLabel(snap.details.fiscalYearEnd)}</KV>
+            <KV label="Board meets">every {boardMeetingEveryDays} days <span className="text-xs font-normal text-ux2-muted">per the bylaws · the Board meeting cycle runbook follows it</span></KV>
             <KV label="Legal entity">{snap.name} <span className="text-xs font-normal text-ux2-muted">{snap.details.entityType === 'incorporated' ? `${snap.address.state || 'DC'} nonprofit` : 'unincorporated association'}</span></KV>
             <KV label="Registered agent">{counsel[0] ? <>{counsel[0].firm} <span className="text-xs font-normal text-ux2-muted">counsel</span></> : <span className="text-ux2-muted">None on file</span>}</KV>
           </Inner>

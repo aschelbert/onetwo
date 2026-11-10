@@ -7,6 +7,7 @@ import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Ta
 import { dayLabel } from '../../home/calendar';
 import { budgetSummary, nextYearScenarios, reserveSummary, type BudgetLine, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
+import { addYears, everyYears, lastStudyDate } from '../../boardroom/reserveStudy';
 
 type Section = 'budget' | 'draft' | 'reserves';
 const SECTIONS: Section[] = ['budget', 'draft', 'reserves'];
@@ -188,6 +189,13 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
   const res = reserveSummary(snap);
   const setAnnual = useFinancialStore(s => s.setAnnualReserveContribution);
   const addItem = useFinancialStore(s => s.addReserveItem);
+  const reserveStudyDate = useFinancialStore(s => s.reserveStudyDate);
+  const reserveStudyEveryYears = useFinancialStore(s => s.reserveStudyEveryYears);
+  const setReserveStudy = useFinancialStore(s => s.setReserveStudy);
+  const [studyDate, setStudyDate] = useState(reserveStudyDate ?? '');
+  const [studyYears, setStudyYears] = useState(String(reserveStudyEveryYears || 3));
+  const studyLast = lastStudyDate();
+  const studyNext = studyLast ? addYears(studyLast, everyYears(reserveStudyEveryYears)) : null;
   const year = Number(snap.today.slice(0, 4));
   const [choice, setChoice] = useState<'today' | 'recommended' | 'custom'>('today');
   const [custom, setCustom] = useState('');
@@ -257,6 +265,17 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
             <input aria-label="Custom monthly contribution" inputMode="numeric" placeholder="$" value={custom} onFocus={() => setChoice('custom')} onChange={e => { setCustom(e.target.value); setChoice('custom'); }} className="h-10 w-[110px] shrink-0 rounded-full border border-ux2-line-strong px-3.5 text-sm" />
           </label>
         </div>
+        <Inner className="flex flex-wrap items-end justify-between gap-3" aria-label="Reserve study">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-ux2-ink">Reserve study · {studyLast ? `last ${dayLabel(studyLast)}, next due ${dayLabel(studyNext!)}` : 'none on record'}</div>
+            <p className="m-0 text-xs text-ux2-muted">The Reserve study update runbook opens its case 90 days before the next one is due{reserveStudyDate ? '' : studyLast ? ', reading the date from the newest reserve study file under Building › Documents until one is set here' : ', or at once while none is on record'}. Enter the study's date when a new one arrives.</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Last study" className="w-[150px]"><input type="date" aria-label="Last reserve study" value={studyDate} onChange={e => setStudyDate(e.target.value)} className={INPUT} /></Field>
+            <Field label="Lasts (years)" className="w-[110px]"><input inputMode="numeric" aria-label="Years a study lasts" value={studyYears} onChange={e => setStudyYears(e.target.value)} className={INPUT} /></Field>
+            <Button size="sm" variant="ghost" onClick={() => setReserveStudy(studyDate || null, Number(studyYears) || undefined)}>Save</Button>
+          </div>
+        </Inner>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-ux2-muted">Whatever you set here is the reserve line in next year's draft. Contingency fund: {hasContingency ? 'set up' : 'none set up'}.</span>
           <span className="flex flex-wrap gap-2">

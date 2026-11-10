@@ -287,6 +287,7 @@ export async function fetchVendors(tenantId: string): Promise<Vendor[] | null> {
     id: r.id, name: r.name, service: r.service, contact: r.contact,
     phone: r.phone, email: r.email, contract: r.contract,
     status: r.status as 'active' | 'inactive',
+    w9OnFile: !!r.w9_on_file,
   }));
 }
 
@@ -317,6 +318,7 @@ export async function updateVendor(id: string, v: Partial<Vendor>): Promise<bool
   if (v.email !== undefined) row.email = v.email;
   if (v.contract !== undefined) row.contract = v.contract;
   if (v.status !== undefined) row.status = v.status;
+  if (v.w9OnFile !== undefined) row.w9_on_file = v.w9OnFile;
   const { error } = await supabase.from('vendors').update(row).eq('id', id);
   if (error) { logDbError('updateVendor error:', error); return false; }
   return true;
@@ -407,6 +409,7 @@ export async function fetchBuildingProfile(tenantId: string): Promise<Omit<Build
     amenities: data.amenities || [],
     entityType: data.entity_type as 'incorporated' | 'unincorporated',
     fiscalYearEnd: data.fiscal_year_end,
+    boardMeetingEveryDays: Number(data.board_meeting_every_days ?? 61) || 61,
   };
 }
 
@@ -424,6 +427,7 @@ export async function upsertBuildingProfile(tenantId: string, d: Partial<Buildin
   if (d.amenities !== undefined) row.amenities = d.amenities;
   if (d.entityType !== undefined) row.entity_type = d.entityType;
   if (d.fiscalYearEnd !== undefined) row.fiscal_year_end = d.fiscalYearEnd;
+  if (d.boardMeetingEveryDays !== undefined) row.board_meeting_every_days = d.boardMeetingEveryDays;
   const { error } = await supabase.from('building_profiles').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertBuildingProfile error:', error); return false; }
   return true;
