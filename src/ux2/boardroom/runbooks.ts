@@ -5,9 +5,10 @@
  * starts itself today (month close, collections, insurance renewal, year-end
  * close, annual budget, filings, the annual meeting, the board meeting cycle,
  * the inspections, the 1099s, the owner disclosure, resident requests, moves,
- * amenity bookings, vendor bids, work orders and spending requests, each from
- * a module next to this file, with a database twin except the bookings and
- * the bids, which live only in the app); the rest
+ * amenity bookings, vendor bids, work orders, spending requests, vendor
+ * onboarding and special assessments, each from a module next to this file,
+ * with a database twin except the bookings and the bids, which live only in
+ * the app); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -47,14 +48,14 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'annual-meeting', name: 'Annual meeting', trigger: '90 days before the deadline, 13 months after the last one', steps: 13, automated: 3, sitId: 'annual-meeting-planning', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6, 10] },
   { id: 'reserve-study', name: 'Reserve study update', trigger: 'Every 3 years, 90 days before due', steps: 4, automated: 2, sitId: 'reserve-management', catId: 'financial', visibility: 'owners', defaultOn: true },
   { id: 'resale-certificate', name: 'Resale certificate', trigger: 'A unit lists for sale', steps: 5, automated: 4, sitId: 'resale-certs', catId: 'admin', visibility: 'board', defaultOn: true },
-  { id: 'special-assessment', name: 'Special assessment', trigger: 'Board approves one', steps: 6, automated: 4, sitId: 'special-assessments', catId: 'financial', visibility: 'owners', defaultOn: true },
+  { id: 'special-assessment', name: 'Special assessment', trigger: 'Board approves one', steps: 6, automated: 4, sitId: 'special-assessments', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 3, 4, 5] },
   { id: 'elevator-inspection', name: 'Elevator inspection', trigger: 'Certificate expiry, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
   { id: 'boiler-fire', name: 'Boiler and fire systems', trigger: 'Inspection calendar, 60 days out', steps: 6, automated: 4, sitId: 'inspection-scheduling', catId: 'maintenance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3] },
   { id: 'snow', name: 'Snow and ice', trigger: 'First forecast under 32°F', steps: 3, automated: 3, visibility: 'owners', defaultOn: true },
   { id: 'amenity-booking', name: 'Amenity booking', trigger: 'A booking needs the board\'s approval', steps: 4, automated: 2, sitId: 'amenities', catId: 'operations', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'work-order', name: 'Work order', trigger: 'A work order is raised on its own', steps: 4, automated: 3, sitId: 'common-area-repairs', catId: 'maintenance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
   { id: 'spending-request', name: 'Spending request', trigger: 'A request waits for the board', steps: 4, automated: 3, sitId: 'capital-projects', catId: 'strategic', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 3] },
-  { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
+  { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1, 3] },
   { id: '1099', name: '1099 filing', trigger: 'January 1, when a vendor was paid $600 or more', steps: 4, automated: 2, visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'year-end', name: 'Year-end close', trigger: 'Fiscal year end', steps: 6, automated: 2, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [2, 3] },
   { id: 'financial-review', name: 'Financial review', trigger: 'After year-end close', steps: 4, automated: 2, visibility: 'owners', defaultOn: true },
