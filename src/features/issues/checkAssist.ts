@@ -23,6 +23,8 @@
  * test (`checkAssist.test.ts`) counts those so the fallback stays rare.
  */
 
+import { WRITE_ANY, WRITE_FIRST, pagesInText } from './stepGuide';
+
 export type PanelId =
   | 'budget-drafter' | 'reserve-study' | 'contract-renewals' | 'bylaws-review'
   | 'budget-lines' | 'financials' | 'unit-ledger' | 'delinquency' | 'fees' | 'units'
@@ -44,6 +46,8 @@ export interface CheckContext {
   step: string;
   /** The case has a unit (collections, violations, damage). */
   hasUnit: boolean;
+  /** The step's guidance, when the item is the step's own task: the pages it names are where the item is done. */
+  guidance?: string | null;
 }
 
 export interface Resolution {
@@ -128,7 +132,7 @@ const T = {
   send: tool('send-comm', 'Draft and send it'),
   boardVote: tool('board-vote', 'Record the board vote'),
   ownerVote: tool('owner-vote', 'Record the owner vote'),
-  upload: tool('upload-doc', 'Attach it to the case'),
+  upload: tool('upload-doc', 'Attach it to the action'),
   wo: tool('create-wo', 'Create a work order'),
   invoice: tool('create-invoice', 'Create an invoice'),
   meeting: tool('create-meeting', 'Schedule or link a meeting'),
@@ -245,6 +249,64 @@ const RULES: Rule[] = [
     assists: [T.upload, T.note] },
 ];
 
+/** Where the information in a panel lives, so an item that shows it in place can also take you there. */
+const PANEL_HOME: Record<PanelId, { path: string; label: string }> = {
+  'budget-drafter': { path: ROUTES.draft, label: 'Open Funds › Planning' },
+  'budget-lines': { path: ROUTES.budget, label: 'Open Funds › Planning' },
+  'reserve-study': { path: ROUTES.reserves, label: 'Open Funds › Planning › Reserves' },
+  'contract-renewals': { path: ROUTES.contracts, label: 'Open Building › Contracts' },
+  'bylaws-review': { path: ROUTES.documents, label: 'Open Building › Documents' },
+  financials: { path: ROUTES.statements, label: 'Open Funds › Statements & taxes' },
+  'unit-ledger': { path: ROUTES.ledger, label: 'Open Funds › Income' },
+  delinquency: { path: ROUTES.behind, label: 'Open Funds › Income › Behind' },
+  fees: { path: ROUTES.fees, label: 'Open the fee schedule' },
+  units: { path: ROUTES.ledger, label: 'Open Funds › Income › Units' },
+  insurance: { path: ROUTES.insurance, label: 'Open Building › Insurance' },
+  vendors: { path: ROUTES.contracts, label: 'Open Building › Contracts' },
+  documents: { path: ROUTES.documents, label: 'Open Building › Documents' },
+  owner: { path: ROUTES.directory, label: 'Open Building › Directory' },
+  board: { path: ROUTES.directory, label: 'Open Building › Directory' },
+  counsel: { path: ROUTES.directory, label: 'Open Building › Directory' },
+  meetings: { path: ROUTES.meetings, label: 'Open Community › Meetings' },
+  assets: { path: ROUTES.assets, label: 'Open Building › Assets' },
+  filings: { path: ROUTES.filings, label: 'Open Building › Filings' },
+};
+
+/** An item is something to write down in place: the note comes first. */
+const WRITE_HERE = tool('note', 'Write it here');
+const MAX_ASSISTS = 4;
+
+/**
+ * What every item gets on top of its rule:
+ *  - a page it names ("under Building › Documents") is where it goes first;
+ *  - information shown in place can also be opened where it lives, so the
+ *    action dock follows and brings you back to this item;
+ *  - an item that asks for something to be written gets a place to write it.
+ */
+function complete(assists: Assist[], text: string, generic = false, guidance?: string | null): Assist[] {
+  let out = [...assists];
+  const hasRoute = (path: string) => out.some(a => a.kind === 'route' && a.path === path);
+  const pages = [...pagesInText(text), ...pagesInText(guidance)];
+  const named = pages.filter((pg, i) => !hasRoute(pg.path) && pages.findIndex(x => x.path === pg.path) === i).map(pg => route(pg.path, `Open ${pg.label}`));
+  out = [...named, ...out];
+  if (!out.some(a => a.kind === 'route')) {
+    const p = out.find((a): a is Extract<Assist, { kind: 'panel' }> => a.kind === 'panel');
+    if (p) out.push(route(PANEL_HOME[p.panel].path, PANEL_HOME[p.panel].label));
+  }
+  const hasNote = out.some(a => a.kind === 'tool' && a.tool === 'note');
+  // Writing comes first only when nothing more specific is known about the item ("Describe the damage");
+  // "Itemize the lien amount" still opens the ledger first, with the place to write beside it.
+  if (generic && WRITE_FIRST.test(text)) out = [WRITE_HERE, ...out.filter(a => !(a.kind === 'tool' && a.tool === 'note'))];
+  else if ((WRITE_FIRST.test(text) || WRITE_ANY.test(text)) && !hasNote) out.push(WRITE_HERE);
+  // Keep the note when trimming: it is the one thing no other assist stands in for.
+  if (out.length > MAX_ASSISTS) {
+    const note = out.find(a => a.kind === 'tool' && a.tool === 'note');
+    out = out.slice(0, MAX_ASSISTS);
+    if (note && !out.includes(note)) out[MAX_ASSISTS - 1] = note;
+  }
+  return out;
+}
+
 /** The assists for one checklist item. Never empty. */
 export function resolveCheck(label: string, ctx: CheckContext): Resolution {
   const text = label.replace(/\s+—\s+(generate or upload|attach.*)$/i, '');
@@ -255,7 +317,10 @@ export function resolveCheck(label: string, ctx: CheckContext): Resolution {
   const r = byLabel ?? match(ctx.step);
   if (r) {
     const assists = typeof r.assists === 'function' ? r.assists(ctx) : r.assists;
-    return { assists, fallback: false, rule: byLabel ? r.name : `step:${r.name}` };
+    return { assists: complete(assists, text, r.name === 'evidence', ctx.guidance), fallback: false, rule: byLabel ? r.name : `step:${r.name}` };
   }
-  return { assists: [T.note, T.upload], fallback: true, rule: 'fallback' };
+  // No rule knows it, but it may still name a page.
+  const named = complete([], text, true, ctx.guidance);
+  if (named.some(a => a.kind === 'route')) return { assists: complete([T.note, T.upload], text, true, ctx.guidance), fallback: false, rule: 'page' };
+  return { assists: complete([T.note, T.upload], text, true), fallback: true, rule: 'fallback' };
 }

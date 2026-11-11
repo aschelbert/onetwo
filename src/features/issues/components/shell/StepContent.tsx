@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
+import { isOwnTask, pagesInText } from '../../stepGuide';
 import type { StepAction } from '@/store/useIssuesStore';
 import { Step1BudgetReview } from './Step1BudgetReview';
 import { Step3ThreeYearOutlook } from './Step3ThreeYearOutlook';
@@ -23,6 +26,10 @@ interface StepContentProps {
   stateAbbr: string;
   onToggleStep: (idx: number) => void;
   onAddNote: (idx: number) => void;
+  /** Save the step's note, written in place. */
+  onSaveNote?: (idx: number, note: string) => void;
+  /** Save what was written for one checklist item. */
+  onSaveCheckNote?: (checkId: string, note: string) => void;
   onToggleAction?: (actionId: string) => void;
   onToggleCheck?: (checkId: string) => void;
   onAction?: (action: StepAction, stepIdx: number) => void;
@@ -40,7 +47,7 @@ interface StepContentProps {
  * Shows jurisdiction guidance (step 0 only), step card with toggle/metadata/guidance/warning/notes,
  * and a centered navigation hint at the bottom.
  */
-export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId }: StepContentProps) {
+export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onSaveNote, onSaveCheckNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
   const guided = isBudgetAction(c) && !!budgetStepKey(step.s);
@@ -130,6 +137,8 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
               <div className="bg-mist-50 border border-mist-100 rounded-lg p-3 mb-3">
                 <div className="text-[10px] font-bold text-mist-500 uppercase tracking-wide mb-1">Guidance</div>
                 <p className="text-[13px] text-ink-700 leading-relaxed">{step.detail}</p>
+                {/* The pages the guidance names: go there, and the action dock brings you back to this step. When the step's own task is on its checklist, that item carries them. */}
+                {!guided && !(step.checks ?? []).some(ck => isOwnTask(step, ck.label)) && <GuidancePages text={step.detail} />}
               </div>
             )}
 
@@ -316,7 +325,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
                           </div>
                           {/* What this item needs: the information to review, a step tool, or where to do it */}
                           <div className={`border-t border-ink-50 px-4 pb-3 ${ck.checked ? 'opacity-70' : ''}`}>
-                            <CheckAssist c={c} step={step} stepIndex={stepIndex} checkId={ck.id} label={ck.label} onAction={onAction} onAddNote={onAddNote} onUploadCheckDoc={onUploadCheckDoc} />
+                            <CheckAssist c={c} step={step} stepIndex={stepIndex} checkId={ck.id} label={ck.label} note={ck.note} onSaveNote={onSaveCheckNote ? text => onSaveCheckNote(ck.id, text) : undefined} onAction={onAction} onAddNote={onAddNote} onUploadCheckDoc={onUploadCheckDoc} />
                           </div>
                         </div>
                       );
@@ -357,33 +366,8 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             );
           })()}
 
-          {/* User notes */}
-          {step.userNotes && (
-            <div className="border-t border-ink-100 px-5 py-3 bg-sand-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wide">📝 Note</span>
-                <button
-                  onClick={() => onAddNote(stepIndex)}
-                  className="text-xs text-ink-400 hover:text-ink-600 px-2 py-0.5 rounded hover:bg-ink-50"
-                >
-                  Edit
-                </button>
-              </div>
-              <p className="text-[13px] text-ink-700 leading-relaxed">{step.userNotes}</p>
-            </div>
-          )}
-
-          {/* Add note button when no notes */}
-          {!step.userNotes && (
-            <div className="border-t border-ink-100 px-5 py-2">
-              <button
-                onClick={() => onAddNote(stepIndex)}
-                className="text-xs text-ink-400 hover:text-ink-600 px-2 py-1 rounded hover:bg-ink-50"
-              >
-                + Note
-              </button>
-            </div>
-          )}
+          {/* Notes, written in place */}
+          <StepNotes key={`${c.id}:${step.id}`} value={step.userNotes || ''} onSave={onSaveNote ? text => onSaveNote(stepIndex, text) : undefined} onPrompt={() => onAddNote(stepIndex)} />
         </div>
 
         {/* Document aggregation for resale-certs delivery step (step 10, index 9) */}
@@ -429,6 +413,63 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The pages a step's guidance names, as buttons. The action dock follows and brings you back to the step. */
+function GuidancePages({ text }: { text: string | null | undefined }) {
+  const navigate = useNavigate();
+  const pages = pagesInText(text);
+  if (pages.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" data-guidance-pages>
+      {pages.map(pg => (
+        <button key={pg.path} type="button" onClick={() => navigate(pg.path)} className="inline-flex items-center gap-1 rounded-lg border border-accent-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-accent-700 hover:bg-accent-50">
+          Go to {pg.label} ↗
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The step's note: a box to write in, saved when you leave it or press Save. No pop-up. */
+function StepNotes({ value, onSave, onPrompt }: { value: string; onSave?: (text: string) => void; onPrompt: () => void }) {
+  const [text, setText] = useState(value);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { setText(value); }, [value]);
+  if (!onSave) {
+    return (
+      <div className="border-t border-ink-100 px-5 py-2">
+        {value && <p className="text-[13px] text-ink-700 leading-relaxed mb-1">{value}</p>}
+        <button onClick={onPrompt} className="text-xs text-ink-400 hover:text-ink-600 px-2 py-1 rounded hover:bg-ink-50">{value ? 'Edit note' : '+ Note'}</button>
+      </div>
+    );
+  }
+  const dirty = text.trim() !== value.trim();
+  const save = () => { if (!dirty) return; onSave(text.trim()); setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
+  return (
+    <div className="border-t border-ink-100 px-5 py-3 bg-sand-100" data-step-notes>
+      <label className="block">
+        <span className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wide">Notes on this step</span>
+          <span className="text-[11px] text-sage-600" aria-live="polite">{saved ? 'Saved' : ''}</span>
+        </span>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onBlur={save}
+          rows={text.split('\n').length > 2 || text.length > 160 ? 4 : 2}
+          placeholder="What you found, what was decided, who you spoke to. It stays with this step."
+          className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-[13px] text-ink-700 leading-relaxed placeholder:text-ink-300 focus:border-accent-400 focus:outline-none"
+        />
+      </label>
+      {dirty && (
+        <div className="mt-1.5 flex gap-2">
+          <button type="button" onClick={save} className="rounded-lg bg-accent-600 px-3 py-1 text-xs font-semibold text-white hover:bg-accent-700">Save note</button>
+          <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => setText(value)} className="rounded-lg border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-600 hover:bg-ink-50">Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
