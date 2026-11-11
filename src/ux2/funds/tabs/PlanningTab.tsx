@@ -1,13 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
-import { useMeetingsStore } from '@/store/useMeetingsStore';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
+import { addDays } from '@/lib/billingCycle';
 import { fmt } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Table, Th, Td, RowMenu, Bar, KV, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { budgetSummary, nextYearScenarios, reserveSummary, type BudgetLine, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
 import { addYears, everyYears, lastStudyDate } from '../../boardroom/reserveStudy';
+import { BUDGET_LEAD_DAYS, openBudgetCase, startBudgetNow } from '../../boardroom/annualBudget';
+import { draftTotals } from '../../boardroom/budgetDraft';
+import { fiscalLabel, nextFiscalYear } from '../../boardroom/fiscal';
+import { casePath } from '../../shell/caseDock';
 
 type Section = 'budget' | 'draft' | 'reserves';
 const SECTIONS: Section[] = ['budget', 'draft', 'reserves'];
@@ -112,57 +119,69 @@ function BudgetCard({ snap, onSection, onGo }: { snap: FundsSnapshot; onSection:
   );
 }
 
+/** Next year's budget action and its draft, when there is one. */
+function useNextBudget(today: string) {
+  const cases = useIssuesStore(s => s.cases);
+  const fye = useBuildingStore(s => s.details?.fiscalYearEnd);
+  const fy = nextFiscalYear(today, fye);
+  const action = openBudgetCase(cases, fy.start);
+  const draft = useBudgetDraftStore(s => s.drafts[fy.start]);
+  const steps = action?.steps ?? [];
+  return { fy, label: fiscalLabel(fy), action, draft, steps, nextIdx: steps.findIndex(x => !x.done), done: steps.filter(x => x.done).length, opensOn: addDays(fy.start, -BUDGET_LEAD_DAYS) };
+}
+
+/** Next year's budget: the Annual budget action's draft when one is open, with a way straight to the step it is on; a preview from this year's numbers until then. */
 function NextYearCard({ snap }: { snap: FundsSnapshot }) {
-  const draft = nextYearScenarios(snap);
+  const preview = nextYearScenarios(snap);
   const res = reserveSummary(snap);
-  const [pick, setPick] = useState<'keep' | 'recommended' | 'minimum'>('keep');
-  const chosen = draft.scenarios.find(s => s.id === pick)!;
   const navigate = useNavigate();
-  const meetings = useMeetingsStore(s => s.meetings);
-  const units = Math.max(1, snap.units.length);
-  const year = Number(snap.today.slice(0, 4));
-  const lines = [...snap.budget].sort((a, b) => b.budgeted - a.budgeted).slice(0, 3);
-  const nextMeeting = meetings.map(m => m.date).filter(d => d >= snap.today).sort()[0];
-  const gapAfter = res.next ? Math.max(0, res.next.cost - (res.next.funded + chosen.reserveAnnual * Math.max(0, res.next.year - year))) : 0;
+  const { fy, label, action, draft, steps, nextIdx, done, opensOn } = useNextBudget(snap.today);
+  const go = (id: string, idx: number) => navigate(casePath(id, idx >= 0 ? { step: idx, approach: null } : undefined));
+  const t = draft ? draftTotals(draft) : null;
   return (
     <Card aria-label="Next year draft" id="draft">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-lg font-medium text-ux2-ink">Next year: {draft.year} draft</h2><Chip tone="ghost">Runbook · annual budget</Chip></div>
-        <Chip tone="ghost">Drafted for you · refreshed from this year's actuals</Chip>
+        <div className="flex flex-wrap items-center gap-2"><h2 className="m-0 text-lg font-medium text-ux2-ink">Next year: the {label} budget</h2><Chip tone="ghost">Runbook · annual budget</Chip></div>
+        {action ? <Chip tone={done === steps.length && steps.length ? 'sage' : 'navy'}>{done} of {steps.length} steps done</Chip> : <Chip tone="ghost">Starts itself {dayLabel(opensOn)}</Chip>}
       </div>
-      <PillTabs size="filter" surface="white" aria-label="Dues options" value={pick} onChange={setPick} tabs={draft.scenarios.map(s => ({ id: s.id, label: `${s.id === 'keep' ? `Dues stay at ${fmt(s.dues)}` : `${fmt(s.dues)} · ${s.id === 'recommended' ? (res.next ? `${res.next.name.toLowerCase()} funded on time` : 'reserves funded') : 'the minimum'}`}` }))} />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Inner className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">If dues {pick === 'keep' ? 'stay at' : 'move to'} {fmt(chosen.dues)}</div><Chip tone="ghost">Computed</Chip></div>
-          <KV label={`Dues, ${units} units`}>{fmt(chosen.dues * 12 * units)}</KV>
-          <KV label="Reserves">{fmt(chosen.reserveAnnual)}{chosen.reserveAnnual === snap.annualReserveContribution ? ' · unchanged' : ''}</KV>
-          <KV label={`The ${snap.budget.length} lines`}>{fmt(chosen.linesAnnual)}</KV>
-          {res.next && <KV label={`${res.next.name} in ${res.next.year}`}>{gapAfter > 0 ? `special assessment ≈ ${fmt(Math.round(gapAfter / units))} a unit` : 'funded'}</KV>}
-        </Inner>
-        <Inner className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">What changes from {year}</div><Chip tone="amber">{lines.length ? 1 : 0} needs you</Chip></div>
-          {lines.map((b, i) => (
-            <div key={b.id ?? b.name} className="flex items-center justify-between gap-2 border-b border-ux2-line py-2 text-sm last:border-b-0">
-              <span className="min-w-0"><span className="text-ux2-ink">{b.name}</span><span className="text-xs text-ux2-muted"> · {i === 0 ? `suggested, this year's ${fmt(b.actual)} plus 3%` : 'rolled forward from this year'}</span></span>
-              <span className="flex shrink-0 items-center gap-2"><b className="font-semibold">{fmt(Math.round((i === 0 ? b.actual : b.budgeted) * 1.03))}</b>{i === 0 ? <Chip tone="ghost">Accept</Chip> : <Chip tone="sage">Filled</Chip>}</span>
-            </div>
-          ))}
-          {lines.length === 0 && <div className="text-sm text-ux2-muted">No lines yet.</div>}
-        </Inner>
-        <Inner className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Where it stands</div><Chip tone="teal">Live</Chip></div>
-          <KV label="Sent to owners">30 days before FY · Dec 1</KV>
-          <KV label="Owner vote">opens when sent</KV>
-          <KV label="Board vote">{nextMeeting ? `${dayLabel(nextMeeting)} meeting` : 'next meeting'}</KV>
-          <KV label="Adopt by">Jan 1</KV>
-          <div className="mt-2 flex gap-2"><Button size="sm" onClick={() => navigate('/issues?view=new')}>Open the draft</Button><Button size="sm" variant="ghost" onClick={() => navigate('/community?tab=votes')}>Owner vote</Button></div>
-        </Inner>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <span className="font-semibold text-ux2-muted">Done for you</span>
-        {[`Rolled forward from ${year} actuals`, 'Dues from the fee schedule', res.next ? `${res.next.name} gap from the funding model` : 'Reserve gap from the funding model', 'Vote counts and dates live', 'Sent to owners 30 days before FY'].map(t => <Chip key={t} tone="ghost">{t}</Chip>)}
-      </div>
-      <Why>Yours to decide: the dues option{lines[0] ? ` and the ${lines[0].name.toLowerCase()} line` : ''}. Picking a dues pill rewrites the reserve line and the plan above; the choice is recorded in the action and the minutes. Next year the draft appears again with {draft.year} actuals, without anyone setting it up.</Why>
+      {action && t && draft ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Inner className="flex flex-col gap-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">The draft</div>
+            <KV label="Running the building">{fmt(t.operating)}</KV>
+            <KV label="Cushion">{draft.contingencyPct == null ? 'not set yet' : fmt(t.contingency)}</KV>
+            <KV label="Into reserves">{draft.reserve.choice ? fmt(t.reserve) : 'not set yet'}</KV>
+            <KV label="The year">{fmt(t.needed)}</KV>
+          </Inner>
+          <Inner className="flex flex-col gap-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Dues</div>
+            <KV label="Today, all units">{fmt(draft.base.monthlyDues)} a month</KV>
+            <KV label={label}>{draft.dues.option ? `${fmt(t.monthly)} a month · ${t.change >= 0 ? '+' : ''}${(t.change * 100).toFixed(1)}%` : 'not picked yet'}</KV>
+            <KV label="Adopted">{draft.adoptedAt ? dayLabel(draft.adoptedAt) : 'not yet'}</KV>
+            <KV label="Takes effect">{draft.switchedAt ? `switched ${dayLabel(draft.switchedAt)}` : dayLabel(fy.start)}</KV>
+          </Inner>
+          <Inner className="flex flex-col gap-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Where it is</div>
+            {nextIdx >= 0
+              ? <><div className="text-sm text-ux2-ink"><b className="font-semibold">Step {nextIdx + 1} of {steps.length}</b> · {steps[nextIdx].s}</div><div><Button size="sm" onClick={() => go(action.id, nextIdx)}>Continue the budget</Button></div></>
+              : <><div className="text-sm text-ux2-ink">Every step is done.</div><div><Button size="sm" variant="ghost" onClick={() => go(action.id, -1)}>Open the budget</Button></div></>}
+            <Why>Each step shows the numbers it needs and is decided right there; the action dock brings you back after a trip to another page.</Why>
+          </Inner>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Inner className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">A first look, from this year</div><Chip tone="ghost">Computed</Chip></div>
+            {preview.scenarios.map(sc => <KV key={sc.id} label={sc.id === 'keep' ? 'Dues stay' : sc.id === 'recommended' ? (res.next ? `${res.next.name} funded on time` : 'Reserves as recommended') : 'The lowest that pays every line'}>{fmt(sc.dues)} a unit a month</KV>)}
+            <Why>Today's {snap.budget.length} lines grown 3%, with the reserve options. The budget itself is made step by step in the Annual budget action.</Why>
+          </Inner>
+          <Inner className="flex flex-col gap-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">How it works</div>
+            <div className="text-sm text-ux2-ink">The Annual budget runbook opens on {dayLabel(opensOn)}, 90 days before the {label} year starts, and walks the board through ten steps: costs, lines, reserves, dues, the meeting, the vote, the owner notice, the switch-over and the record.</div>
+            <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => { const id = startBudgetNow(snap.today); go(id, 0); }}>{action ? 'Open the budget' : 'Start it now'}</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=annual-budget')}>See its steps</Button></div>
+          </Inner>
+        </div>
+      )}
     </Card>
   );
 }
@@ -294,6 +313,8 @@ export default function PlanningTab({ snap, section, onSection, onGo }: { snap: 
   const bud = budgetSummary(snap);
   const res = reserveSummary(snap);
   const draft = nextYearScenarios(snap);
+  const nb = useNextBudget(snap.today);
+  const nt = nb.draft ? draftTotals(nb.draft) : null;
   const current: Section = (SECTIONS as string[]).includes(section ?? '') ? (section as Section) : 'budget';
   const year = snap.today.slice(0, 4);
   const monthEnd = new Date(Number(year), Number(snap.today.slice(5, 7)) - 1, 0);
@@ -327,18 +348,22 @@ export default function PlanningTab({ snap, section, onSection, onGo }: { snap: 
       id: 'draft',
       tile: {
         tone: 'navy',
-        label: `${draft.year} budget · decide`,
-        meta: <Chip tone="white" className="!bg-white/[0.15] normal-case tracking-normal">Computed</Chip>,
-        value: fmt(draft.scenarios[0].dues),
-        unit: `dues from January, or ${fmt(draft.scenarios[1].dues)} or ${fmt(draft.scenarios[2].dues)}`,
+        label: `${nb.label} budget`,
+        meta: <Chip tone="white" className="!bg-white/[0.15] normal-case tracking-normal">{nb.action ? `${nb.done} of ${nb.steps.length} steps` : 'Preview'}</Chip>,
+        value: nt && nb.draft?.dues.option ? fmt(nt.monthly) : fmt(draft.scenarios[0].dues),
+        unit: nt && nb.draft?.dues.option ? `a month, all units · ${nt.change >= 0 ? '+' : ''}${(nt.change * 100).toFixed(1)}%` : nb.action ? 'dues today, a unit · not picked yet' : `a unit today, or ${fmt(draft.scenarios[1].dues)} with reserves on time`,
         children: (
           <div>
-            <KV dark label="Owner vote">opens when sent</KV>
-            <KV dark label="Board vote">next meeting</KV>
-            <KV dark label="Adopt by">Jan 1</KV>
+            <KV dark label="Board vote">{nb.draft?.adoptedAt ? `adopted ${dayLabel(nb.draft.adoptedAt)}` : 'not yet'}</KV>
+            <KV dark label="Owners told by">{dayLabel(addDays(nb.fy.start, -30))}</KV>
+            <KV dark label="Takes effect">{dayLabel(nb.fy.start)}</KV>
           </div>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">Pick the dues number</b> · the three options, below</span><Chip tone="white" className="!bg-white !text-ux2-navy">Decide</Chip></>,
+        action: nb.action
+          ? nb.nextIdx >= 0
+            ? <><span className="min-w-0 truncate"><b className="font-semibold">Step {nb.nextIdx + 1}</b> · {nb.steps[nb.nextIdx].s}</span><Chip tone="white" className="!bg-white !text-ux2-navy">Continue</Chip></>
+            : <><span className="min-w-0 truncate"><b className="font-semibold">Every step done</b></span><Chip tone="white" className="!bg-white !text-ux2-navy">Done</Chip></>
+          : <><span className="min-w-0 truncate"><b className="font-semibold">Starts itself {dayLabel(nb.opensOn)}</b> · or start it now</span><Chip tone="white" className="!bg-white !text-ux2-navy">Start</Chip></>,
       },
       detail: <NextYearCard snap={snap} />,
     },

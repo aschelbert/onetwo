@@ -47,7 +47,7 @@ export interface RunbookDef {
 }
 
 export const RUNBOOKS: RunbookDef[] = [
-  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 9, automated: 2, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6] },
+  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 10, automated: 4, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6, 7, 8] },
   { id: 'board-meeting', name: 'Board meeting cycle', trigger: 'Bylaws cadence', steps: 5, automated: 3, sitId: 'board-meetings', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
   { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 2, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 3] },
   { id: 'covenant-violation', name: 'Covenant violation', trigger: 'A request or inspection flags one', steps: 7, automated: 5, sitId: 'covenant-violations', catId: 'enforcement', visibility: 'board', defaultOn: true },

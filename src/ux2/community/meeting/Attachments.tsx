@@ -10,7 +10,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { canStoreFiles, downloadDocumentFile, uploadDocumentFile } from '@/lib/services/documentFiles';
 import { Button, Chip, Field, INPUT, PillTabs } from '../../components';
-import { REPORTS, buildReport, type ReportSource } from '../meetingReports';
+import { REPORTS, PICKABLE_REPORTS, buildReport, type ReportSource } from '../meetingReports';
 import type { AgendaAttachment, Audience, ReportKind, ReportSnapshot } from '../meetingRecord';
 
 const attId = () => `att_${Math.random().toString(36).slice(2, 10)}`;
@@ -134,7 +134,7 @@ export function AttachPanel({ itemTitle, today, by, onAdd, onClose }: { itemTitl
             <Field label="Keep it"><select value={mode} onChange={e => setMode(e.target.value as 'frozen' | 'live')} className={INPUT}><option value="frozen">Frozen as captured</option><option value="live">Refresh until the notice goes out</option></select></Field>
             <Field label="Who sees it"><select value={audience} onChange={e => setAudience(e.target.value as Audience | 'default')} className={INPUT}><option value="default">Usual for the report</option><option value="all">Everyone</option><option value="board">Board only</option></select></Field>
           </div>
-          {(Object.keys(REPORTS) as ReportKind[]).map(k => (
+          {PICKABLE_REPORTS.map(k => (
             <div key={k} className="flex items-center justify-between gap-2 border-t border-ux2-line/70 py-1.5 text-sm">
               <span className="text-ux2-ink">{REPORTS[k].label} <span className="text-ux2-muted">· {REPORTS[k].from}{REPORTS[k].audience === 'board' ? ' · board only' : ''}</span></span>
               <Button size="sm" variant="ghost" onClick={() => addReport(k)}>Add</Button>

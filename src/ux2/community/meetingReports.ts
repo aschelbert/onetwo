@@ -25,7 +25,12 @@ export const REPORTS: Record<ReportKind, { label: string; from: string; audience
   delinquency: { label: 'Delinquency report', from: 'Funds', audience: 'board', dated: false },
   dues_by_unit: { label: 'Dues by unit', from: 'Funds', audience: 'all', dated: false },
   open_requests: { label: 'Open requests and work orders', from: 'Community, Board Room', audience: 'all', dated: false },
+  // Attached by the Annual budget runbook from its draft, as it stood; not offered in the picker.
+  proposed_budget: { label: 'Proposed budget', from: 'Annual budget runbook', audience: 'all', dated: false },
 };
+
+/** The reports a person can pick to attach; the proposed budget comes from the budget runbook. */
+export const PICKABLE_REPORTS = (Object.keys(REPORTS) as ReportKind[]).filter(k => k !== 'proposed_budget');
 
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 
@@ -71,5 +76,8 @@ export function buildReport(kind: ReportKind, asOf: string, src: ReportSource): 
       ];
       return { title: `Open requests and work orders, as of ${asOf}`, columns: ['What', 'Kind', 'Status', 'Who'], rows };
     }
+    case 'proposed_budget':
+      // Always attached frozen, from the draft; a rebuild has no draft to read.
+      return { title: `Proposed budget, as of ${asOf}`, columns: ['Line', 'Amount'], rows: [['Open the Annual budget action for the draft', '']] };
   }
 }
