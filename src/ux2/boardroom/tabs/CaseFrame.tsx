@@ -96,7 +96,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
         </Inner>
       )}
       {c && c.source === 'runbook' && c.sourceId && (
-        <Inner className="text-xs text-ux2-muted">Opened by the {c.sourceId.startsWith('month-close:') ? 'Month close' : 'runbook'} runbook on {dayLabel(c.created.slice(0, 10))}. Steps the app can see (dues posted, books closed, packet sent) tick themselves; the rest are yours. The day it starts is under Funds › Settings › Billing rules.</Inner>
+        <Inner className="text-xs text-ux2-muted">Opened by the {sitName ?? 'runbook'} runbook on {dayLabel(c.created.slice(0, 10))}. Steps the app can see done tick themselves; the rest are yours.{c.sourceId.startsWith('month-close:') ? ' The day it starts is under Funds › Settings › Billing rules.' : ''}</Inner>
       )}
       {c && c.source === 'issue' && c.sourceId && (
         <Inner className="text-xs text-ux2-muted">Opened from request {c.sourceId}. The owner follows it on Community › Requests; the 14-day reply clock runs on the Inbox. <button type="button" className="text-ux2-teal hover:underline" onClick={() => onOpenCase(c.id)}>Refresh</button></Inner>

@@ -32,7 +32,7 @@ export interface ReportSnapshot {
   note?: string;
 }
 
-export type ReportKind = 'balance_sheet' | 'income_statement' | 'budget_vs_actual' | 'reserve_status' | 'delinquency' | 'dues_by_unit' | 'open_requests';
+export type ReportKind = 'balance_sheet' | 'income_statement' | 'budget_vs_actual' | 'reserve_status' | 'delinquency' | 'dues_by_unit' | 'open_requests' | 'proposed_budget';
 
 export interface AgendaAttachment {
   id: string;

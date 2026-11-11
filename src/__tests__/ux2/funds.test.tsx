@@ -146,10 +146,11 @@ describe('Funds', () => {
     expect(within(budget).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Budget line', 'Budget', 'Spent', 'Left', 'Used', 'Status', '']);
     expect(within(budget).getByText('Where the dues go')).toBeTruthy();
     expect(screen.queryByTestId('legacy-budget')).toBeNull();
-    fireEvent.click(tile(`${new Date().getFullYear() + 1} budget · decide`));
+    fireEvent.click(tile(`${new Date().getFullYear() + 1} budget`));
     const draft = document.querySelector('[aria-label="Next year draft"]') as HTMLElement;
-    expect(within(draft).getByRole('navigation', { name: 'Dues options' })).toBeTruthy();
-    expect(within(draft).getByText('Where it stands')).toBeTruthy();
+    // Before the runbook opens: a first look from this year, and a way to start it.
+    expect(within(draft).getByText('A first look, from this year')).toBeTruthy();
+    expect(within(draft).getByRole('button', { name: /^(Start it now|Open the budget)$/ })).toBeTruthy();
   });
 
   it('Online payments shows the collected, payouts and fees tiles, the payments table, the Stripe card and the setup runbook', () => {

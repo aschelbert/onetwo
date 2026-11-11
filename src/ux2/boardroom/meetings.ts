@@ -29,6 +29,7 @@ import { addDays } from '@/lib/billingCycle';
 import type { CaseTrackerCase } from '@/types/issues';
 import type { Meeting } from '@/store/useMeetingsStore';
 import { ISO_DATE, noticeSentFor, todayIso } from '../runbook/adapters';
+import { budgetForMeeting, MEETING_BUDGET_STEP } from './annualBudget';
 
 export const ANNUAL_MEETING_ID = 'annual-meeting';
 export const BOARD_MEETING_ID = 'board-meeting';
@@ -91,6 +92,8 @@ function meetingForAnnualCase(c: CaseTrackerCase, meetings: Meeting[]): Meeting 
 export function syncAnnualCase(c: CaseTrackerCase): void {
   if (c.status === 'closed' || !c.steps || c.source !== 'runbook' || !c.sourceId?.startsWith(`${ANNUAL_MEETING_ID}:`)) return;
   const m = meetingForAnnualCase(c, useMeetingsStore.getState().meetings);
+  // The budget step ticks once the board has adopted the budget this meeting presents.
+  if (budgetForMeeting(m?.date ?? c.dueDate ?? todayIso()).adoptedAt) tick(c, MEETING_BUDGET_STEP);
   if (!m) return;
   tick(c, /^set annual meeting date/i);
   if (noticeSentFor(m, useComplianceStore.getState().communications)) tick(c, /^send formal annual meeting notice/i);

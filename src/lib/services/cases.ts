@@ -25,6 +25,7 @@ export async function fetchCases(tenantId: string): Promise<CaseTrackerCase[] | 
       done: row.done,
       doneDate: row.done_date,
       userNotes: row.user_notes,
+      ...(Array.isArray(row.checks) && row.checks.length > 0 && { checks: row.checks as CaseStep['checks'] }),
     });
     stepsByCase.set(row.case_id, list);
   });
@@ -123,6 +124,7 @@ export async function createCase(tenantId: string, c: CaseTrackerCase, localId?:
       done: s.done,
       done_date: s.doneDate || null,
       user_notes: s.userNotes,
+      checks: checksForDb(s.checks),
       sort_order: i,
     }));
     await supabase.from('case_steps').insert(stepRows);
@@ -184,6 +186,24 @@ export async function updateCaseStep(caseId: string, localId: string, done: bool
     .eq('case_id', caseId)
     .eq('local_id', localId);
   if (error) { logDbError('updateCaseStep error:', error); return false; }
+  return true;
+}
+
+/** A step's checklist as it is kept: the items, their ticks and notes; a generated file's contents stay in the browser. */
+function checksForDb(checks: CaseStep['checks']) {
+  if (!checks || checks.length === 0) return null;
+  return checks.map(ck => (ck.attachment?.dataUrl ? { ...ck, attachment: { ...ck.attachment, dataUrl: undefined } } : ck));
+}
+
+/** Save a step's progress: done, and its checklist (ticks and notes). */
+export async function updateCaseStepProgress(caseId: string, localId: string, done: boolean, doneDate: string | null, checks: CaseStep['checks']): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from('case_steps')
+    .update({ done, done_date: doneDate, checks: checksForDb(checks) })
+    .eq('case_id', caseId)
+    .eq('local_id', localId);
+  if (error) { logDbError('updateCaseStepProgress error:', error); return false; }
   return true;
 }
 

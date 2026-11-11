@@ -40,6 +40,8 @@ function Progress({ d, className }: { d: DockedCase; className?: string }) {
   );
 }
 
+/** A short id (c8) names the action; a long generated one says nothing, so the title stands alone. */
+const tag = (d: DockedCase) => (d.c.id.length <= 8 ? `${d.c.id} · ` : '');
 const summary = (d: DockedCase) => `Step ${d.stepIdx + 1} of ${d.steps.length} · ${d.step.s}${d.checksTotal ? ` · ${d.checksDone} of ${d.checksTotal} checks` : ''}`;
 
 /** Checklist and other cases: the expanded content, shared by the desktop panel and the phone sheet. */
@@ -110,7 +112,7 @@ export default function CaseDock() {
             {open && <div className="px-5 pb-2 pt-4" id="case-dock-panel"><DockBody d={d} others={others} onGo={go} /></div>}
             <div className={cn('flex flex-wrap items-center gap-3 py-2.5 pl-4 pr-3', open && 'border-t border-white/[0.12]')}>
               <span className="inline-flex shrink-0 items-center rounded-full bg-ux2-cyan px-2.5 py-1.5 text-xs font-semibold text-ux2-navy">On an action</span>
-              <button type="button" onClick={back} className="min-w-0 flex-1 truncate text-left text-sm"><b className="font-semibold">{d.c.id} · {d.c.title}</b><span className="text-white/[0.72]"> · {summary(d)}</span></button>
+              <button type="button" onClick={back} className="min-w-0 flex-1 truncate text-left text-sm"><b className="font-semibold">{tag(d)}{d.c.title}</b><span className="text-white/[0.72]"> · {summary(d)}</span></button>
               <Progress d={d} />
               <button type="button" onClick={back} className="h-10 shrink-0 rounded-full bg-white px-4 text-[13px] font-semibold text-ux2-navy">Back to the step</button>
               <button type="button" aria-label={open ? 'Collapse the action dock' : 'Expand the action dock'} aria-expanded={open} aria-controls="case-dock-panel" onClick={() => setOpen(o => !o)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/30 hover:bg-white/10">
@@ -128,7 +130,7 @@ export default function CaseDock() {
       <div data-widget="case-dock-chip" className="ux2 fixed inset-x-0 bottom-[84px] z-40 px-4 min-[1080px]:hidden">
         <div className="flex items-center gap-2 rounded-[18px] bg-ux2-navy py-2 pl-3.5 pr-2 text-white shadow-[0_12px_28px_rgba(13,27,46,.22)]">
           <button type="button" aria-label={`${d.c.id}, ${summary(d)}. Open the action dock`} aria-expanded={open} onClick={() => setOpen(true)} className="flex min-h-[44px] min-w-0 flex-1 flex-col justify-center gap-1 text-left">
-            <span className="truncate text-[13px] font-semibold">{d.c.id} · Step {d.stepIdx + 1} · {d.step.s}</span>
+            <span className="truncate text-[13px] font-semibold">{tag(d)}Step {d.stepIdx + 1} · {d.step.s}</span>
             <span className="flex items-center gap-2"><Progress d={d} />{d.checksTotal > 0 && <span className="text-[11px] text-white/[0.72]">{d.checksDone} of {d.checksTotal} checks</span>}</span>
           </button>
           <button type="button" onClick={back} className="h-9 shrink-0 rounded-full bg-white px-3 text-xs font-semibold text-ux2-navy">Back</button>
@@ -141,7 +143,7 @@ export default function CaseDock() {
             <span aria-hidden="true" className="mx-auto h-1 w-10 rounded-full bg-ux2-line-strong" />
             <div className="flex items-start gap-2.5">
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-teal">On an action · {d.c.id}</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-teal">On an action{d.c.id.length <= 8 ? ` · ${d.c.id}` : ''}</div>
                 <div className="text-lg font-semibold leading-snug text-ux2-ink">{d.step.s}</div>
                 <div className="text-[13px] text-ux2-muted">{d.c.title} · Step {d.stepIdx + 1} of {d.steps.length}{d.step.t ? ` · ${d.step.t}` : ''}</div>
               </div>

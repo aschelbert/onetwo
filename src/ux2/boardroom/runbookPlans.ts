@@ -26,7 +26,7 @@ export interface PlanStep {
 export interface RunbookPlan {
   steps: PlanStep[];
   /** Where the steps come from. */
-  source: 'runbook' | 'workflow' | 'plan';
+  source: 'runbook' | 'workflow' | 'plan' | 'custom';
   /** The app starts it and ticks steps today. */
   live: boolean;
 }
@@ -36,15 +36,16 @@ type Own = [title: string, how?: string][];
 /** Runbooks with their own steps; a second entry means the app does that step. */
 const OWN: Record<string, Own> = {
   'annual-budget': [
-    ['Roll next year’s draft forward from this year’s actuals', 'Done as the action opens: the draft is copied from this year’s actuals'],
-    ['Pick the dues option and the reserve line'],
-    ['Put next year’s contracts and insurance into the lines'],
-    ['Board reviews the draft at a meeting'],
-    ['Board votes to adopt the budget'],
-    ['Set the new dues on the fee schedule and every unit'],
-    ['Tell owners: the adopted budget and the new dues', 'Ticks itself when a budget notice goes out to owners'],
-    ['Enter the adopted lines as next year’s budget'],
-    ['File the adopted budget with the minutes under Building › Documents'],
+    ['Start next year’s draft from this year’s numbers', 'Done as the action opens: every line with its spending so far, the contracts, the premiums, the reserve study and today’s dues'],
+    ['Check next year’s contracts and insurance'],
+    ['Set every line for next year'],
+    ['Set the reserve contribution and a cushion'],
+    ['Pick next year’s dues'],
+    ['Put the draft on a board meeting’s agenda'],
+    ['Board votes to adopt the budget', 'Ticks itself when the vote on the meeting’s agenda item passes'],
+    ['Tell owners: the adopted budget and the new dues', 'The notice is written from the budget; ticks itself when it is posted'],
+    ['Switch Funds to the new budget and dues', 'Done on the first day of the year: the lines, every unit’s dues, the reserve transfer'],
+    ['File the adopted budget under Building › Documents'],
   ],
   'resident-request': [
     ['Acknowledge the owner', 'Ticks itself when the request gets a reply or moves past Submitted'],
@@ -187,6 +188,7 @@ function situationSteps(sitId?: string): string[] {
 }
 
 export function runbookPlan(def: RunbookDef): RunbookPlan {
+  if (def.kind === 'custom') return { source: 'custom', live: false, steps: (def.stepTitles ?? []).map(title => ({ title, auto: false })) };
   const own = OWN[def.id];
   if (own) return { source: 'runbook', live: !!def.wired, steps: own.map(([title, how]) => ({ title, auto: !!how, how })) };
   const titles = situationSteps(def.sitId);
@@ -202,7 +204,7 @@ export function runbookPlan(def: RunbookDef): RunbookPlan {
 /** "3 of 5 automated" today, or the planned count for one that opens by hand. */
 export function automationLine(def: RunbookDef, plan: RunbookPlan = runbookPlan(def)): { auto: number; total: number; planned: boolean } {
   const auto = plan.steps.filter(s => s.auto).length;
-  if (plan.live) return { auto, total: plan.steps.length, planned: false };
+  if (plan.live || def.kind) return { auto, total: plan.steps.length, planned: false };
   const plannedCount = plan.steps.some(s => s.planned) ? plan.steps.filter(s => s.planned).length : Math.min(def.automated, plan.steps.length);
   return { auto: plannedCount, total: plan.steps.length, planned: true };
 }
