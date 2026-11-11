@@ -437,13 +437,13 @@ export function generateCards(input: CardInput, ctx: CardContext): CardSet {
       kind: 'delinquency',
       refId: dq.unitId,
       title: `${dq.unitLabel} · ${dq.daysPastDue} days past due`,
-      why: `$${dq.amount.toLocaleString()} outstanding · ${dq.caseId ? 'collections case open' : 'start collections'}`,
+      why: `$${dq.amount.toLocaleString()} outstanding · ${dq.caseId ? 'collections action open' : 'start collections'}`,
       status: dq.daysPastDue >= 90 ? 'overdue' : 'due',
       roles: ['BOARD_MEMBER', 'PROPERTY_MANAGER'],
       dimension: 'Oversight',
       points: 1,
       action: dq.caseId
-        ? { label: 'Open the case', path: `/issues?view=case:${encodeURIComponent(dq.caseId)}` }
+        ? { label: 'Open the action', path: `/issues?view=case:${encodeURIComponent(dq.caseId)}` }
         : { label: 'Start collections', path: `/funds?tab=units&unit=${encodeURIComponent(dq.unitId)}` },
       priority: dq.daysPastDue >= 90 ? 35 : 90 - dq.daysPastDue / 1000,
     });

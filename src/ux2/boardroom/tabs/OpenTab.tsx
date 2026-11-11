@@ -35,12 +35,12 @@ export default function OpenTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot;
   );
 
   return (
-    <Card aria-label="Open cases">
+    <Card aria-label="Open actions">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PillTabs
           size="filter"
           surface="white"
-          aria-label="Filter cases"
+          aria-label="Filter actions"
           value={filter}
           onChange={setFilter}
           tabs={[
@@ -50,15 +50,15 @@ export default function OpenTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot;
             { id: 'funds', label: 'Funds' }, { id: 'building', label: 'Building' }, { id: 'people', label: 'People' }, { id: 'board', label: 'Board' },
           ]}
         />
-        <SearchInput value={search} onChange={setSearch} placeholder="Search title, id, unit, owner, assignee" label="Search cases" className="w-[280px] max-w-full" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search title, id, unit, owner, assignee" label="Search actions" className="w-[280px] max-w-full" />
       </div>
       {list.length === 0 ? <p className="m-0 text-sm text-ux2-muted">Nothing here.</p> : (
         <Table>
-          <thead><tr><Th>Case</Th><Th>Where it is</Th><Th>Next</Th><Th>Driver</Th><Th>Due</Th><Th>Priority</Th></tr></thead>
+          <thead><tr><Th>Action</Th><Th>Where it is</Th><Th>Next</Th><Th>Driver</Th><Th>Due</Th><Th>Priority</Th></tr></thead>
           <tbody>{list.map(r => <Row key={r.c.id} r={r} />)}</tbody>
         </Table>
       )}
-      <Why>Same list as Daily Operations today, with "Where it is" and "Next" added so nobody has to open a case to know what it needs. Requests keep the 14-day clock, upvotes and convert-to-case.{sum.onHold.length ? ` ${sum.onHold.length} on hold, under Archive until resumed.` : ''}</Why>
+      <Why>Same list as Daily Operations today, with "Where it is" and "Next" added so nobody has to open an action to know what it needs. Requests keep the 14-day clock, upvotes and convert-to-action.{sum.onHold.length ? ` ${sum.onHold.length} on hold, under Archive until resumed.` : ''}</Why>
     </Card>
   );
 }

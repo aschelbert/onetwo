@@ -59,7 +59,7 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Chip tone={plan.live ? 'cyan' : 'ghost'}>{plan.live ? 'Starts itself' : 'Opens by hand today'}</Chip>
-              <Chip tone="ghost">{r.def.visibility === 'owners' ? 'Owners see its cases' : 'Board only · the unit sees its own view'}</Chip>
+              <Chip tone="ghost">{r.def.visibility === 'owners' ? 'Owners see its actions' : 'Board only · the unit sees its own view'}</Chip>
             </div>
             <h2 className="m-0 mt-1.5 text-2xl font-semibold text-white">{r.def.name}</h2>
             <div className="text-sm text-white/[0.78]">{plan.live ? 'Starts' : 'Meant to start'} {lower(r.trigger)}{r.def.id === MONTH_CLOSE_ID && r.on ? ` · next on ${dayLabel(nextMonthCloseStart(snap.today, snap.monthCloseStartDay ?? 1))}` : ''}</div>
@@ -74,7 +74,7 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
           <div className="flex flex-col gap-1 rounded-[14px] bg-white px-3.5 py-3"><span className="text-xs text-ux2-muted">By a person</span><span className="text-[15px] font-semibold text-ux2-ink">{plan.steps.filter(s => !s.auto).length} step{plan.steps.filter(s => !s.auto).length === 1 ? '' : 's'}</span><span className="text-xs text-ux2-muted">{open?.assignedTo || open?.assignedRole ? `Each arrives as a Home card for ${open.assignedTo || open.assignedRole}` : 'Each arrives as a Home card for whoever is assigned'}</span></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {open && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onOpenCase(open.id)}>Open the case</Button>}
+          {open && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onOpenCase(open.id)}>Open the action</Button>}
           {!open && r.def.sitId && r.def.catId && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })}>Take Action</Button>}
           {setting && <Button size="sm" variant="ghost" className="!border-white/30 !bg-white/10 !text-white" onClick={() => navigate(setting.path)}>{setting.label}</Button>}
         </div>
@@ -97,19 +97,19 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
                   <div className="text-sm font-semibold text-ux2-ink">{s.title}</div>
                   <div className="text-xs text-ux2-muted">{s.auto ? `The app does this · ${s.how ?? 'it ticks itself'}` : s.planned ? 'A person does this today · planned to be automated' : 'A person does this · it arrives as a Home card for whoever is assigned'}</div>
                 </div>
-                <span className="flex shrink-0 flex-wrap items-center gap-1.5">{done && <Chip tone="sage">Done on the open case</Chip>}<Chip tone={s.auto ? 'teal' : s.planned ? 'ghost' : 'navy'}>{s.auto ? 'Automated' : s.planned ? 'Planned' : 'Person'}</Chip></span>
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">{done && <Chip tone="sage">Done on the open action</Chip>}<Chip tone={s.auto ? 'teal' : s.planned ? 'ghost' : 'navy'}>{s.auto ? 'Automated' : s.planned ? 'Planned' : 'Person'}</Chip></span>
               </li>
             );
           })}
         </ol>
         <Why>{plan.live
-          ? 'Automated steps tick themselves when the app sees the work done in the place it happens (Funds, Contracts, Meetings...). A person can still tick any of them on the case.'
-          : `This runbook doesn't start itself yet: open a case by hand${r.def.sitId ? ' and these are its steps' : ''}. Its automated count is the plan for it.`}</Why>
+          ? 'Automated steps tick themselves when the app sees the work done in the place it happens (Funds, Contracts, Meetings...). A person can still tick any of them on the action.'
+          : `This runbook doesn't start itself yet: take action by hand${r.def.sitId ? ' and these are its steps' : ''}. Its automated count is the plan for it.`}</Why>
       </Card>
 
       {r.openCases.length > 0 && (
-        <Card aria-label="Open cases" className="gap-2">
-          <SectionLabel>Open cases · {r.openCases.length}</SectionLabel>
+        <Card aria-label="Open actions" className="gap-2">
+          <SectionLabel>Open actions · {r.openCases.length}</SectionLabel>
           {r.openCases.map(c => (
             <button key={c.id} type="button" onClick={() => onOpenCase(c.id)} className="flex items-center justify-between gap-3 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 text-left hover:border-ux2-line-strong">
               <Cell title={c.title} note={`${startedHow(c, r.trigger)} · step ${Math.min((c.steps?.filter(s => s.done).length ?? 0) + 1, c.steps?.length ?? 1)} of ${c.steps?.length ?? plan.steps.length}${c.assignedTo || c.assignedRole ? ` · ${c.assignedTo || c.assignedRole}` : ''}`} />
@@ -141,7 +141,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
     <Card aria-label="All runbooks" className="gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SectionLabel>All runbooks · {sum.total}</SectionLabel>
-        <span className="text-xs text-ux2-muted">{sum.wired} start themselves · {autoSteps} steps done by the app · {sum.withOpenCase.length} with a case open</span>
+        <span className="text-xs text-ux2-muted">{sum.wired} start themselves · {autoSteps} steps done by the app · {sum.withOpenCase.length} with an action open</span>
       </div>
       <Table minWidth={860}>
         <thead><tr><Th>Runbook</Th><Th>Starts when</Th><Th num>Steps</Th><Th>Automated</Th><Th>Now</Th><Th num>On</Th></tr></thead>
@@ -150,7 +150,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
             const line = plans.get(r.def.id)!;
             return (
               <tr key={r.def.id} data-runbook={r.def.id} onClick={() => open(r.def.id)} className={cn('cursor-pointer hover:bg-ux2-surface', r.on ? '' : 'opacity-70')}>
-                <Td><Cell title={<button type="button" onClick={e => { e.stopPropagation(); open(r.def.id); }} className="text-left font-semibold text-ux2-ink hover:underline">{r.def.name}</button>} note={r.def.visibility === 'owners' ? 'Owners see its cases' : 'Board only'} /></Td>
+                <Td><Cell title={<button type="button" onClick={e => { e.stopPropagation(); open(r.def.id); }} className="text-left font-semibold text-ux2-ink hover:underline">{r.def.name}</button>} note={r.def.visibility === 'owners' ? 'Owners see its actions' : 'Board only'} /></Td>
                 <Td className="text-ux2-muted">{r.trigger}{!r.def.wired && <span className="block text-[11px]">Opens by hand today</span>}</Td>
                 <Td num>{line.total}</Td>
                 <Td><Chip tone={line.planned ? 'ghost' : 'teal'}>{line.auto} of {line.total}{line.planned ? ' planned' : ''}</Chip></Td>
@@ -165,7 +165,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
           })}
         </tbody>
       </Table>
-      <Why>Click a runbook to see its steps and which ones the app does itself. Switching one off only stops its trigger; its steps stay for any case opened by hand.</Why>
+      <Why>Click a runbook to see its steps and which ones the app does itself. Switching one off only stops its trigger; its steps stay for any action opened by hand.</Why>
     </Card>
   );
 }

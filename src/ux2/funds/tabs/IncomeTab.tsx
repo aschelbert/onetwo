@@ -167,7 +167,7 @@ function UnitLedger({ snap, beh, panel, setPanel }: { snap: FundsSnapshot; beh: 
           <tbody>{rows.map(u => <UnitRow key={u.number} u={u} b={byNum.get(u.number)} onPanel={setPanel} onCase={() => navigate('/issues?view=new')} />)}</tbody>
         </Table>
       )}
-      <Why>The row menu offers Record a payment, Add a fee or special assessment, and Open a case. Outstanding {fmt(beh.reduce((t, b) => t + b.amount, 0))} is {beh.length ? beh.map(b => `${b.number} ${fmt(b.amount)}`).join(' + ') : 'nothing'}. Owners see only their own unit, in their own view.</Why>
+      <Why>The row menu offers Record a payment, Add a fee or special assessment, and Take Action. Outstanding {fmt(beh.reduce((t, b) => t + b.amount, 0))} is {beh.length ? beh.map(b => `${b.number} ${fmt(b.amount)}`).join(' + ') : 'nothing'}. Owners see only their own unit, in their own view.</Why>
     </Card>
   );
 }

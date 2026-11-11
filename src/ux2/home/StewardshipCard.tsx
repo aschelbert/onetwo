@@ -17,7 +17,7 @@ const RULES: Record<StewardshipGroup, Record<Dimension, string>> = {
   board: {
     Timeliness: 'Owner requests answered inside the 14-day window earn full credit; one left past it earns none.',
     Compliance: 'Filings on time earn full credit, half 1 to 7 days late, a quarter 8 to 30 days late. Duties count when they are marked done.',
-    Oversight: 'A case closed earns credit; a case past its target date loses it.',
+    Oversight: 'An action closed earns credit; an action past its target date loses it.',
     Reach: 'Board meetings you were on the attendance list for, in person, remote or by proxy.',
     Impact: 'Spending decisions you cast a vote on, of the ones the board decided.',
   },
@@ -31,7 +31,7 @@ const RULES: Record<StewardshipGroup, Record<Dimension, string>> = {
   building: {
     Timeliness: 'Owners on dues paid by the due date; the board on requests answered inside 14 days. Averaged over everyone.',
     Compliance: 'The board on filings and duties on time; owners on assessments and invoices paid by their date.',
-    Oversight: 'The board on cases closed and none past target; owners on what they acknowledged of what was offered.',
+    Oversight: 'The board on actions closed and none past target; owners on what they acknowledged of what was offered.',
     Reach: 'Meetings attended, in person, remote or by proxy, by everyone expected there.',
     Impact: 'The board on decisions voted; owners on ballots cast in elections they could vote in.',
   },

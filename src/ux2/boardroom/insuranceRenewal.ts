@@ -34,10 +34,10 @@ export function insuranceSteps(p: Pick<InsurancePolicy, 'type' | 'carrier' | 'ex
   const carrier = p.carrier ? ` from ${p.carrier}` : '';
   return [
     { s: `Ask for the ${p.type} renewal quote${carrier}`, ck: ['Current declarations page and loss runs sent to the broker', 'Coverage limits checked against the bylaws and any lender requirements'] },
-    { s: 'Get at least two competing quotes', ck: ['Same limits and deductibles on every quote', 'Quotes kept with the case'] },
-    { s: 'Board approves the premium', ck: ['Vote recorded in the minutes or on this case', 'Budget line checked; a spending request if it is over'] },
+    { s: 'Get at least two competing quotes', ck: ['Same limits and deductibles on every quote', 'Quotes kept with the action'] },
+    { s: 'Board approves the premium', ck: ['Vote recorded in the minutes or on this action', 'Budget line checked; a spending request if it is over'] },
     { s: `Bind the policy and record it on file: carrier, coverage, premium, new expiry (was ${p.expires})`, detail: 'Building › Overview › Insurance holds the policy list. This step ticks itself when the policy on file carries a later expiry.' },
-    { s: 'Upload the new certificate of insurance to the policy', detail: 'Owners and lenders ask for it; it lives on the policy under Building › Overview › Insurance. This step ticks itself when a certificate uploaded after this case opened is on the policy.' },
+    { s: 'Upload the new certificate of insurance to the policy', detail: 'Owners and lenders ask for it; it lives on the policy under Building › Overview › Insurance. This step ticks itself when a certificate uploaded after this action opened is on the policy.' },
   ];
 }
 

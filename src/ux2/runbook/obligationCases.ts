@@ -122,7 +122,7 @@ export function completeFromCase(c: CaseTrackerCase): void {
   const comp = useComplianceStore.getState();
   if (c.source === 'filing') {
     const f = comp.filings.find(x => x.id === c.sourceId);
-    if (f && f.status !== 'filed') comp.markFilingComplete(f.id, c.completedAt ?? new Date().toISOString().slice(0, 10), `Case ${c.id.slice(0, 8)}`);
+    if (f && f.status !== 'filed') comp.markFilingComplete(f.id, c.completedAt ?? new Date().toISOString().slice(0, 10), `Action ${c.id.slice(0, 8)}`);
   } else if (!comp.completions[c.sourceId]) {
     comp.setCompletion(c.sourceId, true);
   }

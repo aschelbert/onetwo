@@ -154,7 +154,7 @@ describe('Case dock', () => {
     const dock = document.querySelector('[data-widget="case-dock"]') as HTMLElement;
     expect(dock).toBeTruthy();
     expect(within(dock).getByText(new RegExp(`${c.id} · `))).toBeTruthy();
-    fireEvent.click(within(dock).getByRole('button', { name: 'Expand the case dock' }));
+    fireEvent.click(within(dock).getByRole('button', { name: 'Expand the action dock' }));
     const stepIdx = c.steps!.findIndex(s => !s.done);
     const step = c.steps![stepIdx];
     if (step.checks?.length) {
@@ -166,7 +166,7 @@ describe('Case dock', () => {
     } else {
       expect(within(dock).getByRole('button', { name: 'Mark step done' })).toBeTruthy();
     }
-    fireEvent.click(within(dock).getByRole('button', { name: 'Dismiss the case dock' }));
+    fireEvent.click(within(dock).getByRole('button', { name: 'Dismiss the action dock' }));
     expect(document.querySelector('[data-widget="case-dock"]')).toBeNull();
     expect(useCaseDockStore.getState().dismissed).toContain(c.id);
   });

@@ -16,7 +16,7 @@ import { dimensionLines, lowestDimension, recentReceipts, type MeSnapshot } from
 const HOW: Record<string, string> = {
   Timeliness: 'Dues paid by the due date and requests answered by their date. Full credit on time, half a week late, a quarter a month late.',
   Compliance: 'Filings and dated obligations met on time; invoices and assessments paid by their date.',
-  Oversight: 'Cases closed and none past their target; for board members, the board checklist.',
+  Oversight: 'Actions closed and none past their target; for board members, the board checklist.',
   Reach: 'Showing up: meetings attended, in person, remote or by proxy.',
   Impact: 'Ballots cast and board decisions voted on, of the ones you could.',
 };
@@ -178,7 +178,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
             {[
               ['Home cards', 'Approvals, replies, meeting and vote reminders', cards, (v: boolean) => setPref('cards', v)],
               ['Daily digest email, 7am', 'New posts, requests and what is due today', digest, (v: boolean) => { setPref('digest', v); updateProfile({ notifications: { ...user.notifications, email: v } }); }],
-              ['Weekly board digest, Monday', 'Cases, bills awaiting approval, obligations', weekly, (v: boolean) => setPref('weekly', v)],
+              ['Weekly board digest, Monday', 'Actions, bills awaiting approval, obligations', weekly, (v: boolean) => setPref('weekly', v)],
             ].map(([t, d, on, set]) => <Inner key={String(t)} className="flex items-center justify-between gap-3"><Cell title={String(t)} note={String(d)} /><Toggle on={on as boolean} onChange={set as (v: boolean) => void} label={String(t)} /></Inner>)}
           </Card>
           <Card aria-label="Units on this account" className="gap-2">

@@ -97,11 +97,11 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
           {status === 'on' && current && <Chip tone="sage" className="h-7 px-3">{current.label} connected</Chip>}
           {status === 'off' && s.mailLater && <Chip tone="ghost" className="h-7 px-3">Left for later</Chip>}
         </div>
-        {status === 'off' && <p className="m-0 text-[13px] text-ux2-muted">Open an account with a mail vendor in the association's name. Certified notices, demand letters and owner mailings then print, stamp and mail themselves, with tracking attached to the case. The vendor bills the building directly per letter; ONE two never holds a card for postage.</p>}
+        {status === 'off' && <p className="m-0 text-[13px] text-ux2-muted">Open an account with a mail vendor in the association's name. Certified notices, demand letters and owner mailings then print, stamp and mail themselves, with tracking attached to the action. The vendor bills the building directly per letter; ONE two never holds a card for postage.</p>}
 
         {status === 'on' && current && (
           <div role="status" className="flex flex-wrap items-center gap-3 rounded-[14px] bg-ux2-sage-tint px-4 py-3.5 text-sm text-ux2-sage">
-            <span className="min-w-[280px] flex-1 leading-relaxed"><b className="font-semibold">The building's {current.label} account is connected.</b> A letter sent from a case or the Board Room lands in that account{current.id === 'letterstream' ? ' and mails once it is paid for there, or at once from a prepaid balance.' : ' and mails from its prepaid balance.'}</span>
+            <span className="min-w-[280px] flex-1 leading-relaxed"><b className="font-semibold">The building's {current.label} account is connected.</b> A letter sent from an action or the Board Room lands in that account{current.id === 'letterstream' ? ' and mails once it is paid for there, or at once from a prepaid balance.' : ' and mails from its prepaid balance.'}</span>
             <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => window.open(current.portalUrl, '_blank', 'noopener')}>Open {current.label} <Ext /></Button>
           </div>
         )}
@@ -190,7 +190,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
             </div>
             <div className={CARD} aria-label="How letters go out">
               <span className={EYEBROW}>How letters go out</span>
-              {[['From a case', 'Issues › Send notice: pick a template, the recipient and certified or first-class; tracking attaches to the case.'], ['From the Board Room', 'Outbox: demand letters, meeting notices and owner mailings, with a printed copy for anyone without email.'], ['Paying for them', current.billing + '.']].map(([t, n]) => (
+              {[['From an action', 'Issues › Send notice: pick a template, the recipient and certified or first-class; tracking attaches to the action.'], ['From the Board Room', 'Outbox: demand letters, meeting notices and owner mailings, with a printed copy for anyone without email.'], ['Paying for them', current.billing + '.']].map(([t, n]) => (
                 <div key={t} className={ROW}><span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{t}</span><span className="text-xs text-ux2-muted">{n}</span></span></div>
               ))}
             </div>

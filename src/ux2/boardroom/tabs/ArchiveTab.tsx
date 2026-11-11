@@ -99,7 +99,7 @@ export default function ArchiveTab({ snap, onOpenCase }: { snap: BoardRoomSnapsh
           </Table>
         )}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Why>Showing {visible.length} of {list.length}, newest first. Open a row to read the full record: the thread, every letter and its proof of delivery, and the decision trail. Closed items cannot be edited; a mistake is corrected by opening a new case that references this one.</Why>
+          <Why>Showing {visible.length} of {list.length}, newest first. Open a row to read the full record: the thread, every letter and its proof of delivery, and the decision trail. Closed items cannot be edited; a mistake is corrected by opening a new action that references this one.</Why>
           {list.length > 10 && <Button size="sm" variant="ghost" onClick={() => setShowAll(v => !v)}>{showAll ? 'Show fewer' : `Show the other ${list.length - 10}`}</Button>}
         </div>
       </Card>
@@ -113,7 +113,7 @@ export default function ArchiveTab({ snap, onOpenCase }: { snap: BoardRoomSnapsh
         </Card>
         <Card aria-label="How long it stays">
           <SectionLabel>How long it stays</SectionLabel>
-          <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="7 years from the day it closed" note="Then it is deleted, unless a related case is open or counsel has placed a hold" /><Chip tone="cyan">Retention</Chip></Inner>
+          <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="7 years from the day it closed" note="Then it is deleted, unless a related action is open or counsel has placed a hold" /><Chip tone="cyan">Retention</Chip></Inner>
           <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="Minutes and adopted budgets stay for good" note="They are the building's permanent record and also live in Building › Documents" /><Chip tone="ghost">Permanent</Chip></Inner>
           <Why>Nothing is deleted without a notice on Home 30 days before. Owners never see the archive; they see their own closed requests in Community › Requests. Records: DC Code § 29-1101 et seq. · bylaws</Why>
         </Card>

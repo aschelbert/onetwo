@@ -264,7 +264,7 @@ export function CommModal({ caseId, store, onClose, catId, sitId, issueId }: Mod
         ) : !selectedTemplate ? (
           <>
             <div className="p-6 space-y-3">
-              <p className="text-sm text-ink-500">Select a template to compose a letter. Suggested templates for this case type appear first.</p>
+              <p className="text-sm text-ink-500">Select a template to compose a letter. Suggested templates for this type of action appear first.</p>
               {templates.length === 0 ? (
                 <p className="text-sm text-ink-400 text-center py-8">No templates available. Create templates in the Communications tab.</p>
               ) : (
@@ -387,7 +387,7 @@ export function DocModal({ caseId, store, stepIdx, onClose }: ModalProps & { cas
       <div className="bg-white rounded-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
           <h2 className="text-xl font-bold text-ink-900">Add Document</h2>
-          <p className="text-sm text-ink-500 mt-1">Attach a document to this case</p>
+          <p className="text-sm text-ink-500 mt-1">Attach a document to this action</p>
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -441,7 +441,7 @@ export function ApproachModal({ c, store, onClose }: ModalProps & { c: CaseTrack
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div className="bg-white rounded-xl max-w-md w-full p-6 text-center" onClick={e => e.stopPropagation()}>
-          <p className="text-ink-500 mb-4">All approaches are already active on this case.</p>
+          <p className="text-ink-500 mb-4">All approaches are already active on this action.</p>
           <button onClick={onClose} className="px-4 py-2 bg-ink-900 text-white rounded-lg font-medium">OK</button>
         </div>
       </div>
@@ -571,7 +571,7 @@ export function LinkLetterModal({ caseId, caseUnit, store, onClose }: ModalProps
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
           <h2 className="text-xl font-bold text-ink-900">Link Existing Letter</h2>
-          <p className="text-sm text-ink-500 mt-1">Select a letter to link to this case</p>
+          <p className="text-sm text-ink-500 mt-1">Select a letter to link to this action</p>
         </div>
         <div className="p-6">
           {available.length === 0 ? (
@@ -621,7 +621,7 @@ export function InvoiceCreateModal({ caseId, caseUnit, store, onClose }: ModalPr
       <div className="bg-white rounded-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
           <h2 className="text-xl font-bold text-ink-900">Create Invoice</h2>
-          <p className="text-sm text-ink-500 mt-1">Create and link a unit invoice to this case</p>
+          <p className="text-sm text-ink-500 mt-1">Create and link a unit invoice to this action</p>
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -647,7 +647,7 @@ export function InvoiceCreateModal({ caseId, caseUnit, store, onClose }: ModalPr
             <input value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Invoice description" />
           </div>
           <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
-            <p className="text-xs text-ink-600">This creates a unit invoice in Fiscal Lens and links it to case <strong>{caseId}</strong>.</p>
+            <p className="text-xs text-ink-600">This creates a unit invoice in Fiscal Lens and links it to action <strong>{caseId}</strong>.</p>
           </div>
         </div>
         <div className="border-t p-6 flex justify-end space-x-3">
@@ -683,7 +683,7 @@ export function LinkInvoiceModal({ caseId, caseUnit, store, onClose }: ModalProp
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="border-b p-6">
           <h2 className="text-xl font-bold text-ink-900">Link Existing Invoice</h2>
-          <p className="text-sm text-ink-500 mt-1">Select an invoice to link to this case</p>
+          <p className="text-sm text-ink-500 mt-1">Select an invoice to link to this action</p>
         </div>
         <div className="p-6">
           {available.length === 0 ? (
@@ -850,7 +850,7 @@ export function HoldCaseModal({ caseId, store, onClose }: ModalProps & { caseId:
   };
 
   return (
-    <Modal title="Put Case On Hold" subtitle="This case will be paused until resumed." onClose={onClose} onSave={handleSave} saveLabel="Put On Hold" saveColor="bg-amber-600 hover:bg-amber-700">
+    <Modal title="Put Action On Hold" subtitle="This action will be paused until resumed." onClose={onClose} onSave={handleSave} saveLabel="Put On Hold" saveColor="bg-amber-600 hover:bg-amber-700">
       <div className="space-y-3">
         <div>
           <label className="block text-sm font-medium text-ink-700 mb-1">Reason for hold *</label>
@@ -861,8 +861,8 @@ export function HoldCaseModal({ caseId, store, onClose }: ModalProps & { caseId:
   );
 }
 
-// ─── Close Case Modal ─────────────────────────────────────
-const CLOSE_REASONS = ['Resolved', 'Withdrawn by Owner', 'Duplicate Case', 'No Action Required', 'Referred to Legal', 'Other'];
+// ─── Close Action Modal ─────────────────────────────────────
+const CLOSE_REASONS = ['Resolved', 'Withdrawn by Owner', 'Duplicate Action', 'No Action Required', 'Referred to Legal', 'Other'];
 
 export function CloseCaseModal({ caseId, store, incompleteCount, totalCount, onClose }: ModalProps & { caseId: string; store: any; incompleteCount: number; totalCount: number }) {
   const [reason, setReason] = useState('Resolved');
@@ -875,7 +875,7 @@ export function CloseCaseModal({ caseId, store, incompleteCount, totalCount, onC
   };
 
   return (
-    <Modal title="Close Case" subtitle="This case will be marked as closed." onClose={onClose} onSave={handleSave} saveLabel="Close Case">
+    <Modal title="Close Action" subtitle="This action will be marked as closed." onClose={onClose} onSave={handleSave} saveLabel="Close Action">
       <div className="space-y-4">
         {incompleteCount > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -978,7 +978,7 @@ export function AddBidModal({ caseId, stepIdx, store, onClose }: ModalProps & { 
   );
 }
 
-// ─── Delete Case Modal ────────────────────────────────────
+// ─── Delete Action Modal ────────────────────────────────────
 export function DeleteCaseModal({ caseId, store, onClose, onDeleted }: ModalProps & { caseId: string; store: any; onDeleted: () => void }) {
   const [confirmText, setConfirmText] = useState('');
   const confirmed = confirmText === caseId;
@@ -991,7 +991,7 @@ export function DeleteCaseModal({ caseId, store, onClose, onDeleted }: ModalProp
   };
 
   return (
-    <Modal title="Delete Case" onClose={onClose} onSave={handleDelete} saveLabel="Delete Permanently" saveColor={confirmed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 opacity-50 cursor-not-allowed'}>
+    <Modal title="Delete Action" onClose={onClose} onSave={handleDelete} saveLabel="Delete Permanently" saveColor={confirmed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 opacity-50 cursor-not-allowed'}>
       <div className="space-y-4">
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
           <p className="text-sm font-medium text-red-800">This action cannot be undone. All attachments, notes, and progress will be permanently removed.</p>

@@ -39,7 +39,7 @@ export function vendors1099(taxYear: number): Vendor1099[] {
 export function form1099Steps(taxYear: number, list: Vendor1099[]): { s: string; detail?: string; ck?: string[] }[] {
   const total = list.reduce((t, v) => t + v.amount, 0);
   return [
-    { s: `Confirm the vendors paid ${fmt(FORM_1099_THRESHOLD)} or more in ${taxYear}: ${list.length} vendor${list.length === 1 ? '' : 's'}, ${fmt(total)}`, detail: `From the paid work orders: ${list.map(v => `${v.vendor} ${fmt(v.amount)}`).join(' · ')}. Corporations and payments by card are exempt; strike those. This step ticks itself when the case opens.` },
+    { s: `Confirm the vendors paid ${fmt(FORM_1099_THRESHOLD)} or more in ${taxYear}: ${list.length} vendor${list.length === 1 ? '' : 's'}, ${fmt(total)}`, detail: `From the paid work orders: ${list.map(v => `${v.vendor} ${fmt(v.amount)}`).join(' · ')}. Corporations and payments by card are exempt; strike those. This step ticks itself when the action opens.` },
     { s: 'Collect the W-9 from every vendor on the list', detail: 'Building › Contracts shows who has one on file; Mark received as they arrive. This step ticks itself when every vendor on the list has a W-9.' },
     { s: `File Form 1099-NEC with the IRS and send each vendor its copy by ${taxYear + 1}-01-31`, ck: ['Filed through the IRS IRIS portal or the accountant', 'Copy B to each vendor', 'DC copies where the vendor is in DC'] },
     { s: `Keep the filed forms and the W-9s with the ${taxYear} records`, ck: ['Filed 1099s under Building › Documents', 'W-9s in the vendor file'] },

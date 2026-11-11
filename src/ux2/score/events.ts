@@ -75,7 +75,7 @@ export function boardEvents(s: StoreSnapshot, who: { name: string; officerTitle?
 
   for (const c of s.cases) {
     if (c.status === 'closed' && inWindow(today, c.completedAt)) {
-      ev.push({ id: `case:${c.id}`, dimension: 'Oversight', date: c.completedAt!.slice(0, 10), label: c.title, earned: 1, available: 1, reason: 'Case closed' });
+      ev.push({ id: `case:${c.id}`, dimension: 'Oversight', date: c.completedAt!.slice(0, 10), label: c.title, earned: 1, available: 1, reason: 'Action closed' });
     } else if (c.status === 'open' && c.dueDate && ISO_DATE.test(c.dueDate) && daysBetween(today, c.dueDate) < 0) {
       ev.push({ id: `case:${c.id}`, dimension: 'Oversight', date: c.dueDate, label: c.title, earned: 0, available: 1, reason: `Past its ${c.dueDate} target` });
     }
