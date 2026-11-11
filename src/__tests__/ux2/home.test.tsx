@@ -9,7 +9,7 @@ vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', features: {} }),
 }));
 
-import HomePage from '@/ux2/home/HomePage';
+import HomePage, { unitBalanceState } from '@/ux2/home/HomePage';
 import CaseDock from '@/ux2/shell/CaseDock';
 import { dockFor, caseIdFromLocation, casePath, spotFromSearch, useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useLocation } from 'react-router-dom';
@@ -223,3 +223,23 @@ describe('Case dock', () => {
     expect(spotFromSearch('?view=case:c1')).toBeNull();
   });
 });
+
+describe('Unit balance state', () => {
+  const units = [{ number: '301', monthlyFee: 450, payments: [{ date: '2026-10-15', amount: 450 }] }];
+  const inv = (dueDate: string, amount = 450, paidAmount: number | null = null, status = 'sent') => ({ unitNumber: '301', amount, paidAmount, status, dueDate });
+  it('is paid up with nothing owed, and names the next dues date from the due day', () => {
+    expect(unitBalanceState(units, [], 0, '2026-11-11', 15)).toMatchObject({ state: 'paid', pastDue: 0, next: { date: '2026-11-15', amount: 450 } });
+    expect(unitBalanceState(units, [], 0, '2026-11-20', 15).next.date).toBe('2026-12-15');
+  });
+  it('is due when everything owed is on invoices not yet past their due date', () => {
+    expect(unitBalanceState(units, [inv('2026-11-15')], 450, '2026-11-11', 15)).toMatchObject({ state: 'due', pastDue: 0, next: { date: '2026-11-15', amount: 450 } });
+    // A part-paid invoice counts only what is left.
+    expect(unitBalanceState(units, [inv('2026-11-15', 450, 200)], 250, '2026-11-11', 15).state).toBe('due');
+  });
+  it('is behind when an invoice is past due, or the balance is more than the upcoming invoices explain', () => {
+    expect(unitBalanceState(units, [inv('2026-10-15', 450, null, 'overdue'), inv('2026-11-15')], 900, '2026-11-11', 15)).toMatchObject({ state: 'behind', pastDue: 450 });
+    expect(unitBalanceState(units, [inv('2026-11-15')], 950, '2026-11-11', 15)).toMatchObject({ state: 'behind', pastDue: 500 });
+    expect(unitBalanceState(units, [], 120, '2026-11-11', 15)).toMatchObject({ state: 'behind', pastDue: 120 });
+  });
+});
+
