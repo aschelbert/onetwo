@@ -46,11 +46,11 @@ describe('Board Room', () => {
     useRunbookSwitches.setState({ off: ['vendor-bids'] });
   });
 
-  it('renders Ops with a row per open case and the six sections', () => {
+  it('renders Current Actions with a row per open case and the six sections', () => {
     renderAt('/boardroom');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Board Room');
     const nav = screen.getByRole('navigation', { name: 'Board Room sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Ops', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom']);
     const open = useIssuesStore.getState().cases.filter(c => c.status === 'open').length;
     expect(document.querySelectorAll('tr[data-case]').length).toBe(open);
   });
@@ -63,7 +63,7 @@ describe('Board Room', () => {
     expect(document.querySelector('[data-page="ux2-boardroom-case"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-issues').getAttribute('data-embedded')).toBe('1');
     expect(screen.getByText(id)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'All cases' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Current Actions' }));
     expect(document.querySelector('[data-page="ux2-boardroom"]')).toBeTruthy();
   });
 
@@ -81,7 +81,7 @@ describe('Board Room', () => {
     const target = store.cases.find(c => c.status === 'open' && (c.steps ?? []).some(s => !s.done && (s.isSpendingDecision || s.requiresBids || s.requiresConflictCheck)));
     if (!target) return;
     renderAt(`/boardroom?view=case:${target.id}`);
-    expect(document.querySelector('[aria-label="Decisions on this case"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Decisions on this action"]')).toBeTruthy();
   });
 
   it('Inbox lists requests in the mock table with reply, acknowledges through the issues store, and shows the five-step runbook', () => {
@@ -132,7 +132,7 @@ describe('Board Room', () => {
     expect(detail.textContent).toContain('Opens by hand today');
     expect(detail.querySelectorAll('li[data-step]').length).toBeGreaterThan(3);
     expect(detail.querySelectorAll('li[data-step][data-auto="1"]').length).toBe(0);
-    const start = within(detail).queryByRole('button', { name: 'Open a case now' });
+    const start = within(detail).queryByRole('button', { name: 'Take Action' });
     if (start) {
       fireEvent.click(start);
       expect(screen.getByTestId('legacy-issues').textContent).toBe('enforcement/covenant-violations');
@@ -167,7 +167,7 @@ describe('Board Room', () => {
     renderAt('/boardroom?tab=intercom');
     const navs = screen.getAllByRole('navigation', { name: 'Board Room sections' });
     const last = navs[navs.length - 1];
-    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Ops', 'Inbox', 'Runbooks', 'Outbox']);
+    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Runbooks', 'Outbox']);
     expect(screen.getAllByTestId('legacy-intercom').length).toBe(1);
   });
 

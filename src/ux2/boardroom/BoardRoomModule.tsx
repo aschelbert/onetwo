@@ -1,7 +1,7 @@
 /**
  * Board Room — operations for the board, manager and staff (ux2.boardroom).
  *
- *  Ops       every open case with where it is, what it needs next and who drives it
+ *  Current Actions  every open case with where it is, what it needs next and who drives it
  *  Inbox     what owners asked for, the 14-day clock, acknowledge, reply, convert to case
  *  Runbooks  every runbook; one opens to its steps and which the app does
  *  Outbox    every letter and notice: drafts, sent, in transit, templates, delivery
@@ -95,16 +95,16 @@ export default function BoardRoomModule() {
   }
 
   const subtitle = {
-    open: 'Operations for the board, manager and staff: open cases, owner requests, the runbooks that run them, and the outbox. An owner sees only a case about their own unit.',
+    open: 'Operations for the board, manager and staff: current actions, owner requests, the runbooks that run them, and the outbox. An owner sees only an action about their own unit.',
     inbox: 'What owners have asked the board for, and the 14-day clock on each one. Owners see the status of their own request in Community › Requests.',
     runbooks: 'All 32 are on from day one. Month close starts itself on the building\'s day; the rest open by hand until their triggers are wired. Turn one off only if the building does not want it.',
     outbox: 'Every letter and notice the board sends, drafted from a template, delivered the way the bylaws require, and kept with proof of delivery.',
-    tasks: 'The team\'s board: what the manager, staff and officers are working on, dragged from to-do to done, each linked to the case, log entry or vendor behind it.',
+    tasks: 'The team\'s board: what the manager, staff and officers are working on, dragged from to-do to done, each linked to the action, log entry or vendor behind it.',
     intercom: 'The team\'s channels: the board, the manager and staff talking in one place, with a board-only channel. Owners never see it.',
   }[tab];
 
   const tabs = [
-    { id: 'open' as BoardRoomTab, label: 'Ops', badge: cases.open.length || undefined, badgeTone: cases.overdue.length ? 'red' as const : 'navy' as const },
+    { id: 'open' as BoardRoomTab, label: 'Current Actions', badge: cases.open.length || undefined, badgeTone: cases.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'inbox' as BoardRoomTab, label: 'Inbox', badge: inbox.open.length || undefined, badgeTone: inbox.overdue.length ? 'red' as const : 'amber' as const },
     { id: 'runbooks' as BoardRoomTab, label: 'Runbooks', badge: runbooks.withOpenCase.length ? `${runbooks.withOpenCase.length} open` : undefined, badgeTone: 'teal' as const },
     { id: 'outbox' as BoardRoomTab, label: 'Outbox', badge: outbox.drafts.length ? `${outbox.drafts.length} draft${outbox.drafts.length === 1 ? '' : 's'}` : undefined, badgeTone: 'cyan' as const },
@@ -123,7 +123,7 @@ export default function BoardRoomModule() {
           subtitle={subtitle}
           status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
           tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
-          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
+          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>Take Action</Button>}
         />
 
         {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
@@ -133,7 +133,7 @@ export default function BoardRoomModule() {
         {tab === 'tasks' && pmSeat && (
           <Card aria-label="Tasks">
             <SectionLabel>Tasks · {openTasks} open</SectionLabel>
-            <Inner className="text-xs text-ux2-muted">Property log findings become tasks here; a task can link to a case, a vendor or a log entry. Part of the Property Manager Seat.</Inner>
+            <Inner className="text-xs text-ux2-muted">Property log findings become tasks here; a task can link to an action, a vendor or a log entry. Part of the Property Manager Seat.</Inner>
             <div className="ux2-legacy"><TaskTrackingTab /></div>
           </Card>
         )}

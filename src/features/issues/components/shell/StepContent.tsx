@@ -409,7 +409,7 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             {stepIndex < totalSteps - 1
               ? `↓ Click step ${stepIndex + 2} in the sidebar to continue`
               : allDone
-              ? '✓ All steps complete — close the case via the ⋮ menu'
+              ? '✓ All steps complete — close the action via the ⋮ menu'
               : 'Complete remaining steps to finish this workflow'}
           </p>
         </div>

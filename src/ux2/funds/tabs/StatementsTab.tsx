@@ -295,7 +295,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
             <KV label="Reviews">1120-H, {localForm}, year end</KV>
           </Inner>
           <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => navigate('/admin/users')}>Manage access</Button><Button size="sm" variant="ghost" onClick={() => download(`${building.name.replace(/\s+/g, '-')}-ledger-${snap.today}.csv`, ['date,id,memo,debit,credit,amount,source', ...ledger.map(e => [e.date, e.id, e.memo, `${e.debitAcct} ${getAcctName(e.debitAcct)}`, `${e.creditAcct} ${getAcctName(e.creditAcct)}`, e.amount, e.source].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n'), 'text/csv')}>Export the ledger</Button></div>
-          <Why>Counsel has no Funds access; they see collections cases in the Board Room only.</Why>
+          <Why>Counsel has no Funds access; they see collections actions in the Board Room only.</Why>
         </Card>
       </div>
     </div>

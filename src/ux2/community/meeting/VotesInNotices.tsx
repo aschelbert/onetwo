@@ -29,7 +29,7 @@ export function BoardDecisionsCard({ snap }: { snap: CommunitySnapshot }) {
         <Inner className="flex flex-col py-1">
           {decided.slice(0, 8).map(d => (
             <div key={d.id} className="flex items-center justify-between gap-3 border-t border-ux2-line/60 py-2 first:border-t-0">
-              <Cell title={d.title} note={<>{d.date ? dayLabel(d.date) : ''}{d.source === 'meeting' && d.meetingId ? <> · <button type="button" onClick={() => navigate(`/community?tab=meetings&meeting=${encodeURIComponent(d.meetingId!)}`)} className="font-semibold text-ux2-teal hover:underline">the meeting</button></> : d.source === 'spending' ? ' · spending approval' : ' · on its case'} · {d.yes} for, {d.no} against{d.abstain ? `, ${d.abstain} abstaining` : ''}</>} />
+              <Cell title={d.title} note={<>{d.date ? dayLabel(d.date) : ''}{d.source === 'meeting' && d.meetingId ? <> · <button type="button" onClick={() => navigate(`/community?tab=meetings&meeting=${encodeURIComponent(d.meetingId!)}`)} className="font-semibold text-ux2-teal hover:underline">the meeting</button></> : d.source === 'spending' ? ' · spending approval' : ' · on its action'} · {d.yes} for, {d.no} against{d.abstain ? `, ${d.abstain} abstaining` : ''}</>} />
               <Chip tone={d.passed ? 'sage' : 'red'}>{d.passed ? 'Passed' : 'Failed'}</Chip>
             </div>
           ))}

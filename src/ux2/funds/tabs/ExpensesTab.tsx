@@ -116,7 +116,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
                   <Td className="whitespace-nowrap text-ux2-muted">{w.status === 'invoiced' && w.invoiceDate ? dayLabel(plusDays(w.invoiceDate, 30)) : '–'}</Td>
                   <Td>{woStatus(w, isFlag)}</Td>
                   <Td num>{actionFor(w)}</Td>
-                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the case', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
+                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
                 </tr>
               );
             })}
@@ -185,7 +185,7 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
         {header}
         <div className="flex flex-col items-center gap-2 rounded-[14px] border border-ux2-line bg-white px-4 py-8 text-center">
           <div className="text-lg font-medium text-ux2-ink">Deck is clear</div>
-          <p className="m-0 max-w-[520px] text-[13px] text-ux2-muted">{decided ? `${decided} request${decided === 1 ? '' : 's'} decided. Each decision is in the case's decision trail and the requester has a card.` : 'Nothing is waiting on a decision.'} The next request opens here when it arrives.</p>
+          <p className="m-0 max-w-[520px] text-[13px] text-ux2-muted">{decided ? `${decided} request${decided === 1 ? '' : 's'} decided. Each decision is in the action's decision trail and the requester has a card.` : 'Nothing is waiting on a decision.'} The next request opens here when it arrives.</p>
           <Button size="sm" variant="ghost" onClick={() => navigate('/issues')}>Review them again</Button>
         </div>
       </Card>
@@ -222,7 +222,7 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
             <Button size="sm" onClick={() => decide('approved')}>Approve and next</Button>
             <Button size="sm" variant="ghost" onClick={() => decide('denied')}>Deny and next</Button>
             <Button size="sm" variant="ghost" onClick={next}>Skip for now</Button>
-            <Button size="sm" variant="ghost" onClick={() => navigate(a.caseId ? `/issues?view=case:${a.caseId}` : '/issues?view=new')}>Open the case</Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate(a.caseId ? `/issues?view=case:${a.caseId}` : '/issues?view=new')}>Open the action</Button>
           </div>
           <Why>{overLimit ? `Votes so far: ${approves.length ? approves.join(', ') + ' approve.' : 'none.'} ${approves.length < boardSize ? `Waiting on ${boardSize - approves.length} more.` : ''}` : overLine ? 'Needs: Treasurer plus one officer.' : 'No vote needed. Approve, deny, or ask for a second bid.'}</Why>
         </Inner>
@@ -284,7 +284,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
                 <Td className="whitespace-nowrap text-ux2-muted">{dayLabel(w.createdDate)}</Td>
                 <Td>{woStatus(w, flagged.has(w.id))}</Td>
                 <Td num>{w.status === 'draft' ? <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button> : w.status === 'approved' ? <Button size="sm" variant="ghost" onClick={() => setReceive(w.id)}>Receive invoice</Button> : w.status === 'invoiced' ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : null}</Td>
-                <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the case', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), { label: 'Show in Bills', onSelect: () => onSection('bills') }, { label: 'The vendor · Building › Contracts', onSelect: () => navigate('/building?tab=contracts') }]} /></Td>
+                <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), { label: 'Show in Bills', onSelect: () => onSection('bills') }, { label: 'The vendor · Building › Contracts', onSelect: () => navigate('/building?tab=contracts') }]} /></Td>
               </tr>
             ))}
           </tbody>
@@ -292,7 +292,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
       )}
       <div className="flex flex-wrap items-start gap-3">
         {rows.length > 8 && <button type="button" onClick={() => setAll(v => !v)} className="shrink-0"><Chip tone="ghost">{all ? 'Show fewer' : `${rows.length - 8} more ${filter === 'open' ? 'open' : ''}`}</Chip></button>}
-        <Why>A work order is created from a case, a runbook step or by hand. Vendors are managed under Building › Contracts; each order links to its vendor.</Why>
+        <Why>A work order is created from an action, a runbook step or by hand. Vendors are managed under Building › Contracts; each order links to its vendor.</Why>
       </div>
       <Inner className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[13px]"><b className="font-semibold text-ux2-ink">Vendors and contracts</b> <span className="text-ux2-muted">· {vendors} active · managed under Building › Contracts · bills here link to each vendor</span></span>
@@ -372,7 +372,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
             </div>
           </>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">Create a work order</b> · from a case or by hand</span><Chip tone="ghost">{paidThisMonth} paid in {new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'short' })}</Chip></>,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">Create a work order</b> · from an action or by hand</span><Chip tone="ghost">{paidThisMonth} paid in {new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'short' })}</Chip></>,
       },
       detail: <WorkOrdersCard snap={snap} onSection={onSection} />,
     },

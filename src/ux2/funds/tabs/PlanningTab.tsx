@@ -162,7 +162,7 @@ function NextYearCard({ snap }: { snap: FundsSnapshot }) {
         <span className="font-semibold text-ux2-muted">Done for you</span>
         {[`Rolled forward from ${year} actuals`, 'Dues from the fee schedule', res.next ? `${res.next.name} gap from the funding model` : 'Reserve gap from the funding model', 'Vote counts and dates live', 'Sent to owners 30 days before FY'].map(t => <Chip key={t} tone="ghost">{t}</Chip>)}
       </div>
-      <Why>Yours to decide: the dues option{lines[0] ? ` and the ${lines[0].name.toLowerCase()} line` : ''}. Picking a dues pill rewrites the reserve line and the plan above; the choice is recorded in the case and the minutes. Next year the draft appears again with {draft.year} actuals, without anyone setting it up.</Why>
+      <Why>Yours to decide: the dues option{lines[0] ? ` and the ${lines[0].name.toLowerCase()} line` : ''}. Picking a dues pill rewrites the reserve line and the plan above; the choice is recorded in the action and the minutes. Next year the draft appears again with {draft.year} actuals, without anyone setting it up.</Why>
     </Card>
   );
 }
@@ -268,7 +268,7 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
         <Inner className="flex flex-wrap items-end justify-between gap-3" aria-label="Reserve study">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-ux2-ink">Reserve study · {studyLast ? `last ${dayLabel(studyLast)}, next due ${dayLabel(studyNext!)}` : 'none on record'}</div>
-            <p className="m-0 text-xs text-ux2-muted">The Reserve study update runbook opens its case 90 days before the next one is due{reserveStudyDate ? '' : studyLast ? ', reading the date from the newest reserve study file under Building › Documents until one is set here' : ', or at once while none is on record'}. Enter the study's date when a new one arrives.</p>
+            <p className="m-0 text-xs text-ux2-muted">The Reserve study update runbook opens its action 90 days before the next one is due{reserveStudyDate ? '' : studyLast ? ', reading the date from the newest reserve study file under Building › Documents until one is set here' : ', or at once while none is on record'}. Enter the study's date when a new one arrives.</p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Field label="Last study" className="w-[150px]"><input type="date" aria-label="Last reserve study" value={studyDate} onChange={e => setStudyDate(e.target.value)} className={INPUT} /></Field>

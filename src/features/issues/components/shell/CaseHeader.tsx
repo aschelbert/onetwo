@@ -70,16 +70,16 @@ function ThreeDotMenu({ c, onAddApproach, onClose, onReopen, onDelete }: {
           </button>
           {c.status !== 'closed' ? (
             <button onClick={() => { onClose(); setOpen(false); }} className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
-              ✓ Close Case
+              ✓ Close Action
             </button>
           ) : (
             <button onClick={() => { onReopen(); setOpen(false); }} className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-ink-700 hover:bg-ink-50">
-              ↺ Reopen Case
+              ↺ Reopen Action
             </button>
           )}
           <div className="border-t border-ink-100" />
           <button onClick={() => { onDelete(); setOpen(false); }} className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-red-500 hover:bg-red-50">
-            🗑 Delete Case
+            🗑 Delete Action
           </button>
         </div>
       )}

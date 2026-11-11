@@ -156,9 +156,9 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
   const allCats = [...new Set(open.map(c => c.catId))];
 
   const TABS: { id: CaseTab; label: string; badge?: number }[] = [
-    { id: 'open', label: 'Open Cases', badge: open.length || undefined },
+    { id: 'open', label: 'Current Actions', badge: open.length || undefined },
     { id: 'issues', label: 'Request Inbox', badge: issues.filter(i => i.status === 'SUBMITTED').length || undefined },
-    { id: 'archive', label: 'Case Archive', badge: closed.length || undefined },
+    { id: 'archive', label: 'Action Archive', badge: closed.length || undefined },
   ];
 
   return (
@@ -168,16 +168,16 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
       <div className="bg-gradient-to-r from-ink-900 via-ink-800 to-accent-800 rounded-t-xl p-8 text-white shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h2 className="font-display text-2xl font-bold">{isBoard ? '⚙️ Daily Operations' : 'Issues & Cases'}</h2>
-            <p className="text-accent-200 text-sm mt-1">Case tracking and issue management</p>
+            <h2 className="font-display text-2xl font-bold">{isBoard ? '⚙️ Daily Operations' : 'Issues & Actions'}</h2>
+            <p className="text-accent-200 text-sm mt-1">Action tracking and issue management</p>
           </div>
           <div className="flex items-center gap-4">
-            {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-white text-ink-900 rounded-lg text-sm font-medium hover:bg-accent-100">＋ New Case</button>}
+            {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-white text-ink-900 rounded-lg text-sm font-medium hover:bg-accent-100">＋ Take Action</button>}
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           {[
-            { val: open.length, label: 'Open Cases', icon: '📂' },
+            { val: open.length, label: 'Current Actions', icon: '📂' },
             { val: urgent.length, label: 'Urgent', icon: '🔴' },
             { val: high.length, label: 'High Priority', icon: '🟠' },
             { val: closed.length, label: 'Closed', icon: '✅' },
@@ -215,7 +215,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
               </button>
             ))}
           </div>
-          {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 shrink-0">+ New Case</button>}
+          {isBoard && <button onClick={() => onNav('new')} className="px-4 py-2 bg-ink-900 text-white rounded-lg text-sm font-medium hover:bg-ink-800 shrink-0">+ Take Action</button>}
         </div>
       )}
 
@@ -242,11 +242,11 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                   return linkedCase
                     ? <button onClick={(e) => { e.stopPropagation(); onNav(`case:${linkedCase.id}`); }}
                         className="px-2 py-1 text-[10px] font-semibold bg-sage-600 text-white rounded hover:bg-sage-700 shrink-0 ml-2">
-                        View Case →
+                        View Action →
                       </button>
                     : <button onClick={() => { handleConvertToCase(i); }}
                         className="px-2 py-1 text-[10px] font-semibold bg-accent-600 text-white rounded hover:bg-accent-700 shrink-0 ml-2">
-                        → Convert to Case
+                        → Convert to Action
                       </button>;
                 })()}
               </div>
@@ -281,7 +281,7 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
           )}
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <input type="text" placeholder="Search cases..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            <input type="text" placeholder="Search actions..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
             <select value={prioFilter} onChange={e => setPrioFilter(e.target.value)} className="px-3 py-2 border border-ink-200 rounded-lg text-sm">
               <option value="all">All Priorities</option>
               <option value="urgent">Urgent</option>
@@ -296,9 +296,9 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
               </select>
             )}
           </div>
-          <p className="text-xs text-ink-400">{filteredOpen.length} case{filteredOpen.length !== 1 ? 's' : ''}{(search || prioFilter !== 'all' || catFilter !== 'all') ? ' (filtered)' : ''}</p>
+          <p className="text-xs text-ink-400">{filteredOpen.length} action{filteredOpen.length !== 1 ? 's' : ''}{(search || prioFilter !== 'all' || catFilter !== 'all') ? ' (filtered)' : ''}</p>
           {filteredOpen.length === 0 ? (
-            <p className="text-sm text-ink-400 py-8 text-center">No open cases match your filters.</p>
+            <p className="text-sm text-ink-400 py-8 text-center">No open actions match your filters.</p>
           ) : (
             <div className="divide-y divide-ink-50">
               {filteredOpen.map(c => {
@@ -403,11 +403,11 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
                       return linkedCase
                         ? <button onClick={(e) => { e.stopPropagation(); onNav(`case:${linkedCase.id}`); }}
                             className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-sage-600 text-white hover:bg-sage-700 ml-1">
-                            View Case →
+                            View Action →
                           </button>
                         : <button onClick={(e) => { e.stopPropagation(); handleConvertToCase(i); }}
                             className="px-2.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white hover:bg-accent-700 ml-1">
-                            → Convert to Case
+                            → Convert to Action
                           </button>;
                     })()}
                   </div>
@@ -441,11 +441,11 @@ function CaseOpsTabs({ open, closed, urgent, high, issues, isBoard, user, onNav,
         {/* ─── CASE ARCHIVE ─── */}
         {tab === 'archive' && (<div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <input type="text" placeholder="Search closed cases..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+            <input type="text" placeholder="Search closed actions..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
           </div>
-          <p className="text-xs text-ink-400">{filteredClosed.length} closed case{filteredClosed.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-ink-400">{filteredClosed.length} closed action{filteredClosed.length !== 1 ? 's' : ''}</p>
           {filteredClosed.length === 0 ? (
-            <p className="text-sm text-ink-400 py-8 text-center">No closed cases.</p>
+            <p className="text-sm text-ink-400 py-8 text-center">No closed actions.</p>
           ) : (
             <div className="divide-y divide-ink-50">
               {filteredClosed.map(c => {
@@ -583,7 +583,7 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
   return (
     <div className="space-y-5">
       <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Back to Dashboard</button>
-      <h2 className="text-2xl font-bold text-ink-900">New Case</h2>
+      <h2 className="text-2xl font-bold text-ink-900">Take Action</h2>
       {prefill?.sourceId && (
         <div className="inline-flex items-center gap-2 bg-accent-50 border border-accent-200 rounded-lg px-3 py-1.5">
           <span className="text-xs font-semibold text-accent-700">From {prefill.source === 'issue' ? `Request #${prefill.sourceId}` : `#${prefill.sourceId}`}</span>
@@ -719,9 +719,9 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
       {step === 3 && (
         <div className="space-y-4">
           <button onClick={() => setStep(2)} className="text-xs text-ink-400 hover:text-ink-600">← Back</button>
-          <h3 className="text-lg font-semibold text-ink-800">3. Case details</h3>
+          <h3 className="text-lg font-semibold text-ink-800">3. Action details</h3>
           <div>
-            <label className="block text-sm font-medium text-ink-700 mb-1">Case Title *</label>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Action Title *</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder={`e.g., Unit 502 — ${isCustom ? customSitName || 'Custom situation' : selSit?.title || 'Issue description'}`} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -792,7 +792,7 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
                 <span className="text-base">🎯</span>
                 <div>
                   <p className="text-xs font-semibold text-accent-800">DACI Auto-Assignment</p>
-                  <p className="text-[11px] text-accent-600">Suggested <strong>{assignedTo}</strong> ({DACI_MATRIX[catId].driver}) as Driver for {selCat?.label || catId} cases</p>
+                  <p className="text-[11px] text-accent-600">Suggested <strong>{assignedTo}</strong> ({DACI_MATRIX[catId].driver}) as Driver for {selCat?.label || catId} actions</p>
                 </div>
               </div>
             )}
@@ -821,7 +821,7 @@ function WizardView({ onDone, onBack, prefill }: { onDone: (id: string) => void;
           </div>
           <div className="flex justify-between">
             <button onClick={() => setStep(2)} className="px-6 py-2.5 rounded-lg text-sm font-semibold border border-ink-200 text-ink-600 hover:bg-ink-50">← Back</button>
-            <button onClick={handleCreate} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${title.trim() ? 'bg-accent-500 text-white hover:bg-accent-600' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Create Case ✓</button>
+            <button onClick={handleCreate} className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${title.trim() ? 'bg-accent-500 text-white hover:bg-accent-600' : 'bg-ink-100 text-ink-300 cursor-not-allowed'}`}>Create Action ✓</button>
           </div>
         </div>
       )}
@@ -1051,7 +1051,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
             recipientName: c.owner || undefined,
             caseId: c.id,
             stepIdx,
-            caseLink: `Case ${c.id} · Step ${stepIdx + 1}`,
+            caseLink: `Action ${c.id} · Step ${stepIdx + 1}`,
             source: 'case-workflow',
           });
           setShowComposePanel(true);
@@ -1084,7 +1084,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId]);
 
-  if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Case not found.</p></div>;
+  if (!c) return <div><button onClick={onBack} className="text-xs text-ink-400">← Back</button><p className="text-ink-400 mt-4">Action not found.</p></div>;
 
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
@@ -1186,7 +1186,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           recipientUnit: c.unit || undefined,
           recipientName: c.owner || undefined,
           caseId: c.id,
-          caseLink: `Case ${c.id}`,
+          caseLink: `Action ${c.id}`,
           source: 'case-workflow',
         });
         setShowComposePanel(true);
@@ -1251,7 +1251,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
       <div className="flex items-center gap-2 px-4 py-2 border-b border-ink-100 bg-white">
         <button onClick={onBack} className="text-xs text-ink-400 hover:text-ink-600">← Dashboard</button>
         <span className="text-ink-300 text-xs">·</span>
-        <button onClick={() => onNav('cases')} className="text-xs text-ink-400 hover:text-ink-600">All Cases</button>
+        <button onClick={() => onNav('cases')} className="text-xs text-ink-400 hover:text-ink-600">All Actions</button>
         <span className="text-ink-300 text-xs">·</span>
         <span className="text-xs text-ink-500 font-medium truncate">{c.title}</span>
       </div>
@@ -1302,7 +1302,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
           </div>
         </div>
       ) : (
-        <div className="p-8 text-center text-ink-400">No workflow steps for this case.</div>
+        <div className="p-8 text-center text-ink-400">No workflow steps for this action.</div>
       )}
 
       {/* Modals */}
@@ -1389,7 +1389,7 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
               </select>
             </div>
             <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
-              <p className="text-xs text-ink-600">This creates a work order in Fiscal Lens and links it to case <strong>{caseId}</strong>. The WO will appear in AP/Work Orders for approval and payment.</p>
+              <p className="text-xs text-ink-600">This creates a work order in Fiscal Lens and links it to action <strong>{caseId}</strong>. The WO will appear in AP/Work Orders for approval and payment.</p>
             </div>
           </div>
         </Modal>

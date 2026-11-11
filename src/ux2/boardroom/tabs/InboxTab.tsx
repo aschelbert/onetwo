@@ -18,7 +18,7 @@ function stepLabel(r: InboxRow): { step: string; note: string } {
 const STEPS = [
   ['1 · Intake', 'The owner writes it in Community; it lands here with the unit attached.', 'done'],
   ['2 · Acknowledge', 'Within 48 hours. A receipt goes back to the owner and the 14-day clock starts.', 'done'],
-  ['3 · Assign', 'Pick a board member, the porter or a vendor. Becomes a case if it needs money or a vote.', 'now'],
+  ['3 · Assign', 'Pick a board member, the porter or a vendor. Becomes an action if it needs money or a vote.', 'now'],
   ['4 · Resolve', 'Do the work, then reply with the outcome before the clock runs out.', ''],
   ['5 · Close', 'The owner confirms or 7 days pass. The thread goes to Archive.', ''],
 ] as const;
@@ -58,14 +58,14 @@ function AssignForm({ r, onDone }: { r: InboxRow; onDone: (caseId: string) => vo
       onSubmit={e => { e.preventDefault(); const id = createCase({ catId: 'governance', sitId: 'board-action-item', approach: 'self', title: r.issue.title, unit: r.issue.unitNumber ?? '', owner: r.issue.reporterName, priority: 'medium', notes: r.issue.description, assignedTo: who || undefined, dueDate: r.replyDue, source: 'issue', sourceId: r.issue.id }); if (r.state === 'new') setStatus(r.issue.id, 'IN_PROGRESS'); onDone(id); }}
       className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
     >
-      <div className="w-full text-sm font-semibold text-ux2-ink">Assign · becomes a case on the resident-request runbook, due {dayLabel(r.replyDue)}</div>
+      <div className="w-full text-sm font-semibold text-ux2-ink">Assign · becomes an action on the resident-request runbook, due {dayLabel(r.replyDue)}</div>
       <label className="flex min-w-[220px] flex-col gap-1 text-xs font-semibold text-ux2-muted">Driver
         <select value={who} onChange={e => setWho(e.target.value)} className="h-10 rounded-full border border-ux2-line-strong bg-white px-3.5 text-sm font-normal text-ux2-ink">
           {board.map(b => <option key={b.name} value={b.name}>{b.name} · {b.role}</option>)}
           <option value="Porter">Porter</option><option value="Vendor">A vendor</option>
         </select>
       </label>
-      <Button type="submit" size="sm">Assign and open the case</Button>
+      <Button type="submit" size="sm">Assign and open the action</Button>
     </form>
   );
 }
@@ -105,7 +105,7 @@ export default function InboxTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot
                     </>
                   ) : (
                     <>
-                      {r.linkedCase ? <Button size="sm" variant="ghost" onClick={() => onOpenCase(r.linkedCase!.id)}>Open the case</Button> : <Button size="sm" variant="ghost" onClick={() => assign(r)}>Assign</Button>}
+                      {r.linkedCase ? <Button size="sm" variant="ghost" onClick={() => onOpenCase(r.linkedCase!.id)}>Open the action</Button> : <Button size="sm" variant="ghost" onClick={() => assign(r)}>Assign</Button>}
                       <Button size="sm" onClick={() => setReplying(replying === r.issue.id ? null : r.issue.id)}>Reply</Button>
                     </>
                   )}
@@ -146,7 +146,7 @@ export default function InboxTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot
             </tbody>
           </Table>
         )}
-        <Why>Open a row to see the owner's message, attachments, the reply thread, upvotes from other owners, and "convert to case" when the request needs a vendor or a vote. Closed requests move to Archive after their last reply.</Why>
+        <Why>Open a row to see the owner's message, attachments, the reply thread, upvotes from other owners, and "convert to action" when the request needs a vendor or a vote. Closed requests move to Archive after their last reply.</Why>
       </Card>
 
       <Card aria-label="Request runbook" className="gap-3">
