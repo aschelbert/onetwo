@@ -32,6 +32,7 @@ import { meetingRows, meetingsSummary, noticesSummary, requestRows, requestsSumm
 import OverviewTab from './tabs/OverviewTab';
 import NoticesTab from './tabs/NoticesTab';
 import MeetingsTab from './tabs/MeetingsTab';
+import VotesRecord from './meeting/VotesRecord';
 import VotesTab from './tabs/VotesTab';
 import RequestsTab from './tabs/RequestsTab';
 import AmenitiesSection from './tabs/AmenitiesSection';
@@ -50,13 +51,15 @@ export function resolveCommunityTab(raw: string | null): CommunityTab {
 
 export default function CommunityModule() {
   const [params, setParams] = useSearchParams();
-  const tab = resolveCommunityTab(params.get('tab'));
+  const requested = resolveCommunityTab(params.get('tab'));
   const tenant = useTenantContext();
   // Amenities come with Plus Facilities (and the legacy tiers that became it); the demo shows everything.
   const isManagementSuite = tierHasAmenities(tenant.tier) || tenant.isDemo;
   const pmSeat = tenant.pmSeat;
   const snap = useCommunitySnapshot();
   const isBoard = snap.viewer.isBoard;
+  // Owners vote inside meetings; their votes and the board's decisions are in Notices.
+  const tab: CommunityTab = requested === 'votes' && !isBoard ? 'notices' : requested;
 
   const notices = noticesSummary(snap);
   const meetings = meetingsSummary(meetingRows(snap));
@@ -91,8 +94,8 @@ export default function CommunityModule() {
     log: 'The property log. Anyone can log what they see around the building; the board and the manager follow up.',
     scorecard: 'How the property manager is doing, quarter by quarter, as the board rates them in five categories.',
     notices: 'The bulletin board. What the building needs to know, who posted it, and the alerts channel for anything urgent.',
-    meetings: 'Scheduling, notices, agendas, attendance, minutes and their approval, in one place for the board and the owners. Owners see this same page without the manage controls: they RSVP, read the agenda, add a proxy and read posted minutes. Notices themselves are sent from the Board Room outbox.',
-    votes: 'Open votes for owners and the board, ballots, proxies, quorum, results and certification. Owners see the open owner votes with a Vote button, the election, their proxy, and results once certified. Board votes and the manage controls show for the board only.',
+    meetings: isBoard ? 'Every meeting, start to finish: the agenda with its votes and reports, the notice and ballots by app, email and mail, the meeting itself (minutes, votes and attendance in one view) and the summary to owners. The sealed record goes to Building › Archive.' : 'Meetings with their agenda, documents and your ballot once the notice is out. Vote ahead or during the meeting; results and approved minutes follow.',
+    votes: 'The record of every vote, grouped by the meeting it was taken at, with open ballots and turnout. Votes between meetings (written consent and mailed ballots) are below.',
     requests: isBoard ? 'Ask the board for something, follow where it is, and see what neighbours have asked for. This is the owner-facing side of the requests the board works in Board Room › Inbox: replies, the 14-day clock and the convert-to-case step happen there; the owner sees the status, the dates and the replies.' : 'Ask the board for something, follow where it is, and see what neighbours have asked for. The board replies within 14 days.',
     amenities: isBoard ? 'Reserve the shared spaces, follow your reservations, and the rules the board set. Approvals and Settings show for the board and manager only.' : 'Reserve the shared spaces, follow your reservations, and the rules the board set. The board approves requests within a day.',
   }[tab];
@@ -101,7 +104,7 @@ export default function CommunityModule() {
     { id: 'overview' as CommunityTab, label: 'Overview' },
     { id: 'notices' as CommunityTab, label: 'Notices', badge: notices.pinned.length || undefined, badgeTone: 'cyan' as const },
     { id: 'meetings' as CommunityTab, label: 'Meetings', badge: meetings.next ? dayLabel(meetings.next.meeting.date) : undefined, badgeTone: meetings.noticesOverdue.length ? 'red' as const : 'ghost' as const },
-    { id: 'votes' as CommunityTab, label: 'Votes', badge: votes.open.length || undefined, badgeTone: 'plum' as const },
+    ...(isBoard ? [{ id: 'votes' as CommunityTab, label: 'Votes', badge: votes.open.length || undefined, badgeTone: 'plum' as const }] : []),
     { id: 'requests' as CommunityTab, label: 'Requests', badge: (isBoard ? requests.open.length : requests.mineOpen.length) || undefined, badgeTone: requests.overdue.length && isBoard ? 'red' as const : 'ghost' as const },
     { id: 'log' as CommunityTab, label: 'Property log' },
     ...(isManagementSuite ? [{ id: 'amenities' as CommunityTab, label: 'Amenities', badge: (isBoard ? pendingApprovals : myReservations) || undefined, badgeTone: 'amber' as const }] : []),
@@ -128,7 +131,7 @@ export default function CommunityModule() {
         {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
         {tab === 'notices' && <NoticesTab snap={snap} />}
         {tab === 'meetings' && <MeetingsTab snap={snap} meetingId={params.get('meeting')} onOpen={openMeeting} />}
-        {tab === 'votes' && <VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} />}
+        {tab === 'votes' && <div className="flex flex-col gap-4"><VotesRecord snap={snap} /><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Between meetings · written consent and mailed ballots</div><VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} /></div>}
         {tab === 'requests' && <RequestsTab snap={snap} highlightId={params.get('request')} />}
         {tab === 'log' && <LogTab isBoard={isBoard} />}
         {tab === 'amenities' && isManagementSuite && <AmenitiesSection snap={snap} />}

@@ -8,6 +8,7 @@ import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, KV, Row
 import { dayLabel } from '../../home/calendar';
 import { emailAnnouncement } from '../notify';
 import { noticesSummary, type CommunitySnapshot } from '../metrics';
+import { BoardDecisionsCard, UnitVotesCard } from '../meeting/VotesInNotices';
 
 const CATEGORIES: { id: Announcement['category']; label: string; tone: 'ghost' | 'amber' | 'teal' | 'red' | 'plum' | 'navy' }[] = [
   { id: 'general', label: 'Notice', tone: 'ghost' },
@@ -132,6 +133,13 @@ export default function NoticesTab({ snap }: { snap: CommunitySnapshot }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!isBoard && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <BoardDecisionsCard snap={snap} />
+          <UnitVotesCard snap={snap} />
         </div>
       )}
 
