@@ -39,7 +39,7 @@
   "url": "https://getonetwo.com",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web",
-  "description": "ONE two does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.",
+  "description": "ONE two does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. A stewardship score tells everyone, board and owners alike, how the building is doing.",
   "offers": [
     {
       "@type": "Offer",
@@ -131,10 +131,8 @@ p{margin:0}
 @media (max-width:960px){.grid3,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}.navlinks{display:none !important}.door{padding:32px 26px}}
 @media (max-width:640px){.doors{grid-template-columns:1fr}}
 @media (max-width:640px){.grid3,.grid4{grid-template-columns:1fr}.wrap{padding:0 16px}.door{padding:28px 22px}}
-@keyframes dial{from{stroke-dashoffset:339}to{stroke-dashoffset:61}}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes stamp{0%{opacity:0;transform:scale(1.4) rotate(-8deg)}60%{opacity:1;transform:scale(.96) rotate(-8deg)}100%{opacity:1;transform:scale(1) rotate(-8deg)}}
-.dial{animation:dial 1.8s ease both .3s}
 .f1{animation:rise .6s ease both .3s}.f2{animation:rise .6s ease both .6s}.f3{animation:rise .6s ease both .9s}.f4{animation:rise .6s ease both 1.2s}
 .stamp{animation:stamp .7s ease both 1s}
 .browser{border:1px solid #e3e8ee;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(13,27,46,.14);background:#ffffff;display:flex;flex-direction:column;flex:1}
@@ -209,7 +207,7 @@ p{margin:0}
 /* home layout and the stewardship card */
 .hgrid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:10px;align-items:start}
 .hcol{display:flex;flex-direction:column;gap:10px;min-width:0}
-.stew{background:#0D1B2E;border-radius:14px;padding:12px 14px 6px;color:#ffffff;display:flex;flex-direction:column;gap:4px;min-width:0}
+.stew{box-sizing:border-box;background:#0D1B2E;border-radius:14px;padding:12px 14px 6px;color:#ffffff;display:flex;flex-direction:column;gap:4px;min-width:0}
 .stew .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .stew .k{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
 .stew .b{font-size:10px;color:rgba(255,255,255,.55);margin-top:2px}
@@ -264,6 +262,7 @@ p{margin:0}
   #top .btn{width:100%}
   .herocard{grid-template-columns:1fr !important;justify-items:center;text-align:center}
   .herocard .row{width:100%;text-align:left}
+  .herocard .stew{width:100% !important;text-align:left}
   .herocard .f4[style*="grid-column"]{text-align:left}
   .invoices{grid-template-columns:1fr !important}
   .appnavlinks{display:none}
@@ -368,26 +367,22 @@ p{margin:0}
     <div style="display:flex;flex-direction:column;gap:24px">
       <span class="eyebrow f1" style="color:#A5F3FC">For Washington, DC condo buildings</span>
       <h1 class="f2" style="font-size:58px;line-height:1.04;color:#ffffff">Everything a property manager does for your building.<br><span style="color:#A5F3FC">Without the property manager.</span></h1>
-      <p class="f3" style="font-size:19px;line-height:1.55;color:#c7d2de;max-width:580px"><strong>ONE two</strong> does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. Board Health tells everyone, board and owners alike, how the building is doing.</p>
+      <p class="f3" style="font-size:19px;line-height:1.55;color:#c7d2de;max-width:580px"><strong>ONE two</strong> does the manager's job: knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof, proves it to the owners. Your board makes the decisions. A stewardship score tells everyone, board and owners alike, how the building is doing.</p>
       <div class="f3" style="display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-red" href="/login?create=1" style="min-height:54px;padding:0 26px;font-size:17px" data-cta="hero">Start your free 21 day trial</a><a class="btn btn-ghost" href="#pricing" style="min-height:54px;font-size:17px" data-cta="hero-pricing">See pricing</a></div>
       <p class="f4" style="font-size:14px;color:#8fa0b3">$179 a month after the trial, everything included.</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
-      <div class="herocard" style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:24px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center">
-        <svg width="150" height="150" viewBox="0 0 120 120" role="img" aria-label="Board Health 82 of 100">
-          <circle cx="60" cy="60" r="54" fill="none" stroke="#e3e8ee" stroke-width="10"></circle>
-          <circle class="dial" cx="60" cy="60" r="54" fill="none" stroke="#155E75" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="61" style="transform:rotate(-90deg);transform-origin:60px 60px"></circle>
-          <text x="60" y="58" text-anchor="middle" font-family="Fraunces,Georgia,serif" font-size="38" font-weight="700" fill="#0D1B2E">82</text>
-          <text x="60" y="76" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="700" fill="#4b5a6b" letter-spacing="1">BOARD HEALTH</text>
-        </svg>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <div><span style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5a6b">1302 R St NW · 12 units</span><br><span style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600">Budget Season · 41 days left</span></div>
-          <div class="f1 row" style="font-size:13px"><span class="muted">Compliance</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
-          <div class="f2 row" style="font-size:13px"><span class="muted">Financial</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
-          <div class="f3 row" style="font-size:13px"><span class="muted">Governance</span><span class="pill" style="background:#fff0f1;color:#D62839">Needs you</span></div>
-          <div class="f4 row" style="font-size:13px"><span class="muted">Records</span><span class="pill" style="background:#f4fbf9;color:#155E75">On track</span></div>
+      <div class="herocard" style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:20px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:center">
+        <div class="stew" id="heroStew" style="width:250px"></div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <div><span style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5a6b">1302 R St NW · 12 units</span><br><span style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600">Up next: adopt the 2027 budget</span></div>
+          <div class="f1 row" style="font-size:13px"><span class="muted">Timeliness</span><span class="pill" style="background:#f4fbf9;color:#155E75">82 · On track</span></div>
+          <div class="f2 row" style="font-size:13px"><span class="muted">Compliance</span><span class="pill" style="background:#fff0f1;color:#D62839">78 · Needs you</span></div>
+          <div class="f3 row" style="font-size:13px"><span class="muted">Oversight</span><span class="pill" style="background:#f4fbf9;color:#155E75">90 · On track</span></div>
+          <div class="f3 row" style="font-size:13px"><span class="muted">Reach</span><span class="pill" style="background:#f4fbf9;color:#155E75">90 · On track</span></div>
+          <div class="f4 row" style="font-size:13px"><span class="muted">Impact</span><span class="pill" style="background:#f4fbf9;color:#155E75">80 · On track</span></div>
         </div>
-        <div class="f4" style="grid-column:1 / -1;padding:12px 14px;border-radius:12px;background:#fff0f1;display:flex;gap:10px;align-items:center;font-size:13px"><span class="pill" style="background:#D62839;color:#ffffff">Due Fri</span><span>Mail the draft budget to owners, 30 day notice. Treasurer. Moves Governance.</span></div>
+        <div class="f4" style="grid-column:1 / -1;padding:12px 14px;border-radius:12px;background:#fff0f1;display:flex;gap:10px;align-items:center;font-size:13px"><span class="pill" style="background:#D62839;color:#ffffff">Due Fri</span><span>Mail the draft budget to owners, 30 day notice. Treasurer. +6 Compliance when it lands.</span></div>
       </div>
       <p style="font-size:12px;color:#8fa0b3;text-align:center">The same number the board sees is the one the owners see.</p>
     </div>
@@ -506,7 +501,7 @@ p{margin:0}
         <div class="row"><span style="font-family:'Fraunces',Georgia,serif;font-size:26px;font-weight:600">Self-Managed</span><span class="pill plan-selected" style="background:#0D1B2E;color:#A5F3FC">Selected</span></div>
         <p class="muted" style="font-size:15px;line-height:1.5">The board runs the building. <strong>ONE two</strong> keeps it compliant. Walk-ups and small buildings with no elevator, pool or staff.</p>
         <div style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Fraunces',Georgia,serif;font-size:46px;font-weight:700;line-height:1">$<span data-price="sm">179</span></span><span class="muted" style="font-size:15px" data-per>a month</span></div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#4b5a6b"><li>Runbook of 45 DC obligations, Board Health score</li><li>Meetings, elections, votes and minutes</li><li>Fiscal Lens: ledger, monthly close, owner statements, online payments</li><li>32 playbooks, work orders, vendors, 1099s</li><li>Asset registry with replacement years and reserve balance</li><li>Owner portal, letters and notices, The Archives</li></ul>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#4b5a6b"><li>Runbook of 45 DC obligations, stewardship score</li><li>Meetings, elections, votes and minutes</li><li>Funds: ledger, monthly close, owner statements, online payments</li><li>32 runbooks, work orders, vendors, 1099s</li><li>Asset registry with replacement years and reserve balance</li><li>Owner portal, letters and notices, the Archive</li></ul>
         <a class="btn btn-navy plan-cta" href="/login?create=1&plan=self_managed&interval=monthly" style="min-height:44px;font-size:15px;align-self:flex-start" data-cta="plan-sm">Start free on Self-Managed</a>
       </button>
       <button type="button" id="planFa" class="plancard" data-plan="fa">
@@ -758,25 +753,35 @@ p{margin:0}
     el('autoLabel').textContent = auto ? 'Playing, 4 seconds a job, six jobs' : 'Paused';
     el('autoBtn').textContent = auto ? 'Pause' : 'Play';
   }
-  /* The strip's radar tweens from the last shape to the new one, so the score is seen to move. */
-  var stripDims = BASE.slice(), tweenId = 0;
-  function renderStrip(j) {
-    var box = el('stripStew');
-    box.innerHTML = stewCard(j, 'The board, this year', 'stripPoly');
-    var from = stripDims.slice(), to = j.dims, poly = el('stripPoly'), num = el('stripPolyNum'), spans = box.querySelectorAll('[data-dim]'), start = null;
-    if (tweenId) cancelAnimationFrame(tweenId);
-    if (reduce || !window.requestAnimationFrame) { stripDims = to.slice(); return; }
+  /* A radar tweens from one shape to the next, so a score is seen to move. Returns a stop function that gives the shape it reached. */
+  function tweenRadar(id, from, to, ms, delay) {
+    var poly = el(id), num = el(id + 'Num'), spans = poly.ownerSVGElement.querySelectorAll('[data-dim]'), start = null, raf = 0, cur = from.slice();
+    function paint(d) { poly.setAttribute('points', rpt(d, 108)); num.textContent = total(d); for (var i = 0; i < 5; i++) spans[i].textContent = Math.round(d[i]); }
+    if (reduce || !window.requestAnimationFrame) { paint(to); return function () { return to.slice(); }; }
+    paint(cur);
     function frame(ts) {
-      if (start === null) start = ts;
-      var p = Math.min(1, (ts - start) / 700), e = 1 - Math.pow(1 - p, 3);
-      var cur = from.map(function (f, i) { return f + (to[i] - f) * e; });
-      poly.setAttribute('points', rpt(cur, 108)); num.textContent = total(cur);
-      for (var i = 0; i < 5; i++) spans[i].textContent = Math.round(cur[i]);
-      stripDims = p < 1 ? cur : to.slice();
-      if (p < 1) tweenId = requestAnimationFrame(frame);
+      if (start === null) start = ts + (delay || 0);
+      var p = Math.max(0, Math.min(1, (ts - start) / ms)), e = 1 - Math.pow(1 - p, 3);
+      cur = from.map(function (f, i) { return f + (to[i] - f) * e; });
+      paint(cur);
+      if (p < 1) raf = requestAnimationFrame(frame);
     }
-    poly.setAttribute('points', rpt(from, 108));
-    tweenId = requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
+    return function () { cancelAnimationFrame(raf); return cur; };
+  }
+  var stripDims = BASE.slice(), stopStrip = null;
+  function renderStrip(j) {
+    if (stopStrip) stripDims = stopStrip();
+    el('stripStew').innerHTML = stewCard(j, 'The board, this year', 'stripPoly');
+    var from = stripDims.slice();
+    stripDims = j.dims.slice();
+    stopStrip = tweenRadar('stripPoly', from, j.dims, 700);
+  }
+  /* The hero card: the same stewardship card, climbing to 82 on load. */
+  var HERO = [82, 78, 90, 90, 80];
+  if (el('heroStew')) {
+    el('heroStew').innerHTML = stewCard({ dims: HERO, score: total(HERO), prev: total(HERO) - 4 }, '1302 R St NW \u00B7 the board, this year', 'heroPoly');
+    tweenRadar('heroPoly', [70, 60, 80, 80, 70], HERO, 1800, 300);
   }
   function renderScene() {
     var j = JOBS[job], t = SCREENS[job];
@@ -844,11 +849,11 @@ p{margin:0}
   var CHECK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#155E75" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="Included"><path d="M20 6 9 17l-5-5"/></svg>';
   var ROWS = [
     ['Core governance'],
-    ['Runbook of 45 DC obligations with due dates, owners and how-tos', 1], ['Board Season calendar and Board Health score', 1], ['Meetings from notice to minutes, quorum, agendas', 1], ['Elections, votes and resolutions online', 1], ['Board roles, responsibilities and the Role Charter owners can see', 1], ['AI advisor trained on the DC Condominium Act', 1],
-    ['Money and playbooks'],
-    ['Fiscal Lens: general ledger, monthly close, financial statements', 1], ['Online assessment payments and owner balances', 1], ['Invoice-first money out, work orders, vendor contracts', 1], ['1099s prepared and e-filed', 1], ['32 playbooks: late owners, repairs, records requests, special assessments and more', 1], ['Book cleaners and handypeople through TaskRabbit, no 1099', 1],
+    ['Runbook of 45 DC obligations with due dates, owners and how-tos', 1], ['Home feed, calendar and the stewardship score', 1], ['Meetings from notice to minutes, quorum, agendas', 1], ['Elections, votes and resolutions online', 1], ['Board roles, responsibilities and the Role Charter owners can see', 1], ['AI advisor trained on the DC Condominium Act', 1],
+    ['Money and runbooks'],
+    ['Funds: general ledger, monthly close, financial statements', 1], ['Online assessment payments and owner balances', 1], ['Invoice-first money out, work orders, vendor contracts', 1], ['1099s prepared and e-filed', 1], ['32 runbooks: late owners, repairs, records requests, special assessments and more', 1], ['Book cleaners and handypeople through TaskRabbit, no 1099', 1],
     ['Building and records'],
-    ['Units, owners, documents, insurance policies', 1], ['Asset registry with replacement year, cost and reserve balance against target', 1], ['The Archives: seven years of minutes, notices, letters and proof', 1], ['Inspection and permit calendar: elevator, pool, fire systems, boiler', 0], ['Reserve study tools, component schedules and funding scenarios', 0], ['Bids workflow and insurance claims workflow', 0],
+    ['Units, owners, documents, insurance policies', 1], ['Asset registry with replacement year, cost and reserve balance against target', 1], ['The Archive: seven years of minutes, notices, letters and proof', 1], ['Inspection and permit calendar: elevator, pool, fire systems, boiler', 0], ['Reserve study tools, component schedules and funding scenarios', 0], ['Bids workflow and insurance claims workflow', 0],
     ['Community and communication'],
     ['Owner portal with statements, documents and requests', 1], ['Letters and notices mailed from the app, postage at cost', 1], ['Amenity reservations and rules', 0],
     ['People and roles'],
