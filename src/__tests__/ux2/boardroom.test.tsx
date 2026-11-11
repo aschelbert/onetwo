@@ -98,53 +98,45 @@ describe('Board Room', () => {
     }
   });
 
-  it('Runbooks lists all 32, switches one off and opens the wizard on a situation', () => {
+  it('Runbooks lists all 32 in one view and switches one off without opening it', () => {
     renderAt('/boardroom?tab=runbooks');
-    expect(screen.queryByText('Switched on')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^All 32$/ }));
+    expect(screen.queryByRole('button', { name: /With an open case/ })).toBeNull();
     expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
-    const sw = screen.getByRole('switch', { name: 'Collections on' });
-    fireEvent.click(sw);
+    fireEvent.click(screen.getByRole('switch', { name: 'Collections on' }));
     expect(useRunbookSwitches.getState().isOn('collections')).toBe(false);
-    const row = document.querySelector('tr[data-runbook="collections"]') as HTMLElement;
-    const start = within(row).queryByRole('button', { name: 'Open a case' });
-    if (start) {
-      fireEvent.click(start);
-      expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/delinquent-accounts');
-    } else {
-      fireEvent.click(within(row).getByRole('button', { name: /^Open now/ }));
-      expect(document.querySelector('[data-page="ux2-boardroom-case"]')).toBeTruthy();
-    }
-  });
-
-  it('Runbooks deep link lands on the named runbook even when it has no case open', () => {
-    renderAt('/boardroom?tab=runbooks&runbook=month-close');
-    const row = document.querySelector('tr[data-runbook="month-close"]') as HTMLElement;
-    expect(row).toBeTruthy();
-    expect(row.getAttribute('data-focus')).toBe('1');
-    expect(document.querySelectorAll('tr[data-runbook]').length).toBeGreaterThanOrEqual(1);
-    if (within(row).queryByRole('button', { name: 'Open a case' })) {
-      expect(document.querySelector('[data-focus-note]')?.textContent).toContain('Month close');
-      fireEvent.click(screen.getByRole('button', { name: 'Open a case now' }));
-      expect(screen.getByTestId('legacy-issues').textContent).toBe('financial/financial-review');
-    }
-  });
-
-  it('Runbooks tells the truth about what starts itself: the month close row carries its day and a way to change it', () => {
-    useFinancialStore.setState({ monthCloseStartDay: 5 });
-    renderAt('/boardroom?tab=runbooks');
-    fireEvent.click(screen.getByRole('button', { name: /^All 32$/ }));
-    const row = document.querySelector('tr[data-runbook="month-close"]') as HTMLElement;
-    expect(row.textContent).toContain('The 5th of each month');
-    expect(row.textContent).not.toContain('Opens by hand today');
-    expect(within(row).getByRole('button', { name: 'Change the day' })).toBeTruthy();
-    const collections = document.querySelector('tr[data-runbook="collections"]') as HTMLElement;
-    expect(collections.textContent).not.toContain('Opens by hand today');
+    expect(document.querySelector('[data-runbook-detail]')).toBeNull();
     const elections = document.querySelector('tr[data-runbook="elections"]') as HTMLElement;
     expect(elections.textContent).toContain('Opens by hand today');
+    expect(within(elections).getByText(/planned/)).toBeTruthy();
+  });
+
+  it('Clicking a runbook shows its steps and which ones the app does, and Back returns to the list', () => {
+    useFinancialStore.setState({ monthCloseStartDay: 5 });
+    renderAt('/boardroom?tab=runbooks');
+    fireEvent.click(within(document.querySelector('tr[data-runbook="month-close"]') as HTMLElement).getByRole('button', { name: 'Month close' }));
+    const detail = document.querySelector('[data-runbook-detail="month-close"]') as HTMLElement;
+    expect(detail.textContent).toContain('Starts the 5th of each month');
+    const steps = [...detail.querySelectorAll('li[data-step]')];
+    expect(steps).toHaveLength(5);
+    expect(steps.map(s => s.getAttribute('data-auto'))).toEqual(['1', '0', '0', '1', '1']);
+    expect(steps[0].textContent).toContain('The app does this · Ticks itself when the month’s dues invoices are posted');
+    expect(steps[1].textContent).toContain('A person does this');
+    expect(within(detail).getByRole('button', { name: 'Change the day' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '← All runbooks' }));
     expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
-    fireEvent.click(within(row).getByRole('button', { name: 'Change the day' }));
-    expect(screen.getByTestId('elsewhere')).toBeTruthy();
+  });
+
+  it('A deep link opens a runbook; one that opens by hand lists its workflow steps and opens the wizard', () => {
+    renderAt('/boardroom?tab=runbooks&runbook=covenant-violation');
+    const detail = document.querySelector('[data-runbook-detail="covenant-violation"]') as HTMLElement;
+    expect(detail.textContent).toContain('Opens by hand today');
+    expect(detail.querySelectorAll('li[data-step]').length).toBeGreaterThan(3);
+    expect(detail.querySelectorAll('li[data-step][data-auto="1"]').length).toBe(0);
+    const start = within(detail).queryByRole('button', { name: 'Open a case now' });
+    if (start) {
+      fireEvent.click(start);
+      expect(screen.getByTestId('legacy-issues').textContent).toBe('enforcement/covenant-violations');
+    }
   });
 
   it('Outbox shows alerts, drafts, templates and delivery without the production communications tab; New letter composes', () => {

@@ -3,7 +3,7 @@
  *
  *  Ops       every open case with where it is, what it needs next and who drives it
  *  Inbox     what owners asked for, the 14-day clock, acknowledge, reply, convert to case
- *  Runbooks  the 32 runbooks, which have a case open, on and off
+ *  Runbooks  every runbook; one opens to its steps and which the app does
  *  Outbox    every letter and notice: drafts, sent, in transit, templates, delivery
  *  Tasks     the team's kanban (Property Manager Seat)
  *  Intercom  the team's realtime channels (Property Manager Seat)
@@ -19,7 +19,7 @@
  * redirect there.
  *
  * Deep links: `/boardroom?tab=open|inbox|runbooks|outbox|tasks|intercom`,
- * `/boardroom?tab=runbooks&runbook=<id>` lands on one runbook's row,
+ * `/boardroom?tab=runbooks&runbook=<id>` opens one runbook's details,
  * `/boardroom?view=case:<id>`, `/boardroom?view=new&cat=<catId>&sit=<sitId>`.
  * `/issues?view=case:<id>` (Home's links) resolves here too.
  */
