@@ -2390,6 +2390,8 @@ interface IssuesState {
 
   // DB sync
   loadFromDb: (tenantId: string) => Promise<void>;
+  /** True once this tenant's cases are in the store (always, without a backend); automations wait for it. */
+  casesLoaded: boolean;
 
   // Issue actions
   addIssue: (issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes' | 'comms'>, tenantId?: string) => void;
@@ -2401,6 +2403,8 @@ interface IssuesState {
   // Case actions
   createCase: (data: { catId: string; sitId: string; approach: CaseApproach; title: string; unit: string; owner: string; priority: CasePriority; notes: string; assignedTo?: string; assignedRole?: string; dueDate?: string; source?: string; sourceId?: string; customSteps?: { s: string; t?: string; d?: string; detail?: string; ck?: string[] }[] }, tenantId?: string) => string;
   toggleStep: (caseId: string, stepIdx: number) => void;
+  /** Mark a step done when the app sees its work is done (a runbook's automated step). Idempotent; a done step stays done. */
+  completeStep: (caseId: string, stepIdx: number, actor?: string) => void;
   addStepNote: (caseId: string, stepIdx: number, note: string) => void;
   closeCase: (caseId: string) => void;
   reopenCase: (caseId: string) => void;
@@ -2491,12 +2495,13 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
   shellActiveStep: 0,
   shellActiveStepCaseId: null,
 
+  casesLoaded: !isBackendEnabled,
   loadFromDb: async (tenantId: string) => {
     const [issues, cases] = await Promise.all([
       issuesSvc.fetchIssues(tenantId),
       casesSvc.fetchCases(tenantId),
     ]);
-    const updates: Record<string, unknown> = {};
+    const updates: Record<string, unknown> = { casesLoaded: !!cases };
     if (issues) updates.issues = issues;
     if (cases) {
       // Restore additionalApproaches from separate localStorage key (not yet in DB schema)
@@ -2671,6 +2676,25 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) {
       const c = get().cases.find(x => x.id === caseId);
       const step = c?.steps?.[stepIdx];
+      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+    }
+  },
+
+  completeStep: (caseId, stepIdx, actor = 'App') => {
+    const today = new Date().toISOString().split('T')[0];
+    const before = get().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
+    if (!before || before.done) return;
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps?.[stepIdx] || c.steps[stepIdx].done) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], done: true, doneDate: today };
+        const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor, summary: `Step completed: ${steps[stepIdx].s}` };
+        return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
+      })
+    }));
+    if (isBackendEnabled) {
+      const step = get().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
       if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
     }
   },

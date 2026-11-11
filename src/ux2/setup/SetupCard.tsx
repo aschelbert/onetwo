@@ -50,7 +50,7 @@ export default function SetupCard() {
         <p className="m-0 text-[15px] leading-relaxed text-white/[0.88]">{s.next.step === 'payments'
           ? 'Your documents are read and the gaps are filled. Next, connect Stripe so owners can pay dues by card or bank from the day they\'re invited. It\'s optional, and Stripe needs a day or two to verify the association, so starting now pays off.'
           : s.next.step === 'mail'
-            ? 'Next, open the building\'s LetterStream account so certified notices and letters print and mail themselves, billed to the building. It\'s optional and takes about five minutes.'
+            ? 'Next, open the building\'s mail account (DocuPost, or LetterStream) so certified notices and letters print and mail themselves, billed to the building. It\'s optional and takes about five minutes.'
             : "Start with the documents you already have. Add your bylaws, owner list and budget (PDF, spreadsheet or pasted text) and we pick out what the building needs. You confirm each item before it's saved."}</p>
         <div className="flex gap-1" aria-hidden="true">{steps.map((x, i) => <span key={x.label} className={cn('h-1.5 flex-1 rounded-full', x.done ? 'bg-white' : i === current ? 'bg-white/55' : 'bg-white/[0.22]')} />)}</div>
         <div className="flex flex-wrap items-center gap-2">

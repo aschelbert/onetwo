@@ -402,13 +402,13 @@ everything is read in the browser, so a document costs nothing to read.
      "Later" moves the Home card on, and nothing here blocks going live. The
      Home card's fourth step and Go live's "Also set up" list show its state.
   5. *Send letters by mail* (`MailStep`), its own page like Stripe
-     (`?step=mail`). LetterStream Partnership mode: the board opens the
-     building's own LetterStream account through our partner link (from the
-     `connect-letterstream` status call; "not configured yet" until the
-     secret is set), pastes the account's API ID and key, and the step
-     verifies and saves them server-side through `useMailStore`, the same
-     store as Funds › Accounts and ledger › Bank & Mail. Shows what to have
-     ready and the estimated per-letter prices; LetterStream bills the
+     (`?step=mail`). The board picks a vendor, DocuPost (recommended: open an
+     account, fund it from $10, paste the API token) or LetterStream (our
+     partner link, from the `connect-mail-provider` status call; "not
+     configured yet" until the secret is set; API ID + key). The step saves
+     the credentials server-side through `useMailStore`, the same store as
+     Funds › Accounts and ledger › Bank & Mail, and shows what to have ready
+     and that vendor's estimated per-letter prices. The vendor bills the
      building, never ONE two. Optional: "Later" moves the Home card on. The
      Home card's fifth step and Go live's "Also set up" list show its state.
   3, 6–7. *Fill the gaps · Invite people · Go live*. Units can be added by

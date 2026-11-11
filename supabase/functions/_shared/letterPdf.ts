@@ -1,5 +1,5 @@
 // supabase/functions/_shared/letterPdf.ts
-// Renders a notice as a US-Letter PDF for LetterStream: return address and
+// Renders a notice as a US-Letter PDF for the mail vendor: return address and
 // recipient block positioned for a #10 window envelope, then the dated letter.
 
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
@@ -10,6 +10,40 @@ export interface LetterInput {
   sender: { name: string; line1: string; line2?: string; city: string; state: string; zip: string };
   recipient: { name: string; line1: string; line2?: string; city: string; state: string; zip: string };
   date?: Date;
+}
+
+/**
+ * pdf-lib's standard fonts can only encode WinAnsi. Letter bodies come from
+ * templates and free-text merge fields, so anything outside that set (arrows,
+ * ≥, emoji, non-Latin scripts) is replaced rather than crashing the send.
+ */
+const REPLACE: Record<string, string> = {
+  "\u2192": "->", "\u2190": "<-", "\u2194": "<->", "\u21D2": "=>", "\u2265": ">=", "\u2264": "<=", "\u2260": "!=",
+  "\u2212": "-", "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2015": "-", "\u2032": "'", "\u2033": '"',
+  "\u00A0": " ", "\u2009": " ", "\u200A": " ", "\u2002": " ", "\u2003": " ", "\u202F": " ", "\u200B": "",
+  "\u2713": "x", "\u2714": "x", "\u2717": "x", "\u2718": "x", "\u25CF": "\u2022", "\u25AA": "\u2022", "\u2023": "\u2022",
+  "\u2192\uFE0F": "->",
+};
+// Code points WinAnsi has above 0x7E (the 0x80–0x9F block plus Latin-1 0xA0–0xFF).
+const WINANSI_HIGH = new Set([
+  0x20AC, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x017D,
+  0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x017E, 0x0178,
+]);
+export function toWinAnsi(text: string): string {
+  let out = "";
+  for (const ch of text.normalize("NFC")) {
+    const cp = ch.codePointAt(0)!;
+    if (cp === 0x0A || cp === 0x0D || cp === 0x09) { out += ch; continue; }
+    if (cp >= 0x20 && cp <= 0x7E) { out += ch; continue; }
+    if (cp >= 0xA0 && cp <= 0xFF) { out += ch; continue; }
+    if (WINANSI_HIGH.has(cp)) { out += ch; continue; }
+    if (REPLACE[ch] !== undefined) { out += REPLACE[ch]; continue; }
+    // Strip accents the font lacks (e.g. ő → o), then drop what is left over (emoji, other scripts).
+    const base = ch.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const bcp = base.codePointAt(0) ?? 0;
+    out += base && bcp >= 0x20 && bcp <= 0xFF ? base : "";
+  }
+  return out;
 }
 
 const PAGE_W = 612;
@@ -42,7 +76,9 @@ function wrap(text: string, width: number, measure: (s: string) => number): stri
   return out;
 }
 
-export async function renderLetterPdf(input: LetterInput): Promise<{ bytes: Uint8Array; pageCount: number }> {
+export async function renderLetterPdf(raw: LetterInput): Promise<{ bytes: Uint8Array; pageCount: number }> {
+  const clean = (a: LetterInput["sender"]) => ({ ...a, name: toWinAnsi(a.name), line1: toWinAnsi(a.line1), line2: a.line2 ? toWinAnsi(a.line2) : a.line2, city: toWinAnsi(a.city), state: toWinAnsi(a.state), zip: toWinAnsi(a.zip) });
+  const input: LetterInput = { ...raw, subject: toWinAnsi(raw.subject), body: toWinAnsi(raw.body), sender: clean(raw.sender), recipient: clean(raw.recipient) };
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);

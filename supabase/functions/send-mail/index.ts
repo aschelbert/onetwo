@@ -1,43 +1,25 @@
 // supabase/functions/send-mail/index.ts
-// Renders the notice as a PDF and pushes it into the *building's* LetterStream
-// account (Partnership mode). No money moves here: LetterStream prices the job
-// and the building pays LetterStream for it, from its prepaid balance or in its
-// LetterStream cart. We only report where the job stands.
+// Renders the notice as a PDF and pushes it into the *building's* own account
+// with its printed-mail vendor (DocuPost or LetterStream). No money moves
+// here: the vendor prices the letter and the building pays the vendor for it.
+// We only report where the letter stands.
 
-import { LETTERSTREAM_PORTAL_URL, LetterStreamError, normalizeStatus, submitJob } from "../_shared/letterstream.ts";
+import { PROVIDER_INFO, isCredentialError, isFundsError, isProvider, submitLetter, vendorError } from "../_shared/mailProvider.ts";
 import { renderLetterPdf } from "../_shared/letterPdf.ts";
+import { pruneOldLetters, storeLetterPdf } from "../_shared/letterStorage.ts";
+import { toStateCode } from "../_shared/usStates.ts";
+import { authUser, cors, jsonResponse, membership, restGetOne, restWrite } from "../_shared/supabaseRest.ts";
 
-const SB_URL = Deno.env.get("SUPABASE_URL") || "";
-const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
-};
-
-export const NOT_CONNECTED = "The building's LetterStream account isn't connected. A board member connects it under Settings → Mailing.";
-
-async function sbGet(table: string, params: Record<string, string>) {
-  const url = new URL(`${SB_URL}/rest/v1/${table}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString(), {
-    headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Accept": "application/vnd.pgrst.object+json" },
-  });
-  return res.ok ? await res.json() : null;
-}
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
-}
+export const NOT_CONNECTED = "The building's mail account isn't connected. A board member connects DocuPost or LetterStream under Settings → Mailing.";
 
 const METHODS = new Set(["first-class", "certified", "certified-return-receipt", "certified-electronic-return-receipt"]);
 
 type Addr = { name: string; line1: string; line2?: string; city: string; state: string; zip: string };
+/** A complete postal address with the state as its USPS code, or null when something required is missing. */
 function address(name: unknown, a: unknown): Addr | null {
   const o = (a && typeof a === "object" ? a : {}) as Record<string, unknown>;
   const pick = (k: string) => String(o[k] ?? "").trim();
-  const out = { name: String(name ?? "").trim(), line1: pick("line1"), line2: pick("line2") || undefined, city: pick("city"), state: pick("state"), zip: pick("zip") };
+  const out = { name: String(name ?? "").trim(), line1: pick("line1"), line2: pick("line2") || undefined, city: pick("city"), state: toStateCode(pick("state")), zip: pick("zip") };
   return out.name && out.line1 && out.city && out.state && out.zip ? out : null;
 }
 
@@ -46,14 +28,11 @@ Deno.serve(async (req) => {
 
   try {
     // ── 1. Who is asking, for which building ───────────────
-    const auth = req.headers.get("Authorization") || "";
-    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { "Authorization": auth, "apikey": SB_ANON } });
-    if (!userRes.ok) return jsonResponse({ error: "Unauthorized" }, 401);
-    const user = await userRes.json();
-
-    const tu = await sbGet("tenant_users", { "user_id": `eq.${user.id}`, "role": "eq.board_member", "select": "tenant_id", "limit": "1" });
-    if (!tu?.tenant_id) return jsonResponse({ error: "Only board members can send mail" }, 403);
-    const tenantId: string = tu.tenant_id;
+    const user = await authUser(req);
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
+    const tu = await membership(user.id);
+    if (!tu?.tenant_id || tu.role !== "board_member") return jsonResponse({ error: "Only board members can send mail" }, 403);
+    const tenantId = tu.tenant_id;
 
     // ── 2. The letter ──────────────────────────────────────
     const body = await req.json();
@@ -64,55 +43,77 @@ Deno.serve(async (req) => {
     const recipient = address(recipientName, recipientAddress);
     if (!recipient) return jsonResponse({ error: "The recipient needs a name and a full postal address" }, 400);
 
-    const tenant = await sbGet("tenants", { "id": `eq.${tenantId}`, "select": "name" });
+    const tenant = await restGetOne("tenants", { "id": `eq.${tenantId}`, "select": "name" });
     const sender = address(senderName || tenant?.name, senderAddress);
     if (!sender) return jsonResponse({ error: "The building's return address is incomplete. Set it under Building → Contacts." }, 400);
 
-    // ── 3. The building's LetterStream credentials ─────────
-    const acct = await sbGet("letterstream_accounts", { "tenant_id": `eq.${tenantId}`, "select": "api_id,api_key,status" });
-    if (!acct?.api_id || !acct?.api_key) return jsonResponse({ error: NOT_CONNECTED, notConnected: true }, 400);
+    // ── 3. The building's vendor account ───────────────────
+    const acct = await restGetOne("mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": "provider,api_id,api_key,status" });
+    if (!acct?.api_key || !isProvider(acct.provider)) return jsonResponse({ error: NOT_CONNECTED, notConnected: true }, 400);
+    const provider = acct.provider;
+    const info = PROVIDER_INFO[provider];
 
-    // ── 4. Render and submit ───────────────────────────────
+    // ── 4. Render, store if the vendor fetches by URL, submit ──
     const { bytes, pageCount } = await renderLetterPdf({ subject, body: letterBody, sender, recipient });
     const stamp = new Date().toISOString().slice(0, 10);
-    const jobName = `${stamp} ${subject}`.slice(0, 60) + (caseId ? ` [${String(caseId).slice(0, 12)}]` : "");
+    const fileName = `notice-${stamp}.pdf`;
+    const label = `${stamp} ${subject}`.slice(0, 36) + (caseId ? ` [${String(caseId).slice(0, 8)}]` : "");
 
-    let job;
+    let pdfUrl: string | undefined;
+    if (info.needsPdfUrl) {
+      try {
+        await pruneOldLetters(tenantId);
+        pdfUrl = (await storeLetterPdf(tenantId, bytes, fileName)).signedUrl;
+      } catch (e) {
+        console.error("Could not store the letter for the vendor:", e);
+        return jsonResponse({ error: `The letter could not be stored for ${info.label} to fetch: ${String(e)}` }, 500);
+      }
+    }
+
+    let result;
     try {
-      job = await submitJob({ apiId: acct.api_id, apiKey: acct.api_key }, {
-        jobName,
-        deliveryMethod,
+      result = await submitLetter(provider, { apiId: acct.api_id || undefined, apiKey: acct.api_key }, {
         pdf: bytes,
-        pdfFileName: `notice-${stamp}.pdf`,
+        pdfUrl,
+        pdfFileName: fileName,
         pageCount,
+        label,
+        deliveryMethod,
         recipient,
         sender,
         includeReturnEnvelope: !!includeReturnEnvelope,
       });
     } catch (e) {
-      if (e instanceof LetterStreamError) {
-        console.error("LetterStream refused the job:", e.message, e.raw);
-        return jsonResponse({ error: `LetterStream did not accept the letter: ${e.message}`, letterstream: e.raw ?? null }, e.httpStatus === 0 ? 502 : 422);
+      const v = vendorError(e);
+      if (v) {
+        console.error(`${info.label} refused the letter:`, v.message, v.raw);
+        if (isCredentialError(provider, v.message)) {
+          await restWrite("PATCH", `mail_provider_accounts?tenant_id=eq.${tenantId}`, { status: "invalid", last_error: v.message });
+          return jsonResponse({ error: `${info.label} rejected the building's saved credentials (${v.message}). A board member can paste a fresh one under Settings → Mailing.`, invalidCredentials: true, vendor: v.raw }, 422);
+        }
+        if (isFundsError(provider, v.message)) {
+          return jsonResponse({ error: `The building's ${info.label} balance is too low for this letter. Add funds at ${info.label} and send it again.`, needsFunds: true, portalUrl: info.portalUrl, vendor: v.raw }, 402);
+        }
+        return jsonResponse({ error: `${info.label} did not accept the letter: ${v.message}`, vendor: v.raw }, v.httpStatus === 0 ? 502 : 422);
       }
       throw e;
     }
 
+    // The vendor accepted a letter with these credentials, so they are verified.
+    if (acct.status !== "verified") await restWrite("PATCH", `mail_provider_accounts?tenant_id=eq.${tenantId}`, { status: "verified", last_error: null, last_verified_at: new Date().toISOString() });
+
     // ── 5. Where it stands ─────────────────────────────────
-    // LetterStream holds API jobs until they are paid for in the building's
-    // account (prepaid balance or cart), so the honest status is usually
-    // "awaiting payment", not "mailed".
-    const status = job.status ? normalizeStatus(job.status) : "awaiting-payment";
     return jsonResponse({
       success: true,
-      jobId: job.jobId,
-      status,
-      awaitingPayment: status === "awaiting-payment" || status === "submitted",
-      portalUrl: LETTERSTREAM_PORTAL_URL,
+      provider,
+      providerLabel: info.label,
+      jobId: result.jobId || null,
+      status: result.status,
+      awaitingPayment: result.status === "awaiting-payment",
+      portalUrl: info.portalUrl,
       pageCount,
       deliveryMethod,
-      message: status === "awaiting-payment"
-        ? "Submitted to the building's LetterStream account. It mails once the building pays for it there, or at once if the account has a prepaid balance."
-        : `Submitted to the building's LetterStream account (${status}).`,
+      message: result.message,
     });
   } catch (err) {
     console.error("send-mail error:", err);

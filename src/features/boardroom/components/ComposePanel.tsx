@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useMailStore } from '@/store/useMailStore';
+import { useMailStore, resolveSender } from '@/store/useMailStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
-import { ESTIMATE_NOTE, PRICING, formatDeliveryMethod } from '@/types/mail';
+import { ESTIMATE_NOTE, formatDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
 import type { LetterTemplate } from '@/lib/services/letterEngine';
 import type { ComposePanelContext, DeliveryChannel, AnnouncementPriority } from '@/types/communication';
@@ -35,10 +35,10 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 // ── Mail pricing for display ────────────────────────────────
 
-const MAIL_OPTIONS: { key: MailDeliveryMethod; label: string; price: number }[] = [
-  { key: 'first-class', label: 'First Class', price: PRICING['first-class'] / 100 },
-  { key: 'certified', label: 'Certified Mail', price: PRICING['certified'] / 100 },
-  { key: 'certified-electronic-return-receipt', label: 'Certified + ERR', price: PRICING['certified-electronic-return-receipt'] / 100 },
+const MAIL_OPTIONS: { key: MailDeliveryMethod; label: string }[] = [
+  { key: 'first-class', label: 'First Class' },
+  { key: 'certified', label: 'Certified Mail' },
+  { key: 'certified-electronic-return-receipt', label: 'Certified + ERR' },
 ];
 
 function substituteVariables(text: string, values: Record<string, string>): string {
@@ -60,6 +60,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   const { units } = useFinancialStore();
   const currentUser = useAuthStore(s => s.currentUser);
   const { mailingSettings } = useMailStore();
+  const sender = resolveSender();
   const sendCommunication = useCommunicationsStore(s => s.sendCommunication);
 
   // ── State ─────────────────────────────────────────────────
@@ -113,6 +114,8 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   }, [scopeTemplates]);
 
   // ── Cost calculation ──────────────────────────────────────
+  const PRICING = pricingFor(mailingSettings.mailProvider);
+  const vendor = mailProviderLabel(mailingSettings);
   const mailPriceCents = PRICING[mailMethod] || 0;
   const mailLetterCount = scope === 'community' ? units.length : 1;
   const estimatedPageCount = Math.max(1, Math.ceil((body || '').length / 2800));
@@ -498,7 +501,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                         {m.label}
                       </span>
                       <span className="text-xs text-ink-400">
-                        ${m.price.toFixed(2)}{scope === 'community' ? '/ea' : ''}
+                        ${((PRICING[m.key] || 0) / 100).toFixed(2)}{scope === 'community' ? '/ea' : ''}
                       </span>
                     </label>
                   ))}
@@ -586,9 +589,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <span>${mailCostDollars.toFixed(2)}</span>
                 </div>
                 <p className="text-[10px] text-ink-400 mt-1">
-                  {mailingSettings.letterstreamConnected
-                    ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
-                    : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
+                  {mailingSettings.mailConnected && mailingSettings.mailProvider
+                    ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account.`
+                    : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                 </p>
               </div>
             ) : (
@@ -660,10 +663,10 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <div className="p-5 bg-white max-h-80 overflow-y-auto">
                     <div className="space-y-3 text-xs" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
                       <div className="text-ink-500">
-                        <p className="font-semibold">{mailingSettings.senderName}</p>
-                        <p>{mailingSettings.senderAddress.line1}</p>
-                        {mailingSettings.senderAddress.line2 && <p>{mailingSettings.senderAddress.line2}</p>}
-                        <p>{mailingSettings.senderAddress.city}, {mailingSettings.senderAddress.state} {mailingSettings.senderAddress.zip}</p>
+                        <p className="font-semibold">{sender.name}</p>
+                        <p>{sender.address.line1}</p>
+                        {sender.address.line2 && <p>{sender.address.line2}</p>}
+                        <p>{sender.address.city}, {sender.address.state} {sender.address.zip}</p>
                       </div>
                       <p className="text-ink-400">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                       <div className="text-ink-700">
@@ -704,7 +707,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span className="text-[11px] font-semibold text-ink-500">Email Preview</span>
                   </div>
                   <div className="px-4 py-2.5 border-b border-ink-100 space-y-1 text-[11px]">
-                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{mailingSettings.senderName}</span></div>
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{sender.name}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">To:</span><span className="text-ink-700 font-medium">{scope === 'unit' ? (selectedUnit?.email || '') : `All owners (${units.length})`}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">Subject:</span><span className="text-ink-900 font-semibold">{subject}</span></div>
                   </div>
@@ -757,9 +760,9 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span>${mailCostDollars.toFixed(2)}</span>
                   </div>
                   <p className="text-[10px] text-ink-400 mt-1">
-                    {mailingSettings.letterstreamConnected
-                      ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s LetterStream account.`
-                      : `${ESTIMATE_NOTE} The building's LetterStream account isn't connected yet (Settings → Mailing).`}
+                    {mailingSettings.mailConnected && mailingSettings.mailProvider
+                      ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account.`
+                      : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                   </p>
                 </div>
               ) : (
