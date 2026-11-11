@@ -9,7 +9,7 @@ import type { GeneratedLetter, LetterTemplate } from '@/lib/services/letterEngin
 import type { MailRecord } from '@/types/mail';
 import { daysBetween, addDays } from '../runbook/model';
 import { ISO_DATE, REQUEST_SLA_DAYS } from '../runbook/adapters';
-import { RUNBOOKS, type RunbookDef } from './runbooks';
+import { ALL_RUNBOOKS, RUNBOOKS, type RunbookDef } from './runbooks';
 import { MONTH_CLOSE_ID, monthCloseTrigger } from './monthClose';
 import { BOARD_MEETING_ID, boardCadenceDays } from './meetings';
 import { RESERVE_STUDY_ID, everyYears } from './reserveStudy';
@@ -218,13 +218,24 @@ export interface RunbookStatus {
   /** Open cases from this runbook's situation. */
   openCases: CaseTrackerCase[];
   lastRan?: { date: string; title: string };
+  /** Every action it has run, open or closed. */
+  used: number;
+  /** When it last started. */
+  lastStarted?: string;
+}
+
+/** An action made with its own steps: a one-off runbook of its own. */
+function customRunbook(c: CaseTrackerCase): RunbookDef {
+  return { id: c.sitId, name: c.title, trigger: 'Made by hand, with its own steps', steps: c.steps?.length ?? 0, automated: 0, sitId: c.sitId, catId: c.catId, visibility: 'board', defaultOn: true, kind: 'custom', stepTitles: (c.steps ?? []).map(s => s.s) };
 }
 
 /** A case the runbook opened itself carries `source: 'runbook'` and `sourceId: '<runbook id>:<key>'`, or sits on the runbook's own situation (`runbook-<id>`) when another link owns `source`, as a request's case does. */
 const startedBy = (c: CaseTrackerCase, def: RunbookDef) => (c.source === 'runbook' && !!c.sourceId?.startsWith(`${def.id}:`)) || c.sitId === `runbook-${def.id}`;
 
+/** Every workflow: the catalogue, the other wizard situations, and each action made with its own steps. */
 export function runbookStatuses(s: BoardRoomSnapshot): RunbookStatus[] {
-  return RUNBOOKS.map(def => {
+  const custom = s.cases.filter(c => c.sitId.startsWith('custom-')).map(customRunbook);
+  return [...ALL_RUNBOOKS, ...custom].map(def => {
     // A case the runbook started is its own; a hand-opened case counts by situation, unless another runbook started it.
     const matching = s.cases.filter(c => startedBy(c, def) || (!!def.sitId && c.sitId === def.sitId && c.source !== 'runbook'));
     const openCases = matching.filter(c => c.status !== 'closed');
@@ -235,6 +246,8 @@ export function runbookStatuses(s: BoardRoomSnapshot): RunbookStatus[] {
       trigger: def.id === MONTH_CLOSE_ID ? monthCloseTrigger(s.monthCloseStartDay ?? 1) : def.id === BOARD_MEETING_ID ? `Every ${boardCadenceDays(s)} days per the bylaws, 30 days ahead` : def.id === RESERVE_STUDY_ID ? `Every ${everyYears(s.reserveStudyEveryYears)} years, 90 days before due` : def.trigger,
       openCases,
       lastRan: closed ? { date: (closed.completedAt ?? closed.created).slice(0, 10), title: closed.title } : undefined,
+      used: matching.length,
+      lastStarted: matching.map(c => c.created.slice(0, 10)).sort().pop(),
     };
   });
 }
@@ -245,6 +258,8 @@ export function runbooksSummary(list: RunbookStatus[]) {
     on: list.filter(r => r.on).length,
     withOpenCase: list.filter(r => r.openCases.length > 0),
     wired: list.filter(r => r.def.wired).length,
+    used: list.filter(r => r.used > 0).length,
+    neverUsed: list.filter(r => r.used === 0).length,
     automatedSteps: list.reduce((t, r) => t + r.def.automated, 0),
     steps: list.reduce((t, r) => t + r.def.steps, 0),
   };
