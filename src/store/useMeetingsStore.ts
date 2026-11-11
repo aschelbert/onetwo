@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as meetingsSvc from '@/lib/services/meetings';
 import { generateLocalId } from '@/lib/generateId';
+import { itemsOf, type AgendaItem, type MeetingSession } from '@/ux2/community/meetingRecord';
 
 export interface MeetingDocument {
   id: string; name: string; size: string; type: string; uploadedAt: string; uploadedBy: string;
@@ -26,6 +27,13 @@ export interface Meeting {
   linkedVoteIds: string[];
   documents: MeetingDocument[];
   minutesApprovals: MinutesApproval[];
+  /** The agenda as items: minutes, attachments and votes. Older meetings have only `agenda`. */
+  items?: AgendaItem[];
+  session?: MeetingSession;
+  noticeSentAt?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  minutesApprovedAt?: string | null;
 }
 
 interface MeetingsState {
@@ -46,6 +54,10 @@ interface MeetingsState {
   removeDocument: (meetingId: string, docId: string) => void;
   approveMinutes: (meetingId: string, approval: MinutesApproval) => void;
   revokeMinutesApproval: (meetingId: string, name: string) => void;
+  /** Replace the agenda items; keeps the plain `agenda` list in step. */
+  setItems: (meetingId: string, items: AgendaItem[]) => void;
+  updateItem: (meetingId: string, itemId: string, patch: Partial<AgendaItem>) => void;
+  updateSession: (meetingId: string, patch: Partial<MeetingSession>) => void;
 }
 
 // Helper: sync full meeting to DB after local mutation
@@ -96,6 +108,12 @@ export const useMeetingsStore = create<MeetingsState>()(persist((set) => ({
   addDocument: (meetingId, doc) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, documents: [...(x.documents || []), { id: generateLocalId('doc_'), ...doc }] } : x) })); syncMeeting(meetingId); },
   removeDocument: (meetingId, docId) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, documents: (x.documents || []).filter(d => d.id !== docId) } : x) })); syncMeeting(meetingId); },
   approveMinutes: (meetingId, approval) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovals: [...(x.minutesApprovals || []).filter(a => a.name !== approval.name), approval] } : x) })); syncMeeting(meetingId); },
+  setItems: (meetingId, items) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, items, agenda: items.map(i => i.title) } : x) })); syncMeeting(meetingId); },
+  updateItem: (meetingId, itemId, patch) => {
+    set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, items: itemsOf(x).map(i => i.id === itemId ? { ...i, ...patch } : i) } : x) }));
+    syncMeeting(meetingId);
+  },
+  updateSession: (meetingId, patch) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, session: { ...(x.session ?? {}), ...patch } } : x) })); syncMeeting(meetingId); },
   revokeMinutesApproval: (meetingId, name) => { set(s => ({ meetings: s.meetings.map(x => x.id === meetingId ? { ...x, minutesApprovals: (x.minutesApprovals || []).filter(a => a.name !== name) } : x) })); syncMeeting(meetingId); },
 }), {
   name: 'onetwo-meetings',

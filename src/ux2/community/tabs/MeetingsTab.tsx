@@ -12,6 +12,7 @@ import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell,
 import { dayLabel } from '../../home/calendar';
 import { meetingRows, meetingsSummary, type MeetingRow, type CommunitySnapshot } from '../metrics';
 import { MEETING_BG, ON_DARK_PRIMARY, Rsvp, stateLabel, typeLabel } from '../meetingUi';
+import { itemsOf } from '../meetingRecord';
 import MeetingPage from './MeetingPage';
 
 type Filter = 'all' | 'upcoming' | 'past' | 'board' | 'owner';
@@ -39,16 +40,24 @@ function ScheduleForm({ onClose, onScheduled }: { onClose: () => void; onSchedul
 }
 
 /** What a meeting still needs, in a word, for the list's last column. */
-function nextStep(r: MeetingRow, isBoard: boolean): { label: string; tone: 'red' | 'amber' | 'sage' | 'ghost' } {
+function nextStep(r: MeetingRow, isBoard: boolean): { label: string; tone: 'red' | 'amber' | 'sage' | 'ghost' | 'plum' } {
+  const m = r.meeting;
   if (r.state === 'cancelled') return { label: 'Cancelled', tone: 'ghost' };
+  if (m.startedAt && !m.endedAt) return { label: 'In session', tone: 'red' };
   if (r.state === 'upcoming') {
-    if (r.datePassed) return { label: isBoard ? 'Mark as held' : 'Date passed', tone: 'amber' };
-    if (isBoard && !r.noticeSent) return { label: r.noticeOverdue ? 'Notice overdue' : 'Send the notice', tone: r.noticeOverdue ? 'red' : 'amber' };
-    if (isBoard && !r.agendaCount) return { label: 'Build the agenda', tone: 'amber' };
-    return { label: r.mine ? 'You are going' : 'RSVP open', tone: 'ghost' };
+    if (!isBoard) {
+      if (!r.noticeSent) return { label: 'Details with the notice', tone: 'ghost' };
+      const open = itemsOf(m).some(i => i.vote?.who === 'owners' && i.vote.status === 'open');
+      return open ? { label: 'Your vote is open', tone: 'plum' } : { label: r.mine ? 'You are going' : 'RSVP open', tone: 'ghost' };
+    }
+    if (r.datePassed) return { label: 'Start or close it', tone: 'amber' };
+    if (!r.agendaCount) return { label: 'Build the agenda', tone: 'amber' };
+    if (!r.noticeSent) return { label: r.noticeOverdue ? 'Notice overdue' : 'Send the notice', tone: r.noticeOverdue ? 'red' : 'amber' };
+    return { label: 'Ballots coming in', tone: 'plum' };
   }
-  if (r.minutes === 'approved') return { label: 'Minutes posted', tone: 'sage' };
-  if (!isBoard) return { label: 'Minutes to come', tone: 'ghost' };
+  if (m.session?.sealedAt) return { label: 'In the archive', tone: 'sage' };
+  if (r.minutes === 'approved') return isBoard && m.endedAt && !m.session?.summary ? { label: 'Send the summary', tone: 'amber' } : { label: 'Minutes posted', tone: 'sage' };
+  if (!isBoard) return m.session?.summary ? { label: 'Summary posted', tone: 'sage' } : { label: 'Minutes to come', tone: 'ghost' };
   return r.minutes === 'draft' ? { label: 'Approve the minutes', tone: 'amber' } : { label: 'Draft the minutes', tone: 'amber' };
 }
 
@@ -94,7 +103,7 @@ export default function MeetingsTab({ snap, meetingId, onOpen }: { snap: Communi
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2"><SectionLabel className="!text-white/[0.72]">Next meeting · {stateLabel(next)}</SectionLabel>{isBoard && <Chip tone={next.noticeSent ? 'sage' : next.noticeOverdue ? 'red' : 'amber'}>{next.noticeSent ? 'Notice sent' : next.noticeOverdue ? `Notice overdue · due ${dayLabel(next.noticeDue)}` : `Notice due ${dayLabel(next.noticeDue)}`}</Chip>}</div>
               <div className="font-display text-2xl font-semibold text-white">{next.meeting.title} · {dayLabel(next.meeting.date)}{next.meeting.time ? `, ${next.meeting.time}` : ''}</div>
-              <div className="text-sm text-white/[0.78]">{next.meeting.location || 'Room to set'}{next.meeting.virtualLink ? ' and remote' : ''} · {next.agendaCount} agenda item{next.agendaCount === 1 ? '' : 's'} · {next.rsvpUnits} of {snap.units.length} units coming</div>
+              <div className="text-sm text-white/[0.78]">{!isBoard && !next.noticeSent ? `The agenda, documents and your ballot come with the notice, by ${dayLabel(next.noticeDue)}` : `${next.meeting.location || 'Room to set'}${next.meeting.virtualLink ? ' and remote' : ''} · ${next.agendaCount} agenda item${next.agendaCount === 1 ? '' : 's'} · ${next.rsvpUnits} of ${snap.units.length} units coming`}</div>
             </div>
             <div className="flex gap-1.5">
               {!isBoard && <Rsvp row={next} snap={snap} onDark />}
@@ -138,7 +147,7 @@ export default function MeetingsTab({ snap, meetingId, onOpen }: { snap: Communi
                   <tr key={r.meeting.id} data-meeting={r.meeting.id} onClick={() => onOpen(r.meeting.id)} className="cursor-pointer hover:bg-ux2-surface">
                     <Td><Cell title={<button type="button" onClick={e => { e.stopPropagation(); onOpen(r.meeting.id); }} className="text-left font-semibold text-ux2-ink hover:underline">{r.meeting.title}</button>} note={`${typeLabel(r.meeting.type)} · ${stateLabel(r).toLowerCase()}`} /></Td>
                     <Td><Cell title={<span className="font-normal">{dayLabel(r.meeting.date)}{r.meeting.time ? `, ${r.meeting.time}` : ''}</span>} note={`${r.meeting.location || 'Room to set'}${r.meeting.virtualLink ? ' and remote' : ''}`} /></Td>
-                    <Td className="text-ux2-muted">{r.agendaCount ? `${r.agendaCount} item${r.agendaCount === 1 ? '' : 's'}` : 'Not started'}</Td>
+                    <Td className="text-ux2-muted">{!isBoard && !r.noticeSent && r.state === 'upcoming' ? 'With the notice' : r.agendaCount ? `${r.agendaCount} item${r.agendaCount === 1 ? '' : 's'}` : 'Not started'}</Td>
                     <Td className="text-ux2-muted">{r.state === 'upcoming' ? `${r.rsvpUnits} of ${snap.units.length} units coming` : `${r.rsvpBoard} of ${boardCount} board · ${r.rsvpUnits} units`}</Td>
                     <Td><Chip tone={s.tone}>{s.label}</Chip></Td>
                     <Td className="text-right"><span aria-hidden className="text-ux2-muted">›</span></Td>
