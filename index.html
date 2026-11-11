@@ -179,7 +179,7 @@ p{margin:0}
 .tile.grey .a{background:#ffffff;border:1px solid #E3E8EE}.tile.grey .a b{border-color:#D8DCE1}
 .tile.cyan .a{background:rgba(255,255,255,.55)}.tile.cyan .a b{border-color:rgba(13,27,46,.3)}
 /* cards */
-.c2{background:#F5F7FA;border:1px solid #E3E8EE;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.c2{background:#F5F7FA;border:1px solid #E3E8EE;border-radius:14px;padding:11px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .c2.white{background:#ffffff}
 .c2.cyan{background:#A5F3FC;border-color:#A5F3FC;color:#0D1B2E}
 .sl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5F6C7B}
@@ -193,7 +193,7 @@ p{margin:0}
 .btn2{display:inline-flex;align-items:center;font-size:10px;font-weight:600;color:#ffffff;background:#0D1B2E;border-radius:999px;padding:5px 9px;white-space:nowrap;flex:none}
 .btn2.ghost{background:#ffffff;color:#1A1F25;border:1px solid #D8DCE1}
 /* feed rows and runbook steps */
-.frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #E3E8EE;font-size:11.5px;min-width:0}
+.frow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #E3E8EE;font-size:11.5px;min-width:0}
 .frow:last-child{border-bottom:0}
 .frow .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.frow .tx b{font-weight:600;color:#1A1F25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.frow .tx span{font-size:10px;color:#5F6C7B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .frow .st{width:14px;height:14px;border-radius:50%;border:1.5px solid #D8DCE1;flex:none;display:flex;align-items:center;justify-content:center}
@@ -225,6 +225,9 @@ p{margin:0}
 .job:hover{border-color:#0D1B2E}
 .job.on{background:#f4f6f9;border-color:#0D1B2E;box-shadow:0 0 0 3px rgba(13,27,46,.10)}
 #inside .two > div{min-width:0}
+#inside .two .browser{position:absolute;inset:0}
+#inside .two .appbody{overflow:hidden;min-height:0}
+#inside .two #shotBody > *{flex-shrink:0}
 .browser{min-width:0;max-width:100%}
 .chrome{overflow:hidden}.url{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .appnav{overflow:hidden}
@@ -378,7 +381,7 @@ p{margin:0}
       <div class="herocard" style="background:#ffffff;color:#0D1B2E;border-radius:18px;padding:20px;box-shadow:0 30px 60px rgba(0,0,0,.35);display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:center">
         <div class="stew" id="heroStew" style="width:250px"></div>
         <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
-          <div><span style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5a6b">1302 R St NW · 12 units</span><br><span style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600">Up next: adopt the 2027 budget</span></div>
+          <div><span style="font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5a6b">Corcoran St NW · 12 units</span><br><span style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600">Up next: adopt the 2027 budget</span></div>
           <div class="f1 row" style="font-size:13px"><span class="muted">Timeliness</span><span class="pill" style="background:#f4fbf9;color:#155E75">82 · On track</span></div>
           <div class="f2 row" style="font-size:13px"><span class="muted">Compliance</span><span class="pill" style="background:#fff0f1;color:#D62839">78 · Needs you</span></div>
           <div class="f3 row" style="font-size:13px"><span class="muted">Oversight</span><span class="pill" style="background:#f4fbf9;color:#155E75">90 · On track</span></div>
@@ -415,10 +418,10 @@ p{margin:0}
         <div id="jobs" style="display:flex;flex-direction:column;gap:8px"></div>
         <div class="row" style="padding:6px 4px 0"><span id="autoLabel" style="font-size:12px;color:#8fa0b3"></span><button type="button" id="autoBtn" class="seg" style="min-height:36px;color:#155E75"></button></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div style="position:relative;min-width:0">
         <div class="browser">
           <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url" id="shotUrl">app.getonetwo.com/home</span></div>
-          <div class="appnav"><img src="/onetwo-mark.webp" alt="" style="width:28px;height:28px;object-fit:contain"><span class="appnavlinks"><span data-nav="Home">Home</span><span data-nav="Building">Building</span><span data-nav="Community">Community</span><span data-nav="Funds">Funds</span><span data-nav="Board Room">Board Room</span></span><span class="appwho"><span class="role">1302 R Street · Board Member</span><span class="av">AS</span></span></div>
+          <div class="appnav"><img src="/onetwo-mark.webp" alt="" style="width:28px;height:28px;object-fit:contain"><span class="appnavlinks"><span data-nav="Home">Home</span><span data-nav="Building">Building</span><span data-nav="Community">Community</span><span data-nav="Funds">Funds</span><span data-nav="Board Room">Board Room</span></span><span class="appwho"><span class="role">Corcoran Row · Board Member</span><span class="av">AS</span></span></div>
           <div class="appbody">
             <div id="shotBody" style="display:contents"></div>
           </div>
@@ -643,7 +646,7 @@ p{margin:0}
   var SCREENS = [
     { nav: 'Home', url: 'app.getonetwo.com/home', title: 'One feed, one next step', sub: 'Home turns the 45 obligations, the filings and every runbook step into cards for the right seat, in order. Do the step, the module records it, the score moves.',
       render: function (j) {
-        return '<div class="mhd"><div class="t"><div><h5>Good morning, Alyssa</h5><div class="sub">Wednesday, November 11 · 1302 R Street Condominium</div></div>' + ptabs([['Feed', '3', 'ghost'], 'Calendar'], 'Feed', 'sm') + '</div>' +
+        return '<div class="mhd"><div class="t"><div><h5>Good morning, Alyssa</h5><div class="sub">Wednesday, November 11 · Corcoran Row Condominium</div></div>' + ptabs([['Feed', '3', 'ghost'], 'Calendar'], 'Feed', 'sm') + '</div>' +
           '<div class="chiprow">' + chip('red', 'Overdue · 1') + chip('plum', 'Votes open · 1') + chip('amber', 'Insurance expiring · 1') + '</div></div>' +
           '<div class="hgrid"><div class="hcol"><div class="tiles">' +
             tile('grey', 'Reserves funded', '71', '%', '$112,400 set aside', 'Reserve plan', 'Open') +
@@ -666,7 +669,7 @@ p{margin:0}
       render: function () {
         return header('Community', chip('ghost', 'Next meeting May 4'), ['Overview', ['Notices', '2', 'cyan'], ['Meetings', 'May 4'], ['Votes', '1', 'plum'], 'Requests', 'Property log'], 'Meetings') +
           '<div class="c2"><div class="slrow"><span class="sl">Next meeting · needs you</span>' + ptabs(['Upcoming · 1', 'Past · 6', 'Board meetings', 'Owner meetings'], 'Upcoming · 1', 'sm white') + '</div>' +
-            '<div class="inner"><span class="ttl">Annual meeting · Monday, May 4, 7:00 pm · lobby and Zoom</span><div class="chiprow">' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + chip('teal', 'Quorum · 8 of 12 units') + chip('ghost', 'Agenda · 5 items, about 75 minutes') + '</div><div class="btns">' + btn('Open agenda') + btn('Record attendance', true) + btn('Minutes', true) + '</div></div>' +
+            '<div class="inner"><span class="ttl">Annual meeting · Monday, May 4, 7:00 pm · lobby and Zoom</span><div class="chiprow">' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + chip('teal', 'Quorum · 8 of 12 units') + chip('ghost', 'Agenda · 5 items, about 75 minutes') + '</div><div class="btns">' + btn('Open agenda') + btn('Record attendance', true) + '</div></div>' +
           '</div>' +
           '<div class="c2"><span class="sl">Approvals</span>' +
             step('done', 'Minutes drafted the same night', 'May 4, 9:40 pm · Secretary · automated from the meeting record') +
@@ -675,8 +678,7 @@ p{margin:0}
           '</div>' +
           '<div class="c2 white" style="padding:6px 8px">' + table([['Meeting', '30%'], ['When and where', '28%'], ['Notice', '12%'], ['Attendance', '16%'], ['Minutes', '14%']], [
             [cell('Annual meeting', 'Elections · budget'), cell('May 4 · lobby and Zoom'), chip('sage', 'Sent'), cell('8 of 12 units'), chip('amber', 'Draft')],
-            [cell('Board meeting', 'Roof bids'), cell('Mar 9 · Zoom'), chip('sage', 'Sent'), cell('4 of 4 board'), chip('sage', 'Approved')],
-            [cell('Budget meeting', '2026 budget'), cell('Dec 2 · lobby'), chip('sage', 'Sent'), cell('9 of 12 units'), chip('sage', 'Approved')]
+            [cell('Board meeting', 'Roof bids'), cell('Mar 9 · Zoom'), chip('sage', 'Sent'), cell('4 of 4 board'), chip('sage', 'Approved')]
           ]) + '</div>';
       } },
     { nav: 'Board Room', url: 'app.getonetwo.com/boardroom', title: 'What to do when', sub: '32 runbooks for the things with no date attached: the leak, the late owner, the records request. Each one knows its steps, its letters and the bylaws clause, and does the routine steps itself.',
@@ -714,23 +716,21 @@ p{margin:0}
         return header('Funds', chip('sage', 'Healthy · 92'), ['Overview', 'Income', ['Expenses', '2 to pay', 'navy'], ['Planning', '1 over', 'amber'], 'Statements & taxes'], 'Planning', '<span class="gear">⚙</span>') +
           ptabs(['This year · budget', '2027 budget · decide', 'Reserves'], 'Reserves', 'sm') +
           '<div class="c2"><div class="slrow"><span class="sl">Reserve contribution</span>' + chip('teal', '71% funded · 70% target by 2031') + '</div>' +
-            '<div class="inner"><span class="big">$1,100<small>a month</small></span><span class="why">Raised $150 in the 2027 draft budget. At this rate the roof is funded in 2031 and no special assessment is needed.</span><div class="btns">' + btn('Change the amount') + btn('Dues options', true) + '</div></div>' +
+            '<div class="inner"><span class="big">$1,100<small>a month</small></span><span class="why">Raised $150 in the 2027 draft budget. No special assessment for the roof in 2031.</span><div class="btns">' + btn('Change the amount') + '</div></div>' +
           '</div>' +
           '<div class="c2 white" style="padding:6px 8px">' + table([['Asset', '30%'], ['Replace', '24%'], ['Budget line', '26%'], ['Status', '20%']], [
             [cell('Roof', 'Inspected Jun 2026'), cell('2031 · $48,000'), cell('Reserve: roof'), chip('teal', '71% funded')],
-            [cell('Boiler', 'DCRA certificate to 2027'), cell('2028 · $22,000'), cell('Reserve: mechanical'), chip('sage', '90% funded')],
-            [cell('Elevator', 'Modernization'), cell('2034 · $95,000'), cell('Reserve: elevator'), chip('amber', '38% funded')]
+            [cell('Boiler', 'DCRA certificate to 2027'), cell('2028 · $22,000'), cell('Reserve: mechanical'), chip('sage', '90% funded')]
           ]) + '</div>' +
           '<div class="c2"><div class="slrow"><span class="sl">2027 budget · annual budget runbook</span>' + chip('cyan', 'Step 7 of 9') + '</div>' +
-            step('done', 'Draft from this year\'s actuals', 'Sep 30 · automated') +
             step('done', 'Mailed to owners, 30-day notice', 'Nov 2 · 12 owners, 3 on paper') +
             step('next', 'Adopt at the Dec 2 budget meeting · board vote', 'Needs the vote · recorded on Community › Votes', chip('plum', 'Vote')) +
           '</div>';
       } },
     { nav: 'Building', url: 'app.getonetwo.com/building?tab=obligations', title: 'Every obligation, with its receipt', sub: 'The 45 obligations the DC Condominium Act and DLCP put on every board, each with a date, a seat and the proof it was done. Seven years of minutes, notices and filings in the Archive.',
       render: function () {
-        return header('1302 R Street Condominium', chip('teal', 'Building score 94 · Good') + chip('sage', 'Insurance · all current'), ['Overview', 'Documents', ['Obligations', '3', 'navy'], 'Contracts', 'Directory', 'Archive'], 'Obligations') +
-          '<div class="slrow">' + ptabs(['This month', 'By role', 'By category', 'Filings · 7', 'Ongoing · 12', 'Duties and roles'], 'Filings · 7', 'sm') + '<span class="chiprow">' + chip('sage', '38 met') + chip('teal', '4 in progress') + chip('ghost', '3 upcoming') + chip('ghost', '0 overdue') + '</span></div>' +
+        return header('Corcoran Row Condominium', chip('teal', 'Building score 94 · Good') + chip('sage', 'Insurance · all current'), ['Overview', 'Documents', ['Obligations', '3', 'navy'], 'Contracts', 'Directory', 'Archive'], 'Obligations') +
+          '<div class="slrow">' + ptabs(['This month', 'By role', 'By category', 'Filings · 7', 'Ongoing · 12'], 'Filings · 7', 'sm') + '<span class="chiprow">' + chip('sage', '38 met') + chip('teal', '4 in progress') + chip('ghost', '3 upcoming') + '</span></div>' +
           '<div class="c2 white" style="padding:6px 8px">' + table([['Obligation', '38%'], ['Due', '13%'], ['Role', '14%'], ['Status', '35%']], [
             [cell('DLCP biennial report', 'DC Code 29-102.11 · $300 fee'), cell('Apr 1'), cell('Secretary'), chip('sage', 'Filed Apr 1 · receipt attached')],
             [cell('Owner disclosure statement', 'DC Code 42-1903.13'), cell('Mar 31'), cell('President'), chip('sage', 'Sent Mar 12 · 12 of 12 owners')],
@@ -783,7 +783,7 @@ p{margin:0}
   /* The hero card: the same stewardship card, climbing to 82 on load. */
   var HERO = [82, 78, 90, 90, 80];
   if (el('heroStew')) {
-    el('heroStew').innerHTML = stewCard({ dims: HERO, score: total(HERO), prev: total(HERO) - 4 }, '1302 R St NW \u00B7 the board, this year', 'heroPoly');
+    el('heroStew').innerHTML = stewCard({ dims: HERO, score: total(HERO), prev: total(HERO) - 4 }, 'Corcoran St NW \u00B7 the board, this year', 'heroPoly');
     tweenRadar('heroPoly', [70, 60, 80, 80, 70], HERO, 1800, 300);
   }
   function renderScene() {
@@ -808,7 +808,7 @@ p{margin:0}
     var t = SCREENS[i];
     return '<div class="mcard" style="z-index:' + (i + 1) + '"><div class="mh"><span class="n">' + (i + 1) + '</span><span style="min-width:0"><span class="jt">' + esc(j.title) + '</span><span class="js">' + esc(j.sub) + '</span></span></div>' +
       '<div class="browser"><div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">' + esc(t.url) + '</span></div>' +
-      '<div class="appnav"><img src="/onetwo-mark.webp" alt="" style="width:28px;height:28px;object-fit:contain"><span class="appnavlinks">' + NAVS.map(function (n) { return '<span class="' + (n === t.nav ? 'on' : '') + '">' + n + '</span>'; }).join('') + '</span><span class="appwho"><span class="role">1302 R Street</span><span class="av">AS</span></span></div>' +
+      '<div class="appnav"><img src="/onetwo-mark.webp" alt="" style="width:28px;height:28px;object-fit:contain"><span class="appnavlinks">' + NAVS.map(function (n) { return '<span class="' + (n === t.nav ? 'on' : '') + '">' + n + '</span>'; }).join('') + '</span><span class="appwho"><span class="role">Corcoran Row</span><span class="av">AS</span></span></div>' +
       '<div class="appbody">' + t.render(j) + '</div></div>' +
       '<div class="mf"><span>' + esc(j.effect) + '</span><span class="sc">' + j.score + '</span></div></div>';
   }).join('');
