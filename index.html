@@ -220,6 +220,46 @@ p{margin:0}
 .pulse{display:flex;align-items:center;gap:7px;font-size:10.5px;color:#1A1F25}
 .pulse .av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;flex:none}
 .pulse .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pulse .tx span{color:#5F6C7B}
+/* header actions, tiles with detail, KPI parts, the four-box row, flow strip, stat cards */
+.acts{margin-left:auto;display:flex;gap:5px;align-items:center;flex:none}
+.hbtn{display:inline-flex;align-items:center;height:26px;padding:0 9px;border:1px solid #D8DCE1;border-radius:999px;font-size:10.5px;font-weight:600;background:#ffffff;color:#1A1F25;white-space:nowrap}
+.hbtn.navy{background:#0D1B2E;color:#ffffff;border-color:#0D1B2E}
+.tile .meta{font-size:9px;font-weight:600;text-transform:none;letter-spacing:0;opacity:.72}
+.tile .lrow{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.tile.sel{box-shadow:0 0 0 2px #ffffff,0 0 0 3.5px #0D1B2E}
+.tile .a .chip{flex:none}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10.5px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+.kv b{font-weight:600;white-space:nowrap}.kv span{opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navy .kv,.teal .kv,.red .kv{border-bottom-color:rgba(255,255,255,.15)}
+.pbar{display:block;height:4px;border-radius:2px;background:#E3E8EE;position:relative;margin:4px 0}
+.pbar i{display:block;height:100%;border-radius:2px;background:#155E75}
+.pbar s{position:absolute;top:-3px;width:1.5px;height:10px;background:#0D1B2E;text-decoration:none}
+.navy .pbar{background:rgba(255,255,255,.15)}.navy .pbar i{background:#A5F3FC}.navy .pbar s{background:#ffffff}
+.prow{display:flex;align-items:center;gap:8px;font-size:10px}.prow .pbar{flex:1;margin:0}.prow b{font-weight:600;white-space:nowrap}
+.stat3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.stat3 div{background:rgba(255,255,255,.1);border-radius:8px;padding:6px 7px;font-size:9px;opacity:.95;min-width:0}
+.stat3 b{display:block;font-size:11px;font-weight:600;margin-top:2px;white-space:nowrap}
+.bars{display:flex;align-items:flex-end;gap:3px;height:34px;margin:2px 0}.bars i{flex:1;background:#155E75;border-radius:2px 2px 0 0}.bars i.g{background:#E3E8EE}
+.axis{display:flex;justify-content:space-between;font-size:8.5px;color:#8A96A3}
+.ringrow{display:flex;align-items:center;gap:8px}.ringrow svg{flex:none}
+.tl{position:relative;height:2px;background:#E3E8EE;margin:10px 4px 2px}.tl i{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#0D1B2E;margin-left:-4px}.tl i.g{background:#C9D2DC}
+.caption{font-size:10px;color:#8A96A3;line-height:1.4}
+.c2.outline{background:#ffffff;border-color:#E23B4E}
+.ct{font-size:14px;font-weight:600;letter-spacing:-.01em;line-height:1.2}.ct small{font-weight:400;color:#5F6C7B;font-size:10.5px;margin-left:6px}
+.c2 .sub{font-size:10.5px;color:#5F6C7B}
+.kv4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.kv4 .inner{gap:2px;padding:7px 9px}.kv4 .lbl{font-size:9.5px;color:#5F6C7B}.kv4 .val{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv4 .val.red{color:#B71C2A}.kv4 .nt{font-size:9.5px;color:#5F6C7B;line-height:1.35}
+.flow{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#5F6C7B;flex-wrap:wrap}.flow .arr{color:#8A96A3}.flow .end{margin-left:auto}
+.srch{height:26px;border:1px solid #D8DCE1;border-radius:999px;padding:0 10px;font-size:10px;color:#8A96A3;display:inline-flex;align-items:center;min-width:150px;background:#ffffff;white-space:nowrap}
+.tb tr.late td{background:#FBF5F6}.tb td.red{color:#B71C2A;font-weight:600}
+.prio::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#E23B4E;margin-right:5px;vertical-align:middle}.prio.amber::before{background:#9A5B00}.prio.ghost::before{background:#8A96A3}
+.rowmenu{width:22px;height:22px;border-radius:50%;border:1px solid #D8DCE1;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#5F6C7B;letter-spacing:1px}
+.tb td .hbtn{height:22px;padding:0 7px;font-size:9.5px;margin-right:3px}
+.tb td.wrap{white-space:normal;line-height:1.3}
+.tb.wrap3 td:nth-child(-n+3){white-space:normal;line-height:1.3}.tb.wrap3 td small{white-space:normal}
+.stat4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat4 .c2{gap:2px;padding:9px 11px}.stat4 .lbl{font-size:10px;color:#5F6C7B}.stat4 .num{font-size:20px;font-weight:600;letter-spacing:-.03em;line-height:1.1}.stat4 .num small{font-size:10px;font-weight:500;letter-spacing:0;color:#5F6C7B;margin-left:3px}.stat4 .nt{font-size:9.5px;color:#5F6C7B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnk{font-size:10px;font-weight:600;color:#155E75;white-space:nowrap}
 .scorestrip{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid #d9e8ec;border-radius:14px;background:#f4fbfc}
 .job{color:#0D1B2E;background:#ffffff;border:1px solid #e3e8ee;padding:16px 16px}
 .job:hover{border-color:#0D1B2E}
@@ -337,6 +377,11 @@ p{margin:0}
   .mcard .tb th:nth-child(n+4),.mcard .tb td:nth-child(n+4){display:none}
   .mcard .tb tr:nth-child(n+4){display:none}
   .mcard .inner .btns{display:none}
+  .mcard .acts,.mcard .srch,.mcard .flow,.mcard .rowmenu,.mcard .tb td .hbtn{display:none}
+  .mcard .stat4,.mcard .kv4{grid-template-columns:1fr 1fr}
+  .mcard .tiles.rich{grid-template-columns:1fr}
+  .mcard .tiles.rich .tile:nth-child(n+2){display:none}
+  .mcard .tiles.rich .tile .a{display:flex}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
 </style>
@@ -643,6 +688,17 @@ p{margin:0}
       '<div class="dots"><s>‹</s><i class="on"></i><i></i><i></i><i></i><i></i><i></i><s>›</s></div>';
   }
 
+  function hbtn(text, navy) { return '<span class="hbtn' + (navy ? ' navy' : '') + '">' + esc(text) + '</span>'; }
+  function acts(list) { return '<span class="acts">' + list.join('') + '</span>'; }
+  function tileX(tone, label, meta, body, action, cls) { return '<div class="tile ' + tone + (cls ? ' ' + cls : '') + '"><span class="lrow"><span class="l">' + esc(label) + '</span><span class="meta">' + meta + '</span></span>' + body + (action ? '<span class="a">' + action + '</span>' : '') + '</div>'; }
+  function kv(k, v) { return '<span class="kv"><span>' + esc(k) + '</span><b>' + esc(v) + '</b></span>'; }
+  function pbar(pct, mark) { return '<span class="pbar"><i style="width:' + pct + '%"></i>' + (mark !== undefined ? '<s style="left:' + mark + '%"></s>' : '') + '</span>'; }
+  function val(big, small) { return '<span class="v">' + esc(big) + (small ? '<small>' + esc(small) + '</small>' : '') + '</span>'; }
+  function ring(pct) { return '<svg width="34" height="34" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#E3E8EE" stroke-width="3.5"></circle><circle cx="18" cy="18" r="15" fill="none" stroke="#155E75" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="' + (94.2 * (1 - pct / 100)).toFixed(1) + '" style="transform:rotate(-90deg);transform-origin:18px 18px"></circle><text x="18" y="21.5" text-anchor="middle" font-size="9" font-weight="700" fill="#0D1B2E">' + pct + '%</text></svg>'; }
+  function box4(items) { return '<div class="kv4">' + items.map(function (b) { return '<div class="inner"><span class="lbl">' + esc(b[0]) + '</span><span class="val' + (b[3] ? ' ' + b[3] : '') + '">' + esc(b[1]) + '</span><span class="nt">' + esc(b[2]) + '</span></div>'; }).join('') + '</div>'; }
+  var FUNDS_TABS = ['Overview', 'Income', ['Expenses', '2 to pay', 'navy'], 'Planning', 'Statements & taxes'];
+  var FUNDS_ACTS = acts([hbtn('Record payment'), hbtn('Pay a bill'), '<span class="gear">⚙</span>']);
+
   var SCREENS = [
     { nav: 'Home', url: 'app.getonetwo.com/home', title: 'One feed, one next step', sub: 'Home turns the 45 obligations, the filings and every runbook step into cards for the right seat, in order. Do the step, the module records it, the score moves.',
       render: function (j) {
@@ -651,12 +707,13 @@ p{margin:0}
           '<div class="hgrid"><div class="hcol"><div class="tiles">' +
             tile('grey', 'Reserves funded', '71', '%', '$112,400 set aside', 'Reserve plan', 'Open') +
             tile('teal', 'Collected', '100', '%', '0 units behind', 'Unit ledger', 'Open') +
-            tile('grey', 'Open cases', '2', '', '1 waiting on others', 'Board Room', 'Open') + '</div>' +
+            tile('grey', 'Open cases', '3', '', '1 waiting on others', 'Board Room', 'Open') + '</div>' +
             '<div class="c2"><div class="slrow"><span class="sl">Up next</span>' + chip('navy', '3') + '</div>' +
-              frow(chip('red', '3d late'), 'DLCP biennial report', 'DC Code 29-102.11 · $300 fee · Secretary', chip('teal', '+6') + btn('File')) +
+              frow(chip('red', '3d late'), 'DLCP biennial report', 'DC Code 29-102.11 · $300 fee · Secretary · in progress', chip('teal', '+3') + btn('Continue · 1 of 3')) +
               frow(chip('navy', 'Today'), 'Approve the annual meeting minutes', 'Drafted from the meeting record · 2 of 3 votes in', chip('teal', '+2') + btn('Approve')) +
-              frow(chip('cyan', '12d'), 'Master insurance renewal', 'Policy expires Feb 15 · the 60-day window opened', chip('teal', '+4') + btn('Open')) +
-              '<div class="slrow" style="padding-top:6px"><span class="sl">Waiting on others</span>' + chip('ghost', '1') + '</div>' +
+              frow(chip('cyan', '12d'), 'Master insurance renewal', 'Policy expires Feb 15 · the 60-day window opened', chip('teal', '+2') + btn('Open the step')) +
+              '<span class="lnk">Show all 3</span>' +
+              '<div class="slrow" style="padding-top:4px"><span class="sl">Waiting on others</span>' + chip('ghost', '1') + '</div>' +
               frow(chip('ghost', 'Waiting'), 'Post November assessments', 'Priya N., Treasurer · due the 1st', btn('Nudge', true)) +
             '</div></div>' +
             '<div class="hcol"><div class="stew">' + stewCard(j, 'Your score as a board member, this year') + '</div>' +
@@ -667,81 +724,79 @@ p{margin:0}
       } },
     { nav: 'Community', url: 'app.getonetwo.com/community?tab=meetings', title: 'The meeting, from notice to minutes', sub: 'Notice goes out inside the legal window, quorum is counted at the door, and the minutes are drafted the same night and approved by a vote the owners can see.',
       render: function () {
-        return header('Community', chip('ghost', 'Next meeting May 4'), ['Overview', ['Notices', '2', 'cyan'], ['Meetings', 'May 4'], ['Votes', '1', 'plum'], 'Requests', 'Property log'], 'Meetings') +
-          '<div class="c2"><div class="slrow"><span class="sl">Next meeting · needs you</span>' + ptabs(['Upcoming · 1', 'Past · 6', 'Board meetings', 'Owner meetings'], 'Upcoming · 1', 'sm white') + '</div>' +
-            '<div class="inner"><span class="ttl">Annual meeting · Monday, May 4, 7:00 pm · lobby and Zoom</span><div class="chiprow">' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + chip('teal', 'Quorum · 8 of 12 units') + chip('ghost', 'Agenda · 5 items, about 75 minutes') + '</div><div class="btns">' + btn('Open agenda') + btn('Record attendance', true) + '</div></div>' +
+        return header('Community', chip('ghost', 'Next meeting May 4'), ['Overview', ['Notices', '2', 'cyan'], ['Meetings', 'May 4'], 'Votes', ['Requests', '1', 'ghost'], 'Property log'], 'Meetings', acts([hbtn('Schedule a meeting', true)])) +
+          '<div class="c2"><div class="slrow"><span class="chiprow" style="align-items:center"><span class="sl">Next meeting</span>' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + '</span>' + acts([hbtn('Edit the agenda'), hbtn('Open', true)]) + '</div>' +
+            '<span class="ct">Annual meeting · May 4, 19:00</span><span class="sub">Lobby and Zoom · open to all owners · 5 agenda items · 8 of 12 units have replied</span>' +
+            box4([['Notice', 'Sent Apr 3', 'In-app and by email to every owner. Ten days’ notice per the bylaws and DC Code § 29-1101.'], ['Agenda', '5 items', 'Budget, elections, roof bids, bike room, visitor parking'], ['RSVP', '8 of 12 units', 'Board: 5 of 5 confirmed. Quorum is 7.'], ['Room', 'Lobby reserved', 'In person; the remote link is on the meeting.']]) +
+            '<span class="caption">This item is also on Home and in Building › Obligations. Recording attendance clears all three.</span>' +
           '</div>' +
-          '<div class="c2"><span class="sl">Approvals</span>' +
-            step('done', 'Minutes drafted the same night', 'May 4, 9:40 pm · Secretary · automated from the meeting record') +
-            step('next', 'Approve the minutes · board vote', 'A majority publishes them to owners · 2 of 3 in', chip('plum', 'Vote')) +
-            step('', 'Mail the election results', '12 owners, 3 want paper · Outbox · postage at cost') +
-          '</div>' +
-          '<div class="c2 white" style="padding:6px 8px">' + table([['Meeting', '30%'], ['When and where', '28%'], ['Notice', '12%'], ['Attendance', '16%'], ['Minutes', '14%']], [
-            [cell('Annual meeting', 'Elections · budget'), cell('May 4 · lobby and Zoom'), chip('sage', 'Sent'), cell('8 of 12 units'), chip('amber', 'Draft')],
-            [cell('Board meeting', 'Roof bids'), cell('Mar 9 · Zoom'), chip('sage', 'Sent'), cell('4 of 4 board'), chip('sage', 'Approved')]
-          ]) + '</div>';
+          '<div class="slrow">' + ptabs(['All meetings', 'Upcoming · 1', 'Past · 6', 'Board meetings', 'Owner meetings'], 'All meetings', 'sm') + '<span class="caption"><span class="lnk">Open the calendar</span> · Minutes archive in Documents</span></div>' +
+          '<div class="c2"><span class="sl">Schedule</span><div class="c2 white" style="padding:2px 6px">' + table([['Meeting', '23%'], ['When and where', '19%'], ['Notice', '13%'], ['Agenda', '10%'], ['Attendance', '17%'], ['Minutes', '18%']], [
+            [cell('Annual meeting', 'Open to owners · upcoming'), cell('May 4, 19:00', 'Lobby and Zoom'), chip('sage', 'Sent Apr 3'), cell('5 items'), cell('8 of 12 RSVP'), cell('After meeting')],
+            [cell('Board meeting', 'Open to owners · completed'), cell('Mar 9, 19:00', 'Zoom'), cell('—'), cell('4 items'), cell('5 of 5 board · 3 of 12'), chip('amber', 'Awaiting approval')],
+            [cell('Budget meeting', 'Open to owners · completed'), cell('Dec 2, 19:00', 'Lobby'), cell('—'), cell('5 items'), cell('5 of 5 board · 9 of 12'), cell('Approved Dec 9')]
+          ]) + '</div></div>';
       } },
-    { nav: 'Board Room', url: 'app.getonetwo.com/boardroom', title: 'What to do when', sub: '32 runbooks for the things with no date attached: the leak, the late owner, the records request. Each one knows its steps, its letters and the bylaws clause, and does the routine steps itself.',
+    { nav: 'Board Room', url: 'app.getonetwo.com/boardroom', title: 'What to do when', sub: '32 runbooks for the things with no date attached: the leak, the late owner, the records request. Every open case shows where it is and what it needs next, so nobody has to open it to know.',
       render: function () {
-        return header('Board Room', chip('red', '1 overdue'), [['Ops', '2', 'navy'], ['Inbox', '1', 'amber'], ['Runbooks', '3 open', 'teal'], ['Outbox', '1 draft', 'cyan'], 'Tasks'], 'Ops') +
-          '<div class="c2"><div class="slrow"><span class="sl">Open cases</span>' + ptabs(['All · 2', 'Mine · 1', 'Overdue · 1'], 'All · 2', 'sm white') + '</div>' +
-            '<div class="inner"><div class="slrow"><span class="ttl">Water intrusion, unit 2B</span><span class="chiprow">' + chip('teal', 'Work order runbook · 3 of 4 automated') + chip('red', 'Overdue · was due Jul 20') + '</span></div>' +
-              step('done', 'Owner notified, access arranged', 'Jul 14 · automated · letter from the template') +
-              step('done', 'Plumber booked, $240, invoice attached', 'Jul 15 · Treasurer · paid from operating') +
-              step('next', 'Decide responsibility · board vote', 'Bylaws 7.2 attached: common element above the ceiling · President', chip('plum', 'Vote')) +
-              step('', 'Letter to the owner of 2B', 'Decision and repair date filled in · Outbox') +
-              step('', 'Close and file', 'Case record to Building › Archive · automated') +
-            '</div></div>' +
-          '<div class="c2"><div class="slrow"><span class="sl">Inbox · needs you</span><span style="font-size:10px;color:#5F6C7B">Replies count toward Timeliness</span></div>' +
-            frow(chip('amber', '48-hour window ends Nov 12'), 'Unit 4A: hallway light out on 3', 'Resident request runbook · step 2 of 4 · assigned to Marcus L.', btn('Reply')) +
+        return header('Board Room', chip('red', '1 overdue'), [['Ops', '3', 'navy'], ['Inbox', '1', 'amber'], ['Runbooks', '3 open', 'teal'], 'Outbox', ['Tasks', '2', 'teal'], 'Intercom'], 'Ops', acts([hbtn('New case', true)])) +
+          '<div class="c2"><div class="slrow">' + ptabs(['All open', 'My tasks · 1', 'Overdue · 1', 'Funds', 'Building', 'People', 'Board'], 'All open', 'sm white') + '<span class="srch">Search title, id, unit, owner, assignee</span></div>' +
+            '<div class="c2 white" style="padding:2px 6px">' + table([['Case', '24%'], ['Where it is', '23%'], ['Next', '18%'], ['Driver', '10%'], ['Due', '14%'], ['Priority', '11%']], [
+              ['<b>Water intrusion · Unit 2B</b><small>c4 · Maintenance · opened Jul 14</small>', '<b>Step 3 of 5 · Decide responsibility</b><small>Work order</small>', cell('Board vote · bylaws 7.2 attached'), cell('President'), '<span class="red">Jul 20 · overdue</span>', '<span class="prio">Urgent</span>'],
+              ['<b>Reserve study update</b><small>c7 · Funds · opened Nov 1</small>', '<b>Step 2 of 8 · Collect bids</b><small>Reserve study update</small>', cell('Three bids from the vendor list'), cell('Treasurer'), cell('Dec 15'), '<span class="prio amber">High</span>'],
+              ['<b>Hallway light out · Unit 4A</b><small>iss-3 · Resident request · opened Nov 10</small>', '<b>Step 2 of 4 · Acknowledge</b><small>Resident request</small>', cell('Reply within 48 hours'), cell('Marcus L.'), cell('Nov 12'), '<span class="prio ghost">Medium</span>'],
+              ['<b>Spending request · Lobby camera</b><small>c9 · Strategic · opened Nov 8 · $4,200</small>', '<b>Step 2 of 4 · Board votes</b><small>Spending request</small>', cell('Board vote · approve or deny'), cell('Treasurer'), cell('—'), '<span class="prio ghost">Medium</span>'],
+              ['<b>Vendor onboarding · Apex Roofing</b><small>c10 · Administrative · opened Nov 6</small>', '<b>Step 2 of 4 · Collect the W-9</b><small>Vendor onboarding and W-9</small>', cell('Ask Apex Roofing for a W-9'), cell('Secretary'), cell('—'), '<span class="prio ghost">Medium</span>']
+            ]).replace('<table class="tb">', '<table class="tb wrap3">').replace('<tr>', '<tr class="late">') + '</div>' +
+            '<span class="caption">Same list as Daily Operations, with “Where it is” and “Next” added so nobody has to open a case to know what it needs. Requests keep the 14-day clock, upvotes and convert-to-case.</span>' +
           '</div>';
       } },
     { nav: 'Funds', url: 'app.getonetwo.com/funds', title: 'Books that close every month', sub: 'Assessments post themselves, payments land in the ledger, the month closes on the 1st and every owner gets a statement they can read. Your accountant gets the ledger.',
       render: function () {
-        return header('Funds', chip('sage', 'Healthy · 92'), ['Overview', 'Income', ['Expenses', '2 to pay', 'navy'], 'Planning', 'Statements & taxes'], 'Overview', '<span class="gear">⚙</span>') +
-          '<div class="tiles">' +
-            tile('navy', 'This month', '3.2', 'months of cash', '$31,420 operating · $9,840 a month out', '2 bills · $1,215 waiting', 'Approve') +
-            tile('grey', 'This year', '78%', '', '80% expected by now · $98,500 of $126,000', '14 of 15 lines on track', 'Budget') +
-            tile('grey', 'Ahead', '71%', 'reserves funded', '$112,400 of a $158,000 target', 'Roof · $48,000 · 2031', 'Lever') + '</div>' +
-          '<div class="chiprow">' + chip('sage', '✓ Assessments posted · 12 of 12 units, the 1st') + chip('sage', '✓ Late fees · after 15 days, $25') + chip('sage', '✓ Statements · sent Nov 8, 3 on paper') + chip('sage', '✓ Reserve transfer · $1,100') + '</div>' +
-          '<div class="c2"><div class="slrow"><span class="sl">Month close · October 2026</span>' + chip('sage', 'Closed Nov 3 · 5 of 5') + '</div>' +
-            step('done', 'Assessments posted', '12 of 12 units billed · automated') +
-            step('done', 'Payments recorded', '12 paid, 0 late · 9 online, 3 by check') +
-            step('done', 'Bills paid', '14 approved invoices · $6,215') +
-            step('done', 'Statement sent', 'Nov 8 · portal and 3 paper copies · automated') +
-          '</div>';
-      } },
-    { nav: 'Funds', url: 'app.getonetwo.com/funds?tab=planning', title: 'The roof is 2031. The reserve knows.', sub: 'Every asset carries a replacement year and a cost, the reserve has a target to match, and the one lever that matters, the monthly contribution, is a number you can move.',
-      render: function () {
-        return header('Funds', chip('sage', 'Healthy · 92'), ['Overview', 'Income', ['Expenses', '2 to pay', 'navy'], ['Planning', '1 over', 'amber'], 'Statements & taxes'], 'Planning', '<span class="gear">⚙</span>') +
-          ptabs(['This year · budget', '2027 budget · decide', 'Reserves'], 'Reserves', 'sm') +
-          '<div class="c2"><div class="slrow"><span class="sl">Reserve contribution</span>' + chip('teal', '71% funded · 70% target by 2031') + '</div>' +
-            '<div class="inner"><span class="big">$1,100<small>a month</small></span><span class="why">Raised $150 in the 2027 draft budget. No special assessment for the roof in 2031.</span><div class="btns">' + btn('Change the amount') + '</div></div>' +
+        return header('Funds', chip('sage', 'Healthy · 92'), FUNDS_TABS, 'Overview', FUNDS_ACTS) +
+          '<div class="tiles rich">' +
+            tileX('navy', 'This month', 'Income ›', val('3.2', 'months of expenses in cash') + '<span class="m">$31,420 operating · $9,840 a month out</span><span class="prow">' + pbar(100) + '<b>12 of 12 paid</b></span><span class="m">$0 outstanding</span><div class="stat3"><div>Collected<b>$9,840</b></div><div>Card or bank<b>9 units</b></div><div>By check<b>3 units</b></div></div>', '<span>2 bills · $1,215 waiting</span><b>Approve</b>') +
+            tileX('grey', 'This year', 'Planning ›', val('78%', 'of budget used') + '<span class="m">80% expected by now · $98,500 of $126,000</span><div class="bars">' + [30, 60, 52, 58, 64, 55, 70, 62, 66, 58, 0, 0].map(function (h, i) { return '<i style="height:' + (h || 22) + '%" class="' + (h ? '' : 'g') + '"></i>'; }).join('') + '</div><span class="axis"><span>Jan</span><span>Nov</span><span>Dec</span></span>', '<span>14 of 15 lines on track</span><b>Budget</b>') +
+            tileX('grey', 'Ahead', 'Reserve plan ›', '<span class="ringrow">' + ring(71) + '<span style="min-width:0;display:flex;flex-direction:column;gap:3px">' + val('2031', 'next big repair') + '<span class="m">$112,400 of $158,000 · $1,100 a month</span></span></span><span class="tl"><i style="left:0%"></i><i style="left:40%"></i><i class="g" style="left:72%"></i><i class="g" style="left:100%"></i></span><span class="axis"><span>now</span><span>Boiler 2028</span><span>Roof 2031</span><span>Elevator 2034</span></span>', '<span>Roof · $48,000 · $1,100 a month</span><b>Lever</b>') +
           '</div>' +
-          '<div class="c2 white" style="padding:6px 8px">' + table([['Asset', '30%'], ['Replace', '24%'], ['Budget line', '26%'], ['Status', '20%']], [
-            [cell('Roof', 'Inspected Jun 2026'), cell('2031 · $48,000'), cell('Reserve: roof'), chip('teal', '71% funded')],
-            [cell('Boiler', 'DCRA certificate to 2027'), cell('2028 · $22,000'), cell('Reserve: mechanical'), chip('sage', '90% funded')]
-          ]) + '</div>' +
-          '<div class="c2"><div class="slrow"><span class="sl">2027 budget · annual budget runbook</span>' + chip('cyan', 'Step 7 of 9') + '</div>' +
-            step('done', 'Mailed to owners, 30-day notice', 'Nov 2 · 12 owners, 3 on paper') +
-            step('next', 'Adopt at the Dec 2 budget meeting · board vote', 'Needs the vote · recorded on Community › Votes', chip('plum', 'Vote')) +
-          '</div>';
+          '<div class="chiprow" style="align-items:center"><span style="font-size:11px;font-weight:600;margin-right:4px">Done for you this month</span>' + chip('sage', '✓ Billing · dues on the 1st') + chip('sage', '✓ Late fees · $25 after 15 days') + chip('sage', '✓ Reserve transfer · $1,100 a month') + '</div>' +
+          '<div class="c2"><span class="ct">The next twelve months</span><div class="chiprow" style="gap:8px">' +
+            '<div class="inner" style="flex:1;flex-direction:row;align-items:center;gap:8px;min-width:0"><span style="font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>Dec 2</b> · 2027 budget vote <span style="color:#5F6C7B">· owners notified Nov 2</span></span>' + chip('plum', 'Needs the vote') + '</div>' +
+            '<div class="inner" style="flex:1;flex-direction:row;align-items:center;gap:8px;min-width:0"><span style="font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>Feb 15</b> · Master policy renewal <span style="color:#5F6C7B">· $6,200/yr</span></span>' + chip('amber', 'Renewal') + '</div>' +
+          '</div><span class="caption">Each of these has a runbook behind it. The steps arrive as Home cards when they are due; nothing here needs you today.</span></div>';
       } },
-    { nav: 'Building', url: 'app.getonetwo.com/building?tab=obligations', title: 'Every obligation, with its receipt', sub: 'The 45 obligations the DC Condominium Act and DLCP put on every board, each with a date, a seat and the proof it was done. Seven years of minutes, notices and filings in the Archive.',
+    { nav: 'Funds', url: 'app.getonetwo.com/funds?tab=planning', title: 'The roof is 2031. The reserve knows.', sub: 'This year’s budget against actual, next year’s dues to decide, and a reserve with a target to match. The one lever that matters, the monthly contribution, is a number you can move.',
+      render: function () {
+        return header('Funds', chip('sage', 'Healthy · 92'), FUNDS_TABS, 'Planning', FUNDS_ACTS) +
+          '<div class="tiles rich">' +
+            tileX('grey', 'This year · budget', 'through Oct 31', val('78%', 'used · 80% expected by now') + pbar(78, 80) + kv('Spent', '$98,500 of $126,000') + kv('On track', '14 of 15 lines'), '<span>Every line inside its budget</span>' + chip('sage', 'On track'), 'sel') +
+            tileX('navy', '2027 budget · decide', chip('ghost', 'Computed'), val('$588', 'dues from January, or $853 or $420') + kv('Owner vote', 'opens when sent') + kv('Board vote', 'Dec 2') + kv('Adopt by', 'Jan 1'), '<span>Pick the dues number · the three options</span><b>Decide</b>') +
+            tileX('teal', 'Reserves · roof', 'study update due Jun 2027', val('71%', '$112,400 of $158,000, due 2031') + kv('On schedule at $1,100 a month', '$0 short') + kv('Roof · $48,000', '71% funded'), '<span>Set the monthly contribution · $1,100 today</span><b>Lever</b>') +
+          '</div><span class="caption">Tap a tile to open its detail below. The other two stay one tap away.</span>' +
+          '<div class="c2"><div class="slrow"><span class="ct">Budget against actual, 2026<small>15 lines · through Oct 31</small></span>' + acts([ptabs(['Biggest 8', 'Over · 1', 'All 15'], 'Biggest 8', 'sm white'), hbtn('Add a budget line')]) + '</div>' +
+            '<div class="inner flow" style="flex-direction:row"><span>Where the dues go</span>' + chip('ghost', 'Dues $118,080') + '<span class="arr">→</span>' + chip('navy', 'Reserves $13,200 · 11%') + '<span class="arr">→</span>' + chip('ghost', 'The 15 lines $126,000 · 100%') + '<span class="end lnk">Set on Reserves ›</span></div>' +
+            '<div class="c2 white" style="padding:2px 6px">' + table([['Budget line', '26%'], ['Budget', '11%'], ['Spent', '11%'], ['Left', '11%'], ['Used', '18%'], ['Status', '17%'], ['', '6%']], [
+              [cell('Insurance', '5040'), cell('$24,000'), cell('$20,100'), cell('$3,900'), pbar(84, 80), chip('sage', 'On track · 84%'), '<span class="rowmenu">⋯</span>'],
+              [cell('Snow removal', '5070'), cell('$3,000'), cell('$3,400'), cell('−$400'), pbar(100, 80), chip('red', 'Over · 113%'), '<span class="rowmenu">⋯</span>']
+            ]) + '</div></div>';
+      } },
+    { nav: 'Building', url: 'app.getonetwo.com/building?tab=obligations', title: 'Every obligation, with its receipt', sub: 'The 45 obligations the DC Condominium Act and DLCP put on every board, each with a seat, a date, the runbook that gets it done and the proof it was. Seven years of records in the Archive.',
       render: function () {
         return header('Corcoran Row Condominium', chip('teal', 'Building score 94 · Good') + chip('sage', 'Insurance · all current'), ['Overview', 'Documents', ['Obligations', '3', 'navy'], 'Contracts', 'Directory', 'Archive'], 'Obligations') +
-          '<div class="slrow">' + ptabs(['This month', 'By role', 'By category', 'Filings · 7', 'Ongoing · 12'], 'Filings · 7', 'sm') + '<span class="chiprow">' + chip('sage', '38 met') + chip('teal', '4 in progress') + chip('ghost', '3 upcoming') + '</span></div>' +
-          '<div class="c2 white" style="padding:6px 8px">' + table([['Obligation', '38%'], ['Due', '13%'], ['Role', '14%'], ['Status', '35%']], [
-            [cell('DLCP biennial report', 'DC Code 29-102.11 · $300 fee'), cell('Apr 1'), cell('Secretary'), chip('sage', 'Filed Apr 1 · receipt attached')],
-            [cell('Owner disclosure statement', 'DC Code 42-1903.13'), cell('Mar 31'), cell('President'), chip('sage', 'Sent Mar 12 · 12 of 12 owners')],
-            [cell('1099-NEC forms', '4 vendors paid $600 or more'), cell('Jan 31'), cell('Treasurer'), chip('sage', 'E-filed Jan 22 · receipts attached')],
-            [cell('Master insurance renewal', 'Policy expires Feb 15'), cell('Feb 15'), cell('President'), chip('teal', 'In progress · 2 of 5 steps')],
-            [cell('Reserve study update', 'Every 3 years'), cell('Jun 2027'), cell('Treasurer'), chip('ghost', 'Upcoming · runbook starts Apr 1')]
-          ]) + '</div>' +
-          '<div class="c2"><div class="slrow"><span class="sl">Archive · 312 documents, 2019 to 2026</span><span class="lnk">All ›</span></div>' +
-            frow(chip('ghost', 'Minutes'), 'Annual meeting minutes, May 4', 'Approved May 11 · published to owners', btn('Open', true)) +
-            frow(chip('ghost', 'Request'), 'Records request, unit 4A', 'Answered in 3 days · DC Code 42-1903.14', btn('Open', true)) +
-          '</div>';
+          ptabs(['This month', 'By role', 'By category', 'Filings · 7', 'Ongoing · 12', 'Duties and roles'], 'This month', 'sm') +
+          '<div class="stat4">' +
+            '<div class="c2"><span class="lbl">Met</span><span class="num">38<small>of 45</small></span><span class="nt">0 overdue</span></div>' +
+            '<div class="c2"><span class="lbl">In progress</span><span class="num">4</span><span class="nt">each one is a Home card for its role</span></div>' +
+            '<div class="c2"><span class="lbl">Auto-verified by documents</span><span class="num">9</span><span class="nt">bylaws, policies, insurance on file</span></div>' +
+            '<div class="c2"><span class="lbl">Board checklist</span><span class="num">94<small>%</small></span><span class="nt">feeds Oversight for board members</span></div>' +
+          '</div>' +
+          '<div class="c2"><div class="slrow"><span class="sl">November</span><span class="caption">Sources: DC Code § 29-1101 et seq. · Bylaws on file · CC&amp;Rs on file · Rules on file · 4 policies</span></div>' +
+            '<div class="c2 white" style="padding:2px 6px">' + table([['Obligation', '23%'], ['Role', '10%'], ['Due', '8%'], ['How it gets done', '18%'], ['Status', '18%'], ['', '23%']], [
+              [cell('Board meeting notice', 'g3 · governance · DC Code § 29-1101'), cell('Secretary'), cell('Nov 20'), cell('Board meeting cycle · auto'), chip('sage', 'Met · Nov 5'), hbtn('View')],
+              [cell('Reserve transfer posted', 'f4 · financial · bylaws 9.1'), cell('Treasurer'), cell('Nov 1'), cell('Automatic · $1,100 on the 1st'), chip('sage', 'Met · receipt'), hbtn('View')],
+              [cell('Annual budget adopted', 'f1 · financial · DC Code § 29-1135'), cell('Treasurer'), cell('Dec 2'), cell('Annual budget runbook · 7 of 9'), chip('teal', 'In progress · 21d'), hbtn('Continue', true) + hbtn('Mark done')],
+              [cell('1099 vendor list reviewed', 'rf7 · filing · IRS'), cell('Treasurer'), cell('Dec 31'), cell('Filing runbook · with proof'), chip('ghost', 'Upcoming · 50d'), hbtn('Start', true) + hbtn('Mark filed')]
+            ]) + '</div></div>';
       } }
   ];
 
