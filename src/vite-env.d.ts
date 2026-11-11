@@ -9,3 +9,8 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+
+/** OpenAI Ads conversion pixel, loaded in app.html / index.html */
+interface Window {
+  oaiq?: (...args: unknown[]) => void;
+}
