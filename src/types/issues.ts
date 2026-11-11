@@ -52,6 +52,8 @@ export interface CaseCheckItem {
   checked: boolean;
   checkedDate: string | null;
   attachment?: CaseCheckItemAttachment;
+  /** What someone wrote for this item ("List the open seats": the list). */
+  note?: string;
 }
 
 // Spending Decision (stored on CaseStep)

@@ -12,7 +12,14 @@
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
+ *
+ * Every other situation in the Take Action wizard is a runbook too
+ * (`SITUATION_RUNBOOKS`, opened by hand with that situation's steps), and an
+ * action made with its own steps is a one-off custom runbook (built from the
+ * action in metrics), so the Runbooks list shows every workflow there is.
  */
+import { CATS } from '@/store/useIssuesStore';
+
 export interface RunbookDef {
   id: string;
   name: string;
@@ -31,10 +38,16 @@ export interface RunbookDef {
   wired?: boolean;
   /** Which steps (0-based) the app does itself, when known; otherwise the track guesses from `automated`. */
   autoSteps?: number[];
+  /** Not in the catalogue: a wizard situation with no runbook of its own, or an action made with its own steps. */
+  kind?: 'situation' | 'custom';
+  /** What it is for, in a line (the wizard's description). */
+  desc?: string;
+  /** A custom runbook's steps, from its action. */
+  stepTitles?: string[];
 }
 
 export const RUNBOOKS: RunbookDef[] = [
-  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 9, automated: 2, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6] },
+  { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 10, automated: 4, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6, 7, 8] },
   { id: 'board-meeting', name: 'Board meeting cycle', trigger: 'Bylaws cadence', steps: 5, automated: 3, sitId: 'board-meetings', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
   { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 2, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 3] },
   { id: 'covenant-violation', name: 'Covenant violation', trigger: 'A request or inspection flags one', steps: 7, automated: 5, sitId: 'covenant-violations', catId: 'enforcement', visibility: 'board', defaultOn: true },
@@ -68,6 +81,18 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'setup', name: 'New building setup', trigger: 'First sign-in', steps: 9, automated: 6, visibility: 'board', defaultOn: true },
 ];
 
+/** Situations the wizard offers that no catalogue runbook runs on: each one is a runbook opened by hand, with the situation's steps. */
+const COVERED = new Set(RUNBOOKS.map(r => r.sitId).filter(Boolean));
+export const SITUATION_RUNBOOKS: RunbookDef[] = CATS.flatMap(c => c.sits
+  .filter(s => !COVERED.has(s.id))
+  .map(s => ({ id: `sit-${s.id}`, name: s.title, trigger: 'When the board takes action on one', steps: s.pre.length, automated: 0, sitId: s.id, catId: c.id, visibility: 'board' as const, defaultOn: true, kind: 'situation' as const, desc: s.desc })));
+
+/** The catalogue and every other wizard situation: all the workflows there are, but the custom ones. */
+export const ALL_RUNBOOKS: RunbookDef[] = [...RUNBOOKS, ...SITUATION_RUNBOOKS];
+
+/** Opened by hand only: nothing starts it and no step is automated. */
+export const handOnly = (def: RunbookDef) => !!def.kind;
+
 export function runbookById(id: string): RunbookDef | undefined {
-  return RUNBOOKS.find(r => r.id === id);
+  return ALL_RUNBOOKS.find(r => r.id === id);
 }

@@ -6,6 +6,7 @@ import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
 import { ANNUAL_BUDGET_FINANCIALS } from '@/features/issues/components/shell/budgetData';
 import { generateLocalId } from '@/lib/generateId';
+import { deriveChecks } from '@/features/issues/stepGuide';
 
 // ─── Situation Templates ───────────────────────────────────
 export interface StepAction {
@@ -46,41 +47,16 @@ export const CATS: Category[] = [
       { id:'annual-budgeting', title:'Annual Budgeting', desc:'Setting assessments, forecasting costs, funding reserves',
         tags:['Setting annual assessments','Forecasting operating costs','Funding reserves','Budget ratification'],
         pre:[
-          {s:'Review current year financials',t:'90 days before fiscal year-end',d:'Bylaws: Budget provisions',
-           desc:'Review the association\'s current financial position including reconciliations, budget variance, collections, reserves, and year-end projections to establish a baseline for next year\'s budget.',
-           actions:[
-             {id:'reconciliations',type:'report',label:'Confirm reconciliations complete (bank + reserves)',reportType:'reconciliation',reportDesc:'Verify all bank and reserve accounts are reconciled to current month-end.'},
-             {id:'budget-variance',type:'report',label:'Budget Variance: Identify structural vs one-time variances',reportType:'budgetVariance',reportDesc:'Review each budget category for variances.'},
-             {id:'collections',type:'report',label:'Review collection rate, delinquency trend, outstanding receivables',reportType:'collections',reportDesc:'Analyze assessment collection rates and delinquency trends.'},
-             {id:'reserves',type:'report',label:'Reserve balances, funding rates — confirm no operating expenses from reserves',reportType:'reserveBalances',reportDesc:'Review reserve fund balances and contribution rates.'},
-             {id:'projections',type:'report',label:'Validate year-end projections (not just YTD actuals)',reportType:'yearEndProjections',reportDesc:'Extrapolate current run-rates to fiscal year-end.'}
-           ],
-           persistent:[
-             {type:'link',label:'Open Financial Dashboard',target:'financial'},
-             {type:'upload',label:'Upload Document'}
-           ],
-           ph:'gather'},
-          {s:'Review reserve study: what capital projects are coming in the next 1-5 years? Is the reserve contribution adequate?',t:'60-90 days out',d:'Reserve study & Fiscal Lens: Reserves',desc:'Evaluate the reserve study to ensure adequate funding for upcoming capital projects and prevent future special assessments.',detail:'This is the most important budget decision. If reserve funding is below 70%, you should increase the annual contribution — even if it means a slightly higher assessment. Every dollar NOT contributed to reserves today becomes a dollar in a future special assessment. Check the reserve study\'s recommended annual contribution and compare to your current amount.',action:{type:'inline',target:'reserve-study',label:'Review Reserve Study'},ph:'gather',ck:['Review upcoming capital projects (1-5 year horizon)','Check reserve percent funded','Compare current contribution to study recommendation']},
-          {s:'Build a 3-year financial outlook',t:'60-90 days out',desc:'Look beyond next year to anticipate expiring contracts, capital projects, insurance changes, and model scenarios for dues increases, insurance inflation, and delinquency impact over a 3-year horizon.',detail:'Beyond next year\'s budget, think 3 years ahead. Are there: major contracts expiring (management, insurance, elevator)? Capital projects in the reserve study within 3 years? Insurance premium increases expected? A 3-year outlook prevents surprise assessments and gives the board time to plan. Model different dues increase scenarios (0%, 5%, 10%), insurance inflation (3.5% standard vs 10% spike), and delinquency impacts (5-10% increase). Identify the year reserves dip below safe threshold and where special assessments may be triggered. Share this outlook with owners — it builds confidence.',
-           actions:[
-             {id:'outlook-base',type:'report',label:'Review vendor contracts, capital projects & insurance projections',reportType:'outlookBase',reportDesc:'Review expiring contracts, upcoming capital projects, and insurance premium trends over the next 3 years.'},
-             {id:'dues-scenarios',type:'report',label:'Model dues under 0%, 5%, 10% increase scenarios',reportType:'duesScenarios',reportDesc:'Compare net surplus or shortfall under different annual dues increase assumptions.'},
-             {id:'insurance-scenarios',type:'report',label:'Model insurance inflation (3.5% standard & 10% annualized)',reportType:'insuranceScenarios',reportDesc:'Compare total insurance cost projections under standard vs elevated inflation scenarios.'},
-             {id:'delinquency-scenarios',type:'report',label:'Model 5–10% delinquency increase scenario',reportType:'delinquencyScenarios',reportDesc:'Estimate lost revenue impact if delinquency rate increases above current levels.'},
-             {id:'reserve-threshold',type:'report',label:'Identify year reserves dip below safe threshold',reportType:'reserveThreshold',reportDesc:'Project reserve balance and percent funded over 5 years to identify when reserves fall below 30% funded.'},
-             {id:'assessment-triggers',type:'report',label:'Identify potential special assessment trigger points',reportType:'assessmentTriggers',reportDesc:'Flag conditions across all scenarios that may require a special assessment.'}
-           ],
-           persistent:[
-             {type:'link',label:'Open Financial Dashboard',target:'financial'},
-             {type:'upload',label:'Upload Document'}
-           ],
-           ph:'gather'},
-          {s:'Obtain bids, contract renewals, and cost estimates for all operating expenses',t:'60-90 days out',d:'Vendor contracts',desc:'Review vendor contracts for renewal terms and obtain competitive bids for expiring agreements.',detail:'Review each vendor contract for renewal terms and rate changes. Obtain competitive bids for expiring contracts. Factor in inflation (typically 3-5% for utilities, insurance often higher). Don\'t just roll forward last year\'s numbers — cost assumptions should be justified.',action:{type:'inline',target:'contract-renewals',label:'Review Contracts & Renewals'},ph:'gather',ck:['Review vendor contract renewal terms','Obtain competitive bids for expiring contracts','Factor in inflation for utilities and insurance']},
-          {s:'Draft proposed budget: operating expenses + reserve contribution + contingency = total; calculate per-unit assessment',t:'60 days out',desc:'Assemble the budget structure with itemized operating expenses, reserve contribution, and contingency to calculate per-unit assessments.',detail:'Budget structure: (1) Operating expenses by category (use Fiscal Lens Budget tab). (2) Reserve contribution (per reserve study recommendation). (3) Contingency (3-5% of operating budget — covers unexpected costs without raiding reserves). (4) Total divided by total percentage interests = per-unit assessment. Show the per-unit impact clearly.',action:{type:'inline',target:'budget-drafter',label:'Draft Budget'},ph:'draft',ck:['Itemize operating expenses by category','Set reserve contribution per study','Add 3-5% contingency','Calculate per-unit assessment']},
-          {s:'Check whether assessment increase triggers owner vote per bylaws or statute',t:'With budget draft',d:'Bylaws & DC Code § 29-1135.02',desc:'Determine if the proposed assessment increase exceeds the bylaws cap and requires owner ratification.',detail:'Check bylaws for assessment increase cap (commonly 10-15% without owner vote). If increase exceeds cap, owner vote or ratification is required. If you need a large increase, consider phasing it over 2 years (e.g., 10% this year, 8% next year) to stay within the cap.',action:{type:'inline',target:'bylaws-review',label:'Check Assessment Limits'},ph:'draft'},
-          {s:'Schedule budget presentation at open board meeting',t:'30 days before adoption',d:'DC Code § 29-1135.02',desc:'Present the proposed budget in plain language, explaining the rationale behind every increase. Allow written questions from owners who cannot attend.',detail:'DC requires 30-day notice before budget adoption. Owners don\'t need to understand every line item — they need to know: (1) What is my assessment? (2) Why is it changing? (3) What am I getting for it? (4) What happens to reserves? Present in these terms, not accounting jargon. Allow written questions from owners who cannot attend.',ph:'present'},
-          {s:'Collect owner feedback and conduct owner vote if required by bylaws',t:'14-21 days after presentation',d:'Bylaws: Owner voting provisions',desc:'Prepare and distribute the preliminary budget package to owners, then open a formal feedback period. Collect written owner questions and conduct the owner vote if the assessment increase exceeds the bylaws cap.',detail:'After presenting the budget, allow a formal feedback period. Collect written owner questions and respond in writing. If the assessment increase exceeds the bylaws cap (see Step 6), conduct an owner vote — typically requiring 2/3 (66.7%) approval in DC. Record vote results including quorum count.',action:{type:'modal',target:'owner-vote',label:'Record Owner Vote'},ph:'present',ck:['Prepare budget with prior year comparison','Include reserve funding status','Include assessment amount and effective date','Include explanation of changes','Send preliminary budget package to owners','Open feedback period (min 14 days)','Collect written owner questions','Conduct owner vote if required','Record vote results and quorum']},
-          {s:'Distribute formal budget package and adopt budget',t:'30 days before effective',d:'DC Code § 29-1135.02 & Bylaws',desc:'Formally adopt the budget via board vote and distribute the adopted budget to all owners via the method required by bylaws.',detail:'Record the board vote in minutes with the full budget attached. Send the adopted budget to all owners via the method required by bylaws. If owners reject the budget, operate under prior year budget until a revised budget is adopted.',w:'Owner ratification required when assessment increase exceeds bylaws cap — see Bylaws & DC Code § 29-1135.02',ph:'present',ck:['Send adopted budget via required method','Board vote recorded in minutes']}
+          {s:"Start next year's draft from this year's numbers",t:'90 days before the fiscal year starts',d:'Bylaws: Budget provisions',detail:"The app copies every budget line with what has been spent so far, the vendor contracts, the insurance premiums, the reserve study and today's dues into a draft for next year. This step ticks itself when the action opens.",ph:'gather'},
+          {s:"Check next year's contracts and insurance",t:'60-90 days out',detail:'Confirm what each vendor contract and insurance policy will cost next year and which line pays for it. Change a price on the contract or the policy and the draft follows.',ph:'gather'},
+          {s:'Set every line for next year',t:'60-90 days out',detail:"Each line has a suggestion from this year's spending. Accept it or type your own; the step ticks itself when every line has been looked at.",ph:'draft'},
+          {s:'Set the reserve contribution and a cushion',t:'60 days out',d:'DC Code § 42-1903.13',detail:'How much goes into reserves for future repairs, from the reserve study, and a contingency for the unexpected (3 to 5% is usual).',ph:'draft'},
+          {s:"Pick next year's dues",t:'60 days out',d:'Bylaws: assessment increase limit',detail:"The dues that pay for the lines, the cushion and the reserves, split by each unit's share. The app checks the bylaws' limit on an increase without an owner vote.",ph:'draft'},
+          {s:"Put the draft on a board meeting's agenda",t:'30-45 days before adoption',d:'DC Code § 29-1109.02',detail:'Add it to a board meeting as a decision with a board vote, with the proposed budget attached as it stands.',ph:'present'},
+          {s:'Board votes to adopt the budget',t:'At the meeting',d:'DC Code § 29-1135.02',detail:'The vote happens at the meeting and is recorded there; this step ticks itself when it passes. A vote taken elsewhere can be recorded on this action.',ph:'present'},
+          {s:'Tell owners: the adopted budget and the new dues',t:'30 days before the year starts',d:'DC Code § 29-1135.02',detail:'The notice is written for you from the adopted budget. This step ticks itself when a notice about the budget is posted after this action opened.',ph:'present'},
+          {s:'Switch Funds to the new budget and dues on the first day of the year',t:'First day of the fiscal year',detail:"On that day the app puts the adopted lines into Funds › Planning, each unit's new dues on its account, and the new reserve transfer. It can also be done earlier by hand.",ph:'present'},
+          {s:'File the adopted budget under Building › Documents',t:'After adoption',detail:'The app writes the adopted budget as a document and files it under Budgets, where owners can read it.',ph:'present'},
         ],
         self:[
           {s:'Respond to owner disputes of assessment increase with written justification citing DC Code § 29-1135.02',t:'Within 14 days of dispute',d:'DC Code § 29-1135.02 & Bylaws',
@@ -1296,7 +1272,7 @@ export const CATS: Category[] = [
           {s:'Set annual meeting date and reserve venue/virtual platform',t:'90 days before meeting',d:'DC Code § 29-1109.02',detail:'DC requires annual meeting within 13 months of prior. Confirm date does not conflict with holidays. Book venue with capacity for quorum attendance.',ph:'prepare'},
           {s:'Review bylaws for quorum requirements, notice periods, and election procedures',t:'90 days out',d:'Bylaws: Annual meeting section',detail:'DC typical quorum: 33-40% of units. Notice window: 10-60 days per DC Code § 29-1109.02(a). Identify number of board seats up for election.',ph:'prepare',ck:['Check quorum threshold','Confirm notice period window','Identify number of board seats up for election']},
           {s:'Open nominations for board seats; distribute Call for Candidates notice',t:'60-75 days out',d:'Bylaws: Election section',detail:'Use the Election — Call for Candidates letter template. Include: number of open seats, term length, eligibility requirements (owner in good standing), candidacy deadline, candidate statement guidelines.',ph:'prepare'},
-          {s:'Finalize proposed budget for owner ratification; prepare annual financial report',t:'60 days out',d:'DC Code § 29-1135.02',detail:'Budget should be board-adopted before presenting to owners. Include: income projections, operating expenses, reserve contribution, assessment rate changes. Prepare year-end financial summary or audited statements.',ph:'prepare',ck:['Finalize proposed budget','Prepare income projections','Prepare year-end financial summary']},
+          {s:'Present the adopted budget for owner ratification; prepare the annual financial report',t:'60 days out',d:'DC Code § 29-1135.02',detail:'The board makes and adopts the budget in the Annual budget runbook; this step brings the adopted budget to the owners. It ticks itself once the board has adopted the budget for the coming year. Prepare the year-end financial summary or audited statements for the meeting.',ph:'prepare',ck:['Adopted budget in the meeting packet','Owner ratification on the agenda if the bylaws require it','Year-end financial summary prepared']},
           {s:'Prepare reserve fund status report for owner presentation',t:'45 days out',d:'DC Code § 42-1903.13',detail:'Include: current reserve balance, funding plan, percent funded, upcoming major expenditures. Reference most recent reserve study.',ph:'prepare',ck:['Report current reserve balance','Summarize funding plan','Calculate percent funded','List upcoming major expenditures']},
           {s:'Close nominations; verify candidate eligibility; prepare ballot',t:'45 days out',d:'Bylaws: Candidate eligibility',detail:'Verify each candidate is a unit owner in good standing (current on assessments). Prepare secret ballot per DC Code § 29-1135.09. Include candidate statements.',ph:'prepare',ck:['Close nominations','Verify each candidate is owner in good standing','Prepare secret ballot','Collect candidate statements']},
           {s:'Send formal Annual Meeting Notice to all owners with agenda, proxy forms, and candidate statements',t:'30-60 days out (per bylaws)',d:'DC Code § 29-1109.02(a)',detail:'Use the Annual Meeting Notice letter template. Must include: date, time, location, full agenda, proxy/ballot form, candidate statements. Send via method required by bylaws (mail, email, or both). Retain proof of delivery.',ph:'prepare',ck:['Prepare meeting notice with date, time, location','Attach full agenda','Include proxy/ballot form','Include candidate statements','Send via required method','Retain proof of delivery']},
@@ -2118,6 +2094,26 @@ function mergeCheckLabels(saved: CaseCheckItem[], templateCk: string[]): CaseChe
   return saved.map((ck, i) => i < templateCk.length ? { ...ck, label: templateCk[i] } : ck);
 }
 
+/** The Annual budget's guided steps are worked through on the draft, not a checklist. */
+const isGuidedBudget = (c: Pick<CaseTrackerCase, 'sitId' | 'approach'>) => c.sitId === 'runbook-annual-budget' || (c.sitId === 'annual-budgeting' && c.approach === 'pre');
+
+/** A step written without a checklist gets one from its own words (see stepGuide), so every step has items to work through. */
+function withStepChecklist<T extends CaseStep>(st: T): T {
+  if ((st.checks && st.checks.length > 0) || (st.actions && st.actions.length > 0)) return st;
+  const checks = hydrateChecks(deriveChecks(st))!.map(ck => (st.done ? { ...ck, checked: true, checkedDate: st.doneDate ?? null } : ck));
+  return { ...st, checks };
+}
+
+/** Every step of an action, and of its added approaches, has a checklist. */
+export function withChecklists(c: CaseTrackerCase): CaseTrackerCase {
+  const steps = c.steps && !isGuidedBudget(c) ? c.steps.map(withStepChecklist) : c.steps;
+  const additionalApproaches = c.additionalApproaches?.map(aa => ({ ...aa, steps: aa.steps.map(withStepChecklist) }));
+  return { ...c, steps, ...(additionalApproaches && { additionalApproaches }) };
+}
+
+/** Completing a step completes its checklist. */
+const tickAll = (checks: CaseCheckItem[] | undefined, date: string) => checks?.map(ck => (ck.checked ? ck : { ...ck, checked: true, checkedDate: date }));
+
 function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
@@ -2151,7 +2147,7 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
       ...(s.requiresConflictCheck && { requiresConflictCheck: true }),
     };
   });
-  return c;
+  return withChecklists(c);
 }
 
 /** Re-hydrate a case from DB or localStorage: merge saved progress onto full template steps.
@@ -2159,7 +2155,8 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
 function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
-  if (!sit) return c;
+  // A runbook's or a custom action's own steps: kept as saved, with a checklist where one is missing.
+  if (!sit) return withChecklists(c);
   const src = c.approach === 'legal' ? sit.legal : c.approach === 'self' ? sit.self : sit.pre;
 
   // Map saved steps by id for merging user progress
@@ -2180,6 +2177,8 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
           ? mergeCheckLabels(saved.checks, st.ck)
           : hydrateChecks(st.ck)
       }),
+      // A checklist made from the step's own words keeps its ticks and notes.
+      ...(!(st.ck && st.ck.length > 0) && saved?.checks && saved.checks.length > 0 && { checks: saved.checks }),
       ...(st.actions && { actions: st.actions.map((a: any) => {
         // Preserve action done/doneDate from saved data
         const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
@@ -2221,6 +2220,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
             ...(st.ck && st.ck.length > 0 && {
               checks: (saved?.checks && saved.checks.length > 0) ? mergeCheckLabels(saved.checks, st.ck) : hydrateChecks(st.ck)
             }),
+            ...(!(st.ck && st.ck.length > 0) && saved?.checks && saved.checks.length > 0 && { checks: saved.checks }),
             ...(st.actions && { actions: st.actions.map((a: any) => {
               const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
               return { ...a, done: savedAction?.done ?? false, doneDate: savedAction?.doneDate ?? null };
@@ -2236,7 +2236,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
     });
   }
 
-  return c;
+  return withChecklists(c);
 }
 
 const seedCases: CaseTrackerCase[] = [
@@ -2413,6 +2413,9 @@ interface IssuesState {
 
   // Phase/check/action actions
   toggleCheck: (caseId: string, stepIdx: number, checkId: string) => void;
+  /** What someone wrote for a checklist item; empty clears it. */
+  setCheckNote: (caseId: string, stepIdx: number, checkId: string, note: string) => void;
+  setAdditionalCheckNote: (caseId: string, approachIdx: number, stepIdx: number, checkId: string, note: string) => void;
   toggleAction: (caseId: string, stepIdx: number, actionId: string) => void;
   completeAllChecks: (caseId: string, stepIdx: number) => void;
   putOnHold: (caseId: string, reason: string) => void;
@@ -2483,6 +2486,13 @@ interface IssuesState {
   shellActiveStep: number;
   shellActiveStepCaseId: string | null;
   setShellActiveStep: (caseId: string, stepIdx: number) => void;
+}
+
+/** Save a step's done state and checklist (ticks, notes) to the database. */
+function saveStepProgress(caseId: string, stepIdx: number) {
+  if (!isBackendEnabled) return;
+  const step = useIssuesStore.getState().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
+  if (step) void casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -2632,18 +2642,18 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       }));
     }
     const today = new Date().toISOString().split('T')[0];
-    const newCase: CaseTrackerCase = {
+    const newCase: CaseTrackerCase = withChecklists({
       id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,
       unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
       status: 'open', created: today,
       steps, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
-      conflictChecks: [], decisionTrail: [{ id: generateLocalId('te'), type: 'case_created', date: today, actor: 'Board', summary: `Case created: ${data.title}` }],
+      conflictChecks: [], decisionTrail: [{ id: generateLocalId('te'), type: 'case_created', date: today, actor: 'Board', summary: `Action created: ${data.title}` }],
       ...(data.assignedTo && { assignedTo: data.assignedTo }),
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
       ...(data.source && { source: data.source }),
       ...(data.sourceId && { sourceId: data.sourceId }),
-    };
+    });
     set({ cases: [newCase, ...s.cases], nextCaseNum: caseNum + 1 });
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
@@ -2664,7 +2674,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         steps[stepIdx] = {
           ...steps[stepIdx],
           done: !wasDone,
-          doneDate: !wasDone ? today : null
+          doneDate: !wasDone ? today : null,
+          // Marking a step done ticks what is left of its checklist.
+          ...(!wasDone && steps[stepIdx].checks && { checks: tickAll(steps[stepIdx].checks, today) }),
         };
         if (!wasDone) {
           const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor: 'Board', summary: `Step completed: ${steps[stepIdx].s}` };
@@ -2676,7 +2688,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) {
       const c = get().cases.find(x => x.id === caseId);
       const step = c?.steps?.[stepIdx];
-      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+      if (step) casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
     }
   },
 
@@ -2688,14 +2700,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps?.[stepIdx] || c.steps[stepIdx].done) return c;
         const steps = [...c.steps];
-        steps[stepIdx] = { ...steps[stepIdx], done: true, doneDate: today };
+        steps[stepIdx] = { ...steps[stepIdx], done: true, doneDate: today, ...(steps[stepIdx].checks && { checks: tickAll(steps[stepIdx].checks, today) }) };
         const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor, summary: `Step completed: ${steps[stepIdx].s}` };
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
     if (isBackendEnabled) {
       const step = get().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
-      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+      if (step) casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
     }
   },
 
@@ -2763,6 +2775,33 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
+  },
+
+  setCheckNote: (caseId, stepIdx, checkId, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps?.[stepIdx]?.checks) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], checks: steps[stepIdx].checks!.map(ck => (ck.id === checkId ? { ...ck, note: note.trim() || undefined } : ck)) };
+        return { ...c, steps };
+      })
+    }));
+    saveStepProgress(caseId, stepIdx);
+  },
+
+  setAdditionalCheckNote: (caseId, approachIdx, stepIdx, checkId, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]?.steps[stepIdx]?.checks) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        steps[stepIdx] = { ...steps[stepIdx], checks: steps[stepIdx].checks!.map(ck => (ck.id === checkId ? { ...ck, note: note.trim() || undefined } : ck)) };
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+    syncAdditionalApproachesToStorage(get().cases);
   },
 
   toggleAction: (caseId, stepIdx, actionId) => {
@@ -2803,6 +2842,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
   },
 
   attachCheckDocument: (caseId, stepIdx, checkId, attachment) => {
@@ -2824,11 +2864,12 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
   },
 
   putOnHold: (caseId, reason) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_held', date: today, actor: 'Board', summary: `Case put on hold: ${reason}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_held', date: today, actor: 'Board', summary: `Action put on hold: ${reason}` };
     set(s => ({
       cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'on-hold' as const, holdReason: reason, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
@@ -2846,7 +2887,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   closeCaseWithReason: (caseId, reason, notes) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_closed', date: today, actor: 'Board', summary: `Case closed: ${reason}`, details: notes };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_closed', date: today, actor: 'Board', summary: `Action closed: ${reason}`, details: notes };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
@@ -2896,7 +2937,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
             ...(st.desc && { desc: st.desc }),
           }));
         }
-        const newApproach = { approach, addedDate: today, steps };
+        const newApproach = { approach, addedDate: today, steps: steps.map(withStepChecklist) };
         const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
         return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
       })

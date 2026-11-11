@@ -49,6 +49,9 @@ function ProfileRow({ label, value, note, onSave, type = 'text', action = 'Chang
   );
 }
 
+/** On desktop a card beside the stewardship card takes the row's height without setting it, so the row stays the stewardship card's height. */
+const FIT = 'lg:h-0 lg:min-h-full lg:overflow-hidden';
+
 export default function AccountTab({ snap }: { snap: MeSnapshot }) {
   const navigate = useNavigate();
   const store = useStoreSnapshot(snap.today);
@@ -81,22 +84,28 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The row is as tall as the stewardship card, the same as on Home; the cards beside it fill that height (FIT) instead of stretching it. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <StewardshipCard you={view.you} events={view.events} buildingDims={view.building.dims} buildingTotal={view.building.total} group={view.group} subject={`${bandFor(view.you.total)} · ${snap.viewer.officerTitle ?? (snap.viewer.isBoard ? 'board member' : 'owner')} · this year`} />
-        <Card aria-label="This month" className="gap-2">
+        <Card aria-label="This month" className={`gap-2 ${FIT}`}>
           <div className="flex items-center justify-between gap-2"><SectionLabel>This month</SectionLabel><Chip tone="ghost">{view.events.length} events behind this score</Chip></div>
           <div><span className="text-[34px] font-semibold leading-none tracking-[-0.03em] text-ux2-ink">{view.you.total}</span><span className="text-sm text-ux2-muted"> composite · {bandFor(view.you.total)}</span></div>
           <div className="text-xs text-ux2-muted">Last {recent.length} scored events, each with a receipt</div>
-          {recent.length === 0 ? <Why>Nothing scored yet.</Why> : recent.map(e => (
-            <Inner key={e.id} className="flex items-center justify-between gap-3">
-              <Cell title={e.label} note={`${dayLabel(e.date)} · ${e.reason ?? ''}`} />
-              <span className="flex items-center gap-1.5"><Chip tone={e.earned >= e.available ? 'teal' : e.earned > 0 ? 'amber' : 'red'}>{e.dimension} {e.earned > 0 ? `+${e.points}` : '0'}</Chip><Chip tone="ghost">Receipt</Chip></span>
-            </Inner>
-          ))}
-          <Inner className="flex items-center justify-between gap-3"><Cell title="All events" note="by dimension, since you joined" /><button type="button" onClick={() => navigate('/community')} className="text-xs font-semibold text-ux2-teal hover:underline">Overview ›</button></Inner>
+          <div className="flex min-h-0 flex-col gap-2 lg:flex-1 lg:overflow-y-auto">
+            {recent.length === 0 ? <Why>Nothing scored yet.</Why> : recent.map(e => (
+              <Inner key={e.id} className="flex items-center justify-between gap-3 !py-2.5" title={`${e.label} · ${dayLabel(e.date)}${e.reason ? ` · ${e.reason}` : ''}`}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ux2-ink">{e.label}</span>
+                  <span className="block truncate text-xs text-ux2-muted">{dayLabel(e.date)}{e.reason ? ` · ${e.reason}` : ''}</span>
+                </span>
+                <Chip tone={e.earned >= e.available ? 'teal' : e.earned > 0 ? 'amber' : 'red'} className="shrink-0">{e.dimension} {e.earned > 0 ? `+${e.points}` : '0'}</Chip>
+              </Inner>
+            ))}
+          </div>
+          <Inner className="flex shrink-0 items-center justify-between gap-3"><Cell title="All events" note="by dimension, since you joined" /><button type="button" onClick={() => navigate('/community')} className="text-xs font-semibold text-ux2-teal hover:underline">Overview ›</button></Inner>
         </Card>
         {snap.viewer.isBoard ? (
-          <Card tone="red" aria-label="On the board" className="gap-1">
+          <Card tone="red" aria-label="On the board" className={`gap-1 ${FIT}`}>
             <SectionLabel className="text-white/[0.75]">On the board</SectionLabel>
             <div className="text-2xl font-semibold">{snap.viewer.officerTitle ?? 'Board member'}</div>
             {rank > 0 && <div><span className="text-[34px] font-semibold leading-none tracking-[-0.03em]">{rank}</span><span className="text-sm text-white/[0.8]"> of {leaderboard.length} on the leaderboard</span></div>}
@@ -108,7 +117,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
             <button type="button" onClick={() => navigate('/community')} className="mt-auto flex items-center justify-between rounded-xl bg-white/[0.12] px-3 py-2 text-left text-[13px] text-white"><span><b className="font-semibold">Full leaderboard</b> · Community › Overview</span><Chip tone="white" className="!bg-white !text-ux2-red-ink">Open</Chip></button>
           </Card>
         ) : (
-          <Card tone="teal" aria-label="Your place">
+          <Card tone="teal" aria-label="Your place" className={FIT}>
             <SectionLabel className="text-white/[0.66]">Among the owners</SectionLabel>
             <div className="text-2xl font-semibold">{view.you.total} · {bandFor(view.you.total)}</div>
             <p className="m-0 text-sm text-white/[0.85]">Owners average {view.building.total}. Lift {lowest} first: {HOW[lowest]}</p>

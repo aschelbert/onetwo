@@ -4,6 +4,7 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
+import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
 import { runbookStatuses, situationLabel, type BoardRoomSnapshot } from '@/ux2/boardroom/metrics';
 import { currentFiscalYear, fiscalLabel, lastFiscalYear, nextFiscalYear } from '@/ux2/boardroom/fiscal';
 import { runYearEndClose, yearEndSteps, STEP as YE } from '@/ux2/boardroom/yearEndClose';
@@ -19,6 +20,7 @@ beforeEach(() => {
   useIssuesStore.setState({ cases: [], nextCaseNum: 1, casesLoaded: true });
   useFinancialStore.setState({ tenantId: null, runbooksOff: [], closedThrough: null, annualReserveContribution: 12000, generalLedger: [entry('e1', '2026-03-10'), entry('e2', '2026-11-02')] });
   useComplianceStore.setState({ announcements: [] });
+  useBudgetDraftStore.setState({ drafts: {} });
   useRunbookSwitches.setState({ off: [] });
   setFye('12-31');
 });
@@ -89,12 +91,12 @@ describe('annual budget', () => {
     expect(runAnnualBudget('2026-10-03')).toMatchObject({ fyStart: '2027-01-01', opened: true });
     const c = useIssuesStore.getState().cases[0];
     expect(c).toMatchObject({ title: 'Annual budget · 2027', sitId: 'runbook-annual-budget', source: 'runbook', sourceId: 'annual-budget:2027-01-01', assignedRole: 'Treasurer', dueDate: '2026-12-02', priority: 'high' });
-    expect(c.steps?.length).toBe(9);
+    expect(c.steps?.length).toBe(10);
     expect(c.steps![AB.draft].done).toBe(true);
     expect(c.steps![AB.notify].done).toBe(false);
     expect(runAnnualBudget('2026-11-10')).toMatchObject({ opened: false, caseId: c.id });
     expect(useIssuesStore.getState().cases.length).toBe(1);
-    expect(budgetSteps({ start: '2027-01-01', end: '2027-12-31' })[AB.notify].s).toBe('Tell owners by 2026-12-02: the adopted budget and the 2027 dues');
+    expect(budgetSteps({ start: '2027-01-01', end: '2027-12-31' })[AB.notify].s).toBe('Tell owners by 2026-12-02: the adopted budget and the new dues');
   });
 
   it('defers to a budget case the board already has, from the Home obligation or the wizard, and respects the switch', () => {

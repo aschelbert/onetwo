@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { archiveRows, caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary, type BoardRoomSnapshot } from '@/ux2/boardroom/metrics';
-import { RUNBOOKS } from '@/ux2/boardroom/runbooks';
+import { ALL_RUNBOOKS, RUNBOOKS, SITUATION_RUNBOOKS } from '@/ux2/boardroom/runbooks';
+import { CATS } from '@/store/useIssuesStore';
 
 const step = (s: string, done: boolean, extra: Record<string, unknown> = {}) => ({ id: s, s, done, doneDate: done ? '2026-10-01' : null, userNotes: '', ...extra });
 
@@ -87,8 +88,13 @@ describe('board room metrics', () => {
     expect(rows[3]).toMatchObject({ kind: 'request', closed: '2026-06-20', outcome: 'Resolved', entries: 2 });
   });
 
-  it('reports the 32 runbooks with switches, open cases and last run', () => {
+  it('reports every workflow: the 32 runbooks, the other wizard situations and custom actions, with switches, use, open cases and last run', () => {
     expect(RUNBOOKS.length).toBe(32);
+    // Every situation Take Action offers is on the list, once as its own runbook when no catalogue runbook runs on it.
+    const sits = CATS.flatMap(c => c.sits.map(s => s.id));
+    for (const id of sits) expect(ALL_RUNBOOKS.some(r => r.sitId === id)).toBe(true);
+    expect(SITUATION_RUNBOOKS.every(r => r.kind === 'situation' && r.automated === 0 && r.id === `sit-${r.sitId}`)).toBe(true);
+    expect(SITUATION_RUNBOOKS.map(r => r.sitId)).toContain('fine-hearings');
     const list = runbookStatuses(snap);
     const by = Object.fromEntries(list.map(r => [r.def.id, r]));
     expect(by['vendor-bids'].on).toBe(false);
@@ -96,8 +102,22 @@ describe('board room metrics', () => {
     expect(by['collections'].openCases.map(c => c.id)).toEqual(['c1']);
     expect(by['covenant-violation'].lastRan).toEqual({ date: '2026-09-14', title: 'Covenant violation 4A' });
     expect(by['work-order'].openCases.map(c => c.id)).toEqual(['c2', 'c4', 'c5']);
+    expect(by['work-order']).toMatchObject({ used: 3, lastStarted: '2026-11-02' });
+    expect(by['covenant-violation']).toMatchObject({ used: 1 });
+    expect(by['elections'].used).toBe(0);
+    expect(by['sit-fine-hearings']).toMatchObject({ used: 0, on: true });
     const sum = runbooksSummary(list);
-    expect(sum).toMatchObject({ total: 32, on: 31 });
+    expect(sum).toMatchObject({ total: ALL_RUNBOOKS.length, on: ALL_RUNBOOKS.length - 1 });
+    expect(sum.used).toBe(4);
     expect(sum.withOpenCase.map(r => r.def.id)).toEqual(['vendor-bids', 'collections', 'work-order']);
+  });
+
+  it('turns an action made with its own steps into a custom runbook of its own', () => {
+    const custom = { id: 'c9', title: 'Lobby art install', catId: 'general', sitId: 'custom-123', status: 'open', priority: 'low', unit: '', owner: '', created: '2026-11-03', steps: [step('Pick the art', true), step('Hang it', false)] };
+    const list = runbookStatuses({ ...snap, cases: [...snap.cases, custom] as unknown as BoardRoomSnapshot['cases'] });
+    const r = list.find(x => x.def.id === 'custom-123')!;
+    expect(r.def).toMatchObject({ kind: 'custom', name: 'Lobby art install', stepTitles: ['Pick the art', 'Hang it'] });
+    expect(r).toMatchObject({ used: 1, lastStarted: '2026-11-03' });
+    expect(r.openCases.map(c => c.id)).toEqual(['c9']);
   });
 });

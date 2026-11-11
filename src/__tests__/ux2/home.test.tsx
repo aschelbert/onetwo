@@ -42,7 +42,10 @@ describe('Home', () => {
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Stewardship by dimension"]')).toBeNull();
     expect(document.querySelector('[aria-label="Building news"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Your account"]')).toBeTruthy();
+    // The unit balance sits between the stewardship card and Building news, and goes to My Unit to pay.
+    const widgets = [...document.querySelectorAll('[data-widget="stewardship-radar"], [aria-label="Unit balance"], [aria-label="Building news"]')];
+    expect(widgets.map(el => el.getAttribute('data-widget') ?? el.getAttribute('aria-label'))).toEqual(['stewardship-radar', 'Unit balance', 'Building news']);
+    expect(document.querySelector('[aria-label="Unit balance"] button')).toBeTruthy();
     expect(document.querySelector('[data-widget="calendar"]')).toBeNull();
   });
 
@@ -103,11 +106,11 @@ describe('Home', () => {
     expect(s.hiddenFor('u1', '2026-11-09').size).toBe(0);
   });
 
-  it('renders the owner Home with the account card, building news and no board tiles', () => {
+  it('renders the owner Home with the unit balance, building news and no board tiles', () => {
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
       render(<MemoryRouter><HomePage /></MemoryRouter>);
-      expect(document.querySelector('[aria-label="Your account"]')).toBeTruthy();
+      expect(document.querySelector('[aria-label="Unit balance"]')).toBeTruthy();
       expect(document.querySelector('[aria-label="Building news"]')).toBeTruthy();
       expect(screen.queryByText('Reserves funded')).toBeNull();
       expect(screen.queryByRole('region', { name: 'Waiting on others' })).toBeNull();

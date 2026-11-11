@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { searchHelp } from '@/ux2/me/help';
@@ -60,6 +60,57 @@ describe('Me', () => {
     expect(document.querySelector('[aria-label="Owner responsibilities"]')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Pay' })[0]);
     expect(screen.getByTestId('elsewhere')).toBeTruthy();
+  });
+
+  it('My Unit with no unit linked: the picker lists the building\'s units and links the one picked', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    const before = useAuthStore.getState().currentUser;
+    useAuthStore.setState(s => ({ currentUser: { ...s.currentUser, linkedUnits: [], unitNumber: '' } }));
+    try {
+      renderAt('/my-unit');
+      const picker = screen.getByRole('form', { name: 'Link a unit' });
+      const select = within(picker).getByLabelText('Unit') as HTMLSelectElement;
+      const options = [...select.options].slice(1).map(o => o.value);
+      expect(options.length).toBe(useFinancialStore.getState().units.length);
+      fireEvent.change(select, { target: { value: options[0] } });
+      fireEvent.click(within(picker).getByRole('button', { name: 'Link' }));
+      expect(useAuthStore.getState().currentUser.linkedUnits).toEqual([options[0]]);
+    } finally {
+      useAuthStore.setState({ currentUser: before });
+    }
+  });
+
+  it('My Unit with no units in the building: the picker is off; a board member is sent to add them, an owner is told the board will', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    const units = useFinancialStore.getState().units;
+    const before = useAuthStore.getState().currentUser;
+    useAuthStore.setState(s => ({ currentUser: { ...s.currentUser, linkedUnits: [], unitNumber: '' } }));
+    useFinancialStore.setState({ units: [] });
+    try {
+      renderAt('/my-unit');
+      const group = screen.getByRole('group', { name: 'Link a unit' });
+      expect((within(group).getByLabelText('Unit') as HTMLSelectElement).disabled).toBe(true);
+      expect(within(group).getByText(/haven't been added yet/)).toBeTruthy();
+      fireEvent.click(within(group).getByRole('button', { name: "Add the building's units" }));
+      expect(screen.getByTestId('elsewhere')).toBeTruthy();
+      cleanup();
+      useAuthStore.setState({ currentRole: 'RESIDENT' });
+      renderAt('/my-unit');
+      const owner = screen.getByRole('group', { name: 'Link a unit' });
+      expect(within(owner).getByText(/The board hasn't added the building's units yet/)).toBeTruthy();
+      expect(within(owner).queryByRole('button', { name: "Add the building's units" })).toBeNull();
+    } finally {
+      useFinancialStore.setState({ units });
+      useAuthStore.setState({ currentUser: before, currentRole: 'BOARD_MEMBER' });
+    }
+  });
+
+  it('My Account: the cards beside the stewardship card take its height instead of stretching it', () => {
+    renderAt('/account');
+    const row = (document.querySelector('[data-widget="stewardship-radar"]') as HTMLElement).parentElement!;
+    const others = [...row.children].filter(el => el.getAttribute('data-widget') !== 'stewardship-radar');
+    expect(others.length).toBe(2);
+    for (const el of others) expect(el.className).toMatch(/lg:h-0 lg:min-h-full/);
   });
 
   it('User Management lists members, sends an invite through the store, and shows the permissions matrix', () => {

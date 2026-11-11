@@ -1225,6 +1225,14 @@ function CaseDetail({ caseId, onBack, onNav }: { caseId: string; onBack: () => v
         if (isAdditionalActive) store.toggleAdditionalCheck(caseId, activeApproachIdx!, currentStepIdx, checkId);
         else store.toggleCheck(caseId, safeStep, checkId);
       }}
+      onSaveNote={(idx, note) => {
+        if (isAdditionalActive) store.addAdditionalStepNote(caseId, activeApproachIdx!, idx, note);
+        else store.addStepNote(caseId, idx, note);
+      }}
+      onSaveCheckNote={(checkId, note) => {
+        if (isAdditionalActive) store.setAdditionalCheckNote(caseId, activeApproachIdx!, currentStepIdx, checkId, note);
+        else store.setCheckNote(caseId, safeStep, checkId, note);
+      }}
       onAction={(action, stepIdx) => handleAction(action, stepIdx)}
       onNavigate={(target) => handleAction({ type: 'navigate', target, label: '' }, currentStepIdx)}
       onUpload={() => handleAction({ type: 'modal', target: 'upload-doc', label: '' }, currentStepIdx)}

@@ -14,17 +14,53 @@ const lastPay = (u: UnitSummary) => [...u.unit.payments].sort((a, b) => b.date.l
 const autopayOn = (u: UnitSummary) => { const p = lastPay(u); return !!p && ONLINE_METHODS.includes((p.method || '').toLowerCase()); };
 const methodLabel = (m?: string) => (!m ? '—' : /stripe|card|online/i.test(m) ? 'Autopay · card on file' : /bank|ach/i.test(m) ? 'Autopay · bank' : m.charAt(0).toUpperCase() + m.slice(1));
 
-function LinkUnit({ onClose }: { onClose: () => void }) {
+/** Where a board member adds or edits the building's units. */
+const ADD_UNITS = '/building?tab=directory&section=units&add=unit';
+
+/**
+ * Link a unit to this sign-in: pick it from the building's units. With no
+ * units on file there is nothing to pick, so the picker is off and says who
+ * adds them: a board member is taken to Building › Directory to add them; an
+ * owner is told the board has to.
+ */
+function LinkUnit({ onClose }: { onClose?: () => void }) {
+  const navigate = useNavigate();
   const units = useFinancialStore(s => s.units);
   const user = useAuthStore(s => s.currentUser);
+  const role = useAuthStore(s => s.currentRole);
   const update = useAuthStore(s => s.updateProfile);
+  const mine = new Set(user.linkedUnits ?? []);
+  const options = useMemo(() => [...units].filter(u => !mine.has(u.number)).sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true })), [units, user.linkedUnits]); // eslint-disable-line react-hooks/exhaustive-deps
   const [n, setN] = useState('');
-  const known = units.some(u => u.number === n.trim());
+  const isBoard = role === 'BOARD_MEMBER' || role === 'PROPERTY_MANAGER' || role === 'PLATFORM_ADMIN';
+  if (units.length === 0) {
+    return (
+      <div role="group" aria-label="Link a unit" className="flex flex-col gap-2 rounded-[14px] border border-ux2-line bg-ux2-surface px-3.5 py-3">
+        <Field label="Unit" className="w-[220px]"><select disabled aria-disabled value="" className={`${INPUT} cursor-not-allowed opacity-60`}><option value="">No units on file yet</option></select></Field>
+        {isBoard ? (
+          <>
+            <p className="m-0 text-[13px] text-ux2-ink"><b className="font-semibold">The building's units haven't been added yet.</b> Add them under Building › Directory › Units and owners, then come back here to link yours. Owners can link theirs once they're there.</p>
+            <div className="flex gap-2"><Button size="sm" onClick={() => navigate(ADD_UNITS)}>Add the building's units</Button>{onClose && <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>}</div>
+          </>
+        ) : (
+          <>
+            <p className="m-0 text-[13px] text-ux2-ink"><b className="font-semibold">The board hasn't added the building's units yet.</b> Once they do, pick yours here.</p>
+            {onClose && <div><Button size="sm" variant="ghost" onClick={onClose}>Close</Button></div>}
+          </>
+        )}
+      </div>
+    );
+  }
   return (
-    <form aria-label="Link a unit" onSubmit={e => { e.preventDefault(); if (!known) return; update({ linkedUnits: Array.from(new Set([...(user.linkedUnits ?? []), n.trim()])) }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
-      <Field label="Unit" className="w-[160px]"><input value={n} onChange={e => setN(e.target.value)} placeholder="4B" className={INPUT} /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!known}>Link</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
-      <Why className="basis-full">The board checks the deed on record and the unit joins this sign-in. Votes stay one per unit.</Why>
+    <form aria-label="Link a unit" onSubmit={e => { e.preventDefault(); if (!n) return; update({ linkedUnits: Array.from(new Set([...(user.linkedUnits ?? []), n])) }); onClose?.(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+      <Field label="Unit" className="w-[260px]">
+        <select value={n} onChange={e => setN(e.target.value)} className={INPUT}>
+          <option value="">Pick your unit</option>
+          {options.map(u => <option key={u.number} value={u.number}>Unit {u.number}{u.owner ? ` · ${u.owner}` : ''}</option>)}
+        </select>
+      </Field>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!n}>Link</Button>{onClose && <Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button>}</div>
+      <Why className="basis-full">The board checks the deed on record and the unit joins this sign-in. Votes stay one per unit.{isBoard ? <> A unit missing from the list? <button type="button" onClick={() => navigate(ADD_UNITS)} className="font-semibold text-ux2-teal hover:underline">Add it in Building › Directory</button>.</> : ''}</Why>
     </form>
   );
 }
@@ -280,7 +316,8 @@ export default function UnitsTab({ snap }: { snap: MeSnapshot }) {
       <Card aria-label="No unit" className="gap-3">
         <SectionLabel>No unit linked</SectionLabel>
         <Why>Link the unit you own or live in. A linked unit gives you its ledger, its documents and its vote.</Why>
-        {linking ? <LinkUnit onClose={() => setLinking(false)} /> : <Button size="sm" className="self-start" onClick={() => setLinking(true)}>Link a unit</Button>}
+        {/* The picker is right here: nothing to open first. */}
+        <LinkUnit />
       </Card>
     );
   }
@@ -355,7 +392,7 @@ export default function UnitsTab({ snap }: { snap: MeSnapshot }) {
 
       <Card aria-label="Link a unit" className="gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Link a unit you own</SectionLabel>{!linking && <Button size="sm" variant="ghost" onClick={() => setLinking(true)}>Link a unit</Button>}</div>
-        {linking ? <LinkUnit onClose={() => setLinking(false)} /> : <Why>Enter the unit; the board checks the deed on record and the unit joins this sign-in. Votes stay one per unit.</Why>}
+        {linking ? <LinkUnit onClose={() => setLinking(false)} /> : <Why>Pick the unit from the building's list; the board checks the deed on record and the unit joins this sign-in. Votes stay one per unit.</Why>}
       </Card>
     </div>
   );

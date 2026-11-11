@@ -1,10 +1,12 @@
 /**
- * Board Room › Runbooks: every runbook in one list. Clicking one opens its
+ * Board Room › Runbooks: every workflow in one list: the catalogue, every
+ * other situation Take Action offers, and each action made with its own
+ * steps; filtered by whether it starts itself and whether it is used. Clicking one opens its
  * details: what starts it, who sees its cases, whether it is on, what is
  * running now, and every step it includes, marked as the app's (with how it
  * does it) or a person's. `?runbook=<id>` opens a runbook's details directly.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, Why } from '../../components';
@@ -13,6 +15,7 @@ import { useRunbookSwitches } from '../store';
 import { runbookStatuses, runbooksSummary, type RunbookStatus, type BoardRoomSnapshot } from '../metrics';
 import { MONTH_CLOSE_ID, nextMonthCloseStart } from '../monthClose';
 import { automationLine, runbookPlan } from '../runbookPlans';
+import { handOnly } from '../runbooks';
 import type { CaseTrackerCase } from '@/types/issues';
 
 /** Where this case came from, truthfully: the runbook itself, a request, an obligation, or a person. */
@@ -41,6 +44,15 @@ function Mark({ kind }: { kind: 'auto' | 'person' | 'planned' | 'done' }) {
   return <span className={cn('inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border', cls)}>{kind === 'person' ? <Person /> : kind === 'done' ? <Check /> : <Bolt />}</span>;
 }
 
+type FilterId = 'all' | 'auto' | 'hand' | 'used' | 'never';
+const FILTERS: { id: FilterId; label: string; test: (r: RunbookStatus) => boolean }[] = [
+  { id: 'all', label: 'All', test: () => true },
+  { id: 'auto', label: 'Start themselves', test: r => !!r.def.wired },
+  { id: 'hand', label: 'By hand', test: r => !r.def.wired },
+  { id: 'used', label: 'Used', test: r => r.used > 0 },
+  { id: 'never', label: 'Never used', test: r => r.used === 0 },
+];
+
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookStatus; snap: BoardRoomSnapshot; onBack: () => void; onOpenCase: (id: string) => void; onNewCase: (prefill?: { catId: string; sitId: string }) => void }) {
@@ -58,24 +70,27 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Chip tone={plan.live ? 'cyan' : 'ghost'}>{plan.live ? 'Starts itself' : 'Opens by hand today'}</Chip>
+              <Chip tone={plan.live ? 'cyan' : 'ghost'}>{plan.live ? 'Starts itself' : r.def.kind === 'custom' ? 'Custom · its own steps' : handOnly(r.def) ? 'By hand · nothing automated' : 'Opens by hand today'}</Chip>
               <Chip tone="ghost">{r.def.visibility === 'owners' ? 'Owners see its actions' : 'Board only · the unit sees its own view'}</Chip>
             </div>
             <h2 className="m-0 mt-1.5 text-2xl font-semibold text-white">{r.def.name}</h2>
-            <div className="text-sm text-white/[0.78]">{plan.live ? 'Starts' : 'Meant to start'} {lower(r.trigger)}{r.def.id === MONTH_CLOSE_ID && r.on ? ` · next on ${dayLabel(nextMonthCloseStart(snap.today, snap.monthCloseStartDay ?? 1))}` : ''}</div>
+            {r.def.desc && <div className="text-sm text-white/[0.78]">{r.def.desc}</div>}
+            <div className="text-sm text-white/[0.78]">{plan.live || handOnly(r.def) ? (r.def.kind === 'custom' ? r.trigger : `Starts ${lower(r.trigger)}`) : `Meant to start ${lower(r.trigger)}`}{r.def.id === MONTH_CLOSE_ID && r.on ? ` · next on ${dayLabel(nextMonthCloseStart(snap.today, snap.monthCloseStartDay ?? 1))}` : ''}</div>
           </div>
-          <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.def.name} ${r.on ? 'on' : 'off'}`} onClick={() => setOn(r.def.id, !r.on)} className="rounded-full">
-            <Chip tone={r.on ? 'cyan' : 'ghost'}>{r.on ? 'On' : 'Off · opens by hand only'}</Chip>
-          </button>
+          {!handOnly(r.def) && (
+            <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.def.name} ${r.on ? 'on' : 'off'}`} onClick={() => setOn(r.def.id, !r.on)} className="rounded-full">
+              <Chip tone={r.on ? 'cyan' : 'ghost'}>{r.on ? 'On' : 'Off · opens by hand only'}</Chip>
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <div className="flex flex-col gap-1 rounded-[14px] bg-white px-3.5 py-3"><span className="text-xs text-ux2-muted">Steps</span><span className="text-[15px] font-semibold text-ux2-ink">{plan.steps.length}</span><span className="text-xs text-ux2-muted">{line.planned ? `${line.auto} planned to be automated` : `${line.auto} done by the app`}</span></div>
-          <div className="flex flex-col gap-1 rounded-[14px] bg-white px-3.5 py-3"><span className="text-xs text-ux2-muted">Now</span><span className="text-[15px] font-semibold text-ux2-ink">{open ? `Open · step ${Math.min(doneSteps + 1, open.steps?.length ?? doneSteps + 1)} of ${open.steps?.length ?? plan.steps.length}` : 'Nothing running'}</span><span className="truncate text-xs text-ux2-muted">{open ? `${open.title}${r.openCases.length > 1 ? ` · ${r.openCases.length - 1} more open` : ''}` : r.lastRan ? `Last ran ${dayLabel(r.lastRan.date)} · ${r.lastRan.title}` : 'Never ran'}</span></div>
+          <div className="flex flex-col gap-1 rounded-[14px] bg-white px-3.5 py-3"><span className="text-xs text-ux2-muted">Now</span><span className="text-[15px] font-semibold text-ux2-ink">{open ? `Open · step ${Math.min(doneSteps + 1, open.steps?.length ?? doneSteps + 1)} of ${open.steps?.length ?? plan.steps.length}` : 'Nothing running'}</span><span className="truncate text-xs text-ux2-muted">{open ? `${open.title}${r.openCases.length > 1 ? ` · ${r.openCases.length - 1} more open` : ''}` : r.lastRan ? `Last ran ${dayLabel(r.lastRan.date)} · ${r.lastRan.title}` : 'Never ran'}{` · used ${r.used} time${r.used === 1 ? '' : 's'}`}</span></div>
           <div className="flex flex-col gap-1 rounded-[14px] bg-white px-3.5 py-3"><span className="text-xs text-ux2-muted">By a person</span><span className="text-[15px] font-semibold text-ux2-ink">{plan.steps.filter(s => !s.auto).length} step{plan.steps.filter(s => !s.auto).length === 1 ? '' : 's'}</span><span className="text-xs text-ux2-muted">{open?.assignedTo || open?.assignedRole ? `Each arrives as a Home card for ${open.assignedTo || open.assignedRole}` : 'Each arrives as a Home card for whoever is assigned'}</span></div>
         </div>
         <div className="flex flex-wrap gap-2">
           {open && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onOpenCase(open.id)}>Open the action</Button>}
-          {!open && r.def.sitId && r.def.catId && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })}>Take Action</Button>}
+          {!open && r.def.kind !== 'custom' && r.def.sitId && r.def.catId && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })}>Take Action</Button>}
           {setting && <Button size="sm" variant="ghost" className="!border-white/30 !bg-white/10 !text-white" onClick={() => navigate(setting.path)}>{setting.label}</Button>}
         </div>
       </Card>
@@ -104,6 +119,8 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
         </ol>
         <Why>{plan.live
           ? 'Automated steps tick themselves when the app sees the work done in the place it happens (Funds, Contracts, Meetings...). A person can still tick any of them on the action.'
+          : r.def.kind === 'custom' ? 'Someone wrote these steps for one action. A person does each of them.'
+          : handOnly(r.def) ? 'Nothing starts this one and no step is automated: a person does each of them. Take Action opens it with these steps.'
           : `This runbook doesn't start itself yet: take action by hand${r.def.sitId ? ' and these are its steps' : ''}. Its automated count is the plan for it.`}</Why>
       </Card>
 
@@ -126,6 +143,7 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
   const list = useMemo(() => runbookStatuses(snap), [snap]);
   const sum = runbooksSummary(list);
   const setOn = useRunbookSwitches(s => s.setOn);
+  const [filter, setFilter] = useState<FilterId>('all');
   const [params, setParams] = useSearchParams();
   const selected = list.find(r => r.def.id === params.get('runbook'));
   const open = (id: string | null) => {
@@ -137,35 +155,48 @@ export default function RunbooksTab({ snap, onOpenCase, onNewCase }: { snap: Boa
 
   const plans = new Map(list.map(r => [r.def.id, automationLine(r.def)]));
   const autoSteps = list.reduce((t, r) => t + (plans.get(r.def.id)!.planned ? 0 : plans.get(r.def.id)!.auto), 0);
+  const shown = list.filter(FILTERS.find(f => f.id === filter)!.test);
   return (
     <Card aria-label="All runbooks" className="gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SectionLabel>All runbooks · {sum.total}</SectionLabel>
-        <span className="text-xs text-ux2-muted">{sum.wired} start themselves · {autoSteps} steps done by the app · {sum.withOpenCase.length} with an action open</span>
+        <span className="text-xs text-ux2-muted">{sum.wired} start themselves · {autoSteps} steps done by the app · {sum.used} used · {sum.neverUsed} never used · {sum.withOpenCase.length} with an action open</span>
       </div>
-      <Table minWidth={860}>
-        <thead><tr><Th>Runbook</Th><Th>Starts when</Th><Th num>Steps</Th><Th>Automated</Th><Th>Now</Th><Th num>On</Th></tr></thead>
+      <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
+        {FILTERS.map(f => {
+          const n = list.filter(f.test).length;
+          return (
+            <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)} className="rounded-full">
+              <Chip tone={filter === f.id ? 'navy' : 'ghost'}>{f.label} · {n}</Chip>
+            </button>
+          );
+        })}
+      </div>
+      <Table minWidth={960}>
+        <thead><tr><Th>Runbook</Th><Th>Starts when</Th><Th num>Steps</Th><Th>Automated</Th><Th>Used</Th><Th>Now</Th><Th num>On</Th></tr></thead>
         <tbody>
-          {list.map(r => {
+          {shown.length === 0 && <tr><Td colSpan={7} className="text-ux2-muted">None here.</Td></tr>}
+          {shown.map(r => {
             const line = plans.get(r.def.id)!;
             return (
               <tr key={r.def.id} data-runbook={r.def.id} onClick={() => open(r.def.id)} className={cn('cursor-pointer hover:bg-ux2-surface', r.on ? '' : 'opacity-70')}>
-                <Td><Cell title={<button type="button" onClick={e => { e.stopPropagation(); open(r.def.id); }} className="text-left font-semibold text-ux2-ink hover:underline">{r.def.name}</button>} note={r.def.visibility === 'owners' ? 'Owners see its actions' : 'Board only'} /></Td>
-                <Td className="text-ux2-muted">{r.trigger}{!r.def.wired && <span className="block text-[11px]">Opens by hand today</span>}</Td>
+                <Td><Cell title={<button type="button" onClick={e => { e.stopPropagation(); open(r.def.id); }} className="text-left font-semibold text-ux2-ink hover:underline">{r.def.name}</button>} note={`${r.def.kind === 'custom' ? 'Custom · ' : ''}${r.def.visibility === 'owners' ? 'Owners see its actions' : 'Board only'}`} /></Td>
+                <Td className="text-ux2-muted">{r.trigger}{!r.def.wired && !handOnly(r.def) && <span className="block text-[11px]">Opens by hand today</span>}</Td>
                 <Td num>{line.total}</Td>
-                <Td><Chip tone={line.planned ? 'ghost' : 'teal'}>{line.auto} of {line.total}{line.planned ? ' planned' : ''}</Chip></Td>
-                <Td>{r.openCases.length > 0 ? <Chip tone="navy">{r.openCases.length} open</Chip> : <span className="text-ux2-muted">{r.lastRan ? `Last ${dayLabel(r.lastRan.date)}` : 'Never ran'}</span>}</Td>
+                <Td><Chip tone={line.planned || line.auto === 0 ? 'ghost' : 'teal'}>{line.auto === 0 && !line.planned ? 'None' : `${line.auto} of ${line.total}${line.planned ? ' planned' : ''}`}</Chip></Td>
+                <Td data-used={r.used}>{r.used > 0 ? <Cell title={`${r.used} time${r.used === 1 ? '' : 's'}`} note={r.lastStarted ? `last ${dayLabel(r.lastStarted)}` : undefined} /> : <span className="text-ux2-muted">Never used</span>}</Td>
+                <Td>{r.openCases.length > 0 ? <Chip tone="navy">{r.openCases.length} open</Chip> : <span className="text-ux2-muted">{r.lastRan ? `Last done ${dayLabel(r.lastRan.date)}` : 'Nothing open'}</span>}</Td>
                 <Td num>
-                  <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.def.name} ${r.on ? 'on' : 'off'}`} onClick={e => { e.stopPropagation(); setOn(r.def.id, !r.on); }} className="rounded-full">
+                  {handOnly(r.def) ? <span className="text-xs text-ux2-muted">By hand</span> : <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.def.name} ${r.on ? 'on' : 'off'}`} onClick={e => { e.stopPropagation(); setOn(r.def.id, !r.on); }} className="rounded-full">
                     <Chip tone={r.on ? 'navy' : 'ghost'}>{r.on ? 'On' : 'Off · manual'}</Chip>
-                  </button>
+                  </button>}
                 </Td>
               </tr>
             );
           })}
         </tbody>
       </Table>
-      <Why>Click a runbook to see its steps and which ones the app does itself. Switching one off only stops its trigger; its steps stay for any action opened by hand.</Why>
+      <Why>Every workflow is here: the runbooks, every other situation Take Action offers (a person does each step), and any action made with its own steps. Click one to see its steps and which ones the app does itself. Used counts every action it has run, open or closed. Switching one off only stops its trigger; its steps stay for any action opened by hand.</Why>
     </Card>
   );
 }
