@@ -302,6 +302,9 @@ Deno.serve(async (req) => {
                 chargebee_customer_id: `eq.${customerId}`,
                 select: "id,payload",
                 order: "created_at.desc",
+                // Newest wins if a retried checkout left more than one row;
+                // a single-object read of several rows would fail outright.
+                limit: "1",
               })
             : null;
 
@@ -320,9 +323,9 @@ Deno.serve(async (req) => {
             break;
           }
 
-          // Clean up the pending_checkouts row
+          // Clean up this customer's pending_checkouts rows
           if (pendingRow?.id) {
-            await fetch(`${SB_URL}/rest/v1/pending_checkouts?id=eq.${pendingRow.id}`, {
+            await fetch(`${SB_URL}/rest/v1/pending_checkouts?chargebee_customer_id=eq.${encodeURIComponent(customerId)}`, {
               method: "DELETE",
               headers: {
                 apikey: SB_SERVICE_KEY,

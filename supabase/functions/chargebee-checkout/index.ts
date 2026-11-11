@@ -279,8 +279,17 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Save building data for the webhook to provision after checkout
-      // Use upsert (on_conflict user_id) so retries don't fail
+      // Save building data for the webhook to provision after checkout.
+      // A retried checkout replaces the earlier pending row: the webhook reads
+      // exactly one row per customer, and the latest details should win.
+      const pendingHeaders = {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+      };
+      await fetch(
+        `${SB_URL}/rest/v1/pending_checkouts?chargebee_customer_id=eq.${encodeURIComponent(customerId)}`,
+        { method: 'DELETE', headers: pendingHeaders },
+      );
       const pendingBody = {
         chargebee_customer_id: customerId,
         user_id: user.id,
@@ -309,16 +318,20 @@ Deno.serve(async (req) => {
           addressFlag: building.addressFlag || null,
         },
       };
-      await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
+      const pendingRes = await fetch(`${SB_URL}/rest/v1/pending_checkouts`, {
         method: 'POST',
         headers: {
-          apikey: SB_SERVICE_KEY,
-          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          ...pendingHeaders,
           'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=representation',
+          Prefer: 'return=minimal',
         },
         body: JSON.stringify(pendingBody),
       });
+      if (!pendingRes.ok) {
+        // Without this row the webhook cannot provision the building, so stop
+        // before the visitor pays rather than after.
+        throw new Error(`Saving pending checkout failed (${pendingRes.status}): ${await pendingRes.text()}`);
+      }
 
       // PM Seat addon
       if (pmSeat) {
