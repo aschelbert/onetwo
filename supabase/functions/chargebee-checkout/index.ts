@@ -307,6 +307,8 @@ Deno.serve(async (req) => {
           conversionEventId: typeof body.conversionEventId === 'string'
             ? body.conversionEventId.slice(0, 128)
             : null,
+          // Visitor's browser sent Global Privacy Control: no ad measurement
+          adMeasurementOptOut: body.adMeasurementOptOut === true,
           // HO-18 extended fields
           role: building.role || 'board_member',
           roleKey: building.roleKey || null,

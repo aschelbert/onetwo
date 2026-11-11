@@ -807,6 +807,9 @@ export default function AuthPage() {
                   },
                   origin: window.location.origin,
                   conversionEventId,
+                  // Global Privacy Control: skip the server-side OpenAI Ads report too
+                  adMeasurementOptOut:
+                    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
                 }),
               }
             );

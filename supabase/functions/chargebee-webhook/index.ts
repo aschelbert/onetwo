@@ -378,12 +378,17 @@ Deno.serve(async (req) => {
             // Sync to admin console
             await syncGovopsStatus(result.tenant_id, { status: "trial" });
 
-            // Tell OpenAI Ads a paid trial signup completed (never throws)
-            await reportSignupConversion({
-              id: pending.conversionEventId || `signup_${subscription.id || customer.id || eventId}`,
-              email: pending.contactEmail || customer.email || null,
-              occurredAtSeconds: event.occurred_at || null,
-            });
+            // Tell OpenAI Ads a paid trial signup completed (never throws),
+            // unless the visitor opted out with Global Privacy Control
+            if (pending.adMeasurementOptOut === true) {
+              console.log("openai-ads: visitor opted out (Global Privacy Control), skipping conversion report");
+            } else {
+              await reportSignupConversion({
+                id: pending.conversionEventId || `signup_${subscription.id || customer.id || eventId}`,
+                email: pending.contactEmail || customer.email || null,
+                occurredAtSeconds: event.occurred_at || null,
+              });
+            }
           }
         }
         break;
