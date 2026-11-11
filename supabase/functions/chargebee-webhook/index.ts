@@ -2,6 +2,8 @@
 // Processes Chargebee webhook events for subscription lifecycle.
 // Zero dependencies -- raw fetch to Supabase REST API.
 
+import { reportSignupConversion } from "../_shared/openaiAds.ts";
+
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const WEBHOOK_USER = Deno.env.get("CHARGEBEE_WEBHOOK_USER") || "";
@@ -372,6 +374,13 @@ Deno.serve(async (req) => {
 
             // Sync to admin console
             await syncGovopsStatus(result.tenant_id, { status: "trial" });
+
+            // Tell OpenAI Ads a paid trial signup completed (never throws)
+            await reportSignupConversion({
+              id: subscription.id || customer.id || eventId,
+              email: pending.contactEmail || customer.email || null,
+              occurredAtSeconds: event.occurred_at || null,
+            });
           }
         }
         break;
