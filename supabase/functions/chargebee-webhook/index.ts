@@ -377,7 +377,7 @@ Deno.serve(async (req) => {
 
             // Tell OpenAI Ads a paid trial signup completed (never throws)
             await reportSignupConversion({
-              id: subscription.id || customer.id || eventId,
+              id: pending.conversionEventId || `signup_${subscription.id || customer.id || eventId}`,
               email: pending.contactEmail || customer.email || null,
               occurredAtSeconds: event.occurred_at || null,
             });
