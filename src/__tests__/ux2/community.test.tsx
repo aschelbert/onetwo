@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
@@ -67,56 +67,94 @@ describe('Community', () => {
     expect(useComplianceStore.getState().announcements.length).toBe(before);
   });
 
-  it('Meetings lists every meeting; opening one shows its own notice, agenda, attendance and minutes', () => {
+  it('A board member runs a meeting through its four steps: agenda with votes and reports, notice, the meeting, the summary', async () => {
+    const { useMeetingRecordStore } = await import('@/store/useMeetingRecordStore');
     useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
-    renderAt('/community?tab=meetings');
-    expect(screen.queryByTestId('legacy-boardroom')).toBeNull();
-    // The list is only the list: no agenda editor, approvals or attendance panels.
-    expect(document.querySelector('[aria-label="All meetings"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Agenda"]')).toBeNull();
-    expect(document.querySelector('[aria-label="Attendance"]')).toBeNull();
-    const upcoming = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
-    const row = document.querySelector(`[data-meeting="${upcoming.id}"]`) as HTMLElement;
-    fireEvent.click(within(row).getByRole('button', { name: upcoming.title }));
+    const m0 = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
+    useMeetingsStore.getState().updateMeeting(m0.id, { items: undefined, session: {}, noticeSentAt: null, startedAt: null, endedAt: null, minutesApprovedAt: null, minutesApprovals: [] });
+    renderAt(`/community?tab=meetings&meeting=${m0.id}`);
+    const meeting = () => useMeetingsStore.getState().meetings.find(m => m.id === m0.id)!;
+    const lastItem = () => { const its = meeting().items!; return its[its.length - 1]; };
 
-    // The meeting's own page.
-    expect(document.querySelector(`[data-meeting-page="${upcoming.id}"]`)).toBeTruthy();
-    expect(document.querySelector('[aria-label="All meetings"]')).toBeNull();
-    expect(document.querySelector('[aria-label="Notice"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Attendance"]')).toBeTruthy();
+    // Step 1: add an item, put an owner vote on it, attach a report as a snapshot.
     const agenda = document.querySelector('[aria-label="Agenda"]') as HTMLElement;
-    const before = upcoming.agenda.length;
     fireEvent.click(within(agenda).getByRole('button', { name: 'Add an item' }));
-    fireEvent.change(within(agenda).getByLabelText('Agenda item'), { target: { value: 'Bike room rules · board vote' } });
+    fireEvent.change(within(agenda).getByLabelText('Agenda item'), { target: { value: 'Adopt the 2027 budget' } });
     fireEvent.click(within(agenda).getByRole('button', { name: 'Add' }));
-    expect(useMeetingsStore.getState().meetings.find(m => m.id === upcoming.id)!.agenda).toHaveLength(before + 1);
-    fireEvent.click(within(agenda).getByRole('button', { name: `Remove agenda item ${before + 1}` }));
-    expect(useMeetingsStore.getState().meetings.find(m => m.id === upcoming.id)!.agenda).toHaveLength(before);
+    const item = lastItem();
+    expect(item.title).toBe('Adopt the 2027 budget');
+    const row = agenda.querySelector(`[data-item="${item.id}"]`) as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Add a vote' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the vote' }));
+    expect(lastItem().vote).toMatchObject({ who: 'owners', threshold: 'majority_voting', status: 'draft' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Attach' }));
+    const panel = screen.getByRole('group', { name: /Attach to/ });
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'Add' })[2]);
+    expect(lastItem().attachments[0]).toMatchObject({ source: 'report', report: 'budget_vs_actual', mode: 'frozen', audience: 'all' });
 
-    fireEvent.click(screen.getByRole('button', { name: '← All meetings' }));
-    expect(document.querySelector('[aria-label="All meetings"]')).toBeTruthy();
+    // Step 2: send the notice; the owner vote opens with it. Then a paper ballot comes in.
+    fireEvent.click(screen.getByRole('button', { name: /^2 · Notice and ballots/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Send to \d+ units$/ }));
+    await waitFor(() => expect(meeting().noticeSentAt).toBeTruthy());
+    expect(lastItem().vote!.status).toBe('open');
+    expect(useComplianceStore.getState().announcements.some(a => a.title === `Meeting notice: ${m0.title}`)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Enter a paper ballot or proxy' }));
+    const paper = screen.getByRole('form', { name: 'Enter a paper ballot or proxy' });
+    fireEvent.change(within(paper).getByLabelText('Unit'), { target: { value: '101' } });
+    fireEvent.click(within(paper).getByLabelText('for'));
+    fireEvent.click(within(paper).getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(useMeetingRecordStore.getState().ballots.some(b => b.meetingId === m0.id && b.unit === '101' && b.method === 'paper')).toBe(true));
+
+    // Step 3: start, check a unit in, count the room, record the vote, adjourn.
+    fireEvent.click(screen.getByRole('button', { name: 'Start the meeting' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start the meeting' }));
+    expect(meeting().startedAt).toBeTruthy();
+    const checkin = screen.getByRole('form', { name: 'Check in a unit' });
+    fireEvent.change(within(checkin).getByLabelText('Unit'), { target: { value: '102' } });
+    fireEvent.click(within(checkin).getByRole('button', { name: 'Check in' }));
+    expect(useMeetingRecordStore.getState().privateOf(m0.id).attendance).toEqual([expect.objectContaining({ unit: '102', mode: 'in_person' })]);
+    const voteItem = screen.getByRole('article', { name: /Adopt the 2027 budget/ });
+    fireEvent.change(within(voteItem).getByLabelText('In the room, for'), { target: { value: '2' } });
+    fireEvent.click(within(voteItem).getByRole('button', { name: 'Close and record in the minutes' }));
+    expect(lastItem().vote).toMatchObject({ status: 'closed', result: expect.objectContaining({ for: 3, passed: true }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Adjourn' }));
+    expect(meeting()).toMatchObject({ status: 'COMPLETED' });
+    expect(meeting().minutes).toContain('Vote: Passed: 3 for, 0 against');
+
+    // Step 4: the summary goes out, written from the record.
+    fireEvent.click(screen.getByRole('button', { name: /^4 · Summary to owners/ }));
+    expect((screen.getByLabelText('What was decided') as HTMLTextAreaElement).value).toContain('Adopt the 2027 budget: passed, 3 for, 0 against.');
+    fireEvent.click(screen.getByRole('button', { name: /^Send to \d+ units$/ }));
+    await waitFor(() => expect(meeting().session?.summary).toBeTruthy());
   });
 
-  it('A held meeting has its minutes and approvals on its page, and an owner RSVPs on an upcoming one', () => {
-    useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
-    const held = useMeetingsStore.getState().meetings.find(m => m.status === 'COMPLETED' && m.minutes)!;
-    renderAt(`/community?tab=meetings&meeting=${held.id}`);
-    const minutes = document.querySelector('[aria-label="Minutes"]') as HTMLElement;
-    expect(minutes).toBeTruthy();
-    expect(minutes.textContent).toContain(held.minutes.split('\n')[0]);
-    expect(document.querySelector('[aria-label="Notice"]')).toBeNull();
-
+  it('An owner sees only the date before the notice, votes on the meeting after it, sees the vote in Notices and has no Votes tab', async () => {
+    const { useMeetingRecordStore } = await import('@/store/useMeetingRecordStore');
     const prev = useAuthStore.getState().currentRole;
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
-      const upcoming = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
-      renderAt(`/community?tab=meetings&meeting=${upcoming.id}`);
-      const pages = document.querySelectorAll(`[data-meeting-page="${upcoming.id}"]`);
-      const page = pages[pages.length - 1] as HTMLElement;
-      const me = useAuthStore.getState().currentUser.name;
-      fireEvent.click(within(page.querySelector('[aria-label="Meeting"]') as HTMLElement).getByRole('button', { name: /RSVP|Going/ }));
-      const m = useMeetingsStore.getState().meetings.find(x => x.id === upcoming.id)!;
-      expect(m.attendees.owners.includes(me)).toBe(true);
+      const m0 = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
+      const items = [{ id: 'i-budget', title: 'Adopt the budget', kind: 'decision' as const, minutes: '', attachments: [], vote: { who: 'owners' as const, question: 'Adopt the budget?', threshold: 'majority_voting' as const, status: 'open' as const } }];
+      useMeetingsStore.getState().updateMeeting(m0.id, { items, noticeSentAt: null, startedAt: null, endedAt: null, session: {} });
+      useComplianceStore.setState({ communications: [] });
+      const first = renderAt(`/community?tab=meetings&meeting=${m0.id}`);
+      expect(screen.getByText('Scheduled · date only')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Cast my vote' })).toBeNull();
+      first.unmount();
+
+      useMeetingsStore.getState().updateMeeting(m0.id, { noticeSentAt: '2026-11-30T12:00:00Z' });
+      const second = renderAt(`/community?tab=meetings&meeting=${m0.id}`);
+      fireEvent.click(screen.getByLabelText('For'));
+      fireEvent.click(screen.getByRole('button', { name: 'Cast my vote' }));
+      await waitFor(() => expect(useMeetingRecordStore.getState().ballots.find(b => b.meetingId === m0.id && b.itemId === 'i-budget')).toMatchObject({ unit: '301', choice: 'for', method: 'online' }));
+      second.unmount();
+
+      renderAt('/community?tab=votes');
+      const nav = screen.getByRole('navigation', { name: 'Community sections' });
+      expect(within(nav).queryByRole('button', { name: /^Votes/ })).toBeNull();
+      const mine = document.querySelector('[aria-label="Your unit\'s votes"]') as HTMLElement;
+      expect(within(mine).getByText(/You: for · can change/)).toBeTruthy();
+      expect(document.querySelector('[aria-label="Board decisions"]')).toBeTruthy();
     } finally {
       useAuthStore.setState({ currentRole: prev });
     }

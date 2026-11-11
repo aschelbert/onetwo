@@ -4,6 +4,7 @@
  * snapshot; the production components underneath keep owning every mutation.
  */
 import type { Issue } from '@/types/issues';
+import { itemsOf } from './meetingRecord';
 import type { Meeting } from '@/store/useMeetingsStore';
 import type { Election } from '@/store/useElectionStore';
 import type { Announcement, OwnerCommunication } from '@/store/useComplianceStore';
@@ -60,8 +61,8 @@ export function meetingRows(s: CommunitySnapshot): MeetingRow[] {
     .map(m => {
       const d = daysBetween(s.today, m.date);
       // Production calls a SCHEDULED or RESCHEDULED meeting upcoming whatever its date; keep that so both views agree.
-      const state: MeetingRow['state'] = m.status === 'CANCELLED' ? 'cancelled' : m.status === 'SCHEDULED' || m.status === 'RESCHEDULED' ? 'upcoming' : 'past';
-      const noticeSent = noticeSentFor(m, s.communications);
+      const state: MeetingRow['state'] = m.status === 'CANCELLED' ? 'cancelled' : m.status === 'SCHEDULED' || m.status === 'RESCHEDULED' || m.status === 'IN_PROGRESS' ? 'upcoming' : 'past';
+      const noticeSent = !!m.noticeSentAt || noticeSentFor(m, s.communications);
       const noticeDue = addDays(m.date, -NOTICE_LEAD_DAYS);
       return {
         meeting: m,
@@ -70,11 +71,11 @@ export function meetingRows(s: CommunitySnapshot): MeetingRow[] {
         noticeSent,
         noticeDue,
         noticeOverdue: state === 'upcoming' && !noticeSent && daysBetween(s.today, noticeDue) < 0,
-        datePassed: state === 'upcoming' && d < 0,
+        datePassed: state === 'upcoming' && d < 0 && !m.startedAt,
         agendaCount: m.agenda.length,
         rsvpUnits: m.attendees.owners.length,
         rsvpBoard: m.attendees.board.length,
-        minutes: (m.minutes ? (m.minutesApprovals.length > 0 ? 'approved' : 'draft') : 'none') as MinutesState,
+        minutes: (m.minutesApprovedAt ? 'approved' : m.minutes ? ((m.minutesApprovals?.length ?? 0) > 0 && !m.endedAt ? 'approved' : 'draft') : 'none') as MinutesState,
         mine: m.attendees.owners.includes(s.viewer.name) || m.attendees.board.includes(s.viewer.name),
       };
     })
@@ -181,6 +182,11 @@ export function boardDecisions(input: {
     out.push({ id: `case:${c.id}`, title: c.boardVotes.motion || c.title, date: c.boardVotes.date, source: 'case', caseId: c.id, ...t, passed: open ? null : t.yes > t.no, open });
   }
   for (const m of input.meetings) {
+    itemsOf(m).forEach(it => {
+      const v = it.vote;
+      if (v?.who !== 'board' || !v.result) return;
+      out.push({ id: `item:${m.id}:${it.id}`, title: v.question || it.title, date: v.result.closedAt.slice(0, 10), source: 'meeting', meetingId: m.id, yes: v.result.for, no: v.result.against, abstain: v.result.abstain, passed: v.result.passed, open: false });
+    });
     for (const v of m.votes) {
       if (v.type !== 'board') continue;
       out.push({ id: `meeting:${m.id}:${v.id}`, title: v.motion, date: v.date || m.date, source: 'meeting', meetingId: m.id, yes: v.tally.approve, no: v.tally.deny, abstain: v.tally.abstain, passed: v.status === 'passed', open: false });
