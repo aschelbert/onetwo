@@ -23,6 +23,7 @@ import { usePayrollStore } from '@/store/usePayrollStore';
 import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useMailStore } from '@/store/useMailStore';
+import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
 export interface OnboardingState {
@@ -246,6 +247,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           usePayrollStore.getState().loadFromDb(tenantInfo.id),
           useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
           useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
+          // Next year's budget drafts: the board's and the manager's only, so a resident's load returns none.
+          useBudgetDraftStore.getState().load(tenantInfo.id),
           // Whether the building's own LetterStream account is connected (the keys stay server-side).
           useMailStore.getState().loadMailingSettings(tenantInfo.id).catch(() => { /* mail stays "not connected" until the function answers */ }),
         ]);

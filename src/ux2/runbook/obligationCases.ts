@@ -19,6 +19,11 @@ import { useComplianceStore } from '@/store/useComplianceStore';
 import type { ComplianceItem } from '@/lib/complianceRefresh';
 import type { RegulatoryFiling } from '@/store/useComplianceStore';
 import type { CaseTrackerCase } from '@/types/issues';
+import { startBudgetNow } from '../boardroom/annualBudget';
+
+/** The budget obligation runs the guided Annual budget runbook, not the wizard's situation. */
+export const BUDGET_OBLIGATION = 'f1';
+const isBudgetRunbookAction = (c: CaseTrackerCase) => c.source === 'runbook' && !!c.sourceId?.startsWith('annual-budget:');
 
 export type ObligationKind = 'obligation' | 'filing';
 
@@ -46,7 +51,9 @@ export function categoryOf(sitId: string): string | undefined {
 
 /** The open case working on this obligation or filing, if there is one. */
 export function obligationCase(cases: CaseTrackerCase[], kind: ObligationKind, id: string): CaseTrackerCase | undefined {
-  return cases.find(c => c.status !== 'closed' && c.source === kind && c.sourceId === id);
+  const own = cases.find(c => c.status !== 'closed' && c.source === kind && c.sourceId === id);
+  if (own || kind !== 'obligation' || id !== BUDGET_OBLIGATION) return own;
+  return cases.find(c => c.status !== 'closed' && isBudgetRunbookAction(c));
 }
 
 /** How far along a case is: checklist items when it has them (they're the work), otherwise steps. */
@@ -83,6 +90,8 @@ export function startObligationCase({ kind, id, item, filing }: StartInput): str
   const store = useIssuesStore.getState();
   const existing = obligationCase(store.cases, kind, id);
   if (existing) return existing.id;
+  // The budget is the Annual budget runbook's guided action, started now.
+  if (kind === 'obligation' && id === BUDGET_OBLIGATION) return startBudgetNow();
 
   const title = item?.task ?? filing?.name;
   if (!title) return null;
@@ -117,6 +126,12 @@ const RESOLVED = /^resolved$/i;
 
 /** When a case for an obligation closes as resolved, mark the obligation done (a filing: filed). */
 export function completeFromCase(c: CaseTrackerCase): void {
+  if (isBudgetRunbookAction(c)) {
+    if (c.closeReason && !RESOLVED.test(c.closeReason)) return;
+    const comp = useComplianceStore.getState();
+    if (!comp.completions[BUDGET_OBLIGATION]) comp.setCompletion(BUDGET_OBLIGATION, true);
+    return;
+  }
   if (c.source !== 'obligation' && c.source !== 'filing') return;
   if (!c.sourceId || (c.closeReason && !RESOLVED.test(c.closeReason))) return;
   const comp = useComplianceStore.getState();

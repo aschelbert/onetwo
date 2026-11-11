@@ -33,13 +33,17 @@ describe('starting an obligation', () => {
     expect(useIssuesStore.getState().cases).toHaveLength(1);
   });
 
-  it('opens the runbook the case wizard has for the annual meeting, the budget and a filing', () => {
+  it('opens the runbook the case wizard has for the annual meeting and a filing, and the guided Annual budget for the budget', () => {
     const meeting = startObligationCase({ kind: 'obligation', id: 'g4', item: item('g4') })!;
     const budget = startObligationCase({ kind: 'obligation', id: 'f1', item: item('f1') })!;
     const filing = startObligationCase({ kind: 'filing', id: 'rf1', filing: { id: 'rf1', name: 'Biennial report', agency: 'DLCP', dueDate: '2026-04-01', status: 'pending', filedDate: null, confirmationNum: '', notes: '', responsible: 'Secretary', recurrence: 'biennial', attachments: [] } as never })!;
     const byId = (id: string) => useIssuesStore.getState().cases.find(c => c.id === id)!;
     expect(byId(meeting)).toMatchObject({ sitId: 'annual-meeting-planning', catId: 'governance' });
-    expect(byId(budget)).toMatchObject({ sitId: 'annual-budgeting', catId: 'financial' });
+    expect(byId(budget)).toMatchObject({ sitId: 'runbook-annual-budget', catId: 'financial', source: 'runbook' });
+    expect(byId(budget).sourceId).toMatch(/^annual-budget:\d{4}-\d{2}-\d{2}$/);
+    // Start again, from Home or Building, resumes the same action.
+    expect(startObligationCase({ kind: 'obligation', id: 'f1', item: item('f1') })).toBe(budget);
+    expect(obligationCase(useIssuesStore.getState().cases, 'obligation', 'f1')?.id).toBe(budget);
     expect(byId(filing)).toMatchObject({ sitId: 'compliance-filing', source: 'filing', sourceId: 'rf1', dueDate: '2026-04-01' });
     for (const c of [meeting, budget, filing]) expect(byId(c).steps!.length).toBeGreaterThan(2);
     for (const sit of Object.values(OBLIGATION_SITUATIONS)) expect(categoryOf(sit), sit).toBeTruthy();

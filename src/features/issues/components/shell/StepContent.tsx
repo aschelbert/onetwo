@@ -10,6 +10,10 @@ import { ContractRenewalPanel } from '../workflow/ContractRenewalPanel';
 import { BudgetDraftPanel } from '../workflow/BudgetDraftPanel';
 import { BylawsReviewPanel } from '../workflow/BylawsReviewPanel';
 import { CheckAssist } from '../workflow/CheckAssist';
+import { BudgetGuide } from '@/ux2/boardroom/budget/BudgetGuide';
+import { MeetingBudgetNote } from '@/ux2/boardroom/budget/MeetingBudgetNote';
+import { isBudgetAction } from '@/ux2/boardroom/annualBudget';
+import { budgetStepKey } from '@/ux2/boardroom/budgetDraft';
 
 interface StepContentProps {
   c: CaseTrackerCase;
@@ -39,14 +43,15 @@ interface StepContentProps {
 export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleStep, onAddNote, onToggleAction, onToggleCheck, onAction, onNavigate, onUpload, onGenerateCheckDoc, onUploadCheckDoc, onAttachFromBuilding, inlineStepIdx, caseId }: StepContentProps) {
   const totalSteps = c.steps?.length || 0;
   const allDone = c.steps?.every(s => s.done) || false;
+  const guided = isBudgetAction(c) && !!budgetStepKey(step.s);
 
-  // Annual-budgeting step 1 enrichment
-  if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 0 && onToggleAction) {
+  // Annual-budgeting step 1 enrichment (actions opened before the guided steps)
+  if (!guided && c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 0 && onToggleAction) {
     return <Step1BudgetReview c={c} step={step} onToggleAction={onToggleAction} />;
   }
 
   // Annual-budgeting step 3 enrichment
-  if (c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 2 && onToggleAction) {
+  if (!guided && c.catId === 'financial' && c.sitId === 'annual-budgeting' && stepIndex === 2 && onToggleAction) {
     return <Step3ThreeYearOutlook c={c} step={step} onToggleAction={onToggleAction} />;
   }
 
@@ -137,8 +142,18 @@ export function StepContent({ c, step, stepIndex, stNote, stateAbbr, onToggleSte
             )}
           </div>
 
+          {/* The Annual budget action walks each step through in place. */}
+          {guided && (
+            <div className="px-5 pb-5">
+              <BudgetGuide c={c} step={step} stepIndex={stepIndex} onAction={onAction} />
+            </div>
+          )}
+
+          {/* The annual meeting's budget step: whether the budget it presents is adopted, and the way to it. */}
+          <div className="px-5 empty:hidden"><MeetingBudgetNote c={c} step={step} /></div>
+
           {/* Actions, Checks & Rich Actions */}
-          {(() => {
+          {!guided && (() => {
             const hasActions = step.actions && step.actions.length > 0;
             const hasChecks = step.checks && step.checks.length > 0;
             const hasPersistent = step.persistent && step.persistent.length > 0;
