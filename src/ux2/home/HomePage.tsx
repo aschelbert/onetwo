@@ -318,8 +318,10 @@ export default function HomePage() {
       {view === 'calendar' ? (
         <CalendarView cards={dated} today={today} forOwner={isOwner} />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
-          {/* Phones read top to bottom: the stewardship card, then the feed, then the other widgets. Desktop places the feed left and stacks the widgets on the right. */}
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3 lg:grid-rows-[auto_1fr]">
+          {/* Phones read top to bottom: the stewardship card, then the feed, then the other widgets. Desktop places the feed left and stacks the widgets on the right.
+              The feed spans both rows; the first row is only as tall as the stewardship card (auto) and the second takes the rest (1fr),
+              so a long feed never opens a gap between the stewardship card and the widgets under it. */}
           <aside className="lg:col-start-3 lg:row-start-1">
             {/* The mock's stewardship card: the radar, then a page per dimension behind the arrows and dots. */}
             <StewardshipCard you={score.you} events={score.events} buildingDims={score.building.dims} buildingTotal={score.building.total} group={score.group} />
