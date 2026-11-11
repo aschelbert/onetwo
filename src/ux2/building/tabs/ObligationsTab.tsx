@@ -12,6 +12,12 @@ import { dutyCounts, obligationRows, obligationsSummary, roleLoads, type Obligat
 
 type View = 'month' | 'byrole' | 'bycategory' | 'filings' | 'ongoing' | 'duties';
 
+const COUNT_TONES: Record<string, { name: string; box: string; ink: string; muted: string }> = {
+  Met: { name: 'navy', box: 'border-ux2-navy bg-ux2-navy', ink: 'text-white', muted: 'text-white/[0.72]' },
+  'In progress': { name: 'teal', box: 'border-ux2-teal bg-ux2-teal', ink: 'text-white', muted: 'text-white/[0.78]' },
+  'Board checklist': { name: 'cyan', box: 'border-ux2-cyan bg-ux2-cyan', ink: 'text-ux2-navy', muted: 'text-ux2-navy/[0.72]' },
+  default: { name: 'surface', box: 'border-ux2-line bg-ux2-surface', ink: 'text-ux2-ink', muted: 'text-ux2-muted' },
+};
 const STATE_LABEL: Record<ObligationState, string> = { overdue: 'Overdue', 'in-progress': 'In progress', upcoming: 'Upcoming', ongoing: 'Ongoing', auto: 'Auto-verified', met: 'Met' };
 const STATE_TONE: Record<ObligationState, 'red' | 'navy' | 'cyan' | 'ghost' | 'teal' | 'sage'> = { overdue: 'red', 'in-progress': 'navy', upcoming: 'cyan', ongoing: 'ghost', auto: 'teal', met: 'sage' };
 const ROLE_TONE: Record<string, 'teal' | 'plum' | 'navy' | 'amber' | 'sage' | 'ghost'> = { President: 'teal', 'Vice President': 'plum', Treasurer: 'navy', Secretary: 'amber', 'Member at Large': 'sage' };
@@ -250,13 +256,17 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
               ['In progress', `${sum.inProgress.length + sum.overdue.length}`, '', 'each one is a Home card for its role'],
               ['Auto-verified by documents', `${sum.auto}`, '', 'bylaws, policies, insurance on file'],
               ['Board checklist', `${sum.pct}`, '%', 'feeds Oversight for board members'],
-            ].map(([label, n, unit, sub]) => (
-              <div key={label} className="flex min-h-[120px] flex-col gap-1.5 rounded-[22px] border border-ux2-line bg-ux2-surface px-[18px] py-4">
-                <div className="text-xs font-semibold text-ux2-muted">{label}</div>
-                <div className="text-[30px] font-semibold leading-none tracking-[-0.03em] text-ux2-ink">{n}{unit && <small className="ml-1 text-[13px] font-medium tracking-normal text-ux2-muted">{unit}</small>}</div>
-                <div className="text-xs text-ux2-muted">{sub}</div>
-              </div>
-            ))}
+            ].map(([label, n, unit, sub]) => {
+              // Met in brand navy, In progress in dark teal, Board checklist in aqua; the rest stay on the grey surface.
+              const tone = COUNT_TONES[label] ?? COUNT_TONES.default;
+              return (
+                <div key={label} data-tone={tone.name} className={cn('flex min-h-[120px] flex-col gap-1.5 rounded-[22px] border px-[18px] py-4', tone.box)}>
+                  <div className={cn('text-xs font-semibold', tone.muted)}>{label}</div>
+                  <div className={cn('text-[30px] font-semibold leading-none tracking-[-0.03em]', tone.ink)}>{n}{unit && <small className={cn('ml-1 text-[13px] font-medium tracking-normal', tone.muted)}>{unit}</small>}</div>
+                  <div className={cn('text-xs', tone.muted)}>{sub}</div>
+                </div>
+              );
+            })}
           </div>
           {view === 'month' && <ObligationTable rows={thisMonth.length ? thisMonth : open.slice(0, 12)} snap={snap} isBoard={isBoard} title={monthName} note={sources} />}
           {view === 'byrole' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by role" note={sources} groupBy="role" />}
