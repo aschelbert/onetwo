@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -104,6 +104,56 @@ function CounselForm({ id, onClose }: { id?: string; onClose: () => void }) {
   );
 }
 
+/** Add a unit, or edit one: who owns it, how to reach them, the dues and its share. Board only. */
+function UnitForm({ unit, onClose }: { unit?: Unit; onClose: () => void }) {
+  const units = useFinancialStore(s => s.units);
+  const addUnit = useFinancialStore(s => s.addUnit);
+  const updateUnit = useFinancialStore(s => s.updateUnit);
+  const [f, setF] = useState({
+    number: unit?.number ?? '', owner: unit?.owner ?? '', email: unit?.email ?? '', phone: unit?.phone ?? '',
+    monthlyFee: unit ? String(unit.monthlyFee || '') : '', votingPct: unit ? String(unit.votingPct || '') : '',
+    sqft: unit ? String(unit.sqft || '') : '', bedrooms: unit ? String(unit.bedrooms || '') : '', parking: unit?.parking ?? '',
+  });
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(x => ({ ...x, [k]: e.target.value }));
+  const num = (s: string) => { const n = Number(s.replace(/[$,%\s]/g, '')); return Number.isFinite(n) ? n : 0; };
+  const number = f.number.trim();
+  const taken = !unit && units.some(u => u.number.toLowerCase() === number.toLowerCase());
+  const ok = !!number && !taken;
+  const save = (again: boolean) => {
+    if (!ok) return;
+    const fields = { owner: f.owner.trim(), email: f.email.trim(), phone: f.phone.trim(), monthlyFee: num(f.monthlyFee), votingPct: num(f.votingPct), sqft: num(f.sqft), bedrooms: num(f.bedrooms), parking: f.parking.trim() || null };
+    if (unit) updateUnit(unit.number, fields);
+    else addUnit({ number, ...fields, status: 'ACTIVE', balance: 0, moveIn: null });
+    if (again) setF({ number: '', owner: '', email: '', phone: '', monthlyFee: f.monthlyFee, votingPct: '', sqft: '', bedrooms: '', parking: '' });
+    else onClose();
+  };
+  return (
+    <form aria-label={unit ? `Edit unit ${unit.number}` : 'Add a unit'} onSubmit={e => { e.preventDefault(); save(false); }} className="flex flex-col gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+      <div className="text-sm font-semibold text-ux2-ink">{unit ? `Unit ${unit.number} · edit` : 'Add a unit'}</div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Unit" className="w-[110px]"><input value={f.number} onChange={set('number')} disabled={!!unit} placeholder="4B" className={INPUT} autoFocus={!unit} /></Field>
+        <Field label="Owner" className="min-w-[180px] flex-1"><input value={f.owner} onChange={set('owner')} placeholder="Name on the deed" className={INPUT} /></Field>
+        <Field label="Email" className="min-w-[200px] flex-1"><input type="email" value={f.email} onChange={set('email')} className={INPUT} /></Field>
+        <Field label="Phone" className="w-[150px]"><input value={f.phone} onChange={set('phone')} className={INPUT} /></Field>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Dues a month" className="w-[130px]"><input inputMode="decimal" value={f.monthlyFee} onChange={set('monthlyFee')} placeholder="$" className={INPUT} /></Field>
+        <Field label="Share, %" className="w-[110px]"><input inputMode="decimal" value={f.votingPct} onChange={set('votingPct')} placeholder="2.1" className={INPUT} /></Field>
+        <Field label="Sq ft" className="w-[100px]"><input inputMode="numeric" value={f.sqft} onChange={set('sqft')} className={INPUT} /></Field>
+        <Field label="Bedrooms" className="w-[100px]"><input inputMode="numeric" value={f.bedrooms} onChange={set('bedrooms')} className={INPUT} /></Field>
+        <Field label="Parking" className="w-[130px]"><input value={f.parking} onChange={set('parking')} placeholder="P-12" className={INPUT} /></Field>
+      </div>
+      {taken && <p role="alert" className="m-0 text-[13px] font-semibold text-ux2-red-ink">Unit {number} is already on the list.</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={!ok}>{unit ? 'Save' : 'Add the unit'}</Button>
+        {!unit && <Button type="button" size="sm" variant="ghost" disabled={!ok} onClick={() => save(true)}>Add and another</Button>}
+        <Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+      </div>
+      <Why>Share is the unit's percentage interest from the declaration: it splits the dues in the annual budget and weighs owner votes. A unit added here appears in Funds and in every owner's list to link their unit.</Why>
+    </form>
+  );
+}
+
 export default function DirectoryTab({ snap, section, onSection, isBoard }: { snap: BuildingSnapshot; section?: string; onSection: (s: string) => void; isBoard: boolean }) {
   const navigate = useNavigate();
   const units = useFinancialStore(s => s.units);
@@ -128,6 +178,12 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const [editingManager, setEditingManager] = useState(false);
   const [editingCounsel, setEditingCounsel] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // `?add=unit` (from an owner's empty unit picker, or setup) opens the add form.
+  const [params, setParams] = useSearchParams();
+  const [editingUnit, setEditingUnit] = useState<string | null>(isBoard && params.get('add') === 'unit' ? 'new' : null);
+  const removeUnit = useFinancialStore(s => s.removeUnit);
+  useEffect(() => { if (editingUnit === 'new' && params.get('add') === 'unit') document.getElementById('dir-units')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const closeUnitForm = () => { setEditingUnit(null); if (params.get('add')) setParams(prev => { const p = new URLSearchParams(prev); p.delete('add'); return p; }, { replace: true }); };
   const current: Section = section === 'people' ? 'board' : (['units', 'board', 'management', 'staff', 'emergency'] as string[]).includes(section ?? '') ? (section as Section) : 'units';
   const pending = invites.filter(i => i.status === 'pending');
   const noEmail = units.filter(u => !u.email);
@@ -178,10 +234,18 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
       )}
 
       <Card id="dir-units" aria-label="Units and owners" className="gap-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
-        {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{units.length ? 'No unit matches.' : 'No units yet.'}</Inner> : (
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
+        {isBoard && editingUnit && <UnitForm key={editingUnit} unit={editingUnit === 'new' ? undefined : units.find(u => u.number === editingUnit)} onClose={closeUnitForm} />}
+        {rows.length === 0 ? (
+          units.length ? <Inner className="text-sm text-ux2-muted">No unit matches.</Inner> : (
+            <Inner className="flex flex-wrap items-center justify-between gap-3">
+              <span className="min-w-0 text-sm"><b className="font-semibold text-ux2-ink">No units yet.</b> <span className="text-ux2-muted">Add each unit with its owner, dues and share. Until they're here, owners can't link their unit, see a balance or vote.</span></span>
+              {isBoard && editingUnit !== 'new' && <Button size="sm" onClick={() => setEditingUnit('new')}>Add the first unit</Button>}
+            </Inner>
+          )
+        ) : (
           <Table minWidth={860}>
-            <thead><tr><Th>Unit</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th></tr></thead>
+            <thead><tr><Th>Unit</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th>{isBoard && <Th num />}</tr></thead>
             <tbody>
               {shown.map(u => {
                 const b = boardByEmail.get(u.email.toLowerCase()) ?? boardByName.get(u.owner.toLowerCase());
@@ -210,6 +274,15 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
                     </Td>
                     <Td>{u.owner ? <Chip tone={autopay(u) ? 'sage' : 'ghost'}>{autopay(u) ? 'On' : 'Off'}</Chip> : <span className="text-ux2-muted">—</span>}</Td>
                     <Td className="whitespace-nowrap text-ux2-muted">{monthYear(u.moveIn)}</Td>
+                    {isBoard && (
+                      <Td num>
+                        <RowMenu label={`More for unit ${u.number}`} items={[
+                          { label: 'Edit', onSelect: () => setEditingUnit(u.number) },
+                          // A unit with money on its ledger stays: its history belongs to the books.
+                          ...(u.payments.length === 0 && u.balance === 0 && !members.some(m => m.unit === u.number) ? [{ label: 'Remove', onSelect: () => { if (window.confirm(`Remove unit ${u.number}? It has no payments or balance.`)) removeUnit(u.number); } }] : []),
+                        ]} />
+                      </Td>
+                    )}
                   </tr>
                 );
               })}

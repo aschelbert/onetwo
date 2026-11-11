@@ -10,8 +10,8 @@
  * the existing flow.
  *
  *  Board member / manager: Reserves / Collected / Open cases · Up next · Waiting on others ·
- *                           Upcoming · Stewardship · Your account · Building news · Pulse
- *  Owner:                   Up next · Stewardship · Your account · Building news · Pulse
+ *                           Upcoming · Stewardship · Unit balance · Building news · Pulse
+ *  Owner:                   Up next · Stewardship · Unit balance · Building news · Pulse
  */
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -183,21 +183,36 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   );
 }
 
-/** Your account: the balance on the units you hold, when the next dues are due, Pay and Statements. */
-function YourAccount({ units, balance, dueDay }: { units: { number: string; monthlyFee: number }[]; balance: number; dueDay: number }) {
+/**
+ * Unit balance: what the viewer's unit owes, the next dues and the last
+ * payment, and the way to My Unit to pay. With no unit linked to the sign-in
+ * it says so and goes to My Unit, where the unit is linked.
+ */
+function UnitBalance({ units, balance, dueDay }: { units: { number: string; monthlyFee: number; payments: { date: string; amount: number }[] }[]; balance: number; dueDay: number }) {
   const go = useGo();
+  if (units.length === 0) {
+    return (
+      <Card aria-label="Unit balance">
+        <SectionLabel>Unit balance</SectionLabel>
+        <p className="m-0 text-sm text-ux2-ink">No unit is linked to your sign-in yet.</p>
+        <p className="m-0 text-xs text-ux2-muted">Link the unit you own to see its balance, pay dues and vote.</p>
+        <Button size="sm" className="self-start" onClick={() => go('/my-unit')}>Link your unit</Button>
+      </Card>
+    );
+  }
+  const monthly = units.reduce((s, u) => s + u.monthlyFee, 0);
+  const last = units.flatMap(u => u.payments).sort((a, b) => b.date.localeCompare(a.date))[0];
   return (
-    <Card aria-label="Your account">
+    <Card aria-label="Unit balance">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Your account</SectionLabel>
-        <Chip tone={balance > 0 ? 'red' : 'sage'}>{balance > 0 ? 'Balance due' : 'Current'}</Chip>
+        <SectionLabel>Unit balance</SectionLabel>
+        <Chip tone={balance > 0 ? 'red' : 'sage'}>{balance > 0 ? 'Balance due' : 'Paid up'}</Chip>
       </div>
-      <div className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ux2-ink">{fmt(balance)}</div>
-      <div className="text-xs text-ux2-muted">Unit {units.map(u => u.number).join(', ')} · next {fmt(units.reduce((s, u) => s + u.monthlyFee, 0))} due on the {ordinal(dueDay)}</div>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => go('/my-unit/pay')}>{balance > 0 ? 'Pay' : 'Pay ahead'}</Button>
-        <Button size="sm" variant="ghost" onClick={() => go('/my-unit')}>Statements</Button>
-      </div>
+      <button type="button" onClick={() => go('/my-unit')} className="flex flex-col gap-1 text-left" aria-label={`${fmt(balance)} owed on unit ${units.map(u => u.number).join(' and ')}. Open My Unit`}>
+        <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ux2-ink">{fmt(balance)}</span>
+        <span className="text-xs text-ux2-muted">Unit {units.map(u => u.number).join(', ')} · {fmt(monthly)} due on the {ordinal(dueDay)}{last ? ` · last paid ${fmt(last.amount)} on ${dayLabel(last.date.slice(0, 10))}` : ''}</span>
+      </button>
+      <Button size="sm" className="self-start" onClick={() => go('/my-unit')}>{balance > 0 ? `Pay ${fmt(balance)}` : 'Pay ahead'}</Button>
     </Card>
   );
 }
@@ -318,8 +333,10 @@ export default function HomePage() {
       {view === 'calendar' ? (
         <CalendarView cards={dated} today={today} forOwner={isOwner} />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
-          {/* Phones read top to bottom: the stewardship card, then the feed, then the other widgets. Desktop places the feed left and stacks the widgets on the right. */}
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3 lg:grid-rows-[auto_1fr]">
+          {/* Phones read top to bottom: the stewardship card, then the feed, then the other widgets. Desktop places the feed left and stacks the widgets on the right.
+              The feed spans both rows; the first row is only as tall as the stewardship card (auto) and the second takes the rest (1fr),
+              so a long feed never opens a gap between the stewardship card and the widgets under it. */}
           <aside className="lg:col-start-3 lg:row-start-1">
             {/* The mock's stewardship card: the radar, then a page per dimension behind the arrows and dots. */}
             <StewardshipCard you={score.you} events={score.events} buildingDims={score.building.dims} buildingTotal={score.building.total} group={score.group} />
@@ -365,7 +382,8 @@ export default function HomePage() {
           </div>
 
           <aside className="flex flex-col gap-4 lg:col-start-3 lg:row-start-2">
-            {myUnits.length > 0 && <YourAccount units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
+            {/* Between the stewardship card and Building news: the viewer's unit balance, on to My Unit to pay. */}
+            {(isOwner || viewer.role === 'BOARD_MEMBER' || myUnits.length > 0) && <UnitBalance units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
             <BuildingNews />
             <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
           </aside>
