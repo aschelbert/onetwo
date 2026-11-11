@@ -75,6 +75,17 @@ export default function CommunityModule() {
     }, { replace: true });
   };
 
+  // Opening a meeting is a step in, so it gets its own history entry: Back returns to the list.
+  const openMeeting = (id: string | null) => {
+    setParams(prev => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', 'meetings');
+      if (id) p.set('meeting', id); else p.delete('meeting');
+      return p;
+    });
+    window.scrollTo?.({ top: 0 });
+  };
+
   const subtitle = {
     overview: 'Where the building acts together: how we are doing as a building, and the latest notices, meetings, votes and requests.',
     log: 'The property log. Anyone can log what they see around the building; the board and the manager follow up.',
@@ -116,7 +127,7 @@ export default function CommunityModule() {
 
         {tab === 'overview' && <OverviewTab snap={snap} onGo={go} />}
         {tab === 'notices' && <NoticesTab snap={snap} />}
-        {tab === 'meetings' && <MeetingsTab snap={snap} highlightId={params.get('meeting')} />}
+        {tab === 'meetings' && <MeetingsTab snap={snap} meetingId={params.get('meeting')} onOpen={openMeeting} />}
         {tab === 'votes' && <VotesTab snap={snap} selectedId={params.get('vote')} onSelect={id => go('votes', { vote: id })} />}
         {tab === 'requests' && <RequestsTab snap={snap} highlightId={params.get('request')} />}
         {tab === 'log' && <LogTab isBoard={isBoard} />}

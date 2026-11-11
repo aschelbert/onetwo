@@ -67,25 +67,58 @@ describe('Community', () => {
     expect(useComplianceStore.getState().announcements.length).toBe(before);
   });
 
-  it('Meetings shows the next meeting, the schedule table and the agenda, and lets the viewer RSVP through the store', () => {
+  it('Meetings lists every meeting; opening one shows its own notice, agenda, attendance and minutes', () => {
+    useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
     renderAt('/community?tab=meetings');
     expect(screen.queryByTestId('legacy-boardroom')).toBeNull();
+    // The list is only the list: no agenda editor, approvals or attendance panels.
     expect(document.querySelector('[aria-label="All meetings"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Agenda"]')).toBeTruthy();
-    expect(document.querySelectorAll('[data-meeting]').length).toBeGreaterThan(0);
-    const next = document.querySelector('[aria-label="Next meeting"]') as HTMLElement | null;
-    if (next) {
+    expect(document.querySelector('[aria-label="Agenda"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Attendance"]')).toBeNull();
+    const upcoming = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
+    const row = document.querySelector(`[data-meeting="${upcoming.id}"]`) as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: upcoming.title }));
+
+    // The meeting's own page.
+    expect(document.querySelector(`[data-meeting-page="${upcoming.id}"]`)).toBeTruthy();
+    expect(document.querySelector('[aria-label="All meetings"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Notice"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Attendance"]')).toBeTruthy();
+    const agenda = document.querySelector('[aria-label="Agenda"]') as HTMLElement;
+    const before = upcoming.agenda.length;
+    fireEvent.click(within(agenda).getByRole('button', { name: 'Add an item' }));
+    fireEvent.change(within(agenda).getByLabelText('Agenda item'), { target: { value: 'Bike room rules · board vote' } });
+    fireEvent.click(within(agenda).getByRole('button', { name: 'Add' }));
+    expect(useMeetingsStore.getState().meetings.find(m => m.id === upcoming.id)!.agenda).toHaveLength(before + 1);
+    fireEvent.click(within(agenda).getByRole('button', { name: `Remove agenda item ${before + 1}` }));
+    expect(useMeetingsStore.getState().meetings.find(m => m.id === upcoming.id)!.agenda).toHaveLength(before);
+
+    fireEvent.click(screen.getByRole('button', { name: '← All meetings' }));
+    expect(document.querySelector('[aria-label="All meetings"]')).toBeTruthy();
+  });
+
+  it('A held meeting has its minutes and approvals on its page, and an owner RSVPs on an upcoming one', () => {
+    useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
+    const held = useMeetingsStore.getState().meetings.find(m => m.status === 'COMPLETED' && m.minutes)!;
+    renderAt(`/community?tab=meetings&meeting=${held.id}`);
+    const minutes = document.querySelector('[aria-label="Minutes"]') as HTMLElement;
+    expect(minutes).toBeTruthy();
+    expect(minutes.textContent).toContain(held.minutes.split('\n')[0]);
+    expect(document.querySelector('[aria-label="Notice"]')).toBeNull();
+
+    const prev = useAuthStore.getState().currentRole;
+    useAuthStore.setState({ currentRole: 'RESIDENT' });
+    try {
+      const upcoming = useMeetingsStore.getState().meetings.find(m => m.status === 'SCHEDULED')!;
+      renderAt(`/community?tab=meetings&meeting=${upcoming.id}`);
+      const pages = document.querySelectorAll(`[data-meeting-page="${upcoming.id}"]`);
+      const page = pages[pages.length - 1] as HTMLElement;
       const me = useAuthStore.getState().currentUser.name;
-      const id = (document.querySelector('[data-meeting]') as HTMLElement).getAttribute('data-meeting')!;
-      const rsvp = within(next).queryByRole('button', { name: /RSVP|Going/ });
-      if (rsvp) {
-        fireEvent.click(rsvp);
-        const m = useMeetingsStore.getState().meetings.find(x => x.id === id)!;
-        expect(m.attendees.board.includes(me) || m.attendees.owners.includes(me)).toBe(true);
-      } else {
-        // A board member sees the manage controls instead of RSVP.
-        expect(within(next).getByRole('button', { name: 'Send notice' })).toBeTruthy();
-      }
+      fireEvent.click(within(page.querySelector('[aria-label="Meeting"]') as HTMLElement).getByRole('button', { name: /RSVP|Going/ }));
+      const m = useMeetingsStore.getState().meetings.find(x => x.id === upcoming.id)!;
+      expect(m.attendees.owners.includes(me)).toBe(true);
+    } finally {
+      useAuthStore.setState({ currentRole: prev });
     }
   });
 
