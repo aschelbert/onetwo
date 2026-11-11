@@ -10,7 +10,13 @@ import { sendMeetingNotice } from '../meetingNotice';
 
 type Filter = 'all' | 'upcoming' | 'past' | 'board' | 'owner';
 
-function Rsvp({ row, snap }: { row: MeetingRow; snap: CommunitySnapshot }) {
+/** The next meeting sits on brand navy sweeping diagonally into brand red, with a soft red glow in the far corner. */
+const NEXT_MEETING_BG = 'radial-gradient(120% 140% at 100% 100%, rgba(226, 59, 78, 0.9) 0%, rgba(226, 59, 78, 0) 55%), linear-gradient(125deg, #0D1B2E 0%, #0D1B2E 35%, #3B1E3C 68%, #E23B4E 100%)';
+const NEXT_TILE = 'flex flex-col gap-1 rounded-[14px] border border-white/15 bg-ux2-navy/40 px-3.5 py-3 backdrop-blur-sm';
+const ON_DARK_GHOST = '!border-white/30 !bg-white/10 !text-white hover:!bg-white/20';
+const ON_DARK_PRIMARY = '!bg-ux2-cyan !text-ux2-navy hover:!bg-white';
+
+function Rsvp({ row, snap, onDark }: { row: MeetingRow; snap: CommunitySnapshot; onDark?: boolean }) {
   const updateAttendees = useMeetingsStore(s => s.updateAttendees);
   const m = row.meeting;
   const key = snap.viewer.isBoard ? 'board' : 'owners';
@@ -19,7 +25,7 @@ function Rsvp({ row, snap }: { row: MeetingRow; snap: CommunitySnapshot }) {
     const next = row.mine ? list.filter(n => n !== snap.viewer.name) : [...list, snap.viewer.name];
     updateAttendees(m.id, { ...m.attendees, [key]: next });
   };
-  return <Button size="sm" variant={row.mine ? 'ghost' : 'primary'} onClick={toggle}>{row.mine ? 'Going · change' : 'RSVP'}</Button>;
+  return <Button size="sm" variant={row.mine ? 'ghost' : 'primary'} className={onDark ? (row.mine ? ON_DARK_GHOST : ON_DARK_PRIMARY) : undefined} onClick={toggle}>{row.mine ? 'Going · change' : 'RSVP'}</Button>;
 }
 
 function ScheduleForm({ onClose }: { onClose: () => void }) {
@@ -90,25 +96,25 @@ export default function MeetingsTab({ snap, highlightId }: { snap: CommunitySnap
       {scheduling && <ScheduleForm onClose={() => setScheduling(false)} />}
 
       {next ? (
-        <Card tone={next.noticeOverdue && isBoard ? 'outline' : 'surface'} aria-label="Next meeting">
+        <Card tone="navy" aria-label="Next meeting" data-overdue={next.noticeOverdue && isBoard ? '1' : undefined} style={{ backgroundImage: NEXT_MEETING_BG }} className="border-transparent">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <div className="flex flex-wrap items-center gap-2"><SectionLabel>Next meeting{next.noticeOverdue && isBoard ? ' · needs you' : ''}</SectionLabel>{isBoard && <Chip tone={next.noticeSent ? 'sage' : next.noticeOverdue ? 'red' : 'amber'}>{next.noticeSent ? 'Notice sent' : next.noticeOverdue ? `Notice overdue · due ${dayLabel(next.noticeDue)}` : `Notice due ${dayLabel(next.noticeDue)}`}</Chip>}</div>
-              <div className="font-display text-2xl font-semibold text-ux2-ink">{next.meeting.title} · {dayLabel(next.meeting.date)}{next.meeting.time ? `, ${next.meeting.time}` : ''}</div>
-              <div className="text-sm text-ux2-muted">{next.meeting.location || 'Location to set'}{next.meeting.virtualLink ? ' and remote' : ''} · open to all owners · {next.agendaCount} agenda item{next.agendaCount === 1 ? '' : 's'} · {next.rsvpUnits} of {snap.units.length} units have replied</div>
+              <div className="flex flex-wrap items-center gap-2"><SectionLabel className="!text-white/[0.72]">Next meeting{next.noticeOverdue && isBoard ? ' · needs you' : ''}</SectionLabel>{isBoard && <Chip tone={next.noticeSent ? 'sage' : next.noticeOverdue ? 'red' : 'amber'}>{next.noticeSent ? 'Notice sent' : next.noticeOverdue ? `Notice overdue · due ${dayLabel(next.noticeDue)}` : `Notice due ${dayLabel(next.noticeDue)}`}</Chip>}</div>
+              <div className="font-display text-2xl font-semibold text-white">{next.meeting.title} · {dayLabel(next.meeting.date)}{next.meeting.time ? `, ${next.meeting.time}` : ''}</div>
+              <div className="text-sm text-white/[0.78]">{next.meeting.location || 'Location to set'}{next.meeting.virtualLink ? ' and remote' : ''} · open to all owners · {next.agendaCount} agenda item{next.agendaCount === 1 ? '' : 's'} · {next.rsvpUnits} of {snap.units.length} units have replied</div>
             </div>
             <div className="flex gap-1.5">
-              {isBoard ? <><Button size="sm" variant="ghost" onClick={() => setEditingAgenda('new')}>Edit the draft</Button>{!next.noticeSent && <Button size="sm" disabled={sendingNotice} onClick={() => { void sendNotice(next.meeting); }}>{sendingNotice ? 'Sending…' : 'Send notice'}</Button>}</> : <Rsvp row={next} snap={snap} />}
+              {isBoard ? <><Button size="sm" variant="ghost" className={ON_DARK_GHOST} onClick={() => setEditingAgenda('new')}>Edit the draft</Button>{!next.noticeSent && <Button size="sm" className={ON_DARK_PRIMARY} disabled={sendingNotice} onClick={() => { void sendNotice(next.meeting); }}>{sendingNotice ? 'Sending…' : 'Send notice'}</Button>}</> : <Rsvp row={next} snap={snap} onDark />}
             </div>
           </div>
-          {noticeNote && <div role="status" className="text-[13px] text-ux2-ink">{noticeNote}</div>}
+          {noticeNote && <div role="status" className="text-[13px] text-white">{noticeNote}</div>}
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Notice</span><span className={`text-[15px] font-semibold ${next.noticeOverdue ? 'text-ux2-red-ink' : 'text-ux2-ink'}`}>{next.noticeSent ? 'Sent' : next.noticeOverdue ? `Not sent · ${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000))} day${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000)) === 1 ? '' : 's'} late` : `Due ${dayLabel(next.noticeDue)}`}</span><span className="text-xs text-ux2-muted">Posted in-app for every member and emailed to everyone with an address on file. Ten days' notice per the bylaws and DC Code § 29-1101 et seq.</span></Inner>
-            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Agenda</span><span className="text-[15px] font-semibold text-ux2-ink">{next.agendaCount} item{next.agendaCount === 1 ? '' : 's'}</span><span className="truncate text-xs text-ux2-muted">{next.meeting.agenda.slice(0, 4).join(', ') || 'Nothing on it yet'}. Goes out with the notice.</span></Inner>
-            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">RSVP</span><span className="text-[15px] font-semibold text-ux2-ink">{next.rsvpUnits} of {snap.units.length} units</span><span className="text-xs text-ux2-muted">Board: {next.rsvpBoard} of {boardCount} confirmed{board.filter(b => !next.meeting.attendees.board.includes(b.name))[0] ? `, ${board.filter(b => !next.meeting.attendees.board.includes(b.name))[0].name.split(' ')[0]} not yet` : ''}.</span></Inner>
-            <Inner className="flex flex-col gap-1"><span className="text-xs text-ux2-muted">Room</span><span className="text-[15px] font-semibold text-ux2-ink">{next.meeting.location ? `${next.meeting.location} reserved` : 'To set'}</span><span className="text-xs text-ux2-muted">{next.meeting.virtualLink ? 'Remote link added to the notice.' : 'In person; add a remote link on the meeting.'}</span></Inner>
+            <div className={NEXT_TILE}><span className="text-xs text-white/[0.72]">Notice</span><span className={`text-[15px] font-semibold ${next.noticeOverdue ? 'text-[#F7A8B2]' : 'text-white'}`}>{next.noticeSent ? 'Sent' : next.noticeOverdue ? `Not sent · ${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000))} day${Math.abs(Math.round((Date.parse(snap.today) - Date.parse(next.noticeDue)) / 86400000)) === 1 ? '' : 's'} late` : `Due ${dayLabel(next.noticeDue)}`}</span><span className="text-xs text-white/[0.72]">Posted in-app for every member and emailed to everyone with an address on file. Ten days' notice per the bylaws and DC Code § 29-1101 et seq.</span></div>
+            <div className={NEXT_TILE}><span className="text-xs text-white/[0.72]">Agenda</span><span className="text-[15px] font-semibold text-white">{next.agendaCount} item{next.agendaCount === 1 ? '' : 's'}</span><span className="truncate text-xs text-white/[0.72]">{next.meeting.agenda.slice(0, 4).join(', ') || 'Nothing on it yet'}. Goes out with the notice.</span></div>
+            <div className={NEXT_TILE}><span className="text-xs text-white/[0.72]">RSVP</span><span className="text-[15px] font-semibold text-white">{next.rsvpUnits} of {snap.units.length} units</span><span className="text-xs text-white/[0.72]">Board: {next.rsvpBoard} of {boardCount} confirmed{board.filter(b => !next.meeting.attendees.board.includes(b.name))[0] ? `, ${board.filter(b => !next.meeting.attendees.board.includes(b.name))[0].name.split(' ')[0]} not yet` : ''}.</span></div>
+            <div className={NEXT_TILE}><span className="text-xs text-white/[0.72]">Room</span><span className="text-[15px] font-semibold text-white">{next.meeting.location ? `${next.meeting.location} reserved` : 'To set'}</span><span className="text-xs text-white/[0.72]">{next.meeting.virtualLink ? 'Remote link added to the notice.' : 'In person; add a remote link on the meeting.'}</span></div>
           </div>
-          <Why>{isBoard ? 'This item is also on Home and in Building › Obligations. Sending the notice clears all three.' : 'RSVP so quorum is known. The agenda goes out with the notice; minutes are posted here once the board approves them.'}</Why>
+          <Why className="!text-white/[0.72]">{isBoard ? 'This item is also on Home and in Building › Obligations. Sending the notice clears all three.' : 'RSVP so quorum is known. The agenda goes out with the notice; minutes are posted here once the board approves them.'}</Why>
         </Card>
       ) : <Inner className="text-sm text-ux2-muted">No meeting is scheduled.{isBoard ? ' Schedule one above.' : ''}</Inner>}
 
