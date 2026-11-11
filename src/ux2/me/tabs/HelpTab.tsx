@@ -20,7 +20,7 @@ import { adminSupabase } from '@/lib/adminSupabase';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { ROLE_LABELS } from '@/types/auth';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, PillTabs, SearchInput, SectionLabel, Tile, TileRow, Why } from '../../components';
-import { RUNBOOKS } from '../../boardroom/runbooks';
+import { ALL_RUNBOOKS as RUNBOOKS } from '../../boardroom/runbooks';
 import { dayLabel } from '../../home/calendar';
 import { searchHelp, type HelpHit } from '../help';
 import type { MeSnapshot } from '../metrics';

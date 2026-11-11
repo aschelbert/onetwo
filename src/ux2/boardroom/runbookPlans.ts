@@ -26,7 +26,7 @@ export interface PlanStep {
 export interface RunbookPlan {
   steps: PlanStep[];
   /** Where the steps come from. */
-  source: 'runbook' | 'workflow' | 'plan';
+  source: 'runbook' | 'workflow' | 'plan' | 'custom';
   /** The app starts it and ticks steps today. */
   live: boolean;
 }
@@ -187,6 +187,7 @@ function situationSteps(sitId?: string): string[] {
 }
 
 export function runbookPlan(def: RunbookDef): RunbookPlan {
+  if (def.kind === 'custom') return { source: 'custom', live: false, steps: (def.stepTitles ?? []).map(title => ({ title, auto: false })) };
   const own = OWN[def.id];
   if (own) return { source: 'runbook', live: !!def.wired, steps: own.map(([title, how]) => ({ title, auto: !!how, how })) };
   const titles = situationSteps(def.sitId);
@@ -202,7 +203,7 @@ export function runbookPlan(def: RunbookDef): RunbookPlan {
 /** "3 of 5 automated" today, or the planned count for one that opens by hand. */
 export function automationLine(def: RunbookDef, plan: RunbookPlan = runbookPlan(def)): { auto: number; total: number; planned: boolean } {
   const auto = plan.steps.filter(s => s.auto).length;
-  if (plan.live) return { auto, total: plan.steps.length, planned: false };
+  if (plan.live || def.kind) return { auto, total: plan.steps.length, planned: false };
   const plannedCount = plan.steps.some(s => s.planned) ? plan.steps.filter(s => s.planned).length : Math.min(def.automated, plan.steps.length);
   return { auto: plannedCount, total: plan.steps.length, planned: true };
 }

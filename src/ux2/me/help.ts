@@ -3,7 +3,7 @@
  * building's obligations and the fee schedule, each hit linking to the page
  * that holds the answer. Pure, so it can be tested without the stores.
  */
-import { RUNBOOKS } from '../boardroom/runbooks';
+import { ALL_RUNBOOKS } from '../boardroom/runbooks';
 
 export interface HelpSource {
   guides: { id: string; title: string; summary: string; route: string; howTos: { title: string; steps: string[] }[] }[];
@@ -45,7 +45,7 @@ export function searchHelp(query: string, src: HelpSource, limit = 8): HelpHit[]
       if (hs) hits.push({ kind: 'guide', title: h.title, detail: `${g.title} · ${h.steps.length} steps`, path: g.route, score: hs + 1 });
     }
   }
-  for (const r of RUNBOOKS) {
+  for (const r of ALL_RUNBOOKS) {
     const s = scoreText(terms, r.name, r.trigger);
     if (s) hits.push({ kind: 'runbook', title: r.name, detail: `Runbook · starts when ${r.trigger.toLowerCase()} · ${r.automated} of ${r.steps} steps automated`, path: src.routes.runbooks, score: s });
   }

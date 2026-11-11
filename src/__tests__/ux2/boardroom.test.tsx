@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
+import { ALL_RUNBOOKS } from '@/ux2/boardroom/runbooks';
 import { useFinancialStore } from '@/store/useFinancialStore';
 
 const tenantFlags = vi.hoisted(() => ({ pmSeat: true }));
@@ -98,16 +99,48 @@ describe('Board Room', () => {
     }
   });
 
-  it('Runbooks lists all 32 in one view and switches one off without opening it', () => {
+  it('Runbooks lists every workflow in one view and switches one off without opening it', () => {
     renderAt('/boardroom?tab=runbooks');
     expect(screen.queryByRole('button', { name: /With an open case/ })).toBeNull();
-    expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
+    expect(document.querySelectorAll('tr[data-runbook]').length).toBeGreaterThanOrEqual(ALL_RUNBOOKS.length);
+    const fines = document.querySelector('tr[data-runbook="sit-fine-hearings"]') as HTMLElement;
+    expect(fines.textContent).toContain('None');
+    expect(fines.textContent).toContain('By hand');
+    expect(within(fines).queryByRole('switch')).toBeNull();
     fireEvent.click(screen.getByRole('switch', { name: 'Collections on' }));
     expect(useRunbookSwitches.getState().isOn('collections')).toBe(false);
     expect(document.querySelector('[data-runbook-detail]')).toBeNull();
     const elections = document.querySelector('tr[data-runbook="elections"]') as HTMLElement;
     expect(elections.textContent).toContain('Opens by hand today');
     expect(within(elections).getByText(/planned/)).toBeTruthy();
+  });
+
+  it('Runbooks filters by what starts itself, what is by hand, and what is used or never used', () => {
+    renderAt('/boardroom?tab=runbooks');
+    const rows = () => [...document.querySelectorAll('tr[data-runbook]')];
+    const all = rows().length;
+    fireEvent.click(screen.getByRole('button', { name: /^Start themselves · \d+$/ }));
+    const auto = rows();
+    expect(auto.length).toBeGreaterThan(0);
+    expect(auto.some(r => r.getAttribute('data-runbook') === 'month-close')).toBe(true);
+    expect(auto.some(r => r.getAttribute('data-runbook')?.startsWith('sit-'))).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /^By hand · \d+$/ }));
+    expect(rows().length).toBe(all - auto.length);
+    fireEvent.click(screen.getByRole('button', { name: /^Never used · \d+$/ }));
+    expect(rows().every(r => r.querySelector('[data-used]')?.getAttribute('data-used') === '0')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^Used · \d+$/ }));
+    expect(rows().every(r => Number(r.querySelector('[data-used]')?.getAttribute('data-used')) > 0)).toBe(true);
+  });
+
+  it('A situation with no runbook of its own opens with its steps, all by a person, and Take Action starts it', () => {
+    renderAt('/boardroom?tab=runbooks&runbook=sit-fine-hearings');
+    const detail = document.querySelector('[data-runbook-detail="sit-fine-hearings"]') as HTMLElement;
+    expect(detail.textContent).toContain('By hand · nothing automated');
+    expect(detail.querySelectorAll('li[data-step]').length).toBe(6);
+    expect(detail.querySelectorAll('li[data-step][data-auto="1"]').length).toBe(0);
+    expect(within(detail).queryByRole('switch')).toBeNull();
+    fireEvent.click(within(detail).getByRole('button', { name: 'Take Action' }));
+    expect(screen.getByTestId('legacy-issues').textContent).toBe('enforcement/fine-hearings');
   });
 
   it('Clicking a runbook shows its steps and which ones the app does, and Back returns to the list', () => {
@@ -123,7 +156,7 @@ describe('Board Room', () => {
     expect(steps[1].textContent).toContain('A person does this');
     expect(within(detail).getByRole('button', { name: 'Change the day' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '← All runbooks' }));
-    expect(document.querySelectorAll('tr[data-runbook]').length).toBe(32);
+    expect(document.querySelectorAll('tr[data-runbook]').length).toBeGreaterThanOrEqual(ALL_RUNBOOKS.length);
   });
 
   it('A deep link opens a runbook; one that opens by hand lists its workflow steps and opens the wizard', () => {
