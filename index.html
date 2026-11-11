@@ -326,6 +326,9 @@ p{margin:0}
   .mcard .tile{min-height:0;padding:9px 10px}
   .mcard .tile .a{display:none}
   .mcard .ptabs.sm{display:none}
+  .mcard .gear{display:none}
+  .mcard .tile .v small.long{display:block;margin:3px 0 0}
+  .mcard .chiprow .chip:nth-child(n+4){display:none}
   .mcard .mhd .st{display:none}
   .mcard .frow .btn2,.mcard .frow .chip.teal{display:none}
   .mcard .tb th:nth-child(n+4),.mcard .tb td:nth-child(n+4){display:none}
@@ -602,7 +605,7 @@ p{margin:0}
     }).join('') + '</span>';
   }
   function header(title, status, tabs, on, extra) { return '<div class="mhd"><div class="t"><h5>' + esc(title) + '<i>i</i></h5><span class="st">' + status + '</span></div><div class="tr">' + ptabs(tabs, on) + (extra || '') + '</div></div>'; }
-  function tile(tone, label, value, unit, sub, actLabel, actBtn) { return '<div class="tile ' + tone + '"><span class="l">' + esc(label) + '</span><span class="v">' + esc(value) + (unit ? '<small>' + esc(unit) + '</small>' : '') + '</span><span class="m">' + esc(sub) + '</span><span class="a"><span>' + esc(actLabel) + '</span><b>' + esc(actBtn) + '</b></span></div>'; }
+  function tile(tone, label, value, unit, sub, actLabel, actBtn) { return '<div class="tile ' + tone + '"><span class="l">' + esc(label) + '</span><span class="v">' + esc(value) + (unit ? '<small' + (unit.length > 2 ? ' class="long"' : '') + '>' + esc(unit) + '</small>' : '') + '</span><span class="m">' + esc(sub) + '</span><span class="a"><span>' + esc(actLabel) + '</span><b>' + esc(actBtn) + '</b></span></div>'; }
   function frow(lead, title, why, right) { return '<div class="frow">' + lead + '<span class="tx"><b>' + esc(title) + '</b><span>' + esc(why) + '</span></span>' + (right || '') + '</div>'; }
   function step(state, title, why, right) { return frow('<span class="st ' + state + '">' + (state === 'done' ? CHECK : '') + '</span>', title, why, right); }
   function table(cols, rows) {
