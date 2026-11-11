@@ -294,6 +294,10 @@ Deno.serve(async (req) => {
           boardTitle: building.boardTitle || 'President',
           plan,
           userId: user.id,
+          // Shared with the browser pixel so OpenAI Ads dedupes the conversion
+          conversionEventId: typeof body.conversionEventId === 'string'
+            ? body.conversionEventId.slice(0, 128)
+            : null,
           // HO-18 extended fields
           role: building.role || 'board_member',
           roleKey: building.roleKey || null,

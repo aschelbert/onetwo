@@ -56,7 +56,11 @@ function dataTypeFor(eventType: string): string {
 }
 
 export interface SignupConversion {
-  /** Stable id so webhook retries do not double-count (e.g. the subscription id). */
+  /**
+   * Event id, sent verbatim. Use the same id the browser pixel sent as
+   * event_id so OpenAI dedupes the two reports; it also makes webhook
+   * retries idempotent.
+   */
   id: string;
   /** Signer's email; hashed before sending, never sent raw. */
   email?: string | null;
@@ -82,7 +86,7 @@ export async function reportSignupConversion(c: SignupConversion): Promise<boole
     if (c.email) user.emails_sha256 = [await sha256Normalized(c.email)];
 
     const event: Record<string, unknown> = {
-      id: `signup_${c.id}`,
+      id: c.id,
       type: SIGNUP_EVENT,
       timestamp_ms: timestampMs,
       action_source: "web",
