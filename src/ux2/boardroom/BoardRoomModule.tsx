@@ -1,7 +1,7 @@
 /**
  * Board Room — operations for the board, manager and staff (ux2.boardroom).
  *
- *  Ops       every open case with where it is, what it needs next and who drives it
+ *  Current Actions  every open case with where it is, what it needs next and who drives it
  *  Inbox     what owners asked for, the 14-day clock, acknowledge, reply, convert to case
  *  Runbooks  every runbook; one opens to its steps and which the app does
  *  Outbox    every letter and notice: drafts, sent, in transit, templates, delivery
@@ -104,7 +104,7 @@ export default function BoardRoomModule() {
   }[tab];
 
   const tabs = [
-    { id: 'open' as BoardRoomTab, label: 'Ops', badge: cases.open.length || undefined, badgeTone: cases.overdue.length ? 'red' as const : 'navy' as const },
+    { id: 'open' as BoardRoomTab, label: 'Current Actions', badge: cases.open.length || undefined, badgeTone: cases.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'inbox' as BoardRoomTab, label: 'Inbox', badge: inbox.open.length || undefined, badgeTone: inbox.overdue.length ? 'red' as const : 'amber' as const },
     { id: 'runbooks' as BoardRoomTab, label: 'Runbooks', badge: runbooks.withOpenCase.length ? `${runbooks.withOpenCase.length} open` : undefined, badgeTone: 'teal' as const },
     { id: 'outbox' as BoardRoomTab, label: 'Outbox', badge: outbox.drafts.length ? `${outbox.drafts.length} draft${outbox.drafts.length === 1 ? '' : 's'}` : undefined, badgeTone: 'cyan' as const },
@@ -123,7 +123,7 @@ export default function BoardRoomModule() {
           subtitle={subtitle}
           status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
           tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
-          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>New case</Button>}
+          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>Take Action</Button>}
         />
 
         {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
