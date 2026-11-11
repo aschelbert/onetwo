@@ -183,12 +183,46 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   );
 }
 
+export type BalanceState = 'paid' | 'due' | 'behind';
+
+interface BalanceUnit { number: string; monthlyFee: number; payments: { date: string; amount: number }[] }
+interface BalanceInvoice { unitNumber: string; amount: number; paidAmount: number | null; status: string; dueDate: string }
+
 /**
- * Unit balance: what the viewer's unit owes, the next dues and the last
- * payment, and the way to My Unit to pay. With no unit linked to the sign-in
- * it says so and goes to My Unit, where the unit is linked.
+ * Where the viewer's balance stands: paid up, due (owed, but nothing past its
+ * due date), or behind. What upcoming invoices don't account for is past due,
+ * so a balance from before the invoice register counts as behind too.
  */
-function UnitBalance({ units, balance, dueDay }: { units: { number: string; monthlyFee: number; payments: { date: string; amount: number }[] }[]; balance: number; dueDay: number }) {
+export function unitBalanceState(units: BalanceUnit[], invoices: BalanceInvoice[], balance: number, today: string, dueDay: number): { state: BalanceState; pastDue: number; next: { date: string; amount: number } } {
+  const mine = new Set(units.map(u => u.number));
+  const open = invoices.filter(i => mine.has(i.unitNumber) && (i.status === 'sent' || i.status === 'overdue'));
+  const left = (i: BalanceInvoice) => Math.max(0, i.amount - (i.paidAmount ?? 0));
+  const upcoming = open.filter(i => i.dueDate >= today).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const pastDue = Math.max(0, Math.round((balance - upcoming.reduce((t, i) => t + left(i), 0)) * 100) / 100);
+  const monthly = units.reduce((t, u) => t + u.monthlyFee, 0);
+  const day = Math.min(Math.max(dueDay || 1, 1), 28);
+  const [y, m, d] = today.split('-').map(Number);
+  const dues = d <= day ? new Date(Date.UTC(y, m - 1, day)) : new Date(Date.UTC(y, m, day));
+  const next = upcoming[0] ? { date: upcoming[0].dueDate, amount: upcoming.filter(i => i.dueDate === upcoming[0].dueDate).reduce((t, i) => t + left(i), 0) } : { date: dues.toISOString().slice(0, 10), amount: monthly };
+  const state: BalanceState = balance <= 0.004 ? 'paid' : pastDue > 0.004 ? 'behind' : 'due';
+  return { state, pastDue, next };
+}
+
+/** The card's look in each state: aqua when paid up, aqua into plum when due, aqua into red when behind. */
+const BALANCE_LOOK: Record<BalanceState, { bg: string; chip: string }> = {
+  paid: { bg: '#A5F3FC', chip: 'bg-ux2-navy text-ux2-cyan' },
+  due: { bg: 'linear-gradient(to top right, #A5F3FC 0%, #A5F3FC 40%, #4F46A8 100%)', chip: 'bg-white text-ux2-plum' },
+  behind: { bg: 'linear-gradient(to top right, #A5F3FC 0%, #E23B4E 100%)', chip: 'bg-white text-ux2-red-ink' },
+};
+
+const daysUntil = (today: string, date: string) => Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000);
+
+/**
+ * Unit balance: what the viewer's unit owes, in a color that says where it
+ * stands (paid up, due, behind), and the way to My Unit to pay. With no unit
+ * linked to the sign-in it says so and goes to My Unit, where the unit is linked.
+ */
+function UnitBalance({ units, invoices, balance, dueDay, today }: { units: BalanceUnit[]; invoices: BalanceInvoice[]; balance: number; dueDay: number; today: string }) {
   const go = useGo();
   if (units.length === 0) {
     return (
@@ -200,20 +234,38 @@ function UnitBalance({ units, balance, dueDay }: { units: { number: string; mont
       </Card>
     );
   }
+  const { state, pastDue, next } = unitBalanceState(units, invoices, balance, today, dueDay);
   const monthly = units.reduce((s, u) => s + u.monthlyFee, 0);
   const last = units.flatMap(u => u.payments).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const look = BALANCE_LOOK[state];
+  const label = `Unit ${units.map(u => u.number).join(', ')}`;
+  const months = monthly > 0 ? Math.max(1, Math.round(pastDue / monthly)) : 0;
+  const days = daysUntil(today, next.date);
+  const chip = state === 'paid' ? 'Paid up' : state === 'due' ? `Due ${dayLabel(next.date)}` : months ? `${months} month${months === 1 ? '' : 's'} behind` : 'Past due';
+  const when = days <= 0 ? 'due today' : days === 1 ? 'due tomorrow' : `due in ${days} days`;
+  const detail = state === 'paid' ? `${label} · next ${fmt(next.amount)} on ${dayLabel(next.date)}`
+    : state === 'due' ? `${label} · nothing past due`
+    : `${label} · includes ${fmt(pastDue)} past due${next.amount > 0 ? ` · next ${fmt(next.amount)} on ${dayLabel(next.date)}` : ''}`;
   return (
-    <Card aria-label="Unit balance">
+    <section aria-label="Unit balance" data-balance-state={state} style={{ background: look.bg }} className="flex flex-col gap-2.5 rounded-[22px] px-[22px] py-5 text-ux2-navy">
       <div className="flex items-center justify-between gap-2">
-        <SectionLabel>Unit balance</SectionLabel>
-        <Chip tone={balance > 0 ? 'red' : 'sage'}>{balance > 0 ? 'Balance due' : 'Paid up'}</Chip>
+        <span className={cn('text-xs uppercase tracking-[0.08em]', state === 'behind' ? 'font-bold' : 'font-semibold text-ux2-navy/70')}>Unit balance</span>
+        <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', look.chip)}>{chip}</span>
       </div>
-      <button type="button" onClick={() => go('/my-unit')} className="flex flex-col gap-1 text-left" aria-label={`${fmt(balance)} owed on unit ${units.map(u => u.number).join(' and ')}. Open My Unit`}>
-        <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ux2-ink">{fmt(balance)}</span>
-        <span className="text-xs text-ux2-muted">Unit {units.map(u => u.number).join(', ')} · {fmt(monthly)} due on the {ordinal(dueDay)}{last ? ` · last paid ${fmt(last.amount)} on ${dayLabel(last.date.slice(0, 10))}` : ''}</span>
+      <button type="button" onClick={() => go('/my-unit')} className="flex flex-col gap-1.5 text-left" aria-label={`${fmt(balance)} owed on ${label.toLowerCase()}, ${chip.toLowerCase()}. Open My Unit`}>
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-[40px] font-semibold leading-none tracking-[-0.02em]">{fmt(balance)}</span>
+          <span className={cn('text-sm', state === 'behind' ? 'font-semibold' : 'text-ux2-navy/75')}>{state === 'due' ? when : 'owed'}</span>
+        </span>
+        <span className={cn('text-[13px]', state === 'behind' ? 'font-semibold' : 'text-ux2-navy/80')}>{detail}</span>
       </button>
-      <Button size="sm" className="self-start" onClick={() => go('/my-unit')}>{balance > 0 ? `Pay ${fmt(balance)}` : 'Pay ahead'}</Button>
-    </Card>
+      <div className={cn('flex items-center justify-between gap-3 rounded-[14px] py-2 pl-3.5 pr-2', state === 'behind' ? 'bg-white/[0.55]' : 'bg-white')}>
+        <span className={cn('min-w-0 truncate text-[13px]', state === 'behind' && 'font-semibold')}>{last ? `Last paid ${fmt(last.amount)} on ${dayLabel(last.date.slice(0, 10))}` : 'No payment on record yet'}</span>
+        {state === 'paid'
+          ? <button type="button" onClick={() => go('/my-unit')} className="h-10 shrink-0 rounded-full border border-ux2-navy bg-white px-4 text-[13px] font-semibold text-ux2-navy">Pay ahead</button>
+          : <button type="button" onClick={() => go('/my-unit')} className="h-10 shrink-0 rounded-full bg-ux2-navy px-4 text-[13px] font-semibold text-white">Pay {fmt(balance)}</button>}
+      </div>
+    </section>
   );
 }
 
@@ -383,7 +435,7 @@ export default function HomePage() {
 
           <aside className="flex flex-col gap-4 lg:col-start-3 lg:row-start-2">
             {/* Between the stewardship card and Building news: the viewer's unit balance, on to My Unit to pay. */}
-            {(isOwner || viewer.role === 'BOARD_MEMBER' || myUnits.length > 0) && <UnitBalance units={myUnits} balance={myBalance} dueDay={snapshot.hoaDueDay} />}
+            {(isOwner || viewer.role === 'BOARD_MEMBER' || myUnits.length > 0) && <UnitBalance units={myUnits} invoices={fin.unitInvoices} balance={myBalance} dueDay={snapshot.hoaDueDay} today={today} />}
             <BuildingNews />
             <Pulse snapshot={snapshot} events={score.events} group={score.group} today={today} />
           </aside>
