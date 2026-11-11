@@ -95,7 +95,8 @@ export async function verifyCredentials(provider: MailProviderId, c: Credentials
 /** Whether a vendor refusal means the saved credential itself is bad. */
 export function isCredentialError(provider: MailProviderId, message: string): boolean {
   if (provider === "docupost") return dp.INVALID_TOKEN.test(message);
-  return /invalid|unauthori[sz]ed|denied|hash/i.test(message);
+  // Only authentication failures, not "Invalid zip code" and the like.
+  return /invalid (api ?)?(id|key|hash|credential|token|signature)|unauthori[sz]ed|authentication|access denied|not authori[sz]ed|bad hash/i.test(message);
 }
 
 /** Whether a vendor refusal means the building's account needs money, not a fix. */

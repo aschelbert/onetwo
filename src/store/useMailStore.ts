@@ -10,6 +10,8 @@ import type {
 } from '@/types/mail';
 import { MAIL_PROVIDERS, calculateMailingCost, mailProviderLabel } from '@/types/mail';
 import { useIssuesStore } from './useIssuesStore';
+import { useBuildingStore } from './useBuildingStore';
+import { toStateCode } from '@/lib/usStates';
 import { supabase } from '@/lib/supabase';
 import { generateLocalId } from '@/lib/generateId';
 
@@ -101,6 +103,29 @@ function fromStatus(s: MailProviderStatus): Partial<MailingSettings> {
 
 const mask = (s: string) => `••••${s.slice(-4)}`;
 
+/** The connection fields, cleared: what a building looks like before any vendor is connected. */
+export const NO_MAIL_CONNECTION: Pick<MailingSettings, 'mailConnected' | 'mailProvider' | 'mailCredentialMasked' | 'mailConnectedAt' | 'mailStatus'> = {
+  mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailConnectedAt: '', mailStatus: '',
+};
+
+/** A postal address with its state as the USPS code the vendors require. */
+export const normalizeAddress = (a: PostalAddress): PostalAddress => ({ ...a, state: toStateCode(a.state) });
+
+/**
+ * Who the letter is from: the building, by its name and the address under
+ * Building › Contacts. The persisted sender fields are only a fallback for a
+ * building that has not entered an address yet (the demo building).
+ */
+export function resolveSender(): { name: string; address: PostalAddress } {
+  const b = useBuildingStore.getState();
+  const s = useMailStore.getState().mailingSettings;
+  const fromBuilding = b.address?.street && b.address.city && b.address.zip;
+  const address: PostalAddress = fromBuilding
+    ? { line1: b.address.street, city: b.address.city, state: b.address.state, zip: b.address.zip }
+    : s.senderAddress;
+  return { name: (fromBuilding && b.name) || s.senderName, address: normalizeAddress(address) };
+}
+
 export const useMailStore = create<MailState>()(persist((set, get) => ({
   mailingSettings: DEFAULT_SETTINGS,
   mailRecords: [],
@@ -126,7 +151,9 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
   loadMailingSettings: async () => {
     if (!supabase) return;
     const { data, error } = await supabase.functions.invoke('connect-mail-provider', { body: { action: 'status' } });
-    if (error || !data || data.error) return;
+    // Fail closed: a connection this browser remembers from another building, or from
+    // before an outage, must not show as live until the server confirms it.
+    if (error || !data || data.error) { set(s => ({ mailingSettings: { ...s.mailingSettings, ...NO_MAIL_CONNECTION } })); return; }
     set(s => ({ mailingSettings: { ...s.mailingSettings, ...fromStatus(data as MailProviderStatus) } }));
   },
 
@@ -148,7 +175,7 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       const { data, error } = await supabase.functions.invoke('connect-mail-provider', { body: { action: 'disconnect' } });
       if (error || !data || data.error) throw new Error(data?.error || error?.message || 'Could not disconnect the mail account');
     }
-    set(s => ({ mailingSettings: { ...s.mailingSettings, mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailConnectedAt: '', mailStatus: '' } }));
+    set(s => ({ mailingSettings: { ...s.mailingSettings, ...NO_MAIL_CONNECTION } }));
   },
 
   sendNotice: async (params) => {
@@ -158,6 +185,8 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
     const id = generateLocalId('mr_');
     const vendor = mailProviderLabel(settings);
     const portalUrl = settings.mailProvider ? MAIL_PROVIDERS[settings.mailProvider].portalUrl : '';
+    const sender = resolveSender();
+    const recipient = { name: params.recipient.name, address: normalizeAddress(params.recipient.address) };
 
     const record: MailRecord = {
       id,
@@ -166,11 +195,8 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       tenantId: params.tenantId,
       templateId: params.templateId,
       templateName: params.templateName,
-      recipient: params.recipient,
-      sender: {
-        name: settings.senderName,
-        address: settings.senderAddress,
-      },
+      recipient,
+      sender,
       deliveryMethod: params.deliveryMethod,
       status: 'draft',
       statusHistory: [{ status: 'draft', timestamp: now, source: 'system', detail: 'Notice created' }],
@@ -213,10 +239,10 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       // The server renders the PDF and pushes it into the building's vendor account.
       const { data, error } = await supabase.functions.invoke('send-mail', {
         body: {
-          recipientName: params.recipient.name,
-          recipientAddress: params.recipient.address,
-          senderName: settings.senderName,
-          senderAddress: settings.senderAddress,
+          recipientName: recipient.name,
+          recipientAddress: recipient.address,
+          senderName: sender.name,
+          senderAddress: sender.address,
           deliveryMethod: params.deliveryMethod,
           templateId: params.templateId,
           subject: params.subject,
@@ -229,7 +255,7 @@ export const useMailStore = create<MailState>()(persist((set, get) => ({
       if (error || data?.error) {
         const errorMsg = data?.error || error?.message || 'Send failed';
         advanceStatus('failed', errorMsg);
-        if (data?.notConnected) set(s => ({ mailingSettings: { ...s.mailingSettings, mailConnected: false, mailProvider: '' } }));
+        if (data?.notConnected || data?.invalidCredentials) set(s => ({ mailingSettings: { ...s.mailingSettings, ...(data.notConnected ? NO_MAIL_CONNECTION : { mailStatus: 'invalid' }) } }));
         throw new Error(errorMsg);
       }
 

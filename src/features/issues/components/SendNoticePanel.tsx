@@ -3,7 +3,8 @@ import type { CaseTrackerCase } from '@/types/issues';
 import type { MailDeliveryMethod, PostalAddress } from '@/types/mail';
 import { ESTIMATE_NOTE, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
 import { useLetterStore } from '@/store/useLetterStore';
-import { useMailStore } from '@/store/useMailStore';
+import { useMailStore, resolveSender } from '@/store/useMailStore';
+import { toStateCode } from '@/lib/usStates';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { getSuggestedTemplateCategories } from '../templateMapping';
 
@@ -55,12 +56,15 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
   // Recipient
   const [editingRecipient, setEditingRecipient] = useState(false);
   const [recipientName, setRecipientName] = useState(caseData.owner || '');
+  // The owner at their unit: the building's street with the unit on line 2, the state as its USPS code.
   const [recipientAddress, setRecipientAddress] = useState<PostalAddress>({
     line1: buildingStore.address.street,
+    line2: caseData.unit ? `Unit ${caseData.unit}` : undefined,
     city: buildingStore.address.city,
-    state: buildingStore.address.state,
+    state: toStateCode(buildingStore.address.state),
     zip: buildingStore.address.zip,
   });
+  const sender = resolveSender();
 
   // Options
   const [emailCopy, setEmailCopy] = useState(true);
@@ -77,7 +81,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
       for (const v of selectedTemplate.variables) {
         if (v.name === 'owner_name') vars[v.name] = caseData.owner || '';
         else if (v.name === 'unit_number') vars[v.name] = caseData.unit || '';
-        else if (v.name === 'sender_name') vars[v.name] = mailStore.mailingSettings.senderName;
+        else if (v.name === 'sender_name') vars[v.name] = resolveSender().name;
         else vars[v.name] = v.defaultValue;
       }
     }
@@ -93,7 +97,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
       for (const v of tmpl.variables) {
         if (v.name === 'owner_name') vars[v.name] = caseData.owner || '';
         else if (v.name === 'unit_number') vars[v.name] = caseData.unit || '';
-        else if (v.name === 'sender_name') vars[v.name] = mailStore.mailingSettings.senderName;
+        else if (v.name === 'sender_name') vars[v.name] = resolveSender().name;
         else vars[v.name] = v.defaultValue;
       }
       setMergeVars(vars);
@@ -354,7 +358,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
             </div>
             <p className="text-[11px] text-ink-400">
               {mailConnected
-                ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).`
+                ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).`
                 : ESTIMATE_NOTE}
             </p>
           </div>
@@ -409,10 +413,10 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                 <div className="p-5 bg-white max-h-96 overflow-y-auto">
                   <div className="space-y-3 text-xs" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
                     <div className="text-ink-500">
-                      <p className="font-semibold">{mailStore.mailingSettings.senderName}</p>
-                      <p>{mailStore.mailingSettings.senderAddress.line1}</p>
-                      {mailStore.mailingSettings.senderAddress.line2 && <p>{mailStore.mailingSettings.senderAddress.line2}</p>}
-                      <p>{mailStore.mailingSettings.senderAddress.city}, {mailStore.mailingSettings.senderAddress.state} {mailStore.mailingSettings.senderAddress.zip}</p>
+                      <p className="font-semibold">{sender.name}</p>
+                      <p>{sender.address.line1}</p>
+                      {sender.address.line2 && <p>{sender.address.line2}</p>}
+                      <p>{sender.address.city}, {sender.address.state} {sender.address.zip}</p>
                     </div>
                     <p className="text-ink-400">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     <div className="text-ink-700">
@@ -442,7 +446,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                     <span className="text-[11px] font-semibold text-ink-500">Email Copy Preview</span>
                   </div>
                   <div className="px-4 py-2.5 border-b border-ink-100 space-y-1 text-[11px]">
-                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{mailStore.mailingSettings.senderName}</span></div>
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{sender.name}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">To:</span><span className="text-ink-700 font-medium">{caseData.owner || recipientName}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">Subject:</span><span className="text-ink-900 font-semibold">{selectedTemplate?.subject}</span></div>
                   </div>
@@ -478,7 +482,7 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                 </div>
                 <p className="text-[11px] text-ink-400">
                   {mailConnected
-                    ? `${ESTIMATE_NOTE} Billed to ${mailStore.mailingSettings.senderName}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).${mailStore.mailingSettings.mailProvider === 'letterstream' ? ' It mails once paid for there, or at once from a prepaid balance.' : ' It is deducted from the prepaid balance when sent.'}`
+                    ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account (${mailStore.mailingSettings.mailCredentialMasked || 'connected'}).${mailStore.mailingSettings.mailProvider === 'letterstream' ? ' It mails once paid for there, or at once from a prepaid balance.' : ' It is deducted from the prepaid balance when sent.'}`
                     : ESTIMATE_NOTE}
                 </p>
               </div>

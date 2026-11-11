@@ -6,48 +6,20 @@
 
 import { PROVIDER_INFO, isCredentialError, isFundsError, isProvider, submitLetter, vendorError } from "../_shared/mailProvider.ts";
 import { renderLetterPdf } from "../_shared/letterPdf.ts";
-import { storeLetterPdf } from "../_shared/letterStorage.ts";
-
-const SB_URL = Deno.env.get("SUPABASE_URL") || "";
-const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, baggage, sentry-trace",
-};
+import { pruneOldLetters, storeLetterPdf } from "../_shared/letterStorage.ts";
+import { toStateCode } from "../_shared/usStates.ts";
+import { authUser, cors, jsonResponse, membership, restGetOne, restWrite } from "../_shared/supabaseRest.ts";
 
 export const NOT_CONNECTED = "The building's mail account isn't connected. A board member connects DocuPost or LetterStream under Settings → Mailing.";
-
-async function sbGet(table: string, params: Record<string, string>) {
-  const url = new URL(`${SB_URL}/rest/v1/${table}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url.toString(), {
-    headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Accept": "application/vnd.pgrst.object+json" },
-  });
-  return res.ok ? await res.json() : null;
-}
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
-}
-
-/** Record what the vendor just told us about the saved credential. */
-async function markAccount(tenantId: string, patch: Record<string, unknown>) {
-  await fetch(`${SB_URL}/rest/v1/mail_provider_accounts?tenant_id=eq.${tenantId}`, {
-    method: "PATCH",
-    headers: { "apikey": SB_SERVICE_KEY, "Authorization": `Bearer ${SB_SERVICE_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
-    body: JSON.stringify(patch),
-  }).catch(e => console.error("markAccount failed:", e));
-}
 
 const METHODS = new Set(["first-class", "certified", "certified-return-receipt", "certified-electronic-return-receipt"]);
 
 type Addr = { name: string; line1: string; line2?: string; city: string; state: string; zip: string };
+/** A complete postal address with the state as its USPS code, or null when something required is missing. */
 function address(name: unknown, a: unknown): Addr | null {
   const o = (a && typeof a === "object" ? a : {}) as Record<string, unknown>;
   const pick = (k: string) => String(o[k] ?? "").trim();
-  const out = { name: String(name ?? "").trim(), line1: pick("line1"), line2: pick("line2") || undefined, city: pick("city"), state: pick("state"), zip: pick("zip") };
+  const out = { name: String(name ?? "").trim(), line1: pick("line1"), line2: pick("line2") || undefined, city: pick("city"), state: toStateCode(pick("state")), zip: pick("zip") };
   return out.name && out.line1 && out.city && out.state && out.zip ? out : null;
 }
 
@@ -56,14 +28,11 @@ Deno.serve(async (req) => {
 
   try {
     // ── 1. Who is asking, for which building ───────────────
-    const auth = req.headers.get("Authorization") || "";
-    const userRes = await fetch(`${SB_URL}/auth/v1/user`, { headers: { "Authorization": auth, "apikey": SB_ANON } });
-    if (!userRes.ok) return jsonResponse({ error: "Unauthorized" }, 401);
-    const user = await userRes.json();
-
-    const tu = await sbGet("tenant_users", { "user_id": `eq.${user.id}`, "role": "eq.board_member", "select": "tenant_id", "limit": "1" });
-    if (!tu?.tenant_id) return jsonResponse({ error: "Only board members can send mail" }, 403);
-    const tenantId: string = tu.tenant_id;
+    const user = await authUser(req);
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
+    const tu = await membership(user.id);
+    if (!tu?.tenant_id || tu.role !== "board_member") return jsonResponse({ error: "Only board members can send mail" }, 403);
+    const tenantId = tu.tenant_id;
 
     // ── 2. The letter ──────────────────────────────────────
     const body = await req.json();
@@ -74,12 +43,12 @@ Deno.serve(async (req) => {
     const recipient = address(recipientName, recipientAddress);
     if (!recipient) return jsonResponse({ error: "The recipient needs a name and a full postal address" }, 400);
 
-    const tenant = await sbGet("tenants", { "id": `eq.${tenantId}`, "select": "name" });
+    const tenant = await restGetOne("tenants", { "id": `eq.${tenantId}`, "select": "name" });
     const sender = address(senderName || tenant?.name, senderAddress);
     if (!sender) return jsonResponse({ error: "The building's return address is incomplete. Set it under Building → Contacts." }, 400);
 
     // ── 3. The building's vendor account ───────────────────
-    const acct = await sbGet("mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": "provider,api_id,api_key,status" });
+    const acct = await restGetOne("mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": "provider,api_id,api_key,status" });
     if (!acct?.api_key || !isProvider(acct.provider)) return jsonResponse({ error: NOT_CONNECTED, notConnected: true }, 400);
     const provider = acct.provider;
     const info = PROVIDER_INFO[provider];
@@ -93,6 +62,7 @@ Deno.serve(async (req) => {
     let pdfUrl: string | undefined;
     if (info.needsPdfUrl) {
       try {
+        await pruneOldLetters(tenantId);
         pdfUrl = (await storeLetterPdf(tenantId, bytes, fileName)).signedUrl;
       } catch (e) {
         console.error("Could not store the letter for the vendor:", e);
@@ -118,7 +88,7 @@ Deno.serve(async (req) => {
       if (v) {
         console.error(`${info.label} refused the letter:`, v.message, v.raw);
         if (isCredentialError(provider, v.message)) {
-          await markAccount(tenantId, { status: "invalid", last_error: v.message });
+          await restWrite("PATCH", `mail_provider_accounts?tenant_id=eq.${tenantId}`, { status: "invalid", last_error: v.message });
           return jsonResponse({ error: `${info.label} rejected the building's saved credentials (${v.message}). A board member can paste a fresh one under Settings → Mailing.`, invalidCredentials: true, vendor: v.raw }, 422);
         }
         if (isFundsError(provider, v.message)) {
@@ -130,7 +100,7 @@ Deno.serve(async (req) => {
     }
 
     // The vendor accepted a letter with these credentials, so they are verified.
-    if (acct.status !== "verified") await markAccount(tenantId, { status: "verified", last_error: null, last_verified_at: new Date().toISOString() });
+    if (acct.status !== "verified") await restWrite("PATCH", `mail_provider_accounts?tenant_id=eq.${tenantId}`, { status: "verified", last_error: null, last_verified_at: new Date().toISOString() });
 
     // ── 5. Where it stands ─────────────────────────────────
     return jsonResponse({

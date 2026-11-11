@@ -8,7 +8,11 @@
  * versions migrate to the new shape.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MAIL_NOT_CONNECTED, useMailStore } from '@/store/useMailStore';
+import { MAIL_NOT_CONNECTED, NO_MAIL_CONNECTION, resolveSender, useMailStore } from '@/store/useMailStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { useCommunicationsStore } from '@/store/useCommunicationsStore';
+import { resetStoresForRealTenant } from '@/store/resetStores';
+import { toStateCode } from '@/lib/usStates';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import type { MailingSettings } from '@/types/mail';
 
@@ -103,5 +107,43 @@ describe('useMailStore', () => {
     expect(migrated.mailingSettings.mailProvider).toBe('letterstream');
     expect(migrated.mailingSettings.mailCredentialMasked).toBe('••••9876');
     expect(migrated.mailingSettings.mailStatus).toBe('verified');
+  });
+
+  it('mails from the building under Building › Contacts, with the state as its USPS code, never the persisted demo sender', async () => {
+    useBuildingStore.setState({ name: 'Maple Court Condominium', address: { street: '12 Maple Ct', city: 'Washington', state: 'District of Columbia', zip: '20001' } });
+    expect(resolveSender()).toEqual({ name: 'Maple Court Condominium', address: { line1: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' } });
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    const rec = await useMailStore.getState().sendNotice({ ...notice, recipient: { name: 'Pat Owner', address: { line1: '12 Maple Ct', line2: 'Unit 2B', city: 'Washington', state: 'district of columbia', zip: '20001' } } });
+    expect(rec.sender.name).toBe('Maple Court Condominium');
+    expect(rec.sender.address.line1).toBe('12 Maple Ct');
+    expect(rec.recipient.address.state).toBe('DC');
+    // A building with no address yet (the demo) still falls back to the persisted sender.
+    useBuildingStore.setState({ name: '', address: { street: '', city: '', state: '', zip: '' } });
+    expect(resolveSender().name).toBe('Castle Condos HOA');
+  });
+
+  it('a real tenant starts with no vendor connection and no letters from the previous building', async () => {
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    await useMailStore.getState().sendNotice(notice);
+    expect(useMailStore.getState().mailRecords).toHaveLength(1);
+    resetStoresForRealTenant();
+    expect(useMailStore.getState().mailRecords).toEqual([]);
+    expect(useMailStore.getState().mailingSettings).toMatchObject(NO_MAIL_CONNECTION);
+  });
+
+  it('a composed mailing records the connected vendor\'s estimate, the same one the panel showed', () => {
+    useMailStore.getState().updateMailingSettings({ mailConnected: true, mailProvider: 'letterstream' });
+    useCommunicationsStore.setState({ communications: [] } as never);
+    const c = useCommunicationsStore.getState().sendCommunication({ scope: 'unit', subject: 'Dues', body: 'Pay', templateId: null, templateName: null, channels: ['mail'], recipientUnit: '2B', recipientName: 'Pat', recipientEmail: null, mailDeliveryMethod: 'certified', mailLetterCount: 1, caseId: null, stepIdx: null, source: 'compose', createdBy: 'Board' } as never);
+    const saved = useCommunicationsStore.getState().communications.find(x => x.id === (c as { id?: string })?.id) ?? useCommunicationsStore.getState().communications[0];
+    expect(saved.mailCostCents).toBe(834);
+  });
+
+  it('turns state names into USPS codes and leaves unknown values for the vendor to judge', () => {
+    expect(toStateCode('District of Columbia')).toBe('DC');
+    expect(toStateCode(' dc ')).toBe('DC');
+    expect(toStateCode('New York')).toBe('NY');
+    expect(toStateCode('Narnia')).toBe('NARNIA');
+    expect(toStateCode('')).toBe('');
   });
 });

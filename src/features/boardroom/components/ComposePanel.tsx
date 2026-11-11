@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useMailStore } from '@/store/useMailStore';
+import { useMailStore, resolveSender } from '@/store/useMailStore';
 import { useCommunicationsStore } from '@/store/useCommunicationsStore';
 import { ESTIMATE_NOTE, formatDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
 import type { MailDeliveryMethod } from '@/types/mail';
@@ -60,6 +60,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
   const { units } = useFinancialStore();
   const currentUser = useAuthStore(s => s.currentUser);
   const { mailingSettings } = useMailStore();
+  const sender = resolveSender();
   const sendCommunication = useCommunicationsStore(s => s.sendCommunication);
 
   // ── State ─────────────────────────────────────────────────
@@ -589,7 +590,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                 </div>
                 <p className="text-[10px] text-ink-400 mt-1">
                   {mailingSettings.mailConnected && mailingSettings.mailProvider
-                    ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s ${vendor} account.`
+                    ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account.`
                     : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                 </p>
               </div>
@@ -662,10 +663,10 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   <div className="p-5 bg-white max-h-80 overflow-y-auto">
                     <div className="space-y-3 text-xs" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
                       <div className="text-ink-500">
-                        <p className="font-semibold">{mailingSettings.senderName}</p>
-                        <p>{mailingSettings.senderAddress.line1}</p>
-                        {mailingSettings.senderAddress.line2 && <p>{mailingSettings.senderAddress.line2}</p>}
-                        <p>{mailingSettings.senderAddress.city}, {mailingSettings.senderAddress.state} {mailingSettings.senderAddress.zip}</p>
+                        <p className="font-semibold">{sender.name}</p>
+                        <p>{sender.address.line1}</p>
+                        {sender.address.line2 && <p>{sender.address.line2}</p>}
+                        <p>{sender.address.city}, {sender.address.state} {sender.address.zip}</p>
                       </div>
                       <p className="text-ink-400">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                       <div className="text-ink-700">
@@ -706,7 +707,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                     <span className="text-[11px] font-semibold text-ink-500">Email Preview</span>
                   </div>
                   <div className="px-4 py-2.5 border-b border-ink-100 space-y-1 text-[11px]">
-                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{mailingSettings.senderName}</span></div>
+                    <div className="flex gap-2"><span className="text-ink-400 w-12">From:</span><span className="text-ink-700 font-medium">{sender.name}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">To:</span><span className="text-ink-700 font-medium">{scope === 'unit' ? (selectedUnit?.email || '') : `All owners (${units.length})`}</span></div>
                     <div className="flex gap-2"><span className="text-ink-400 w-12">Subject:</span><span className="text-ink-900 font-semibold">{subject}</span></div>
                   </div>
@@ -760,7 +761,7 @@ export default function ComposePanel({ context, onClose, onSent }: ComposePanelP
                   </div>
                   <p className="text-[10px] text-ink-400 mt-1">
                     {mailingSettings.mailConnected && mailingSettings.mailProvider
-                      ? `${ESTIMATE_NOTE} Billed to ${mailingSettings.senderName}'s ${vendor} account.`
+                      ? `${ESTIMATE_NOTE} Billed to ${sender.name}'s ${vendor} account.`
                       : `${ESTIMATE_NOTE} The building's mail account isn't connected yet (Settings → Mailing).`}
                   </p>
                 </div>

@@ -12,6 +12,20 @@
 
 alter table if exists letterstream_accounts rename to mail_provider_accounts;
 
+-- A database that never had the LetterStream-only table (fresh install) gets the table here.
+create table if not exists mail_provider_accounts (
+  tenant_id        uuid primary key references tenants(id) on delete cascade,
+  api_id           text,
+  api_key          text not null,
+  status           text not null default 'unverified',
+  last_error       text,
+  connected_by     uuid references auth.users(id) on delete set null,
+  connected_at     timestamptz not null default now(),
+  last_verified_at timestamptz,
+  updated_at       timestamptz not null default now()
+);
+alter table mail_provider_accounts enable row level security;
+
 alter table mail_provider_accounts
   add column if not exists provider text not null default 'letterstream';
 
@@ -23,7 +37,14 @@ alter table mail_provider_accounts
 -- DocuPost has no API ID, only a token.
 alter table mail_provider_accounts alter column api_id drop not null;
 
-alter table financial_settings rename column letterstream_connected to mail_connected;
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'financial_settings' and column_name = 'letterstream_connected')
+     and not exists (select 1 from information_schema.columns where table_name = 'financial_settings' and column_name = 'mail_connected') then
+    alter table financial_settings rename column letterstream_connected to mail_connected;
+  end if;
+end $$;
+alter table financial_settings add column if not exists mail_connected boolean not null default false;
 alter table financial_settings add column if not exists mail_provider text;
 
 -- Keep financial_settings in step with the credentials row.

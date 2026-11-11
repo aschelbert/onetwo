@@ -5,6 +5,7 @@
 
 import { useBuildingStore } from './useBuildingStore';
 import { useFinancialStore } from './useFinancialStore';
+import { useMailStore, NO_MAIL_CONNECTION } from './useMailStore';
 import { DEFAULT_GL_MAPPING } from '@/lib/financial-logic';
 import { useMeetingsStore } from './useMeetingsStore';
 import { useComplianceStore } from './useComplianceStore';
@@ -27,6 +28,10 @@ export function resetStoresForRealTenant() {
   // The case dock remembers case ids per browser; another building's ids mean nothing here.
   useCaseDockStore.getState().reset();
   useSetupStore.getState().reset();
+
+  // The mail store is persisted too: the previous building's vendor connection and
+  // letters must not show on this one. loadMailingSettings() fills the connection back in.
+  useMailStore.setState(s => ({ mailRecords: [], mailingSettings: { ...s.mailingSettings, ...NO_MAIL_CONNECTION } }));
 
   useBuildingStore.setState({
     name: '',
