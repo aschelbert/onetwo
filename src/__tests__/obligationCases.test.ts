@@ -64,7 +64,7 @@ describe('starting an obligation', () => {
     expect(misses).toEqual([]);
     const evac = resolveCheck('Review evacuation routes and assembly points', { catId: 'maintenance', sitId: 'obligation-m5', step: 'Work through: Emergency preparedness plan updated', hasUnit: false });
     expect(evac.rule).toBe('evacuation');
-    expect(evac.assists.map(a => a.label)).toEqual(['Review the floor plans on file', 'Post the routes to residents']);
+    expect(evac.assists.map(a => a.label)).toEqual(['Review the floor plans on file', 'Post the routes to residents', 'Open Building › Documents']);
   });
 });
 

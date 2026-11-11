@@ -6,6 +6,7 @@ import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
 import { ANNUAL_BUDGET_FINANCIALS } from '@/features/issues/components/shell/budgetData';
 import { generateLocalId } from '@/lib/generateId';
+import { deriveChecks } from '@/features/issues/stepGuide';
 
 // ─── Situation Templates ───────────────────────────────────
 export interface StepAction {
@@ -2093,6 +2094,26 @@ function mergeCheckLabels(saved: CaseCheckItem[], templateCk: string[]): CaseChe
   return saved.map((ck, i) => i < templateCk.length ? { ...ck, label: templateCk[i] } : ck);
 }
 
+/** The Annual budget's guided steps are worked through on the draft, not a checklist. */
+const isGuidedBudget = (c: Pick<CaseTrackerCase, 'sitId' | 'approach'>) => c.sitId === 'runbook-annual-budget' || (c.sitId === 'annual-budgeting' && c.approach === 'pre');
+
+/** A step written without a checklist gets one from its own words (see stepGuide), so every step has items to work through. */
+function withStepChecklist<T extends CaseStep>(st: T): T {
+  if ((st.checks && st.checks.length > 0) || (st.actions && st.actions.length > 0)) return st;
+  const checks = hydrateChecks(deriveChecks(st))!.map(ck => (st.done ? { ...ck, checked: true, checkedDate: st.doneDate ?? null } : ck));
+  return { ...st, checks };
+}
+
+/** Every step of an action, and of its added approaches, has a checklist. */
+export function withChecklists(c: CaseTrackerCase): CaseTrackerCase {
+  const steps = c.steps && !isGuidedBudget(c) ? c.steps.map(withStepChecklist) : c.steps;
+  const additionalApproaches = c.additionalApproaches?.map(aa => ({ ...aa, steps: aa.steps.map(withStepChecklist) }));
+  return { ...c, steps, ...(additionalApproaches && { additionalApproaches }) };
+}
+
+/** Completing a step completes its checklist. */
+const tickAll = (checks: CaseCheckItem[] | undefined, date: string) => checks?.map(ck => (ck.checked ? ck : { ...ck, checked: true, checkedDate: date }));
+
 function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
@@ -2126,7 +2147,7 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
       ...(s.requiresConflictCheck && { requiresConflictCheck: true }),
     };
   });
-  return c;
+  return withChecklists(c);
 }
 
 /** Re-hydrate a case from DB or localStorage: merge saved progress onto full template steps.
@@ -2134,7 +2155,8 @@ function hydrateSteps(c: CaseTrackerCase): CaseTrackerCase {
 function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
   const cat = CATS.find(x => x.id === c.catId);
   const sit = cat?.sits.find(x => x.id === c.sitId);
-  if (!sit) return c;
+  // A runbook's or a custom action's own steps: kept as saved, with a checklist where one is missing.
+  if (!sit) return withChecklists(c);
   const src = c.approach === 'legal' ? sit.legal : c.approach === 'self' ? sit.self : sit.pre;
 
   // Map saved steps by id for merging user progress
@@ -2155,6 +2177,8 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
           ? mergeCheckLabels(saved.checks, st.ck)
           : hydrateChecks(st.ck)
       }),
+      // A checklist made from the step's own words keeps its ticks and notes.
+      ...(!(st.ck && st.ck.length > 0) && saved?.checks && saved.checks.length > 0 && { checks: saved.checks }),
       ...(st.actions && { actions: st.actions.map((a: any) => {
         // Preserve action done/doneDate from saved data
         const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
@@ -2196,6 +2220,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
             ...(st.ck && st.ck.length > 0 && {
               checks: (saved?.checks && saved.checks.length > 0) ? mergeCheckLabels(saved.checks, st.ck) : hydrateChecks(st.ck)
             }),
+            ...(!(st.ck && st.ck.length > 0) && saved?.checks && saved.checks.length > 0 && { checks: saved.checks }),
             ...(st.actions && { actions: st.actions.map((a: any) => {
               const savedAction = saved?.actions?.find((sa: any) => sa.id === a.id);
               return { ...a, done: savedAction?.done ?? false, doneDate: savedAction?.doneDate ?? null };
@@ -2211,7 +2236,7 @@ function rehydrateCase(c: CaseTrackerCase): CaseTrackerCase {
     });
   }
 
-  return c;
+  return withChecklists(c);
 }
 
 const seedCases: CaseTrackerCase[] = [
@@ -2388,6 +2413,9 @@ interface IssuesState {
 
   // Phase/check/action actions
   toggleCheck: (caseId: string, stepIdx: number, checkId: string) => void;
+  /** What someone wrote for a checklist item; empty clears it. */
+  setCheckNote: (caseId: string, stepIdx: number, checkId: string, note: string) => void;
+  setAdditionalCheckNote: (caseId: string, approachIdx: number, stepIdx: number, checkId: string, note: string) => void;
   toggleAction: (caseId: string, stepIdx: number, actionId: string) => void;
   completeAllChecks: (caseId: string, stepIdx: number) => void;
   putOnHold: (caseId: string, reason: string) => void;
@@ -2458,6 +2486,13 @@ interface IssuesState {
   shellActiveStep: number;
   shellActiveStepCaseId: string | null;
   setShellActiveStep: (caseId: string, stepIdx: number) => void;
+}
+
+/** Save a step's done state and checklist (ticks, notes) to the database. */
+function saveStepProgress(caseId: string, stepIdx: number) {
+  if (!isBackendEnabled) return;
+  const step = useIssuesStore.getState().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
+  if (step) void casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
 }
 
 export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
@@ -2607,18 +2642,18 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       }));
     }
     const today = new Date().toISOString().split('T')[0];
-    const newCase: CaseTrackerCase = {
+    const newCase: CaseTrackerCase = withChecklists({
       id, catId: data.catId, sitId: data.sitId, approach: data.approach, title: data.title,
       unit: data.unit, owner: data.owner, priority: data.priority, notes: data.notes,
       status: 'open', created: today,
       steps, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
-      conflictChecks: [], decisionTrail: [{ id: generateLocalId('te'), type: 'case_created', date: today, actor: 'Board', summary: `Case created: ${data.title}` }],
+      conflictChecks: [], decisionTrail: [{ id: generateLocalId('te'), type: 'case_created', date: today, actor: 'Board', summary: `Action created: ${data.title}` }],
       ...(data.assignedTo && { assignedTo: data.assignedTo }),
       ...(data.assignedRole && { assignedRole: data.assignedRole }),
       ...(data.dueDate && { dueDate: data.dueDate }),
       ...(data.source && { source: data.source }),
       ...(data.sourceId && { sourceId: data.sourceId }),
-    };
+    });
     set({ cases: [newCase, ...s.cases], nextCaseNum: caseNum + 1 });
     const tid = tenantId || getActiveTenantId();
     if (isBackendEnabled && tid) {
@@ -2639,7 +2674,9 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         steps[stepIdx] = {
           ...steps[stepIdx],
           done: !wasDone,
-          doneDate: !wasDone ? today : null
+          doneDate: !wasDone ? today : null,
+          // Marking a step done ticks what is left of its checklist.
+          ...(!wasDone && steps[stepIdx].checks && { checks: tickAll(steps[stepIdx].checks, today) }),
         };
         if (!wasDone) {
           const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor: 'Board', summary: `Step completed: ${steps[stepIdx].s}` };
@@ -2651,7 +2688,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
     if (isBackendEnabled) {
       const c = get().cases.find(x => x.id === caseId);
       const step = c?.steps?.[stepIdx];
-      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+      if (step) casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
     }
   },
 
@@ -2663,14 +2700,14 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId || !c.steps?.[stepIdx] || c.steps[stepIdx].done) return c;
         const steps = [...c.steps];
-        steps[stepIdx] = { ...steps[stepIdx], done: true, doneDate: today };
+        steps[stepIdx] = { ...steps[stepIdx], done: true, doneDate: today, ...(steps[stepIdx].checks && { checks: tickAll(steps[stepIdx].checks, today) }) };
         const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'step_completed', date: today, actor, summary: `Step completed: ${steps[stepIdx].s}` };
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
     if (isBackendEnabled) {
       const step = get().cases.find(x => x.id === caseId)?.steps?.[stepIdx];
-      if (step) casesSvc.updateCaseStep(caseId, step.id, step.done, step.doneDate);
+      if (step) casesSvc.updateCaseStepProgress(caseId, step.id, step.done, step.doneDate, step.checks);
     }
   },
 
@@ -2738,6 +2775,33 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
+  },
+
+  setCheckNote: (caseId, stepIdx, checkId, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.steps?.[stepIdx]?.checks) return c;
+        const steps = [...c.steps];
+        steps[stepIdx] = { ...steps[stepIdx], checks: steps[stepIdx].checks!.map(ck => (ck.id === checkId ? { ...ck, note: note.trim() || undefined } : ck)) };
+        return { ...c, steps };
+      })
+    }));
+    saveStepProgress(caseId, stepIdx);
+  },
+
+  setAdditionalCheckNote: (caseId, approachIdx, stepIdx, checkId, note) => {
+    set(s => ({
+      cases: s.cases.map(c => {
+        if (c.id !== caseId || !c.additionalApproaches?.[approachIdx]?.steps[stepIdx]?.checks) return c;
+        const aa = [...c.additionalApproaches];
+        const steps = [...aa[approachIdx].steps];
+        steps[stepIdx] = { ...steps[stepIdx], checks: steps[stepIdx].checks!.map(ck => (ck.id === checkId ? { ...ck, note: note.trim() || undefined } : ck)) };
+        aa[approachIdx] = { ...aa[approachIdx], steps };
+        return { ...c, additionalApproaches: aa };
+      })
+    }));
+    syncAdditionalApproachesToStorage(get().cases);
   },
 
   toggleAction: (caseId, stepIdx, actionId) => {
@@ -2778,6 +2842,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
   },
 
   attachCheckDocument: (caseId, stepIdx, checkId, attachment) => {
@@ -2799,11 +2864,12 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         return { ...c, steps, decisionTrail: [...(c.decisionTrail || []), trail] };
       })
     }));
+    saveStepProgress(caseId, stepIdx);
   },
 
   putOnHold: (caseId, reason) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_held', date: today, actor: 'Board', summary: `Case put on hold: ${reason}` };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_held', date: today, actor: 'Board', summary: `Action put on hold: ${reason}` };
     set(s => ({
       cases: s.cases.map(c => c.id === caseId ? { ...c, status: 'on-hold' as const, holdReason: reason, decisionTrail: [...(c.decisionTrail || []), trail] } : c)
     }));
@@ -2821,7 +2887,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
 
   closeCaseWithReason: (caseId, reason, notes) => {
     const today = new Date().toISOString().split('T')[0];
-    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_closed', date: today, actor: 'Board', summary: `Case closed: ${reason}`, details: notes };
+    const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'case_closed', date: today, actor: 'Board', summary: `Action closed: ${reason}`, details: notes };
     set(s => ({
       cases: s.cases.map(c => {
         if (c.id !== caseId) return c;
@@ -2871,7 +2937,7 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
             ...(st.desc && { desc: st.desc }),
           }));
         }
-        const newApproach = { approach, addedDate: today, steps };
+        const newApproach = { approach, addedDate: today, steps: steps.map(withStepChecklist) };
         const trail: DecisionTrailEntry = { id: generateLocalId('te'), type: 'approach_added', date: today, actor: 'Board', summary: `${approach === 'legal' ? 'Legal Counsel' : approach === 'self' ? 'Self-Represented' : 'Pre-Legal'} approach added` };
         return { ...c, additionalApproaches: [...(c.additionalApproaches || []), newApproach], decisionTrail: [...(c.decisionTrail || []), trail] };
       })
