@@ -256,6 +256,7 @@ p{margin:0}
 .ct{font-size:14px;font-weight:600;letter-spacing:-.01em;line-height:1.2}.ct small{font-weight:400;color:#5F6C7B;font-size:10.5px;margin-left:6px}
 .c2 .sub{font-size:10.5px;color:#5F6C7B}
 .kv4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.kv3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.kv3 .inner{gap:2px;padding:7px 9px}.kv3 .lbl{font-size:9.5px;font-weight:600;color:#155E75;text-transform:uppercase;letter-spacing:.04em}.kv3 .val{font-size:11.5px;font-weight:600;color:#1A1F25;line-height:1.3}.kv3 .nt{font-size:9.5px;color:#5F6C7B;line-height:1.35}
 .kv4 .inner{gap:2px;padding:7px 9px}.kv4 .lbl{font-size:9.5px;color:#5F6C7B}.kv4 .val{font-size:11.5px;font-weight:600;color:#1A1F25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv4 .val.red{color:#B71C2A}.kv4 .nt{font-size:9.5px;color:#5F6C7B;line-height:1.35}
 .flow{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#5F6C7B;flex-wrap:wrap}.flow .arr{color:#8A96A3}.flow .end{margin-left:auto}
 .srch{height:26px;border:1px solid #D8DCE1;border-radius:999px;padding:0 10px;font-size:10px;color:#8A96A3;display:inline-flex;align-items:center;min-width:150px;background:#ffffff;white-space:nowrap}
@@ -345,6 +346,7 @@ p{margin:0}
   .appnavlinks{display:none}
   .spotframe .tb th:nth-child(n+4),.spotframe .tb td:nth-child(n+4){display:none}
   .spotframe .tiles{grid-template-columns:1fr !important}
+  .spotframe .kv3{grid-template-columns:1fr}
   .spotframe .chrome{display:none}
   .cmp{grid-template-columns:1fr}
   .cmp .h{display:none}
@@ -590,13 +592,13 @@ p{margin:0}
 
     <div class="spot">
       <div class="spottext">
-        <span class="n">01 · Collections</span>
-        <h3>From a late payment to the courthouse, one case.</h3>
-        <p>Thirty days past due opens a case. The app charges the late fee, sends the second notice by certified mail, then the formal demand with the statutory lien language and the 30-day cure period. If the owner will not take the plan, the board records the lien and files in Small Claims from the same file. Counsel comes in only when the board decides, and gets the whole packet.</p>
+        <span class="n">01 · Escalation</span>
+        <h3>Every need has a path, from a friendly notice to the courthouse.</h3>
+        <p>A late payment, a rules violation, a leak in a unit, an insurance claim. Each one starts with the friendly steps: a notice, a reminder, a fee where the bylaws allow it, a cure period. Most end there, and most of that runs itself. If one doesn't, it moves up on the timeline the bylaws and DC Code set, and every letter, vote and receipt from the first notice comes with it. The board can take it as far as Small Claims on its own. Counsel comes in only when the board says so.</p>
         <ul>
-          <li><span><b>Pre-legal.</b> Fee, notice, demand, payment plan. The first three run themselves.</span></li>
-          <li><span><b>Self-directed legal.</b> The lien notice and the Small Claims packet, drafted from the case, voted by the board.</span></li>
-          <li><span><b>Legal escalation.</b> One packet to the association's attorney with every letter, receipt and ledger line inside.</span></li>
+          <li><span><b>Pre-legal.</b> Notices, reminders, fees and cure periods, sent on time and by the right channel. Most end here, and most of it runs itself.</span></li>
+          <li><span><b>Self-directed legal.</b> The certified demand, the hearing notice, the lien and the Small Claims packet, drafted from the file and voted by the board.</span></li>
+          <li><span><b>Legal escalation.</b> When the board decides, one packet to the association's attorney with every letter, receipt, vote and ledger line inside.</span></li>
         </ul>
       </div>
       <div class="browser spotframe" id="spot1"></div>
@@ -623,7 +625,7 @@ p{margin:0}
         <p>Every notice starts from a template the app fills in with the names, amounts and dates. It posts to the portal and emails every owner with an address on file. The owners who want paper get first class. A demand letter goes certified with return receipt, and the USPS tracking and the PDF are filed in the Archive. Postage at cost.</p>
         <ul>
           <li><span><b>Right channel, every time.</b> Meeting notices inside the legal window, budget notices 30 days ahead, demands by certified mail.</span></li>
-          <li><span><b>Nothing to print.</b> The mail vendor prints, stuffs and posts it; first class from $1.48, certified from $11.73.</span></li>
+          <li><span><b>Nothing to print.</b> The mail vendor prints, stuffs and posts it; first class and certified mail all at a direct cost to you. No upcharge from us.</span></li>
           <li><span><b>Proof, filed.</b> Tracking, delivery and the letter itself land in the Archive against the obligation they satisfy.</span></li>
         </ul>
       </div>
@@ -1011,22 +1013,21 @@ p{margin:0}
 
   /* ---------- Feature spotlight: four mocks drawn with the same parts as the screens above ---------- */
   function spot(id, url, html) { var n = el(id); if (n) n.innerHTML = '<div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">' + esc(url) + '</span></div><div class="appbody">' + html + '</div>'; }
-  spot('spot1', 'app.getonetwo.com/boardroom?view=case:c12',
-    '<div class="stage"><span class="ct">Collections · Unit 203 · $1,425 past due</span><span class="chiprow">' + chip('teal', 'Collections runbook') + chip('red', '64 days past due') + '</span></div>' +
-    '<div class="c2"><div class="slrow"><span class="sl">Pre-legal · days 30 to 90</span>' + chip('teal', '3 of 4 automated') + '</div>' +
-      step('done', 'Late fee charged · $25 after the 15-day grace', 'Billing did it on Dec 16 · on the unit ledger and the statement') +
-      step('done', 'Second notice by certified mail, statement of account attached', 'Dec 20 · USPS 9407 1118 9922 · delivered Dec 23 · $11.73 at cost') +
-      step('done', 'Formal demand letter · lien rights under DC Code § 42-1903.13(a), 30-day cure', 'Jan 14 · certified, return receipt · itemized $1,425') +
-      step('done', 'Written payment plan offered · the same terms every owner gets', 'Jan 15 · declined Feb 1') +
+  spot('spot1', 'app.getonetwo.com/boardroom',
+    '<div class="stage"><span class="ct">Open cases, by stage</span><span class="chiprow">' + chip('teal', 'Pre-legal · 3') + chip('navy', 'Self-directed · 1') + chip('red', 'Counsel · 1') + '</span></div>' +
+    '<div class="kv3">' +
+      '<div class="inner"><span class="lbl">1 · Pre-legal</span><span class="val">Notice, reminder, fee, cure period</span><span class="nt">Most end here. Most of it runs itself.</span></div>' +
+      '<div class="inner"><span class="lbl">2 · Self-directed legal</span><span class="val">Certified demand, hearing, lien, Small Claims</span><span class="nt">Drafted from the file. The board votes.</span></div>' +
+      '<div class="inner"><span class="lbl">3 · Legal escalation</span><span class="val">One packet to counsel</span><span class="nt">Only if the board decides.</span></div>' +
     '</div>' +
-    '<div class="c2"><div class="slrow"><span class="sl">Self-directed legal · the board, no lawyer yet</span>' + chip('plum', 'Board vote recorded') + '</div>' +
-      step('next', 'Record the lien · DC Recorder of Deeds', 'Notice drafted with the legal description and the itemized balance · Secretary', chip('navy', 'Open the packet')) +
-      step('', 'File in DC Superior Court · Small Claims Branch', 'Up to $10,000 · DC Code § 42-1903.13(c) · the court packet is built from this case') +
-    '</div>' +
-    '<div class="c2"><div class="slrow"><span class="sl">Legal escalation · only if the board decides</span>' + chip('ghost', 'Counsel from the Directory') + '</div>' +
-      step('', 'Hand the file to the association’s attorney', 'Every letter, receipt, vote and ledger line, in one packet') +
-    '</div>' +
-    '<span class="caption">The outcome step ticks itself the day the unit has nothing past due.</span>');
+    '<div class="c2 white" style="padding:2px 6px">' + table([['Case', '30%'], ['Runbook', '20%'], ['Stage', '22%'], ['Next', '28%']], [
+      [cell('Unit 203 · $1,425 past due', 'Opened at 30 days past due'), cell('Collections'), chip('navy', 'Self-directed'), cell('Record the lien', 'Secretary · notice drafted')],
+      [cell('Unit 4A · balcony enclosure', 'Flagged at the fall inspection'), cell('Covenant violation'), chip('teal', 'Pre-legal'), cell('Cure period ends Dec 1', 'Notice sent certified Nov 1')],
+      [cell('Unit 2B · water intrusion', 'Reported by the owner Jul 14'), cell('Work order'), chip('teal', 'Pre-legal'), cell('Decide responsibility', 'Bylaws 7.2 attached')],
+      [cell('Lobby flood · $38,000 loss', 'Reported Sep 9'), cell('Insurance claim'), chip('red', 'Counsel'), cell('Coverage dispute with counsel', 'Packet sent Nov 3')],
+      [cell('Unit 5C · records request', 'Asked Oct 20'), cell('Records request'), chip('sage', 'Resolved'), cell('Answered in 3 days', 'DC Code § 42-1903.14')]
+    ]) + '</div>' +
+    '<span class="caption">Each runbook knows its path. A case moves up a stage only on the date the bylaws and DC Code set, never sooner, and the board decides every step that needs a vote.</span>');
   spot('spot2', 'app.getonetwo.com/my-unit/pay',
     '<div class="tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))">' +
       tileX('navy', 'Balance', 'Unit 203', val('$1,425') + '<span class="m">$1,400 dues and charges · $25 late fee</span>', '<span>Pay by bank or card</span><b>Pay $1,425</b>') +
