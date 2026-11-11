@@ -111,12 +111,45 @@ describe('Building', () => {
     expect(screen.queryByTestId('legacy-units')).toBeNull();
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     const units = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
-    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in']);
+    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in', '']);
     expect(document.querySelector('[aria-label="Board"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Management and counsel"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Emergency contacts"]')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Intercom' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Property log' })).toBeNull();
+  });
+
+  it('Directory lets the board add a unit, add the first one when there are none, and edit one; ?add=unit opens the form', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    const before = useFinancialStore.getState().units;
+    try {
+      useFinancialStore.setState({ units: [] });
+      renderAt('/building?tab=directory&section=units&add=unit');
+      const card = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
+      expect(within(card).getByText('No units yet.')).toBeTruthy();
+      const form = within(card).getByRole('form', { name: 'Add a unit' });
+      fireEvent.change(within(form).getByLabelText('Unit'), { target: { value: '1A' } });
+      fireEvent.change(within(form).getByLabelText('Owner'), { target: { value: 'Ana Ruiz' } });
+      fireEvent.change(within(form).getByLabelText('Dues a month'), { target: { value: '$420' } });
+      fireEvent.change(within(form).getByLabelText('Share, %'), { target: { value: '2.5' } });
+      fireEvent.click(within(form).getByRole('button', { name: 'Add and another' }));
+      expect(useFinancialStore.getState().units).toHaveLength(1);
+      expect(useFinancialStore.getState().units[0]).toMatchObject({ number: '1A', owner: 'Ana Ruiz', monthlyFee: 420, votingPct: 2.5, balance: 0, status: 'ACTIVE' });
+      // The same number twice is refused.
+      fireEvent.change(within(form).getByLabelText('Unit'), { target: { value: '1a' } });
+      expect(within(form).getByRole('alert').textContent).toMatch(/already on the list/);
+      expect((within(form).getByRole('button', { name: 'Add the unit' }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(within(card).getByRole('button', { name: 'More for unit 1A' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+      const edit = within(card).getByRole('form', { name: 'Edit unit 1A' });
+      expect((within(edit).getByLabelText('Unit') as HTMLInputElement).disabled).toBe(true);
+      fireEvent.change(within(edit).getByLabelText('Email'), { target: { value: 'ana@example.com' } });
+      fireEvent.click(within(edit).getByRole('button', { name: 'Save' }));
+      expect(useFinancialStore.getState().units[0].email).toBe('ana@example.com');
+    } finally {
+      useFinancialStore.setState({ units: before });
+    }
   });
 
   it('Directory lets the board add, edit and remove the property manager and legal counsel', async () => {
