@@ -113,7 +113,7 @@ function UnitRow({ u, b, onPanel, onCase }: { u: Unit; b?: BehindUnit; onPanel: 
             { label: 'Add a fee', onSelect: () => onPanel({ kind: 'fee', unit: u.number }) },
             { label: 'Add a special assessment', onSelect: () => onPanel({ kind: 'assessment', unit: u.number }) },
             ...(u.balance < 0 ? [{ label: `Return the ${fmt(-u.balance)} paid ahead`, onSelect: () => { refundCredit(u.number, -u.balance, 'Returned to the owner'); } }] : []),
-            { label: 'Open a case', onSelect: onCase },
+            { label: 'Take Action', onSelect: onCase },
           ]}
         />
       </Td>

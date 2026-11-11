@@ -33,7 +33,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-ux2-muted">
           <button type="button" onClick={onBack} className="font-semibold text-ux2-teal hover:underline">All cases</button>
           {c && <><span>/</span><span>{snap.categories.find(x => x.id === c.catId)?.label ?? c.catId}</span><span>/</span><span className="text-ux2-ink">{c.id}</span></>}
-          {!c && <><span>/</span><span className="text-ux2-ink">New case</span></>}
+          {!c && <><span>/</span><span className="text-ux2-ink">Take Action</span></>}
         </nav>
         {c && row && (
           <div className="flex flex-wrap items-start justify-between gap-3">
