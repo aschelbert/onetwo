@@ -245,10 +245,18 @@ p{margin:0}
 .tl{position:relative;height:2px;background:#E3E8EE;margin:10px 4px 2px}.tl i{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#0D1B2E;margin-left:-4px}.tl i.g{background:#C9D2DC}
 .caption{font-size:10px;color:#8A96A3;line-height:1.4}
 .c2.outline{background:#ffffff;border-color:#E23B4E}
+.c2.navy{background:#0D1B2E;border-color:#0D1B2E;color:#ffffff}
+.c2.teal{background:#155E75;border-color:#155E75;color:#ffffff}
+.stat4 .c2.navy .lbl,.stat4 .c2.navy .nt,.stat4 .c2.navy .num small,.stat4 .c2.teal .lbl,.stat4 .c2.teal .nt,.stat4 .c2.teal .num small{color:rgba(255,255,255,.72)}
+.stat4 .c2.cyan .lbl,.stat4 .c2.cyan .nt,.stat4 .c2.cyan .num small{color:rgba(13,27,46,.7)}
+.c2.grad{background:linear-gradient(118deg,#0D1B2E 0%,#0D1B2E 34%,#D62839 100%);border-color:transparent;color:#ffffff}
+.c2.grad .sl,.c2.grad .sub,.c2.grad .caption{color:rgba(255,255,255,.75)}
+.c2.grad .hbtn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5);color:#ffffff}
+.c2.grad .hbtn.navy{background:#ffffff;border-color:#ffffff;color:#0D1B2E}
 .ct{font-size:14px;font-weight:600;letter-spacing:-.01em;line-height:1.2}.ct small{font-weight:400;color:#5F6C7B;font-size:10.5px;margin-left:6px}
 .c2 .sub{font-size:10.5px;color:#5F6C7B}
 .kv4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.kv4 .inner{gap:2px;padding:7px 9px}.kv4 .lbl{font-size:9.5px;color:#5F6C7B}.kv4 .val{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv4 .val.red{color:#B71C2A}.kv4 .nt{font-size:9.5px;color:#5F6C7B;line-height:1.35}
+.kv4 .inner{gap:2px;padding:7px 9px}.kv4 .lbl{font-size:9.5px;color:#5F6C7B}.kv4 .val{font-size:11.5px;font-weight:600;color:#1A1F25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kv4 .val.red{color:#B71C2A}.kv4 .nt{font-size:9.5px;color:#5F6C7B;line-height:1.35}
 .flow{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#5F6C7B;flex-wrap:wrap}.flow .arr{color:#8A96A3}.flow .end{margin-left:auto}
 .srch{height:26px;border:1px solid #D8DCE1;border-radius:999px;padding:0 10px;font-size:10px;color:#8A96A3;display:inline-flex;align-items:center;min-width:150px;background:#ffffff;white-space:nowrap}
 .tb tr.late td{background:#FBF5F6}.tb td.red{color:#B71C2A;font-weight:600}
@@ -725,7 +733,7 @@ p{margin:0}
     { nav: 'Community', url: 'app.getonetwo.com/community?tab=meetings', title: 'The meeting, from notice to minutes', sub: 'Notice goes out inside the legal window, quorum is counted at the door, and the minutes are drafted the same night and approved by a vote the owners can see.',
       render: function () {
         return header('Community', chip('ghost', 'Next meeting May 4'), ['Overview', ['Notices', '2', 'cyan'], ['Meetings', 'May 4'], 'Votes', ['Requests', '1', 'ghost'], 'Property log'], 'Meetings', acts([hbtn('Schedule a meeting', true)])) +
-          '<div class="c2"><div class="slrow"><span class="chiprow" style="align-items:center"><span class="sl">Next meeting</span>' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + '</span>' + acts([hbtn('Edit the agenda'), hbtn('Open', true)]) + '</div>' +
+          '<div class="c2 grad"><div class="slrow"><span class="chiprow" style="align-items:center"><span class="sl">Next meeting</span>' + chip('sage', 'Notice sent Apr 3 · 31 days ahead') + '</span>' + acts([hbtn('Edit the agenda'), hbtn('Open', true)]) + '</div>' +
             '<span class="ct">Annual meeting · May 4, 19:00</span><span class="sub">Lobby and Zoom · open to all owners · 5 agenda items · 8 of 12 units have replied</span>' +
             box4([['Notice', 'Sent Apr 3', 'In-app and by email to every owner. Ten days’ notice per the bylaws and DC Code § 29-1101.'], ['Agenda', '5 items', 'Budget, elections, roof bids, bike room, visitor parking'], ['RSVP', '8 of 12 units', 'Board: 5 of 5 confirmed. Quorum is 7.'], ['Room', 'Lobby reserved', 'In person; the remote link is on the meeting.']]) +
             '<span class="caption">This item is also on Home and in Building › Obligations. Recording attendance clears all three.</span>' +
@@ -785,10 +793,10 @@ p{margin:0}
         return header('Corcoran Row Condominium', chip('teal', 'Building score 94 · Good') + chip('sage', 'Insurance · all current'), ['Overview', 'Documents', ['Obligations', '3', 'navy'], 'Contracts', 'Directory', 'Archive'], 'Obligations') +
           ptabs(['This month', 'By role', 'By category', 'Filings · 7', 'Ongoing · 12', 'Duties and roles'], 'This month', 'sm') +
           '<div class="stat4">' +
-            '<div class="c2"><span class="lbl">Met</span><span class="num">38<small>of 45</small></span><span class="nt">0 overdue</span></div>' +
-            '<div class="c2"><span class="lbl">In progress</span><span class="num">4</span><span class="nt">each one is a Home card for its role</span></div>' +
+            '<div class="c2 navy"><span class="lbl">Met</span><span class="num">38<small>of 45</small></span><span class="nt">0 overdue</span></div>' +
+            '<div class="c2 teal"><span class="lbl">In progress</span><span class="num">4</span><span class="nt">each one is a Home card for its role</span></div>' +
             '<div class="c2"><span class="lbl">Auto-verified by documents</span><span class="num">9</span><span class="nt">bylaws, policies, insurance on file</span></div>' +
-            '<div class="c2"><span class="lbl">Board checklist</span><span class="num">94<small>%</small></span><span class="nt">feeds Oversight for board members</span></div>' +
+            '<div class="c2 cyan"><span class="lbl">Board checklist</span><span class="num">94<small>%</small></span><span class="nt">feeds Oversight for board members</span></div>' +
           '</div>' +
           '<div class="c2"><div class="slrow"><span class="sl">November</span><span class="caption">Sources: DC Code § 29-1101 et seq. · Bylaws on file · CC&amp;Rs on file · Rules on file · 4 policies</span></div>' +
             '<div class="c2 white" style="padding:2px 6px">' + table([['Obligation', '23%'], ['Role', '10%'], ['Due', '8%'], ['How it gets done', '18%'], ['Status', '18%'], ['', '23%']], [
