@@ -63,7 +63,7 @@ describe('Board Room', () => {
     expect(document.querySelector('[data-page="ux2-boardroom-case"]')).toBeTruthy();
     expect(screen.getByTestId('legacy-issues').getAttribute('data-embedded')).toBe('1');
     expect(screen.getByText(id)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'All cases' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Current Actions' }));
     expect(document.querySelector('[data-page="ux2-boardroom"]')).toBeTruthy();
   });
 
@@ -81,7 +81,7 @@ describe('Board Room', () => {
     const target = store.cases.find(c => c.status === 'open' && (c.steps ?? []).some(s => !s.done && (s.isSpendingDecision || s.requiresBids || s.requiresConflictCheck)));
     if (!target) return;
     renderAt(`/boardroom?view=case:${target.id}`);
-    expect(document.querySelector('[aria-label="Decisions on this case"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Decisions on this action"]')).toBeTruthy();
   });
 
   it('Inbox lists requests in the mock table with reply, acknowledges through the issues store, and shows the five-step runbook', () => {

@@ -64,7 +64,7 @@ export function OwnerCaseView({ c, onBack }: OwnerCaseViewProps) {
         {/* Phase-level timeline */}
         {phaseProgress.length > 0 ? (
           <div className="space-y-3">
-            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Case Phases</p>
+            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">Action Phases</p>
             {phaseProgress.map((p, i) => (
               <div key={p.id} className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ background: phaseColors[i % phaseColors.length] }} />
@@ -110,7 +110,7 @@ export function OwnerCaseView({ c, onBack }: OwnerCaseViewProps) {
             <span className="text-lg mt-0.5">📞</span>
             <div>
               <p className="text-sm font-medium text-ink-800">Contact Management</p>
-              <p className="text-xs text-ink-500">Reach out to property management with questions about this case.</p>
+              <p className="text-xs text-ink-500">Reach out to property management with questions about this action.</p>
             </div>
           </div>
         </div>

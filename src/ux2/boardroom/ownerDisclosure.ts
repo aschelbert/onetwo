@@ -27,7 +27,7 @@ export function disclosureSteps(year: number): { s: string; detail?: string; ck?
   return [
     { s: `Compile the ${year} disclosure: ${year - 1} actuals against budget, the reserve balance, the insurance summary, pending litigation, the board and officers`, detail: `Funds › Statements has the year-end packet and the reserve position; Building › Overview the policies and the board. This step ticks itself once the ${year - 1} books are closed.` },
     { s: 'Board approves the statement', ck: ['Reviewed at a meeting or by email vote, recorded in the minutes', 'Any planned special assessment or litigation stated plainly'] },
-    { s: `Send it to every owner by ${disclosureDue(year)} and keep proof of delivery`, detail: 'Post it as a financial notice under Community and mail it where the bylaws require. This step ticks itself when a notice about the disclosure goes out after this case opened.' },
+    { s: `Send it to every owner by ${disclosureDue(year)} and keep proof of delivery`, detail: 'Post it as a financial notice under Community and mail it where the bylaws require. This step ticks itself when a notice about the disclosure goes out after this action opened.' },
   ];
 }
 

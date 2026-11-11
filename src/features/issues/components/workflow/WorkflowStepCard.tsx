@@ -581,13 +581,13 @@ export const WorkflowStepCard = forwardRef<HTMLDivElement, WorkflowStepCardProps
                   </button>
                 )}
 
-                {/* Close Case button — last step only */}
+                {/* Close Action button — last step only */}
                 {!step.done && index === totalSteps - 1 && onCloseCase && (
                   <button
                     onClick={onCloseCase}
                     className="w-full py-2.5 rounded-xl bg-sage-600 text-white text-sm font-semibold hover:bg-sage-700 transition-colors shadow-sm"
                   >
-                    Close Case ✓
+                    Close Action ✓
                   </button>
                 )}
               </div>

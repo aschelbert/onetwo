@@ -32,7 +32,7 @@ export function bookingSteps(r: Reservation): { s: string; detail?: string; ck?:
     { s: `Approve or deny ${who}'s ${r.amenityName} booking for ${r.date}`, detail: `Community › Amenities › Reservations. ${r.startTime} to ${r.endTime}${r.notes ? `; ${r.notes}` : ''}. This step ticks itself when the booking is approved or denied.` },
     { s: r.fee > 0 || r.deposit > 0 ? `Invoice ${who}${unit}: ${r.fee > 0 ? `the ${fmt(r.fee)} fee` : ''}${r.fee > 0 && r.deposit > 0 ? ' and ' : ''}${r.deposit > 0 ? `the ${fmt(r.deposit)} deposit` : ''}` : 'No fee or deposit to invoice', detail: 'The amenities page invoices on approval. This step ticks itself when the invoices exist.' },
     { s: `${r.date}: access and setup, then check the space afterwards`, ck: ['Access or key arranged', 'Space checked and any damage photographed'] },
-    { s: r.deposit > 0 ? `Return the ${fmt(r.deposit)} deposit, or charge the damage against it` : 'No deposit to return', detail: r.deposit > 0 ? 'Refund from the unit ledger, or keep it with the damage noted on this case.' : 'This step ticks itself: there is no deposit.' },
+    { s: r.deposit > 0 ? `Return the ${fmt(r.deposit)} deposit, or charge the damage against it` : 'No deposit to return', detail: r.deposit > 0 ? 'Refund from the unit ledger, or keep it with the damage noted on this action.' : 'This step ticks itself: there is no deposit.' },
   ];
 }
 

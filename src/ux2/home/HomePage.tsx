@@ -167,7 +167,7 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   const counts = attentionCounts(set);
   const chips: { label: string; count: number; tone: ChipTone; path: string }[] = [];
   if (counts.overdueFilings) chips.push({ label: 'Overdue', count: counts.overdueFilings, tone: 'red', path: '/boardroom?tab=runbook' });
-  if (counts.urgentCases) chips.push({ label: 'Urgent cases', count: counts.urgentCases, tone: 'red', path: '/issues' });
+  if (counts.urgentCases) chips.push({ label: 'Urgent actions', count: counts.urgentCases, tone: 'red', path: '/issues' });
   if (counts.newRequests) chips.push({ label: role === 'RESIDENT' ? 'Open requests' : 'New requests', count: counts.newRequests, tone: 'amber', path: role === 'RESIDENT' ? '/community?tab=requests' : '/issues' });
   if (counts.insuranceExpiring) chips.push({ label: 'Insurance expiring', count: counts.insuranceExpiring, tone: 'amber', path: '/building?tab=insurance' });
   if (counts.votes) chips.push({ label: 'Votes open', count: counts.votes, tone: 'plum', path: '/community?tab=votes' });
@@ -348,7 +348,7 @@ export default function HomePage() {
                 />
                 <Tile
                   tone="grey"
-                  label="Open cases"
+                  label="Open actions"
                   value={kpis.openCases}
                   sub={`${set.waitingOnOthers.length} waiting on others`}
                   className="min-h-[150px]"

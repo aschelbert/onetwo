@@ -109,7 +109,7 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
           </tbody>
         </Table>
       )}
-      <Why>Start walks through an obligation as a case: its runbook's steps, or its how-to list as a checklist where each item links to where it's done, then a step to record it. Closing the case as Resolved marks it done (a filing: filed). Mark done and Mark filed are there when it's already been handled. Expanding a row shows why it matters, what happens if it is missed and the how-to steps; owners see the status only.</Why>
+      <Why>Start walks through an obligation as an action: its runbook's steps, or its how-to list as a checklist where each item links to where it's done, then a step to record it. Closing the action as Resolved marks it done (a filing: filed). Mark done and Mark filed are there when it's already been handled. Expanding a row shows why it matters, what happens if it is missed and the how-to steps; owners see the status only.</Why>
     </Card>
   );
 }
@@ -149,7 +149,7 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {[
           ['Duty of care', duties.care, 'Act as a reasonably prudent person would: come to meetings, read the packet before voting, ask questions, decide on the facts.', 'Scored under Oversight and Timeliness.', 'teal'],
-          ['Duty of loyalty', duties.loyalty, 'Put the association first: disclose every conflict, step out of related votes, never self-deal.', 'Conflict disclosures collected each January; the case workspace checks them before a vote.', 'plum'],
+          ['Duty of loyalty', duties.loyalty, 'Put the association first: disclose every conflict, step out of related votes, never self-deal.', 'Conflict disclosures collected each January; the action checks them before a vote.', 'plum'],
           ['Duty of compliance', duties.obedience, 'Follow the bylaws, the CC&Rs and the law in every decision. The board can only do what they allow.', 'Scored under Compliance, the dimension of the same name. Called the duty of obedience in the law · DC Code § 29-1101 et seq.', 'amber'],
         ].map(([name, n, text, note, tone]) => (
           <Card key={String(name)} aria-label={String(name)} className="gap-1.5">
@@ -276,7 +276,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
         </>
       )}
       {view === 'duties' && <Duties rows={rows} snap={snap} />}
-      {view !== 'duties' && <Why>Runbooks, open cases and the outbox are operations, so they live in <button type="button" onClick={() => navigate('/boardroom?tab=runbooks')} className="font-semibold text-ux2-teal hover:underline">Board Room</button>. Nothing here is deeper than tab › section; whatever needs someone this week is also a Home card.</Why>}
+      {view !== 'duties' && <Why>Runbooks, current actions and the outbox are operations, so they live in <button type="button" onClick={() => navigate('/boardroom?tab=runbooks')} className="font-semibold text-ux2-teal hover:underline">Board Room</button>. Nothing here is deeper than tab › section; whatever needs someone this week is also a Home card.</Why>}
     </div>
   );
 }

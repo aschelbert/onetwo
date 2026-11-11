@@ -37,7 +37,7 @@ export const GROUPS: { id: SettingsGroup; label: string }[] = [
 ];
 /** Deep-link sections (`?section=`) → the group that shows them; a group id is its own section. */
 export const GROUP_OF: Record<string, SettingsGroup> = { ledger: 'ledger', opening: 'ledger', accounts: 'accounts', mapping: 'mapping', billing: 'billing', rules: 'billing', fees: 'billing', bank: 'bank', mailing: 'bank' };
-const SOURCE_LABEL: Record<GLEntry['source'], string> = { manual: 'By hand', assessment: 'Billing run', payment: 'Payment', expense: 'Bill', case: 'Case', transfer: 'Transfer', fee: 'Fee', refund: 'Refund', payroll: 'Payroll' };
+const SOURCE_LABEL: Record<GLEntry['source'], string> = { manual: 'By hand', assessment: 'Billing run', payment: 'Payment', expense: 'Bill', case: 'Action', transfer: 'Transfer', fee: 'Fee', refund: 'Refund', payroll: 'Payroll' };
 const SECTION_LABEL: Record<string, string> = { asset: 'Owns', liability: 'Owes', equity: 'Fund balances', income: 'Income', expense: 'Expenses' };
 const MAPPING_LABELS: { key: string; label: string; types: string[] }[] = [
   { key: 'bankAccount', label: 'Operating bank account', types: ['asset'] },
@@ -110,7 +110,7 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
         </Inner>
         <Inner className="flex flex-col gap-2" aria-label="Month close start">
           <div className="text-sm font-semibold text-ux2-ink">Month close starts on the {ordinal(monthCloseStartDay)}</div>
-          <p className="m-0 text-xs text-ux2-muted">The Month close runbook opens its case for the month just ended on this day (every morning, and when a board member opens the app), with the packet due two weeks later. Move it to follow an off-cycle fiscal calendar or a bank statement that lands late. Fiscal year ends {fyLabel(fiscalYearEnd)} · <button type="button" onClick={() => navigate('/building')} className="font-semibold text-ux2-teal hover:underline">Building › Details</button>.</p>
+          <p className="m-0 text-xs text-ux2-muted">The Month close runbook opens its action for the month just ended on this day (every morning, and when a board member opens the app), with the packet due two weeks later. Move it to follow an off-cycle fiscal calendar or a bank statement that lands late. Fiscal year ends {fyLabel(fiscalYearEnd)} · <button type="button" onClick={() => navigate('/building')} className="font-semibold text-ux2-teal hover:underline">Building › Details</button>.</p>
           <label className="text-xs text-ux2-muted" htmlFor="rules-close-day">Day of the month (1–28)</label>
           <div className="flex gap-2"><input id="rules-close-day" inputMode="numeric" value={closeDay} onChange={e => setCloseDay(e.target.value)} className={`${INPUT} !w-20`} /><Button size="sm" variant="ghost" onClick={() => { const n = Number(closeDay); if (n >= 1 && n <= 28) setMonthCloseStartDay(n); }}>Save</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Runbook</Button></div>
         </Inner>

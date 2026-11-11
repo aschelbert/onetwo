@@ -36,10 +36,10 @@ export function bidsSteps(parent: CaseTrackerCase, step: CaseStep): { s: string;
   const min = step.minimumBids || step.bidCollection?.minimumBids || 3;
   return [
     { s: `Write one scope of work for every bidder: ${parent.title}`, ck: ['Same scope, timeline and warranty asked of each', 'Fixed price or not-to-exceed stated', 'Site visit offered'] },
-    { s: `Collect at least ${min} bids on the parent case`, detail: `The parent case's step "${step.s}" holds the bids (Add bid). This step ticks itself at ${min}.` },
+    { s: `Collect at least ${min} bids on the parent action`, detail: `The parent action's step "${step.s}" holds the bids (Add bid). This step ticks itself at ${min}.` },
     { s: 'Verify the license and insurance on every bid', detail: 'General liability naming the association, workers compensation, the license current. Each bid carries two checks; this step ticks itself when every bid has both.' },
-    { s: 'Pick the bid and record why', detail: 'Qualifications, references, price and timeline, not the lowest price alone. This step ticks itself when a bid is selected on the parent case.' },
-    { s: 'Carry the choice back to the parent case and move it on', detail: 'This step ticks itself when the parent step is done.' },
+    { s: 'Pick the bid and record why', detail: 'Qualifications, references, price and timeline, not the lowest price alone. This step ticks itself when a bid is selected on the parent action.' },
+    { s: 'Carry the choice back to the parent action and move it on', detail: 'This step ticks itself when the parent step is done.' },
   ];
 }
 
@@ -78,7 +78,7 @@ export function runVendorBids(today: string = todayIso()): BidsRun {
       unit: parent.unit,
       owner: parent.owner,
       priority: parent.priority,
-      notes: `Opened by the Vendor bids runbook on ${today}: the case "${parent.title}" reached "${hit.step.s}", which asks for ${hit.step.minimumBids || hit.step.bidCollection?.minimumBids || 3} bids. Add the bids on that case; this one tracks the scope, the verification and the pick.`,
+      notes: `Opened by the Vendor bids runbook on ${today}: the action "${parent.title}" reached "${hit.step.s}", which asks for ${hit.step.minimumBids || hit.step.bidCollection?.minimumBids || 3} bids. Add the bids on that action; this one tracks the scope, the verification and the pick.`,
       assignedTo: parent.assignedTo,
       assignedRole: parent.assignedRole,
       dueDate: parent.dueDate,

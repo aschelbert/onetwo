@@ -36,7 +36,7 @@ type Own = [title: string, how?: string][];
 /** Runbooks with their own steps; a second entry means the app does that step. */
 const OWN: Record<string, Own> = {
   'annual-budget': [
-    ['Roll next year’s draft forward from this year’s actuals', 'Done as the case opens: the draft is copied from this year’s actuals'],
+    ['Roll next year’s draft forward from this year’s actuals', 'Done as the action opens: the draft is copied from this year’s actuals'],
     ['Pick the dues option and the reserve line'],
     ['Put next year’s contracts and insurance into the lines'],
     ['Board reviews the draft at a meeting'],
@@ -54,10 +54,10 @@ const OWN: Record<string, Own> = {
   ],
   'vendor-bids': [
     ['Write one scope of work for every bidder'],
-    ['Collect the minimum number of bids', 'Ticks itself when enough bids are on the parent case'],
+    ['Collect the minimum number of bids', 'Ticks itself when enough bids are on the parent action'],
     ['Verify the license and insurance on every bid', 'Ticks itself when every bid is marked licensed and insured'],
     ['Pick the bid and record why', 'Ticks itself when a bid is selected'],
-    ['Carry the choice back to the parent case and move it on', 'Ticks itself when the parent case’s bids step is done'],
+    ['Carry the choice back to the parent action and move it on', 'Ticks itself when the parent action’s bids step is done'],
   ],
   'insurance-renewal': [
     ['Ask for the renewal quote'],
@@ -81,7 +81,7 @@ const OWN: Record<string, Own> = {
     ['Send the monthly packet to owners', 'Ticks itself when the packet is sent from Funds'],
   ],
   'special-assessment': [
-    ['Compute each unit’s share by percentage interest', 'Done as the case opens, from the units’ shares'],
+    ['Compute each unit’s share by percentage interest', 'Done as the action opens, from the units’ shares'],
     ['Board resolution: adopt the assessment, the due date, the payment plan'],
     ['Owner vote, if the bylaws require one at this amount'],
     ['Notice to every owner before the due date', 'Ticks itself when the assessment notice goes out'],
@@ -101,7 +101,7 @@ const OWN: Record<string, Own> = {
     ['Pay it', 'Ticks itself when the work order is paid'],
   ],
   'spending-request': [
-    ['Check the amount against its fund and the bylaws limit', 'Done as the case opens'],
+    ['Check the amount against its fund and the bylaws limit', 'Done as the action opens'],
     ['Board votes: approve or deny', 'Ticks itself when the request is approved or denied'],
     ['Record the decision in the minutes'],
     ['Release the money: a work order or the payment', 'Ticks itself when a work order is attached, or the request is denied'],
@@ -113,7 +113,7 @@ const OWN: Record<string, Own> = {
     ['Put the vendor’s contract on file, with its end date', 'Ticks itself when a contract for the vendor is on file'],
   ],
   '1099': [
-    ['Confirm the vendors paid $600 or more in the year', 'Done as the case opens, from the year’s payments'],
+    ['Confirm the vendors paid $600 or more in the year', 'Done as the action opens, from the year’s payments'],
     ['Collect the W-9 from every vendor on the list', 'Ticks itself when every vendor on the list has a W-9'],
     ['File Form 1099-NEC with the IRS and send each vendor its copy by January 31'],
     ['Keep the filed forms and the W-9s with the year’s records'],
@@ -141,7 +141,7 @@ const TICKS: Record<string, [RegExp, string][]> = {
     [/^record detailed minutes/i, 'Ticks itself when the meeting has minutes'],
   ],
   'annual-meeting': [
-    [/^set annual meeting date/i, 'Done as the case opens, from the meeting on the calendar'],
+    [/^set annual meeting date/i, 'Done as the action opens, from the meeting on the calendar'],
     [/^send formal annual meeting notice/i, 'Ticks itself when the meeting’s notice is sent'],
     [/^conduct annual meeting/i, 'Ticks itself when the meeting is marked held'],
   ],
@@ -158,13 +158,13 @@ const TICKS: Record<string, [RegExp, string][]> = {
     [/^disclose reserve health/i, 'Ticks itself when a reserve notice goes out to owners'],
   ],
   'elevator-inspection': [
-    [/^identify all required inspections/i, 'Done as the case opens, from the maintenance schedule'],
+    [/^identify all required inspections/i, 'Done as the action opens, from the maintenance schedule'],
     [/^engage qualified/i, 'Ticks itself when the schedule names a vendor'],
     [/^schedule inspection date/i, 'Ticks itself when the inspection is recorded as done'],
     [/^attend inspection/i, 'Ticks itself when the inspection is recorded as done'],
   ],
   'boiler-fire': [
-    [/^identify all required inspections/i, 'Done as the case opens, from the maintenance schedule'],
+    [/^identify all required inspections/i, 'Done as the action opens, from the maintenance schedule'],
     [/^engage qualified/i, 'Ticks itself when the schedule names a vendor'],
     [/^schedule inspection date/i, 'Ticks itself when the inspection is recorded as done'],
     [/^attend inspection/i, 'Ticks itself when the inspection is recorded as done'],

@@ -35,7 +35,7 @@ export function requestSteps(i: Issue): { s: string; detail?: string; ck?: strin
   return [
     { s: `Acknowledge ${who}'s request within ${ACK_DAYS} days`, detail: `A reply on the request under Community › Requests, or moving it to In progress, counts. Due ${ISO_DATE.test(submitted) ? addDays(submitted, ACK_DAYS) : 'at once'}. This step ticks itself when the request is in progress or answered.` },
     { s: 'Decide who handles it and what it needs', ck: ['Assigned to a board member or the manager', 'Vendor, spending or a rule question identified'] },
-    { s: 'Do the work, or decide why not', ck: ['Work order, letter or decision recorded on this case'] },
+    { s: 'Do the work, or decide why not', ck: ['Work order, letter or decision recorded on this action'] },
     { s: `Reply to ${who} by ${replyDueFor(i)} and resolve the request`, detail: 'The 14-day clock runs on the Inbox. This step ticks itself when the request is resolved or closed.' },
   ];
 }

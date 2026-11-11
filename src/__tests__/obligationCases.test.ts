@@ -86,7 +86,7 @@ describe('finishing it', () => {
       useIssuesStore.getState().closeCase(id);
       const f = useComplianceStore.getState().filings[0];
       expect(f.status).toBe('filed');
-      expect(f.confirmationNum).toMatch(/^Case /);
+      expect(f.confirmationNum).toMatch(/^Action /);
     } finally { stop(); }
   });
 });

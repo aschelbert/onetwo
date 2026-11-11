@@ -76,7 +76,7 @@ export function caseRows(s: BoardRoomSnapshot): CaseRow[] {
       const cat = s.categories.find(x => x.id === c.catId);
       const due = c.dueDate && ISO_DATE.test(c.dueDate) ? c.dueDate : undefined;
       const d = due ? daysBetween(s.today, due) : undefined;
-      let next = step?.s ?? (steps.length ? 'All steps done · close the case' : 'Add steps');
+      let next = step?.s ?? (steps.length ? 'All steps done · close the action' : 'Add steps');
       if (step?.isSpendingDecision) next = `Spending decision · ${step.s}`;
       else if (step?.requiresBids) next = `Collect bids · ${step.s}`;
       else if (step?.requiresConflictCheck) next = `Conflict check, then ${step.s}`;
@@ -187,7 +187,7 @@ export interface ArchiveRow {
 
 export function archiveRows(s: BoardRoomSnapshot): ArchiveRow[] {
   const out: ArchiveRow[] = [];
-  const label = (catId: string) => s.categories.find(c => c.id === catId)?.label ?? 'Cases';
+  const label = (catId: string) => s.categories.find(c => c.id === catId)?.label ?? 'Actions';
   const typeOfCase = new Map<string, string>();
   for (const c of s.cases.filter(x => x.status === 'closed')) {
     const closed = (c.completedAt ?? c.created).slice(0, 10);

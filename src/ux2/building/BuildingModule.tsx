@@ -120,7 +120,7 @@ export default function BuildingModule() {
             obligations: "The things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.",
             contracts: 'Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.',
             directory: 'The one directory: units and owners, the board, advisers, staff, and who to call at 2am.',
-            archive: 'The cases, requests and letters this board has closed, read-only, with the decision trail behind each one. Nothing here needs you; owners never see it.',
+            archive: 'The actions, requests and letters this board has closed, read-only, with the decision trail behind each one. Nothing here needs you; owners never see it.',
           }[tab] ?? 'The building itself: what it is, what it must keep, who is in it.'}</span></>}
           status={<>
             <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>

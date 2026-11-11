@@ -71,20 +71,20 @@ export function CaseSidebar({ c, steps, activeStepIdx, selectedStep, onStepClick
   const menuItems: { label: string; onClick: () => void; danger?: boolean }[] = [];
   if (c.status === 'open') {
     if (onPutOnHold) menuItems.push({ label: 'Put On Hold', onClick: onPutOnHold });
-    menuItems.push({ label: 'Close Case', onClick: onClose });
+    menuItems.push({ label: 'Close Action', onClick: onClose });
     menuItems.push({ label: 'Edit Assignment', onClick: onEditAssignment });
     menuItems.push({ label: 'Add Approach', onClick: onAddApproach });
-    menuItems.push({ label: 'Delete Case', onClick: onDelete, danger: true });
+    menuItems.push({ label: 'Delete Action', onClick: onDelete, danger: true });
   } else if (c.status === 'on-hold') {
     if (onResume) menuItems.push({ label: 'Resume', onClick: onResume });
-    menuItems.push({ label: 'Close Case', onClick: onClose });
+    menuItems.push({ label: 'Close Action', onClick: onClose });
     menuItems.push({ label: 'Edit Assignment', onClick: onEditAssignment });
     menuItems.push({ label: 'Add Approach', onClick: onAddApproach });
-    menuItems.push({ label: 'Delete Case', onClick: onDelete, danger: true });
+    menuItems.push({ label: 'Delete Action', onClick: onDelete, danger: true });
   } else {
-    menuItems.push({ label: 'Reopen Case', onClick: onReopen });
+    menuItems.push({ label: 'Reopen Action', onClick: onReopen });
     menuItems.push({ label: 'Edit Assignment', onClick: onEditAssignment });
-    menuItems.push({ label: 'Delete Case', onClick: onDelete, danger: true });
+    menuItems.push({ label: 'Delete Action', onClick: onDelete, danger: true });
   }
 
   return (

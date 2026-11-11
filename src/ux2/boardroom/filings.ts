@@ -49,7 +49,7 @@ export function runFilings(today: string = todayIso()): FilingsRun {
       unit: '',
       owner: f.responsible || 'Board',
       priority: late ? 'urgent' : 'high',
-      notes: [`Opened by the Filings runbook on ${today}: ${f.name} is ${late ? 'late, it was' : ''} due ${f.dueDate}${f.legalRef ? ` (${f.legalRef})` : ''}. Closing this case as Resolved marks it filed.`, f.notes].filter(Boolean).join('\n\n'),
+      notes: [`Opened by the Filings runbook on ${today}: ${f.name} is ${late ? 'late, it was' : ''} due ${f.dueDate}${f.legalRef ? ` (${f.legalRef})` : ''}. Closing this action as Resolved marks it filed.`, f.notes].filter(Boolean).join('\n\n'),
       assignedRole: f.responsible || undefined,
       dueDate: f.dueDate,
       source: 'filing',

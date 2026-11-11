@@ -31,7 +31,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
     <div data-page="ux2-boardroom-case" className="flex flex-col gap-5">
       <header className="flex flex-col gap-2">
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-ux2-muted">
-          <button type="button" onClick={onBack} className="font-semibold text-ux2-teal hover:underline">All cases</button>
+          <button type="button" onClick={onBack} className="font-semibold text-ux2-teal hover:underline">Current Actions</button>
           {c && <><span>/</span><span>{snap.categories.find(x => x.id === c.catId)?.label ?? c.catId}</span><span>/</span><span className="text-ux2-ink">{c.id}</span></>}
           {!c && <><span>/</span><span className="text-ux2-ink">Take Action</span></>}
         </nav>
@@ -53,9 +53,9 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
       <div className="ux2-legacy"><IssuesPage embedded prefill={prefill} /></div>
 
       {c && c.status !== 'closed' && decisionSteps.length > 0 && (
-        <Card aria-label="Decisions on this case">
-          <SectionLabel>Decisions on this case</SectionLabel>
-          <p className="text-sm text-ux2-muted">The spending decision, the bids and the conflict check for the open steps that need them. Each records onto the case and its decision trail.</p>
+        <Card aria-label="Decisions on this action">
+          <SectionLabel>Decisions on this action</SectionLabel>
+          <p className="text-sm text-ux2-muted">The spending decision, the bids and the conflict check for the open steps that need them. Each records onto the action and its decision trail.</p>
           {decisionSteps.map(({ s, i }) => (
             <Inner key={s.id} className="flex flex-col gap-3">
               <div className="text-sm font-semibold text-ux2-ink">Step {i + 1} · {s.s}</div>
@@ -92,7 +92,7 @@ export default function CaseFrame({ snap, view, prefill, onBack, onOpenCase }: {
 
       {c && (c.source === 'obligation' || c.source === 'filing') && c.sourceId && (
         <Inner className="text-xs text-ux2-muted">
-          Opened from {c.source === 'filing' ? 'the filing' : 'the obligation'} {c.sourceId} on Building › Obligations. Closing this case as Resolved marks it {c.source === 'filing' ? 'filed' : 'done'} there; closing it any other way leaves it open.
+          Opened from {c.source === 'filing' ? 'the filing' : 'the obligation'} {c.sourceId} on Building › Obligations. Closing this action as Resolved marks it {c.source === 'filing' ? 'filed' : 'done'} there; closing it any other way leaves it open.
         </Inner>
       )}
       {c && c.source === 'runbook' && c.sourceId && (

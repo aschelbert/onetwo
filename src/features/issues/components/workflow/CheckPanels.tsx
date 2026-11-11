@@ -87,7 +87,7 @@ function UnitLedger({ unit }: { unit?: string }) {
   const units = useFinancialStore(s => s.units);
   const invoices = useFinancialStore(s => s.unitInvoices);
   const u = unit ? units.find(x => x.number === unit) : undefined;
-  if (!u) return <Delinquency note="This case has no unit attached; here is everyone with a balance." />;
+  if (!u) return <Delinquency note="This action has no unit attached; here is everyone with a balance." />;
   const fees = u.lateFees.filter(f => !f.waived && !f.paid);
   const legacyFees = fees.filter(f => !f.invoiceId);
   const sa = u.specialAssessments.filter(a => !a.paid);
@@ -220,7 +220,7 @@ function Counsel() {
   const counsel = useBuildingStore(s => s.legalCounsel);
   return (
     <Frame title="Legal counsel" to={ROUTES.directory} toLabel="Open Building › Directory"
-      note={counsel.length ? 'Send counsel the case export so they start from the full record.' : 'No counsel on file yet. Add the association’s attorney in Building › Directory.'}>
+      note={counsel.length ? 'Send counsel the action export so they start from the full record.' : 'No counsel on file yet. Add the association’s attorney in Building › Directory.'}>
       <Rows head={['Firm', 'Attorney', 'Contact', 'Specialty']} rows={counsel.map(l => [l.firm, l.attorney, [l.email, l.phone].filter(Boolean).join(' · '), l.specialty])} empty="" />
     </Frame>
   );

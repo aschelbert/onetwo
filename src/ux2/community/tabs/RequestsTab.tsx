@@ -118,7 +118,7 @@ export default function RequestsTab({ snap, highlightId }: { snap: CommunitySnap
             <SectionLabel>What happens next</SectionLabel>
             {[
               ['Acknowledged within 48 hours', 'A board member reads it and tells you who has it.'],
-              ['Assigned', 'To a board member, staff or a vendor, with a date. Bigger jobs become a case you can follow.'],
+              ['Assigned', 'To a board member, staff or a vendor, with a date. Bigger jobs become an action you can follow.'],
               ['Resolved', 'You confirm it is done, or reopen it. The board must reply within 14 days either way.'],
             ].map(([t, d], i) => <Inner key={t} className="flex items-start gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ux2-navy text-xs font-bold text-white">{i + 1}</span><Cell title={t} note={d} /></Inner>)}
             <Why>You get a card at each step, on Home and by email.</Why>

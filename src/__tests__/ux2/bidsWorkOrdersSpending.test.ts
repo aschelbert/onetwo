@@ -39,7 +39,7 @@ describe('vendor bids', () => {
     const b = cases().find(c => c.sourceId === `vendor-bids:${parent}:1`)!;
     expect(b).toMatchObject({ title: 'Bids · Roof membrane', catId: 'maintenance', sitId: 'runbook-vendor-bids', assignedRole: 'Vice President', dueDate: '2026-12-15', priority: 'high' });
     expect(b.steps?.length).toBe(5);
-    expect(b.steps![V.collect].s).toBe('Collect at least 3 bids on the parent case');
+    expect(b.steps![V.collect].s).toBe('Collect at least 3 bids on the parent action');
     expect(runVendorBids('2026-11-11').opened.length).toBe(0);
     expect(cases().length).toBe(2);
   });
