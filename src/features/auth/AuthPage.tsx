@@ -5,6 +5,7 @@ import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
+import { loadOpenAIPixel } from '@/lib/openaiPixel';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -243,6 +244,13 @@ export default function AuthPage() {
     setProvisioningTimedOut(true);
     return false;
   };
+
+  // OpenAI Ads pixel: load only once the visitor is in the signup steps, so
+  // nobody signing in or using the app is tracked.
+  const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
+  useEffect(() => {
+    if (inSignupSteps) loadOpenAIPixel();
+  }, [inSignupSteps]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
