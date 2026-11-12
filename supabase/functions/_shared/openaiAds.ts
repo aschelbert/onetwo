@@ -9,14 +9,14 @@
 //   OPENAI_ADS_PIXEL_ID       pixel id (same one the browser snippet uses)
 // Optional:
 //   OPENAI_ADS_SIGNUP_EVENT   event type to report for a completed signup;
-//                             defaults to "page_viewed" to match the pixel's
-//                             conversion event so both count toward the same goal
+//                             defaults to "trial_started", the same event the
+//                             browser sends, so OpenAI dedupes the two
 //   OPENAI_ADS_VALIDATE_ONLY  "true" sends with validate_only so OpenAI checks
 //                             the payload but records nothing (dry run)
 
 const API_KEY = Deno.env.get("OPENAI_ADS_API_KEY") || "";
 const PIXEL_ID = Deno.env.get("OPENAI_ADS_PIXEL_ID") || "";
-const SIGNUP_EVENT = Deno.env.get("OPENAI_ADS_SIGNUP_EVENT") || "page_viewed";
+const SIGNUP_EVENT = Deno.env.get("OPENAI_ADS_SIGNUP_EVENT") || "trial_started";
 const VALIDATE_ONLY = (Deno.env.get("OPENAI_ADS_VALIDATE_ONLY") || "").toLowerCase() === "true";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://getonetwo.com";
 

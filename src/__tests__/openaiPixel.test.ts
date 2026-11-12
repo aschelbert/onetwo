@@ -22,10 +22,13 @@ describe('loadOpenAIPixel', () => {
     expect(sdkScripts()).toHaveLength(0);
   });
 
-  it('adds the SDK script and queues init with the pixel id', () => {
+  it('adds the SDK script, then queues init and one page view', () => {
     loadOpenAIPixel();
     expect(sdkScripts()).toHaveLength(1);
-    expect(queued()).toEqual([['init', { pixelId: 'EeUAjrxrWJtnf5M7tToTws' }]]);
+    expect(queued()).toEqual([
+      ['init', { pixelId: 'EeUAjrxrWJtnf5M7tToTws' }],
+      ['measure', 'page_viewed', { type: 'contents' }],
+    ]);
   });
 
   it('queues consent=false before init when Global Privacy Control is on', () => {
@@ -34,6 +37,7 @@ describe('loadOpenAIPixel', () => {
     expect(queued()).toEqual([
       ['consent', false],
       ['init', { pixelId: 'EeUAjrxrWJtnf5M7tToTws' }],
+      ['measure', 'page_viewed', { type: 'contents' }],
     ]);
   });
 
@@ -41,12 +45,12 @@ describe('loadOpenAIPixel', () => {
     loadOpenAIPixel();
     loadOpenAIPixel();
     expect(sdkScripts()).toHaveLength(1);
-    expect(queued()).toHaveLength(1);
+    expect(queued()).toHaveLength(2);
   });
 
-  it('queues measure calls made before the SDK arrives', () => {
+  it('queues the signup conversion made before the SDK arrives', () => {
     loadOpenAIPixel();
-    window.oaiq?.('measure', 'page_viewed', { type: 'contents' }, { event_id: 'signup_x' });
-    expect(queued()[1]).toEqual(['measure', 'page_viewed', { type: 'contents' }, { event_id: 'signup_x' }]);
+    window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: 'signup_x' });
+    expect(queued()[2]).toEqual(['measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: 'signup_x' }]);
   });
 });

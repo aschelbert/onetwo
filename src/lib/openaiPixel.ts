@@ -4,7 +4,8 @@
 // loads it only when a visitor enters the signup steps, so residents and
 // board members using the app are never tracked. Same loader as OpenAI's
 // snippet, including the Global Privacy Control opt-out the privacy policy
-// promises.
+// promises. Each load records one page_viewed event; a completed signup is
+// recorded separately as trial_started.
 
 const PIXEL_ID = 'EeUAjrxrWJtnf5M7tToTws';
 const SDK_URL = 'https://bzrcdn.openai.com/sdk/oaiq.min.js';
@@ -31,4 +32,5 @@ export function loadOpenAIPixel(): void {
   const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
   if (nav.globalPrivacyControl === true) q('consent', false);
   q('init', { pixelId: PIXEL_ID });
+  q('measure', 'page_viewed', { type: 'contents' });
 }

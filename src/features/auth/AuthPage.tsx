@@ -842,7 +842,7 @@ export default function AuthPage() {
         success: async (_hostedPageId: string) => {
           console.log('[checkout] Checkout success, polling for tenant...');
           // OpenAI Ads conversion: paid trial signup completed
-          window.oaiq?.('measure', 'page_viewed', { type: 'contents' }, { event_id: conversionEventId });
+          window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {
