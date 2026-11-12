@@ -47,6 +47,17 @@ function setupPriceId(_plan: PlanId): string {
   return "Setup-Fee-USD";
 }
 
+/** The signup page on the site the visitor used, or null if origin isn't a web origin. */
+function signupPageUrl(origin: string | undefined): string | null {
+  if (!origin) return null;
+  try {
+    const u = new URL(origin);
+    return u.protocol === "https:" || u.protocol === "http:" ? `${u.origin}/login` : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Supabase helpers ──
 
 async function sbQuery(
@@ -309,6 +320,8 @@ Deno.serve(async (req) => {
             : null,
           // Visitor's browser sent Global Privacy Control: no ad measurement
           adMeasurementOptOut: body.adMeasurementOptOut === true,
+          // Page the signup happened on, reported to OpenAI Ads as source_url
+          signupUrl: signupPageUrl(origin),
           // HO-18 extended fields
           role: building.role || 'board_member',
           roleKey: building.roleKey || null,

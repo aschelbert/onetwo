@@ -387,6 +387,7 @@ Deno.serve(async (req) => {
                 id: pending.conversionEventId || `signup_${subscription.id || customer.id || eventId}`,
                 email: pending.contactEmail || customer.email || null,
                 occurredAtSeconds: event.occurred_at || null,
+                sourceUrl: pending.signupUrl || undefined,
               });
             }
           }
