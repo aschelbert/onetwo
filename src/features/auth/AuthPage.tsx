@@ -769,6 +769,14 @@ export default function AuthPage() {
       // Track hostedPage errors separately since Chargebee swallows them
       let hostedPageError: string | null = null;
 
+      // One id shared by the browser pixel and the server-side conversion
+      // report, so OpenAI Ads counts this signup once.
+      const conversionEventId = `signup_${
+        typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      }`;
+
       cbInstanceRef.current.openCheckout({
         hostedPage: async () => {
           try {
@@ -798,6 +806,10 @@ export default function AuthPage() {
                     lastName: lastName.trim(),
                   },
                   origin: window.location.origin,
+                  conversionEventId,
+                  // Global Privacy Control: skip the server-side OpenAI Ads report too
+                  adMeasurementOptOut:
+                    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
                 }),
               }
             );
@@ -822,7 +834,7 @@ export default function AuthPage() {
         success: async (_hostedPageId: string) => {
           console.log('[checkout] Checkout success, polling for tenant...');
           // OpenAI Ads conversion: paid trial signup completed
-          window.oaiq?.('measure', 'page_viewed', { type: 'contents' });
+          window.oaiq?.('measure', 'page_viewed', { type: 'contents' }, { event_id: conversionEventId });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {
