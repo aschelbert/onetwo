@@ -18,7 +18,8 @@ const API_KEY = Deno.env.get("OPENAI_ADS_API_KEY") || "";
 const PIXEL_ID = Deno.env.get("OPENAI_ADS_PIXEL_ID") || "";
 const SIGNUP_EVENT = Deno.env.get("OPENAI_ADS_SIGNUP_EVENT") || "trial_started";
 const VALIDATE_ONLY = (Deno.env.get("OPENAI_ADS_VALIDATE_ONLY") || "").toLowerCase() === "true";
-const SITE_URL = Deno.env.get("SITE_URL") || "https://getonetwo.com";
+// Where signups happen; used when a signup did not record its page
+const DEFAULT_SOURCE_URL = "https://www.getonetwo.com/login";
 
 const EVENTS_URL = "https://bzr.openai.com/v1/events";
 
@@ -66,7 +67,7 @@ export interface SignupConversion {
   email?: string | null;
   /** When the conversion happened, in Unix seconds. Defaults to now. */
   occurredAtSeconds?: number | null;
-  /** Page the conversion is attributed to. Defaults to the signup page. */
+  /** Page the signup happened on. Defaults to https://www.getonetwo.com/login. */
   sourceUrl?: string;
 }
 
@@ -90,7 +91,7 @@ export async function reportSignupConversion(c: SignupConversion): Promise<boole
       type: SIGNUP_EVENT,
       timestamp_ms: timestampMs,
       action_source: "web",
-      source_url: c.sourceUrl || `${SITE_URL}/login`,
+      source_url: c.sourceUrl || DEFAULT_SOURCE_URL,
       data: { type: dataTypeFor(SIGNUP_EVENT) },
     };
     if (SIGNUP_EVENT === "custom") (event.data as Record<string, unknown>).custom_event_name = "signup_completed";
