@@ -440,6 +440,36 @@ p{margin:0}
   .mcard .tiles.rich .tile .a{display:flex}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
+@media (max-width:1180px){.navlinks{gap:18px !important;font-size:15px}.navlinks>*,header .btn,header a span{white-space:nowrap}}
+@media (max-width:1060px) and (min-width:961px){.navlinks a[href="#spotlight"]{display:none}}
+/* contact panel */
+.navlink-btn{background:none;border:0;padding:0;font:inherit;font-weight:500;color:#0D1B2E;cursor:pointer}
+.navlink-btn:hover{color:#155E75}
+.cpanel{margin:0 0 0 auto;padding:0;border:0;width:min(480px,100vw);height:100dvh;max-height:none;max-width:none;background:#ffffff;color:#0D1B2E;box-shadow:-24px 0 60px rgba(0,0,0,.35);font-family:'DM Sans',system-ui,sans-serif}
+.cpanel[open]{display:flex;flex-direction:column;animation:cpIn .28s ease-out both}
+.cpanel::backdrop{background:rgba(8,18,31,.62)}
+@keyframes cpIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.cp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:28px 28px 20px;border-bottom:1px solid #e9edf2}
+.cp-close{width:44px;height:44px;border-radius:10px;border:1.5px solid #c9d2dc;background:#ffffff;color:#0D1B2E;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.cp-close:hover{border-color:#0D1B2E}
+.cp-body{flex:1;overflow-y:auto;padding:24px 28px 28px;display:flex;flex-direction:column;gap:18px}
+.cp-field{display:flex;flex-direction:column;gap:6px}
+.cp-field label{font-size:14px;font-weight:600}
+.cp-input{min-height:48px;padding:0 14px;border:1.5px solid #c9d2dc;border-radius:10px;font:inherit;font-size:16px;color:#0D1B2E;background:#ffffff;box-sizing:border-box;width:100%}
+textarea.cp-input{min-height:160px;padding:12px 14px;line-height:1.5;resize:vertical}
+.cp-input:focus{outline:3px solid #A5F3FC;outline-offset:1px;border-color:#155E75}
+.cp-input[aria-invalid="true"]{border:2px solid #D62839;background:#fff8f8}
+.cp-err{font-size:13px;font-weight:600;color:#b71c2a}
+.cp-err:empty{display:none}
+.cp-alert{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:#fff0f1;border:1px solid #f0c4c8;font-size:14px;line-height:1.45;color:#8a1622}
+.cp-alert[hidden],.cp-success[hidden],.cp-form[hidden]{display:none}
+.cp-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.cp-form{display:flex;flex-direction:column;gap:18px}
+.cp-form .btn[disabled]{opacity:.65;cursor:progress}
+.cp-success{display:flex;flex-direction:column;gap:20px}
+.cp-check{width:56px;height:56px;border-radius:50%;background:#f4fbf9;border:1.5px solid #b8ddd4;display:flex;align-items:center;justify-content:center}
+@media (max-width:960px){.cpanel h2{font-size:26px !important}}
+@media (max-width:520px){.cp-head{padding:20px 16px 16px}.cp-body{padding:20px 16px 24px}}
 </style>
 <style>
 .plancard .plan-selected[hidden],.plancard .plan-hint[hidden]{display:none}
@@ -463,11 +493,11 @@ p{margin:0}
 <header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
   <div class="wrap row" style="min-height:72px">
     <a href="#top" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0D1B2E"><img src="/onetwo-nav-logo.jpg" alt="ONE two" style="width:36px;height:34px;object-fit:cover;border-radius:6px"><span style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px">ONE <span style="font-weight:500">two</span></span></a>
-    <nav class="navlinks" style="display:flex;gap:28px" aria-label="Main"><a href="#inside" style="color:#0D1B2E;text-decoration:none;font-weight:500">What's inside</a><a href="#replace" style="color:#0D1B2E;text-decoration:none;font-weight:500">Why Us</a><a href="#spotlight" style="color:#0D1B2E;text-decoration:none;font-weight:500">Spotlight</a><a href="#pricing" style="color:#0D1B2E;text-decoration:none;font-weight:500">Pricing</a><a href="#owners" style="color:#0D1B2E;text-decoration:none;font-weight:500">Get Started</a></nav>
+    <nav class="navlinks" style="display:flex;gap:28px" aria-label="Main"><a href="#inside" style="color:#0D1B2E;text-decoration:none;font-weight:500">What's inside</a><a href="#replace" style="color:#0D1B2E;text-decoration:none;font-weight:500">Why Us</a><a href="#spotlight" style="color:#0D1B2E;text-decoration:none;font-weight:500">Spotlight</a><a href="#pricing" style="color:#0D1B2E;text-decoration:none;font-weight:500">Pricing</a><a href="#owners" style="color:#0D1B2E;text-decoration:none;font-weight:500">Get Started</a><button type="button" class="navlink-btn" data-contact-open data-cta="nav-contact" aria-haspopup="dialog">Contact</button></nav>
     <div class="hero-actions" style="display:flex;gap:10px;align-items:center"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="nav">Start free trial</a><button type="button" class="menubtn" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menu</button></div>
   </div>
 
-  <nav class="mobilemenu" id="mobileMenu" aria-label="Mobile"><a href="#inside">What's inside</a><a href="#replace">Why Us</a><a href="#spotlight">Spotlight</a><a href="#pricing">Pricing</a><a href="#owners">Get Started</a><a href="/login">Log in</a></nav>
+  <nav class="mobilemenu" id="mobileMenu" aria-label="Mobile"><a href="#inside">What's inside</a><a href="#replace">Why Us</a><a href="#spotlight">Spotlight</a><a href="#pricing">Pricing</a><a href="#owners">Get Started</a><a href="mailto:hello@getonetwo.com" data-contact-open data-cta="mobile-contact">Contact</a><a href="/login">Log in</a></nav>
 </header>
 
 <!-- HERO: ownership (D) + replacement (A) + score (B) -->
@@ -767,7 +797,62 @@ p{margin:0}
   </div>
 </section>
 
-<footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
+<footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" data-contact-open data-cta="footer-contact" style="color:#8fa0b3">Contact</a></nav></div></footer>
+
+<dialog class="cpanel" id="contactPanel" aria-labelledby="cpTitle">
+  <div class="cp-head">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h2 id="cpTitle" style="font-size:28px;line-height:1.15">Send us a note</h2>
+      <p class="muted" style="font-size:15px" id="cpSub">A person replies within one business day.</p>
+    </div>
+    <button type="button" class="cp-close" data-contact-close aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="cp-body">
+    <form class="cp-form" id="contactForm" novalidate data-endpoint="%VITE_SUPABASE_URL%/functions/v1/contact-form">
+      <div class="cp-alert" id="cpAlert" role="alert" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D62839" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span id="cpAlertText"></span></div>
+      <div class="cp-field">
+        <label for="cpEmail">Email</label>
+        <input class="cp-input" id="cpEmail" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" aria-describedby="cpEmailErr">
+        <span class="cp-err" id="cpEmailErr"></span>
+      </div>
+      <div class="cp-field">
+        <label for="cpTopic">Topic</label>
+        <select class="cp-input" id="cpTopic" name="topic" aria-describedby="cpTopicErr">
+          <option value="demo">See a demo</option>
+          <option value="pricing">Pricing and plans</option>
+          <option value="switch">Leaving a manager</option>
+          <option value="owner">I am a unit owner</option>
+          <option value="other">Something else</option>
+        </select>
+        <span class="cp-err" id="cpTopicErr"></span>
+      </div>
+      <div class="cp-field">
+        <label for="cpMsg">Message</label>
+        <textarea class="cp-input" id="cpMsg" name="message" required maxlength="4000" aria-describedby="cpMsgErr"></textarea>
+        <span class="cp-err" id="cpMsgErr"></span>
+      </div>
+      <div class="cp-hp" aria-hidden="true"><label for="cpWebsite">Leave this empty</label><input id="cpWebsite" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+      <button type="submit" class="btn btn-red" id="cpSubmit" style="min-height:52px;width:100%">Send</button>
+      <p class="muted" style="font-size:13px;line-height:1.5;text-align:center">We only use this to reply. See our <a href="/privacy">privacy policy</a>.</p>
+    </form>
+
+    <div class="cp-success" id="cpSuccess" role="status" hidden>
+      <div class="cp-check"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#155E75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3 style="font-size:30px;line-height:1.1" tabindex="-1" id="cpSuccessTitle">Got it.</h3>
+        <p style="font-size:16px;line-height:1.6;color:#4b5a6b">We sent a confirmation to <strong style="color:#0D1B2E" id="cpSentTo"></strong>. Expect a reply from a person within one business day.</p>
+      </div>
+      <div style="border-top:1px solid #e3e8ee;padding-top:20px;display:flex;flex-direction:column;gap:10px">
+        <span class="eyebrow">While you wait</span>
+        <p style="font-size:15px;line-height:1.55">Start your building free for 21 days and look around. No board vote needed to begin.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-red" href="/login?create=1" data-cta="contact-success">Start free trial</a>
+        <button type="button" class="btn btn-outline" data-contact-close>Close</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 <script>
 (function () {
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1154,6 +1239,103 @@ p{margin:0}
     var plan = ''; try { plan = sessionStorage.getItem('ot_plan') || ''; } catch(e) {}
     var interval = ''; try { interval = sessionStorage.getItem('ot_interval') || ''; } catch(e) {}
     mixpanel.track('cta_click', { location: loc, plan: plan, interval: interval });
+  });
+})();
+</script>
+<script>
+/* Contact panel. Posts to the contact-form edge function, which holds the
+   team inbox address server-side; nothing here knows where mail goes. */
+(function () {
+  var panel = document.getElementById('contactPanel');
+  if (!panel || typeof panel.showModal !== 'function') return; // old browsers keep the mailto links
+  var form = document.getElementById('contactForm');
+  var email = document.getElementById('cpEmail');
+  var topic = document.getElementById('cpTopic');
+  var msg = document.getElementById('cpMsg');
+  var submit = document.getElementById('cpSubmit');
+  var alertBox = document.getElementById('cpAlert');
+  var alertText = document.getElementById('cpAlertText');
+  var success = document.getElementById('cpSuccess');
+  var endpoint = form.getAttribute('data-endpoint') || '';
+  var openedAt = 0;
+  var opener = null;
+
+  var HINTS = {
+    demo: 'Tell us about your building and when a walkthrough would suit the board.',
+    pricing: 'Which plan are you weighing, and what would you need it to cover?',
+    'switch': 'When does your current management contract end? We can help plan the handoff.',
+    owner: 'What would you like to see about your building?',
+    other: 'How can we help?'
+  };
+  function setHint() { msg.placeholder = HINTS[topic.value] || ''; }
+  topic.addEventListener('change', setHint);
+  setHint();
+
+  function fieldError(input, errId, text) {
+    var err = document.getElementById(errId);
+    err.textContent = text || '';
+    if (text) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  }
+  function clearErrors() {
+    fieldError(email, 'cpEmailErr'); fieldError(topic, 'cpTopicErr'); fieldError(msg, 'cpMsgErr');
+    alertBox.hidden = true;
+  }
+  function showAlert(text) { alertText.textContent = text; alertBox.hidden = false; }
+
+  function open(e) {
+    if (e) e.preventDefault();
+    opener = document.activeElement;
+    var menu = document.getElementById('mobileMenu');
+    if (menu && menu.classList.contains('open')) { menu.classList.remove('open'); document.getElementById('menuBtn').setAttribute('aria-expanded', 'false'); }
+    if (!success.hidden) { success.hidden = true; form.hidden = false; form.reset(); setHint(); }
+    clearErrors();
+    openedAt = Date.now();
+    panel.showModal();
+    email.focus();
+  }
+  function close() { panel.close(); }
+  panel.addEventListener('close', function () { if (opener && opener.focus) opener.focus(); });
+  panel.addEventListener('click', function (e) { if (e.target === panel) close(); }); // backdrop
+  document.querySelectorAll('[data-contact-open]').forEach(function (b) { b.addEventListener('click', open); });
+  panel.querySelectorAll('[data-contact-close]').forEach(function (b) { b.addEventListener('click', close); });
+  if (location.hash === '#contact') open();
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearErrors();
+    var v = { email: email.value.trim(), topic: topic.value, message: msg.value.trim() };
+    var bad = false;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email)) { fieldError(email, 'cpEmailErr', 'That email looks incomplete. Check the part after the @.'); bad = true; }
+    if (v.message.length < 2) { fieldError(msg, 'cpMsgErr', 'Add a sentence so we know where to start.'); bad = true; }
+    if (bad) { (email.getAttribute('aria-invalid') ? email : msg).focus(); return; }
+    if (endpoint.indexOf('%') !== -1 || endpoint.indexOf('http') !== 0) { showAlert('The form is not connected yet. Email hello@getonetwo.com instead.'); return; }
+
+    submit.disabled = true; submit.textContent = 'Sending…';
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: v.email, topic: v.topic, message: v.message, website: document.getElementById('cpWebsite').value, elapsed_ms: Date.now() - openedAt })
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) { return { status: res.status, data: data }; });
+    }).then(function (r) {
+      if (r.data && r.data.ok) {
+        document.getElementById('cpSentTo').textContent = v.email;
+        form.hidden = true; success.hidden = false;
+        document.getElementById('cpSuccessTitle').focus();
+        if (typeof mixpanel !== 'undefined') mixpanel.track('contact_submitted', { topic: v.topic });
+        return;
+      }
+      var fe = (r.data && r.data.fieldErrors) || {};
+      if (fe.email) fieldError(email, 'cpEmailErr', fe.email);
+      if (fe.topic) fieldError(topic, 'cpTopicErr', fe.topic);
+      if (fe.message) fieldError(msg, 'cpMsgErr', fe.message);
+      if (r.status === 429) showAlert('That is a lot of messages in a short time. Try again in an hour, or email hello@getonetwo.com.');
+      else if (!fe.email && !fe.topic && !fe.message) showAlert('We could not send that just now. Try again, or email hello@getonetwo.com.');
+    }).catch(function () {
+      showAlert('We could not reach the server. Check your connection, or email hello@getonetwo.com.');
+    }).then(function () {
+      submit.disabled = false; submit.textContent = 'Send';
+    });
   });
 })();
 </script>
