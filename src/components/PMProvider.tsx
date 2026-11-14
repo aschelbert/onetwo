@@ -92,9 +92,17 @@ export default function PMProvider({ children }: { children: React.ReactNode }) 
         }
 
         // 4. Get accessible tenant IDs via RPC
-        const { data: rpcResult } = await sb.rpc('get_pm_accessible_tenant_ids');
-        if (rpcResult) {
-          setAccessibleTenantIds(rpcResult);
+        // The function takes the user id and returns rows of { tenant_id }; it
+        // only answers for the caller's own id.
+        const { data: rpcResult, error: rpcError } = await sb.rpc('get_pm_accessible_tenant_ids', {
+          p_user_id: currentUser.id,
+        });
+        if (rpcError) {
+          console.warn('PMProvider: failed to load accessible buildings', rpcError);
+        } else if (rpcResult) {
+          setAccessibleTenantIds(
+            (rpcResult as { tenant_id: string }[]).map((row) => row.tenant_id),
+          );
         }
       } catch (err) {
         console.warn('PMProvider: failed to load PM context', err);
