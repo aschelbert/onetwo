@@ -31,7 +31,7 @@ export function resetStoresForRealTenant() {
   useCaseDockStore.getState().reset();
   useSetupStore.getState().reset();
   useBudgetDraftStore.getState().reset();
-  // Tasker jobs are kept in this browser only (demo TaskRabbit); another building's jobs mean nothing here.
+  // Tasker jobs: another building's mean nothing here; this building's load from tasker_jobs.
   useTaskerStore.getState().reset();
 
   // The mail store is persisted too: the previous building's vendor connection and
