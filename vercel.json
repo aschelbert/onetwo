@@ -7,10 +7,6 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Robots-Tag",
-          "value": "noai, noimageai"
-        },
-        {
           "key": "X-Frame-Options",
           "value": "DENY"
         },
