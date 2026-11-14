@@ -1,7 +1,7 @@
 /**
  * The assists under one checklist item: open the information to review in
  * place, use the step's tools (letter, vote, attach, work order, invoice,
- * meeting, note), go to the module where the work happens (the case dock
+ * meeting, note, book a Tasker), go to the module where the work happens (the case dock
  * follows), or open the official site for work done outside the app.
  */
 import { useEffect, useState } from 'react';
@@ -13,6 +13,8 @@ import { useCaseDockStore } from '@/ux2/shell/caseDock';
 import { resolveCheck, type Assist, type ToolId } from '../../checkAssist';
 import { isOwnTask } from '../../stepGuide';
 import { CheckPanel } from './CheckPanels';
+import { TaskerPanel } from '@/features/tasker/TaskerPanel';
+import { useTaskerStore, jobFor } from '@/store/useTaskerStore';
 
 const TOOL_ACTION: Partial<Record<ToolId, string>> = {
   'send-comm': 'send-comm', 'board-vote': 'board-vote', 'owner-vote': 'owner-vote', 'upload-doc': 'upload-doc',
@@ -37,6 +39,9 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, note, onSaveNo
   const units = useFinancialStore(s => s.units);
   const rememberCheck = useCaseDockStore(s => s.rememberCheck);
   const [open, setOpen] = useState<string | null>(null);
+  // A Tasker job on this item stays in view until it is cancelled.
+  const taskerJob = useTaskerStore(s => jobFor(s.jobs, c.id, checkId));
+  const taskerLive = !!taskerJob && taskerJob.status !== 'cancelled';
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState(note ?? '');
   useEffect(() => { if (!writing) setText(note ?? ''); }, [note, writing]);
@@ -48,6 +53,7 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, note, onSaveNo
     if (a.kind === 'panel') { setOpen(o => (o === a.panel ? null : a.panel)); return; }
     if (a.kind === 'route') { navigate(a.path); return; }
     if (a.kind === 'external') return; // rendered as a link
+    if (a.tool === 'book-tasker') { setOpen(o => (o === 'tasker' ? null : 'tasker')); return; }
     if (a.tool === 'note') { if (onSaveNote) setWriting(w => !w); else onAddNote?.(stepIndex); return; }
     if (a.tool === 'upload-doc' && onUploadCheckDoc) { onUploadCheckDoc(checkId); return; }
     const target = TOOL_ACTION[a.tool];
@@ -65,9 +71,11 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, note, onSaveNo
           if (a.kind === 'external') return <a key={i} href={a.href} target="_blank" rel="noreferrer" className={cls}>{a.label} ↗</a>;
           const isOpen = a.kind === 'panel' && open === a.panel;
           const isNote = a.kind === 'tool' && a.tool === 'note' && !!onSaveNote;
+          const isTasker = a.kind === 'tool' && a.tool === 'book-tasker';
+          if (isTasker && taskerLive) return null;
           return (
-            <button key={i} type="button" onClick={() => run(a)} aria-expanded={a.kind === 'panel' ? isOpen : isNote ? writing : undefined} className={cls}>
-              {isNote && note ? 'Edit what you wrote' : a.label}{a.kind === 'panel' ? (isOpen ? ' ▴' : ' ▾') : a.kind === 'route' ? ' ↗' : isNote ? (writing ? ' ▴' : ' ▾') : ''}
+            <button key={i} type="button" onClick={() => run(a)} aria-expanded={a.kind === 'panel' ? isOpen : isNote ? writing : isTasker ? open === 'tasker' : undefined} className={cls}>
+              {isNote && note ? 'Edit what you wrote' : a.label}{a.kind === 'panel' ? (isOpen ? ' ▴' : ' ▾') : a.kind === 'route' ? ' ↗' : isNote ? (writing ? ' ▴' : ' ▾') : isTasker ? (open === 'tasker' ? ' ▴' : ' ▾') : ''}
             </button>
           );
         })}
@@ -91,7 +99,8 @@ export function CheckAssist({ c, step, stepIndex, checkId, label, note, onSaveNo
           </div>
         </form>
       )}
-      {open && <CheckPanel panel={open as never} c={c} step={step} stepIndex={stepIndex} label={label} />}
+      {(open === 'tasker' || taskerLive) && <TaskerPanel c={c} step={step} stepIndex={stepIndex} checkId={checkId} onAction={onAction} />}
+      {open && open !== 'tasker' && <CheckPanel panel={open as never} c={c} step={step} stepIndex={stepIndex} label={label} />}
     </div>
   );
 }

@@ -12,8 +12,9 @@
  *              the step tools that already existed (the budget drafter, the
  *              reserve study, contract renewals, the bylaws review)
  *  - tool      something the case workspace does in place: send a letter or
- *              notice, record a vote, attach proof, create a work order or an
- *              invoice, schedule a meeting, add a note
+ *              notice, record a vote, attach proof, create a work order, book
+ *              a Tasker through TaskRabbit, create an invoice, schedule a
+ *              meeting, add a note
  *  - route     the module and tab where the work happens; the case dock follows
  *  - external  the official place for work done outside the app (DC Code, the
  *              courts, DOB, DLCP, DISB, the Recorder of Deeds)
@@ -31,7 +32,7 @@ export type PanelId =
   | 'insurance' | 'vendors' | 'documents' | 'owner' | 'board' | 'counsel'
   | 'meetings' | 'assets' | 'filings';
 
-export type ToolId = 'send-comm' | 'board-vote' | 'owner-vote' | 'upload-doc' | 'create-wo' | 'create-invoice' | 'create-meeting' | 'note';
+export type ToolId = 'send-comm' | 'board-vote' | 'owner-vote' | 'upload-doc' | 'create-wo' | 'book-tasker' | 'create-invoice' | 'create-meeting' | 'note';
 
 export type Assist =
   | { kind: 'panel'; panel: PanelId; label: string }
@@ -134,6 +135,7 @@ const T = {
   ownerVote: tool('owner-vote', 'Record the owner vote'),
   upload: tool('upload-doc', 'Attach it to the action'),
   wo: tool('create-wo', 'Create a work order'),
+  tasker: tool('book-tasker', 'Book a Tasker'),
   invoice: tool('create-invoice', 'Create an invoice'),
   meeting: tool('create-meeting', 'Schedule or link a meeting'),
   note: tool('note', 'Add a note'),
@@ -143,10 +145,15 @@ type Rule = { name: string; re: RegExp; assists: Assist[] | ((ctx: CheckContext)
 
 const budgetSit = (c: CheckContext) => c.sitId === 'annual-budgeting';
 /** Situations where money goes to a vendor, not from an owner. */
+/** Situations where a small job may go to a Tasker instead of a vendor (the panel still checks for licensed trades). */
+const SMALL_JOB_SITS = ['common-area-repairs', 'preventative-maintenance', 'runbook-resident-request', 'runbook-work-order'];
 const VENDOR_SITS = ['vendor-management', 'common-area-repairs', 'capital-projects', 'emergency-situations', 'structural-safety', 'inspection-scheduling', 'preventative-maintenance'];
 
 /** Ordered: the first match wins. */
 const RULES: Rule[] = [
+  // ── Getting the work done (the resident request's "Work order, letter or decision") ──
+  { name: 'do-the-work', re: /work order, letter or decision/i, assists: [T.tasker, T.wo, T.send, T.note] },
+
   // ── Budget drafting and reserves ─────────────────────────────────────────
   { name: 'budget-draft', re: /itemi[sz]e operating|operating expenses by category|draft(ing)? (the |a )?(proposed )?budget|proposed budget|line[- ]item budget|budget line/i,
     assists: c => budgetSit(c) ? [P.drafter, route(ROUTES.budget, 'Open Funds › Planning')] : [P.budget, route(ROUTES.budget, 'Open Funds › Planning')] },
@@ -214,7 +221,7 @@ const RULES: Rule[] = [
   { name: 'vendor', re: /vendor|contractor|w-?9|bids?\b|proposal|quote|estimate|contract|scope of work|reference|licen[cs]e|warranty|lien waiver|punch list|change order|retainage|termination|performance|milestone|engineer|architect|consultant|professional|specialist|inspector\b|exterminator|plumber|electrician|roofer|abatement|mitigation company|restoration company/i,
     assists: [P.vendors, route(ROUTES.contracts, 'Open Building › Contracts')] },
   { name: 'work', re: /work order|repair|fix\b|remediat|replace|maintenance|service (call|request|contract)|seasonal service|dispatch|shut off|shutoff|board up|secure the|clean[- ]?up|dry\b|dried|exterminat|patch|seal\b|restore/i,
-    assists: [T.wo, route(ROUTES.workorders, 'Open Funds › Work orders')] },
+    assists: c => SMALL_JOB_SITS.includes(c.sitId) ? [T.wo, T.tasker, route(ROUTES.workorders, 'Open Funds › Work orders')] : [T.wo, route(ROUTES.workorders, 'Open Funds › Work orders')] },
 
   // ── The building, inspections, filings ───────────────────────────────────
   { name: 'availability', re: /available (for|to) (inspection|review|owners)|owners? (may|can|to) inspect|make .* available/i, assists: [T.send, P.documents] },

@@ -24,12 +24,15 @@ import { useLetterStore } from './useLetterStore';
 import { useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useSetupStore } from '@/features/setup/useSetupStore';
 import { useBudgetDraftStore } from './useBudgetDraftStore';
+import { useTaskerStore } from './useTaskerStore';
 
 export function resetStoresForRealTenant() {
   // The case dock remembers case ids per browser; another building's ids mean nothing here.
   useCaseDockStore.getState().reset();
   useSetupStore.getState().reset();
   useBudgetDraftStore.getState().reset();
+  // Tasker jobs are kept in this browser only (demo TaskRabbit); another building's jobs mean nothing here.
+  useTaskerStore.getState().reset();
 
   // The mail store is persisted too: the previous building's vendor connection and
   // letters must not show on this one. loadMailingSettings() fills the connection back in.
