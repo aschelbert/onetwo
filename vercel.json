@@ -64,6 +64,8 @@
     { "source": "/cases/:path*", "destination": "/app.html" },
     { "source": "/board-ops/:path*", "destination": "/app.html" },
     { "source": "/property-log", "destination": "/app.html" },
+    { "source": "/guides", "destination": "/guides/index.html" },
+    { "source": "/guides/:slug", "destination": "/guides/:slug.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" }
   ],

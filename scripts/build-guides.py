@@ -18,7 +18,7 @@ GUIDES = [
  dict(
   slug="dc-condo-reserve-study",
   title="DC Condo Reserve Study Requirements | ONE two",
-  description="Does a DC condo association need a reserve study? What the DC Condominium Act says about reserves, what buyers and lenders look at, and a checklist for self-managed boards.",
+  description="What the DC Condominium Act says about condo reserves and reserve studies, what buyers and lenders look at, and a checklist for self-managed boards.",
   eyebrow="Reserves",
   h1="Does a DC condo association need a reserve study?",
   answer=f"DC law does not require a reserve study or a minimum reserve balance. The DC Condominium Act lets the board adopt a budget that includes reserves ({code('42-1903.08')}), and your declaration or bylaws may require more. Most buildings still need one: buyers see your reserves on every resale certificate, and mortgage lenders look at reserve funding before they lend in the building.",
@@ -185,29 +185,9 @@ GUIDES = [
 
 ALL = {g["slug"]: g for g in GUIDES}
 
-def page(g):
-    url = f"{SITE}/guides/{g['slug']}"
-    related = "".join(
-        f'<li><a href="/guides/{o["slug"]}">{html.escape(o["h1"])}</a></li>'
-        for o in GUIDES if o["slug"] != g["slug"])
-    how = "".join(f"<li>{html.escape(h)}</li>" for h in g["how"])
-    sources = ""
-    if g["sources"]:
-        items = "".join(
-            f'<li><a href="https://code.dccouncil.gov/us/dc/council/code/sections/{s}">DC Code § {s}</a>: {html.escape(t)}</li>'
-            for s, t in g["sources"])
-        sources = f'<h2 id="sources">Sources</h2><ul class="sources">{items}</ul>'
-    schema = [
-      {"@context":"https://schema.org","@type":"Article","headline":g["h1"],"description":g["description"],
-       "datePublished":UPDATED_ISO,"dateModified":UPDATED_ISO,"mainEntityOfPage":url,
-       "author":{"@type":"Organization","name":"ONE two","url":SITE},
-       "publisher":{"@type":"Organization","name":"ONE two","url":SITE,"logo":{"@type":"ImageObject","url":f"{SITE}/onetwo-logo.jpg"}}},
-      {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
-       {"@type":"ListItem","position":1,"name":"ONE two","item":SITE + "/"},
-       {"@type":"ListItem","position":2,"name":"Guides","item":SITE + "/guides"},
-       {"@type":"ListItem","position":3,"name":g["h1"],"item":url}]},
-    ]
-    t = html.escape(g["title"]); d = html.escape(g["description"])
+def shell(t, d, url, schema, main, og_type="article", og_title=None, extra_css=""):
+    og_title = html.escape(og_title or "")
+    schema_json = json.dumps(schema, indent=1, ensure_ascii=False)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -217,9 +197,9 @@ def page(g):
 <title>{t}</title>
 <meta name="description" content="{d}">
 <link rel="canonical" href="{url}">
-<meta property="og:type" content="article">
+<meta property="og:type" content="{og_type}">
 <meta property="og:url" content="{url}">
-<meta property="og:title" content="{html.escape(g['h1'])}">
+<meta property="og:title" content="{og_title}">
 <meta property="og:description" content="{d}">
 <meta property="og:image" content="{SITE}/og.png">
 <meta property="og:site_name" content="ONE two">
@@ -228,7 +208,7 @@ def page(g):
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 <script type="application/ld+json">
-{json.dumps(schema, indent=1, ensure_ascii=False)}
+{schema_json}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&amp;family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&amp;display=swap" rel="stylesheet">
@@ -290,7 +270,7 @@ p{{margin:0}}
   .data td[data-label]::before{{content:attr(data-label);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#4b5a6b;font-weight:600;margin-bottom:2px}}
   header .btn-outline{{display:none}}
 }}
-</style>
+{extra_css}</style>
 </head>
 <body>
 <header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
@@ -299,7 +279,36 @@ p{{margin:0}}
     <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="guide-header">Start free trial</a></div>
   </div>
 </header>
-<main>
+{main}
+<footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/guides" style="color:#8fa0b3">Guides</a><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
+</body>
+</html>
+"""
+
+def page(g):
+    url = f"{SITE}/guides/{g['slug']}"
+    related = "".join(
+        f'<li><a href="/guides/{o["slug"]}">{html.escape(o["h1"])}</a></li>'
+        for o in GUIDES if o["slug"] != g["slug"])
+    how = "".join(f"<li>{html.escape(h)}</li>" for h in g["how"])
+    sources = ""
+    if g["sources"]:
+        items = "".join(
+            f'<li><a href="https://code.dccouncil.gov/us/dc/council/code/sections/{s}">DC Code § {s}</a>: {html.escape(t)}</li>'
+            for s, t in g["sources"])
+        sources = f'<h2 id="sources">Sources</h2><ul class="sources">{items}</ul>'
+    schema = [
+      {"@context":"https://schema.org","@type":"Article","headline":g["h1"],"description":g["description"],
+       "datePublished":UPDATED_ISO,"dateModified":UPDATED_ISO,"mainEntityOfPage":url,
+       "author":{"@type":"Organization","name":"ONE two","url":SITE},
+       "publisher":{"@type":"Organization","name":"ONE two","url":SITE,"logo":{"@type":"ImageObject","url":f"{SITE}/onetwo-logo.jpg"}}},
+      {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+       {"@type":"ListItem","position":1,"name":"ONE two","item":SITE + "/"},
+       {"@type":"ListItem","position":2,"name":"Guides","item":SITE + "/guides"},
+       {"@type":"ListItem","position":3,"name":g["h1"],"item":url}]},
+    ]
+    t = html.escape(g["title"]); d = html.escape(g["description"])
+    main = f"""<main>
 <section class="hero"><div class="in">
   <nav class="crumbs" aria-label="Breadcrumb"><a href="/">ONE two</a> / <a href="/guides">Guides</a></nav>
   <div class="eyebrow">{html.escape(g['eyebrow'])}</div>
@@ -318,14 +327,58 @@ p{{margin:0}}
   <nav class="related" aria-label="More guides"><h2>More guides for DC condo boards</h2><ul>{related}</ul></nav>
   <p class="disclaimer">This guide is general information about DC condominium rules, not legal advice. Your declaration and bylaws may add requirements; for a specific situation, ask the association's attorney.</p>
 </article>
-</main>
-<footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/guides" style="color:#8fa0b3">Guides</a><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
-</body>
-</html>
+</main>"""
+    return shell(t, d, url, schema, main, og_title=g["h1"])
+
+INDEX_CSS = """
+.article .cards{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:14px}
+.cards a{display:block;text-decoration:none;color:inherit;background:#ffffff;border:1px solid #e3e8ee;border-radius:12px;padding:22px 24px;transition:border-color .15s}
+.cards a:hover{border-color:#155E75}
+.cards .k{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#155E75}
+.cards h2{font-size:22px;line-height:1.25;color:#0D1B2E;margin:6px 0 8px}
+.cards p{font-size:15.5px;line-height:1.6;color:#4b5a6b;margin:0}
+.intro{padding-top:36px}
 """
+
+def index_page():
+    url = f"{SITE}/guides"
+    cards = "".join(
+        f'<li><a href="/guides/{g["slug"]}"><span class="k">{html.escape(g["eyebrow"])}</span>'
+        f'<h2>{html.escape(g["h1"])}</h2><p>{html.escape(g["description"])}</p></a></li>'
+        for g in GUIDES)
+    schema = [
+      {"@context":"https://schema.org","@type":"CollectionPage","name":"Guides for DC condo boards","url":url,
+       "description":"Plain-language guides for Washington, DC condo boards running their own building.",
+       "hasPart":[{"@type":"Article","headline":g["h1"],"url":f"{SITE}/guides/{g['slug']}"} for g in GUIDES]},
+      {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+       {"@type":"ListItem","position":1,"name":"ONE two","item":SITE + "/"},
+       {"@type":"ListItem","position":2,"name":"Guides","item":url}]},
+    ]
+    main = f"""<main>
+<section class="hero"><div class="in">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="/">ONE two</a> / Guides</nav>
+  <div class="eyebrow">Guides</div>
+  <h1>Guides for DC condo boards</h1>
+  <p class="upd">Plain answers for boards running their own building in Washington, DC · Updated <time datetime="{UPDATED_ISO}">{UPDATED}</time></p>
+</div></section>
+<div class="article intro">
+  <ul class="cards">{cards}</ul>
+  <aside class="how">
+    <h2>Run the building without a manager</h2>
+    <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month after a 21 day free trial.</p>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index">Start your free 21 day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+  </aside>
+</div>
+</main>"""
+    return shell("Guides for DC Condo Boards | ONE two",
+                 "Plain-language guides for Washington, DC condo boards: reserve studies, leaving a property manager, and what condo management costs.",
+                 url, schema, main, og_type="website", og_title="Guides for DC condo boards", extra_css=INDEX_CSS)
 
 os.makedirs(OUT, exist_ok=True)
 for g in GUIDES:
     with open(os.path.join(OUT, g["slug"] + ".html"), "w") as f:
         f.write(page(g))
     print("wrote", g["slug"])
+with open(os.path.join(OUT, "index.html"), "w") as f:
+    f.write(index_page())
+print("wrote index")

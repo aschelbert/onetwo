@@ -39,6 +39,10 @@ For a 12 unit building, a manager at $45 a unit a month costs $6,480 a year in f
 - [Home page](https://getonetwo.com/): overview, features, comparison table
 - [Pricing](https://getonetwo.com/#pricing): plans and add-ons
 - [FAQ](https://getonetwo.com/#faq): common questions about self-managing a DC condo building
+- [Guides for DC condo boards](https://getonetwo.com/guides): index of plain-language guides
+- [Does a DC condo association need a reserve study?](https://getonetwo.com/guides/dc-condo-reserve-study): what the DC Condominium Act says about reserves, and why boards get a study anyway
+- [How to leave your property management company in DC](https://getonetwo.com/guides/leaving-your-property-manager-dc): the contract, the 90 day rule for developer contracts, the records to get back, and a timeline
+- [What does condo management cost in Washington, DC?](https://getonetwo.com/guides/dc-condo-management-cost): typical rates by service level, extra fees, and what self-managing costs
 - [Start a free trial](https://getonetwo.com/login?create=1)
 - [Privacy policy](https://getonetwo.com/privacy)
 - [Terms of service](https://getonetwo.com/terms)
