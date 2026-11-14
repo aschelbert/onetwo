@@ -52,7 +52,7 @@ export default function AuthPage() {
           p_subscription_interest: demoSubscriptionInterest,
         });
 
-        // Fire-and-forget: notify alyssa@getonetwo.com
+        // Fire-and-forget: notify the internal signup inbox
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
