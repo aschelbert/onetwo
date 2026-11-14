@@ -185,7 +185,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
             <KV label="Legal entity">{snap.name} <span className="text-xs font-normal text-ux2-muted">{snap.details.entityType === 'incorporated' ? `${snap.address.state || 'DC'} nonprofit` : 'unincorporated association'}</span></KV>
             <KV label="Registered agent">{counsel[0] ? <>{counsel[0].firm} <span className="text-xs font-normal text-ux2-muted">counsel</span></> : <span className="text-ux2-muted">None on file</span>}</KV>
           </Inner>
-          <Why>Legal entity and agent feed the filing runbooks and the 1099s, so nobody types them twice. <span className="text-ux2-dim">DC Code § 29-1101 et seq.</span></Why>
+          <Why>Legal entity and agent feed the filing runbooks and the 1099s, so nobody types them twice. <span className="text-ux2-dim">DC Code § 29-102.11</span></Why>
         </Card>
 
         <Card aria-label="Insurance" className="gap-2.5">
@@ -247,7 +247,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
           <KV label="Reply address">{management.email || snap.board[0]?.email || '—'}</KV>
           <KV label="Notices to owners">Email · {withEmail} units <span className="text-xs font-normal text-ux2-muted">· paper for {Math.max(0, units.length - withEmail)} without email</span></KV>
           <KV label="Demand letters">Certified mail + email <span className="text-xs font-normal text-ux2-muted">· DC Code § 42-1903.13</span></KV>
-          <KV label="Meeting notices">10 days before <span className="text-xs font-normal text-ux2-muted">· bylaws · DC minimum 48 hours</span></KV>
+          <KV label="Meeting notices">10 days before <span className="text-xs font-normal text-ux2-muted">· bylaws · DC minimum 21 days for annual and regular owner meetings, 7 for others</span></KV>
           <KV label="Phone">{management.phone || snap.board[0]?.phone || '—'} <span className="text-xs font-normal text-ux2-muted">· {management.company ? 'the manager' : 'rings the President'}</span></KV>
         </Inner>
         <Why>The outbox in Board Room uses these when it sends; owners change their own preference in Me.</Why>

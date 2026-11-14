@@ -221,11 +221,11 @@ const seedElections: Election[] = [
       { id: 'ub_8', unitNumber: '502', owner: 'Nicole White', votingPct: 2.5, method: 'paper', recordedBy: 'Secretary', recordedAt: '2025-12-10T19:48:00Z', isProxy: false, votes: { bi_1: ['cand_1', 'cand_3', 'cand_4'] } },
       { id: 'ub_9', unitNumber: '102', owner: 'Mike Davis', votingPct: 2.2, method: 'paper', recordedBy: 'Secretary', recordedAt: '2025-12-10T19:50:00Z', isProxy: false, votes: { bi_1: ['cand_1', 'cand_2', 'cand_3'] } },
     ],
-    legalRef: 'Bylaws Art. III; DC Code § 29-1109.02',
+    legalRef: 'Bylaws Art. III; DC Code § 42-1903.03',
     notes: 'All three incumbents re-elected. 42 of 50 units represented (84% quorum).',
     complianceChecks: [
       { id: 'cc_1', rule: 'Bylaws Art. III §2: 30-day notice required', source: 'bylaws', requirement: 'Notice sent at least 30 days before AGM', status: 'pass', note: 'Notice mailed November 10, 2025 — 30 days before meeting.', autoChecked: false },
-      { id: 'cc_2', rule: 'DC Code § 29-1109.02: Secret ballot required', source: 'statute', requirement: 'Secret ballot used for board elections', status: 'pass', note: 'Paper ballots used with sealed ballot box.', autoChecked: false },
+      { id: 'cc_2', rule: 'Bylaws: Secret ballot required', source: 'bylaws', requirement: 'Secret ballot used for board elections', status: 'pass', note: 'Paper ballots used with sealed ballot box.', autoChecked: false },
       { id: 'cc_3', rule: 'Bylaws Art. V §1: 40% quorum required', source: 'bylaws', requirement: 'At least 40% of units represented', status: 'pass', note: '42 of 50 units represented (84%).', autoChecked: false },
     ],
     timeline: [
@@ -267,7 +267,7 @@ const seedElections: Election[] = [
         rationale: 'Insurance premiums increased 8%. Maintenance contracts up 4%. Reserve study recommends increased contribution. Without increase, reserves will be underfunded by 2028.',
         type: 'yes_no',
         requiredThreshold: 66.7,
-        legalRef: 'Bylaws Art. VII §3; DC Code § 29-1135.02',
+        legalRef: 'Bylaws Art. VII §3; DC Code § 42-1903.08(a)(2)',
         attachments: [],
         financialImpact: 'Average increase: $14/month per unit. Annual revenue increase: $8,400.',
       },
@@ -285,10 +285,10 @@ const seedElections: Election[] = [
       { id: 'ub_b10', unitNumber: '203', owner: 'Emma Stone', votingPct: 2.2, method: 'paper', recordedBy: 'Secretary', recordedAt: '2025-12-10T20:14:00Z', isProxy: false, votes: { bi_2: 'deny' } },
       { id: 'ub_b11', unitNumber: '303', owner: 'David Park', votingPct: 2.2, method: 'paper', recordedBy: 'Secretary', recordedAt: '2025-12-10T20:15:00Z', isProxy: false, votes: { bi_2: 'abstain' } },
     ],
-    legalRef: 'DC Code § 29-1135.02; Bylaws Art. VII §3',
+    legalRef: 'DC Code § 42-1903.08(a)(2); Bylaws Art. VII §3',
     notes: 'Approved with 75% in favor. Effective January 1, 2026.',
     complianceChecks: [
-      { id: 'cc_b1', rule: 'DC Code § 29-1135.02: 30-day notice for budget adoption', source: 'statute', requirement: 'Budget notice sent 30+ days before vote', status: 'pass', note: 'Notice sent November 10, 30 days before AGM.', autoChecked: false },
+      { id: 'cc_b1', rule: 'DC Code § 42-1903.03: 21-day notice for the annual meeting', source: 'statute', requirement: 'Annual meeting notice sent 21+ days before the vote', status: 'pass', note: 'Notice sent November 10, 30 days before AGM.', autoChecked: false },
       { id: 'cc_b2', rule: 'Bylaws Art. VII §3: 2/3 approval for assessment increase >10%', source: 'bylaws', requirement: '3% increase under 10% threshold — board approval sufficient', status: 'pass', note: 'Increase of 3% is under the 10% bylaws cap. Owner vote conducted as best practice.', autoChecked: false },
     ],
     timeline: [
@@ -587,15 +587,19 @@ export function generateComplianceChecks(opts: {
   const noticeDays = election.noticeDate && election.openedAt
     ? Math.floor((new Date(election.openedAt).getTime() - new Date(election.noticeDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
   checks.push({
-    id: 'cc_notice', rule: isDC ? 'DC Code § 29-1135.08: Written notice required 10+ days before vote' : 'Bylaws: Adequate notice required before vote',
-    source: isDC ? 'statute' : 'bylaws', requirement: 'Written notice must be provided at least 10 days before the vote',
-    status: election.noticeDate ? (noticeDays >= 10 ? 'pass' : noticeDays >= 7 ? 'warning' : 'fail') : 'not_checked',
-    note: election.noticeDate ? `${noticeDays} days notice provided` : 'Set a notice date to validate', autoChecked: true,
+    id: 'cc_notice', rule: isDC ? 'DC Code § 42-1903.03: Notice at least 21 days before an annual or regular meeting, 7 days before others' : 'Bylaws: Adequate notice required before vote',
+    source: isDC ? 'statute' : 'bylaws', requirement: isDC ? 'Notice of time, place and purpose: 21+ days for an annual or regular meeting, 7+ days for any other' : 'Written notice must be provided at least 10 days before the vote',
+    status: election.noticeDate ? (isDC
+      ? (noticeDays >= 21 ? 'pass' : noticeDays >= 7 ? 'warning' : 'fail')
+      : (noticeDays >= 10 ? 'pass' : noticeDays >= 7 ? 'warning' : 'fail')) : 'not_checked',
+    note: election.noticeDate
+      ? (isDC && noticeDays >= 7 && noticeDays < 21 ? `${noticeDays} days notice provided: enough for a special meeting, short of the 21 days an annual or regular meeting needs` : `${noticeDays} days notice provided`)
+      : 'Set a notice date to validate', autoChecked: true,
   });
 
   // Quorum
   checks.push({
-    id: 'cc_quorum', rule: isDC ? 'DC Code § 29-1135.03: Quorum required for valid vote' : 'Bylaws: Quorum requirement',
+    id: 'cc_quorum', rule: isDC ? 'DC Code § 42-1903.04(a): Quorum (more than 33⅓% of votes unless the bylaws set another, not below 25%)' : 'Bylaws: Quorum requirement',
     source: isDC ? 'statute' : 'bylaws', requirement: `Quorum of ${election.quorumRequired}% of ownership must participate`,
     status: 'not_checked', note: 'Will be validated when voting closes', autoChecked: false,
   });
@@ -633,16 +637,16 @@ export function generateComplianceChecks(opts: {
   const hasProxyBallots = election.ballots.some(b => b.isProxy);
   if (hasProxyBallots) {
     checks.push({
-      id: 'cc_proxy', rule: isDC ? 'DC Code § 29-1135.10: Proxy voting requirements' : 'Bylaws: Proxy authorization requirements',
-      source: isDC ? 'statute' : 'bylaws', requirement: 'Written proxy authorization must be on file for each proxy vote',
+      id: 'cc_proxy', rule: isDC ? 'DC Code § 42-1903.05: Proxy voting requirements' : 'Bylaws: Proxy authorization requirements',
+      source: isDC ? 'statute' : 'bylaws', requirement: isDC ? 'Each proxy must be dated, witnessed (witness signs with full name and address) and not revocable without notice' : 'Written proxy authorization must be on file for each proxy vote',
       status: 'warning', note: 'Verify proxy authorization forms are collected and filed', autoChecked: false,
     });
   }
 
   // Record keeping
   checks.push({
-    id: 'cc_records', rule: isDC ? 'DC Code § 29-1135.13: Records retention' : 'Best practice: Retain vote records',
-    source: isDC ? 'statute' : 'best_practice', requirement: 'Vote records must be retained for at least 7 years',
+    id: 'cc_records', rule: isDC ? 'Best practice: Retain vote records (DC Code § 42-1903.14 opens records to owners)' : 'Best practice: Retain vote records',
+    source: 'best_practice', requirement: 'Vote records must be retained for at least 7 years',
     status: 'pass', note: 'Records stored in system with full audit trail', autoChecked: true,
   });
 
@@ -659,8 +663,8 @@ export function generateComplianceChecks(opts: {
   // Secret ballot for elections
   if (election.type === 'board_election') {
     checks.push({
-      id: 'cc_secret', rule: isDC ? 'DC Code § 29-1135.09: Secret ballot for board elections' : 'Best practice: Secret ballot',
-      source: isDC ? 'statute' : 'best_practice', requirement: 'Board member elections should use secret ballot',
+      id: 'cc_secret', rule: isDC ? 'Bylaws or best practice: Secret ballot (DC law requires one only where the condominium instruments do)' : 'Best practice: Secret ballot',
+      source: 'best_practice', requirement: 'Board member elections should use secret ballot',
       status: 'pass', note: 'Individual votes are not disclosed to other voters in the system', autoChecked: true,
     });
   }

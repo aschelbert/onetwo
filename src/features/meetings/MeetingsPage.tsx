@@ -48,7 +48,7 @@ export default function MeetingsPage() {
       req: isDC ? 4 : 4,
       actual: boardCount,
       freq: 'Quarterly minimum',
-      legalRef: isDC ? 'DC Code § 29-1109.01' : `${jurisdiction} Condo Act`,
+      legalRef: isDC ? 'DC Code § 42-1903.03' : `${jurisdiction} Condo Act`,
       source: hasBylaws ? 'Bylaws Art. III' : 'DC Code',
       sourceType: 'law' as const,
     },
@@ -57,7 +57,7 @@ export default function MeetingsPage() {
       req: 1,
       actual: annualCount,
       freq: 'Within 13 months of prior',
-      legalRef: isDC ? 'DC Code § 29-1109.02' : `${jurisdiction} Condo Act`,
+      legalRef: isDC ? 'DC Code § 42-1903.03(a)' : `${jurisdiction} Condo Act`,
       source: hasBylaws ? 'Bylaws Art. III §2' : 'DC Code',
       sourceType: 'law' as const,
     },
@@ -66,7 +66,7 @@ export default function MeetingsPage() {
       req: 100,
       actual: minutesRate,
       freq: 'All completed meetings',
-      legalRef: isDC ? 'DC Code § 29-1108.06' : `${jurisdiction} Condo Act`,
+      legalRef: isDC ? 'DC Code § 42-1903.03(b)' : `${jurisdiction} Condo Act`,
       source: 'Required by law',
       sourceType: 'law' as const,
       isPct: true,
@@ -76,7 +76,7 @@ export default function MeetingsPage() {
       req: 1,
       actual: hasProperNotice ? 1 : 0,
       freq: 'Annual: 10-60 days · Board: 48 hrs',
-      legalRef: isDC ? 'DC Code § 29-1109.02(a)' : `${jurisdiction} Condo Act`,
+      legalRef: isDC ? 'DC Code § 42-1903.03' : `${jurisdiction} Condo Act`,
       source: 'Required by law',
       sourceType: 'law' as const,
     },
@@ -191,7 +191,7 @@ export default function MeetingsPage() {
           <span className="font-semibold text-ink-700">Legal basis: </span>
           {isDC ? (
             <>
-              Requirements derived from <span className="font-mono text-accent-700">DC Code § 29-1101 et seq.</span> (DC Condominium Act)
+              Requirements derived from <span className="font-mono text-accent-700">DC Code § 42-1901.01 et seq.</span> (DC Condominium Act)
               {hasBylaws && <>, cross-referenced with your <span className="font-semibold text-ink-700">Condominium Bylaws</span></>}
               {hasCCRs && <> and <span className="font-semibold text-ink-700">CC&Rs / Declaration</span></>}.
               {!hasBylaws && <span className="text-amber-600 ml-1">⚠ Upload your Bylaws under Legal & Bylaws to enable bylaw-specific checks.</span>}

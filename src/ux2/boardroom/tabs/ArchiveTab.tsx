@@ -115,7 +115,7 @@ export default function ArchiveTab({ snap, onOpenCase }: { snap: BoardRoomSnapsh
           <SectionLabel>How long it stays</SectionLabel>
           <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="7 years from the day it closed" note="Then it is deleted, unless a related action is open or counsel has placed a hold" /><Chip tone="cyan">Retention</Chip></Inner>
           <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="Minutes and adopted budgets stay for good" note="They are the building's permanent record and also live in Building › Documents" /><Chip tone="ghost">Permanent</Chip></Inner>
-          <Why>Nothing is deleted without a notice on Home 30 days before. Owners never see the archive; they see their own closed requests in Community › Requests. Records: DC Code § 29-1101 et seq. · bylaws</Why>
+          <Why>Nothing is deleted without a notice on Home 30 days before. Owners never see the archive; they see their own closed requests in Community › Requests. Records: DC Code § 42-1903.14 · bylaws</Why>
         </Card>
       </div>
     </div>
