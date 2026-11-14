@@ -28,11 +28,15 @@ export function openaiAdsEnabled(): boolean {
   return Boolean(API_KEY && PIXEL_ID);
 }
 
-/** Lowercase hex SHA-256 of a trimmed, lowercased value, as the API expects. */
-export async function sha256Normalized(value: string): Promise<string> {
-  const normalized = value.trim().toLowerCase();
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized));
+/** Lowercase hex SHA-256 of a value, exactly as given. */
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Lowercase hex SHA-256 of a trimmed, lowercased value (emails). */
+export function sha256Normalized(value: string): Promise<string> {
+  return sha256Hex(value.trim().toLowerCase());
 }
 
 /** The `data.type` shape each standard event type is defined with. */
@@ -65,6 +69,10 @@ export interface SignupConversion {
   id: string;
   /** Signer's email; hashed before sending, never sent raw. */
   email?: string | null;
+  /** Signer's account (Supabase user) ID; hashed before sending, like the pixel's external ID. */
+  userId?: string | null;
+  /** ChatGPT ad click reference (oppref) saved at signup, if the visitor came from an ad. */
+  adClickRef?: string | null;
   /** When the conversion happened, in Unix seconds. Defaults to now. */
   occurredAtSeconds?: number | null;
   /** Page the signup happened on. Defaults to https://www.getonetwo.com/login. */
@@ -85,6 +93,7 @@ export async function reportSignupConversion(c: SignupConversion): Promise<boole
     const timestampMs = c.occurredAtSeconds ? c.occurredAtSeconds * 1000 : Date.now();
     const user: Record<string, unknown> = {};
     if (c.email) user.emails_sha256 = [await sha256Normalized(c.email)];
+    if (c.userId) user.external_ids_sha256 = [await sha256Hex(c.userId)];
 
     const event: Record<string, unknown> = {
       id: c.id,
@@ -94,6 +103,7 @@ export async function reportSignupConversion(c: SignupConversion): Promise<boole
       source_url: c.sourceUrl || DEFAULT_SOURCE_URL,
       data: { type: dataTypeFor(SIGNUP_EVENT) },
     };
+    if (c.adClickRef) event.oppref = c.adClickRef;
     if (SIGNUP_EVENT === "custom") (event.data as Record<string, unknown>).custom_event_name = "signup_completed";
     if (Object.keys(user).length) event.user = user;
 

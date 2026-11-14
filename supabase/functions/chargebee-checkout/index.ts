@@ -322,6 +322,10 @@ Deno.serve(async (req) => {
           adMeasurementOptOut: body.adMeasurementOptOut === true,
           // Page the signup happened on, reported to OpenAI Ads as source_url
           signupUrl: signupPageUrl(origin),
+          // ChatGPT ad click reference (oppref), reported to OpenAI Ads
+          adClickRef: typeof body.adClickRef === 'string' && body.adClickRef.trim()
+            ? body.adClickRef.trim().slice(0, 512)
+            : null,
           // HO-18 extended fields
           role: building.role || 'board_member',
           roleKey: building.roleKey || null,

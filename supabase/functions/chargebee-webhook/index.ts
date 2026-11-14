@@ -386,6 +386,8 @@ Deno.serve(async (req) => {
               await reportSignupConversion({
                 id: pending.conversionEventId || `signup_${subscription.id || customer.id || eventId}`,
                 email: pending.contactEmail || customer.email || null,
+                userId: pending.userId || null,
+                adClickRef: pending.adClickRef || null,
                 occurredAtSeconds: event.occurred_at || null,
                 sourceUrl: pending.signupUrl || undefined,
               });
