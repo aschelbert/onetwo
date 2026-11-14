@@ -1,6 +1,6 @@
 /**
  * DACI Matrix — maps case category IDs to responsible board roles.
- * Based on DC Code §29-1135, standard DC condo bylaws, and governance best practices.
+ * Based on the DC Condominium Act (DC Code § 42-1901.01 et seq.), standard DC condo bylaws, and governance best practices.
  *
  * D = Driver (owns execution), A = Approver (final authority),
  * C = Contributor (provides input), I = Informed (kept in the loop)

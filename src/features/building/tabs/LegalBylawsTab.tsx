@@ -5,13 +5,13 @@ import type { LegalDocument } from '@/store/useBuildingStore';
  *  The `required` flag indicates whether the document is legally required (true) or recommended best practice (false).
  *  `legalRef` cites the relevant statute or standard. */
 const REQUIRED_DOCS = [
-  { key: 'bylaws', name: 'Condominium Bylaws', required: true, legalRef: 'DC Code § 29-1105.02', desc: 'Governs the internal affairs of the association. Must be recorded with the deed.' },
-  { key: 'ccrs', name: 'CC&Rs / Declaration', required: true, legalRef: 'DC Code § 29-1105.01', desc: 'Covenants, conditions, and restrictions that bind all unit owners.' },
-  { key: 'master-deed', name: 'Master Deed / Plat', required: true, legalRef: 'DC Code § 29-1103', desc: 'Legal instrument creating the condominium. Filed with the recorder of deeds.' },
+  { key: 'bylaws', name: 'Condominium Bylaws', required: true, legalRef: 'DC Code § 42-1903.01', desc: 'Governs the internal affairs of the association. Must be recorded with the declaration.' },
+  { key: 'ccrs', name: 'CC&Rs / Declaration', required: true, legalRef: 'DC Code § 42-1902.10', desc: 'Covenants, conditions, and restrictions that bind all unit owners.' },
+  { key: 'master-deed', name: 'Master Deed / Plat', required: true, legalRef: 'DC Code §§ 42-1902.01, 42-1902.14', desc: 'Plats and plans recorded with the declaration; the condominium exists once its instruments are recorded.' },
   { key: 'articles', name: 'Articles of Incorporation', required: true, legalRef: 'DC Code Title 29, Chapter 4 (Nonprofit Corporations)', desc: 'Establishes the association as a legal entity.' },
-  { key: 'rules', name: 'Rules & Regulations', required: true, legalRef: 'DC Code § 29-1105.02(a)(10)', desc: 'Day-to-day rules adopted by the board. Must be consistent with bylaws and CC&Rs.' },
-  { key: 'collection', name: 'Collection Policy', required: true, legalRef: 'DC Code § 29-1135.03', desc: 'Written policy for assessment collection, late fees, and lien procedures.' },
-  { key: 'reserve-study', name: 'Reserve Study', required: true, legalRef: 'DC Code § 29-1135.03(b)', desc: 'Professional analysis of building component lifespans and funding needs. Update every 3-5 years.' },
+  { key: 'rules', name: 'Rules & Regulations', required: true, legalRef: 'Bylaws (DC Code § 42-1903.01)', desc: 'Day-to-day rules adopted by the board. Must be consistent with bylaws and CC&Rs.' },
+  { key: 'collection', name: 'Collection Policy', required: true, legalRef: 'DC Code §§ 42-1903.12, 42-1903.13', desc: 'Written policy for assessment collection, late fees, and lien procedures.' },
+  { key: 'reserve-study', name: 'Reserve Study', required: true, legalRef: 'Bylaws (not required by DC law; disclosed on resale, § 42-1904.11)', desc: 'Professional analysis of building component lifespans and funding needs. Commonly updated every 3-5 years.' },
   { key: 'arch-standards', name: 'Architectural Standards', required: false, legalRef: 'Best Practice', desc: 'Guidelines for unit modifications, renovations, and alterations.' },
   { key: 'pet-policy', name: 'Pet Policy', required: false, legalRef: 'Best Practice', desc: 'Rules governing pet ownership, breeds, and common area access.' },
   { key: 'move-in-out', name: 'Move-In/Move-Out Policy', required: false, legalRef: 'Best Practice', desc: 'Procedures, deposits, scheduling, and damage responsibilities for moves.' },

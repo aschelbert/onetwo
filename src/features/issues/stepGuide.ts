@@ -41,7 +41,7 @@ export function titleTasks(title: string): string[] {
 export function guidanceTasks(detail: string | null | undefined): string[] {
   if (!detail) return [];
   return detail
-    // Not after an abbreviation's dot ("e.g. the roof", "§ 29-1109.02").
+    // Not after an abbreviation's dot ("e.g. the roof", "§ 42-1903.03").
     .split(/(?<=[.!?])\s+(?=[A-Z(])/)
     .map(x => x.trim())
     .filter(x => x.length > 8 && !APP_DOES.test(x) && IMPERATIVE.test(x))

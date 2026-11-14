@@ -287,7 +287,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
                         const newCount = approvedCount + 1;
                         const newMajority = newCount > totalBoard / 2;
                         if (newMajority && !isMajority) {
-                          comp.addCommunication({ type: 'minutes', subject: `${m.title} — Minutes Approved & Distributed`, date: new Date().toISOString().split('T')[0], method: 'email+portal', recipients: 'All owners (50 units)', respondedBy: 'Secretary', status: 'sent', notes: `Minutes approved by board majority (${newCount}/${totalBoard}). Auto-distributed per DC Code § 29-1108.06.` });
+                          comp.addCommunication({ type: 'minutes', subject: `${m.title} — Minutes Approved & Distributed`, date: new Date().toISOString().split('T')[0], method: 'email+portal', recipients: 'All owners (50 units)', respondedBy: 'Secretary', status: 'sent', notes: `Minutes approved by board majority (${newCount}/${totalBoard}). Available to owners per DC Code § 42-1903.03(b).` });
                           // Prompt: Post meeting recap as community announcement
                           const agendaSummary = m.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n');
                           const minutesSummary = m.minutes ? `\n\nMinutes Summary:\n${m.minutes.slice(0, 500)}${m.minutes.length > 500 ? '...' : ''}` : '';
@@ -329,7 +329,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-ink-400 mt-3">{isDC ? 'DC Code § 29-1108.06 — Minutes must be approved by board majority and made available for owner inspection.' : 'Bylaws require board approval of meeting minutes at or before the next regular meeting.'}</p>
+                  <p className="text-[10px] text-ink-400 mt-3">{isDC ? 'DC Code § 42-1903.03(b) — Minutes must be recorded and made available for owners to examine and copy; the board approves them per the bylaws.' : 'Bylaws require board approval of meeting minutes at or before the next regular meeting.'}</p>
                 </div>
               );
             })()}
@@ -884,12 +884,12 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
             <div className={`rounded-xl border p-4 ${minutesPending === 0 ? 'border-sage-200 bg-sage-50' : 'border-amber-200 bg-amber-50'}`}>
               <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Minutes Status</p>
               <p className="text-lg font-bold text-ink-900 mt-1">{minutesPending === 0 ? '✅ All approved' : `⚠ ${minutesPending} pending`}</p>
-              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 29-1108.06' : 'State statute'} — record, approve, distribute</p>
+              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 42-1903.03(b)' : 'State statute'} — record, approve, distribute</p>
             </div>
             <div className="rounded-xl border border-ink-100 bg-white p-4">
               <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Notice Requirements</p>
               <p className="text-xs text-ink-700 mt-1.5">{isDC ? 'Owner meetings: notice at least 21 days before annual or regular meetings, 7 days before others (DC Code § 42-1903.03). Board meetings: publish the time and place.' : 'Follow bylaws notice requirements.'}</p>
-              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 29-1109.04' : bylawRef}</p>
+              <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 42-1903.03' : bylawRef}</p>
             </div>
           </div>
           <div className="flex items-center justify-between">
