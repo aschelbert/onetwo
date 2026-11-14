@@ -2306,7 +2306,7 @@ const seedCases: CaseTrackerCase[] = [
     id: 'c5', catId: 'admin', sitId: 'compliance-filing',
     title: 'File DC Biennial Report', unit: 'Common', owner: 'N/A',
     approach: 'pre', status: 'open', priority: 'medium', created: '2026-01-20',
-    notes: 'File with DCRA. $80 filing fee.',
+    notes: 'File with DLCP. $80 filing fee.',
     steps: null, linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [],
     assignedTo: 'Robert Mitchell', assignedRole: 'President', dueDate: '2026-04-01',
     source: 'Runbook item', sourceId: 'rf1',

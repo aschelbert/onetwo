@@ -8,7 +8,7 @@ const REQUIRED_DOCS = [
   { key: 'bylaws', name: 'Condominium Bylaws', required: true, legalRef: 'DC Code § 29-1105.02', desc: 'Governs the internal affairs of the association. Must be recorded with the deed.' },
   { key: 'ccrs', name: 'CC&Rs / Declaration', required: true, legalRef: 'DC Code § 29-1105.01', desc: 'Covenants, conditions, and restrictions that bind all unit owners.' },
   { key: 'master-deed', name: 'Master Deed / Plat', required: true, legalRef: 'DC Code § 29-1103', desc: 'Legal instrument creating the condominium. Filed with the recorder of deeds.' },
-  { key: 'articles', name: 'Articles of Incorporation', required: true, legalRef: 'DC Code § 29-1101', desc: 'Establishes the association as a legal entity.' },
+  { key: 'articles', name: 'Articles of Incorporation', required: true, legalRef: 'DC Code Title 29, Chapter 4 (Nonprofit Corporations)', desc: 'Establishes the association as a legal entity.' },
   { key: 'rules', name: 'Rules & Regulations', required: true, legalRef: 'DC Code § 29-1105.02(a)(10)', desc: 'Day-to-day rules adopted by the board. Must be consistent with bylaws and CC&Rs.' },
   { key: 'collection', name: 'Collection Policy', required: true, legalRef: 'DC Code § 29-1135.03', desc: 'Written policy for assessment collection, late fees, and lien procedures.' },
   { key: 'reserve-study', name: 'Reserve Study', required: true, legalRef: 'DC Code § 29-1135.03(b)', desc: 'Professional analysis of building component lifespans and funding needs. Update every 3-5 years.' },

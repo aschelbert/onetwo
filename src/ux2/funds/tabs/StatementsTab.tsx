@@ -279,7 +279,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
               {filing === f.id && f.id === 'annual' && <div className="rounded-[12px] bg-ux2-surface px-3 py-2">{years.filter(y => y !== thisYear).length === 0 ? <Why>No past year in the ledger yet.</Why> : years.filter(y => y !== thisYear).map(y => <Inner key={y} className="flex items-center justify-between gap-3"><Cell title={`Annual report · ${y}`} note="Year-end statements and the reserve position" /><Button size="sm" variant="ghost" onClick={() => { setYear(y); document.querySelector('[aria-label="Monthly statement packets"]')?.scrollIntoView({ behavior: 'smooth' }); }}>Open</Button></Inner>)}</div>}
             </Inner>
           ))}
-          <Why>Each filing is a Runbook: the numbers fill in from the ledger, the accountant reviews, and the "file" step arrives as a Home card when it is due. The biennial report to DCRA (Apr 1) is a records filing and lives under Building obligations.</Why>
+          <Why>Each filing is a Runbook: the numbers fill in from the ledger, the accountant reviews, and the "file" step arrives as a Home card when it is due. The biennial report to DLCP (Apr 1) is a records filing and lives under Building obligations.</Why>
         </Card>
 
         <Card aria-label="Accountant access">

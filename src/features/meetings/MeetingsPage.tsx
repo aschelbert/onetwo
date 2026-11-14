@@ -191,7 +191,7 @@ export default function MeetingsPage() {
           <span className="font-semibold text-ink-700">Legal basis: </span>
           {isDC ? (
             <>
-              Requirements derived from <span className="font-mono text-accent-700">DC Code § 29-1101 et seq.</span> (DC Condominium Act)
+              Requirements derived from <span className="font-mono text-accent-700">DC Code § 42-1901.01 et seq.</span> (DC Condominium Act)
               {hasBylaws && <>, cross-referenced with your <span className="font-semibold text-ink-700">Condominium Bylaws</span></>}
               {hasCCRs && <> and <span className="font-semibold text-ink-700">CC&Rs / Declaration</span></>}.
               {!hasBylaws && <span className="text-amber-600 ml-1">⚠ Upload your Bylaws under Legal & Bylaws to enable bylaw-specific checks.</span>}

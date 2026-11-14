@@ -215,7 +215,7 @@ export default function CompliancePage() {
           const allItems = catScores.flatMap(c => c.items);
           const autoVerifiedCount = allItems.filter(i => i.autoPass).length;
           const needsActionCount = allItems.filter(i => !i.autoPass && !comp.completions[i.id]).length;
-          const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
+          const stateAct = isDC ? 'DC Code § 42-1901.01 et seq.' : `${jurisdiction} Condominium Act`;
           const missingDocs: string[] = [];
           if (!hasBylaws) missingDocs.push('Bylaws');
           if (!hasCCRs) missingDocs.push('CC&Rs / Declaration');

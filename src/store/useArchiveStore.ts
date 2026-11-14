@@ -102,7 +102,7 @@ const seedArchives: ArchiveSnapshot[] = [
       totalChecklistItems: 44,
     },
     filings: [
-      { id: 'rf-a1', name: 'DC Biennial Report', category: 'government', dueDate: '2025-04-01', status: 'filed', filedDate: '2025-03-20', confirmationNum: 'DCRA-2025-4482', notes: 'Filed on time.', responsible: 'President', recurrence: 'biennial', legalRef: 'DC Code § 29-102.11', attachments: [] },
+      { id: 'rf-a1', name: 'DC Biennial Report', category: 'government', dueDate: '2025-04-01', status: 'filed', filedDate: '2025-03-20', confirmationNum: 'DLCP-2025-4482', notes: 'Filed on time.', responsible: 'President', recurrence: 'biennial', legalRef: 'DC Code § 29-102.11', attachments: [] },
       { id: 'rf-a2', name: 'Form 1120-H (Federal Tax Return)', category: 'tax', dueDate: '2025-04-15', status: 'filed', filedDate: '2025-04-10', confirmationNum: 'IRS-1120H-2024', notes: 'Filed for FY 2024.', responsible: 'Treasurer', recurrence: 'annual', legalRef: 'IRS Code § 528', attachments: [] },
       { id: 'rf-a3', name: 'Annual Fire Safety Inspection', category: 'inspection', dueDate: '2025-06-30', status: 'filed', filedDate: '2025-06-15', confirmationNum: 'DCFEMS-2025-1122', notes: 'Passed.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Fire Code', attachments: [] },
       { id: 'rf-a4', name: 'Elevator Inspection Certificate', category: 'inspection', dueDate: '2025-08-15', status: 'filed', filedDate: '2025-08-20', confirmationNum: 'ELEV-2025-8842', notes: 'Both elevators passed.', responsible: 'Vice President', recurrence: 'annual', legalRef: 'DC Code § 1-303.43', attachments: [] },

@@ -124,7 +124,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
 
   // Vote defaults
   const getVoteDefaults = (meetingType: string): { requiresVote: boolean; voteScope: 'board' | 'owner'; reason: string } => {
-    const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
+    const stateAct = isDC ? 'DC Code § 42-1901.01 et seq.' : `${jurisdiction} Condo Act`;
     switch (meetingType) {
       case 'ANNUAL': return { requiresVote: true, voteScope: 'owner', reason: `Required: Board elections & budget approval (${stateAct})` };
       case 'SPECIAL': return { requiresVote: true, voteScope: 'owner', reason: `Typically required: Special meetings called for owner vote (${stateAct})` };
@@ -180,7 +180,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
         if (selectedAgenda.length > 0) {
         const typeMap: Record<string, string> = { ANNUAL: 'budget_approval', SPECIAL: 'special_assessment', BOARD: 'meeting_motion', QUARTERLY: 'meeting_motion', EMERGENCY: 'meeting_motion' };
         const elType = (typeMap[mForm.type] || 'meeting_motion') as any;
-        const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condo Act`;
+        const stateAct = isDC ? 'DC Code § 42-1901.01 et seq.' : `${jurisdiction} Condo Act`;
         elections.addElection({
           title: `${mForm.title} — Vote`, type: elType, status: 'draft',
           description: `Vote items for ${mForm.title} on ${mForm.date}. ${mForm.voteScope === 'owner' ? 'Owner vote' : 'Board vote'}.`,
@@ -490,7 +490,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
           const completedCount = allItems.filter(i => isItemComplete(i.id, i.howTo.length)).length;
           const inProgressCount = allItems.filter(i => { const s = workflowSteps[i.id]; return s && s.some(Boolean) && !s.every(Boolean); }).length;
           const needsActionCount = allItems.length - completedCount - inProgressCount;
-          const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
+          const stateAct = isDC ? 'DC Code § 42-1901.01 et seq.' : `${jurisdiction} Condominium Act`;
           const missingDocs: string[] = [];
           const hasCCRs = legalDocuments.some(d => d.name.toLowerCase().includes('cc&r') || d.name.toLowerCase().includes('declaration'));
           if (!hasBylaws) missingDocs.push('Bylaws');
@@ -888,7 +888,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
             </div>
             <div className="rounded-xl border border-ink-100 bg-white p-4">
               <p className="text-[10px] font-bold text-ink-600 uppercase tracking-wider">Notice Requirements</p>
-              <p className="text-xs text-ink-700 mt-1.5">{isDC ? '48-hour notice for board meetings. 10–60 day window for annual meeting.' : 'Follow bylaws notice requirements.'}</p>
+              <p className="text-xs text-ink-700 mt-1.5">{isDC ? 'Owner meetings: notice at least 21 days before annual or regular meetings, 7 days before others (DC Code § 42-1903.03). Board meetings: publish the time and place.' : 'Follow bylaws notice requirements.'}</p>
               <p className="text-[10px] text-ink-400 mt-1.5">📖 {isDC ? 'DC Code § 29-1109.04' : bylawRef}</p>
             </div>
           </div>

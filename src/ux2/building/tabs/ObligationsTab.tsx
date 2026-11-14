@@ -150,7 +150,7 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
         {[
           ['Duty of care', duties.care, 'Act as a reasonably prudent person would: come to meetings, read the packet before voting, ask questions, decide on the facts.', 'Scored under Oversight and Timeliness.', 'teal'],
           ['Duty of loyalty', duties.loyalty, 'Put the association first: disclose every conflict, step out of related votes, never self-deal.', 'Conflict disclosures collected each January; the action checks them before a vote.', 'plum'],
-          ['Duty of compliance', duties.obedience, 'Follow the bylaws, the CC&Rs and the law in every decision. The board can only do what they allow.', 'Scored under Compliance, the dimension of the same name. Called the duty of obedience in the law · DC Code § 29-1101 et seq.', 'amber'],
+          ['Duty of compliance', duties.obedience, 'Follow the bylaws, the CC&Rs and the law in every decision. The board can only do what they allow.', 'Scored under Compliance, the dimension of the same name. Called the duty of obedience in the law · DC Code § 42-1903.08', 'amber'],
         ].map(([name, n, text, note, tone]) => (
           <Card key={String(name)} aria-label={String(name)} className="gap-1.5">
             <div className="flex items-center justify-between gap-2"><SectionLabel>{name}</SectionLabel><Chip tone={tone as 'teal' | 'plum' | 'amber'}>{n} obligations</Chip></div>
@@ -243,7 +243,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
   const open = rows.filter(r => r.state !== 'met' && r.state !== 'auto');
   const rulesOnFile = snap.legalDocuments.some(d => /rule/i.test(d.name) && d.attachments.length > 0);
   const policies = snap.legalDocuments.filter(d => /polic/i.test(d.name)).length;
-  const sources = `Sources: DC Code § 29-1101 et seq. · ${snap.legalDocuments.some(d => /bylaw/i.test(d.name)) ? 'Bylaws on file' : 'Bylaws missing'} · ${snap.legalDocuments.some(d => /cc&r|covenant/i.test(d.name)) ? 'CC&Rs on file' : 'CC&Rs missing'} · ${rulesOnFile ? 'Rules on file' : 'Rules missing'} · ${policies} policies`;
+  const sources = `Sources: DC Code § 42-1901.01 et seq. · ${snap.legalDocuments.some(d => /bylaw/i.test(d.name)) ? 'Bylaws on file' : 'Bylaws missing'} · ${snap.legalDocuments.some(d => /cc&r|covenant/i.test(d.name)) ? 'CC&Rs on file' : 'CC&Rs missing'} · ${rulesOnFile ? 'Rules on file' : 'Rules missing'} · ${policies} policies`;
 
   return (
     <div className="flex flex-col gap-4">
