@@ -4,7 +4,9 @@
  * › Contracts, or is there without a W-9, one case opens: the record, the
  * W-9, the certificate of insurance and licenses, the contract on file.
  * The app ticks the record, the W-9 and the contract as they land. One
- * case per vendor, by name.
+ * case per vendor, by name. Work orders for Tasker jobs are left out: TaskRabbit
+ * vets and pays its Taskers, so there is no W-9, certificate or contract to
+ * collect from each one.
  *
  * The database opens the same case every morning (run_vendor_onboarding,
  * migration 062); the step texts here and there must stay the same.
@@ -13,6 +15,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useTaskerStore } from '@/store/useTaskerStore';
 import { fmt } from '@/lib/formatters';
 import type { CaseTrackerCase } from '@/types/issues';
 import { todayIso } from '../runbook/adapters';
@@ -29,11 +32,12 @@ export const onboardingCase = (cases: CaseTrackerCase[], name: string) => cases.
 const vendorRecord = (name: string) => useBuildingStore.getState().vendors.find(v => vendorKey(v.name) === vendorKey(name));
 const vendorContract = (name: string) => { const v = vendorRecord(name); return useVendorTrackerStore.getState().contracts.find(c => (v && c.vendorId === v.id) || vendorKey(c.vendorName) === vendorKey(name)); };
 
-/** Vendors money has moved to (a work order past draft) who still need onboarding: no record, or a record without a W-9. */
+/** Vendors money has moved to (a work order past draft) who still need onboarding: no record, or a record without a W-9. Tasker jobs' work orders don't count. */
 export function vendorsToOnboard(): { name: string; paid: number; hasRecord: boolean }[] {
   const seen = new Map<string, { name: string; paid: number }>();
+  const taskerWorkOrders = new Set(useTaskerStore.getState().jobs.map(j => j.woId).filter(Boolean));
   for (const w of useFinancialStore.getState().workOrders) {
-    if (w.status === 'draft' || !w.vendor?.trim()) continue;
+    if (w.status === 'draft' || !w.vendor?.trim() || taskerWorkOrders.has(w.id)) continue;
     const k = vendorKey(w.vendor);
     const cur = seen.get(k) ?? { name: w.vendor.trim(), paid: 0 };
     cur.paid += w.amount;
