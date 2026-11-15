@@ -460,6 +460,8 @@ export interface FinancialSettingsRow {
   /** When the last professional reserve study was done (YYYY-MM-DD), and how many years one lasts. */
   reserveStudyDate: string | null;
   reserveStudyEveryYears: number;
+  /** The most one Tasker job may cost before the board votes on it (Book a Tasker on an action). */
+  taskerLimit: number;
 }
 
 export async function fetchFinancialSettings(tenantId: string): Promise<FinancialSettingsRow | null> {
@@ -491,6 +493,7 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     runbooksOff: Array.isArray(data.runbooks_off) ? (data.runbooks_off as string[]) : [],
     reserveStudyDate: (data.reserve_study_date as string) || null,
     reserveStudyEveryYears: Number(data.reserve_study_every_years ?? 3) || 3,
+    taskerLimit: data.tasker_limit == null ? 300 : Number(data.tasker_limit),
   };
 }
 
@@ -516,6 +519,7 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.runbooksOff !== undefined) row.runbooks_off = s.runbooksOff;
   if (s.reserveStudyDate !== undefined) row.reserve_study_date = s.reserveStudyDate;
   if (s.reserveStudyEveryYears !== undefined) row.reserve_study_every_years = s.reserveStudyEveryYears;
+  if (s.taskerLimit !== undefined) row.tasker_limit = s.taskerLimit;
   const { error } = await supabase.from('financial_settings').upsert(row, { onConflict: 'tenant_id' });
   if (error) { logDbError('upsertFinancialSettings error:', error); return false; }
   return true;
