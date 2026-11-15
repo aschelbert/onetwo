@@ -111,7 +111,7 @@ describe('Building', () => {
     expect(screen.queryByTestId('legacy-units')).toBeNull();
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     const units = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
-    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Share', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in', '']);
+    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Ownership %', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in', '']);
     expect(document.querySelector('[aria-label="Board"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Management and counsel"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Emergency contacts"]')).toBeTruthy();
@@ -128,11 +128,14 @@ describe('Building', () => {
       renderAt('/building?tab=directory');
       const units = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
       expect(within(units).getByText('3.1%')).toBeTruthy();
-      expect(within(units).getByText(/shares 59.15%/)).toBeTruthy();
-      expect((units.querySelector('[data-shares-incomplete]') as HTMLElement).textContent).toMatch(/The shares add up to 59.15%, not 100%\./);
+      expect(within(units).getByText(/ownership 59.15%/)).toBeTruthy();
+      const total = units.querySelector('[data-ownership-total]') as HTMLElement;
+      expect(total.textContent).toMatch(/^Total59.15%Should add up to 100%/);
+      expect((units.querySelector('[data-shares-incomplete]') as HTMLElement).textContent).toMatch(/Ownership adds up to 59.15%, not 100%\./);
       // Complete shares: no warning.
       act(() => { useFinancialStore.setState({ units: before.slice(0, 4).map((u, n) => ({ ...u, number: String(n + 1), votingPct: 25 })) }); });
       expect(units.querySelector('[data-shares-incomplete]')).toBeNull();
+      expect((units.querySelector('[data-ownership-total]') as HTMLElement).textContent).toMatch(/^Total100%All units add up to 100%/);
     } finally {
       useFinancialStore.setState({ units: before });
     }

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/formatters';
 
 /**
@@ -50,18 +51,70 @@ export interface MenuItem {
 }
 
 /** The round ··· button with a small menu under it. */
+/**
+ * The round ··· menu at the end of a row. The list is drawn on the page body,
+ * fixed beside its button, so a table's scroll box doesn't clip it (the last
+ * row's menu used to be cut off), and it opens upward when there isn't room
+ * below. It closes on a click elsewhere, Escape, or when the page scrolls.
+ */
 export function RowMenu({ label, items, className }: { label: string; items: MenuItem[]; className?: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number; up: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLUListElement>(null);
+  // Place the list under the button, or over it when it would run off the bottom of the window.
+  useLayoutEffect(() => {
+    if (!open || !btn.current) { setPos(null); return; }
+    const r = btn.current.getBoundingClientRect();
+    const h = menu.current?.offsetHeight || items.length * 40 + 16;
+    const up = r.bottom + 4 + h > window.innerHeight && r.top - 4 - h >= 0;
+    setPos({ top: up ? r.top - 4 - h : r.bottom + 4, right: Math.max(8, window.innerWidth - r.right), up });
+  }, [open, items.length]);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const close = (e: MouseEvent) => { const t = e.target as Node; if (!ref.current?.contains(t) && !menu.current?.contains(t)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus(); } };
+    // A fixed list would drift from its row on scroll: close it instead.
+    const shut = (e: Event) => { const t = e.target; if (!(t instanceof Node) || !menu.current?.contains(t)) setOpen(false); };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', shut, true);
+    window.addEventListener('resize', shut);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+      window.removeEventListener('scroll', shut, true);
+      window.removeEventListener('resize', shut);
+    };
   }, [open]);
+  const list = open && (
+    <ul
+      ref={menu}
+      role="menu"
+      aria-label={label}
+      data-placement={pos?.up ? 'up' : 'down'}
+      style={{ position: 'fixed', top: pos?.top ?? 0, right: pos?.right ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+      className="ux2 z-50 min-w-[200px] list-none rounded-[14px] border border-ux2-line bg-white p-1.5 shadow-lg"
+    >
+      {items.map(it => (
+        <li key={it.label} role="none">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); it.onSelect(); }}
+            className={cn('block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-ux2-surface', it.danger ? 'text-ux2-red-ink' : 'text-ux2-ink')}
+          >
+            {it.label}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
   return (
     <div ref={ref} className={cn('relative inline-block', className)}>
       <button
+        ref={btn}
         type="button"
         aria-label={label}
         aria-haspopup="menu"
@@ -71,22 +124,7 @@ export function RowMenu({ label, items, className }: { label: string; items: Men
       >
         ···
       </button>
-      {open && (
-        <ul role="menu" className="absolute right-0 z-20 mt-1 min-w-[200px] list-none rounded-[14px] border border-ux2-line bg-white p-1.5 shadow-lg">
-          {items.map(it => (
-            <li key={it.label} role="none">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => { setOpen(false); it.onSelect(); }}
-                className={cn('block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-ux2-surface', it.danger ? 'text-ux2-red-ink' : 'text-ux2-ink')}
-              >
-                {it.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {list && (typeof document !== 'undefined' ? createPortal(list, document.body) : list)}
     </div>
   );
 }

@@ -238,11 +238,11 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
       )}
 
       <Card id="dir-units" aria-label="Units and owners" className="gap-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.length ? `shares ${shareTotal}% · ` : ''}{units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.length ? `ownership ${shareTotal}% · ` : ''}{units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
         {isBoard && units.length > 0 && !sharesComplete && (
           <div data-shares-incomplete className="rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink">
-            <b className="font-semibold">{noShare === units.length ? 'No unit has a share on file.' : `The shares add up to ${shareTotal}%, not 100%${noShare ? `, and ${noShare} unit${noShare === 1 ? ' has' : 's have'} none` : ''}.`}</b>{' '}
-            Each unit's share (its percentage interest, from the declaration) splits the dues in the Annual budget and weighs owner votes. Change one from its row's ⋯ menu › Edit.
+            <b className="font-semibold">{noShare === units.length ? 'No unit has an ownership % on file.' : `Ownership adds up to ${shareTotal}%, not 100%${noShare ? `, and ${noShare} unit${noShare === 1 ? ' has' : 's have'} none` : ''}.`}</b>{' '}
+            Each unit's ownership % (its percentage interest, from the declaration) splits the dues in the Annual budget and weighs owner votes. Change one from its row's ⋯ menu › Edit (Share, %).
           </div>
         )}
         {isBoard && editingUnit && <UnitForm key={editingUnit} unit={editingUnit === 'new' ? undefined : units.find(u => u.number === editingUnit)} onClose={closeUnitForm} />}
@@ -255,7 +255,7 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
           )
         ) : (
           <Table minWidth={920}>
-            <thead><tr><Th>Unit</Th><Th num>Share</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th>{isBoard && <Th num />}</tr></thead>
+            <thead><tr><Th>Unit</Th><Th num>Ownership %</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th>{isBoard && <Th num />}</tr></thead>
             <tbody>
               {shown.map(u => {
                 const b = boardByEmail.get(u.email.toLowerCase()) ?? boardByName.get(u.owner.toLowerCase());
@@ -298,6 +298,15 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
                 );
               })}
             </tbody>
+            {units.length > 0 && (
+              <tfoot>
+                <tr data-ownership-total className="border-t border-ux2-line-strong">
+                  <Td className="font-semibold">Total</Td>
+                  <Td num className={cn('whitespace-nowrap font-semibold', sharesComplete ? 'text-ux2-ink' : 'text-ux2-amber')}>{shareTotal}%</Td>
+                  <Td colSpan={isBoard ? 7 : 6} className="text-xs text-ux2-muted">{sharesComplete ? 'All units add up to 100%.' : `Should add up to 100%${noShare ? ` · ${noShare} unit${noShare === 1 ? '' : 's'} without one` : ''}${q || shown.length < rows.length ? ' · the total is every unit, not just the ones shown' : ''}.`}</Td>
+                </tr>
+              </tfoot>
+            )}
           </Table>
         )}
         {rows.length > 8 && !q && <Button size="sm" variant="ghost" className="self-start" onClick={() => setShowAll(v => !v)}>{showAll ? 'Show fewer' : `Show ${rows.length - 8} more units`}</Button>}
