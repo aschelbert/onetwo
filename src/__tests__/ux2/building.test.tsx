@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
 
@@ -111,12 +111,31 @@ describe('Building', () => {
     expect(screen.queryByTestId('legacy-units')).toBeNull();
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     const units = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
-    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in', '']);
+    expect(within(units).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Unit', 'Share', 'Owner', 'Email', 'Phone', 'Roles', 'Autopay', 'Move-in', '']);
     expect(document.querySelector('[aria-label="Board"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Management and counsel"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Emergency contacts"]')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Intercom' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Property log' })).toBeNull();
+  });
+
+  it('Directory shows each unit\'s share and warns the board when the shares don\'t add up to 100%', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    const before = useFinancialStore.getState().units;
+    try {
+      const pcts = [29.91, 13.04, 13.1, 3.1];
+      useFinancialStore.setState({ units: before.slice(0, 4).map((u, n) => ({ ...u, number: String(n + 1), votingPct: pcts[n] })) });
+      renderAt('/building?tab=directory');
+      const units = document.querySelector('[aria-label="Units and owners"]') as HTMLElement;
+      expect(within(units).getByText('3.1%')).toBeTruthy();
+      expect(within(units).getByText(/shares 59.15%/)).toBeTruthy();
+      expect((units.querySelector('[data-shares-incomplete]') as HTMLElement).textContent).toMatch(/The shares add up to 59.15%, not 100%\./);
+      // Complete shares: no warning.
+      act(() => { useFinancialStore.setState({ units: before.slice(0, 4).map((u, n) => ({ ...u, number: String(n + 1), votingPct: 25 })) }); });
+      expect(units.querySelector('[data-shares-incomplete]')).toBeNull();
+    } finally {
+      useFinancialStore.setState({ units: before });
+    }
   });
 
   it('Directory lets the board add a unit, add the first one when there are none, and edit one; ?add=unit opens the form', async () => {

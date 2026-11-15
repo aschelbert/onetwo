@@ -36,6 +36,8 @@ const ROUTE = {
   meetings: '/community?tab=meetings',
   notices: '/community?tab=notices',
   units: '/funds?tab=income&section=ledger',
+  /** Where each unit's share (percentage interest) is edited: Building › Directory › Units & owners, a row's ⋯ › Edit. */
+  unitShares: '/building?tab=directory&section=units',
   annual: '/boardroom?tab=runbooks&runbook=annual-meeting',
 };
 
@@ -334,7 +336,7 @@ function DuesStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) => 
         {per.length > 6 && <button type="button" onClick={() => setAll(a => !a)} className="self-start text-xs font-semibold text-ux2-teal hover:underline">{all ? 'Show fewer' : `Show all ${per.length} units`}</button>}
         {split.basis === 'interest'
           ? <Why>{split.reason}, as the declaration usually sets it.</Why>
-          : <div data-dues-split={split.basis} className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink"><span className="min-w-[200px] flex-1">{split.reason}. Most declarations split common expenses by percentage interest: put each unit's in, from the declaration, and these follow.</span><GoTo path={ROUTE.units}>Check the units</GoTo></div>}
+          : <div data-dues-split={split.basis} className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink"><span className="min-w-[200px] flex-1">{split.reason}. Most declarations split common expenses by percentage interest: put each unit's in, from the declaration, and these follow. In Building › Directory, each unit's ⋯ menu › Edit has its share.</span><GoTo path={ROUTE.unitShares}>Check the units</GoTo></div>}
       </Inner>
     </>
   );
