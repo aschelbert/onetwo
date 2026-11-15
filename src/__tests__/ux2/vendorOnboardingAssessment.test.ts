@@ -5,6 +5,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useSpendingStore, type SpendingApproval } from '@/store/useSpendingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useTaskerStore, type TaskerJob } from '@/store/useTaskerStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
 import { runbookStatuses, type BoardRoomSnapshot } from '@/ux2/boardroom/metrics';
 import { runVendorOnboarding, vendorsToOnboard, STEP as O } from '@/ux2/boardroom/vendorOnboarding';
@@ -27,9 +28,18 @@ beforeEach(() => {
   useSpendingStore.setState({ approvals: [] });
   useComplianceStore.setState({ announcements: [], communications: [] });
   useRunbookSwitches.setState({ off: [] });
+  useTaskerStore.setState({ jobs: [] });
 });
 
 describe('vendor onboarding', () => {
+  it('leaves Tasker jobs\' work orders out: TaskRabbit vets and pays its Taskers', () => {
+    useFinancialStore.setState({ workOrders: [wo('WO-001', 'TaskRabbit · Andre R.', 'paid', 130), wo('WO-002', 'New Guy LLC', 'approved')] });
+    useTaskerStore.setState({ jobs: [{ id: 'TJ-1', woId: 'WO-001', status: 'paid' } as TaskerJob] });
+    expect(vendorsToOnboard().map(v => v.name)).toEqual(['New Guy LLC']);
+    runVendorOnboarding('2026-11-15');
+    expect(cases().map(c => c.title)).toEqual(['Vendor onboarding · New Guy LLC']);
+  });
+
   it('finds vendors money has moved to who have no record or no W-9, and opens one case each', () => {
     useFinancialStore.setState({ workOrders: [wo('w1', 'Apex Roofing', 'paid', 4200), wo('w2', 'Apex Roofing', 'invoiced', 800), wo('w3', 'New Guy LLC', 'approved'), wo('w4', 'Draft Only', 'draft'), wo('w5', 'Known Co', 'paid')] });
     useBuildingStore.setState({ vendors: [vendor('v1', 'Apex Roofing', false), vendor('v2', 'Known Co', true)] });
