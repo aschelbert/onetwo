@@ -142,8 +142,6 @@ export interface BylawsConfig {
   ownerVoteThreshold: number;
   boardSpendingLimit: number;
   quorumPct: number;
-  /** The most one Tasker job may cost before the board votes on it (Building help through TaskRabbit). */
-  taskerLimit?: number;
 }
 
 interface BuildingState {

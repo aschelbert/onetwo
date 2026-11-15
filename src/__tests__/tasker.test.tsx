@@ -10,7 +10,7 @@ import { resolveCheck } from '@/features/issues/checkAssist';
 import { CheckAssist } from '@/features/issues/components/workflow/CheckAssist';
 import { guessCategory, needsLicensedTrade } from '@/features/tasker/taskRabbit';
 import {
-  acceptReturnVisit, answerScope, applyUpdate, book, cancel, confirmAndPay, rate, ratingsHere, rebook, reportProblem, spendGate,
+  acceptReturnVisit, answerScope, applyUpdate, book, cancel, changeTaskerLimit, confirmAndPay, rate, ratingsHere, rebook, reportProblem, spendGate,
 } from '@/features/tasker/lifecycle';
 import type { Issue } from '@/types/issues';
 
@@ -39,9 +39,9 @@ const bookAndre = (caseId: string, checkId: string, hours = 1) => book({
 
 beforeEach(() => {
   useIssuesStore.setState({ cases: [], issues: [], nextCaseNum: 1, casesLoaded: true });
-  useFinancialStore.setState({ tenantId: null, workOrders: [], generalLedger: [] });
+  useFinancialStore.setState({ tenantId: null, workOrders: [], generalLedger: [], taskerLimit: 300 });
   useTaskerStore.getState().reset();
-  useBuildingStore.setState(s => ({ bylawsConfig: { ...s.bylawsConfig, boardSpendingLimit: 5000, taskerLimit: undefined } }));
+  useBuildingStore.setState(s => ({ bylawsConfig: { ...s.bylawsConfig, boardSpendingLimit: 5000 } }));
 });
 
 describe('which jobs are Tasker jobs', () => {
@@ -79,8 +79,27 @@ describe('the spending gate', () => {
 
   it('uses the board\'s own Tasker limit when it set one', () => {
     const { caseId } = requestAction();
-    useBuildingStore.setState(s => ({ bylawsConfig: { ...s.bylawsConfig, taskerLimit: 500 } }));
+    expect(useFinancialStore.getState().setTaskerLimit(500)).toBe(true);
     expect(spendGate(450, caseOf(caseId)).ok).toBe(true);
+  });
+
+  it('keeps the limit a whole amount from $0 to the bylaws spending limit', () => {
+    const set = useFinancialStore.getState().setTaskerLimit;
+    expect(set(-1)).toBe(false);
+    expect(set(5001)).toBe(false);
+    expect(set(Number.NaN)).toBe(false);
+    expect(useFinancialStore.getState().taskerLimit).toBe(300);
+    expect(set(149.6)).toBe(true);
+    expect(useFinancialStore.getState().taskerLimit).toBe(150);
+    expect(set(0)).toBe(true); // every Tasker job then needs a vote
+  });
+
+  it('records a change made from an action on that action\'s trail', () => {
+    const { caseId } = requestAction();
+    expect(changeTaskerLimit(450, 'Maya K.', caseId)).toBe(true);
+    expect(changeTaskerLimit(9000, 'Maya K.', caseId)).toBe(false);
+    const trail = (caseOf(caseId).decisionTrail ?? []).filter(e => e.type === 'tasker_update').map(e => e.summary);
+    expect(trail).toEqual(['Changed the limit for Tasker jobs without a board vote from $300 to $450.']);
   });
 
   it('will not book over the limit without the vote', () => {
@@ -208,6 +227,34 @@ describe('inside the action', () => {
     rerender(ui());
     expect(container.querySelector('[data-tasker-status="scheduled"]')).not.toBeNull();
     expect(screen.getByText(/work order WO-/)).toBeTruthy();
+  });
+
+  it('changes the limit from the panel, for every action', () => {
+    useAuthStore.setState(s => ({ currentUser: { ...s.currentUser, role: 'BOARD_MEMBER', name: 'Maya K.' } }));
+    const { caseId, checkId } = requestAction();
+    const c = caseOf(caseId);
+    render(<MemoryRouter><CheckAssist c={c} step={c.steps![0]} stepIndex={0} checkId={checkId} label={CHECK} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: /Book a Tasker/ }));
+    expect(screen.getByText(/Up to \$300 a job without a board vote/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+    const input = screen.getByLabelText(/Without a board vote, up to/);
+    fireEvent.change(input, { target: { value: '9000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert').textContent).toMatch(/\$0 to \$5,000/);
+    fireEvent.change(input, { target: { value: '450' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(useFinancialStore.getState().taskerLimit).toBe(450);
+    expect(screen.getByText(/Up to \$450 a job without a board vote/)).toBeTruthy();
+  });
+
+  it('shows the limit read-only to everyone else', () => {
+    useAuthStore.setState(s => ({ currentUser: { ...s.currentUser, role: 'RESIDENT' } }));
+    const { caseId, checkId } = requestAction();
+    const c = caseOf(caseId);
+    render(<MemoryRouter><CheckAssist c={c} step={c.steps![0]} stepIndex={0} checkId={checkId} label={CHECK} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: /Book a Tasker/ }));
+    expect(screen.getByText(/Up to \$300 a job without a board vote/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Change' })).toBeNull();
   });
 
   it('sends licensed work to a vendor unless the board says otherwise', () => {

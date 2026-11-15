@@ -6,6 +6,8 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { useTaskerStore, jobFor, type TaskerJob, type TaskerJobStatus } from '@/store/useTaskerStore';
 import type { StepAction } from '@/store/useIssuesStore';
 import type { CaseTrackerCase, CaseStep } from '@/types/issues';
@@ -15,8 +17,8 @@ import {
   type TaskCategoryId, type TimeSlotId,
 } from './taskRabbit';
 import {
-  acceptReturnVisit, answerScope, applyUpdate, book, cancel, confirmAndPay, nextDemoUpdate, ratingsHere, rate, rebook,
-  reportProblem, slotLabel, spendGate, taskerLimit, type SpendGate,
+  acceptReturnVisit, answerScope, applyUpdate, book, cancel, changeTaskerLimit, confirmAndPay, nextDemoUpdate, ratingsHere, rate, rebook,
+  reportProblem, slotLabel, spendGate, type SpendGate,
 } from './lifecycle';
 
 const BOOKING_ROLES = ['BOARD_MEMBER', 'PROPERTY_MANAGER', 'PLATFORM_ADMIN'];
@@ -309,6 +311,39 @@ function DemoControls({ j }: { j: TaskerJob }) {
   );
 }
 
+// ── The limit ──────────────────────────────────────────────────────────────
+/** The per-job limit, with Change for the board and the manager. The same setting as Funds › Settings › Billing rules. */
+function LimitControl({ caseId, canBook }: { caseId: string; canBook: boolean }) {
+  const me = useAuthStore(s => s.currentUser.name);
+  const limit = useFinancialStore(s => s.taskerLimit);
+  const ceiling = useBuildingStore(s => s.bylawsConfig.boardSpendingLimit);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(limit));
+  const [error, setError] = useState('');
+  if (!editing) {
+    return (
+      <span className="text-[11px] text-ink-400">
+        Up to {fmt(limit)} a job without a board vote
+        {canBook && <> · <button type="button" className="font-semibold text-accent-700 hover:underline" onClick={() => { setValue(String(limit)); setError(''); setEditing(true); }}>Change</button></>}
+      </span>
+    );
+  }
+  const save = () => {
+    if (changeTaskerLimit(Number(value), me, caseId)) setEditing(false);
+    else setError(`Enter a whole dollar amount from $0 to ${fmt(ceiling)}, the bylaws spending limit.`);
+  };
+  return (
+    <form className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-500" onSubmit={e => { e.preventDefault(); save(); }}>
+      <label htmlFor={`tasker-limit-${caseId}`}>Without a board vote, up to $</label>
+      <input id={`tasker-limit-${caseId}`} inputMode="numeric" autoFocus className={`${INPUT} !w-20 !py-1`} value={value} onChange={e => setValue(e.target.value.replace(/[^0-9]/g, ''))} />
+      <span>a job, for every action</span>
+      <button type="submit" className={PRIMARY}>Save</button>
+      <button type="button" className={GHOST} onClick={() => setEditing(false)}>Cancel</button>
+      {error && <span role="alert" className="basis-full text-accent-700">{error}</span>}
+    </form>
+  );
+}
+
 // ── The panel ──────────────────────────────────────────────────────────────
 export function TaskerPanel({ c, step, stepIndex, checkId, onAction }: {
   c: CaseTrackerCase; step: CaseStep; stepIndex: number; checkId: string;
@@ -325,7 +360,7 @@ export function TaskerPanel({ c, step, stepIndex, checkId, onAction }: {
     <div className="mt-2 space-y-2 rounded-lg border border-ink-100 bg-mist-50 p-3" data-check-panel="tasker" data-tasker-status={j?.status ?? 'new'}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-bold uppercase tracking-widest text-ink-500">{live ? 'Tasker job' : 'Book a Tasker'} <span className="font-semibold normal-case tracking-normal text-ink-400">through TaskRabbit{TASKER_MODE === 'demo' ? ' (demo)' : ''}</span></p>
-        <span className="text-[11px] text-ink-400">Limit {fmt(taskerLimit())} a job without a vote</span>
+        <LimitControl caseId={c.id} canBook={canBook} />
       </div>
       {live
         ? <JobCard j={j} c={c} canBook={canBook} onVote={onVote} onWorkOrder={onWorkOrder} />

@@ -44,7 +44,7 @@ export type TimeSlotId = typeof TIME_SLOTS[number]['id'];
 export const ACCEPT_HOURS = 2;
 /** TaskRabbit bills at least one hour. VERIFY. */
 export const MIN_BILLED_HOURS = 1;
-/** A per-job limit for Tasker work the board can change in the bylaws review; above it the board votes on the action first. */
+/** The per-job limit for Tasker work until the board sets its own (Funds › Settings › Billing rules); above it the board votes on the action first. */
 export const DEFAULT_TASKER_LIMIT = 300;
 
 /**

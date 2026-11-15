@@ -58,7 +58,7 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 /** '06-30' → 'Jun 30'. */
 function fyLabel(mmdd: string): string { const [m, d] = mmdd.split('-').map(Number); return MONTHS_SHORT[m - 1] ? `${MONTHS_SHORT[m - 1]} ${d}` : mmdd; }
 
-/** Billing rules: due day, automatic billing, the late fee and the month close day. */
+/** Billing rules: due day, automatic billing, the late fee, the month close day and the Tasker job limit. */
 export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const setHoaDueDay = useFinancialStore(s => s.setHoaDueDay);
   const setAutoBilling = useFinancialStore(s => s.setAutoBilling);
@@ -71,6 +71,11 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
   const setPaymentOrder = useFinancialStore(s => s.setPaymentOrder);
   const monthCloseStartDay = useFinancialStore(s => s.monthCloseStartDay);
   const setMonthCloseStartDay = useFinancialStore(s => s.setMonthCloseStartDay);
+  const taskerLimit = useFinancialStore(s => s.taskerLimit);
+  const setTaskerLimit = useFinancialStore(s => s.setTaskerLimit);
+  const spendingLimit = useBuildingStore(s => s.bylawsConfig.boardSpendingLimit);
+  const [taskerCap, setTaskerCap] = useState(String(taskerLimit));
+  const [taskerError, setTaskerError] = useState('');
   const fiscalYearEnd = useBuildingStore(s => s.details?.fiscalYearEnd) || '12-31';
   const navigate = useNavigate();
   const [day, setDay] = useState(String(snap.hoaDueDay));
@@ -113,6 +118,13 @@ export function BillingRules({ snap }: { snap: FundsSnapshot }) {
           <p className="m-0 text-xs text-ux2-muted">The Month close runbook opens its action for the month just ended on this day (every morning, and when a board member opens the app), with the packet due two weeks later. Move it to follow an off-cycle fiscal calendar or a bank statement that lands late. Fiscal year ends {fyLabel(fiscalYearEnd)} · <button type="button" onClick={() => navigate('/building')} className="font-semibold text-ux2-teal hover:underline">Building › Details</button>.</p>
           <label className="text-xs text-ux2-muted" htmlFor="rules-close-day">Day of the month (1–28)</label>
           <div className="flex gap-2"><input id="rules-close-day" inputMode="numeric" value={closeDay} onChange={e => setCloseDay(e.target.value)} className={`${INPUT} !w-20`} /><Button size="sm" variant="ghost" onClick={() => { const n = Number(closeDay); if (n >= 1 && n <= 28) setMonthCloseStartDay(n); }}>Save</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=month-close')}>Runbook</Button></div>
+        </Inner>
+        <Inner className="flex flex-col gap-2" aria-label="Tasker job limit">
+          <div className="text-sm font-semibold text-ux2-ink">Tasker jobs · up to {fmt(taskerLimit)} without a vote</div>
+          <p className="m-0 text-xs text-ux2-muted">A board member or the manager can book a TaskRabbit Tasker from an action for up to this much a job. Above it, the board votes on the action first. It can't be more than the {fmt(spendingLimit)} bylaws spending limit.</p>
+          <label className="text-xs text-ux2-muted" htmlFor="rules-tasker-limit">Dollars per job</label>
+          <div className="flex gap-2"><input id="rules-tasker-limit" inputMode="numeric" value={taskerCap} onChange={e => { setTaskerCap(e.target.value.replace(/[^0-9]/g, '')); setTaskerError(''); }} className={`${INPUT} !w-24`} /><Button size="sm" variant="ghost" onClick={() => setTaskerError(setTaskerLimit(Number(taskerCap)) ? '' : `Enter a whole dollar amount from $0 to ${fmt(spendingLimit)}.`)}>Save</Button></div>
+          {taskerError && <p role="alert" className="m-0 text-xs text-ux2-red-ink">{taskerError}</p>}
         </Inner>
       </div>
       <Inner className="flex flex-wrap items-center justify-between gap-3">

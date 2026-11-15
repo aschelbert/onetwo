@@ -192,6 +192,23 @@ describe('Funds', () => {
     expect(sw.getAttribute('aria-checked')).toBe('true');
   });
 
+  it('Billing rules sets the Tasker job limit, up to the bylaws spending limit', () => {
+    useFinancialStore.setState({ taskerLimit: 300 });
+    useBuildingStore.setState(s => ({ bylawsConfig: { ...s.bylawsConfig, boardSpendingLimit: 5000 } }));
+    renderAt('/funds?tab=settings&section=rules');
+    const card = document.querySelector('[aria-label="Tasker job limit"]') as HTMLElement;
+    expect(card.textContent).toContain('up to $300 without a vote');
+    fireEvent.change(within(card).getByLabelText('Dollars per job'), { target: { value: '6000' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(useFinancialStore.getState().taskerLimit).toBe(300);
+    expect(within(card).getByRole('alert').textContent).toContain('$0 to $5,000');
+    fireEvent.change(within(card).getByLabelText('Dollars per job'), { target: { value: '500' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(useFinancialStore.getState().taskerLimit).toBe(500);
+    expect(card.textContent).toContain('up to $500 without a vote');
+    expect(within(card).queryByRole('alert')).toBeNull();
+  });
+
   it('Billing rules shows the day the month close starts and saves a new one', () => {
     useFinancialStore.setState({ monthCloseStartDay: 1 });
     renderAt('/funds?tab=settings&section=rules');

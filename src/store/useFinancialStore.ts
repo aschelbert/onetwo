@@ -172,6 +172,10 @@ interface FinancialState {
   /** Day of the month (1–28) the month close runbook opens its case for the month just ended. */
   monthCloseStartDay: number;
   setMonthCloseStartDay: (day: number) => void;
+  /** The most one Tasker job may cost before the board votes on it. Shared by the building (financial_settings). */
+  taskerLimit: number;
+  /** Set it; refused (false) unless it is a whole-dollar amount from $0 up to the bylaws spending limit. */
+  setTaskerLimit: (amount: number) => boolean;
   /** The Month close runbook's switch, shared with the database job that runs it every morning. */
   monthCloseEnabled: boolean;
   setMonthCloseEnabled: (on: boolean) => void;
@@ -316,6 +320,7 @@ function syncSettings() {
     paymentOrder: s.paymentOrder,
     monthCloseStartDay: s.monthCloseStartDay,
     monthCloseEnabled: s.monthCloseEnabled,
+    taskerLimit: s.taskerLimit,
     runbooksOff: s.runbooksOff,
     reserveStudyDate: s.reserveStudyDate,
     reserveStudyEveryYears: s.reserveStudyEveryYears,
@@ -415,6 +420,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.runbooksOff = data.settings.runbooksOff ?? [];
       updates.reserveStudyDate = data.settings.reserveStudyDate ?? null;
       updates.reserveStudyEveryYears = data.settings.reserveStudyEveryYears || 3;
+      updates.taskerLimit = Number.isFinite(data.settings.taskerLimit) ? data.settings.taskerLimit : 300;
       // The saved mapping wins over this browser's copy; keys added since it was saved take their defaults.
       if (data.settings.glAccountMapping) updates.glAccountMapping = { ...DEFAULT_GL_MAPPING, ...(data.settings.glAccountMapping as Partial<GLAccountMapping>) };
     }
@@ -1233,6 +1239,15 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ paymentOrder: order });
     syncSettings();
   },
+  taskerLimit: 300,
+  setTaskerLimit: (amount) => {
+    const n = Math.round(Number(amount));
+    const ceiling = useBuildingStore.getState().bylawsConfig.boardSpendingLimit;
+    if (!Number.isFinite(n) || n < 0 || n > ceiling) return false;
+    set({ taskerLimit: n });
+    syncSettings();
+    return true;
+  },
   monthCloseStartDay: 1,
   setMonthCloseStartDay: (day) => {
     const n = Math.round(Number(day));
@@ -1559,6 +1574,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     paymentOrder: state.paymentOrder,
     monthCloseStartDay: state.monthCloseStartDay,
     monthCloseEnabled: state.monthCloseEnabled,
+    taskerLimit: state.taskerLimit,
     runbooksOff: state.runbooksOff,
     reserveStudyDate: state.reserveStudyDate,
     reserveStudyEveryYears: state.reserveStudyEveryYears,

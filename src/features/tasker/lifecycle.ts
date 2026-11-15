@@ -27,7 +27,8 @@ import { DEFAULT_TASKER_LIMIT, MIN_BILLED_HOURS, TIME_SLOTS, estimateFor, tasker
 /** Repairs and maintenance: where Tasker work is charged. */
 export const TASKER_ACCOUNT = '5010';
 
-export const taskerLimit = () => useBuildingStore.getState().bylawsConfig.taskerLimit ?? DEFAULT_TASKER_LIMIT;
+/** The building's per-job limit (Funds › Settings › Billing rules, or Change on the Tasker panel). */
+export const taskerLimit = () => useFinancialStore.getState().taskerLimit ?? DEFAULT_TASKER_LIMIT;
 export const ownerVoteLimit = () => useBuildingStore.getState().bylawsConfig.boardSpendingLimit;
 
 /** The board approved spending on this action: its recorded vote has more approvals than denials. */
@@ -74,6 +75,18 @@ export interface BookInput {
   category: TaskCategoryId; title: string; details: string;
   date: string; slot: TimeSlotId; access: string;
   taskerId: string; estimateHours: number; notifyOwner: boolean; bookedBy: string;
+}
+
+/**
+ * Change the per-job limit. Refused over the bylaws spending limit (that is owner-vote territory) or below $0.
+ * Changed from an action, the change goes on that action's decision trail too.
+ */
+export function changeTaskerLimit(amount: number, by: string, caseId?: string): boolean {
+  const before = taskerLimit();
+  if (!useFinancialStore.getState().setTaskerLimit(amount)) return false;
+  const after = taskerLimit();
+  if (caseId && after !== before) trail(caseId, by, `Changed the limit for Tasker jobs without a board vote from ${fmt(before)} to ${fmt(after)}.`);
+  return true;
 }
 
 /** Ask a Tasker. Refuses (returns null) when the amount is not allowed yet. */

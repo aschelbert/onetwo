@@ -88,6 +88,7 @@ export function resetStoresForRealTenant() {
     autoReserveTransfer: true,
     paymentOrder: 'dues-first',
     glAccountMapping: { ...DEFAULT_GL_MAPPING },
+    taskerLimit: 300,
   });
 
   useMeetingsStore.setState({ meetings: [] });
