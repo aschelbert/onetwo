@@ -10,10 +10,10 @@ vi.mock('@/components/TenantProvider', () => ({
 }));
 
 import HomePage, { unitBalanceState } from '@/ux2/home/HomePage';
-import { todayIso } from '@/ux2/runbook/adapters';
 import CaseDock from '@/ux2/shell/CaseDock';
 import { dockFor, caseIdFromLocation, casePath, spotFromSearch, useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useLocation } from 'react-router-dom';
+import { todayIso } from '@/ux2/runbook/adapters';
 
 function renderHome(path = '/home') {
   return render(
@@ -68,8 +68,10 @@ describe('Home', () => {
     expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull();
     expect(document.querySelectorAll('[data-widget="calendar"] [data-month]').length).toBe(6);
     expect(document.querySelector('[data-widget="calendar"] [data-month] [data-day]')).toBeTruthy();
-    // Today is always listed in the first month, whether or not something is scheduled on it.
-    expect(document.querySelector(`[data-widget="calendar"] [data-day="${todayIso()}"]`)).toBeTruthy();
+    // Today is always listed: empty ("Nothing scheduled today") or with what falls on it, whichever the demo dates give.
+    const todayRow = document.querySelector(`[data-widget="calendar"] [data-day="${todayIso()}"]`) as HTMLElement;
+    expect(todayRow).toBeTruthy();
+    expect(todayRow.querySelector('b.rounded-full')).toBeTruthy();
     expect(screen.queryByText('Reserves funded')).toBeNull();
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Later months' }));
