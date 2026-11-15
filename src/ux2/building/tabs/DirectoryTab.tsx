@@ -184,6 +184,10 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const removeUnit = useFinancialStore(s => s.removeUnit);
   useEffect(() => { if (editingUnit === 'new' && params.get('add') === 'unit') document.getElementById('dir-units')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const closeUnitForm = () => { setEditingUnit(null); if (params.get('add')) setParams(prev => { const p = new URLSearchParams(prev); p.delete('add'); return p; }, { replace: true }); };
+  // Each unit's share (percentage interest): the declaration sets it, it splits the dues in the Annual budget and weighs owner votes.
+  const shareTotal = Math.round(units.reduce((t, u) => t + (Number(u.votingPct) || 0), 0) * 100) / 100;
+  const noShare = units.filter(u => !((Number(u.votingPct) || 0) > 0)).length;
+  const sharesComplete = units.length > 0 && noShare === 0 && (Math.abs(shareTotal - 100) <= 0.5 || Math.abs(shareTotal - 1) <= 0.005);
   const current: Section = section === 'people' ? 'board' : (['units', 'board', 'management', 'staff', 'emergency'] as string[]).includes(section ?? '') ? (section as Section) : 'units';
   const pending = invites.filter(i => i.status === 'pending');
   const noEmail = units.filter(u => !u.email);
@@ -234,7 +238,13 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
       )}
 
       <Card id="dir-units" aria-label="Units and owners" className="gap-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.length ? `shares ${shareTotal}% · ` : ''}{units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
+        {isBoard && units.length > 0 && !sharesComplete && (
+          <div data-shares-incomplete className="rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink">
+            <b className="font-semibold">{noShare === units.length ? 'No unit has a share on file.' : `The shares add up to ${shareTotal}%, not 100%${noShare ? `, and ${noShare} unit${noShare === 1 ? ' has' : 's have'} none` : ''}.`}</b>{' '}
+            Each unit's share (its percentage interest, from the declaration) splits the dues in the Annual budget and weighs owner votes. Change one from its row's ⋯ menu › Edit.
+          </div>
+        )}
         {isBoard && editingUnit && <UnitForm key={editingUnit} unit={editingUnit === 'new' ? undefined : units.find(u => u.number === editingUnit)} onClose={closeUnitForm} />}
         {rows.length === 0 ? (
           units.length ? <Inner className="text-sm text-ux2-muted">No unit matches.</Inner> : (
@@ -244,8 +254,8 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
             </Inner>
           )
         ) : (
-          <Table minWidth={860}>
-            <thead><tr><Th>Unit</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th>{isBoard && <Th num />}</tr></thead>
+          <Table minWidth={920}>
+            <thead><tr><Th>Unit</Th><Th num>Share</Th><Th>Owner</Th><Th>Email</Th><Th>Phone</Th><Th>Roles</Th><Th>Autopay</Th><Th>Move-in</Th>{isBoard && <Th num />}</tr></thead>
             <tbody>
               {shown.map(u => {
                 const b = boardByEmail.get(u.email.toLowerCase()) ?? boardByName.get(u.owner.toLowerCase());
@@ -257,6 +267,7 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
                 return (
                   <tr key={u.number}>
                     <Td className="font-semibold">{u.number}</Td>
+                    <Td num className={cn('whitespace-nowrap', !((Number(u.votingPct) || 0) > 0) && 'text-ux2-muted')}>{(Number(u.votingPct) || 0) > 0 ? `${u.votingPct}%` : '—'}</Td>
                     <Td className="font-semibold">{u.owner || (inv ? 'Vacant · new owner invited' : 'Vacant')}</Td>
                     <Td className="text-ux2-muted">{u.email || (inv ? 'invite pending' : '—')}</Td>
                     <Td className="text-ux2-muted">{u.phone || '—'}</Td>
