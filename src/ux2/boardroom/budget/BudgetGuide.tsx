@@ -24,7 +24,7 @@ import { dayLabel } from '../../home/calendar';
 import { todayIso } from '../../runbook/adapters';
 import { defaultVote, itemsOf, type AgendaItem } from '../../community/meetingRecord';
 import { budgetFyOf, ensureBudgetDraft, switchToBudget, syncBudgetCase, BUDGET_NOTICE_DAYS } from '../annualBudget';
-import { CONTINGENCY_OPTIONS, budgetDocument, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, usd, type BudgetDraft, type BudgetStepKey, type DraftLine } from '../budgetDraft';
+import { CONTINGENCY_OPTIONS, budgetDocument, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, isNewLine, starterLines, usd, STARTER_LINES, type BudgetDraft, type BudgetStepKey, type DraftLine } from '../budgetDraft';
 import { addDays } from '@/lib/billingCycle';
 
 const ROUTE = {
@@ -84,7 +84,7 @@ function StartStep({ d }: { d: BudgetDraft }) {
               {rows.map(l => (
                 <tr key={l.id} className="border-t border-ux2-line"><td className="py-1.5">{l.name}</td><td className="py-1.5 text-right">{usd(l.budgeted)}</td><td className="py-1.5 text-right">{usd(l.actual)}</td><td className={cn('py-1.5 text-right', l.projected > l.budgeted && 'font-semibold text-ux2-red')}>{usd(l.projected)}</td></tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={4} className="py-2 text-ux2-muted">No budget lines yet. The next steps add them.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={4} className="py-2 text-ux2-muted">No budget lines yet. Step 3 starts them, from the lines most buildings have.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -158,39 +158,72 @@ function CostsStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) =>
 function LinesStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) => BudgetDraft) => void }) {
   const [name, setName] = useState('');
   const setLine = (id: string, patch: Partial<DraftLine>) => edit(x => ({ ...x, lines: x.lines.map(l => l.id === id ? { ...l, ...patch } : l) }));
+  const removeLine = (id: string) => edit(x => ({ ...x, lines: x.lines.filter(l => l.id !== id), costs: x.costs.map(c => c.lineId === id ? { ...c, lineId: null, confirmed: false } : c) }));
+  const addStarters = () => edit(x => ({ ...x, lines: [...x.lines, ...starterLines(x.lines, Date.now().toString(36))] }));
   const t = draftTotals(d);
   const left = d.lines.filter(l => !l.reviewed);
+  // A suggestion worth accepting has a number behind it; a line with nothing to go on needs an amount typed.
+  const acceptable = left.filter(l => l.suggested > 0);
+  const toType = left.filter(l => l.suggested <= 0);
+  const missingStarters = STARTER_LINES.filter(x => !d.lines.some(l => l.name.trim().toLowerCase() === x.name.toLowerCase())).length;
   return (
     <>
-      <Explain title="How to set a line">
-        Each line shows this year's budget, what has been spent, where the year is heading, and a suggestion for next year with the reason.
-        If the suggestion looks right, accept it. If you know something the numbers don't (a contract ending, a repair already done), type your own amount.
-      </Explain>
-      <div className="overflow-x-auto rounded-[14px] border border-ux2-line bg-white">
-        <table className="w-full min-w-[600px] text-sm">
-          <thead><tr className="text-left text-xs text-ux2-muted"><th className="px-3 py-2 font-semibold">Line</th><th className="px-3 py-2 text-right font-semibold">This year</th><th className="px-3 py-2 text-right font-semibold">Heading to</th><th className="px-3 py-2 font-semibold">Suggested</th><th className="px-3 py-2 text-right font-semibold">Next year</th><th className="px-3 py-2" /></tr></thead>
-          <tbody>
-            {d.lines.map(l => (
-              <tr key={l.id} data-line={l.id} className="border-t border-ux2-line">
-                <td className="px-3 py-2 font-semibold text-ux2-ink">{l.name}</td>
-                <td className="px-3 py-2 text-right">{usd(l.budgeted)}</td>
-                <td className={cn('px-3 py-2 text-right', l.projected > l.budgeted && 'font-semibold text-ux2-red')}>{usd(l.projected)}</td>
-                <td className="px-3 py-2"><b className="font-semibold">{usd(l.suggested)}</b><span className="block max-w-[220px] text-xs text-ux2-muted">{l.why}</span></td>
-                <td className="px-3 py-2 text-right"><MoneyInput label={`${l.name} next year`} value={l.amount} onChange={n => setLine(l.id, { amount: n, reviewed: true })} /></td>
-                <td className="px-3 py-2 text-right">{l.reviewed ? <Chip tone="sage">Set</Chip> : <Button size="sm" onClick={() => setLine(l.id, { amount: l.suggested, reviewed: true })}>Accept</Button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {d.lines.length === 0 ? (
+        <Explain title="Start the lines">
+          This building has no budget lines yet, so there is no year to suggest from. A budget line is one kind of cost, like insurance or utilities.
+          Add the lines most condo buildings have, then type what each will cost next year and remove the ones this building doesn't have. Add your own below.
+        </Explain>
+      ) : (
+        <Explain title="How to set a line">
+          Each line shows this year's budget, what has been spent, where the year is heading, and a suggestion for next year with the reason.
+          If the suggestion looks right, accept it. If you know something the numbers don't (a contract ending, a repair already done), type your own amount.
+          A new line has no year behind it: type what it will cost, from a contract, a quote or last year's bills.
+        </Explain>
+      )}
+      {d.lines.length === 0 ? (
+        <Inner className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-[220px] flex-1 text-sm text-ux2-ink">The usual lines: {STARTER_LINES.map(x => x.name).join(', ')}.</div>
+          <Button size="sm" onClick={addStarters}>Add the usual lines</Button>
+        </Inner>
+      ) : (
+        <div className="overflow-x-auto rounded-[14px] border border-ux2-line bg-white">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead><tr className="text-left text-xs text-ux2-muted"><th className="px-3 py-2 font-semibold">Line</th><th className="px-3 py-2 text-right font-semibold">This year</th><th className="px-3 py-2 text-right font-semibold">Heading to</th><th className="px-3 py-2 font-semibold">Suggested</th><th className="px-3 py-2 text-right font-semibold">Next year</th><th className="px-3 py-2" /></tr></thead>
+            <tbody>
+              {d.lines.map(l => {
+                const fresh = isNewLine(l);
+                return (
+                  <tr key={l.id} data-line={l.id} className="border-t border-ux2-line">
+                    <td className="px-3 py-2 font-semibold text-ux2-ink">{l.name}{fresh && <span className="ml-1.5 align-middle"><Chip tone="ghost">New</Chip></span>}</td>
+                    <td className="px-3 py-2 text-right">{fresh ? <span className="text-ux2-muted">—</span> : usd(l.budgeted)}</td>
+                    <td className={cn('px-3 py-2 text-right', l.projected > l.budgeted && 'font-semibold text-ux2-red')}>{fresh ? <span className="text-ux2-muted">—</span> : usd(l.projected)}</td>
+                    <td className="px-3 py-2">{l.suggested > 0 && <b className="font-semibold">{usd(l.suggested)}</b>}<span className="block max-w-[220px] text-xs text-ux2-muted">{l.why}</span></td>
+                    <td className="px-3 py-2 text-right"><MoneyInput label={`${l.name} next year`} value={l.amount} onChange={n => setLine(l.id, { amount: n, reviewed: true })} /></td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {l.reviewed ? <Chip tone="sage">Set</Chip> : l.suggested > 0 ? <Button size="sm" onClick={() => setLine(l.id, { amount: l.suggested, reviewed: true })}>Accept</Button> : <span className="whitespace-nowrap text-xs text-ux2-muted">Type an amount</span>}
+                        {fresh && <Button size="sm" variant="ghost" aria-label={`Remove ${l.name}`} onClick={() => removeLine(l.id)}>Remove</Button>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <form aria-label="Add a line" onSubmit={e => { e.preventDefault(); if (!name.trim()) return; edit(x => ({ ...x, lines: [...x.lines, { id: `line-${Date.now().toString(36)}`, name: name.trim(), budgeted: 0, actual: 0, projected: 0, suggested: 0, why: 'A new line', amount: 0, reviewed: false }] })); setName(''); }} className="flex flex-wrap items-end gap-2">
-        <Field label="A line this year didn't have" className="min-w-[220px] flex-1"><input value={name} onChange={e => setName(e.target.value)} placeholder="Window cleaning" className={INPUT} /></Field>
+        <Field label={d.lines.length === 0 ? 'Or add a line of your own' : "A line this year didn't have"} className="min-w-[220px] flex-1"><input value={name} onChange={e => setName(e.target.value)} placeholder="Window cleaning" className={INPUT} /></Field>
         <Button type="submit" size="sm" variant="ghost" disabled={!name.trim()}>Add the line</Button>
+        {d.lines.length > 0 && missingStarters > 0 && d.lines.every(isNewLine) && <Button type="button" size="sm" variant="ghost" onClick={addStarters}>Add the usual lines</Button>}
       </form>
-      <div className="flex flex-wrap items-center gap-2">
-        {left.length > 0 && <Button size="sm" onClick={() => edit(x => ({ ...x, lines: x.lines.map(l => l.reviewed ? l : { ...l, amount: l.suggested, reviewed: true }) }))}>Accept the {left.length} suggestion{left.length === 1 ? '' : 's'} left</Button>}
-        <span className="text-sm text-ux2-muted">Running the building next year: <b className="font-semibold text-ux2-ink">{usd(t.operating)}</b>{left.length ? ` · ${left.length} to look at` : ''}</span>
-      </div>
+      {d.lines.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {acceptable.length > 0 && <Button size="sm" onClick={() => edit(x => ({ ...x, lines: x.lines.map(l => l.reviewed || l.suggested <= 0 ? l : { ...l, amount: l.suggested, reviewed: true }) }))}>Accept the {acceptable.length} suggestion{acceptable.length === 1 ? '' : 's'} left</Button>}
+          <span className="text-sm text-ux2-muted">Running the building next year: <b className="font-semibold text-ux2-ink">{usd(t.operating)}</b>{left.length ? ` · ${left.length} to look at` : ''}{toType.length ? ` · ${toType.length} need${toType.length === 1 ? 's' : ''} an amount` : ''}</span>
+        </div>
+      )}
+      <Why>The step ticks itself when every line has an amount set. A line set to $0 counts as looked at; remove a new line the building doesn't need.</Why>
     </>
   );
 }

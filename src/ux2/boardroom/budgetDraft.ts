@@ -84,6 +84,33 @@ export interface SeedInput {
   capPct?: number | null;
 }
 
+/**
+ * The lines most condo budgets have, for a building with no budget lines yet:
+ * a place to start, each with what it pays for. The board types next year's
+ * amount on each and removes what the building doesn't have.
+ */
+export const STARTER_LINES: { name: string; covers: string }[] = [
+  { name: 'Insurance', covers: 'The master policy, D&O and any other policies the association holds' },
+  { name: 'Utilities', covers: 'Water, sewer, common-area electricity and gas' },
+  { name: 'Maintenance & Repairs', covers: 'Routine upkeep and small repairs not paid from reserves' },
+  { name: 'Landscaping', covers: 'Grounds, snow removal and seasonal work' },
+  { name: 'Cleaning & Janitorial', covers: 'Common-area cleaning and trash removal' },
+  { name: 'Management Fees', covers: 'The property manager, if the building has one' },
+  { name: 'Legal & Professional', covers: 'The lawyer, the accountant, the annual tax return or audit' },
+  { name: 'Administrative', covers: 'Bank fees, postage, software, filing fees' },
+];
+
+/** Starter lines not already on the draft (by name), ready to add. */
+export function starterLines(existing: { name: string }[], stamp: string): DraftLine[] {
+  const have = new Set(existing.map(l => l.name.trim().toLowerCase()));
+  return STARTER_LINES.filter(x => !have.has(x.name.toLowerCase())).map((x, n) => ({
+    id: `line-${stamp}-${n}`, name: x.name, budgeted: 0, actual: 0, projected: 0, suggested: 0, why: x.covers, amount: 0, reviewed: false,
+  }));
+}
+
+/** A line the draft added (not one of this year's budget lines): it has no year behind it to suggest from. */
+export const isNewLine = (l: DraftLine) => !l.categoryId && l.budgeted === 0 && l.actual === 0;
+
 export const INFLATION = 0.03;
 export const CONTINGENCY_OPTIONS = [3, 5, 10];
 const round10 = (n: number) => Math.round(n / 10) * 10;
