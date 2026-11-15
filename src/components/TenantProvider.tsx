@@ -24,6 +24,7 @@ import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
+import { useTaskerStore } from '@/store/useTaskerStore';
 import { resetStoresForRealTenant } from '@/store/resetStores';
 
 export interface OnboardingState {
@@ -100,6 +101,8 @@ function loadTenantStores(tenantId: string) {
     useFeeScheduleStore.getState().loadFromDb(tenantId),
     // Next year's budget drafts: the board's and the manager's only, so a resident's load returns none.
     useBudgetDraftStore.getState().load(tenantId),
+    // Tasker jobs booked from actions: the board's and the manager's only.
+    useTaskerStore.getState().load(tenantId),
     // Whether the building's own LetterStream account is connected (the keys stay server-side).
     useMailStore.getState().loadMailingSettings(tenantId).catch(() => { /* mail stays "not connected" until the function answers */ }),
   ]);

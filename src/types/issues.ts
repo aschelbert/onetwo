@@ -116,7 +116,8 @@ export type TrailEntryType =
   | 'conflict_check' | 'communication_sent' | 'document_attached'
   | 'case_held' | 'case_resumed' | 'case_closed' | 'work_order_linked'
   | 'note_added' | 'approach_added'
-  | 'notice_sent' | 'notice_delivered';
+  | 'notice_sent' | 'notice_delivered'
+  | 'tasker_update';
 
 export interface DecisionTrailEntry {
   id: string;

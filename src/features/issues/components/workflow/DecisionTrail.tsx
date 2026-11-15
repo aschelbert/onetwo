@@ -21,6 +21,7 @@ const iconMap: Record<TrailEntryType, string> = {
   approach_added: '\u2795',
   notice_sent: '\u{1F4EE}',
   notice_delivered: '\u{1F4EC}',
+  tasker_update: '\u{1F9F0}',
 };
 
 interface DecisionTrailProps {
