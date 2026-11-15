@@ -9,7 +9,7 @@ import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
 import { budgetForMeeting, budgetStepIndex, runAnnualBudget, switchToBudget, syncBudgetCase } from '@/ux2/boardroom/annualBudget';
-import { annualFromText, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, projectYear, seedDraft, STARTER_LINES, type BudgetDraft } from '@/ux2/boardroom/budgetDraft';
+import { annualFromText, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, duesSplit, needsOwnerVote, noticeText, projectYear, seedDraft, STARTER_LINES, type BudgetDraft } from '@/ux2/boardroom/budgetDraft';
 import { BudgetGuide } from '@/ux2/boardroom/budget/BudgetGuide';
 import { syncAnnualCase, ANNUAL_MEETING_SIT } from '@/ux2/boardroom/meetings';
 import { itemsOf } from '@/ux2/community/meetingRecord';
@@ -82,6 +82,28 @@ describe('the budget draft', () => {
     expect(capFromClauses([{ heading: 'Assessments', text: 'The board may not increase the annual assessment by more than 15% without a vote of the owners.', ref: 'Art. V §3' }])).toEqual({ pct: 15, ref: 'Art. V §3' });
     expect(capFromClauses([{ heading: 'Pets', text: 'Up to 2 pets, 50% of units', ref: 'R1' }])).toBeNull();
     expect(noticeText({ ...d, contingencyPct: 5, reserve: { choice: 'keep', annual: 2000 }, dues: { option: 'needed', monthlyTotal: 0 } }, units).body).toMatch(/Dues go up 4\.2%/);
+  });
+
+  it('splits the dues by percentage interest only when it is complete, and by today\'s dues when it is not', () => {
+    // As on the staging building: the percentages add to 59.15%, and unit 4's 3.1% would take its $900 down to $185.
+    const off = [
+      { number: '1', monthlyFee: 800, votingPct: 29.91 },
+      { number: '2', monthlyFee: 300, votingPct: 13.04 },
+      { number: '3', monthlyFee: 350, votingPct: 13.1 },
+      { number: '4', monthlyFee: 900, votingPct: 3.1 },
+    ];
+    expect(duesSplit(off)).toMatchObject({ basis: 'today', pctSum: 59.15 });
+    expect(duesSplit(off).reason).toMatch(/add up to 59.15%, not 100%/);
+    const next = duesByUnit(off, 3533);
+    expect(next.map(u => u.next)).toEqual([1202.72, 451.02, 526.19, 1353.06]);
+    // Each unit goes up by the same 50.3%.
+    for (const u of next) expect(u.next / u.now).toBeCloseTo(3533 / 2350, 3);
+    // Complete percentages are used as they are, in percent or as fractions.
+    expect(duesSplit(units).basis).toBe('interest');
+    expect(duesByUnit(units.map(u => ({ ...u, votingPct: u.votingPct / 100 })), 1000).map(u => u.next)).toEqual([400, 300, 300]);
+    // A unit without one, or none at all.
+    expect(duesSplit([{ number: '1', monthlyFee: 500, votingPct: 60 }, { number: '2', monthlyFee: 500, votingPct: 0 }]).reason).toMatch(/Some units have no percentage interest/);
+    expect(duesByUnit([{ number: '1', monthlyFee: 0, votingPct: 0 }, { number: '2', monthlyFee: 0, votingPct: 0 }], 1000).map(u => u.next)).toEqual([500, 500]);
   });
 
   it('knows each step by its title, the new ones and the ones written before', () => {
@@ -217,6 +239,18 @@ describe('the guide on each step', () => {
     expect(useBudgetDraftStore.getState().drafts[FY.start].dues.option).toBe('needed');
     expect(within(guide).getByText(/owners have to approve it/)).toBeTruthy();
     expect(within(guide).getByText('Unit 101')).toBeTruthy();
+    expect(guide.querySelector('[data-dues-split]')).toBeNull();
+    expect(within(guide).getByText(/By each unit's percentage interest/)).toBeTruthy();
+  });
+
+  it('dues: says when the percentage interests are incomplete, and keeps each unit\'s share of today\'s dues', () => {
+    useFinancialStore.setState(s => ({ units: s.units.map((u, n) => ({ ...u, votingPct: [40, 30, 3][n] })) }));
+    useBudgetDraftStore.setState({ drafts: {} });
+    const { guide } = at('dues');
+    fireEvent.click(within(guide).getAllByRole('radio')[0]);
+    const note = guide.querySelector('[data-dues-split="today"]') as HTMLElement;
+    expect(note.textContent).toMatch(/add up to 73%, not 100%, so each unit keeps its share of today's dues/);
+    expect(within(note).getByRole('button', { name: /Check the units/ })).toBeTruthy();
   });
 
   it('the meeting: puts the budget on a board meeting with the vote set up and the draft attached', () => {

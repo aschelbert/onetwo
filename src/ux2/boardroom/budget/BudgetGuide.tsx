@@ -24,7 +24,7 @@ import { dayLabel } from '../../home/calendar';
 import { todayIso } from '../../runbook/adapters';
 import { defaultVote, itemsOf, type AgendaItem } from '../../community/meetingRecord';
 import { budgetFyOf, ensureBudgetDraft, switchToBudget, syncBudgetCase, BUDGET_NOTICE_DAYS } from '../annualBudget';
-import { CONTINGENCY_OPTIONS, budgetDocument, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, isNewLine, starterLines, usd, STARTER_LINES, type BudgetDraft, type BudgetStepKey, type DraftLine } from '../budgetDraft';
+import { CONTINGENCY_OPTIONS, budgetDocument, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, duesSplit, needsOwnerVote, noticeText, isNewLine, starterLines, usd, STARTER_LINES, type BudgetDraft, type BudgetStepKey, type DraftLine } from '../budgetDraft';
 import { addDays } from '@/lib/billingCycle';
 
 const ROUTE = {
@@ -281,6 +281,7 @@ function DuesStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) => 
   const keepShort = Math.max(0, t.needed - d.base.monthlyDues * 12);
   const choose = (option: 'needed' | 'keep' | 'custom', monthlyTotal: number) => edit(x => ({ ...x, dues: { option, monthlyTotal } }));
   const per = duesByUnit(units, t.monthly);
+  const split = duesSplit(units);
   const shown = all ? per : per.slice(0, 6);
   const neededChange = d.base.monthlyDues > 0 ? (t.neededMonthly - d.base.monthlyDues) / d.base.monthlyDues : 0;
   return (
@@ -331,6 +332,9 @@ function DuesStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) => 
         <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">What each unit pays, a month</div>
         {shown.map(u => <KV key={u.unit} label={`Unit ${u.unit}`}>{usd(u.now)} → <b className="font-semibold">{usd(u.next)}</b></KV>)}
         {per.length > 6 && <button type="button" onClick={() => setAll(a => !a)} className="self-start text-xs font-semibold text-ux2-teal hover:underline">{all ? 'Show fewer' : `Show all ${per.length} units`}</button>}
+        {split.basis === 'interest'
+          ? <Why>{split.reason}, as the declaration usually sets it.</Why>
+          : <div data-dues-split={split.basis} className="mt-1 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink"><span className="min-w-[200px] flex-1">{split.reason}. Most declarations split common expenses by percentage interest: put each unit's in, from the declaration, and these follow.</span><GoTo path={ROUTE.units}>Check the units</GoTo></div>}
       </Inner>
     </>
   );

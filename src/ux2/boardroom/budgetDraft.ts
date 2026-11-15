@@ -211,12 +211,33 @@ export function draftTotals(d: BudgetDraft) {
   return { operating, contingency, reserve, needed, neededMonthly, monthly, change, shortfall };
 }
 
-/** Each unit's new monthly dues: its share of the total, by percentage interest (or today's split when shares are missing). */
-export function duesByUnit(units: { number: string; monthlyFee: number; votingPct: number }[], monthlyTotal: number): { unit: string; now: number; next: number }[] {
-  const pctSum = units.reduce((t, u) => t + (u.votingPct || 0), 0);
-  const feeSum = units.reduce((t, u) => t + (u.monthlyFee || 0), 0);
+type DuesUnit = { number: string; monthlyFee: number; votingPct: number };
+
+/**
+ * How next year's dues are split between the units. By percentage interest
+ * only when it is complete: every unit has one and they add up to 100% (or 1,
+ * when stored as fractions). Otherwise each unit keeps its share of today's
+ * dues, so a missing or mistyped percentage doesn't move one unit's dues
+ * up or down by hundreds.
+ */
+export function duesSplit(units: DuesUnit[]): { basis: 'interest' | 'today' | 'even'; pctSum: number; reason: string } {
+  const pctSum = Math.round(units.reduce((t, u) => t + (Number(u.votingPct) || 0), 0) * 100) / 100;
+  const feeSum = units.reduce((t, u) => t + (Number(u.monthlyFee) || 0), 0);
+  const complete = units.length > 0 && units.every(u => (Number(u.votingPct) || 0) > 0) && (Math.abs(pctSum - 100) <= 0.5 || Math.abs(pctSum - 1) <= 0.005);
+  if (complete) return { basis: 'interest', pctSum, reason: "By each unit's percentage interest" };
+  const why = pctSum <= 0 ? 'No unit has a percentage interest on file'
+    : units.some(u => !((Number(u.votingPct) || 0) > 0)) ? 'Some units have no percentage interest on file'
+    : `The units' percentage interests add up to ${pctSum}%, not 100%`;
+  if (feeSum > 0) return { basis: 'today', pctSum, reason: `${why}, so each unit keeps its share of today's dues` };
+  return { basis: 'even', pctSum, reason: `${why} and no unit pays dues today, so the dues are split evenly` };
+}
+
+/** Each unit's new monthly dues: its share of the total (see duesSplit for how the share is decided). */
+export function duesByUnit(units: DuesUnit[], monthlyTotal: number): { unit: string; now: number; next: number }[] {
+  const { basis, pctSum } = duesSplit(units);
+  const feeSum = units.reduce((t, u) => t + (Number(u.monthlyFee) || 0), 0);
   return units.map(u => {
-    const share = pctSum > 0 ? (u.votingPct || 0) / pctSum : feeSum > 0 ? u.monthlyFee / feeSum : 1 / Math.max(1, units.length);
+    const share = basis === 'interest' ? (Number(u.votingPct) || 0) / pctSum : basis === 'today' ? (Number(u.monthlyFee) || 0) / feeSum : 1 / Math.max(1, units.length);
     return { unit: u.number, now: u.monthlyFee, next: Math.round(monthlyTotal * share * 100) / 100 };
   });
 }
