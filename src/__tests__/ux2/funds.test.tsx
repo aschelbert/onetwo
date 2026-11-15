@@ -148,9 +148,9 @@ describe('Funds', () => {
     expect(screen.queryByTestId('legacy-budget')).toBeNull();
     fireEvent.click(tile(`${new Date().getFullYear() + 1} budget`));
     const draft = document.querySelector('[aria-label="Next year draft"]') as HTMLElement;
-    // Before the runbook opens: a first look from this year, and a way to start it.
+    // A first look from this year, and a way to start the action or go to its next step.
     expect(within(draft).getByText('A first look, from this year')).toBeTruthy();
-    expect(within(draft).getByRole('button', { name: /^(Start it now|Open the budget)$/ })).toBeTruthy();
+    expect(within(draft).getByRole('button', { name: /^(Start it now|Continue the budget|Open the budget)$/ })).toBeTruthy();
   });
 
   it('Online payments shows the collected, payouts and fees tiles, the payments table, the Stripe card and the setup runbook', () => {

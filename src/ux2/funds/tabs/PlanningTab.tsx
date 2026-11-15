@@ -138,6 +138,13 @@ function NextYearCard({ snap }: { snap: FundsSnapshot }) {
   const { fy, label, action, draft, steps, nextIdx, done, opensOn } = useNextBudget(snap.today);
   const go = (id: string, idx: number) => navigate(casePath(id, idx >= 0 ? { step: idx, approach: null } : undefined));
   const t = draft ? draftTotals(draft) : null;
+  const firstLook = (
+    <Inner className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">A first look, from this year</div><Chip tone="ghost">Computed</Chip></div>
+      {preview.scenarios.map(sc => <KV key={sc.id} label={sc.id === 'keep' ? 'Dues stay' : sc.id === 'recommended' ? (res.next ? `${res.next.name} funded on time` : 'Reserves as recommended') : 'The lowest that pays every line'}>{fmt(sc.dues)} a unit a month</KV>)}
+      <Why>Today's {snap.budget.length} lines grown 3%, with the reserve options. The budget itself is made step by step in the Annual budget action.</Why>
+    </Inner>
+  );
   return (
     <Card aria-label="Next year draft" id="draft">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -168,17 +175,25 @@ function NextYearCard({ snap }: { snap: FundsSnapshot }) {
             <Why>Each step shows the numbers it needs and is decided right there; the action dock brings you back after a trip to another page.</Why>
           </Inner>
         </div>
+      ) : action ? (
+        // Open, but its draft hasn't been started yet (on this device, or before the store loaded): say so, not when it would open.
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {firstLook}
+          <Inner className="flex flex-col gap-2" aria-label="The open budget action">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Where it is</div>
+            <div className="text-sm text-ux2-ink">The Annual budget action is open: {done} of {steps.length} steps done. Its draft starts from this year's numbers once you open a step.</div>
+            {nextIdx >= 0
+              ? <><div className="text-sm text-ux2-ink"><b className="font-semibold">Step {nextIdx + 1} of {steps.length}</b> · {steps[nextIdx].s}</div><div><Button size="sm" onClick={() => go(action.id, nextIdx)}>Continue the budget</Button></div></>
+              : <><div className="text-sm text-ux2-ink">Every step is done.</div><div><Button size="sm" variant="ghost" onClick={() => go(action.id, -1)}>Open the budget</Button></div></>}
+          </Inner>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Inner className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-2"><div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">A first look, from this year</div><Chip tone="ghost">Computed</Chip></div>
-            {preview.scenarios.map(sc => <KV key={sc.id} label={sc.id === 'keep' ? 'Dues stay' : sc.id === 'recommended' ? (res.next ? `${res.next.name} funded on time` : 'Reserves as recommended') : 'The lowest that pays every line'}>{fmt(sc.dues)} a unit a month</KV>)}
-            <Why>Today's {snap.budget.length} lines grown 3%, with the reserve options. The budget itself is made step by step in the Annual budget action.</Why>
-          </Inner>
+          {firstLook}
           <Inner className="flex flex-col gap-2">
             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">How it works</div>
             <div className="text-sm text-ux2-ink">The Annual budget runbook opens on {dayLabel(opensOn)}, 90 days before the {label} year starts, and walks the board through ten steps: costs, lines, reserves, dues, the meeting, the vote, the owner notice, the switch-over and the record.</div>
-            <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => { const id = startBudgetNow(snap.today); go(id, 0); }}>{action ? 'Open the budget' : 'Start it now'}</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=annual-budget')}>See its steps</Button></div>
+            <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => { const id = startBudgetNow(snap.today); go(id, 0); }}>Start it now</Button><Button size="sm" variant="ghost" onClick={() => navigate('/boardroom?tab=runbooks&runbook=annual-budget')}>See its steps</Button></div>
           </Inner>
         </div>
       )}

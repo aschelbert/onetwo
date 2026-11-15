@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -14,6 +14,8 @@ import { BudgetGuide } from '@/ux2/boardroom/budget/BudgetGuide';
 import { syncAnnualCase, ANNUAL_MEETING_SIT } from '@/ux2/boardroom/meetings';
 import { itemsOf } from '@/ux2/community/meetingRecord';
 import type { CaseTrackerCase } from '@/types/issues';
+import PlanningTab from '@/ux2/funds/tabs/PlanningTab';
+import { useFundsSnapshot } from '@/ux2/funds/useFundsSnapshot';
 
 const FY = { start: '2027-01-01', end: '2027-12-31' };
 const units = [
@@ -212,5 +214,30 @@ describe('the guide on each step', () => {
     act(() => useBudgetDraftStore.getState().update(FY.start, d => ({ ...d, adoptedAt: '2026-11-15' })));
     fireEvent.click(within(document.querySelector('[data-budget-guide="notify"]') as HTMLElement).getByRole('button', { name: 'Post it to every owner' }));
     expect(useComplianceStore.getState().announcements[0]).toMatchObject({ title: 'The 2027 budget and dues', category: 'financial' });
+  });
+});
+
+describe('the Planning tab next-year card', () => {
+  const Planning = () => <PlanningTab snap={useFundsSnapshot('2026-11-15')} section="draft" onSection={() => {}} onGo={() => {}} />;
+  const Where = () => { const l = useLocation(); return <div data-testid="at">{l.pathname + l.search}</div>; };
+
+  it('an open action whose draft has not started yet: says it is open, its progress, and goes straight to the next step', () => {
+    const { caseId } = runAnnualBudget('2026-10-03');
+    act(() => useBudgetDraftStore.setState({ drafts: {} }));
+    const c = useIssuesStore.getState().cases.find(x => x.id === caseId)!;
+    const nextIdx = c.steps!.findIndex(x => !x.done);
+    const done = c.steps!.filter(x => x.done).length;
+    render(<MemoryRouter initialEntries={['/funds?tab=planning']}><Routes><Route path="/funds" element={<Planning />} /><Route path="/issues" element={<Where />} /></Routes></MemoryRouter>);
+    const card = document.querySelector('[aria-label="Next year draft"]') as HTMLElement;
+    expect(within(card).queryByText(/runbook opens on/)).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Start it now' })).toBeNull();
+    expect(within(card).getByText(`${done} of ${c.steps!.length} steps done`)).toBeTruthy();
+    const where = within(card).getByLabelText('The open budget action');
+    expect(where.textContent).toMatch(/The Annual budget action is open/);
+    expect(where.textContent).toContain(`Step ${nextIdx + 1} of ${c.steps!.length}`);
+    // The computed preview stays alongside.
+    expect(within(card).getByText('A first look, from this year')).toBeTruthy();
+    fireEvent.click(within(where).getByRole('button', { name: 'Continue the budget' }));
+    expect(screen.getByTestId('at').textContent).toBe(`/issues?view=case:${encodeURIComponent(caseId!)}&step=${nextIdx + 1}`);
   });
 });
