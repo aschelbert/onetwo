@@ -76,6 +76,38 @@ const defaultContextValue: TenantContextValue = {
 const TenantContext = createContext<TenantContextValue>(defaultContextValue);
 export const useTenantContext = () => useContext(TenantContext);
 
+/**
+ * Load one building's data into every store. Both ways into a building (a
+ * board member or manager signing in, a platform admin viewing it) use this
+ * one list, so a store added here is loaded on both.
+ */
+function loadTenantStores(tenantId: string) {
+  return Promise.all([
+    useComplianceStore.getState().loadFromDb(tenantId),
+    useMeetingsStore.getState().loadFromDb(tenantId),
+    useIssuesStore.getState().loadFromDb(tenantId),
+    useElectionStore.getState().loadFromDb(tenantId),
+    useBuildingStore.getState().loadFromDb(tenantId),
+    useFinancialStore.getState().loadFromDb(tenantId),
+    useArchiveStore.getState().loadFromDb(tenantId),
+    useVendorTrackerStore.getState().loadFromDb(tenantId),
+    useSpendingStore.getState().loadFromDb(tenantId),
+    useLetterStore.getState().loadFromDb(tenantId),
+    usePropertyLogStore.getState().loadFromDb(tenantId),
+    useReportStore.getState().loadFromDb(tenantId),
+    useScorecardStore.getState().loadFromDb(tenantId),
+    usePayrollStore.getState().loadFromDb(tenantId),
+    useTaskTrackingStore.getState().loadFromDb(tenantId),
+    useFeeScheduleStore.getState().loadFromDb(tenantId),
+    // Next year's budget drafts: the board's and the manager's only, so a resident's load returns none.
+    useBudgetDraftStore.getState().load(tenantId),
+    // Tasker jobs booked from actions: the board's and the manager's only.
+    useTaskerStore.getState().load(tenantId),
+    // Whether the building's own LetterStream account is connected (the keys stay server-side).
+    useMailStore.getState().loadMailingSettings(tenantId).catch(() => { /* mail stays "not connected" until the function answers */ }),
+  ]);
+}
+
 export default function TenantProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<TenantInfo>(defaultTenant);
   const [loaded, setLoaded] = useState(false);
@@ -231,30 +263,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
       const schemaReady = !schemaProbe || schemaProbe.code !== 'PGRST205';
 
       if (schemaReady) {
-        await Promise.all([
-          useComplianceStore.getState().loadFromDb(tenantInfo.id),
-          useMeetingsStore.getState().loadFromDb(tenantInfo.id),
-          useIssuesStore.getState().loadFromDb(tenantInfo.id),
-          useElectionStore.getState().loadFromDb(tenantInfo.id),
-          useBuildingStore.getState().loadFromDb(tenantInfo.id),
-          useFinancialStore.getState().loadFromDb(tenantInfo.id),
-          useArchiveStore.getState().loadFromDb(tenantInfo.id),
-          useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
-          useSpendingStore.getState().loadFromDb(tenantInfo.id),
-          useLetterStore.getState().loadFromDb(tenantInfo.id),
-          usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
-          useReportStore.getState().loadFromDb(tenantInfo.id),
-          useScorecardStore.getState().loadFromDb(tenantInfo.id),
-          usePayrollStore.getState().loadFromDb(tenantInfo.id),
-          useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
-          useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
-          // Next year's budget drafts: the board's and the manager's only, so a resident's load returns none.
-          useBudgetDraftStore.getState().load(tenantInfo.id),
-          // Tasker jobs booked from actions: the board's and the manager's only.
-          useTaskerStore.getState().load(tenantInfo.id),
-          // Whether the building's own LetterStream account is connected (the keys stay server-side).
-          useMailStore.getState().loadMailingSettings(tenantInfo.id).catch(() => { /* mail stays "not connected" until the function answers */ }),
-        ]);
+        await loadTenantStores(tenantInfo.id);
       }
     }
   }, [updateName, updateAddress, updateDetails]);
@@ -425,26 +434,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         const schemaReady = !schemaProbe || schemaProbe.code !== 'PGRST205';
 
         if (schemaReady) {
-          await Promise.all([
-            useComplianceStore.getState().loadFromDb(tenantInfo.id),
-            useMeetingsStore.getState().loadFromDb(tenantInfo.id),
-            useIssuesStore.getState().loadFromDb(tenantInfo.id),
-            useElectionStore.getState().loadFromDb(tenantInfo.id),
-            useBuildingStore.getState().loadFromDb(tenantInfo.id),
-            useFinancialStore.getState().loadFromDb(tenantInfo.id),
-            useArchiveStore.getState().loadFromDb(tenantInfo.id),
-            useVendorTrackerStore.getState().loadFromDb(tenantInfo.id),
-            useSpendingStore.getState().loadFromDb(tenantInfo.id),
-            useLetterStore.getState().loadFromDb(tenantInfo.id),
-            usePropertyLogStore.getState().loadFromDb(tenantInfo.id),
-            useReportStore.getState().loadFromDb(tenantInfo.id),
-            useScorecardStore.getState().loadFromDb(tenantInfo.id),
-            usePayrollStore.getState().loadFromDb(tenantInfo.id),
-            useTaskTrackingStore.getState().loadFromDb(tenantInfo.id),
-            useFeeScheduleStore.getState().loadFromDb(tenantInfo.id),
-            useTaskerStore.getState().load(tenantInfo.id),
-            useMailStore.getState().loadMailingSettings(tenantInfo.id).catch(() => { /* mail stays "not connected" until the function answers */ }),
-          ]);
+          await loadTenantStores(tenantInfo.id);
         }
 
       } catch (err) {
