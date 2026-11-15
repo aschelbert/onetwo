@@ -30,3 +30,8 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+# The public Contact panel on getonetwo.com posts here from a logged-out page.
+# The function rate-limits and filters bots itself.
+[functions.contact-form]
+verify_jwt = false

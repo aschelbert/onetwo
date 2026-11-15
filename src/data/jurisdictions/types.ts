@@ -25,11 +25,11 @@ export interface JurisdictionData {
   name: string;
   /** Short code (e.g. "DC") */
   code: string;
-  /** Primary condo act citation (e.g. "DC Code § 29-1101 et seq.") */
+  /** Primary condo act citation (e.g. "DC Code § 42-1901.01 et seq.") */
   primaryAct: string;
   /** Short form for inline references (e.g. "DC Code") */
   actShortName: string;
-  /** State filing agency (e.g. "DCRA") */
+  /** State filing agency (e.g. "DLCP") */
   filingAgency: string;
   /** How complete this data is */
   coverage: JurisdictionCoverage;

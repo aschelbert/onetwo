@@ -294,7 +294,7 @@ const seedTenants: Tenant[] = [
 ];
 
 const seedPlatformUsers: PlatformUser[] = [
-  { id: 'padm-000', name: 'Alyssa Schelbert', email: 'alyssa@getonetwo.com', role: 'super_admin', status: 'active', lastLogin: '2026-02-22T10:00:00Z', createdAt: '2024-10-01', buildings: ['*'] },
+  { id: 'padm-000', name: 'Platform Admin', email: 'admin@example.com', role: 'super_admin', status: 'active', lastLogin: '2026-02-22T10:00:00Z', createdAt: '2024-10-01', buildings: ['*'] },
   { id: 'padm-001', name: 'Alex Rivera', email: 'alex@onetwo.com', role: 'super_admin', status: 'active', lastLogin: '2026-02-20T08:30:00Z', createdAt: '2024-11-01', buildings: ['*'] },
   { id: 'padm-002', name: 'Morgan Lee', email: 'morgan@onetwo.com', role: 'support', status: 'active', lastLogin: '2026-02-19T14:22:00Z', createdAt: '2025-02-15', buildings: ['*'] },
   { id: 'padm-003', name: 'Jordan Kim', email: 'jordan@onetwo.com', role: 'billing', status: 'active', lastLogin: '2026-02-18T10:05:00Z', createdAt: '2025-06-01', buildings: ['*'] },
@@ -368,7 +368,7 @@ const seedTickets: SupportTicket[] = [
 ];
 
 const seedAnnouncements: Announcement[] = [
-  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Management Suite subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'management_suite', status: 'sent', createdBy: 'Alyssa Schelbert', createdAt: '2026-02-15', sentAt: '2026-02-15' },
+  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Management Suite subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'management_suite', status: 'sent', createdBy: 'Platform Admin', createdAt: '2026-02-15', sentAt: '2026-02-15' },
   { id: 'ann-002', title: 'Scheduled Maintenance — Feb 28', message: 'Brief downtime expected Feb 28 2-4 AM ET for infrastructure upgrades.', audience: 'all', status: 'draft', createdBy: 'Alex Rivera', createdAt: '2026-02-22', sentAt: null },
 ];
 
@@ -583,11 +583,11 @@ const seedPlatformBudgets: PlatformBudget[] = [
 ];
 
 const seedPlatformApprovals: PlatformSpendingApproval[] = [
-  { id: 'pa-001', title: 'Upgrade AWS RDS to r6g.xlarge', description: 'Current DB instance hitting 85% CPU during peak. Need to scale up for growing tenant base.', amount: 1200, category: 'infrastructure', status: 'pending', requestedBy: 'Alex Rivera', votes: [{ voter: 'Alyssa Schelbert', vote: 'approve', date: '2026-02-28' }], priority: 'high', createdAt: '2026-02-27' },
+  { id: 'pa-001', title: 'Upgrade AWS RDS to r6g.xlarge', description: 'Current DB instance hitting 85% CPU during peak. Need to scale up for growing tenant base.', amount: 1200, category: 'infrastructure', status: 'pending', requestedBy: 'Alex Rivera', votes: [{ voter: 'Platform Admin', vote: 'approve', date: '2026-02-28' }], priority: 'high', createdAt: '2026-02-27' },
   { id: 'pa-002', title: 'Google Ads campaign — Q2 push', description: 'Expand PPC campaign targeting DC-area HOA boards. Expected 15-20 new trial signups.', amount: 5000, category: 'marketing', status: 'pending', requestedBy: 'Morgan Lee', votes: [], priority: 'normal', createdAt: '2026-03-01' },
-  { id: 'pa-003', title: 'Annual SOC 2 Type II audit', description: 'Required for enterprise sales pipeline. Vendor: Drata + auditor.', amount: 18000, category: 'operations', status: 'approved', requestedBy: 'Alyssa Schelbert', votes: [{ voter: 'Alex Rivera', vote: 'approve', date: '2026-02-15' }, { voter: 'Jordan Kim', vote: 'approve', date: '2026-02-16' }], priority: 'high', createdAt: '2026-02-10' },
+  { id: 'pa-003', title: 'Annual SOC 2 Type II audit', description: 'Required for enterprise sales pipeline. Vendor: Drata + auditor.', amount: 18000, category: 'operations', status: 'approved', requestedBy: 'Platform Admin', votes: [{ voter: 'Alex Rivera', vote: 'approve', date: '2026-02-15' }, { voter: 'Jordan Kim', vote: 'approve', date: '2026-02-16' }], priority: 'high', createdAt: '2026-02-10' },
   { id: 'pa-004', title: 'Outside counsel — HOA compliance review', description: 'Legal review of DC-specific HOA regulations for compliance module.', amount: 7500, category: 'legal', status: 'pending', requestedBy: 'Jordan Kim', votes: [{ voter: 'Alex Rivera', vote: 'approve', date: '2026-03-02' }], priority: 'normal', createdAt: '2026-03-01' },
-  { id: 'pa-005', title: 'Contract UI engineer (3-month)', description: 'Accelerate community portal and voting module build-out.', amount: 24000, category: 'engineering', status: 'denied', requestedBy: 'Alex Rivera', votes: [{ voter: 'Alyssa Schelbert', vote: 'deny', date: '2026-02-20' }, { voter: 'Jordan Kim', vote: 'deny', date: '2026-02-21' }], priority: 'normal', createdAt: '2026-02-18' },
+  { id: 'pa-005', title: 'Contract UI engineer (3-month)', description: 'Accelerate community portal and voting module build-out.', amount: 24000, category: 'engineering', status: 'denied', requestedBy: 'Alex Rivera', votes: [{ voter: 'Platform Admin', vote: 'deny', date: '2026-02-20' }, { voter: 'Jordan Kim', vote: 'deny', date: '2026-02-21' }], priority: 'normal', createdAt: '2026-02-18' },
 ];
 
 // ── Accounting Helper Functions ──────────────────────

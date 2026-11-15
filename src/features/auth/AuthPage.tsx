@@ -5,6 +5,7 @@ import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
+import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -51,7 +52,7 @@ export default function AuthPage() {
           p_subscription_interest: demoSubscriptionInterest,
         });
 
-        // Fire-and-forget: notify alyssa@getonetwo.com
+        // Fire-and-forget: notify the internal signup inbox
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
@@ -243,6 +244,13 @@ export default function AuthPage() {
     setProvisioningTimedOut(true);
     return false;
   };
+
+  // OpenAI Ads pixel: load only once the visitor is in the signup steps, so
+  // nobody signing in or using the app is tracked.
+  const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
+  useEffect(() => {
+    if (inSignupSteps) loadOpenAIPixel();
+  }, [inSignupSteps]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -810,6 +818,8 @@ export default function AuthPage() {
                   // Global Privacy Control: skip the server-side OpenAI Ads report too
                   adMeasurementOptOut:
                     (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
+                  // ChatGPT ad click reference, for the server-side conversion report
+                  adClickRef: readAdClickRef(),
                 }),
               }
             );
@@ -833,8 +843,10 @@ export default function AuthPage() {
         },
         success: async (_hostedPageId: string) => {
           console.log('[checkout] Checkout success, polling for tenant...');
-          // OpenAI Ads conversion: paid trial signup completed
-          window.oaiq?.('measure', 'page_viewed', { type: 'contents' }, { event_id: conversionEventId });
+          // OpenAI Ads conversion: paid trial signup completed. Attach the
+          // hashed email and user ID first so OpenAI can match it to the ad.
+          await setOpenAIPixelUser({ email: signupEmail, userId: currentSession?.user?.id });
+          window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {

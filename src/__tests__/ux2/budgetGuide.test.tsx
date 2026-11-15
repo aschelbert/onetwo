@@ -9,7 +9,7 @@ import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
 import { useRunbookSwitches } from '@/ux2/boardroom/store';
 import { budgetForMeeting, budgetStepIndex, runAnnualBudget, switchToBudget, syncBudgetCase } from '@/ux2/boardroom/annualBudget';
-import { annualFromText, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, projectYear, seedDraft, type BudgetDraft } from '@/ux2/boardroom/budgetDraft';
+import { annualFromText, budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, needsOwnerVote, noticeText, projectYear, seedDraft, STARTER_LINES, type BudgetDraft } from '@/ux2/boardroom/budgetDraft';
 import { BudgetGuide } from '@/ux2/boardroom/budget/BudgetGuide';
 import { syncAnnualCase, ANNUAL_MEETING_SIT } from '@/ux2/boardroom/meetings';
 import { itemsOf } from '@/ux2/community/meetingRecord';
@@ -168,6 +168,32 @@ describe('the guide on each step', () => {
     expect(within(guide).getAllByText(/over its budget/).length).toBeGreaterThan(0);
     fireEvent.click(within(guide).getByRole('button', { name: /^Accept the 3 suggestions left$/ }));
     expect(useBudgetDraftStore.getState().drafts[FY.start].lines.every(l => l.reviewed)).toBe(true);
+    expect(c().steps![i].done).toBe(true);
+  });
+
+  it('every line, for a building with no budget lines yet: starts from the usual lines, each typed in or removed, and then ticks', () => {
+    useFinancialStore.setState({ budgetCategories: [] });
+    useBuildingStore.setState({ vendors: [], insurance: [] });
+    const { c, i, guide } = at('lines');
+    expect(guide.querySelectorAll('tr[data-line]')).toHaveLength(0);
+    expect(within(guide).getByText('Start the lines')).toBeTruthy();
+    fireEvent.click(within(guide).getByRole('button', { name: 'Add the usual lines' }));
+    const lines = () => useBudgetDraftStore.getState().drafts[FY.start].lines;
+    expect(lines().map(l => l.name)).toEqual(STARTER_LINES.map(x => x.name));
+    // Nothing to suggest from: no Accept, no $0 suggestions to accept in bulk; each one needs an amount.
+    expect(within(guide).queryByRole('button', { name: /^Accept/ })).toBeNull();
+    expect(within(guide).getAllByText('Type an amount')).toHaveLength(STARTER_LINES.length);
+    expect(within(guide).getByText(/^The master policy/)).toBeTruthy();
+    fireEvent.click(within(guide).getByRole('button', { name: 'Remove Management Fees' }));
+    expect(lines().some(l => l.name === 'Management Fees')).toBe(false);
+    for (const l of lines()) {
+      const input = within(guide).getByLabelText(`${l.name} next year`);
+      fireEvent.change(input, { target: { value: '1,200' } });
+      fireEvent.blur(input);
+    }
+    expect(lines().every(l => l.reviewed && l.amount === 1200)).toBe(true);
+    expect(draftTotals(useBudgetDraftStore.getState().drafts[FY.start]).operating).toBe(1200 * (STARTER_LINES.length - 1));
+    syncBudgetCase(c(), '2026-10-04');
     expect(c().steps![i].done).toBe(true);
   });
 

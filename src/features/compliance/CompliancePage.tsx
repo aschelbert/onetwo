@@ -106,10 +106,10 @@ export default function CompliancePage() {
   const completedMeetings = meetings.filter(m => m.status === 'COMPLETED').length;
   const minutesRate = completedMeetings > 0 ? Math.round((hasMinutes / completedMeetings) * 100) : 100;
   const meetingReqs = [
-    { label: 'Board Meetings', req: 4, actual: boardCount, freq: 'Quarterly minimum', legalRef: isDC ? 'DC Code § 29-1109.01' : `${jurisdiction} Condo Act`, source: hasBylaws ? 'Bylaws Art. III' : 'DC Code' },
-    { label: 'Annual Meeting', req: 1, actual: annualCount, freq: 'Within 13 months of prior', legalRef: isDC ? 'DC Code § 29-1109.02' : `${jurisdiction} Condo Act`, source: hasBylaws ? 'Bylaws Art. III §2' : 'DC Code' },
-    { label: 'Meeting Minutes', req: 100, actual: minutesRate, freq: 'All completed meetings', legalRef: isDC ? 'DC Code § 29-1108.06' : `${jurisdiction} Condo Act`, source: 'Required by law', isPct: true },
-    { label: 'Meeting Notices', req: 1, actual: 1, freq: 'Annual: 10-60 days · Board: 48 hrs', legalRef: isDC ? 'DC Code § 29-1109.02(a)' : `${jurisdiction} Condo Act`, source: 'Required by law' },
+    { label: 'Board Meetings', req: 4, actual: boardCount, freq: 'Per bylaws', legalRef: isDC ? 'DC Code § 42-1903.03 (open meetings)' : `${jurisdiction} Condo Act`, source: hasBylaws ? 'Bylaws Art. III' : 'DC Code' },
+    { label: 'Annual Meeting', req: 1, actual: annualCount, freq: 'At least once a year', legalRef: isDC ? 'DC Code § 42-1903.03(a)' : `${jurisdiction} Condo Act`, source: hasBylaws ? 'Bylaws Art. III §2' : 'DC Code' },
+    { label: 'Meeting Minutes', req: 100, actual: minutesRate, freq: 'All completed meetings', legalRef: isDC ? 'DC Code § 42-1903.03(b)' : `${jurisdiction} Condo Act`, source: 'Required by law', isPct: true },
+    { label: 'Meeting Notices', req: 1, actual: 1, freq: isDC ? 'Annual/regular: 21 days · Other: 7 days' : 'Per bylaws', legalRef: isDC ? 'DC Code § 42-1903.03' : `${jurisdiction} Condo Act`, source: 'Required by law' },
   ];
   const mtgMet = meetingReqs.filter(r => (r as any).isPct ? r.actual >= r.req : r.actual >= r.req).length;
   const mtgScore = Math.round((mtgMet / meetingReqs.length) * 100);
@@ -215,7 +215,7 @@ export default function CompliancePage() {
           const allItems = catScores.flatMap(c => c.items);
           const autoVerifiedCount = allItems.filter(i => i.autoPass).length;
           const needsActionCount = allItems.filter(i => !i.autoPass && !comp.completions[i.id]).length;
-          const stateAct = isDC ? 'DC Code § 29-1101 et seq.' : `${jurisdiction} Condominium Act`;
+          const stateAct = isDC ? 'DC Code § 42-1901.01 et seq.' : `${jurisdiction} Condominium Act`;
           const missingDocs: string[] = [];
           if (!hasBylaws) missingDocs.push('Bylaws');
           if (!hasCCRs) missingDocs.push('CC&Rs / Declaration');

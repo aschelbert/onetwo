@@ -1,10 +1,11 @@
 // supabase/functions/notify-signup/index.ts
-// Sends internal notification email to alyssa@getonetwo.com when someone
+// Sends an internal notification email to the CONTACT_INBOX secret when someone
 // signs up for the demo or a new building is provisioned.
 // Fire-and-forget from client — failures logged but don't block UX.
 
 const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
 const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
+const CONTACT_INBOX = Deno.env.get("CONTACT_INBOX") || "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Missing or invalid type (demo | building)" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!CONTACT_INBOX) {
+      console.warn("CONTACT_INBOX not configured — skipping notification email");
+      return new Response(
+        JSON.stringify({ sent: false, error: "Recipient not configured" }),
+        { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
@@ -130,7 +139,7 @@ Deno.serve(async (req) => {
         Messages: [
           {
             From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" },
-            To: [{ Email: "alyssa@getonetwo.com", Name: "Alyssa" }],
+            To: [{ Email: CONTACT_INBOX }],
             Subject: subject,
             TextPart: textBody,
             HTMLPart: htmlBody,
@@ -148,7 +157,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Signup notification (${type}) sent to alyssa@getonetwo.com`);
+    console.log(`Signup notification (${type}) sent`);
     return new Response(JSON.stringify({ sent: true }), {
       status: 200,
       headers: { ...cors, "Content-Type": "application/json" },

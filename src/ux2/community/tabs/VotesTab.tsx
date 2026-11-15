@@ -173,7 +173,7 @@ export default function VotesTab({ snap, selectedId, onSelect }: { snap: Communi
             {sum.toCertify.length > 0 && <KV label="Closed, awaiting certification">{sum.toCertify.length}</KV>}
           </Inner>
           <div className="flex flex-wrap gap-2">{isBoard && open && <Button size="sm" variant="ghost" onClick={() => setProxyFor(proxyFor ? null : open.election.id)}>Record a proxy</Button>}<Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=documents')}>Proxy form</Button></div>
-          <Why>A proxy counts toward quorum and lets another owner vote for a unit at one meeting. Owners add their own on this page; the board records paper proxies. Majority of units per the bylaws; DC Code § 29-1101 et seq.</Why>
+          <Why>A proxy counts toward quorum and lets another owner vote for a unit at one meeting. Owners add their own on this page; the board records paper proxies. Majority of units per the bylaws; DC Code § 42-1903.05</Why>
         </Card>
         <Card id="ballot-preview" aria-label="Ballot" className="gap-2.5">
           <SectionLabel>{open && !open.voted ? 'Your ballot' : 'Ballot preview · what an owner sees'}</SectionLabel>

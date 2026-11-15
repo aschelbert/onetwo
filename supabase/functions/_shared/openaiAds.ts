@@ -9,16 +9,17 @@
 //   OPENAI_ADS_PIXEL_ID       pixel id (same one the browser snippet uses)
 // Optional:
 //   OPENAI_ADS_SIGNUP_EVENT   event type to report for a completed signup;
-//                             defaults to "page_viewed" to match the pixel's
-//                             conversion event so both count toward the same goal
+//                             defaults to "trial_started", the same event the
+//                             browser sends, so OpenAI dedupes the two
 //   OPENAI_ADS_VALIDATE_ONLY  "true" sends with validate_only so OpenAI checks
 //                             the payload but records nothing (dry run)
 
 const API_KEY = Deno.env.get("OPENAI_ADS_API_KEY") || "";
 const PIXEL_ID = Deno.env.get("OPENAI_ADS_PIXEL_ID") || "";
-const SIGNUP_EVENT = Deno.env.get("OPENAI_ADS_SIGNUP_EVENT") || "page_viewed";
+const SIGNUP_EVENT = Deno.env.get("OPENAI_ADS_SIGNUP_EVENT") || "trial_started";
 const VALIDATE_ONLY = (Deno.env.get("OPENAI_ADS_VALIDATE_ONLY") || "").toLowerCase() === "true";
-const SITE_URL = Deno.env.get("SITE_URL") || "https://getonetwo.com";
+// Where signups happen; used when a signup did not record its page
+const DEFAULT_SOURCE_URL = "https://www.getonetwo.com/login";
 
 const EVENTS_URL = "https://bzr.openai.com/v1/events";
 
@@ -27,11 +28,15 @@ export function openaiAdsEnabled(): boolean {
   return Boolean(API_KEY && PIXEL_ID);
 }
 
-/** Lowercase hex SHA-256 of a trimmed, lowercased value, as the API expects. */
-export async function sha256Normalized(value: string): Promise<string> {
-  const normalized = value.trim().toLowerCase();
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized));
+/** Lowercase hex SHA-256 of a value, exactly as given. */
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Lowercase hex SHA-256 of a trimmed, lowercased value (emails). */
+export function sha256Normalized(value: string): Promise<string> {
+  return sha256Hex(value.trim().toLowerCase());
 }
 
 /** The `data.type` shape each standard event type is defined with. */
@@ -64,9 +69,13 @@ export interface SignupConversion {
   id: string;
   /** Signer's email; hashed before sending, never sent raw. */
   email?: string | null;
+  /** Signer's account (Supabase user) ID; hashed before sending, like the pixel's external ID. */
+  userId?: string | null;
+  /** ChatGPT ad click reference (oppref) saved at signup, if the visitor came from an ad. */
+  adClickRef?: string | null;
   /** When the conversion happened, in Unix seconds. Defaults to now. */
   occurredAtSeconds?: number | null;
-  /** Page the conversion is attributed to. Defaults to the signup page. */
+  /** Page the signup happened on. Defaults to https://www.getonetwo.com/login. */
   sourceUrl?: string;
 }
 
@@ -84,15 +93,17 @@ export async function reportSignupConversion(c: SignupConversion): Promise<boole
     const timestampMs = c.occurredAtSeconds ? c.occurredAtSeconds * 1000 : Date.now();
     const user: Record<string, unknown> = {};
     if (c.email) user.emails_sha256 = [await sha256Normalized(c.email)];
+    if (c.userId) user.external_ids_sha256 = [await sha256Hex(c.userId)];
 
     const event: Record<string, unknown> = {
       id: c.id,
       type: SIGNUP_EVENT,
       timestamp_ms: timestampMs,
       action_source: "web",
-      source_url: c.sourceUrl || `${SITE_URL}/login`,
+      source_url: c.sourceUrl || DEFAULT_SOURCE_URL,
       data: { type: dataTypeFor(SIGNUP_EVENT) },
     };
+    if (c.adClickRef) event.oppref = c.adClickRef;
     if (SIGNUP_EVENT === "custom") (event.data as Record<string, unknown>).custom_event_name = "signup_completed";
     if (Object.keys(user).length) event.user = user;
 

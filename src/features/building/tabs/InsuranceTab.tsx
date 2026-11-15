@@ -4,10 +4,10 @@ import type { InsurancePolicy } from '@/store/useBuildingStore';
 /** Required and recommended insurance policies for condominiums.
  *  Based on DC Code, Fannie Mae/Freddie Mac requirements, and industry best practices. */
 const REQUIRED_POLICIES = [
-  { key: 'gl', name: 'General Liability', required: true, legalRef: 'DC Code § 29-1135.06', desc: 'Covers bodily injury and property damage in common areas. Minimum $1M/$2M recommended.', minCoverage: '$1,000,000' },
-  { key: 'property', name: 'Property / Hazard', required: true, legalRef: 'DC Code § 29-1135.06', desc: 'Covers the building structure, common elements, and fixtures at 100% replacement cost.', minCoverage: 'Full Replacement' },
+  { key: 'gl', name: 'General Liability', required: true, legalRef: 'DC Code § 42-1903.10(b)', desc: 'Covers bodily injury and property damage in common areas. Minimum $1M/$2M recommended.', minCoverage: '$1,000,000' },
+  { key: 'property', name: 'Property / Hazard', required: true, legalRef: 'DC Code § 42-1903.10(b)', desc: 'Covers the building structure, common elements, and fixtures. DC requires at least 90% of replacement cost after deductibles; 100% is recommended.', minCoverage: 'Full Replacement' },
   { key: 'do', name: 'Directors & Officers (D&O)', required: true, legalRef: 'Best Practice / Fannie Mae', desc: 'Protects board members from personal liability for decisions made in their official capacity.', minCoverage: '$1,000,000' },
-  { key: 'fidelity', name: 'Fidelity Bond', required: true, legalRef: 'DC Code § 29-1135.06', desc: 'Covers theft or misappropriation of association funds by employees, board members, or management.', minCoverage: '3 months assessments' },
+  { key: 'fidelity', name: 'Fidelity Bond', required: true, legalRef: 'Bylaws / lender requirements', desc: 'Covers theft or misappropriation of association funds by employees, board members, or management.', minCoverage: '3 months assessments' },
   { key: 'workers-comp', name: 'Workers Compensation', required: true, legalRef: 'DC Workers Comp Act', desc: 'Required if the association has any employees. Covers workplace injuries and illnesses.', minCoverage: 'Statutory' },
   { key: 'umbrella', name: 'Umbrella / Excess Liability', required: false, legalRef: 'Best Practice', desc: 'Provides additional coverage above primary policy limits. Recommended $5M-$10M.', minCoverage: '$5,000,000' },
   { key: 'flood', name: 'Flood Insurance', required: false, legalRef: 'FEMA / Lender Req', desc: 'Required if building is in a FEMA-designated flood zone. Recommended for all properties.', minCoverage: 'Varies' },

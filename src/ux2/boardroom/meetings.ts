@@ -2,7 +2,7 @@
  * The meeting cycle, wired. Two runbooks share this file:
  *
  *  Annual meeting: the next one is due 13 months after the last (DC Code
- *    § 29-1108), and the case opens 90 days before that, with the annual
+ *    § 42-1903.03(a)), and the case opens 90 days before that, with the annual
  *    meeting playbook (date, nominations, notice, proxies, election,
  *    minutes). The app ticks the steps it can see: the meeting set, the
  *    notice sent, the meeting held. A planning case the board already has,
@@ -122,7 +122,7 @@ export function runAnnualMeeting(today: string = todayIso()): MeetingRun {
     unit: '',
     owner: 'President',
     priority: 'high',
-    notes: `Opened by the Annual meeting runbook on ${today}: ${last ? `the last annual meeting was ${last.date}, so the next must be held by ${deadline}` : `no annual meeting is on the calendar, so one should be held by ${deadline}`} (DC Code § 29-1108, within 13 months of the last). Notice goes to every owner at least 10 days before.`,
+    notes: `Opened by the Annual meeting runbook on ${today}: ${last ? `the last annual meeting was ${last.date}, so the next must be held by ${deadline}` : `no annual meeting is on the calendar, so one should be held by ${deadline}`} (DC Code § 42-1903.03(a) requires one at least once a year). Notice goes to every owner at least 21 days before.`,
     assignedRole: 'President',
     dueDate: deadline,
     source: 'runbook',
@@ -188,7 +188,7 @@ export function runBoardMeeting(today: string = todayIso()): MeetingRun {
     owner: 'President',
     priority: 'medium',
     notes: m
-      ? `Opened by the Board meeting cycle runbook on ${today}: ${m.title || 'a board meeting'} is on the calendar for ${m.date}${m.time ? ` at ${m.time}` : ''}${m.location ? `, ${m.location}` : ''}. Notice goes to the board and owners per the bylaws and DC Code § 29-1109; minutes within 7 days.`
+      ? `Opened by the Board meeting cycle runbook on ${today}: ${m.title || 'a board meeting'} is on the calendar for ${m.date}${m.time ? ` at ${m.time}` : ''}${m.location ? `, ${m.location}` : ''}. Notice goes to the board and owners per the bylaws and DC Code § 42-1903.03; minutes within 7 days.`
       : `Opened by the Board meeting cycle runbook on ${today}: the bylaws have the board meeting every ${cadence} days and nothing is scheduled; the next meeting is due by ${next.deadline}. Put it on Community › Meetings, then the notice, quorum, minutes and approval follow here.`,
     assignedRole: 'President',
     dueDate: next.deadline,

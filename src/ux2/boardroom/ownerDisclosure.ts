@@ -1,7 +1,7 @@
 /**
  * The owner disclosure statement runbook, wired: on January 1, one case to
- * send owners the annual disclosure by March 31 (DC Code § 42-1904.04 and
- * the bylaws): last year against budget, the reserve balance, the insurance
+ * send owners the annual disclosure by March 31 (a bylaws and best-practice
+ * duty; DC law has no annual disclosure requirement): last year against budget, the reserve balance, the insurance
  * summary, pending litigation, the board and officers. The app ticks the
  * steps it can see: the figures ready once last year's books are closed,
  * the statement sent once a notice about it goes out. A case the board

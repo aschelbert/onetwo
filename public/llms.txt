@@ -1,0 +1,52 @@
+# ONE two
+
+> ONE two is software that does a property manager's job for Washington, DC condo buildings. It knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof and proves it to the owners. The board makes the decisions; a stewardship score shows the board and every owner how the building is doing. Plans start at $179 a month after a 21 day free trial.
+
+## Who it is for
+
+- Self-managed condo associations in Washington, DC, and boards that want to leave a property management company
+- Board members (president, treasurer, secretary) who run a building as volunteers
+- Unit owners who want to see how their building is run; an owner can start ONE two without a board vote
+
+## What it does
+
+- Tracks 45 obligations from the DC Condominium Act and DLCP, each with a due date, an owner and a how-to
+- 32 runbooks start work on time: the monthly close on the 1st, insurance renewal 60 days before expiry, filings 45 days before they are due, the budget 90 days before the fiscal year, collections at 30 days past due
+- Meetings, elections, votes and minutes, with notices sent inside the legal window
+- Dues and fees: assessments post on the 1st; owners pay by bank, card or autopay into the association's own bank account through Stripe
+- Funds: ledger, monthly close and an owner statement every month
+- Escalation from friendly notice to certified demand, lien and Small Claims packet, with attorney handoff when the board decides
+- Notices and letters by email, portal, first class or certified mail, with postage at cost and tracking filed in the Archive
+- Work orders, vendors, W-9s and 1099s; vendors are paid directly at their own price, with no markups
+- Asset registry with replacement years, reserve balance and funding targets
+- Owner portal and a seven year Archive for records requests (DC Code 42-1903.14)
+- Stewardship score across five dimensions: Timeliness, Compliance, Oversight, Reach and Impact
+
+## Pricing
+
+- Self-Managed: $179 a month, or $1,790 a year. For walk-ups and small buildings with no elevator, pool or staff.
+- Plus Facilities: $279 a month, or $2,790 a year. Adds an inspection and permit calendar (elevator, pool, fire systems, boiler), reserve study tools, bids and insurance claims workflows, amenity reservations and a staff role.
+- Add-on, On Call: $249 a month for a named advisor who knows the building (monthly call, replies within a business day, budget and year-end review, a seat at the annual meeting; up to 2 hours a month).
+- Add-on, Property Manager Seat: $79 a month for a manager who keeps operations but works inside the association's records.
+- 21 day free trial. Postage and card processing fees at cost. Cancel any time; records export with you.
+
+## Compared with a property management company
+
+For a 12 unit building, a manager at $45 a unit a month costs $6,480 a year in fees alone, and about $9,350 with project oversight, resale certificate fees and mailings. ONE two Self-Managed costs $2,148 a year on the monthly plan, with vendors at their own price.
+
+## Links
+
+- [Home page](https://getonetwo.com/): overview, features, comparison table
+- [Pricing](https://getonetwo.com/#pricing): plans and add-ons
+- [FAQ](https://getonetwo.com/#faq): common questions about self-managing a DC condo building
+- [Guides for DC condo boards](https://getonetwo.com/guides): index of plain-language guides
+- [Does a DC condo association need a reserve study?](https://getonetwo.com/guides/dc-condo-reserve-study): what the DC Condominium Act says about reserves, and why boards get a study anyway
+- [How to leave your property management company in DC](https://getonetwo.com/guides/leaving-your-property-manager-dc): the contract, the 90 day rule for developer contracts, the records to get back, and a timeline
+- [What does condo management cost in Washington, DC?](https://getonetwo.com/guides/dc-condo-management-cost): typical rates by service level, extra fees, and what self-managing costs
+- [Start a free trial](https://getonetwo.com/login?create=1)
+- [Privacy policy](https://getonetwo.com/privacy)
+- [Terms of service](https://getonetwo.com/terms)
+
+## Contact
+
+hello@getonetwo.com · a person replies within one business day
