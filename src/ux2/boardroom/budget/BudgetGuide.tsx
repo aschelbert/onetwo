@@ -491,12 +491,21 @@ export function BudgetGuide({ c, step, stepIndex, onAction }: { c: CaseTrackerCa
   const key = budgetStepKey(step.s);
   const draft = useBudgetDraftStore(s => (fy ? s.drafts[fy.start] : undefined));
   const loaded = useBudgetDraftStore(s => s.loaded);
+  const failed = useBudgetDraftStore(s => s.failed);
   const update = useBudgetDraftStore(s => s.update);
+  // The board's drafts load with the building; load them here when that hasn't happened, so the draft can start.
+  useEffect(() => { if (fy && !loaded && !failed) void useBudgetDraftStore.getState().load(); }, [fy?.start, loaded, failed]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (fy && !draft) ensureBudgetDraft(fy); }, [fy?.start, draft, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   // Tick what the draft now shows done.
   useEffect(() => { if (draft) syncBudgetCase(c); }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!fy || !key) return null;
-  if (!draft) return <div data-budget-guide={key} className="ux2 rounded-[18px] border border-ux2-line bg-ux2-surface px-4 py-3 text-sm text-ux2-muted">Loading next year's draft…</div>;
+  if (!draft) return (
+    <div data-budget-guide={key} className="ux2 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-ux2-line bg-ux2-surface px-4 py-3 text-sm text-ux2-muted">
+      {failed
+        ? <><span>Next year's draft couldn't be loaded. The steps need it, and a new one isn't started in case another board member already has one.</span><Button size="sm" onClick={() => void useBudgetDraftStore.getState().load()}>Try again</Button></>
+        : <span>Loading next year's draft…</span>}
+    </div>
+  );
   const edit = (fn: (d: BudgetDraft) => BudgetDraft) => update(fy.start, fn);
   const body = {
     start: <StartStep d={draft} />,

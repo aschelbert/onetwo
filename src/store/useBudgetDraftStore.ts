@@ -12,6 +12,8 @@ import type { BudgetDraft } from '@/ux2/boardroom/budgetDraft';
 interface BudgetDraftState {
   drafts: Record<string, BudgetDraft>;
   loaded: boolean;
+  /** The last load didn't work: the guide offers to try again rather than wait. */
+  failed: boolean;
   load: (tenantId?: string) => Promise<void>;
   get: (fyStart: string) => BudgetDraft | undefined;
   /** Whether a new draft may be started: always in demo mode, once the board's drafts have loaded with the backend on. */
@@ -39,12 +41,14 @@ function save(fyStart: string) {
 export const useBudgetDraftStore = create<BudgetDraftState>()(persist((set, get) => ({
   drafts: {},
   loaded: false,
+  failed: false,
   load: async (tenantId) => {
     const tid = tenantId ?? getActiveTenantId();
-    if (!isBackendEnabled || !tid) { set({ loaded: true }); return; }
+    if (!isBackendEnabled || !tid) { set({ loaded: true, failed: false }); return; }
     const rows = await svc.fetchBudgetDrafts(tid);
     // Only a load that worked lets the app start a new draft: one that failed could hide a draft another board member has.
-    if (rows) set(s => ({ loaded: true, drafts: { ...s.drafts, ...Object.fromEntries(rows.map(d => [d.fyStart, d])) } }));
+    if (rows) set(s => ({ loaded: true, failed: false, drafts: { ...s.drafts, ...Object.fromEntries(rows.map(d => [d.fyStart, d])) } }));
+    else set({ failed: true });
   },
   get: (fyStart) => get().drafts[fyStart],
   canSeed: () => !isBackendEnabled || get().loaded,
@@ -55,5 +59,5 @@ export const useBudgetDraftStore = create<BudgetDraftState>()(persist((set, get)
     set(s => ({ drafts: { ...s.drafts, [fyStart]: { ...fn(s.drafts[fyStart] ?? cur), updatedAt: new Date().toISOString() } } }));
     save(fyStart);
   },
-  reset: () => set({ drafts: {}, loaded: false }),
+  reset: () => set({ drafts: {}, loaded: false, failed: false }),
 }), { name: 'onetwo-budget-drafts', version: 1, partialize: s => ({ drafts: s.drafts }) }));
