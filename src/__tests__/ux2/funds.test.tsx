@@ -26,6 +26,12 @@ vi.mock('@/features/unit-manager/tabs/MyBalanceTab', () => ({ default: ({ active
 import FundsPage from '@/ux2/funds/FundsPage';
 import { RedirectKeepQuery } from '@/ux2/shell/routes';
 import PayPage from '@/ux2/funds/PayPage';
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { useBudgetDraftStore } from '@/store/useBudgetDraftStore';
+import { budgetSteps } from '@/ux2/boardroom/annualBudget';
+import { nextFiscalYear } from '@/ux2/boardroom/fiscal';
+import { todayIso } from '@/ux2/runbook/adapters';
 
 /** The tile acting as a button at the top of a tab, by the start of its label. */
 const tile = (label: string) => Array.from(document.querySelectorAll('[role="button"][data-tone]')).find(el => el.textContent?.startsWith(label)) as HTMLElement;
@@ -148,9 +154,29 @@ describe('Funds', () => {
     expect(screen.queryByTestId('legacy-budget')).toBeNull();
     fireEvent.click(tile(`${new Date().getFullYear() + 1} budget`));
     const draft = document.querySelector('[aria-label="Next year draft"]') as HTMLElement;
-    // Before the runbook opens: a first look from this year, and a way to start it.
+    // Before the draft starts: a first look from this year, and a way to start it or carry on.
     expect(within(draft).getByText('A first look, from this year')).toBeTruthy();
-    expect(within(draft).getByRole('button', { name: /^(Start it now|Open the budget)$/ })).toBeTruthy();
+    expect(within(draft).getByRole('button', { name: /^(Start it now|Continue the budget|Open the budget)$/ })).toBeTruthy();
+  });
+
+  it('Planning: an open budget action with no draft yet shows where it is, not a date already past', () => {
+    const cases = useIssuesStore.getState().cases;
+    const drafts = useBudgetDraftStore.getState().drafts;
+    const fy = nextFiscalYear(todayIso(), useBuildingStore.getState().details?.fiscalYearEnd);
+    useIssuesStore.setState({ cases: [{ id: 'b1', catId: 'financial', sitId: 'runbook-annual-budget', title: 'Annual budget', unit: '', owner: '', approach: 'pre', status: 'open', priority: 'high', created: todayIso(), notes: '', steps: budgetSteps(fy).map((x, i) => ({ id: `s${i}`, s: x.s, done: i === 0, doneDate: null, userNotes: '' })), linkedWOs: [], linkedLetterIds: [], linkedInvoiceIds: [], linkedMeetingIds: [], attachments: [], boardVotes: null, additionalApproaches: [], comms: [], source: 'runbook', sourceId: `annual-budget:${fy.start}` } as never] });
+    useBudgetDraftStore.setState({ drafts: {} });
+    try {
+      renderAt('/funds?tab=planning&section=draft');
+      const draft = document.querySelector('[aria-label="Next year draft"]') as HTMLElement;
+      expect(within(draft).getByText('Where it is')).toBeTruthy();
+      expect(within(draft).getByText(/Step 2 of 10/)).toBeTruthy();
+      expect(within(draft).queryByText(/runbook opens on/)).toBeNull();
+      fireEvent.click(within(draft).getByRole('button', { name: 'Continue the budget' }));
+      expect(screen.getByTestId('elsewhere')).toBeTruthy();
+    } finally {
+      useIssuesStore.setState({ cases });
+      useBudgetDraftStore.setState({ drafts });
+    }
   });
 
   it('Online payments shows the collected, payouts and fees tiles, the payments table, the Stripe card and the setup runbook', () => {

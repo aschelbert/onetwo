@@ -13,6 +13,7 @@ import HomePage, { unitBalanceState } from '@/ux2/home/HomePage';
 import CaseDock from '@/ux2/shell/CaseDock';
 import { dockFor, caseIdFromLocation, casePath, spotFromSearch, useCaseDockStore } from '@/ux2/shell/caseDock';
 import { useLocation } from 'react-router-dom';
+import { todayIso } from '@/ux2/runbook/adapters';
 
 function renderHome(path = '/home') {
   return render(
@@ -67,7 +68,10 @@ describe('Home', () => {
     expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull();
     expect(document.querySelectorAll('[data-widget="calendar"] [data-month]').length).toBe(6);
     expect(document.querySelector('[data-widget="calendar"] [data-month] [data-day]')).toBeTruthy();
-    expect(screen.getByText('Nothing scheduled today')).toBeTruthy();
+    // Today is always listed: empty ("Nothing scheduled today") or with what falls on it, whichever the demo dates give.
+    const todayRow = document.querySelector(`[data-widget="calendar"] [data-day="${todayIso()}"]`) as HTMLElement;
+    expect(todayRow).toBeTruthy();
+    expect(todayRow.querySelector('b.rounded-full')).toBeTruthy();
     expect(screen.queryByText('Reserves funded')).toBeNull();
     expect(document.querySelector('[data-widget="stewardship-radar"]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Later months' }));
