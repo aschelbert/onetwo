@@ -251,6 +251,7 @@ describe('the guide on each step', () => {
     const note = guide.querySelector('[data-dues-split="today"]') as HTMLElement;
     expect(note.textContent).toMatch(/add up to 73%, not 100%, so each unit keeps its share of today's dues/);
     expect(within(note).getByRole('button', { name: /Check the units/ })).toBeTruthy();
+    expect(note.textContent).toMatch(/In Building › Directory, each unit's ⋯ menu › Edit has its share/);
   });
 
   it('the meeting: puts the budget on a board meeting with the vote set up and the draft attached', () => {
