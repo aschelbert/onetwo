@@ -54,3 +54,21 @@ export function useTenant() {
   if (!ctx) throw new Error('useTenant must be used within TenantProvider')
   return ctx
 }
+
+// The tenant nav still uses its original page names. The module registry is
+// now grouped by the product's modules, so each nav entry maps to the
+// registry module that governs it.
+const REGISTRY_MODULE: Record<string, string> = {
+  'Board Room': 'Board Room',
+  'The Building': 'Building',
+  'The Archives': 'Building',
+  'Fiscal Lens': 'Funds',
+  'Community Room': 'Community',
+  'Association Team': 'Community',
+  'Account Management': 'Me',
+}
+
+/** Whether a tenant nav entry is open to the user, given the registry modules they can reach. */
+export function navModuleAccessible(accessibleModules: string[], navModule: string): boolean {
+  return accessibleModules.includes(REGISTRY_MODULE[navModule] ?? navModule)
+}
