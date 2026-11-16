@@ -48,16 +48,23 @@ function AuthListener() {
     ranRef.current = true;
     const sb = supabase; // narrow for TS inside async callback
 
-    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      const { isAuthenticated, login, signOut, addMember } = useAuthStore.getState();
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+      const { isAuthenticated, signOut } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
         if (isAuthenticated) signOut();
         return;
       }
 
-      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set
-      if (session && !isAuthenticated) {
+      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set.
+      // Deferred to the next tick: supabase-js holds its auth lock while it waits
+      // for this callback, and the queries below need that lock to read the
+      // session. Awaiting them here hangs the call that fired the event (the
+      // setSession of a subdomain handoff never returns, so a new building's
+      // owner lands on the login form).
+      setTimeout(async () => {
+        const { isAuthenticated, login, addMember } = useAuthStore.getState();
+        if (isAuthenticated) return;
         try {
           // Check if platform admin first
           const { data: admin } = await sb
@@ -134,7 +141,7 @@ function AuthListener() {
         } catch {
           // Session exists but lookup failed — don't crash
         }
-      }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
