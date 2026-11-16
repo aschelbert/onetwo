@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
   return withAdminAuth(async (db) => {
-    const plan = req.nextUrl.searchParams.get('plan') || 'compliance-pro'
+    const plan = req.nextUrl.searchParams.get('plan') || 'self-managed'
     const role = req.nextUrl.searchParams.get('role') || 'BOARD_MEMBER'
     const { data, error } = await db.rpc('resolve_permissions', {
       p_plan_id: plan,

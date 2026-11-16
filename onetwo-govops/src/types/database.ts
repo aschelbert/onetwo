@@ -894,6 +894,9 @@ export type Database = {
           stripe_product_id: string | null
           stripe_sync_status: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at: string | null
+          kind: string
+          chargebee_price_monthly_id: string | null
+          chargebee_price_yearly_id: string | null
           updated_at: string
         }
         Insert: {
@@ -912,6 +915,9 @@ export type Database = {
           stripe_product_id?: string | null
           stripe_sync_status?: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at?: string | null
+          kind?: string
+          chargebee_price_monthly_id?: string | null
+          chargebee_price_yearly_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -930,6 +936,9 @@ export type Database = {
           stripe_product_id?: string | null
           stripe_sync_status?: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at?: string | null
+          kind?: string
+          chargebee_price_monthly_id?: string | null
+          chargebee_price_yearly_id?: string | null
           updated_at?: string
         }
         Relationships: []

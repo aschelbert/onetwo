@@ -124,28 +124,37 @@ Deno.serve(async (req) => {
 
   try {
     // ── Platform admins only ──
+    // Two callers: a signed-in platform admin (the in-app console), or the
+    // separate Admin Console app, which checks its own admins and then calls
+    // server-to-server with this project's service role key.
     const auth = req.headers.get("Authorization") || "";
-    const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { apikey: SB_ANON, Authorization: auth },
-    });
-    if (!userRes.ok) return jsonResponse({ error: "Not signed in" }, 401);
-    const user = await userRes.json();
-    if (!user?.id) return jsonResponse({ error: "Not signed in" }, 401);
+    const body = await req.json().catch(() => ({}));
+    let actor: string;
+    if (SB_SERVICE_KEY && auth === `Bearer ${SB_SERVICE_KEY}`) {
+      actor = typeof body?.actor === "string" && body.actor ? body.actor.slice(0, 200) : "Admin Console";
+    } else {
+      const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
+        headers: { apikey: SB_ANON, Authorization: auth },
+      });
+      if (!userRes.ok) return jsonResponse({ error: "Not signed in" }, 401);
+      const user = await userRes.json();
+      if (!user?.id) return jsonResponse({ error: "Not signed in" }, 401);
 
-    const adminRes = await sbService(
-      "GET",
-      `platform_admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`,
-    );
-    const admins = adminRes.ok ? await adminRes.json() : [];
-    if (!Array.isArray(admins) || admins.length === 0) {
-      return jsonResponse({ error: "Platform admins only" }, 403);
+      const adminRes = await sbService(
+        "GET",
+        `platform_admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`,
+      );
+      const admins = adminRes.ok ? await adminRes.json() : [];
+      if (!Array.isArray(admins) || admins.length === 0) {
+        return jsonResponse({ error: "Platform admins only" }, 403);
+      }
+      actor = user.email || user.id;
     }
 
     if (!CHARGEBEE_SITE || !CHARGEBEE_API_KEY) {
       return jsonResponse({ error: "Chargebee is not configured for this environment" }, 503);
     }
 
-    const body = await req.json().catch(() => ({}));
     const action = body?.action === "set" ? "set" : "get";
 
     if (action === "get") {
@@ -188,7 +197,7 @@ Deno.serve(async (req) => {
     const save = await sbService("PATCH", "platform_settings?id=eq.default", {
       trial_days: days,
       updated_at: new Date().toISOString(),
-      updated_by: user.email || user.id,
+      updated_by: actor,
     });
     if (!save.ok) {
       return jsonResponse({
@@ -198,7 +207,7 @@ Deno.serve(async (req) => {
     }
 
     await sbService("POST", "audit_log", {
-      actor_name: user.email || "Platform Admin",
+      actor_name: actor,
       actor_role: "platform_admin",
       action: "platform.trial_days_updated",
       target: "Platform Settings",
