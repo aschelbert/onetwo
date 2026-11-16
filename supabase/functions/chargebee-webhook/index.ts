@@ -149,6 +149,59 @@ async function syncGovopsStatus(tenantId: string, fields: Record<string, unknown
   }
 }
 
+/**
+ * Create the building's row in the admin console. The console lists
+ * `tenancies` from its own database, and syncGovopsStatus only updates a row
+ * that already exists, so without this a new signup never shows up there.
+ * An upsert, so a redelivered event leaves one row.
+ */
+async function createGovopsTenancy(tenancy: {
+  id: string;
+  name: string;
+  subdomain: string;
+  // deno-lint-ignore no-explicit-any
+  address: any;
+  totalUnits: number;
+  plan: PlanId;
+  interval: Interval;
+  trialEndsAt: string | null;
+}) {
+  if (!GOVOPS_URL || !GOVOPS_SERVICE_KEY) {
+    console.log("Govops sync not configured, tenancy not added to the admin console");
+    return;
+  }
+  const addr = tenancy.address || {};
+  try {
+    const res = await fetch(`${GOVOPS_URL}/rest/v1/tenancies?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: GOVOPS_SERVICE_KEY,
+        Authorization: `Bearer ${GOVOPS_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        id: tenancy.id,
+        name: tenancy.name,
+        slug: tenancy.subdomain,
+        address: addr.street || "",
+        city: addr.city || "",
+        state: addr.state || "",
+        zip: addr.zip || "",
+        units: tenancy.totalUnits,
+        subscription_id: tenancy.plan === "facilities" ? "plus-facilities" : "self-managed",
+        status: "trial",
+        billing_cycle: tenancy.interval === "annual" ? "yearly" : "monthly",
+        trial_ends_at: tenancy.trialEndsAt,
+        board_members: 1,
+      }),
+    });
+    if (!res.ok) console.error(`Govops tenancy create failed: ${res.status} ${await res.text()}`);
+  } catch (e) {
+    console.error("Govops tenancy create error:", e);
+  }
+}
+
 // ── Update webhook event status ──
 
 async function markEvent(eventId: string, status: string, errorMessage?: string) {
@@ -375,8 +428,17 @@ Deno.serve(async (req) => {
               { tenant_id: result.tenant_id },
             );
 
-            // Sync to admin console
-            await syncGovopsStatus(result.tenant_id, { status: "trial" });
+            // Add the building to the admin console
+            await createGovopsTenancy({
+              id: result.tenant_id,
+              name: pending.name,
+              subdomain: result.subdomain || pending.subdomain || result.tenant_id,
+              address: pending.address,
+              totalUnits: pending.totalUnits || 0,
+              plan: result.plan === "facilities" || result.plan === "self_managed" ? result.plan : parsed.plan,
+              interval: parsed.interval,
+              trialEndsAt: result.trial_ends_at || null,
+            });
 
             // Tell OpenAI Ads a paid trial signup completed (never throws),
             // unless the visitor opted out with Global Privacy Control
