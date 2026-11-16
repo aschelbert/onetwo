@@ -9,5 +9,5 @@ export default async function SubscriptionsPage() {
     supabase.from('user_roles').select('id, name, icon'),
     supabase.from('platform_settings').select('trial_days').eq('id', 'default').maybeSingle(),
   ])
-  return <SubscriptionsClient plans={plans || []} tenancies={tenancies || []} roles={roles || []} trialDays={settings?.trial_days ?? 30} />
+  return <SubscriptionsClient plans={plans || []} tenancies={tenancies || []} roles={roles || []} trialDays={settings?.trial_days ?? 0} />
 }

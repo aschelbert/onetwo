@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, FEATURE_GROUPS, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
-import { TIERS, type SubscriptionTier as BillingTier } from '@/lib/tiers';
+import { usePlatformAdminStore, generateSubdomain, TIER_FEATURES, TENANT_ROLES, type Tenant, type SubscriptionTier } from '@/store/usePlatformAdminStore';
+import { TIERS, ADDONS, getAddOnPrice } from '@/lib/tiers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
 import Modal from '@/components/ui/Modal';
@@ -9,6 +9,11 @@ import StripeTab from './StripeTab';
 import FinanceTab from './FinanceTab';
 import FeedbackTab from './FeedbackTab';
 import ProblemsTab from './ProblemsTab';
+import TrialSettingsCard from './TrialSettingsCard';
+import {
+  PLAN_IDS, PLAN_LABELS as TIER_LABELS, PLAN_PRICES as TIER_PRICES, PLAN_COLORS as TIER_COLORS, PLAN_BADGE as TIER_BADGE,
+  MODULE_CATALOG, CATALOG_FEATURE_COUNT, AVAILABILITY_LABEL, AVAILABILITY_BADGE, planIncludes, planFeatureCount,
+} from './catalog';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,13 +26,8 @@ const STATUS_BADGE: Record<string, string> = {
   suspended: 'bg-red-100 text-red-700', archived: 'bg-ink-100 text-ink-500',
   trial: 'bg-yellow-100 text-yellow-700', past_due: 'bg-red-100 text-red-700',
 };
-const TIER_BADGE: Record<string, string> = { compliance_pro: 'bg-accent-100 text-accent-700', community_plus: 'bg-ink-100 text-ink-600', management_suite: 'bg-sage-100 text-sage-700' };
-const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
-// Legacy admin tiers -> billing tiers in lib/tiers (same monthly price). management_suite has no billing counterpart.
-const BILLING_TIER: Record<SubscriptionTier, BillingTier | null> = { compliance_pro: 'self_managed', community_plus: 'facilities', management_suite: null };
-const annualPrice = (tier: SubscriptionTier) => TIERS.find(t => t.id === BILLING_TIER[tier])?.annual ?? TIER_PRICES[tier] * 12;
-const TIER_LABELS: Record<string, string> = { compliance_pro: 'Compliance Pro', community_plus: 'Community Plus', management_suite: 'Management Suite' };
-const TIER_COLORS: Record<string, string> = { compliance_pro: '#c42030', community_plus: '#6b7280', management_suite: '#16a34a' };
+const annualPrice = (tier: SubscriptionTier) => TIERS.find(t => t.id === tier)?.annual ?? TIER_PRICES[tier] * 12;
+// Per-tenant switches stored in tenant_features (overrides on a tenancy).
 const FEATURE_LABELS: Record<string, string> = {
   fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook',
   aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing',
@@ -41,7 +41,7 @@ const NAV = [
   ]},
   { section: 'Product', items: [
     { id: 'subscriptions' as Page, label: 'Subscriptions', d: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-    { id: 'features' as Page, label: 'Features', d: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+    { id: 'features' as Page, label: 'Modules & Features', d: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
     { id: 'matrix' as Page, label: 'Feature Matrix', d: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z' },
     { id: 'permissions' as Page, label: 'Permissions', d: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
   ]},
@@ -61,12 +61,12 @@ const NAV = [
 const PAGE_META: Record<Page, [string, string]> = {
   dashboard: ['Dashboard', 'Admin Console > Overview'],
   subscriptions: ['Subscriptions', 'Admin Console > Product > Subscriptions'],
-  features: ['Features', 'Admin Console > Product > Features'],
+  features: ['Modules & Features', 'Admin Console > Product > Modules & Features'],
   matrix: ['Feature Matrix', 'Admin Console > Product > Feature Matrix'],
   permissions: ['Permissions', 'Admin Console > Product > RBAC Permissions'],
   tenancies: ['Tenancies', 'Admin Console > Operations > Tenancies'],
   roles: ['User Roles', 'Admin Console > Operations > User Roles'],
-  stripe: ['Stripe Integration', 'Admin Console > Billing > Stripe'],
+  stripe: ['Stripe (Owner Payments)', 'Admin Console > Billing > Stripe'],
   finance: ['Fiscal Lens', 'Admin Console > Billing > Fiscal Lens'],
   support: ['Support', 'Admin Console > Operations > Support'],
   feedback: ['Feedback', 'Admin Console > Operations > Feedback'],
@@ -153,11 +153,7 @@ export default function PlatformAdminPage() {
   const [page, setPage] = useState<Page>('dashboard');
   const [selectedTenancy, setSelectedTenancy] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
-  const [bldgForm, setBldgForm] = useState({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' as SubscriptionTier });
-  const [trialDaysInput, setTrialDaysInput] = useState(store.trialDays);
-  const [trialDaysSaving, setTrialDaysSaving] = useState(false);
-
-  useEffect(() => { setTrialDaysInput(store.trialDays); }, [store.trialDays]);
+  const [bldgForm, setBldgForm] = useState({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'self_managed' as SubscriptionTier });
 
   const selected = tenants.find(t => t.id === selectedTenancy);
   const totalRevenueYTD = store.glEntries.filter(e => e.creditAcct.startsWith('4')).reduce((s, e) => s + e.amount, 0);
@@ -179,7 +175,7 @@ export default function PlatformAdminPage() {
       onboardingChecklist: { accountCreated: true, buildingProfileComplete: !!bldgForm.street, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
     });
     store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'building.create', target: bldgForm.name, details: `Onboarded: ${subdomain}.getonetwo.com`, buildingId: id });
-    setBldgForm({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'compliance_pro' });
+    setBldgForm({ name: '', street: '', city: '', state: '', zip: '', units: '', yearBuilt: '', contactName: '', contactEmail: '', contactPhone: '', tier: 'self_managed' });
     setModal(null);
   };
 
@@ -286,13 +282,25 @@ export default function PlatformAdminPage() {
                 <div className="bg-white rounded-[10px] border border-ink-200 p-5">
                   <h3 className="font-display text-base font-bold text-ink-900 mb-4">Subscription Mix</h3>
                   <div className="space-y-3">
-                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
+                    {PLAN_IDS.map(tier => {
                       const count = tenants.filter(t => t.subscription.tier === tier).length;
                       return (
                         <div key={tier} className="flex items-center justify-between">
                           <div className="flex items-center gap-2.5">
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[tier] }} />
                             <span className="text-sm text-ink-700 font-medium">{TIER_LABELS[tier]}</span>
+                          </div>
+                          <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{count} tenancies</span>
+                        </div>
+                      );
+                    })}
+                    {ADDONS.map(addon => {
+                      const count = tenants.filter(t => addon.id === 'on_call' ? t.subscription.onCall : t.subscription.pmAddon).length;
+                      return (
+                        <div key={addon.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-ink-300" />
+                            <span className="text-sm text-ink-700 font-medium">{addon.name} <span className="text-ink-400 font-normal">add-on</span></span>
                           </div>
                           <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{count} tenancies</span>
                         </div>
@@ -328,7 +336,7 @@ export default function PlatformAdminPage() {
                     {TENANT_ROLES.map(role => {
                       const rolePerms = permissions.filter(p => p.roleId === role.id);
                       const totalPerms = rolePerms.reduce((s, p) => s + p.actions.length, 0);
-                      const maxPerms = Object.keys(FEATURE_LABELS).length * 5;
+                      const maxPerms = Math.max(1, new Set(permissions.map(p => p.featureId)).size) * 5;
                       const pct = maxPerms > 0 ? Math.round((totalPerms / maxPerms) * 100) : 0;
                       const barColor = pct > 80 ? 'bg-sage-500' : pct > 50 ? 'bg-blue-500' : 'bg-amber-500';
                       return (
@@ -385,49 +393,86 @@ export default function PlatformAdminPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="font-display text-lg font-bold text-ink-900">Subscription Plans</h2>
-                <p className="text-sm text-ink-500 mt-1">Manage plans, pricing, and Stripe product links</p>
+                <p className="text-sm text-ink-500 mt-1">Two plans and two add-ons, billed through Chargebee. Annual billing gives two months free.</p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => {
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {TIERS.map(plan => {
+                  const tier = plan.id;
                   const count = tenants.filter(t => t.subscription.tier === tier).length;
-                  const featureCount = Object.entries(TIER_FEATURES[tier]).filter(([, v]) => v).length;
+                  const prices = store.chargebeeTrial?.prices.filter(p => p.plan === tier) ?? [];
                   return (
-                    <div key={tier} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden hover:shadow-md transition-shadow" style={{ borderTop: `3px solid ${TIER_COLORS[tier]}` }}>
-                      <div className="p-5">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-display text-lg font-bold text-ink-900">{TIER_LABELS[tier]}</h3>
+                    <div key={tier} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col" style={{ borderTop: `3px solid ${TIER_COLORS[tier]}` }}>
+                      <div className="p-5 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="font-display text-lg font-bold text-ink-900">{plan.name}</h3>
                           <span className="text-xs bg-sage-100 text-sage-700 px-2 py-0.5 rounded-full font-semibold">Active</span>
                         </div>
-                        <p className="text-sm text-ink-500 mb-3">{featureCount} features included</p>
+                        <p className="text-sm text-ink-500 mb-3">{plan.tagline}</p>
                         <div className="flex items-baseline gap-2 mb-3">
-                          <span className="text-2xl font-bold text-ink-900">{fmt(TIER_PRICES[tier])}</span>
+                          <span className="text-2xl font-bold text-ink-900">{fmt(plan.monthly)}</span>
                           <span className="text-sm text-ink-400">/mo</span>
                           <span className="text-sm text-ink-500 font-semibold ml-2">{fmt(annualPrice(tier))}/yr</span>
                         </div>
-                        <p className="text-xs text-ink-500">{count} tenancies · {TENANT_ROLES.length} roles</p>
+                        <ul className="space-y-1 mb-3">
+                          {plan.features.map(f => <li key={f} className="text-sm text-ink-700 flex gap-2"><span className="text-sage-600">✓</span>{f}</li>)}
+                        </ul>
+                        <p className="text-xs text-ink-500">{count} tenancies · {planFeatureCount(tier)} of {CATALOG_FEATURE_COUNT} features · {store.trialDays === 0 ? 'no free trial' : `${store.trialDays} day free trial`}</p>
                       </div>
-                      <div className="bg-ink-50 px-5 py-3 flex items-center gap-2 text-xs border-t border-ink-100">
-                        <span className="w-2 h-2 rounded-full bg-sage-600" />
-                        <span className="text-ink-500">Stripe:</span>
-                        <code className="text-ink-400 text-[0.7rem]">{tier === 'compliance_pro' ? 'prod_U1uEALGv7cxbG8' : tier === 'community_plus' ? 'prod_U18qLUrk51rvcH' : 'prod_U1uF4LzxGLbojg'}</code>
-                        <span className="ml-auto text-sage-600 font-semibold">Synced</span>
+                      <div className="bg-ink-50 px-5 py-3 flex items-center gap-2 text-xs border-t border-ink-100 flex-wrap">
+                        <span className={`w-2 h-2 rounded-full ${prices.length > 0 && prices.every(p => p.found) ? 'bg-sage-600' : 'bg-ink-300'}`} />
+                        <span className="text-ink-500">Chargebee:</span>
+                        {prices.length > 0
+                          ? prices.map(p => <code key={p.id} className={`text-[0.7rem] ${p.found ? 'text-ink-500' : 'text-red-600'}`}>{p.id}</code>)
+                          : <span className="text-ink-400">price ids load with the trial settings below</span>}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Buildings by Tier */}
+              {/* Add-ons */}
+              <div>
+                <h3 className="font-display text-base font-bold text-ink-900 mb-3">Add-ons</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {ADDONS.map(addon => {
+                    const count = tenants.filter(t => addon.id === 'on_call' ? t.subscription.onCall : t.subscription.pmAddon).length;
+                    return (
+                      <div key={addon.id} className="bg-white rounded-[10px] border border-ink-200 p-5">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-display text-base font-bold text-ink-900">{addon.name}</h4>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${AVAILABILITY_BADGE[addon.id]}`}>Add-on</span>
+                        </div>
+                        <p className="text-sm text-ink-500 mb-3">{addon.description}</p>
+                        <div className="space-y-1 text-sm">
+                          {TIERS.map(plan => (
+                            <div key={plan.id} className="flex justify-between">
+                              <span className="text-ink-600">With {plan.name}</span>
+                              <span className="font-semibold text-ink-900">{fmt(getAddOnPrice(addon, plan.id, 'monthly'))}/mo · {fmt(getAddOnPrice(addon, plan.id, 'annual'))}/yr</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-ink-500 mt-3">{count} tenancies</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tenancies by plan */}
               <div>
                 <h3 className="font-display text-base font-bold text-ink-900 mb-3">Tenancies by Plan</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {PLAN_IDS.map(tier => (
                     <div key={tier} className="bg-white rounded-[10px] border border-ink-200 p-4">
                       <p className="text-xs font-bold uppercase mb-3 text-ink-500">{TIER_LABELS[tier]}</p>
                       {tenants.filter(t => t.subscription.tier === tier).map(t => (
-                        <div key={t.id} className="flex items-center justify-between py-1.5">
-                          <span className="text-sm text-ink-700">{t.name}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[t.status]}`}>{t.status}</span>
+                        <div key={t.id} className="flex items-center justify-between py-1.5 gap-2">
+                          <span className="text-sm text-ink-700 truncate">{t.name}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {t.subscription.onCall && <span className={`text-[10px] px-1.5 py-0.5 rounded ${AVAILABILITY_BADGE.on_call}`}>On Call</span>}
+                            {t.subscription.pmAddon && <span className={`text-[10px] px-1.5 py-0.5 rounded ${AVAILABILITY_BADGE.pm_seat}`}>PM Seat</span>}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_BADGE[t.subscription.status] || STATUS_BADGE[t.status]}`}>{t.subscription.status.replace('_', ' ')}</span>
+                          </span>
                         </div>
                       ))}
                       {tenants.filter(t => t.subscription.tier === tier).length === 0 && (
@@ -438,92 +483,49 @@ export default function PlatformAdminPage() {
                 </div>
               </div>
 
-              {/* Trial Settings */}
-              <div className="bg-white rounded-[10px] border border-ink-200 p-5">
-                <h3 className="font-display text-base font-bold text-ink-900 mb-1">Trial Settings</h3>
-                <p className="text-sm text-ink-500 mb-4">Configure the default trial period for new tenancies. Changes apply to future sign-ups only.</p>
-                <div className="flex items-end gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-ink-600 mb-1">Trial length (days)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={365}
-                      value={trialDaysInput}
-                      onChange={e => setTrialDaysInput(Math.max(0, Math.min(365, parseInt(e.target.value) || 0)))}
-                      className="w-24 px-3 py-2 border border-ink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sage-300"
-                    />
-                  </div>
-                  <button
-                    disabled={trialDaysSaving || trialDaysInput === store.trialDays}
-                    onClick={async () => {
-                      setTrialDaysSaving(true);
-                      const ok = await store.updateTrialDays(trialDaysInput);
-                      setTrialDaysSaving(false);
-                      if (ok) {
-                        store.addAuditEntry({ actor: ACTOR, actorRole: 'super_admin', action: 'platform.trial_days_updated', target: 'Platform Settings', details: `Trial days changed to ${trialDaysInput}`, buildingId: null });
-                      }
-                    }}
-                    className="px-4 py-2 bg-ink-900 text-white text-sm font-semibold rounded-lg hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  >
-                    {trialDaysSaving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-                <p className="text-xs text-ink-400 mt-2">Set to 0 to disable free trials. Maximum 365 days.</p>
-              </div>
+              <TrialSettingsCard actor={ACTOR} />
             </div>
           )}
 
-          {/* ═══ FEATURES ═══ */}
+          {/* ═══ MODULES & FEATURES ═══ */}
           {page === 'features' && (
             <div className="space-y-6">
               <div>
-                <h2 className="font-display text-lg font-bold text-ink-900">Features</h2>
-                <p className="text-sm text-ink-500 mt-1">{Object.keys(FEATURE_LABELS).length} features in {FEATURE_GROUPS.length} groups</p>
+                <h2 className="font-display text-lg font-bold text-ink-900">Modules & Features</h2>
+                <p className="text-sm text-ink-500 mt-1">{CATALOG_FEATURE_COUNT} features in {MODULE_CATALOG.length} modules, grouped the way the app is today.</p>
               </div>
-              {FEATURE_GROUPS.map(group => {
-                const groupFeatures = group.features.filter(f => FEATURE_LABELS[f]);
-                if (groupFeatures.length === 0) return null;
-                return (
-                  <div key={group.name} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden">
-                    <div className="px-5 py-4 border-b border-ink-100 flex items-center gap-2">
-                      <h3 className="font-semibold text-ink-900">{group.name}</h3>
-                      <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{groupFeatures.length}</span>
+              {MODULE_CATALOG.map(mod => (
+                <div key={mod.id} className="bg-white rounded-[10px] border border-ink-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-ink-100">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-ink-900">{mod.name}</h3>
+                      <span className="text-xs bg-ink-100 text-ink-500 px-2 py-0.5 rounded-full font-semibold">{mod.features.length}</span>
+                      <code className="text-xs text-ink-400 ml-auto">{mod.path}</code>
                     </div>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
-                          <th className="px-5 py-2.5">Feature</th>
-                          <th className="px-3 py-2.5">Plans</th>
-                          <th className="px-3 py-2.5">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupFeatures.map(featureId => (
-                          <tr key={featureId} className="border-b border-ink-100 hover:bg-ink-50">
-                            <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
-                            <td className="px-3 py-3">
-                              <div className="flex gap-1.5 flex-wrap">
-                                {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
-                                  TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? (
-                                    <span key={tier} className="text-[0.65rem] px-2 py-0.5 rounded-full font-semibold"
-                                      style={{ backgroundColor: `${TIER_COLORS[tier]}20`, color: TIER_COLORS[tier] }}>
-                                      {TIER_LABELS[tier]}
-                                    </span>
-                                  ) : null
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="text-xs bg-sage-100 text-sage-700 px-2 py-0.5 rounded-full font-semibold">Active</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <p className="text-sm text-ink-500 mt-0.5">{mod.summary}</p>
                   </div>
-                );
-              })}
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
+                        <th className="px-5 py-2.5 w-1/4">Feature</th>
+                        <th className="px-3 py-2.5">What it is</th>
+                        <th className="px-3 py-2.5 w-44">Included with</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mod.features.map(f => (
+                        <tr key={f.name} className="border-b border-ink-100 hover:bg-ink-50">
+                          <td className="px-5 py-3 font-medium text-ink-700">{f.name}</td>
+                          <td className="px-3 py-3 text-ink-500">{f.detail}</td>
+                          <td className="px-3 py-3">
+                            <span className={`text-[0.65rem] px-2 py-0.5 rounded-full font-semibold ${AVAILABILITY_BADGE[f.availability]}`}>{AVAILABILITY_LABEL[f.availability]}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           )}
 
@@ -532,14 +534,14 @@ export default function PlatformAdminPage() {
             <div className="space-y-6">
               <div>
                 <h2 className="font-display text-lg font-bold text-ink-900">Feature x Subscription Matrix</h2>
-                <p className="text-sm text-ink-500 mt-1">Feature availability per subscription plan.</p>
+                <p className="text-sm text-ink-500 mt-1">What each plan includes, by module, and what the add-ons unlock.</p>
               </div>
               <div className="bg-white rounded-[10px] border border-ink-200 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-[0.7rem] uppercase tracking-wide text-ink-500 font-semibold border-b-2 border-ink-200 bg-ink-50">
                       <th className="px-5 py-3 min-w-[250px]">Feature</th>
-                      {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+                      {PLAN_IDS.map(tier => (
                         <th key={tier} className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: TIER_COLORS[tier] }} />
@@ -548,35 +550,41 @@ export default function PlatformAdminPage() {
                           <p className="text-lg font-bold text-ink-900 mt-1 normal-case tracking-normal">{fmt(TIER_PRICES[tier])}/mo</p>
                         </th>
                       ))}
+                      {ADDONS.map(addon => (
+                        <th key={addon.id} className="px-4 py-3 text-center">
+                          <span>{addon.name}</span>
+                          <p className="text-lg font-bold text-ink-900 mt-1 normal-case tracking-normal">+{fmt(addon.monthly)}/mo</p>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {FEATURE_GROUPS.map(group => {
-                      const groupFeatures = group.features.filter(f => FEATURE_LABELS[f]);
-                      if (groupFeatures.length === 0) return null;
-                      return (
-                        <Fragment key={group.name}>
-                          <tr className="bg-ink-900">
-                            <td colSpan={4} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">{group.name}</td>
+                    {MODULE_CATALOG.map(mod => (
+                      <Fragment key={mod.id}>
+                        <tr className="bg-ink-900">
+                          <td colSpan={1 + PLAN_IDS.length + ADDONS.length} className="px-5 py-2 text-[0.75rem] text-white uppercase font-bold tracking-wider">{mod.name}</td>
+                        </tr>
+                        {mod.features.map(f => (
+                          <tr key={f.name} className="border-b border-ink-100 hover:bg-ink-50">
+                            <td className="px-5 py-3 font-medium text-ink-700">{f.name}</td>
+                            {PLAN_IDS.map(tier => (
+                              <td key={tier} className="px-4 py-3 text-center">
+                                <span className={`text-lg ${planIncludes(tier, f.availability) ? 'text-sage-600' : 'text-ink-200'}`}>{planIncludes(tier, f.availability) ? '✓' : '—'}</span>
+                              </td>
+                            ))}
+                            {ADDONS.map(addon => (
+                              <td key={addon.id} className="px-4 py-3 text-center">
+                                <span className={`text-lg ${f.availability === addon.id ? 'text-sage-600' : 'text-ink-200'}`}>{f.availability === addon.id ? '✓' : '—'}</span>
+                              </td>
+                            ))}
                           </tr>
-                          {groupFeatures.map(featureId => (
-                            <tr key={featureId} className="border-b border-ink-100 hover:bg-ink-50">
-                              <td className="px-5 py-3 font-medium text-ink-700">{FEATURE_LABELS[featureId]}</td>
-                              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
-                                <td key={tier} className="px-4 py-3 text-center">
-                                  <span className={`text-lg ${TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? 'text-sage-600' : 'text-ink-200'}`}>
-                                    {TIER_FEATURES[tier][featureId as keyof Tenant['features']] ? '✓' : '—'}
-                                  </span>
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </Fragment>
-                      );
-                    })}
+                        ))}
+                      </Fragment>
+                    ))}
                   </tbody>
                 </table>
               </div>
+              <p className="text-xs text-ink-400">On Call is {fmt(getAddOnPrice(ADDONS[0], 'facilities', 'monthly'))}/mo with Plus Facilities. During a free trial every Plus Facilities feature is on.</p>
             </div>
           )}
 
@@ -638,8 +646,8 @@ export default function PlatformAdminPage() {
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-ink-100">
                         <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
-                          <span className="text-xs text-ink-400">{t.status === 'active' ? 'Stripe Linked' : 'Stripe Pending'}</span>
+                          <span className={`w-2 h-2 rounded-full ${t.subscription.chargebeeSubscriptionId ? 'bg-sage-600' : 'bg-amber-500'}`} />
+                          <span className="text-xs text-ink-400">{t.subscription.chargebeeSubscriptionId ? 'Chargebee linked' : 'No Chargebee subscription'}</span>
                         </div>
                         <span className="text-xs text-ink-400">Since {t.createdAt}</span>
                       </div>
@@ -711,13 +719,15 @@ export default function PlatformAdminPage() {
                 <div className="bg-white border border-ink-200 rounded-[10px] p-5">
                   <h4 className="font-bold text-ink-900 mb-3">Subscription</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><p className="text-xs text-ink-400">Tier</p><p className="font-bold text-ink-900">{TIER_LABELS[selected.subscription.tier]}</p></div>
+                    <div><p className="text-xs text-ink-400">Plan</p><p className="font-bold text-ink-900">{TIER_LABELS[selected.subscription.tier]}</p></div>
                     <div><p className="text-xs text-ink-400">Status</p><p className="font-bold text-ink-900 capitalize">{selected.subscription.status.replace('_', ' ')}</p></div>
                     <div><p className="text-xs text-ink-400">Rate</p><p className="font-bold text-ink-900">{fmt(selected.subscription.monthlyRate)}/mo</p></div>
-                    <div><p className="text-xs text-ink-400">Next Billing</p><p className="font-bold text-ink-900">{selected.subscription.nextBillingDate}</p></div>
+                    <div><p className="text-xs text-ink-400">{selected.subscription.status === 'trial' ? 'Trial Ends' : 'Next Billing'}</p><p className="font-bold text-ink-900">{(selected.subscription.status === 'trial' ? selected.subscription.trialEndsAt : null) || selected.subscription.nextBillingDate || '--'}</p></div>
+                    <div><p className="text-xs text-ink-400">Billing</p><p className="font-bold text-ink-900 capitalize">{selected.subscription.interval || 'monthly'}</p></div>
+                    <div><p className="text-xs text-ink-400">Add-ons</p><p className="font-bold text-ink-900">{[selected.subscription.onCall && 'On Call', selected.subscription.pmAddon && 'PM Seat'].filter(Boolean).join(', ') || 'None'}</p></div>
                   </div>
                   <div className="flex gap-2 mt-4 flex-wrap">
-                    {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).filter(t => t !== selected.subscription.tier).map(tier => (
+                    {PLAN_IDS.filter(t => t !== selected.subscription.tier).map(tier => (
                       <button key={tier} onClick={() => store.changeTier(selected.id, tier, ACTOR)}
                         className="px-3 py-1.5 border border-ink-200 rounded-lg text-xs font-medium hover:bg-ink-50">
                         → {TIER_LABELS[tier]} ({fmt(TIER_PRICES[tier])})
@@ -726,20 +736,16 @@ export default function PlatformAdminPage() {
                   </div>
                 </div>
                 <div className="bg-white border border-ink-200 rounded-[10px] p-5">
-                  <h4 className="font-bold text-ink-900 mb-3">Stripe Integration</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><p className="text-xs text-ink-400">Customer ID</p><p className="font-mono text-xs text-ink-600">cus_{selected.id.slice(-8)}...</p></div>
-                    <div><p className="text-xs text-ink-400">Subscription ID</p><p className="font-mono text-xs text-ink-600">sub_{selected.id.slice(-8)}...</p></div>
+                  <h4 className="font-bold text-ink-900 mb-3">Chargebee Billing</h4>
+                  <div className="grid grid-cols-1 gap-4 text-sm">
+                    <div><p className="text-xs text-ink-400">Subscription ID</p><p className="font-mono text-xs text-ink-600 break-all">{selected.subscription.chargebeeSubscriptionId || '--'}</p></div>
+                    <div><p className="text-xs text-ink-400">Plan price</p><p className="font-mono text-xs text-ink-600 break-all">{selected.subscription.chargebeePlanPriceId || '--'}</p></div>
                     <div>
                       <p className="text-xs text-ink-400">Sync Status</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`w-2 h-2 rounded-full ${selected.status === 'active' ? 'bg-sage-600' : 'bg-amber-500'}`} />
-                        <span className="text-sm">{selected.status === 'active' ? 'Linked' : 'Pending'}</span>
+                        <span className={`w-2 h-2 rounded-full ${selected.subscription.chargebeeSubscriptionId ? 'bg-sage-600' : 'bg-amber-500'}`} />
+                        <span className="text-sm">{selected.subscription.chargebeeSubscriptionId ? 'Linked' : 'No Chargebee subscription'}</span>
                       </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-ink-400">Last Payment</p>
-                      <p className="text-sm text-ink-600">{stripePayments.find(p => p.tenantName === selected.name)?.createdAt?.split('T')[0] || '--'}</p>
                     </div>
                   </div>
                 </div>
@@ -747,7 +753,8 @@ export default function PlatformAdminPage() {
 
               {/* Feature Flags */}
               <div className="bg-white border border-ink-200 rounded-[10px] p-5">
-                <h4 className="font-bold text-ink-900 mb-3">Feature Flags</h4>
+                <h4 className="font-bold text-ink-900 mb-1">Feature Switches</h4>
+                <p className="text-xs text-ink-500 mb-3">Per-tenancy switches. Both plans turn all of these on; Plus Facilities and add-on features follow the plan above.</p>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {(Object.entries(selected.features) as [keyof Tenant['features'], boolean][]).map(([key, enabled]) => {
                     const tierDefault = TIER_FEATURES[selected.subscription.tier][key];
@@ -777,13 +784,11 @@ export default function PlatformAdminPage() {
                 <h2 className="font-display text-lg font-bold text-ink-900">User Roles</h2>
                 <p className="text-sm text-ink-500 mt-1">Role definitions, subscription availability, and permission summary</p>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {TENANT_ROLES.map(role => {
                   const rolePerms = permissions.filter(p => p.roleId === role.id);
                   const totalPerms = rolePerms.reduce((s, p) => s + p.actions.length, 0);
-                  const availableFeatures = Object.keys(FEATURE_LABELS).filter(f =>
-                    role.tiers.some(tier => TIER_FEATURES[tier][f as keyof Tenant['features']])
-                  );
+                  const availableFeatures = [...new Set(rolePerms.filter(p => p.actions.length > 0).map(p => p.featureId))];
                   return (
                     <div key={role.id} className="bg-white rounded-[10px] border border-ink-200 p-5 hover:shadow-md transition-shadow">
                       <div className="text-3xl mb-3">{role.icon}</div>
@@ -891,28 +896,17 @@ export default function PlatformAdminPage() {
             </div>
 
             <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Subscription</p></div>
-            <div className="grid grid-cols-3 gap-3">
-              {(['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[]).map(tier => (
+            <div className="grid grid-cols-2 gap-3">
+              {PLAN_IDS.map(tier => (
                 <button key={tier} type="button" onClick={() => setBldgForm({ ...bldgForm, tier })}
                   className={`p-3 rounded-xl border-2 text-left ${bldgForm.tier === tier ? 'border-accent-500 bg-accent-50' : 'border-ink-100 hover:border-ink-200'}`}>
                   <p className="font-bold text-ink-900">{TIER_LABELS[tier]}</p>
                   <p className="text-lg font-bold text-accent-600">{fmt(TIER_PRICES[tier])}<span className="text-xs font-normal text-ink-400">/mo</span></p>
-                  <p className="text-xs text-ink-400 mt-1">{Object.entries(TIER_FEATURES[tier]).filter(([, v]) => v).length} features</p>
+                  <p className="text-xs text-ink-400 mt-1">{planFeatureCount(tier)} features</p>
                 </button>
               ))}
             </div>
 
-            <div className="border-b border-ink-100 pb-2 mt-2"><p className="text-xs font-semibold text-ink-400 uppercase">Stripe Linking</p></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Stripe Customer ID</label>
-                <input placeholder="cus_xxxxxxxxxxxx" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Stripe Subscription ID</label>
-                <input placeholder="sub_xxxxxxxxxxxx" className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm font-mono" />
-              </div>
-            </div>
           </div>
         </Modal>
       )}
