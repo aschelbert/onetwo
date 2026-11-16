@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSameBuilding, pickMembership } from '@/lib/tenantMembership';
+import { isSameBuilding, needsBuildingChoice, pickMembership, subscriptionLabel } from '@/lib/tenantMembership';
 
 const addr = (street: string, zip = '20001') => ({ street, city: 'Washington', state: 'DC', zip });
 
@@ -40,21 +40,68 @@ describe('isSameBuilding', () => {
 
 describe('pickMembership', () => {
   const rows = [
-    { id: 'new', tenant: { name: 'New', subdomain: 'harbor', address: null } },
-    { id: 'old', tenant: { name: 'Old', subdomain: 'sunny', address: null } },
+    { tenant_id: 'new', tenant: { name: 'New', subdomain: 'harbor', address: null } },
+    { tenant_id: 'old', tenant: { name: 'Old', subdomain: 'sunny', address: null } },
   ];
 
   it('returns null with no memberships', () => {
-    expect(pickMembership([], 'app.getonetwo.com')).toBeNull();
-    expect(pickMembership(null, 'app.getonetwo.com')).toBeNull();
+    expect(pickMembership([], 'app.getonetwo.com', null)).toBeNull();
+    expect(pickMembership(null, 'app.getonetwo.com', null)).toBeNull();
   });
 
-  it("prefers the building whose host we're on", () => {
-    expect(pickMembership(rows, 'sunny.getonetwo.com')?.id).toBe('old');
+  it("prefers the building whose host we're on, even over a stored choice", () => {
+    expect(pickMembership(rows, 'sunny.getonetwo.com', null)?.tenant_id).toBe('old');
+    expect(pickMembership(rows, 'sunny.getonetwo.com', 'new')?.tenant_id).toBe('old');
+  });
+
+  it('then the building this browser last chose', () => {
+    expect(pickMembership(rows, 'localhost', 'old')?.tenant_id).toBe('old');
+  });
+
+  it('ignores a stored choice the account does not belong to', () => {
+    expect(pickMembership(rows, 'localhost', 'someone-elses')?.tenant_id).toBe('new');
   });
 
   it('otherwise uses the newest membership', () => {
-    expect(pickMembership(rows, 'app.getonetwo.com')?.id).toBe('new');
-    expect(pickMembership(rows, 'localhost')?.id).toBe('new');
+    expect(pickMembership(rows, 'app.getonetwo.com', null)?.tenant_id).toBe('new');
+  });
+});
+
+describe('needsBuildingChoice', () => {
+  const one = [{ tenant_id: 'a', tenant: { name: 'A', subdomain: 'sunny', address: null } }];
+  const two = [...one, { tenant_id: 'b', tenant: { name: 'B', subdomain: 'harbor', address: null } }];
+
+  it('never asks an account with one building', () => {
+    expect(needsBuildingChoice(one, 'app.getonetwo.com', null, false)).toBe(false);
+    expect(needsBuildingChoice([], 'app.getonetwo.com', null, false)).toBe(false);
+  });
+
+  it('asks at the root login when there are several', () => {
+    expect(needsBuildingChoice(two, 'app.getonetwo.com', null, false)).toBe(true);
+    expect(needsBuildingChoice(two, 'localhost', 'a', false)).toBe(true);
+  });
+
+  it("does not ask on a building's own host", () => {
+    expect(needsBuildingChoice(two, 'harbor.getonetwo.com', null, false)).toBe(false);
+  });
+
+  it('does not ask when a remembered choice still applies', () => {
+    expect(needsBuildingChoice(two, 'app.getonetwo.com', 'b', true)).toBe(false);
+    expect(needsBuildingChoice(two, 'app.getonetwo.com', 'gone', true)).toBe(true);
+  });
+});
+
+describe('subscriptionLabel', () => {
+  const now = new Date('2026-11-16T12:00:00Z');
+  it('counts trial days left', () => {
+    expect(subscriptionLabel({ subscription_status: 'trialing', trial_ends_at: '2026-12-04T12:00:00Z' }, now))
+      .toEqual({ text: 'Trial, 18 days left', tone: 'trial' });
+    expect(subscriptionLabel({ subscription_status: 'trialing', trial_ends_at: '2026-11-17T06:00:00Z' }, now)?.text).toBe('Trial, 1 day left');
+    expect(subscriptionLabel({ subscription_status: 'trialing', trial_ends_at: '2026-11-01T00:00:00Z' }, now)?.tone).toBe('bad');
+  });
+  it('labels the other states, and nothing when unknown', () => {
+    expect(subscriptionLabel({ subscription_status: 'active' }, now)).toEqual({ text: 'Active', tone: 'ok' });
+    expect(subscriptionLabel({ subscription_status: 'past_due' }, now)?.tone).toBe('bad');
+    expect(subscriptionLabel({ subscription_status: null }, now)).toBeNull();
   });
 });

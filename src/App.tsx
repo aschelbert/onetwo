@@ -23,7 +23,7 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import { isTenantHost } from '@/lib/tenantHost';
-import { resolveMembership } from '@/lib/tenantMembership';
+import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -117,7 +117,11 @@ function AuthListener() {
           }
 
           // Check tenant user
-          const tu = await resolveMembership(sb, session.user.id);
+          // With several buildings and none implied by the host, the login
+          // page asks which one; don't pick for them here.
+          const memberships = await fetchMemberships(sb, session.user.id);
+          if (needsBuildingChoice(memberships)) return;
+          const tu = pickMembership(memberships);
 
           if (tu) {
             const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
@@ -158,7 +162,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
-  if (isAuthenticated) {
+  const location = useLocation();
+  // ?create=1 is signup. A signed-in board member setting up another building
+  // must reach it rather than being sent back into the building they are in.
+  const addingBuilding = new URLSearchParams(location.search).get('create') === '1'
+    && currentRole !== 'PLATFORM_ADMIN' && currentRole !== 'PM_COMPANY';
+  if (isAuthenticated && !addingBuilding) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'

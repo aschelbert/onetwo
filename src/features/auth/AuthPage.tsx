@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
-import { fetchMemberships, isSameBuilding, resolveMembership } from '@/lib/tenantMembership';
+import {
+  addressLine, chooseTenant, fetchMemberships, isSameBuilding, needsBuildingChoice, pickMembership, subscriptionLabel,
+  type TenantMembership,
+} from '@/lib/tenantMembership';
+
+type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
 
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
@@ -158,6 +163,11 @@ export default function AuthPage() {
   }, [bldgSubdomain]);
 
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
+  // "Which building?" — set when a signed-in account has several and none is implied by the host
+  const [buildingChoices, setBuildingChoices] = useState<{ user: SessionUser; rows: TenantMembership[] } | null>(null);
+  const [rememberBuilding, setRememberBuilding] = useState(false);
+  // Set while an already signed-in person is setting up another building: no email or password to enter
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   // Chargebee Drop-in initialization
@@ -198,7 +208,11 @@ export default function AuthPage() {
       .eq('id', tu.tenant_id)
       .maybeSingle();
 
-    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+    // This is now the building this browser is in
+    chooseTenant(tu.tenant_id);
+    setActiveTenantId(tu.tenant_id);
+
+    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
     const m = {
       id: user.id,
       name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -224,7 +238,47 @@ export default function AuthPage() {
       window.location.href = target;
       return true; // redirecting
     }
+    // Added a building while already signed in on this host: reload so the
+    // app starts clean in the new building instead of staying on signup.
+    if (new URLSearchParams(window.location.search).get('create') === '1') {
+      window.location.assign('/home');
+      return true;
+    }
     return false;
+  };
+
+  // Enter the account's building, or ask which one when it has several.
+  // Returns false when the account has no building at all.
+  const enterBuilding = async (user: SessionUser): Promise<boolean> => {
+    const rows = await fetchMemberships(supabase!, user.id);
+    if (!rows || rows.length === 0) return false;
+    if (needsBuildingChoice(rows)) {
+      setBuildingChoices({ user, rows });
+      return true;
+    }
+    await loginWithTenantUser(user, pickMembership(rows)!);
+    return true;
+  };
+
+  const pickBuilding = async (m: TenantMembership) => {
+    if (!buildingChoices) return;
+    chooseTenant(m.tenant_id, rememberBuilding);
+    setLoginLoading(true);
+    const redirecting = await loginWithTenantUser(buildingChoices.user, m);
+    if (!redirecting) setBuildingChoices(null);
+    setLoginLoading(false);
+  };
+
+  // A signed-in person setting up another building: skip straight to the
+  // plan step with their details filled in.
+  const startAddBuilding = (user: SessionUser) => {
+    const [first = '', ...rest] = (user.user_metadata?.full_name || '').trim().split(/\s+/);
+    setSignedInAs(user.email || '');
+    setProfileEmail(user.email || '');
+    if (first) setFirstName(first);
+    if (rest.length) setLastName(rest.join(' '));
+    setBuildingChoices(null);
+    setAuthStep('signup-plan');
   };
 
   // Poll for tenant provisioning after checkout success
@@ -394,10 +448,17 @@ export default function AuthPage() {
               return;
             }
 
-            const tu = await resolveMembership(supabase!, user.id);
+            // Signed in and here to set up another building (?create=1):
+            // go to signup instead of into the building they already have.
+            if (params.get('create') === '1') {
+              startAddBuilding(user);
+              setLoginLoading(false);
+              clearTimeout(timeout);
+              setSessionChecking(false);
+              return;
+            }
 
-            if (tu) {
-              await loginWithTenantUser(user, tu);
+            if (await enterBuilding(user)) {
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
@@ -499,45 +560,7 @@ export default function AuthPage() {
           }
 
           // Check if user belongs to a tenant
-          const tenantUser = await resolveMembership(supabase!, data.user.id);
-
-          if (tenantUser) {
-            const tenant = tenantUser.tenant;
-
-            const roleMap: Record<string, Role> = {
-              board_member: 'BOARD_MEMBER',
-              resident: 'RESIDENT',
-              staff: 'STAFF',
-              property_manager: 'PROPERTY_MANAGER',
-            };
-
-            const member = {
-              id: data.user.id,
-              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              email: data.user.email || email,
-              phone: '',
-              role: roleMap[tenantUser.role] || ('BOARD_MEMBER' as Role),
-              unit: tenantUser.unit || '',
-              status: 'active' as const,
-              joined: new Date().toISOString().split('T')[0],
-              boardTitle: tenantUser.board_title || null,
-            };
-
-            addMember(member);
-            login(member);
-
-            // Hop to the building's own host in production (the session rides
-            // along in the URL); stay put on staging, previews and localhost.
-            const { data: sessionData } = await supabase.auth.getSession();
-            const target = tenantLoginUrl(tenant?.subdomain, {
-              accessToken: sessionData?.session?.access_token || '',
-              refreshToken: sessionData?.session?.refresh_token || '',
-            });
-            if (target) {
-              window.location.href = target;
-              return;
-            }
-
+          if (await enterBuilding(data.user)) {
             setLoginLoading(false);
             return;
           }
@@ -704,13 +727,19 @@ export default function AuthPage() {
       // Validate required fields before creating auth user
       const signupEmail = profileEmail || email;
       if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
-      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      // Already signed in as this person (setting up another building): no
+      // password to check and no account to create.
+      const { data: { session: openSession } } = await supabase.auth.getSession();
+      const alreadySignedIn = !!signedInAs
+        && openSession?.user?.email?.toLowerCase() === signupEmail.toLowerCase();
+
+      if (!alreadySignedIn && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
       if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
       // Try to sign up — if user already exists (e.g., abandoned checkout), sign them in instead
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = alreadySignedIn ? { error: null } : await supabase.auth.signUp({
         email: signupEmail,
         password: password,
         options: { data: { full_name: fullName } },
@@ -946,8 +975,13 @@ export default function AuthPage() {
               ))}
             </div>
             <div className="flex items-center gap-2.5 text-sm">
+              {signedInAs ? (
+                // Signed in already: leaving signup goes back to their buildings
+                <a href="/login" className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Cancel</a>
+              ) : (<>
               <span className="text-navy-300 hidden sm:inline">Already have an account?</span>
               <a onClick={() => setAuthStep('login')} className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Log in</a>
+              </>)}
             </div>
           </div>
         </header>
@@ -1155,6 +1189,11 @@ export default function AuthPage() {
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" />
                         </div>
                       </div>
+                      {signedInAs ? (
+                        <p className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-700">
+                          Signed in as <span className="font-semibold">{signedInAs}</span>. This building is added to the same account.
+                        </p>
+                      ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
                         <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)}
@@ -1172,6 +1211,7 @@ export default function AuthPage() {
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
                       </div>
+                      </>)}
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
                         <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
@@ -1196,8 +1236,10 @@ export default function AuthPage() {
                         <button onClick={() => {
                             if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
-                            if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            if (!signedInAs) {
+                              if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                              if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            }
                             handleCheckout();
                           }} disabled={checkoutLoading}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
@@ -1307,8 +1349,46 @@ export default function AuthPage() {
           </div>
         )}
 
+        {/* ══════ WHICH BUILDING? ══════ */}
+        {buildingChoices && (
+          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
+            <Logo />
+            <h1 className="text-center font-display text-xl font-bold text-ink-900">Which building?</h1>
+            <p className="mt-1 text-center text-sm text-ink-500">Signed in as {buildingChoices.user.email}</p>
+            <ul className="mt-5 space-y-2.5">
+              {buildingChoices.rows.map(m => {
+                const sub = subscriptionLabel(m);
+                const roleLabel = m.board_title || ({ board_member: 'Board member', resident: 'Resident', staff: 'Staff', property_manager: 'Property manager' } as Record<string, string>)[m.role] || 'Member';
+                const street = addressLine(m.tenant?.address);
+                return (
+                  <li key={m.tenant_id}>
+                    <button type="button" onClick={() => pickBuilding(m)} disabled={loginLoading}
+                      className="flex w-full items-center gap-3 rounded-xl border border-ink-200 px-4 py-3 text-left transition-colors hover:border-ink-900 focus-visible:border-ink-900 disabled:opacity-50">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-ink-900">{m.tenant?.name || 'Building'}</span>
+                        <span className="block truncate text-xs text-ink-500">{[street, roleLabel].filter(Boolean).join(' · ')}</span>
+                      </span>
+                      {sub && (
+                        <span className={`flex-none rounded-full px-2 py-0.5 text-[11px] font-semibold ${sub.tone === 'ok' ? 'bg-sage-50 text-sage-700' : sub.tone === 'bad' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>{sub.text}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <label className="mt-4 flex items-center justify-center gap-2 text-sm text-ink-600">
+              <input id="remember-building" type="checkbox" checked={rememberBuilding} onChange={e => setRememberBuilding(e.target.checked)} className="h-4 w-4" />
+              Open the building I pick next time
+            </label>
+            <div className="border-t border-ink-100 mt-6 pt-4 flex items-center justify-between text-sm">
+              <a onClick={() => startAddBuilding(buildingChoices.user)} className="text-accent-600 font-semibold cursor-pointer hover:underline">+ Set up another building</a>
+              <a onClick={async () => { await supabase?.auth.signOut(); setBuildingChoices(null); setAuthStep('login'); }} className="text-ink-400 hover:text-ink-600 cursor-pointer">Sign out</a>
+            </div>
+          </div>
+        )}
+
         {/* ══════ LOGIN ══════ */}
-        {authStep === 'login' && (
+        {authStep === 'login' && !buildingChoices && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
             {provisioningTimedOut && (

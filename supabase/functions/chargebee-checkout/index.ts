@@ -58,6 +58,18 @@ function signupPageUrl(origin: string | undefined): string | null {
   }
 }
 
+/**
+ * Identifies a building within one person's signups: street + ZIP, or the
+ * name when there is no street. A retried checkout for the same building
+ * yields the same key, so it reuses the same reserved building id.
+ */
+function buildingKey(b: { name?: string; address?: { street?: string; zip?: string } }): string {
+  const norm = (v: string | undefined) => (v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const street = norm(b.address?.street);
+  if (street) return `addr:${street}|${(b.address?.zip || "").replace(/\D/g, "").slice(0, 5)}`;
+  return `name:${norm(b.name)}`;
+}
+
 // ── Supabase helpers ──
 
 async function sbQuery(
@@ -267,8 +279,41 @@ Deno.serve(async (req) => {
       const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
       const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
 
-      // Get or create Chargebee customer so we can link pending_checkouts
-      const customerId = `cb_${user.id}`;
+      const pendingHeaders = {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+      };
+
+      // Each building is its own Chargebee customer (cb_tenant_<building id>),
+      // the same naming the existing-tenant mode uses. The building does not
+      // exist yet, so its id is only *reserved* here: it lives in the
+      // pending_checkouts row and nowhere else until the webhook provisions
+      // the building after payment. Nothing has to be undone if checkout is
+      // abandoned or fails.
+      //
+      // Coming back to change the plan or add-ons, or retrying after a failed
+      // card, is the same building: reuse its reserved id and customer rather
+      // than minting new ones.
+      const key = buildingKey(building);
+      let tenantId: string | null = null;
+      const priorRes = await fetch(
+        `${SB_URL}/rest/v1/pending_checkouts?user_id=eq.${user.id}&select=payload&order=created_at.desc`,
+        { headers: pendingHeaders },
+      );
+      if (priorRes.ok) {
+        const prior = (await priorRes.json()) as { payload?: { tenantId?: string; buildingKey?: string } }[];
+        tenantId = prior.find((r) => r.payload?.tenantId && r.payload?.buildingKey === key)?.payload?.tenantId ?? null;
+      }
+      if (tenantId) {
+        // A reserved id whose building already exists (provisioned, but its
+        // pending row was left behind) must not be reused for a new checkout.
+        const taken = await sbQuery("GET", "tenants", { id: `eq.${tenantId}`, select: "id" });
+        if (taken?.id) tenantId = null;
+      }
+      if (!tenantId) tenantId = crypto.randomUUID();
+
+      // Get or create the building's Chargebee customer
+      const customerId = `cb_tenant_${tenantId}`;
       const cp = new URLSearchParams();
       cp.append('email', user.email || '');
       cp.append('first_name', building.firstName || building.contactName || '');
@@ -293,10 +338,6 @@ Deno.serve(async (req) => {
       // Save building data for the webhook to provision after checkout.
       // A retried checkout replaces the earlier pending row: the webhook reads
       // exactly one row per customer, and the latest details should win.
-      const pendingHeaders = {
-        apikey: SB_SERVICE_KEY,
-        Authorization: `Bearer ${SB_SERVICE_KEY}`,
-      };
       await fetch(
         `${SB_URL}/rest/v1/pending_checkouts?chargebee_customer_id=eq.${encodeURIComponent(customerId)}`,
         { method: 'DELETE', headers: pendingHeaders },
@@ -305,6 +346,9 @@ Deno.serve(async (req) => {
         chargebee_customer_id: customerId,
         user_id: user.id,
         payload: {
+          // Reserved building id and the key it was reserved under
+          tenantId,
+          buildingKey: key,
           name: building.name,
           subdomain: building.subdomain || null,
           address: building.address || {},
