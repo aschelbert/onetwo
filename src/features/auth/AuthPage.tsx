@@ -5,6 +5,10 @@ import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
+import { fetchMemberships, isSameBuilding, resolveMembership } from '@/lib/tenantMembership';
+
+// Buildings the account had before checkout began, kept across the Chargebee redirect
+const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 
 const Logo = () => (
@@ -224,15 +228,15 @@ export default function AuthPage() {
   };
 
   // Poll for tenant provisioning after checkout success
-  const pollForTenantAndRedirect = async (userId: string, user: any) => {
+  // `knownTenantIds` are buildings the user already had before this checkout:
+  // someone adding another building must wait for the new one, not land in an old one.
+  const pollForTenantAndRedirect = async (userId: string, user: any, knownTenantIds: string[] = []) => {
     setProvisioningStatus('Setting up your building...');
     for (let attempt = 0; attempt < 15; attempt++) {
-      const { data: tu } = await supabase!
-        .from('tenant_users')
-        .select('tenant_id, role, board_title, unit')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const rows = await fetchMemberships(supabase!, userId);
+      const tu = rows?.find(r => !knownTenantIds.includes(r.tenant_id));
       if (tu) {
+        try { sessionStorage.removeItem(KNOWN_TENANTS_KEY); } catch { /* ignore */ }
         setProvisioningStatus('Redirecting to your building...');
         await loginWithTenantUser(user, tu);
         setProvisioningStatus(null);
@@ -356,16 +360,20 @@ export default function AuthPage() {
               setProvisioningStatus('Setting up your building...');
               window.history.replaceState({}, '', '/login');
               const maxAttempts = 15;
+              // Buildings the user had before this checkout (saved by handleCheckout)
+              let knownTenantIds: string[] = [];
+              try {
+                const savedKnown = JSON.parse(sessionStorage.getItem(KNOWN_TENANTS_KEY) || '[]');
+                if (Array.isArray(savedKnown)) knownTenantIds = savedKnown;
+              } catch { /* ignore parse errors */ }
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                const { data: tu } = await supabase!
-                  .from('tenant_users')
-                  .select('tenant_id, role, board_title, unit')
-                  .eq('user_id', user.id)
-                  .maybeSingle();
+                const rows = await fetchMemberships(supabase!, user.id);
+                const tu = rows?.find(r => !knownTenantIds.includes(r.tenant_id));
 
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
                   sessionStorage.removeItem('onetwo_checkout_tokens');
+                  sessionStorage.removeItem(KNOWN_TENANTS_KEY);
                   await loginWithTenantUser(user, tu);
                   clearTimeout(timeout);
                   setSessionChecking(false);
@@ -386,11 +394,7 @@ export default function AuthPage() {
               return;
             }
 
-            const { data: tu } = await supabase!
-              .from('tenant_users')
-              .select('tenant_id, role, board_title, unit')
-              .eq('user_id', user.id)
-              .maybeSingle();
+            const tu = await resolveMembership(supabase!, user.id);
 
             if (tu) {
               await loginWithTenantUser(user, tu);
@@ -495,18 +499,10 @@ export default function AuthPage() {
           }
 
           // Check if user belongs to a tenant
-          const { data: tenantUser } = await supabase!
-            .from('tenant_users')
-            .select('tenant_id, role, board_title, unit')
-            .eq('user_id', data.user.id)
-            .maybeSingle();
+          const tenantUser = await resolveMembership(supabase!, data.user.id);
 
           if (tenantUser) {
-            const { data: tenant } = await supabase!
-              .from('tenants')
-              .select('name, subdomain')
-              .eq('id', tenantUser.tenant_id)
-              .maybeSingle();
+            const tenant = tenantUser.tenant;
 
             const roleMap: Record<string, Role> = {
               board_member: 'BOARD_MEMBER',
@@ -741,19 +737,28 @@ export default function AuthPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
 
-      // Check if user already has a tenant (completed checkout before) — skip to login
-      const { data: existingTenant } = await supabase
-        .from('tenant_users')
-        .select('tenant_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (existingTenant) {
+      // An existing account may add another building. Only stop when this is
+      // a building the account already has (same address, or same name when no
+      // address is on file) — that is a repeat of a finished checkout.
+      const memberships = await fetchMemberships(supabase, session.user.id);
+      if (memberships === null) {
+        alert('We could not check your account. Please try again.');
+        setCheckoutLoading(false);
+        return;
+      }
+      const newBuilding = {
+        name: bldgName,
+        address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+      };
+      const alreadyHas = memberships.some(m =>
+        !!m.tenant && isSameBuilding(newBuilding, { name: m.tenant.name, address: m.tenant.address }));
+      if (alreadyHas) {
         alert('Your account is already set up. Redirecting to login...');
         setAuthStep('login');
         setCheckoutLoading(false);
         return;
       }
+      const knownTenantIds = memberships.map(m => m.tenant_id);
 
       // Open Chargebee Drop-in checkout modal (lazy-init if needed)
       if (!ensureChargebee()) {
@@ -770,6 +775,7 @@ export default function AuthPage() {
           access_token: session.access_token,
           refresh_token: session.refresh_token,
         }));
+        sessionStorage.setItem(KNOWN_TENANTS_KEY, JSON.stringify(knownTenantIds));
       } catch { /* sessionStorage may be unavailable */ }
 
       console.log('[checkout] Opening Chargebee Drop-in...');
@@ -854,7 +860,7 @@ export default function AuthPage() {
             user = currentSession.user;
           }
           if (user) {
-            await pollForTenantAndRedirect(user.id, user);
+            await pollForTenantAndRedirect(user.id, user, knownTenantIds);
           } else {
             console.error('[checkout] No user available after checkout success');
             // Redirect to provisioned page so session-check can retry

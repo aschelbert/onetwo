@@ -23,6 +23,7 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import { isTenantHost } from '@/lib/tenantHost';
+import { resolveMembership } from '@/lib/tenantMembership';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -116,11 +117,7 @@ function AuthListener() {
           }
 
           // Check tenant user
-          const { data: tu } = await sb
-            .from('tenant_users')
-            .select('role, unit, tenant_id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
+          const tu = await resolveMembership(sb, session.user.id);
 
           if (tu) {
             const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };

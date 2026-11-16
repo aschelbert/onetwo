@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
+import { resolveMembership } from '@/lib/tenantMembership';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
@@ -339,11 +340,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     (async () => {
       try {
         // Get user's tenant membership
-        const { data: tu } = await supabase
-          .from('tenant_users')
-          .select('tenant_id')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
+        // A user can belong to several buildings: use this host's, else the newest
+        const tu = await resolveMembership(supabase, currentUser.id);
 
         if (!tu?.tenant_id) {
           setLoaded(true);
