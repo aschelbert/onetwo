@@ -71,14 +71,14 @@ const DEMO_TENANT: TenantContext = {
   name: 'Sunny Acres Condominium',
   subdomain: 'demo',
   status: 'active',
-  tier: 'compliance_pro',
+  tier: 'self_managed',
   features: {
     fiscalLens: true, caseOps: true, complianceRunbook: true,
     aiAdvisor: true, documentVault: true, paymentProcessing: true,
     votesResolutions: false, communityPortal: false,
     vendorManagement: true, reserveStudyTools: false,
   },
-  subscription: { tier: 'compliance_pro', status: 'active', monthlyRate: 179, trialEndsAt: null },
+  subscription: { tier: 'self_managed', status: 'active', monthlyRate: 179, trialEndsAt: null },
   onboarding: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: true, firstUserInvited: true, bylawsUploaded: true, financialSetupDone: true, goLive: true },
 };
 
@@ -138,7 +138,7 @@ export function useTenant() {
         name: tenantRow.name,
         subdomain: tenantRow.subdomain,
         status: tenantRow.status,
-        tier: sub?.tier || 'compliance_pro',
+        tier: sub?.tier || 'self_managed',
         features: {
           fiscalLens: feat?.fiscal_lens ?? true,
           caseOps: feat?.case_ops ?? true,
@@ -152,7 +152,7 @@ export function useTenant() {
           reserveStudyTools: feat?.reserve_study_tools ?? false,
         },
         subscription: {
-          tier: sub?.tier || 'compliance_pro',
+          tier: sub?.tier || 'self_managed',
           status: sub?.status || 'trialing',
           monthlyRate: (sub?.monthly_rate || 17900) / 100,
           trialEndsAt: sub?.trial_ends_at || null,
