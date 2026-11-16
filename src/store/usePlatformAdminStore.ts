@@ -2,10 +2,18 @@ import { create } from 'zustand';
 import { isBackendEnabled } from '@/lib/supabase';
 import * as platformSvc from '@/lib/services/platform';
 import { generateLocalId } from '@/lib/generateId';
+import { DEFAULT_TRIAL_DAYS, TIERS, type SubscriptionTier as BillingTier } from '@/lib/tiers';
 
 // ── Types ──────────────────────────────────────────
 
-export type SubscriptionTier = 'compliance_pro' | 'community_plus' | 'management_suite';
+// The two plans sold today (lib/tiers). Older tier ids still in the database
+// are folded onto them by normalizeTier.
+export type SubscriptionTier = BillingTier;
+
+/** Map any tier id the database may hold onto one of the two current plans. */
+export function normalizeTier(tier: string | null | undefined): SubscriptionTier {
+  return tier === 'facilities' || tier === 'management_suite' || tier === 'estate' ? 'facilities' : 'self_managed';
+}
 export type SubscriptionStatus = 'active' | 'trial' | 'past_due' | 'cancelled' | 'suspended';
 export type BuildingStatus = 'active' | 'onboarding' | 'suspended' | 'archived';
 
@@ -27,6 +35,11 @@ export interface Tenant {
     trialEndsAt: string | null;
     /** Property Manager Seat add-on. */
     pmAddon?: boolean;
+    /** On Call add-on. */
+    onCall?: boolean;
+    interval?: 'monthly' | 'annual';
+    chargebeeSubscriptionId?: string | null;
+    chargebeePlanPriceId?: string | null;
   };
   stats: {
     activeUsers: number;
@@ -60,24 +73,17 @@ export interface Tenant {
   };
 }
 
-// Feature matrix per tier — determines defaults when creating/changing tiers
-// Tiers match Stripe products: Compliance Pro ($179), Community Plus ($279), Management Suite ($399)
+// Per-tenant feature switches (tenant_features). Both plans turn all of them
+// on; what Plus Facilities and the add-ons unlock is described by the module
+// catalog in features/admin/catalog.ts and enforced from the plan and add-ons.
+const ALL_FEATURES_ON: Record<keyof Tenant['features'], boolean> = {
+  fiscalLens: true, caseOps: true, complianceRunbook: true,
+  aiAdvisor: true, documentVault: true, paymentProcessing: true,
+  votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
+};
 export const TIER_FEATURES: Record<SubscriptionTier, Record<keyof Tenant['features'], boolean>> = {
-  compliance_pro: {
-    fiscalLens: true, caseOps: true, complianceRunbook: true,
-    aiAdvisor: false, documentVault: false, paymentProcessing: false,
-    votesResolutions: false, communityPortal: false, vendorManagement: false, reserveStudyTools: false,
-  },
-  community_plus: {
-    fiscalLens: true, caseOps: true, complianceRunbook: true,
-    aiAdvisor: true, documentVault: true, paymentProcessing: true,
-    votesResolutions: false, communityPortal: true, vendorManagement: false, reserveStudyTools: false,
-  },
-  management_suite: {
-    fiscalLens: true, caseOps: true, complianceRunbook: true,
-    aiAdvisor: true, documentVault: true, paymentProcessing: true,
-    votesResolutions: true, communityPortal: true, vendorManagement: true, reserveStudyTools: true,
-  },
+  self_managed: { ...ALL_FEATURES_ON },
+  facilities: { ...ALL_FEATURES_ON },
 };
 
 export function generateSubdomain(name: string, existingSubdomains: string[]): string {
@@ -212,10 +218,10 @@ export interface PlatformSpendingApproval {
 
 // Role definitions for RBAC
 export const TENANT_ROLES = [
-  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'staff', name: 'Staff', description: 'Building staff such as concierge, maintenance, and building managers', icon: '🔧', tiers: ['compliance_pro', 'community_plus', 'management_suite'] as SubscriptionTier[] },
-  { id: 'property_manager', name: 'Property Manager', description: 'Professional property management company representatives', icon: '💼', tiers: ['management_suite'] as SubscriptionTier[] },
+  { id: 'board_member', name: 'Board Member', description: 'HOA board members with governance and fiduciary responsibilities', icon: '🛡️', tiers: ['self_managed', 'facilities'] as SubscriptionTier[] },
+  { id: 'resident', name: 'Resident', description: 'Unit owners and residents of the community', icon: '🏠', tiers: ['self_managed', 'facilities'] as SubscriptionTier[] },
+  { id: 'staff', name: 'Staff', description: 'Porter, super or concierge. The staff role comes with Plus Facilities', icon: '🔧', tiers: ['self_managed', 'facilities'] as SubscriptionTier[] },
+  { id: 'property_manager', name: 'Property Manager', description: 'A manager working inside the building\'s records. Needs the Property Manager Seat add-on', icon: '💼', tiers: ['self_managed', 'facilities'] as SubscriptionTier[] },
 ] as const;
 
 export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
@@ -225,16 +231,15 @@ export const CORE_FEATURES = [
   'dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement', 'fiscalLens',
 ] as const;
 
-// Feature groups for display in permissions matrix
+// Permission features grouped by the app module they live in today
+// (Home, Building, Community, Funds, Board Room, Me).
 export const FEATURE_GROUPS: { name: string; features: string[] }[] = [
-  { name: 'Core Modules', features: ['dashboard', 'boardRoom', 'building', 'propertyLog', 'archives', 'myUnit', 'userManagement'] },
-  { name: 'Financial', features: ['fiscalLens', 'paymentProcessing'] },
-  { name: 'Compliance & Governance', features: ['complianceRunbook'] },
-  { name: 'Case & Workflow', features: ['caseOps'] },
-  { name: 'AI & Intelligence', features: ['aiAdvisor'] },
-  { name: 'Documents & Archives', features: ['documentVault'] },
-  { name: 'Community', features: ['votesResolutions', 'communityPortal'] },
-  { name: 'Management', features: ['vendorManagement', 'reserveStudyTools'] },
+  { name: 'Home', features: ['dashboard'] },
+  { name: 'Building', features: ['building', 'archives', 'documentVault', 'vendorManagement'] },
+  { name: 'Community', features: ['communityPortal', 'votesResolutions', 'propertyLog'] },
+  { name: 'Funds', features: ['fiscalLens', 'paymentProcessing', 'reserveStudyTools'] },
+  { name: 'Board Room', features: ['boardRoom', 'complianceRunbook', 'caseOps', 'aiAdvisor'] },
+  { name: 'Me', features: ['myUnit', 'userManagement'] },
 ];
 
 // ── Seed Data ──────────────────────────────────────
@@ -245,50 +250,50 @@ const seedTenants: Tenant[] = [
     id: '02305a79-beb2-4037-b447-5263e955e84c', name: '1302 R ST NW', subdomain: '1302rstnw',
     address: { street: '1302 R St NW', city: 'Washington', state: 'DC', zip: '20009-4882' },
     totalUnits: 4, yearBuilt: '', status: 'onboarding', createdAt: '2026-03-02',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
+    subscription: { tier: 'self_managed', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
     stats: { activeUsers: 1, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
     primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
-    features: { ...TIER_FEATURES.compliance_pro },
+    features: { ...TIER_FEATURES.self_managed },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
   {
     id: 'b1280a87-b936-4668-83c4-b75594833f6f', name: 'Castle Condos', subdomain: 'castle',
     address: { street: '123 Main St', city: 'Washington', state: 'DC', zip: '20009' },
     totalUnits: 20, yearBuilt: '', status: 'onboarding', createdAt: '2026-02-23',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    subscription: { tier: 'self_managed', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
     stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
     primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
-    features: { ...TIER_FEATURES.compliance_pro },
+    features: { ...TIER_FEATURES.self_managed },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
   {
     id: '74a6009c-6daa-45b2-bd91-ba5c4d7310cb', name: "Coop's Coop", subdomain: 'coopscoop',
     address: { street: '', city: '', state: '', zip: '' },
     totalUnits: 0, yearBuilt: '', status: 'onboarding', createdAt: '2026-02-23',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    subscription: { tier: 'self_managed', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
     stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
     primaryContact: { name: 'Board Member', email: 'boardmember@getonetwo.com', phone: '', role: 'Primary Contact' },
-    features: { ...TIER_FEATURES.compliance_pro },
+    features: { ...TIER_FEATURES.self_managed },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: false, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
   {
     id: '0ed0ce61-98a6-4aaf-922a-749b109889be', name: 'Sunny Acres Condominium', subdomain: 'sunnyacres',
     address: { street: '1234 Constitution Ave NW', city: 'Washington', state: 'DC', zip: '20001' },
     totalUnits: 50, yearBuilt: '1998', status: 'onboarding', createdAt: '2026-02-23',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
+    subscription: { tier: 'self_managed', status: 'trial', startDate: '2026-02-23', nextBillingDate: '2026-03-25', monthlyRate: 179, trialEndsAt: '2026-03-25' },
     stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
     primaryContact: { name: 'Robert Mitchell', email: 'robert@example.com', phone: '202-555-0401', role: 'Primary Contact' },
-    features: { ...TIER_FEATURES.compliance_pro },
+    features: { ...TIER_FEATURES.self_managed },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
   {
     id: '0a5eee55-bb60-4a1c-b623-89fce7ce0b7a', name: 'Test Building', subdomain: 'testbuilding',
     address: { street: '123 Main St NW', city: 'Washington', state: 'DC', zip: '20009' },
     totalUnits: 10, yearBuilt: '', status: 'onboarding', createdAt: '2026-03-02',
-    subscription: { tier: 'compliance_pro', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
+    subscription: { tier: 'self_managed', status: 'trial', startDate: '2026-03-02', nextBillingDate: '2026-04-01', monthlyRate: 179, trialEndsAt: '2026-04-01' },
     stats: { activeUsers: 0, occupiedUnits: 0, collectionRate: 0, complianceScore: 0, openCases: 0, monthlyRevenue: 0 },
     primaryContact: { name: '', email: '', phone: '', role: 'Primary Contact' },
-    features: { ...TIER_FEATURES.compliance_pro },
+    features: { ...TIER_FEATURES.self_managed },
     onboardingChecklist: { accountCreated: true, buildingProfileComplete: true, unitsConfigured: false, firstUserInvited: false, bylawsUploaded: false, financialSetupDone: false, goLive: false },
   },
 ];
@@ -333,7 +338,7 @@ export interface Announcement {
   id: string;
   title: string;
   message: string;
-  audience: 'all' | 'compliance_pro' | 'community_plus' | 'management_suite' | string;
+  audience: 'all' | SubscriptionTier | string;
   status: 'draft' | 'sent';
   createdBy: string;
   createdAt: string;
@@ -368,12 +373,12 @@ const seedTickets: SupportTicket[] = [
 ];
 
 const seedAnnouncements: Announcement[] = [
-  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Management Suite subscribers can now create ownership-weighted elections with full compliance tracking.', audience: 'management_suite', status: 'sent', createdBy: 'Platform Admin', createdAt: '2026-02-15', sentAt: '2026-02-15' },
+  { id: 'ann-001', title: 'Votes & Resolutions Now Available', message: 'Boards can now create ownership-weighted elections with full compliance tracking.', audience: 'all', status: 'sent', createdBy: 'Platform Admin', createdAt: '2026-02-15', sentAt: '2026-02-15' },
   { id: 'ann-002', title: 'Scheduled Maintenance — Feb 28', message: 'Brief downtime expected Feb 28 2-4 AM ET for infrastructure upgrades.', audience: 'all', status: 'draft', createdBy: 'Alex Rivera', createdAt: '2026-02-22', sentAt: null },
 ];
 
 const seedTemplates: EmailTemplate[] = [
-  { id: 'tmpl-001', name: 'Welcome — New Building', subject: 'Welcome to ONE two, {{building_name}}!', body: 'Hi {{contact_name}},\n\nYour building {{building_name}} is now set up at {{subdomain}}.getonetwo.com.\n\nYour 30-day trial of {{tier_name}} begins today. Here\'s how to get started:\n\n1. Complete your building profile\n2. Configure your units\n3. Invite your first board member or resident\n4. Upload your governing documents\n\nQuestions? Reply to this email or visit our help center.\n\n— The ONE two Team', trigger: 'onboarding_welcome', lastEdited: '2026-01-10' },
+  { id: 'tmpl-001', name: 'Welcome — New Building', subject: 'Welcome to ONE two, {{building_name}}!', body: 'Hi {{contact_name}},\n\nYour building {{building_name}} is now set up at {{subdomain}}.getonetwo.com.\n\nYour free trial of {{tier_name}} begins today. Here\'s how to get started:\n\n1. Complete your building profile\n2. Configure your units\n3. Invite your first board member or resident\n4. Upload your governing documents\n\nQuestions? Reply to this email or visit our help center.\n\n— The ONE two Team', trigger: 'onboarding_welcome', lastEdited: '2026-01-10' },
   { id: 'tmpl-002', name: 'Trial Ending — 7 Days', subject: 'Your ONE two trial ends in 7 days', body: 'Hi {{contact_name}},\n\nYour trial for {{building_name}} ({{tier_name}}) ends on {{trial_end_date}}.\n\nTo continue uninterrupted:\n→ Log in at {{subdomain}}.getonetwo.com\n→ Go to Account Settings → Billing\n→ Add a payment method\n\nNeed more time? Reply and we\'ll extend your trial.', trigger: 'trial_ending', lastEdited: '2026-01-15' },
   { id: 'tmpl-003', name: 'Payment Past Due', subject: 'Action required: Payment overdue for {{building_name}}', body: 'Hi {{contact_name}},\n\nWe were unable to process payment of {{amount}} for {{building_name}}.\n\nPlease update your payment method within 15 days to avoid service interruption.\n\nUpdate billing: {{subdomain}}.getonetwo.com/settings/billing', trigger: 'past_due', lastEdited: '2026-01-20' },
   { id: 'tmpl-004', name: 'Feature Update', subject: 'New in ONE two: {{feature_name}}', body: 'Hi {{contact_name}},\n\nWe\'ve just launched {{feature_name}} for {{tier_name}} subscribers.\n\n{{feature_description}}\n\nLog in to try it: {{subdomain}}.getonetwo.com', trigger: 'feature_update', lastEdited: '2026-02-10' },
@@ -718,6 +723,11 @@ interface PlatformAdminState {
   castPlatformVote: (approvalId: string, voter: string, vote: 'approve' | 'deny') => void;
   deletePlatformApproval: (id: string) => void;
   // Platform Settings
+  chargebeeTrial: platformSvc.ChargebeeTrial | null;
+  /** Why Chargebee could not be read or written; null when the last call worked. */
+  chargebeeTrialError: string | null;
+  chargebeeTrialLoading: boolean;
+  loadChargebeeTrial: () => Promise<void>;
   updateTrialDays: (days: number) => Promise<boolean>;
   // Computed
   getAccountBalance: (acctNum: string) => number;
@@ -735,7 +745,10 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   emailTemplates: seedTemplates,
   invoices: seedInvoices,
   impersonating: null,
-  trialDays: 30,
+  trialDays: DEFAULT_TRIAL_DAYS,
+  chargebeeTrial: null,
+  chargebeeTrialError: null,
+  chargebeeTrialLoading: false,
 
   // Admin Console v2 initial state
   permissions: seedPermissions,
@@ -818,7 +831,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
     set(s => ({
       tenants: s.tenants.map(t => t.id === id ? {
         ...t,
-        subscription: { ...t.subscription, tier, monthlyRate: { compliance_pro: 179, community_plus: 279, management_suite: 399 }[tier] },
+        subscription: { ...t.subscription, tier, monthlyRate: TIERS.find(x => x.id === tier)?.monthly ?? t.subscription.monthlyRate },
         features,
       } : t),
       auditLog: [{ id: generateLocalId('aud-'), timestamp: new Date().toISOString(), actor, actorRole: 'super_admin', action: 'subscription.tier_change', target: s.tenants.find(t => t.id === id)?.name || id, details: `Tier changed to ${tier} — features auto-updated`, buildingId: id }, ...s.auditLog],
@@ -940,7 +953,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
         return { ...p, actions: newActions, updatedAt: new Date().toISOString(), updatedBy: 'admin' };
       }),
     }));
-    const allFeatures = [...CORE_FEATURES, ...Object.keys(TIER_FEATURES.compliance_pro)];
+    const allFeatures = [...CORE_FEATURES, ...Object.keys(TIER_FEATURES.self_managed)];
     if (isBackendEnabled) platformSvc.bulkUpdatePermissions(roleId, mode, allFeatures);
   },
 
@@ -992,10 +1005,25 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
   },
 
   // ─── Platform Settings ────────────────────────────
+  loadChargebeeTrial: async () => {
+    set({ chargebeeTrialLoading: true });
+    const res = await platformSvc.fetchChargebeeTrial();
+    set({
+      chargebeeTrialLoading: false,
+      chargebeeTrial: res.trial ?? null,
+      chargebeeTrialError: res.ok ? null : res.error,
+      // What Chargebee gives a new signup is the number worth showing.
+      ...(res.ok && res.trial.chargebeeTrialDays !== null ? { trialDays: res.trial.chargebeeTrialDays } : {}),
+    });
+  },
   updateTrialDays: async (days) => {
-    const ok = await platformSvc.updatePlatformSettings(days);
-    if (ok) set({ trialDays: days });
-    return ok;
+    const res = await platformSvc.saveTrialDays(days);
+    set({
+      chargebeeTrial: res.trial ?? get().chargebeeTrial,
+      chargebeeTrialError: res.ok ? null : res.error,
+      ...(res.ok ? { trialDays: days } : {}),
+    });
+    return res.ok;
   },
 
   // ─── Computed ─────────────────────────────────────

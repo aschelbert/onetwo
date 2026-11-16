@@ -291,12 +291,37 @@ function syncBudgetCategory(id: string) {
   if (cat) financialSvc.updateBudgetCategory(id, cat).catch(err => console.error('[syncWrite] updateBudgetCategory failed:', err));
 }
 
+// Each work order's writes go out one at a time, in order: its insert first, then
+// every change. A change sent while an earlier one is still in flight could land
+// first and be overwritten (an invoice landing after the payment left the bill
+// "invoiced" in the database although it was paid), and a change sent before the
+// insert lands updates nothing. Each write sends the work order as it is when the
+// write runs, so the last one carries the latest state.
+const workOrderWrites: Record<string, Promise<unknown>> = {};
+/** Run one write for a work order after the ones before it. Exported for tests. */
+export function queueWorkOrderWrite(localId: string, write: () => Promise<unknown>): Promise<unknown> {
+  const next = (workOrderWrites[localId] ?? Promise.resolve())
+    .then(write)
+    .catch(err => console.error('[syncWrite] work order write failed:', err));
+  workOrderWrites[localId] = next;
+  return next;
+}
+
+function insertWorkOrder(tid: string, localId: string) {
+  queueWorkOrderWrite(localId, () => {
+    const wo = useFinancialStore.getState().workOrders.find(x => x.id === localId);
+    return wo ? financialSvc.createWorkOrder(tid, wo) : Promise.resolve(false);
+  });
+}
+
 function syncWorkOrder(localId: string) {
   if (!isBackendEnabled) return;
   const tid = resolveTenantId();
   if (!tid) return;
-  const wo = useFinancialStore.getState().workOrders.find(x => x.id === localId);
-  if (wo) financialSvc.updateWorkOrderByLocalId(tid, localId, wo).catch(err => console.error('[syncWrite] updateWorkOrder failed:', err));
+  queueWorkOrderWrite(localId, () => {
+    const wo = useFinancialStore.getState().workOrders.find(x => x.id === localId);
+    return wo ? financialSvc.updateWorkOrderByLocalId(tid, localId, wo) : Promise.resolve(false);
+  });
 }
 
 function syncSettings() {
@@ -568,7 +593,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         const entry = post(input.asOf, `Opening bill · ${b.vendor} · ${b.description}`, m.operatingFundBalance, m.accountsPayable, amt, 'expense', `opening:bill:${id}`);
         const wo: WorkOrder = { id, title: b.description, vendor: b.vendor, description: b.description, acctNum: b.acctNum, amount: amt, status: 'invoiced', caseId: null, createdDate: input.asOf, approvedDate: input.asOf, invoiceNum: b.invoiceNum || id, invoiceDate: input.asOf, paidDate: null, glEntryId: null, attachments: [], accrualGlEntryId: entry.id };
         set(st => ({ workOrders: [...st.workOrders, wo] }));
-        if (isBackendEnabled) { const tid = get().tenantId || getActiveTenantId(); if (tid) financialSvc.createWorkOrder(tid, wo); }
+        if (isBackendEnabled) { const tid = get().tenantId || getActiveTenantId(); if (tid) insertWorkOrder(tid, wo.id); }
       }
       get().closeBooksThrough(input.asOf, today);
     } catch (err) {
@@ -960,7 +985,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set((s) => ({ workOrders: [...s.workOrders, newWo] }));
     if (isBackendEnabled) {
       const tid = state.tenantId || getActiveTenantId();
-      if (tid) financialSvc.createWorkOrder(tid, newWo);
+      if (tid) insertWorkOrder(tid, newWo.id);
     }
   },
 

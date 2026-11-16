@@ -2,12 +2,12 @@ import { useState, Fragment } from 'react';
 import { usePlatformAdminStore, TIER_FEATURES, TENANT_ROLES, PERMISSION_ACTIONS, FEATURE_GROUPS, CORE_FEATURES, type SubscriptionTier, type Tenant } from '@/store/usePlatformAdminStore';
 
 const FEATURE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', boardRoom: 'Board Room', building: 'The Building',
+  dashboard: 'Home', boardRoom: 'Board Room', building: 'The Building',
   propertyLog: 'Property Log', archives: 'The Archives', myUnit: 'My Unit',
   userManagement: 'User Management',
-  fiscalLens: 'Fiscal Lens', caseOps: 'Case Ops', complianceRunbook: 'Compliance Runbook',
-  aiAdvisor: 'AI Advisor', documentVault: 'Document Vault', paymentProcessing: 'Payment Processing',
-  votesResolutions: 'Votes & Resolutions', communityPortal: 'Community Portal',
+  fiscalLens: 'Funds (Fiscal Lens)', caseOps: 'Current Actions (Cases)', complianceRunbook: 'Runbooks & Obligations',
+  aiAdvisor: 'AI Advisor', documentVault: 'Documents', paymentProcessing: 'Online Payments',
+  votesResolutions: 'Votes & Resolutions', communityPortal: 'Community',
   vendorManagement: 'Vendor Management', reserveStudyTools: 'Reserve Study Tools',
 };
 
