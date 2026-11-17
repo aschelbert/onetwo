@@ -483,6 +483,7 @@ export type Database = {
       support_threads: {
         Row: {
           id: string
+          internal: boolean
           tenancy_id: string
           subject: string
           status: string
@@ -497,6 +498,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          internal?: boolean
           tenancy_id: string
           subject: string
           status?: string
@@ -511,6 +513,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          internal?: boolean
           tenancy_id?: string
           subject?: string
           status?: string

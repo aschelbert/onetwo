@@ -25,8 +25,8 @@ export type OnCallRow = {
   support_thread_id: string | null
 }
 
-type TenantJoin = { name: string; subdomain: string; total_units: number | null }
-type SubJoin = { tier: string | null; status: string | null; billing_interval: string | null; trial_ends_at: string | null }
+export type TenantJoin = { name: string; subdomain: string; total_units: number | null }
+export type SubJoin = { tier: string | null; status: string | null; billing_interval: string | null; trial_ends_at: string | null }
 
 const PLAN_ID: Record<string, string> = { facilities: 'plus-facilities', self_managed: 'self-managed' }
 const TENANCY_STATUS: Record<string, string> = { trialing: 'trial', active: 'active', past_due: 'active', canceled: 'churned' }
@@ -74,7 +74,7 @@ async function loadRows(): Promise<{ rows: OnCallRow[]; details: Map<string, { t
 }
 
 /** Support threads belong to a tenancy here, so the building needs its row in this project. */
-async function ensureTenancy(tenantId: string, tenant: TenantJoin, sub: SubJoin | null) {
+export async function ensureTenancy(tenantId: string, tenant: TenantJoin, sub: SubJoin | null) {
   const { data: existing } = await supabaseAdmin.from('tenancies').select('id').eq('id', tenantId).maybeSingle()
   if (existing) return
   const { error } = await supabaseAdmin.from('tenancies').insert({
@@ -111,6 +111,8 @@ export async function syncOnCallRequests(): Promise<{ rows: OnCallRow[]; opened:
           subject: `On Call advisor needed: ${row.building}`,
           priority: 'high',
           module: 'On Call',
+          // For the ONE two team only; the building never sees this thread.
+          internal: true,
           created_by_name: 'ONE two',
         })
         .select('id')
