@@ -23,6 +23,7 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import { isTenantHost } from '@/lib/tenantHost';
+import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -48,16 +49,23 @@ function AuthListener() {
     ranRef.current = true;
     const sb = supabase; // narrow for TS inside async callback
 
-    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      const { isAuthenticated, login, signOut, addMember } = useAuthStore.getState();
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+      const { isAuthenticated, signOut } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
         if (isAuthenticated) signOut();
         return;
       }
 
-      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set
-      if (session && !isAuthenticated) {
+      // On INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED — restore auth if not already set.
+      // Deferred to the next tick: supabase-js holds its auth lock while it waits
+      // for this callback, and the queries below need that lock to read the
+      // session. Awaiting them here hangs the call that fired the event (the
+      // setSession of a subdomain handoff never returns, so a new building's
+      // owner lands on the login form).
+      setTimeout(async () => {
+        const { isAuthenticated, login, addMember } = useAuthStore.getState();
+        if (isAuthenticated) return;
         try {
           // Check if platform admin first
           const { data: admin } = await sb
@@ -109,11 +117,11 @@ function AuthListener() {
           }
 
           // Check tenant user
-          const { data: tu } = await sb
-            .from('tenant_users')
-            .select('role, unit, tenant_id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
+          // With several buildings and none implied by the host, the login
+          // page asks which one; don't pick for them here.
+          const memberships = await fetchMemberships(sb, session.user.id);
+          if (needsBuildingChoice(memberships)) return;
+          const tu = pickMembership(memberships);
 
           if (tu) {
             const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
@@ -134,7 +142,7 @@ function AuthListener() {
         } catch {
           // Session exists but lookup failed — don't crash
         }
-      }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
@@ -154,7 +162,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
-  if (isAuthenticated) {
+  const location = useLocation();
+  // ?create=1 is signup. A signed-in board member setting up another building
+  // must reach it rather than being sent back into the building they are in.
+  const addingBuilding = new URLSearchParams(location.search).get('create') === '1'
+    && currentRole !== 'PLATFORM_ADMIN' && currentRole !== 'PM_COMPANY';
+  if (isAuthenticated && !addingBuilding) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'

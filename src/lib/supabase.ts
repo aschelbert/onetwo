@@ -15,16 +15,38 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
-
-export const isBackendEnabled = !!supabase;
-
 // ── Active tenant ID ──────────────────────────────────────────────
 // Set once by TenantProvider after tenant is resolved.
 // Stores use this to auto-persist without callers passing tenantId.
 let _activeTenantId: string | null = null;
+
+/** Header that tells the database which building a request is for. */
+export const TENANT_HEADER = 'x-tenant-id';
+
+/**
+ * Adds the active building to database requests. The database serves one
+ * building per request (current_tenant_id() and the `tenant_scope` policies),
+ * so someone who belongs to two buildings only ever gets the one they are in.
+ * Only /rest/v1/ is tagged: edge functions, auth and storage have their own
+ * CORS allow-lists and would reject the extra header.
+ */
+export function withTenantHeader(input: RequestInfo | URL, init?: RequestInit): RequestInit | undefined {
+  if (!_activeTenantId) return init;
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (!url.includes('/rest/v1/')) return init;
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  headers.set(TENANT_HEADER, _activeTenantId);
+  return { ...init, headers };
+}
+
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      global: { fetch: (input, init) => fetch(input, withTenantHeader(input, init)) },
+    })
+  : null;
+
+export const isBackendEnabled = !!supabase;
+
 export function setActiveTenantId(id: string | null) { _activeTenantId = id; }
 export function getActiveTenantId(): string | null { return _activeTenantId; }
 
