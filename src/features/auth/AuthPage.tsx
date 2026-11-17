@@ -509,10 +509,13 @@ export default function AuthPage() {
               return;
             }
 
-            // Signed in and here to set up another building (?create=1):
-            // go to signup instead of into the building they already have.
+            // Signup (?create=1). Only "Set up another building" from inside
+            // the app (?add=1) continues as the signed-in person. A plain
+            // signup link starts blank even if this browser still holds a
+            // session: the visitor did not ask to act as that account, and if
+            // they enter its email the form asks how they want to continue.
             if (params.get('create') === '1') {
-              startAddBuilding(user);
+              if (params.get('add') === '1') startAddBuilding(user);
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);

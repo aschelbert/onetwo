@@ -61,8 +61,8 @@ export default function Ux2TopNav() {
   };
   // Signup lives on the root host in production; elsewhere it is this host
   const addBuildingHref = isEnvironmentHost(window.location.hostname)
-    ? '/login?create=1'
-    : `https://app.${ROOT_DOMAIN}/login?create=1`;
+    ? '/login?create=1&add=1'
+    : `https://app.${ROOT_DOMAIN}/login?create=1&add=1`;
   const buildingItems = (itemRole: 'menuitem' | 'menuitemradio') => (
     <>
       {buildings.map(b => {
