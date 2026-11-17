@@ -309,6 +309,25 @@ export default function AuthPage() {
   // Enter the account's building, or ask which one when it has several.
   // Returns false when the account has no building at all.
   const enterBuilding = async (user: SessionUser): Promise<boolean> => {
+    // Signing in to finish a "sign in later" signup: open the building that
+    // was just paid for, not the one they had before and not the picker. It
+    // is attached by the payment webhook, so give it a few seconds to appear.
+    let paidFor: string | null = null;
+    try { paidFor = sessionStorage.getItem(SIGN_IN_LATER_KEY); } catch { /* ignore */ }
+    if (paidFor) {
+      const wanted = paidFor.trim().toLowerCase();
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const found = (await fetchMemberships(supabase!, user.id))
+          ?.find(m => (m.tenant?.name || '').trim().toLowerCase() === wanted);
+        if (found) {
+          await loginWithTenantUser(user, found);
+          return true;
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      }
+      // Still not there: carry on to whatever they do have; the note stays up
+    }
+
     const rows = await fetchMemberships(supabase!, user.id);
     if (!rows || rows.length === 0) return false;
     if (needsBuildingChoice(rows)) {
@@ -815,6 +834,14 @@ export default function AuthPage() {
 
       // From here until checkout succeeds or stops, any session is the signup's
       setSignupInProgress(true);
+
+      // This browser may still hold a sign-in the visitor did not ask to use
+      // (they opened a plain signup, not "Set up another building"). Drop it,
+      // so the signup acts only on what they choose here: otherwise "sign in
+      // later" would finish with them already inside their existing building.
+      if (!alreadySignedIn && openSession) {
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+      }
 
       // Try to sign up — if the email already has an account, sign in instead
       const { error: authError } = alreadySignedIn || signInLater ? { error: null }
