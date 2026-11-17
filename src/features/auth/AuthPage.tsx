@@ -16,9 +16,8 @@ const consentSource = (signedInAs: string | null, existingAccount: unknown) =>
 
 type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
 
-// The signup form, kept while its owner leaves to open an emailed sign-in link
-const SIGNUP_DRAFT_KEY = 'onetwo_signup_draft';
-const SIGNUP_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Name of a building paid for without signing in; survives Chargebee's redirect
+const SIGN_IN_LATER_KEY = 'onetwo_sign_in_later';
 
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
@@ -184,12 +183,17 @@ export default function AuthPage() {
   // Signing up with an email that already has an account: the account step
   // becomes a one-field sign-in instead of "choose a password". `error` is
   // shown when the password entered there is wrong.
-  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean } | null>(null);
+  // `mode` is how they chose to continue: sign in to that account now, or
+  // skip signing in and have the building attached to it after payment.
+  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean; mode: 'now' | 'later' } | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  // Set after a "sign in later" checkout: the login form explains what to do next
+  const [signInLaterFor, setSignInLaterFor] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(SIGN_IN_LATER_KEY); } catch { return null; }
+  });
   // Terms, Privacy and (optional) product emails. Asked on every form that
   // takes an email; nothing is pre-ticked.
   const [consent, setConsent] = useState<Consent>(NO_CONSENT);
-  // The emailed sign-in link, for someone who can't or won't use the password
-  const [emailLink, setEmailLink] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   // Chargebee Drop-in initialization
@@ -229,6 +233,10 @@ export default function AuthPage() {
       .select('name, subdomain')
       .eq('id', tu.tenant_id)
       .maybeSingle();
+
+    // Signed in: the "sign in to open your new building" note has done its job
+    try { sessionStorage.removeItem(SIGN_IN_LATER_KEY); } catch { /* ignore */ }
+    setSignInLaterFor(null);
 
     // This is now the building this browser is in
     chooseTenant(tu.tenant_id);
@@ -301,68 +309,9 @@ export default function AuthPage() {
     if (rest.length) setLastName(rest.join(' '));
     setBuildingChoices(null);
     setExistingAccount(null);
-    // Back from an emailed sign-in link: pick the signup up where it stopped.
-    // The draft is consumed on first use, so a second call (the session check
-    // can run twice) must not send them back to the plan step.
-    if (restoreSignupDraft(user.email || '')) {
-      draftRestored.current = true;
-      setAuthStep('signup-account');
-    } else if (!draftRestored.current) {
-      setAuthStep('signup-plan');
-    }
-  };
-  const draftRestored = useRef(false);
-
-  const saveSignupDraft = (forEmail: string) => {
-    try {
-      localStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify({
-        savedAt: Date.now(), email: forEmail.trim().toLowerCase(),
-        selectedTier, billingInterval, addOns: [...selectedAddOns],
-        bldgName, bldgSubdomain, bldgStreet, bldgCity, bldgState, bldgZip, bldgUnits,
-        firstName, lastName, profilePhone, profileUnit, boardTitle,
-      }));
-    } catch { /* storage unavailable: they re-enter the form after the link */ }
+    setAuthStep('signup-plan');
   };
 
-  /** Refill the form from a saved draft for this email. Returns whether one was restored. */
-  const restoreSignupDraft = (forEmail: string): boolean => {
-    try {
-      const raw = localStorage.getItem(SIGNUP_DRAFT_KEY);
-      if (!raw) return false;
-      localStorage.removeItem(SIGNUP_DRAFT_KEY);
-      const d = JSON.parse(raw);
-      if (!d || d.email !== forEmail.trim().toLowerCase()) return false;
-      if (typeof d.savedAt !== 'number' || Date.now() - d.savedAt > SIGNUP_DRAFT_MAX_AGE_MS) return false;
-      if (d.selectedTier === 'self_managed' || d.selectedTier === 'facilities') setSelectedTier(d.selectedTier);
-      if (d.billingInterval === 'monthly' || d.billingInterval === 'annual') setBillingInterval(d.billingInterval);
-      if (Array.isArray(d.addOns)) setSelectedAddOns(new Set(d.addOns as AddOnId[]));
-      const str = (v: unknown) => (typeof v === 'string' ? v : '');
-      setBldgName(str(d.bldgName));
-      subdomainManuallyEdited.current = true; // keep the short name they chose
-      setBldgSubdomain(str(d.bldgSubdomain));
-      setBldgStreet(str(d.bldgStreet)); setBldgCity(str(d.bldgCity)); setBldgState(str(d.bldgState));
-      setBldgZip(str(d.bldgZip)); setBldgUnits(str(d.bldgUnits));
-      if (str(d.firstName)) setFirstName(str(d.firstName));
-      if (str(d.lastName)) setLastName(str(d.lastName));
-      setProfilePhone(str(d.profilePhone)); setProfileUnit(str(d.profileUnit));
-      if (str(d.boardTitle)) setBoardTitle(str(d.boardTitle));
-      return !!str(d.bldgName);
-    } catch { return false; }
-  };
-
-  // Prove ownership of an existing account by email instead of by password.
-  // The link signs them in and returns here, where the saved form is restored.
-  const sendSignInLink = async () => {
-    const target = (profileEmail || email).trim();
-    if (!supabase || !target) return;
-    setEmailLink('sending');
-    saveSignupDraft(target);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: target,
-      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/login?create=1` },
-    });
-    setEmailLink(error ? 'failed' : 'sent');
-  };
 
   // Poll for tenant provisioning after checkout success
   // `knownTenantIds` are buildings the user already had before this checkout:
@@ -823,13 +772,17 @@ export default function AuthPage() {
       // The email is already known to have an account: sign in, don't sign up
       const knownAccount = !alreadySignedIn && existingAccount?.email === signupEmail.trim().toLowerCase();
 
+      // They chose not to sign in now: no account is touched here. The server
+      // attaches the building to that account once it has been paid for.
+      const signInLater = knownAccount && existingAccount?.mode === 'later';
+
       if (!alreadySignedIn && !knownAccount && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
       if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
       // Try to sign up — if the email already has an account, sign in instead
-      const { error: authError } = alreadySignedIn ? { error: null }
+      const { error: authError } = alreadySignedIn || signInLater ? { error: null }
         : knownAccount ? { error: { message: 'already registered' } }
         : await supabase.auth.signUp({
           email: signupEmail,
@@ -848,7 +801,7 @@ export default function AuthPage() {
             password: password,
           });
           if (signInError) {
-            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: knownAccount });
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: knownAccount, mode: 'now' });
             setPassword('');
             setConfirmPassword('');
             setCheckoutLoading(false);
@@ -861,8 +814,8 @@ export default function AuthPage() {
       }
 
       // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+      const session = signInLater ? null : (await supabase.auth.getSession()).data.session;
+      if (!signInLater && !session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
 
       // Proof of what was ticked on this form, stored before any payment step
       await recordConsent(supabase, consentSource(signedInAs, existingAccount), signupEmail, consent);
@@ -870,7 +823,8 @@ export default function AuthPage() {
       // An existing account may add another building. Only stop when this is
       // a building the account already has (same address, or same name when no
       // address is on file) — that is a repeat of a finished checkout.
-      const memberships = await fetchMemberships(supabase, session.user.id);
+      // (Without a session the server makes the same check before checkout.)
+      const memberships = session ? await fetchMemberships(supabase, session.user.id) : [];
       if (memberships === null) {
         alert('We could not check your account. Please try again.');
         setCheckoutLoading(false);
@@ -901,11 +855,15 @@ export default function AuthPage() {
 
       // Save session tokens so we can restore them if Chargebee redirects away
       try {
-        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        }));
-        sessionStorage.setItem(KNOWN_TENANTS_KEY, JSON.stringify(knownTenantIds));
+        if (session) {
+          sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          }));
+          sessionStorage.setItem(KNOWN_TENANTS_KEY, JSON.stringify(knownTenantIds));
+        } else {
+          sessionStorage.setItem(SIGN_IN_LATER_KEY, bldgName.trim());
+        }
       } catch { /* sessionStorage may be unavailable */ }
 
       console.log('[checkout] Opening Chargebee Drop-in...');
@@ -931,7 +889,8 @@ export default function AuthPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${currentSession.access_token}`,
+                  // No session when signing in later: the server then goes by existingEmail
+                  'Authorization': `Bearer ${currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                   'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
                 },
                 body: JSON.stringify({
@@ -950,6 +909,7 @@ export default function AuthPage() {
                     lastName: lastName.trim(),
                   },
                   origin: window.location.origin,
+                  ...(signInLater ? { existingEmail: signupEmail.trim().toLowerCase() } : {}),
                   conversionEventId,
                   // Global Privacy Control: skip the server-side OpenAI Ads report too
                   adMeasurementOptOut:
@@ -982,6 +942,17 @@ export default function AuthPage() {
           // OpenAI Ads conversion: paid trial signup completed. Attach the
           // hashed email and user ID first so OpenAI can match it to the ad.
           await setOpenAIPixelUser({ email: signupEmail, userId: currentSession?.user?.id });
+          if (signInLater) {
+            // Paid without signing in: the building is being attached to
+            // their account. Send them to sign in, with the next step spelled out.
+            setSignInLaterFor(bldgName.trim());
+            setExistingAccount(null);
+            setEmail(signupEmail.trim());
+            setPassword('');
+            setAuthStep('login');
+            setCheckoutLoading(false);
+            return;
+          }
           window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
@@ -1297,36 +1268,57 @@ export default function AuthPage() {
                       ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); setEmailLink('idle'); }}
+                        <input ref={emailInputRef} type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
                           className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
                       </div>
                       {existingAccount ? (
-                        <div role="status" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
-                          <p className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
-                          <p className="mt-0.5 text-sm text-ink-700">This building will be added to it. Confirm it&apos;s you with your password, or with a link we email you.</p>
-                          <label htmlFor="existing-account-password" className="mt-3 block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
-                          <input id="existing-account-password" type="password" value={password} autoFocus
-                            onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
-                            aria-invalid={existingAccount.error || undefined}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
-                          {existingAccount.error && <p className="mt-1.5 text-sm text-red-700">That password doesn&apos;t match this account. Try again, or use the email link below.</p>}
-                          <div className="mt-3 border-t border-ink-200 pt-3">
-                            {emailLink === 'sent' ? (
-                              <p role="status" className="text-sm text-ink-800">
-                                <span className="font-semibold">Check {existingAccount.email}.</span> Open the link in this browser and you&apos;ll come back here signed in, with this form filled in. The link expires in an hour.
-                              </p>
-                            ) : (
-                              <>
-                                <p className="text-sm text-ink-700">Don&apos;t know the password, or don&apos;t want to use it?</p>
-                                <button type="button" onClick={sendSignInLink} disabled={emailLink === 'sending'}
-                                  className="mt-1.5 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-semibold text-ink-900 hover:border-ink-900 disabled:opacity-50">
-                                  {emailLink === 'sending' ? 'Sending…' : 'Email me a sign-in link instead'}
-                                </button>
-                                {emailLink === 'failed' && <p className="mt-1.5 text-sm text-red-700">We couldn&apos;t send the email just now. Wait a minute and try again.</p>}
-                              </>
-                            )}
+                        <fieldset className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
+                          <legend className="sr-only">This email already has an account</legend>
+                          <p role="status" className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
+                          <p className="mt-0.5 text-sm text-ink-700">How would you like to continue?</p>
+
+                          <div className="mt-3 space-y-2">
+                            <label htmlFor="existing-now" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
+                              <input id="existing-now" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
+                                checked={existingAccount.mode === 'now'}
+                                onChange={() => setExistingAccount(x => x && { ...x, mode: 'now', error: false })} />
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in now</span>
+                                <span className="block text-ink-600">Enter that account&apos;s password. You&apos;ll land in the new building after checkout.</span>
+                                {existingAccount.mode === 'now' && (
+                                  <span className="mt-2 block">
+                                    <label htmlFor="existing-account-password" className="block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
+                                    <input id="existing-account-password" type="password" value={password}
+                                      onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
+                                      aria-invalid={existingAccount.error || undefined}
+                                      className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
+                                    {existingAccount.error && <span className="mt-1.5 block text-sm text-red-700">That password doesn&apos;t match this account. Try again, or pick another option below.</span>}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+
+                            <label htmlFor="existing-later" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
+                              <input id="existing-later" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
+                                checked={existingAccount.mode === 'later'}
+                                onChange={() => { setPassword(''); setExistingAccount(x => x && { ...x, mode: 'later', error: false }); }} />
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in later</span>
+                                <span className="block text-ink-600">No password now. After checkout, sign in with that account&apos;s password to open the building, or reset it by email if you don&apos;t know it.</span>
+                              </span>
+                            </label>
+
+                            <button type="button"
+                              onClick={() => { setExistingAccount(null); setPassword(''); setConfirmPassword(''); setProfileEmail(''); setTimeout(() => emailInputRef.current?.focus(), 0); }}
+                              className="flex w-full items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-left text-sm text-ink-800 hover:border-ink-900">
+                              <span aria-hidden className="mt-0.5 h-4 w-4 flex-none text-center leading-4 text-ink-500">&rarr;</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Keep it separate: use a different email</span>
+                                <span className="block text-ink-600">Creates a new account with its own password, not connected to the existing one.</span>
+                              </span>
+                            </button>
                           </div>
-                        </div>
+                        </fieldset>
                       ) : (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -1369,7 +1361,7 @@ export default function AuthPage() {
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
                             { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             if (existingAccount) {
-                              if (!password) { alert('Please enter your ONE two password.'); return; }
+                              if (existingAccount.mode === 'now' && !password) { alert('Please enter your ONE two password, or pick another option.'); return; }
                             } else if (!signedInAs) {
                               if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
                               if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
@@ -1377,7 +1369,7 @@ export default function AuthPage() {
                             handleCheckout();
                           }} disabled={checkoutLoading}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
-                          {checkoutLoading ? 'Setting up...' : existingAccount ? 'Sign In & Start Free Trial' : 'Start Free Trial'}
+                          {checkoutLoading ? 'Setting up...' : existingAccount?.mode === 'now' ? 'Sign In & Start Free Trial' : 'Start Free Trial'}
                         </button>
                       ) : (
                         <button onClick={() => {
@@ -1526,6 +1518,12 @@ export default function AuthPage() {
         {authStep === 'login' && !buildingChoices && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
+            {signInLaterFor !== null && (
+              <div role="status" className="bg-sage-50 border border-sage-200 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-ink-900 mb-1">{signInLaterFor ? `${signInLaterFor} is being set up` : 'Your building is being set up'}</p>
+                <p className="text-xs text-ink-700">It&apos;s being added to your existing ONE two account. Sign in below with that account&apos;s password to open it. If you don&apos;t know the password, use &ldquo;Forgot password?&rdquo; and we&apos;ll email you a reset link.</p>
+              </div>
+            )}
             {provisioningTimedOut && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
                 <p className="text-sm font-semibold text-amber-900 mb-1">Your building is still being set up</p>
