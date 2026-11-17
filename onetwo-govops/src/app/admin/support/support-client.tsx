@@ -92,6 +92,12 @@ const TYPE_META: Record<string, { label: string; variant: 'red' | 'purple' | 'am
 
 // --- Helpers ---
 
+// A reply this console sends arrives twice: once in the response to the send,
+// and once from the live feed. Keep one copy.
+function appendMessage(list: Message[], msg: Message): Message[] {
+  return list.some(m => m.id === msg.id) ? list : [...list, msg]
+}
+
 function getInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -200,7 +206,7 @@ export function SupportClient({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, (payload) => {
         const msg = payload.new as Message
         if (msg.thread_id === selectedId) {
-          setMessages(prev => [...prev, msg])
+          setMessages(prev => appendMessage(prev, msg))
         }
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_threads' }, (payload) => {
@@ -278,7 +284,7 @@ export function SupportClient({
     })
     if (res.ok) {
       const msg = await res.json()
-      setMessages(prev => [...prev, msg])
+      setMessages(prev => appendMessage(prev, msg))
       setReplyText('')
       clearAttachment()
     }
