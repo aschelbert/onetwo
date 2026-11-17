@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useTenantContext } from '@/components/TenantProvider';
-import { ROLE_LABELS } from '@/types/auth';
 import { getInitials } from '@/lib/formatters';
 import { Plus, Send, MessageCircle, Paperclip, X } from 'lucide-react';
 
-import { adminSupabase } from '@/lib/adminSupabase';
+import { MAX_SUPPORT_ATTACHMENT_BYTES, createSupportThread, listSupportMessages, listSupportThreads, replyToSupportThread, supportAvailable, toSupportAttachment } from '@/lib/supportApi';
 
 interface Thread {
   id: string;
@@ -58,9 +56,8 @@ function timeAgo(date: string) {
 }
 
 export default function SupportPage() {
-  const { currentUser, currentRole } = useAuthStore();
   const tenant = useTenantContext();
-  const [tenancyId, setTenancyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -82,101 +79,57 @@ export default function SupportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newFormFileInputRef = useRef<HTMLInputElement>(null);
 
-  const db = adminSupabase;
+  const live = supportAvailable && !tenant.isDemo;
+  const tenantId = tenant.id;
   const thread = threads.find(t => t.id === selectedId);
 
-  // Resolve tenant subdomain → tenancy_id in admin project
-  useEffect(() => {
-    if (!db || tenant.isDemo) {
-      setLoadingThreads(false);
-      return;
+  // Threads for this building. Re-read on a timer so a reply or a status
+  // change from support shows up without a reload.
+  const loadThreads = useCallback(async (first: boolean) => {
+    try {
+      const list = await listSupportThreads(tenantId);
+      setThreads(list as Thread[]);
+      if (first && list.length > 0) setSelectedId(prev => prev ?? list[0].id);
+      setError(null);
+    } catch (e) {
+      if (first) setError(e instanceof Error ? e.message : 'Support threads could not be loaded');
     }
-
-    (async () => {
-      // The tenancies table is not readable with the anon key; this function
-      // returns only the id for a slug.
-      const { data: id } = await db.rpc('tenancy_id_for_slug', { p_slug: tenant.subdomain });
-
-      if (typeof id === 'string' && id) {
-        setTenancyId(id);
-      } else {
-        setLoadingThreads(false);
-      }
-    })();
-  }, [tenant.subdomain, tenant.isDemo]);
-
-  // Load threads once tenancyId is resolved
-  useEffect(() => {
-    if (!db || !tenancyId) return;
-
-    (async () => {
-      const { data } = await db
-        .from('support_threads')
-        .select('*')
-        .eq('tenancy_id', tenancyId)
-        .order('updated_at', { ascending: false });
-
-      if (data) {
-        setThreads(data as Thread[]);
-        if (data.length > 0) setSelectedId(data[0].id);
-      }
-      setLoadingThreads(false);
-    })();
-  }, [tenancyId]);
-
-  // Load messages for selected thread
-  const fetchMessages = useCallback(async (threadId: string) => {
-    if (!db) return;
-    setLoadingMessages(true);
-    const { data } = await db
-      .from('support_messages')
-      .select('*')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true });
-
-    if (data) setMessages(data as Message[]);
-    setLoadingMessages(false);
-  }, []);
+    if (first) setLoadingThreads(false);
+  }, [tenantId]);
 
   useEffect(() => {
-    if (selectedId) fetchMessages(selectedId);
-  }, [selectedId, fetchMessages]);
+    if (!live) { setLoadingThreads(false); return; }
+    void loadThreads(true);
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') void loadThreads(false); }, 20_000);
+    return () => clearInterval(timer);
+  }, [live, loadThreads]);
+
+  // Messages for the selected thread, re-read while it is open.
+  const fetchMessages = useCallback(async (threadId: string, quiet = false) => {
+    if (!quiet) setLoadingMessages(true);
+    try {
+      const list = await listSupportMessages(tenantId, threadId);
+      setMessages(prev => (quiet && prev.length === list.length ? prev : (list as Message[])));
+    } catch (e) {
+      if (!quiet) setError(e instanceof Error ? e.message : 'Messages could not be loaded');
+    }
+    if (!quiet) setLoadingMessages(false);
+  }, [tenantId]);
+
+  useEffect(() => {
+    if (!live || !selectedId) return;
+    void fetchMessages(selectedId);
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') void fetchMessages(selectedId, true); }, 8_000);
+    return () => clearInterval(timer);
+  }, [live, selectedId, fetchMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Realtime subscription
-  useEffect(() => {
-    if (!db) return;
-    const channel = db
-      .channel('tenant-support-live')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'support_messages',
-      }, (payload) => {
-        const msg = payload.new as Message;
-        if (msg.thread_id === selectedId) {
-          setMessages(prev => [...prev, msg]);
-        }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'support_threads',
-      }, (payload) => {
-        const updated = payload.new as Thread;
-        setThreads(prev => prev.map(t => t.id === updated.id ? updated : t));
-      })
-      .subscribe();
-
-    return () => { db.removeChannel(channel); };
-  }, [selectedId]);
-
   const handleAttachment = (file: File, setFile: (f: File | null) => void, setPreview: (p: string | null) => void) => {
     if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5 MB'); return; }
+    if (file.size > MAX_SUPPORT_ATTACHMENT_BYTES) { alert('Image must be under 3 MB'); return; }
     setFile(file);
     const url = URL.createObjectURL(file);
     setPreview(url);
@@ -200,91 +153,52 @@ export default function SupportPage() {
     }
   };
 
-  const uploadAttachment = async (file: File, threadId: string): Promise<string | null> => {
-    if (!db) return null;
-    const ext = file.name.split('.').pop() || 'png';
-    const path = `${threadId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await db.storage.from('support-attachments').upload(path, file);
-    if (error) { console.error('Upload error:', error); return null; }
-    const { data: urlData } = db.storage.from('support-attachments').getPublicUrl(path);
-    return urlData.publicUrl;
-  };
-
   const sendReply = async () => {
-    if ((!replyText.trim() && !attachmentFile) || !selectedId || !db) return;
+    if ((!replyText.trim() && !attachmentFile) || !selectedId || !live) return;
     setSending(true);
-
-    let attachment_url: string | null = null;
-    if (attachmentFile) {
-      attachment_url = await uploadAttachment(attachmentFile, selectedId);
-    }
-
-    const { data } = await db
-      .from('support_messages')
-      .insert({
-        thread_id: selectedId,
-        sender_type: 'tenant',
-        sender_name: currentUser.name,
-        sender_role: ROLE_LABELS[currentRole],
+    try {
+      const { message, attachmentError } = await replyToSupportThread(tenantId, selectedId, {
         body: replyText,
-        attachment_url,
-      })
-      .select()
-      .single();
-
-    if (data) {
-      setMessages(prev => [...prev, data as Message]);
+        attachment: attachmentFile ? await toSupportAttachment(attachmentFile) : null,
+      });
+      setMessages(prev => [...prev, message as Message]);
       setReplyText('');
       clearAttachment(setAttachmentFile, setAttachmentPreview);
-      await db.from('support_threads').update({ updated_at: new Date().toISOString() }).eq('id', selectedId);
+      setError(attachmentError);
+      void loadThreads(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The message could not be sent');
     }
     setSending(false);
   };
 
   const createThread = async () => {
-    if (!newSubject.trim() || !newMessage.trim() || !db || !tenancyId) return;
+    if (!newSubject.trim() || !newMessage.trim() || !live) return;
     setCreating(true);
-
-    const { data: newThread } = await db
-      .from('support_threads')
-      .insert({
-        tenancy_id: tenancyId,
+    try {
+      const { thread: created, attachmentError } = await createSupportThread(tenantId, {
         subject: newSubject,
         module: newModule,
         priority: newPriority,
-        created_by_name: currentUser.name,
-      })
-      .select()
-      .single();
-
-    if (newThread) {
-      let attachment_url: string | null = null;
-      if (newFormAttachmentFile) {
-        attachment_url = await uploadAttachment(newFormAttachmentFile, newThread.id);
-      }
-
-      await db.from('support_messages').insert({
-        thread_id: newThread.id,
-        sender_type: 'tenant',
-        sender_name: currentUser.name,
-        sender_role: ROLE_LABELS[currentRole],
         body: newMessage,
-        attachment_url,
+        attachment: newFormAttachmentFile ? await toSupportAttachment(newFormAttachmentFile) : null,
       });
-
-      setThreads(prev => [newThread as Thread, ...prev]);
-      setSelectedId(newThread.id);
+      setThreads(prev => [created as Thread, ...prev]);
+      setSelectedId(created.id);
       setShowNewForm(false);
       setNewSubject('');
       setNewModule('Board Room');
       setNewPriority('medium');
       setNewMessage('');
       clearAttachment(setNewFormAttachmentFile, setNewFormAttachmentPreview);
+      setError(attachmentError);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The thread could not be created');
     }
     setCreating(false);
   };
 
-  if (tenant.isDemo || !adminSupabase) {
+  if (!live) {
     return (
       <div className="max-w-2xl mx-auto py-16 text-center">
         <MessageCircle className="w-12 h-12 text-ink-300 mx-auto mb-4" />
@@ -295,7 +209,9 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="flex bg-white rounded-xl border border-ink-200 overflow-hidden h-full">
+    <div className="flex flex-col h-full">
+    {error && <p role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+    <div className="flex bg-white rounded-xl border border-ink-200 overflow-hidden flex-1 min-h-0">
       {/* Left — thread list */}
       <div className="w-[300px] flex-shrink-0 border-r border-ink-200 flex flex-col">
         <div className="p-3 border-b border-ink-100 flex items-center justify-between">
@@ -593,6 +509,7 @@ export default function SupportPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

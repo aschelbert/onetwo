@@ -34,7 +34,6 @@ vi.mock('@/lib/supabase', () => ({
     removeChannel: () => {},
   },
 }));
-vi.mock('@/lib/adminSupabase', () => ({ adminSupabase: null }));
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', tier: 'self_managed', features: {}, id: 't1', subdomain: 'sunny' }),
 }));
