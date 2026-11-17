@@ -193,22 +193,24 @@ function normZip(s: string | null | undefined): string {
 /**
  * Whether a building being signed up is one the user already has.
  *
- * The street address decides: the same street (and ZIP, when both are known)
- * is the same building whatever it is called. Only when one side has no street
- * on file does the name decide.
+ * Same street and same ZIP is the same building whatever it is called. When a
+ * ZIP is missing on either side the street alone is too weak to go on (a
+ * half-filled address such as "123" matches far too much), so the name has to
+ * match as well. With no street on one side, the name decides on its own.
  */
 export function isSameBuilding(
   a: { name?: string | null; address?: BuildingAddress | null },
   b: { name?: string | null; address?: BuildingAddress | null },
 ): boolean {
+  const nameA = normName(a.name);
+  const sameName = !!nameA && nameA === normName(b.name);
   const streetA = normStreet(a.address?.street);
   const streetB = normStreet(b.address?.street);
   if (streetA && streetB) {
     if (streetA !== streetB) return false;
     const zipA = normZip(a.address?.zip);
     const zipB = normZip(b.address?.zip);
-    return !zipA || !zipB || zipA === zipB;
+    return zipA && zipB ? zipA === zipB : sameName;
   }
-  const nameA = normName(a.name);
-  return !!nameA && nameA === normName(b.name);
+  return sameName;
 }

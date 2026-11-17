@@ -838,11 +838,16 @@ export default function AuthPage() {
         name: bldgName,
         address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
       };
-      const alreadyHas = memberships.some(m =>
+      const duplicateOf = memberships.find(m =>
         !!m.tenant && isSameBuilding(newBuilding, { name: m.tenant.name, address: m.tenant.address }));
-      if (alreadyHas) {
-        alert('Your account is already set up. Redirecting to login...');
-        setAuthStep('login');
+      if (duplicateOf) {
+        // Say which building it collides with and let them fix the address,
+        // rather than a vague "already set up" and a bounce to the login page.
+        // They are signed in at this point, so the form stops asking for a password.
+        if (session?.user?.email) setSignedInAs(session.user.email);
+        setExistingAccount(null);
+        alert(`Your account already has this building: "${duplicateOf.tenant?.name || 'your existing building'}". To add another building, enter its own name and street address.`);
+        setAuthStep('signup-building');
         setCheckoutLoading(false);
         return;
       }

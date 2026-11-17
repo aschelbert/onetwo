@@ -32,6 +32,13 @@ describe('isSameBuilding', () => {
     )).toBe(false);
   });
 
+  it('needs the name to match too when a ZIP is missing', () => {
+    const onFile = { name: 'Condo Building', address: { street: '123', city: '', state: '', zip: '' } };
+    expect(isSameBuilding({ name: 'Harbor View', address: addr('123', '20002') }, onFile)).toBe(false);
+    expect(isSameBuilding({ name: 'Harbor View', address: { street: '123' } }, onFile)).toBe(false);
+    expect(isSameBuilding({ name: 'condo  building', address: { street: '123' } }, onFile)).toBe(true);
+  });
+
   it('falls back to the name when an address is missing', () => {
     expect(isSameBuilding({ name: 'Sunny  Acres', address: {} }, { name: 'sunny acres', address: addr('1 A St') })).toBe(true);
     expect(isSameBuilding({ name: 'Sunny Acres', address: null }, { name: 'Harbor View', address: null })).toBe(false);
