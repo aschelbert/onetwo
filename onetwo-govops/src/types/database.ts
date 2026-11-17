@@ -483,6 +483,7 @@ export type Database = {
       support_threads: {
         Row: {
           id: string
+          internal: boolean
           tenancy_id: string
           subject: string
           status: string
@@ -497,6 +498,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          internal?: boolean
           tenancy_id: string
           subject: string
           status?: string
@@ -511,6 +513,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          internal?: boolean
           tenancy_id?: string
           subject?: string
           status?: string
@@ -894,6 +897,9 @@ export type Database = {
           stripe_product_id: string | null
           stripe_sync_status: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at: string | null
+          kind: string
+          chargebee_price_monthly_id: string | null
+          chargebee_price_yearly_id: string | null
           updated_at: string
         }
         Insert: {
@@ -912,6 +918,9 @@ export type Database = {
           stripe_product_id?: string | null
           stripe_sync_status?: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at?: string | null
+          kind?: string
+          chargebee_price_monthly_id?: string | null
+          chargebee_price_yearly_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -930,6 +939,9 @@ export type Database = {
           stripe_product_id?: string | null
           stripe_sync_status?: Database["public"]["Enums"]["stripe_sync_status"]
           stripe_synced_at?: string | null
+          kind?: string
+          chargebee_price_monthly_id?: string | null
+          chargebee_price_yearly_id?: string | null
           updated_at?: string
         }
         Relationships: []

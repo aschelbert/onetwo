@@ -6,7 +6,7 @@ import type {
   Permission, StripeWebhookEvent, StripePayment, StripeConfig,
   PlatformAccount, PlatformGLEntry, PlatformBudget,
 } from '@/store/usePlatformAdminStore';
-import { TIER_FEATURES } from '@/store/usePlatformAdminStore';
+import { TIER_FEATURES, normalizeTier } from '@/store/usePlatformAdminStore';
 
 import { DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
 
@@ -24,19 +24,66 @@ export async function fetchPlatformSettings(): Promise<PlatformSettings | null> 
   return { trialDays: (data.trial_days as number) ?? DEFAULT_TRIAL_DAYS };
 }
 
-export async function updatePlatformSettings(trialDays: number): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('platform_settings')
-    .update({ trial_days: trialDays, updated_at: new Date().toISOString(), updated_by: 'admin' })
-    .eq('id', 'default');
-  if (error) { logDbError('updatePlatformSettings error:', error); return false; }
-  return true;
+// ── Free trial (Chargebee is the source of truth) ──
+
+export interface ChargebeeTrialPrice {
+  id: string;
+  plan: string;
+  interval: string;
+  found: boolean;
+  /** Trial length in days; null when Chargebee holds it in another unit or the price was not found. */
+  trialDays: number | null;
+  trialPeriod: number | null;
+  trialPeriodUnit: string | null;
+}
+
+export interface ChargebeeTrial {
+  site: string;
+  prices: ChargebeeTrialPrice[];
+  /** The one trial length every plan price agrees on, or null when they differ or could not be read. */
+  chargebeeTrialDays: number | null;
+  storedTrialDays: number | null;
+  inSync: boolean;
+  /** The trial is turned off (stored as 0 days) and skipped at checkout. */
+  trialOff?: boolean;
+  /** What a new signup gets: 0 when off, otherwise the length Chargebee holds. */
+  effectiveTrialDays?: number | null;
+}
+
+export type ChargebeeTrialResult =
+  | { ok: true; trial: ChargebeeTrial }
+  | { ok: false; error: string; trial?: ChargebeeTrial };
+
+async function callTrialSettings(body: Record<string, unknown>): Promise<ChargebeeTrialResult> {
+  if (!supabase) return { ok: false, error: 'No backend connected' };
+  const { data, error } = await supabase.functions.invoke('chargebee-trial-settings', { body });
+  if (error) {
+    // A non-2xx reply still carries the function's own explanation and the current Chargebee values.
+    let detail: (Partial<ChargebeeTrial> & { error?: string }) | null = null;
+    try { detail = await (error as { context?: Response }).context?.json(); } catch { /* not JSON */ }
+    logDbError('chargebee-trial-settings error:', error);
+    return {
+      ok: false,
+      error: detail?.error || error.message || 'Could not reach Chargebee',
+      trial: detail?.prices ? (detail as ChargebeeTrial) : undefined,
+    };
+  }
+  return { ok: true, trial: data as ChargebeeTrial };
+}
+
+/** Read the trial length Chargebee holds on each plan price. */
+export function fetchChargebeeTrial(): Promise<ChargebeeTrialResult> {
+  return callTrialSettings({ action: 'get' });
+}
+
+/** Set the trial length on every Chargebee plan price, then in platform settings. */
+export function saveTrialDays(days: number): Promise<ChargebeeTrialResult> {
+  return callTrialSettings({ action: 'set', days });
 }
 
 // ── Tenants ──
 
-const TIER_PRICES: Record<SubscriptionTier, number> = { compliance_pro: 179, community_plus: 279, management_suite: 399 };
+const TIER_PRICES: Record<SubscriptionTier, number> = { self_managed: 179, facilities: 279 };
 
 export async function fetchTenants(): Promise<Tenant[] | null> {
   if (!supabase) return null;
@@ -101,8 +148,7 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
   return (tenantRows || []).map((r): Tenant => {
     const id = r.id as string;
     const sub = subMap.get(id);
-    const tier = ((sub?.tier as string) || 'compliance_pro') as SubscriptionTier;
-    const validTier = (tier in TIER_FEATURES) ? tier : 'compliance_pro' as SubscriptionTier;
+    const validTier = normalizeTier(sub?.tier as string | undefined);
     const addr = typeof r.address === 'string' ? JSON.parse(r.address) : (r.address || {});
     const subStatus = (sub?.status as string) || 'trialing';
     // Map DB subscription status to app status
@@ -160,6 +206,11 @@ export async function fetchTenants(): Promise<Tenant[] | null> {
         nextBillingDate: ((sub?.current_period_end as string) || (sub?.trial_ends_at as string) || '').split('T')[0],
         monthlyRate: (sub?.monthly_rate as number) ? ((sub?.monthly_rate as number) / 100) : TIER_PRICES[validTier],
         trialEndsAt: (sub?.trial_ends_at as string)?.split('T')[0] || null,
+        pmAddon: !!sub?.pm_addon,
+        onCall: !!sub?.addon_on_call,
+        interval: (sub?.billing_interval as string) === 'annual' ? 'annual' : 'monthly',
+        chargebeeSubscriptionId: (sub?.chargebee_subscription_id as string) || null,
+        chargebeePlanPriceId: (sub?.chargebee_plan_price_id as string) || null,
       },
       stats: {
         activeUsers: userCounts.get(id) || 0,

@@ -3,22 +3,19 @@
  * Runbooks / How ONE two works / Guides row, Contact us with the open
  * support threads, the Guides list, Send feedback or start a thread, Legal
  * references, Release notes and Legal. Threads live in the admin project
- * (`support_threads`, `support_messages`), the same tables the production
- * support page reads; replying opens that page in place so its realtime
- * thread keeps working.
+ * and are reached through the Admin Console's backend (lib/supportApi), the
+ * same route the support page uses; replying opens that page in place.
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SupportPage from '@/features/support/SupportPage';
 import { GUIDES } from '@/features/support/HowItWorksPage';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { lateFeeAsScheduleItem, useFeeScheduleStore } from '@/store/useFeeScheduleStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
-import { adminSupabase } from '@/lib/adminSupabase';
+import { createSupportThread, listSupportThreads, supportAvailable, type SupportThread } from '@/lib/supportApi';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
-import { ROLE_LABELS } from '@/types/auth';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, PillTabs, SearchInput, SectionLabel, Tile, TileRow, Why } from '../../components';
 import { ALL_RUNBOOKS as RUNBOOKS } from '../../boardroom/runbooks';
 import { dayLabel } from '../../home/calendar';
@@ -34,34 +31,29 @@ const RELEASE_NOTES = [
   { date: '2026-10-15', title: 'Statements and taxes in Funds', detail: '1099s for vendors over $600 and Form 1120-H, with their dates' },
 ];
 
-interface Thread { id: string; subject: string; status: string; priority: string; module: string; updated_at: string; created_by_name: string }
+type Thread = Pick<SupportThread, 'id' | 'subject' | 'status' | 'priority' | 'module' | 'updated_at' | 'created_by_name'>;
 
-/** Open support threads for this tenant from the admin project. */
+/** Open support threads for this building, through the Admin Console's backend. */
 function useThreads() {
   const tenant = useTenantContext();
-  const [tenancyId, setTenancyId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
-  const live = !tenant.isDemo && !!adminSupabase;
+  const live = !tenant.isDemo && supportAvailable;
   useEffect(() => {
-    if (!live || !adminSupabase) return;
+    if (!live) return;
     let cancelled = false;
-    (async () => {
-      const { data: t } = await adminSupabase.from('tenancies').select('id').eq('slug', tenant.subdomain).maybeSingle();
-      if (cancelled || !t) return;
-      setTenancyId(t.id);
-      const { data } = await adminSupabase.from('support_threads').select('id, subject, status, priority, module, updated_at, created_by_name').eq('tenancy_id', t.id).order('updated_at', { ascending: false }).limit(20);
-      if (!cancelled && data) setThreads(data as Thread[]);
-    })();
+    listSupportThreads(tenant.id).then(list => { if (!cancelled) setThreads(list); }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [live, tenant.subdomain]);
+  }, [live, tenant.id]);
   const open = threads.filter(t => t.status !== 'closed' && t.status !== 'resolved');
-  const create = async (subject: string, module: string, priority: string, body: string, sender: { name: string; role: string }) => {
-    if (!live || !adminSupabase || !tenancyId) return null;
-    const { data: thread } = await adminSupabase.from('support_threads').insert({ tenancy_id: tenancyId, subject, module, priority, created_by_name: sender.name }).select().single();
-    if (!thread) return null;
-    await adminSupabase.from('support_messages').insert({ thread_id: thread.id, sender_type: 'tenant', sender_name: sender.name, sender_role: sender.role, body, attachment_url: null });
-    setThreads(prev => [thread as Thread, ...prev]);
-    return thread as Thread;
+  const create = async (subject: string, module: string, priority: string, body: string) => {
+    if (!live) return null;
+    try {
+      const { thread } = await createSupportThread(tenant.id, { subject, module, priority, body });
+      setThreads(prev => [thread, ...prev]);
+      return thread as Thread;
+    } catch {
+      return null;
+    }
   };
   return { live, threads, open, create };
 }
@@ -75,7 +67,6 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
   const lateFeeGraceDays = useFinancialStore(s => s.lateFeeGraceDays);
   // The late fee is set under Billing rules; it reads here next to the schedule.
   const fees = useMemo(() => [...(lateFeeEnabled ? [lateFeeAsScheduleItem({ lateFeeEnabled, lateFeeAmount, lateFeeGraceDays })] : []), ...schedule], [schedule, lateFeeEnabled, lateFeeAmount, lateFeeGraceDays]);
-  const currentRole = useAuthStore(s => s.currentRole);
   const { live, open, create } = useThreads();
   const [q, setQ] = useState('');
   const [gq, setGq] = useState('');
@@ -129,7 +120,7 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
     e.preventDefault();
     if (!subject.trim() || !message.trim()) { setNote('A subject and a message, please.'); return; }
     if (!live) { setNote(`In the demo building nothing is sent. On a live building this ${kind === 'feedback' ? 'feedback' : 'thread'} goes to support, and replies land here and in ${snap.viewer.email}.`); return; }
-    const t = await create(kind === 'feedback' ? `Feedback: ${subject.trim()}` : subject.trim(), module, kind === 'feedback' ? 'low' : priority, message.trim(), { name: snap.viewer.name, role: ROLE_LABELS[currentRole] });
+    const t = await create(kind === 'feedback' ? `Feedback: ${subject.trim()}` : subject.trim(), module, kind === 'feedback' ? 'low' : priority, message.trim());
     if (t) { setNote(`${kind === 'feedback' ? 'Feedback sent' : 'Thread started'}. Replies land here and in ${snap.viewer.email}.`); setSubject(''); setMessage(''); setShowThread(true); } else setNote('That did not go through. Email support@getonetwo.com instead.');
   };
 

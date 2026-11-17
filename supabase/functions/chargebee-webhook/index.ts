@@ -149,6 +149,59 @@ async function syncGovopsStatus(tenantId: string, fields: Record<string, unknown
   }
 }
 
+/**
+ * Create the building's row in the admin console. The console lists
+ * `tenancies` from its own database, and syncGovopsStatus only updates a row
+ * that already exists, so without this a new signup never shows up there.
+ * An upsert, so a redelivered event leaves one row.
+ */
+async function createGovopsTenancy(tenancy: {
+  id: string;
+  name: string;
+  subdomain: string;
+  // deno-lint-ignore no-explicit-any
+  address: any;
+  totalUnits: number;
+  plan: PlanId;
+  interval: Interval;
+  trialEndsAt: string | null;
+}) {
+  if (!GOVOPS_URL || !GOVOPS_SERVICE_KEY) {
+    console.log("Govops sync not configured, tenancy not added to the admin console");
+    return;
+  }
+  const addr = tenancy.address || {};
+  try {
+    const res = await fetch(`${GOVOPS_URL}/rest/v1/tenancies?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: GOVOPS_SERVICE_KEY,
+        Authorization: `Bearer ${GOVOPS_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        id: tenancy.id,
+        name: tenancy.name,
+        slug: tenancy.subdomain,
+        address: addr.street || "",
+        city: addr.city || "",
+        state: addr.state || "",
+        zip: addr.zip || "",
+        units: tenancy.totalUnits,
+        subscription_id: tenancy.plan === "facilities" ? "plus-facilities" : "self-managed",
+        status: "trial",
+        billing_cycle: tenancy.interval === "annual" ? "yearly" : "monthly",
+        trial_ends_at: tenancy.trialEndsAt,
+        board_members: 1,
+      }),
+    });
+    if (!res.ok) console.error(`Govops tenancy create failed: ${res.status} ${await res.text()}`);
+  } catch (e) {
+    console.error("Govops tenancy create error:", e);
+  }
+}
+
 // ── Update webhook event status ──
 
 async function markEvent(eventId: string, status: string, errorMessage?: string) {
@@ -378,8 +431,57 @@ Deno.serve(async (req) => {
               { tenant_id: result.tenant_id },
             );
 
-            // Sync to admin console
-            await syncGovopsStatus(result.tenant_id, { status: "trial" });
+            // Record which ad sent this signup. Best effort: a failure here
+            // must not undo a provisioned building.
+            const attr = pending.attribution;
+            if (attr && typeof attr === "object") {
+              const saved = await sbQuery("PATCH", "tenants", { id: `eq.${result.tenant_id}` }, {
+                utm_source: attr.utm_source || null,
+                utm_medium: attr.utm_medium || null,
+                utm_campaign: attr.utm_campaign || null,
+                utm_term: attr.utm_term || null,
+                utm_content: attr.utm_content || null,
+                first_landing_url: attr.first_landing_url || null,
+              }).catch(() => false);
+              if (!saved) console.error(`attribution: could not save UTM tags for tenant ${result.tenant_id}`);
+            }
+
+            // Add the building to the admin console
+            await createGovopsTenancy({
+              id: result.tenant_id,
+              name: pending.name,
+              subdomain: result.subdomain || pending.subdomain || result.tenant_id,
+              address: pending.address,
+              totalUnits: pending.totalUnits || 0,
+              plan: result.plan === "facilities" || result.plan === "self_managed" ? result.plan : parsed.plan,
+              interval: parsed.interval,
+              trialEndsAt: result.trial_ends_at || null,
+            });
+
+            // provision_tenant records every new building as trialing with
+            // the trial's extras switched on. When the trial is turned off,
+            // Chargebee starts the subscription active: record what it says,
+            // so the building is active on the plan it is paying for.
+            if (subscription.status && subscription.status !== "in_trial") {
+              await sbRpc("link_chargebee_subscription", {
+                p_tenant_id: result.tenant_id,
+                p_customer_id: customer.id || null,
+                p_subscription_id: subscription.id,
+                p_plan: parsed.plan,
+                p_on_call: parsed.onCall,
+                p_pm_seat: parsed.pmSeat,
+                p_interval: parsed.interval,
+                p_status: subscription.status,
+                p_trial_ends_at: null,
+                p_period_start: subscription.current_term_start
+                  ? new Date(subscription.current_term_start * 1000).toISOString()
+                  : null,
+                p_period_end: subscription.current_term_end
+                  ? new Date(subscription.current_term_end * 1000).toISOString()
+                  : null,
+              });
+              await syncGovopsStatus(result.tenant_id, { status: mapStatus(subscription.status) });
+            }
 
             // Tell OpenAI Ads a paid trial signup completed (never throws),
             // unless the visitor opted out with Global Privacy Control

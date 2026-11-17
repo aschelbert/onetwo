@@ -137,7 +137,7 @@ p{margin:0}
 <header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
   <div class="wrap row" style="min-height:72px">
     <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0D1B2E"><img src="/onetwo-nav-logo.jpg" alt="ONE two" style="width:36px;height:34px;object-fit:cover;border-radius:6px"><span style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px">ONE <span style="font-weight:500">two</span></span></a>
-    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="guide-header">Start free trial</a></div>
+    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="guide-header" data-no-trial="Start today!">Start free trial</a></div>
   </div>
 </header>
 <main>
@@ -151,11 +151,13 @@ p{margin:0}
   <ul class="cards"><li><a href="/guides/dc-condo-reserve-study"><span class="k">Reserves</span><h2>Does a DC condo association need a reserve study?</h2><p>What the DC Condominium Act says about condo reserves and reserve studies, what buyers and lenders look at, and a checklist for self-managed boards.</p></a></li><li><a href="/guides/leaving-your-property-manager-dc"><span class="k">Changing management</span><h2>How to leave your property management company in DC</h2><p>A step-by-step guide for DC condo boards leaving a property management company: reading the contract, the 90 day rule for developer contracts, what records to get back, and a timeline.</p></a></li><li><a href="/guides/dc-condo-management-cost"><span class="k">Costs</span><h2>What does condo management cost in Washington, DC?</h2><p>What DC condo associations pay for property management: typical per-unit rates by service level, monthly minimums, the extra fees to ask about, and what self-managing costs instead.</p></a></li></ul>
   <aside class="how">
     <h2>Run the building without a manager</h2>
-    <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month after a 21 day free trial.</p>
-    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index">Start your free 21 day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+    <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month<span data-no-trial=""> after a <span data-trial-days>21</span> day free trial</span>.</p>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index" data-no-trial="Start today!">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
   </aside>
 </div>
 </main>
 <footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/guides" style="color:#8fa0b3">Guides</a><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
+<script src="/site-config.js"></script>
+<script src="/trial-days.js"></script>
 </body>
 </html>

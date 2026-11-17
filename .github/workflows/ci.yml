@@ -30,5 +30,7 @@ jobs:
       - name: Test
         run: npm test --if-present
 
-      - name: Audit (high severity)
-        run: npm audit --audit-level=high
+      # Production dependencies only: build and test tooling never ships to
+      # the browser, and an unpatched advisory there would block every PR.
+      - name: Audit (high severity, production dependencies)
+        run: npm audit --omit=dev --audit-level=high

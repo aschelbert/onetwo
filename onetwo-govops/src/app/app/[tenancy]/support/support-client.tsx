@@ -122,7 +122,7 @@ export function SupportClient({
       }, (payload) => {
         const msg = payload.new as Message
         if (msg.thread_id === selectedId) {
-          setMessages(prev => [...prev, msg])
+          setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]))
         }
       })
       .on('postgres_changes', {
@@ -149,7 +149,7 @@ export function SupportClient({
       })
       if (res.ok) {
         const msg = await res.json()
-        setMessages(prev => [...prev, msg])
+        setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]))
         setReplyText('')
       }
     } finally {

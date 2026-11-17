@@ -70,7 +70,7 @@ const defaultOnboarding: OnboardingState = {
 
 const defaultTenant: TenantInfo = {
   id: 'demo', name: 'Sunny Acres Condominium', subdomain: 'demo',
-  status: 'active', tier: 'management_suite', pmSeat: true, features: { ...TIER_FEATURES['management_suite'] },
+  status: 'active', tier: 'facilities', pmSeat: true, features: { ...TIER_FEATURES.facilities },
   address: { street: '1234 Constitution Avenue NW', city: 'Washington', state: 'District of Columbia', zip: '20001' },
   totalUnits: 50, isDemo: true, onboarding: defaultOnboarding,
 };
@@ -221,7 +221,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
         name: t.name,
         subdomain: t.subdomain,
         status: t.status,
-        tier: sub?.tier || 'compliance_pro',
+        tier: sub?.tier || 'self_managed',
         pmSeat: !!sub?.pm_addon,
         features: feat ? {
           fiscalLens: feat.fiscal_lens,
@@ -392,7 +392,7 @@ export default function TenantProvider({ children }: { children: React.ReactNode
           name: t.name,
           subdomain: t.subdomain,
           status: t.status,
-          tier: sub?.tier || 'compliance_pro',
+          tier: sub?.tier || 'self_managed',
         pmSeat: !!sub?.pm_addon,
           features: feat ? {
             fiscalLens: feat.fiscal_lens,
