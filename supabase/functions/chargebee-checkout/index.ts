@@ -58,6 +58,21 @@ function signupPageUrl(origin: string | undefined): string | null {
   }
 }
 
+/** Keep only the known attribution fields, as trimmed, length-capped strings. */
+function cleanAttribution(input: unknown): Record<string, string> | null {
+  if (!input || typeof input !== "object") return null;
+  const limits: Record<string, number> = {
+    utm_source: 100, utm_medium: 100, utm_campaign: 100, utm_term: 100, utm_content: 100,
+    first_landing_url: 500,
+  };
+  const out: Record<string, string> = {};
+  for (const [key, max] of Object.entries(limits)) {
+    const v = (input as Record<string, unknown>)[key];
+    if (typeof v === "string" && v.trim()) out[key] = v.trim().slice(0, max);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 // ── Supabase helpers ──
 
 async function sbQuery(
@@ -326,6 +341,8 @@ Deno.serve(async (req) => {
           adClickRef: typeof body.adClickRef === 'string' && body.adClickRef.trim()
             ? body.adClickRef.trim().slice(0, 512)
             : null,
+          // Which ad sent this visitor (UTM tags), saved on the tenants row
+          attribution: cleanAttribution(body.attribution),
           // HO-18 extended fields
           role: building.role || 'board_member',
           roleKey: building.roleKey || null,

@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client';
 import * as Sentry from "@sentry/react";
 import App from './App';
 import './index.css';
+import { captureAttribution } from './lib/attribution';
+
+// Remember which ad sent this visitor, before any route rewrites the URL
+captureAttribution();
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN as string,
