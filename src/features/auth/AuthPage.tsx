@@ -214,7 +214,7 @@ export default function AuthPage() {
   // shown when the password entered there is wrong.
   // `mode` is how they chose to continue: sign in to that account now, or
   // skip signing in and have the building attached to it after payment.
-  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean; mode: 'now' | 'later' } | null>(null);
+  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean; mode: 'now' | 'later' | null } | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   // Set after a "sign in later" checkout: the login form explains what to do next
   const [signInLaterFor, setSignInLaterFor] = useState<string | null>(() => {
@@ -824,18 +824,25 @@ export default function AuthPage() {
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          // The building is added to the existing account, which needs that
-          // account's password. Whatever was typed as a "new" password is
-          // tried first (it works for someone retrying an abandoned signup);
-          // otherwise ask for the real one, once, in place of the two fields.
+          // First time we learn this email has an account: always stop and
+          // ask how they want to continue. Never sign the account in on the
+          // strength of a password typed as a "new" one, even if it matches.
+          if (!knownAccount) {
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: false, mode: null });
+            setPassword('');
+            setConfirmPassword('');
+            setSignupInProgress(false);
+            setCheckoutLoading(false);
+            return;
+          }
+          // They chose "sign in now" and entered the account's password
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: signupEmail,
             password: password,
           });
           if (signInError) {
-            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: knownAccount, mode: 'now' });
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: true, mode: 'now' });
             setPassword('');
-            setConfirmPassword('');
             setSignupInProgress(false);
             setCheckoutLoading(false);
             return;
@@ -1417,6 +1424,7 @@ export default function AuthPage() {
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
                             { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             if (existingAccount) {
+                              if (!existingAccount.mode) { alert('Please choose how you want to continue with your existing account.'); return; }
                               if (existingAccount.mode === 'now' && !password) { alert('Please enter your ONE two password, or pick another option.'); return; }
                             } else if (!signedInAs) {
                               if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
