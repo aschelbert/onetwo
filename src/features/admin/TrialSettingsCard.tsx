@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
+import { usePlatformAdminStore, effectiveTrialDays } from '@/store/usePlatformAdminStore';
 import { isBackendEnabled } from '@/lib/supabase';
 import { PLAN_LABELS } from './catalog';
 import type { SubscriptionTier } from '@/lib/tiers';
@@ -22,9 +22,10 @@ export default function TrialSettingsCard({ actor }: { actor: string }) {
 
   const readable = !!cb && cb.prices.every(p => p.found);
   const editable = isBackendEnabled && readable && !loading;
-  const pricesDisagree = readable && cb.chargebeeTrialDays === null;
-  const settingsBehind = readable && cb.chargebeeTrialDays !== null && cb.storedTrialDays !== cb.chargebeeTrialDays;
-  const dirty = editable && (input !== cb.chargebeeTrialDays || !cb.inSync);
+  const off = !!cb?.trialOff;
+  const pricesDisagree = readable && !off && cb.chargebeeTrialDays === null;
+  const settingsBehind = readable && !off && cb.chargebeeTrialDays !== null && cb.storedTrialDays !== cb.chargebeeTrialDays;
+  const dirty = editable && (input !== effectiveTrialDays(cb) || !cb.inSync);
 
   const save = async () => {
     setSaving(true); setSaved(false);

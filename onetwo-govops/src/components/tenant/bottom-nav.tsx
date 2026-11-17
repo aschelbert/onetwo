@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useTenant } from '@/lib/tenant-context'
+import { useTenant, navModuleAccessible } from '@/lib/tenant-context'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutGrid, Monitor, BarChart3, Users, MoreHorizontal, Building2, Wrench, Archive } from 'lucide-react'
@@ -49,10 +49,10 @@ export function BottomNav() {
   }, [])
 
   const visibleTabs = TABS.filter(
-    t => t.module === 'Dashboard' || accessibleModules.includes(t.module)
+    t => t.module === 'Dashboard' || navModuleAccessible(accessibleModules, t.module)
   )
   const visibleMore = MORE_ITEMS.filter(
-    t => accessibleModules.includes(t.module)
+    t => navModuleAccessible(accessibleModules, t.module)
   )
 
   return (

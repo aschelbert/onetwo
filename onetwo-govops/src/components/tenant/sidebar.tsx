@@ -1,5 +1,5 @@
 'use client'
-import { useTenant } from '@/lib/tenant-context'
+import { useTenant, navModuleAccessible } from '@/lib/tenant-context'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -21,7 +21,7 @@ export function TenantSidebar() {
   const basePath = `/app/${tenancy.slug}`
 
   const visibleNav = MODULE_NAV.filter(
-    item => item.module === 'Dashboard' || accessibleModules.includes(item.module)
+    item => item.module === 'Dashboard' || navModuleAccessible(accessibleModules, item.module)
   )
 
   return (

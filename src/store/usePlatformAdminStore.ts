@@ -11,6 +11,11 @@ import { DEFAULT_TRIAL_DAYS, TIERS, type SubscriptionTier as BillingTier } from 
 export type SubscriptionTier = BillingTier;
 
 /** Map any tier id the database may hold onto one of the two current plans. */
+/** What a new signup gets: 0 when the trial is off, otherwise the length Chargebee holds. */
+export function effectiveTrialDays(t: platformSvc.ChargebeeTrial): number | null {
+  return t.effectiveTrialDays !== undefined ? t.effectiveTrialDays : t.chargebeeTrialDays;
+}
+
 export function normalizeTier(tier: string | null | undefined): SubscriptionTier {
   return tier === 'facilities' || tier === 'management_suite' || tier === 'estate' ? 'facilities' : 'self_managed';
 }
@@ -1013,7 +1018,7 @@ export const usePlatformAdminStore = create<PlatformAdminState>((set, get) => ({
       chargebeeTrial: res.trial ?? null,
       chargebeeTrialError: res.ok ? null : res.error,
       // What Chargebee gives a new signup is the number worth showing.
-      ...(res.ok && res.trial.chargebeeTrialDays !== null ? { trialDays: res.trial.chargebeeTrialDays } : {}),
+      ...(res.ok && effectiveTrialDays(res.trial) !== null ? { trialDays: effectiveTrialDays(res.trial)! } : {}),
     });
   },
   updateTrialDays: async (days) => {

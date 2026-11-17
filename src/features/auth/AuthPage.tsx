@@ -19,6 +19,8 @@ const SIGNUP_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
+import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
+import { readAttribution } from '@/lib/attribution';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -102,6 +104,8 @@ export default function AuthPage() {
     });
   };
   const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
+  // The trial can be turned off in the Admin Console (0 days): billing then starts at signup.
+  const hasTrial = trialDays > 0;
 
   useEffect(() => {
     if (!supabase) return;
@@ -374,11 +378,11 @@ export default function AuthPage() {
     return false;
   };
 
-  // OpenAI Ads pixel: load only once the visitor is in the signup steps, so
+  // OpenAI and Reddit Ads pixels: load only once the visitor is in the signup steps, so
   // nobody signing in or using the app is tracked.
   const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
   useEffect(() => {
-    if (inSignupSteps) loadOpenAIPixel();
+    if (inSignupSteps) { loadOpenAIPixel(); loadRedditPixel(); }
   }, [inSignupSteps]);
 
   useEffect(() => {
@@ -937,6 +941,8 @@ export default function AuthPage() {
                     (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
                   // ChatGPT ad click reference, for the server-side conversion report
                   adClickRef: readAdClickRef(),
+                  // Which ad sent this visitor (UTM tags), saved on the building
+                  attribution: readAttribution(),
                 }),
               }
             );
@@ -964,6 +970,8 @@ export default function AuthPage() {
           // hashed email and user ID first so OpenAI can match it to the ad.
           await setOpenAIPixelUser({ email: signupEmail, userId: currentSession?.user?.id });
           window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
+          // Google Ads and Reddit Ads conversion for the same signup
+          trackBuildingCreated({ eventId: conversionEventId, plan: selectedTier, interval: billingInterval });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {
@@ -1036,6 +1044,8 @@ export default function AuthPage() {
       .reduce((sum, a) => sum + getAddOnPrice(a, selectedTier, 'annual'), 0);
     const totalMonthly = tierMonthly + addOnMonthly;
     const totalAnnual = tierAnnual + addOnAnnual;
+    // With no trial, the first period is charged at signup.
+    const dueToday = `$${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly}`;
 
     return (
       <div className="fixed inset-0 z-[100] bg-bg-page overflow-y-auto">
@@ -1100,7 +1110,7 @@ export default function AuthPage() {
                 {authStep === 'signup-plan' && (
                   <>
                     <h1 className="font-display text-3xl font-bold text-ink-900 mb-2">Pick your plan</h1>
-                    <p className="text-ink-500 mb-6">Choose one to continue; nothing is billed until your trial ends.</p>
+                    <p className="text-ink-500 mb-6">{hasTrial ? 'Choose one to continue; nothing is billed until your trial ends.' : 'Choose one to continue.'}</p>
 
                     {/* Billing toggle */}
                     <div className="mb-6">
@@ -1139,7 +1149,7 @@ export default function AuthPage() {
 
                     {/* Add-ons */}
                     <div className="mb-8">
-                      <p className="text-sm font-bold text-ink-900 mb-3">Add-ons for {currentTier?.name}, free during your trial</p>
+                      <p className="text-sm font-bold text-ink-900 mb-3">Add-ons for {currentTier?.name}{hasTrial ? ', free during your trial' : ''}</p>
                       <div className="space-y-3">
                         {ADDONS.map(addon => {
                           const isSelected = selectedAddOns.has(addon.id);
@@ -1156,7 +1166,7 @@ export default function AuthPage() {
                                   {isSelected && <span className="text-white text-xs">&#10003;</span>}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-ink-900">{addon.name}, ${price} / mo after the trial</p>
+                                  <p className="text-sm font-bold text-ink-900">{addon.name}, ${price} / mo{hasTrial ? ' after the trial' : ''}</p>
                                   <p className="text-xs text-ink-400 mt-1">{addon.description}</p>
                                 </div>
                               </div>
@@ -1356,7 +1366,11 @@ export default function AuthPage() {
                             handleCheckout();
                           }} disabled={checkoutLoading}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
-                          {checkoutLoading ? 'Setting up...' : existingAccount ? 'Sign In & Start Free Trial' : 'Start Free Trial'}
+                          {checkoutLoading
+                            ? 'Setting up...'
+                            : existingAccount
+                              ? (hasTrial ? 'Sign In & Start Free Trial' : 'Sign In & Start today!')
+                              : (hasTrial ? 'Start Free Trial' : 'Start today!')}
                         </button>
                       ) : (
                         <button onClick={() => {
@@ -1370,7 +1384,7 @@ export default function AuthPage() {
                           Create Account &amp; Enter
                         </button>
                       )}
-                      <p className="text-[10px] text-ink-400">No charge during your {trialDays}-day trial.</p>
+                      {hasTrial && <p className="text-[10px] text-ink-400">No charge during your {trialDays}-day trial.</p>}
                       <a onClick={() => setAuthStep('signup-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Building</a>
                     </div>
                   </>
@@ -1381,7 +1395,7 @@ export default function AuthPage() {
             {/* ── Desktop order summary card ── */}
             <div className="hidden lg:block w-[340px] flex-shrink-0">
               <div className="bg-navy rounded-2xl p-6 text-white sticky top-20">
-                <p className="text-brand-cyan text-xs font-bold uppercase tracking-wide">YOUR {trialDays} DAY TRIAL</p>
+                <p className="text-brand-cyan text-xs font-bold uppercase tracking-wide">{hasTrial ? `YOUR ${trialDays} DAY TRIAL` : 'YOUR PLAN'}</p>
                 <div className="w-12 h-0.5 bg-brand-cyan mt-1 mb-4" />
 
                 <div className="space-y-2 mb-4">
@@ -1403,9 +1417,9 @@ export default function AuthPage() {
                 <div className="border-t border-navy-700 pt-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Due today</span>
-                    <span className="text-3xl font-bold text-brand-cyan">$0</span>
+                    <span className="text-3xl font-bold text-brand-cyan">{hasTrial ? '$0' : dueToday}</span>
                   </div>
-                  <p className="text-sm text-navy-300 mt-1">After {trialDays} days: ${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly} / {billingInterval === 'annual' ? 'yr' : 'mo'}, before tax.</p>
+                  <p className="text-sm text-navy-300 mt-1">{hasTrial ? `After ${trialDays} days: ` : 'Then '}${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly} / {billingInterval === 'annual' ? 'yr' : 'mo'}, before tax.</p>
                 </div>
 
                 <div className="bg-navy-800 rounded-xl p-4 mt-4">
@@ -1453,7 +1467,7 @@ export default function AuthPage() {
                 <li className="flex items-center gap-2"><span className="text-sage-400">&#10003;</span> DC jurisdiction compliance built in</li>
               </ul>
               <button onClick={() => setAuthStep('signup-plan')}
-                className="w-full mt-4 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 transition-all">Start Free Trial &rarr;</button>
+                className="w-full mt-4 py-2.5 bg-accent-600 text-white rounded-lg text-sm font-semibold hover:bg-accent-700 transition-all">{hasTrial ? 'Start Free Trial' : 'Start today!'} &rarr;</button>
             </div>
             <p className="text-center text-xs text-ink-400 mt-5">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
             <div className="border-t border-ink-100 mt-4 pt-4 flex items-center justify-center">

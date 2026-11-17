@@ -2,7 +2,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, Grid3X3, Monitor, Users, UserCog, Shield, Building2, MessageCircle, Lightbulb, CreditCard, ClipboardCheck, ClipboardList, TrendingUp, X } from 'lucide-react'
+import { LayoutDashboard, Package, Grid3X3, Monitor, Users, UserCog, Shield, Building2, MessageCircle, Lightbulb, CreditCard, ClipboardCheck, ClipboardList, TrendingUp, Headset, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type NavItem = { href: string; label: string; icon: React.ElementType; count?: number } | { section: string }
@@ -12,14 +12,15 @@ const navItems: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { section: 'Product' },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: Package },
-  { href: '/admin/modules', label: 'Module Registry', icon: Grid3X3, count: 8 },
+  { href: '/admin/modules', label: 'Module Registry', icon: Grid3X3 },
   { href: '/admin/simulator', label: 'Permission Simulator', icon: Monitor },
   { section: 'Access Control' },
   { href: '/admin/console-users', label: 'Console Users', icon: UserCog },
   { href: '/admin/console-permissions', label: 'Console Permissions', icon: Shield },
-  { href: '/admin/roles', label: 'User Roles', icon: Users, count: 4 },
+  { href: '/admin/roles', label: 'User Roles', icon: Users },
   { section: 'Operations' },
   { href: '/admin/tenancies', label: 'Tenancies', icon: Building2 },
+  { href: '/admin/on-call', label: 'On Call Advisors', icon: Headset },
   { href: '/admin/support', label: 'Support', icon: MessageCircle },
   { href: '/admin/feedback', label: 'Feedback', icon: Lightbulb },
   { href: '/admin/problems', label: 'Problem Statements', icon: ClipboardList },
@@ -31,9 +32,11 @@ const navItems: NavItem[] = [
 interface SidebarProps {
   open?: boolean
   onClose?: () => void
+  /** Buildings waiting for an On Call advisor. */
+  onCallWaiting?: number
 }
 
-export function Sidebar({ open = false, onClose }: SidebarProps) {
+export function Sidebar({ open = false, onClose, onCallWaiting }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -75,6 +78,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               return <div key={i} className="px-3 pt-3 pb-1 text-[0.6rem] uppercase tracking-[0.1em] text-gray-500 font-semibold">{item.section}</div>
             }
             const Icon = item.icon
+            const count = item.href === '/admin/on-call' ? (onCallWaiting || undefined) : item.count
             const active = pathname === item.href || (item.href === '/admin/dashboard' && pathname === '/admin')
             return (
               <Link key={item.href} href={item.href}
@@ -84,8 +88,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 )}>
                 <Icon size={18} className="flex-shrink-0" />
                 {item.label}
-                {item.count !== undefined && (
-                  <span className="ml-auto bg-[#c42030] text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full">{item.count}</span>
+                {count !== undefined && (
+                  <span className="ml-auto bg-[#c42030] text-white text-[0.6rem] font-bold px-1.5 py-0.5 rounded-full">{count}</span>
                 )}
               </Link>
             )

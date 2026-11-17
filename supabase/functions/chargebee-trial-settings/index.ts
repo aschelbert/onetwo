@@ -4,8 +4,12 @@
 // Chargebee is where a trial actually starts, so it is the source of truth:
 // the trial length lives on each plan item price. This function reads those
 // values for the console, and on save writes the new length to every plan
-// item price and then to platform_settings.trial_days, which the signup page
-// and checkout read. Platform admins only.
+// item price and then to platform_settings.trial_days, which the signup page,
+// the website and checkout read. Platform admins only.
+//
+// Turning the trial off is stored as trial_days = 0. Checkout enforces it by
+// telling Chargebee to start the subscription with no trial, so the plan
+// prices keep their last length for when the trial is switched back on.
 // Zero dependencies -- raw fetch to Chargebee API + Supabase REST/Auth.
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -109,13 +113,48 @@ function summarize(prices: Awaited<ReturnType<typeof readPlanPrices>>, stored: n
   // One number only when every plan price was read and they all agree on a day count.
   const chargebeeTrialDays =
     found.length === prices.length && values.length === 1 && values[0] !== null ? values[0] : null;
+  const trialOff = stored === 0;
   return {
     site: CHARGEBEE_SITE,
     prices,
     chargebeeTrialDays,
     storedTrialDays: stored,
-    inSync: chargebeeTrialDays !== null && chargebeeTrialDays === stored,
+    // Off is enforced at checkout, not on the plan prices, so there is nothing to compare.
+    trialOff,
+    // What a new signup gets: no trial when off, otherwise what Chargebee holds.
+    effectiveTrialDays: trialOff ? 0 : chargebeeTrialDays,
+    inSync: trialOff || (chargebeeTrialDays !== null && chargebeeTrialDays === stored),
   };
+}
+
+/**
+ * True when the caller presented a service role key for this project.
+ * The key the Admin Console holds need not be the same string as the one in
+ * this function's environment (a project can have several), so anything that
+ * claims to be a service key is checked against an endpoint only a service
+ * role can read, rather than compared to one known value.
+ */
+async function isServiceCaller(authHeader: string): Promise<boolean> {
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  if (SB_SERVICE_KEY && token === SB_SERVICE_KEY) return true;
+
+  let claimsService = token.startsWith("sb_secret_");
+  if (!claimsService) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      claimsService = payload?.role === "service_role";
+    } catch {
+      claimsService = false;
+    }
+  }
+  if (!claimsService) return false;
+
+  const res = await fetch(`${SB_URL}/auth/v1/admin/users?page=1&per_page=1`, {
+    headers: { apikey: token, Authorization: `Bearer ${token}` },
+  });
+  await res.body?.cancel();
+  return res.ok;
 }
 
 Deno.serve(async (req) => {
@@ -124,28 +163,37 @@ Deno.serve(async (req) => {
 
   try {
     // ── Platform admins only ──
+    // Two callers: a signed-in platform admin (the in-app console), or the
+    // separate Admin Console app, which checks its own admins and then calls
+    // server-to-server with this project's service role key.
     const auth = req.headers.get("Authorization") || "";
-    const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { apikey: SB_ANON, Authorization: auth },
-    });
-    if (!userRes.ok) return jsonResponse({ error: "Not signed in" }, 401);
-    const user = await userRes.json();
-    if (!user?.id) return jsonResponse({ error: "Not signed in" }, 401);
+    const body = await req.json().catch(() => ({}));
+    let actor: string;
+    if (await isServiceCaller(auth)) {
+      actor = typeof body?.actor === "string" && body.actor ? body.actor.slice(0, 200) : "Admin Console";
+    } else {
+      const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
+        headers: { apikey: SB_ANON, Authorization: auth },
+      });
+      if (!userRes.ok) return jsonResponse({ error: "Not signed in" }, 401);
+      const user = await userRes.json();
+      if (!user?.id) return jsonResponse({ error: "Not signed in" }, 401);
 
-    const adminRes = await sbService(
-      "GET",
-      `platform_admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`,
-    );
-    const admins = adminRes.ok ? await adminRes.json() : [];
-    if (!Array.isArray(admins) || admins.length === 0) {
-      return jsonResponse({ error: "Platform admins only" }, 403);
+      const adminRes = await sbService(
+        "GET",
+        `platform_admins?user_id=eq.${encodeURIComponent(user.id)}&select=user_id`,
+      );
+      const admins = adminRes.ok ? await adminRes.json() : [];
+      if (!Array.isArray(admins) || admins.length === 0) {
+        return jsonResponse({ error: "Platform admins only" }, 403);
+      }
+      actor = user.email || user.id;
     }
 
     if (!CHARGEBEE_SITE || !CHARGEBEE_API_KEY) {
       return jsonResponse({ error: "Chargebee is not configured for this environment" }, 503);
     }
 
-    const body = await req.json().catch(() => ({}));
     const action = body?.action === "set" ? "set" : "get";
 
     if (action === "get") {
@@ -159,8 +207,9 @@ Deno.serve(async (req) => {
     }
 
     // Chargebee first: if it refuses, the stored number must not move ahead of it.
+    // Turning the trial off changes nothing in Chargebee (see the note at the top).
     const failures: string[] = [];
-    for (const p of PLAN_PRICES) {
+    for (const p of days === 0 ? [] : PLAN_PRICES) {
       const params = new URLSearchParams();
       params.append("trial_period", String(days));
       params.append("trial_period_unit", "day");
@@ -173,7 +222,7 @@ Deno.serve(async (req) => {
 
     // Read back what Chargebee now holds rather than trusting the writes.
     const prices = await readPlanPrices();
-    const confirmed = prices.every((p) => p.found && p.trialDays === days);
+    const confirmed = days === 0 || prices.every((p) => p.found && p.trialDays === days);
 
     if (failures.length > 0 || !confirmed) {
       return jsonResponse({
@@ -188,7 +237,7 @@ Deno.serve(async (req) => {
     const save = await sbService("PATCH", "platform_settings?id=eq.default", {
       trial_days: days,
       updated_at: new Date().toISOString(),
-      updated_by: user.email || user.id,
+      updated_by: actor,
     });
     if (!save.ok) {
       return jsonResponse({
@@ -198,11 +247,13 @@ Deno.serve(async (req) => {
     }
 
     await sbService("POST", "audit_log", {
-      actor_name: user.email || "Platform Admin",
+      actor_name: actor,
       actor_role: "platform_admin",
       action: "platform.trial_days_updated",
       target: "Platform Settings",
-      details: `Free trial set to ${days} days in Chargebee (${CHARGEBEE_SITE}) and platform settings`,
+      details: days === 0
+        ? "Free trial turned off: new buildings are billed at signup"
+        : `Free trial set to ${days} days in Chargebee (${CHARGEBEE_SITE}) and platform settings`,
     }).catch(() => undefined);
 
     return jsonResponse(summarize(prices, days));

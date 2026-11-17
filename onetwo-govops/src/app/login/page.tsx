@@ -13,12 +13,14 @@ export default function CustomerLoginPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
+    // Created on submit, not while rendering: this page is prerendered at build
+    // time, where the Supabase settings may not be present.
+    const supabase = createClient()
 
     if (mode === 'magic') {
       const { error } = await supabase.auth.signInWithOtp({

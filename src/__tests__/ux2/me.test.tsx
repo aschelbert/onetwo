@@ -7,7 +7,6 @@ import { searchHelp } from '@/ux2/me/help';
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', tier: 'self_managed', features: {}, id: 't1', subdomain: 'sunny' }),
 }));
-vi.mock('@/lib/adminSupabase', () => ({ adminSupabase: null }));
 vi.mock('@/features/support/SupportPage', () => ({ default: () => <div data-testid="legacy-support" /> }));
 vi.mock('@/features/support/HowItWorksPage', () => ({
   default: () => <div data-testid="legacy-guides" />,

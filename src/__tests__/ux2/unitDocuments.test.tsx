@@ -11,7 +11,6 @@ const links = vi.hoisted(() => ({ asked: [] as [string, string | undefined][] })
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', tier: 'self_managed', features: {}, id: 't1', subdomain: 'sunny' }),
 }));
-vi.mock('@/lib/adminSupabase', () => ({ adminSupabase: null }));
 vi.mock('@/lib/services/unitManager', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/services/unitManager')>()),
   getDocumentSignedUrl: vi.fn(async (path: string, name?: string) => { links.asked.push([path, name]); return 'https://files.example/signed'; }),
