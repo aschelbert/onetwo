@@ -42,7 +42,7 @@ describe('building switcher', () => {
     expect(items.map(i => i.textContent)).toEqual(['Harbor ViewPresident', 'Sunny AcresTreasurer']);
     expect(items[0].getAttribute('aria-checked')).toBe('true');
     expect(items[1].getAttribute('aria-checked')).toBe('false');
-    expect(within(menu).getByRole('menuitem', { name: /Set up another building/ }).getAttribute('href')).toBe('/login?create=1');
+    expect(within(menu).getByRole('menuitem', { name: /Set up another building/ }).getAttribute('href')).toBe('/login?create=1&add=1');
   });
 
   it('switches when another building is picked, and not when the current one is', () => {
