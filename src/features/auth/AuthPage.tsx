@@ -168,6 +168,10 @@ export default function AuthPage() {
   const [rememberBuilding, setRememberBuilding] = useState(false);
   // Set while an already signed-in person is setting up another building: no email or password to enter
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
+  // Signing up with an email that already has an account: the account step
+  // becomes a one-field sign-in instead of "choose a password". `error` is
+  // shown when the password entered there is wrong.
+  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean } | null>(null);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   // Chargebee Drop-in initialization
@@ -733,30 +737,41 @@ export default function AuthPage() {
       const alreadySignedIn = !!signedInAs
         && openSession?.user?.email?.toLowerCase() === signupEmail.toLowerCase();
 
-      if (!alreadySignedIn && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      // The email is already known to have an account: sign in, don't sign up
+      const knownAccount = !alreadySignedIn && existingAccount?.email === signupEmail.trim().toLowerCase();
+
+      if (!alreadySignedIn && !knownAccount && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
       if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
-      // Try to sign up — if user already exists (e.g., abandoned checkout), sign them in instead
-      const { error: authError } = alreadySignedIn ? { error: null } : await supabase.auth.signUp({
-        email: signupEmail,
-        password: password,
-        options: { data: { full_name: fullName } },
-      });
+      // Try to sign up — if the email already has an account, sign in instead
+      const { error: authError } = alreadySignedIn ? { error: null }
+        : knownAccount ? { error: { message: 'already registered' } }
+        : await supabase.auth.signUp({
+          email: signupEmail,
+          password: password,
+          options: { data: { full_name: fullName } },
+        });
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          // User exists from a previous attempt — sign in and continue to checkout
+          // The building is added to the existing account, which needs that
+          // account's password. Whatever was typed as a "new" password is
+          // tried first (it works for someone retrying an abandoned signup);
+          // otherwise ask for the real one, once, in place of the two fields.
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: signupEmail,
             password: password,
           });
           if (signInError) {
-            alert('An account with this email already exists. Please sign in with the correct password, or use a different email.');
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: knownAccount });
+            setPassword('');
+            setConfirmPassword('');
             setCheckoutLoading(false);
             return;
           }
+          setExistingAccount(null);
         } else {
           alert(authError.message); setCheckoutLoading(false); return;
         }
@@ -1196,9 +1211,22 @@ export default function AuthPage() {
                       ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)}
+                        <input type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
                           className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
                       </div>
+                      {existingAccount ? (
+                        <div role="status" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
+                          <p className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
+                          <p className="mt-0.5 text-sm text-ink-700">Enter that account&apos;s password and this building will be added to it. No new password needed.</p>
+                          <label htmlFor="existing-account-password" className="mt-3 block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
+                          <input id="existing-account-password" type="password" value={password} autoFocus
+                            onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
+                            aria-invalid={existingAccount.error || undefined}
+                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
+                          {existingAccount.error && <p className="mt-1.5 text-sm text-red-700">That password doesn&apos;t match this account. Try again or reset it.</p>}
+                          <p className="mt-2 text-xs text-ink-500"><a href="/reset-password" className="text-accent-600 hover:underline">Forgot your password?</a></p>
+                        </div>
+                      ) : (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
@@ -1211,6 +1239,7 @@ export default function AuthPage() {
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
                       </div>
+                      )}
                       </>)}
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
@@ -1236,14 +1265,16 @@ export default function AuthPage() {
                         <button onClick={() => {
                             if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            if (!signedInAs) {
+                            if (existingAccount) {
+                              if (!password) { alert('Please enter your ONE two password.'); return; }
+                            } else if (!signedInAs) {
                               if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
                               if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
                             }
                             handleCheckout();
                           }} disabled={checkoutLoading}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
-                          {checkoutLoading ? 'Setting up...' : 'Start Free Trial'}
+                          {checkoutLoading ? 'Setting up...' : existingAccount ? 'Sign In & Start Free Trial' : 'Start Free Trial'}
                         </button>
                       ) : (
                         <button onClick={() => {
