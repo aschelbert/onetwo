@@ -428,6 +428,21 @@ Deno.serve(async (req) => {
               { tenant_id: result.tenant_id },
             );
 
+            // Record which ad sent this signup. Best effort: a failure here
+            // must not undo a provisioned building.
+            const attr = pending.attribution;
+            if (attr && typeof attr === "object") {
+              const saved = await sbQuery("PATCH", "tenants", { id: `eq.${result.tenant_id}` }, {
+                utm_source: attr.utm_source || null,
+                utm_medium: attr.utm_medium || null,
+                utm_campaign: attr.utm_campaign || null,
+                utm_term: attr.utm_term || null,
+                utm_content: attr.utm_content || null,
+                first_landing_url: attr.first_landing_url || null,
+              }).catch(() => false);
+              if (!saved) console.error(`attribution: could not save UTM tags for tenant ${result.tenant_id}`);
+            }
+
             // Add the building to the admin console
             await createGovopsTenancy({
               id: result.tenant_id,
