@@ -5,21 +5,29 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 
 type Price = { id: string; plan: string; interval: string; found: boolean; trialDays: number | null; trialPeriod: number | null; trialPeriodUnit: string | null }
-type Trial = { site: string; prices: Price[]; chargebeeTrialDays: number | null; storedTrialDays: number | null; inSync: boolean }
+type Trial = { site: string; prices: Price[]; chargebeeTrialDays: number | null; storedTrialDays: number | null; inSync: boolean; trialOff?: boolean; effectiveTrialDays?: number | null }
+
+/** What a new signup gets: 0 when the trial is off, otherwise the length Chargebee holds. */
+const effectiveDays = (t: Trial) => (t.effectiveTrialDays !== undefined ? t.effectiveTrialDays : t.chargebeeTrialDays)
 
 const PLAN_NAMES: Record<string, string> = { self_managed: 'Self-Managed', facilities: 'Plus Facilities' }
 
+const DEFAULT_TRIAL_DAYS = 21
+
 /**
- * Free trial length. Chargebee starts the trial, so the number shown is the
- * one on Chargebee's plan prices; saving writes it there and to the signup
- * page's setting. When Chargebee cannot be read the field is locked, because
- * a number saved only here would not change what a new signup gets.
+ * Free trial: on or off, and how long. Chargebee starts the trial, so what is
+ * shown is what Chargebee's plan prices hold; saving writes it there and to
+ * the setting the signup page and the website read. Off is stored as 0 days.
+ * When Chargebee cannot be read the controls are locked, because a value
+ * saved only here would not change what a new signup gets.
  */
 export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) {
   const [trial, setTrial] = useState<Trial | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [input, setInput] = useState(lastSavedDays)
+  // The length to go back to when the trial is switched on again.
+  const [lastLength, setLastLength] = useState(lastSavedDays > 0 ? lastSavedDays : DEFAULT_TRIAL_DAYS)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -27,7 +35,9 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
     const next = Array.isArray(data.prices) ? (data as Trial) : null
     if (next) {
       setTrial(next)
-      if (next.chargebeeTrialDays !== null) setInput(next.chargebeeTrialDays)
+      const effective = effectiveDays(next)
+      if (effective !== null) setInput(effective)
+      if (next.chargebeeTrialDays) setLastLength(next.chargebeeTrialDays)
     } else if (status !== 200) {
       setTrial(null)
     }
@@ -47,9 +57,17 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
 
   const readable = !!trial && trial.prices.every(p => p.found)
   const editable = readable && !loading
-  const pricesDisagree = readable && trial.chargebeeTrialDays === null
-  const settingsBehind = readable && trial.chargebeeTrialDays !== null && trial.storedTrialDays !== trial.chargebeeTrialDays
-  const dirty = editable && (input !== trial.chargebeeTrialDays || !trial.inSync)
+  const off = !!trial?.trialOff
+  const pricesDisagree = readable && !off && trial.chargebeeTrialDays === null
+  const settingsBehind = readable && !off && trial.chargebeeTrialDays !== null && trial.storedTrialDays !== trial.chargebeeTrialDays
+  const dirty = editable && (input !== effectiveDays(trial) || !trial.inSync)
+  const trialOn = input > 0
+
+  function setLength(days: number) {
+    setSaved(false)
+    setInput(days)
+    if (days > 0) setLastLength(days)
+  }
 
   async function save() {
     setSaving(true); setSaved(false)
@@ -72,23 +90,39 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
       <div className="flex justify-between items-center mb-1">
         <h3 className="font-serif text-lg font-bold">Free Trial</h3>
         {loading ? <span className="text-xs text-gray-400">Reading Chargebee…</span>
+          : readable && off ? <Badge variant="amber">Free trial off</Badge>
           : readable && trial.inSync ? <Badge variant="green">In sync with Chargebee</Badge>
           : readable ? <Badge variant="amber">Out of sync</Badge>
           : <Badge variant="gray">Chargebee not connected</Badge>}
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        How many days a new building gets free. Saving sets this on every plan price in Chargebee and on the signup page. Buildings already in a trial keep the end date they started with.
+        Whether a new building starts with a free trial, and for how many days. Saving sets this on every plan price in Chargebee, on the signup page and on the website. Buildings already in a trial keep the end date they started with.
       </p>
+
+      <label className="flex items-center gap-2.5 mb-4 w-fit cursor-pointer">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-checked={trialOn}
+          checked={trialOn}
+          disabled={!editable || saving}
+          onChange={e => setLength(e.target.checked ? lastLength : 0)}
+          className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+        />
+        <span className="text-sm font-semibold text-gray-800">Offer a free trial</span>
+        <span className="text-xs text-gray-500">{trialOn ? 'On' : 'Off: new buildings are billed at signup, and the site says "Start today!"'}</span>
+      </label>
 
       <div className="flex items-end gap-3">
         <div>
           <label htmlFor="trial-days" className="block text-xs font-semibold text-gray-600 mb-1">Trial length (days)</label>
           <Input
             id="trial-days"
-            type="number" min={0} max={365}
-            value={input}
-            disabled={!editable || saving}
-            onChange={e => { setSaved(false); setInput(Math.max(0, Math.min(365, parseInt(e.target.value) || 0))) }}
+            type="number" min={1} max={365}
+            value={trialOn ? input : ''}
+            placeholder="Off"
+            disabled={!editable || saving || !trialOn}
+            onChange={e => setLength(Math.max(1, Math.min(365, parseInt(e.target.value) || 1)))}
             className="w-24 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
           />
         </div>
@@ -110,7 +144,7 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
       )}
       {settingsBehind && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">
-          Chargebee gives {trial.chargebeeTrialDays} days, but the signup page is showing {trial.storedTrialDays ?? 'no value'}. Save to make them match.
+          Chargebee {trial.chargebeeTrialDays === 0 ? 'has no trial' : `gives ${trial.chargebeeTrialDays} days`}, but the signup page is showing {trial.storedTrialDays === 0 ? 'no trial' : trial.storedTrialDays ?? 'no value'}. Save to make them match.
         </p>
       )}
 
@@ -120,7 +154,7 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
             <tr className="text-left text-[0.7rem] uppercase tracking-wide text-gray-500 font-semibold border-b border-gray-200">
               <th className="py-2">Chargebee plan price ({trial.site})</th>
               <th className="py-2">Plan</th>
-              <th className="py-2 text-right">Trial in Chargebee</th>
+              <th className="py-2 text-right">{off ? 'Kept in Chargebee' : 'Trial in Chargebee'}</th>
             </tr>
           </thead>
           <tbody>
@@ -138,7 +172,10 @@ export function TrialSettingsCard({ lastSavedDays }: { lastSavedDays: number }) 
           </tbody>
         </table>
       )}
-      <p className="text-xs text-gray-400 mt-3">Set to 0 for no free trial. Maximum 365 days.</p>
+      {readable && off && (
+        <p className="text-xs text-gray-500 mt-3">The trial is off. Checkout tells Chargebee to skip it, so new buildings are billed at signup. The lengths above stay on the plan prices and apply again when the trial is switched back on.</p>
+      )}
+      <p className="text-xs text-gray-400 mt-3">Between 1 and 365 days. Switch the trial off to bill new buildings at signup.</p>
     </div>
   )
 }

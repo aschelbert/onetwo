@@ -177,6 +177,8 @@ Deno.serve(async (req) => {
 
     // ── Build Chargebee checkout params ──
     const p = new URLSearchParams();
+    // Set when the checkout asks Chargebee to skip the trial (trial turned off).
+    let noTrial = false;
     // embed=true is required for Chargebee Drop-in (in-app) checkout
     p.append("embed", "true");
     let itemIdx = 0;
@@ -376,9 +378,17 @@ Deno.serve(async (req) => {
         itemIdx++;
       }
 
-      // Trial period shown on the hosted checkout page
-      p.append("subscription[trial_period]", String(trialDays));
-      p.append("subscription[trial_period_unit]", "day");
+      if (trialDays === 0) {
+        // The trial is turned off in the Admin Console. trial_end = 0 tells
+        // Chargebee to start the subscription with no trial, whatever trial
+        // the plan price carries.
+        p.append("subscription[trial_end]", "0");
+        noTrial = true;
+      } else {
+        // Trial period shown on the hosted checkout page
+        p.append("subscription[trial_period]", String(trialDays));
+        p.append("subscription[trial_period_unit]", "day");
+      }
 
       // Customer (pre-created above)
       p.append("customer[id]", customerId);
@@ -408,7 +418,17 @@ Deno.serve(async (req) => {
     }
 
     // ── Call Chargebee ──
-    const result = await chargebeeRequest("hosted_pages/checkout_new_for_items", p);
+    let result;
+    try {
+      result = await chargebeeRequest("hosted_pages/checkout_new_for_items", p);
+    } catch (e) {
+      if (!noTrial) throw e;
+      // Never block a signup over the no-trial instruction: fall back to the
+      // plan's own trial and leave a record that the override was refused.
+      console.error("chargebee-checkout: no-trial checkout refused, retrying with the plan's trial:", e);
+      p.delete("subscription[trial_end]");
+      result = await chargebeeRequest("hosted_pages/checkout_new_for_items", p);
+    }
     const hostedPage = result.hosted_page;
 
     return jsonResponse({ hosted_page: hostedPage, url: hostedPage.url, hostedPageId: hostedPage.id });

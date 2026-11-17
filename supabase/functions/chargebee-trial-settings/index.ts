@@ -4,8 +4,12 @@
 // Chargebee is where a trial actually starts, so it is the source of truth:
 // the trial length lives on each plan item price. This function reads those
 // values for the console, and on save writes the new length to every plan
-// item price and then to platform_settings.trial_days, which the signup page
-// and checkout read. Platform admins only.
+// item price and then to platform_settings.trial_days, which the signup page,
+// the website and checkout read. Platform admins only.
+//
+// Turning the trial off is stored as trial_days = 0. Checkout enforces it by
+// telling Chargebee to start the subscription with no trial, so the plan
+// prices keep their last length for when the trial is switched back on.
 // Zero dependencies -- raw fetch to Chargebee API + Supabase REST/Auth.
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -109,12 +113,17 @@ function summarize(prices: Awaited<ReturnType<typeof readPlanPrices>>, stored: n
   // One number only when every plan price was read and they all agree on a day count.
   const chargebeeTrialDays =
     found.length === prices.length && values.length === 1 && values[0] !== null ? values[0] : null;
+  const trialOff = stored === 0;
   return {
     site: CHARGEBEE_SITE,
     prices,
     chargebeeTrialDays,
     storedTrialDays: stored,
-    inSync: chargebeeTrialDays !== null && chargebeeTrialDays === stored,
+    // Off is enforced at checkout, not on the plan prices, so there is nothing to compare.
+    trialOff,
+    // What a new signup gets: no trial when off, otherwise what Chargebee holds.
+    effectiveTrialDays: trialOff ? 0 : chargebeeTrialDays,
+    inSync: trialOff || (chargebeeTrialDays !== null && chargebeeTrialDays === stored),
   };
 }
 
@@ -198,8 +207,9 @@ Deno.serve(async (req) => {
     }
 
     // Chargebee first: if it refuses, the stored number must not move ahead of it.
+    // Turning the trial off changes nothing in Chargebee (see the note at the top).
     const failures: string[] = [];
-    for (const p of PLAN_PRICES) {
+    for (const p of days === 0 ? [] : PLAN_PRICES) {
       const params = new URLSearchParams();
       params.append("trial_period", String(days));
       params.append("trial_period_unit", "day");
@@ -212,7 +222,7 @@ Deno.serve(async (req) => {
 
     // Read back what Chargebee now holds rather than trusting the writes.
     const prices = await readPlanPrices();
-    const confirmed = prices.every((p) => p.found && p.trialDays === days);
+    const confirmed = days === 0 || prices.every((p) => p.found && p.trialDays === days);
 
     if (failures.length > 0 || !confirmed) {
       return jsonResponse({
@@ -241,7 +251,9 @@ Deno.serve(async (req) => {
       actor_role: "platform_admin",
       action: "platform.trial_days_updated",
       target: "Platform Settings",
-      details: `Free trial set to ${days} days in Chargebee (${CHARGEBEE_SITE}) and platform settings`,
+      details: days === 0
+        ? "Free trial turned off: new buildings are billed at signup"
+        : `Free trial set to ${days} days in Chargebee (${CHARGEBEE_SITE}) and platform settings`,
     }).catch(() => undefined);
 
     return jsonResponse(summarize(prices, days));

@@ -455,6 +455,31 @@ Deno.serve(async (req) => {
               trialEndsAt: result.trial_ends_at || null,
             });
 
+            // provision_tenant records every new building as trialing with
+            // the trial's extras switched on. When the trial is turned off,
+            // Chargebee starts the subscription active: record what it says,
+            // so the building is active on the plan it is paying for.
+            if (subscription.status && subscription.status !== "in_trial") {
+              await sbRpc("link_chargebee_subscription", {
+                p_tenant_id: result.tenant_id,
+                p_customer_id: customer.id || null,
+                p_subscription_id: subscription.id,
+                p_plan: parsed.plan,
+                p_on_call: parsed.onCall,
+                p_pm_seat: parsed.pmSeat,
+                p_interval: parsed.interval,
+                p_status: subscription.status,
+                p_trial_ends_at: null,
+                p_period_start: subscription.current_term_start
+                  ? new Date(subscription.current_term_start * 1000).toISOString()
+                  : null,
+                p_period_end: subscription.current_term_end
+                  ? new Date(subscription.current_term_end * 1000).toISOString()
+                  : null,
+              });
+              await syncGovopsStatus(result.tenant_id, { status: mapStatus(subscription.status) });
+            }
+
             // Tell OpenAI Ads a paid trial signup completed (never throws),
             // unless the visitor opted out with Global Privacy Control
             if (pending.adMeasurementOptOut === true) {
