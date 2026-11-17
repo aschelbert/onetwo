@@ -24,6 +24,7 @@ import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage'
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import { isTenantHost } from '@/lib/tenantHost';
 import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
+import { isSignupInProgress } from '@/lib/authFlow';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -71,6 +72,8 @@ function AuthListener() {
       setTimeout(async () => {
         const { isAuthenticated, login, addMember } = useAuthStore.getState();
         if (isAuthenticated) return;
+        // A signup signs the account in to run its checkout; that is not a login
+        if (isSignupInProgress()) return;
         try {
           // Check if platform admin first
           const { data: admin } = await sb
