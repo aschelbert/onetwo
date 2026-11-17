@@ -17,6 +17,7 @@ import { boardEvents } from '../../score/events';
 import { bandFor, computeScorecard } from '../../score/stewardship';
 import { ONLINE_METHODS } from '../../funds/metrics';
 import type { BuildingSnapshot } from '../metrics';
+import { useOnCallAdvisor } from '../useOnCallAdvisor';
 
 type Section = 'units' | 'board' | 'management' | 'staff' | 'emergency';
 const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('');
@@ -158,6 +159,7 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const navigate = useNavigate();
   const units = useFinancialStore(s => s.units);
   const management = useBuildingStore(s => s.management);
+  const onCall = useOnCallAdvisor();
   const counsel = useBuildingStore(s => s.legalCounsel);
   const vendors = useBuildingStore(s => s.vendors);
   const removeBoardMember = useBuildingStore(s => s.removeBoardMember);
@@ -330,6 +332,26 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
         </Card>
 
         <div className="flex flex-col gap-3">
+          {onCall && (
+            <Card id="dir-on-call" aria-label="On Call Advisor" className="gap-2.5 !border-ux2-plum !bg-ux2-plum text-white">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-white/80">On Call Advisor</span>
+                <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold">{onCall.status === 'assigned' ? 'ONE two' : 'Being assigned'}</span>
+              </div>
+              {onCall.status === 'assigned' ? (
+                <div className="flex items-center gap-3">
+                  <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold">{initials(onCall.name ?? '')}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[15px] font-semibold">{onCall.name}</span>
+                    {onCall.email && <a href={`mailto:${onCall.email}`} className="block truncate text-[13px] text-white/85 underline-offset-2 hover:underline">{onCall.email}</a>}
+                    <span className="block text-xs text-white/70">Your named advisor{onCall.assignedAt ? ` since ${monthYear(onCall.assignedAt)}` : ''}</span>
+                  </span>
+                </div>
+              ) : (
+                <p className="text-[13px] text-white/85">ONE two is assigning your advisor. They will appear here, and a notice will be posted when they are assigned.</p>
+              )}
+            </Card>
+          )}
           <Card id="dir-management" aria-label="Management and counsel" className="gap-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Management and counsel</SectionLabel><Chip tone={management.company ? 'sage' : 'ghost'}>{management.company ? 'Managed' : 'Self-managed'}</Chip></div>
             {editingManager ? <ManagementForm onClose={() => setEditingManager(false)} /> : (
