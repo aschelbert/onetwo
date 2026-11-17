@@ -50,10 +50,15 @@ function AuthListener() {
     const sb = supabase; // narrow for TS inside async callback
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
-      const { isAuthenticated, signOut } = useAuthStore.getState();
+      const { isAuthenticated, clearSession } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
-        if (isAuthenticated) signOut();
+        // The session is already gone; only this tab's state needs clearing.
+        // Calling signOut() here would send another sign-out to the server,
+        // and it signs out every session: when the event came from another
+        // tab, a late one of those revokes the session of whoever has just
+        // signed back in ("I had to log in twice").
+        if (isAuthenticated) clearSession();
         return;
       }
 
