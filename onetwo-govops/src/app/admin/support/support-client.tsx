@@ -56,6 +56,14 @@ interface CapturedItem {
   feedback_items: { id: string; title: string; status: string } | null
 }
 
+interface ConsoleUser {
+  id: string
+  email: string
+  display_name: string | null
+}
+
+const consoleUserName = (u: ConsoleUser) => u.display_name?.trim() || u.email.split('@')[0]
+
 interface FeedbackRef {
   id: string
   title: string
@@ -106,10 +114,14 @@ export function SupportClient({
   initialThreads,
   tenancies,
   feedbackItems,
+  consoleUsers,
+  currentUserId,
 }: {
   initialThreads: SupportThread[]
   tenancies: Tenancy[]
   feedbackItems: FeedbackRef[]
+  consoleUsers: ConsoleUser[]
+  currentUserId: string
 }) {
   const router = useRouter()
   const [threads, setThreads] = useState(initialThreads)
@@ -125,6 +137,7 @@ export function SupportClient({
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null)
   const [mobilePane, setMobilePane] = useState<MobilePane>('threads')
+  const [assignError, setAssignError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -190,6 +203,12 @@ export function SupportClient({
           setMessages(prev => [...prev, msg])
         }
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_threads' }, (payload) => {
+        const created = payload.new as SupportThread
+        setThreads(prev => prev.some(t => t.id === created.id) ? prev : [created, ...prev])
+        // A thread can arrive for a building this page has not loaded yet.
+        router.refresh()
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'support_threads' }, (payload) => {
         const updated = payload.new as SupportThread
         setThreads(prev => prev.map(t => t.id === updated.id ? updated : t))
@@ -197,7 +216,7 @@ export function SupportClient({
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [selectedId])
+  }, [selectedId, router])
 
   const thread = threads.find(t => t.id === selectedId)
   const tenancy = thread ? tenancyById(thread.tenancy_id) : undefined
@@ -278,18 +297,42 @@ export function SupportClient({
     }
   }
 
-  const handleAssignee = async (assignee: string) => {
-    if (!selectedId) return
+  // Assign a console user to the open thread. On an On Call request this also
+  // makes them the building's advisor, which is what the thread is asking for.
+  const handleAssignee = async (userId: string) => {
+    const current = threads.find(t => t.id === selectedId)
+    if (!current) return
+    setAssignError(null)
+    const assignee = consoleUsers.find(u => u.id === userId)
+
+    if (current.module === 'On Call' && assignee) {
+      const res = await fetch('/api/admin/on-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: current.tenancy_id, console_user_id: assignee.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setAssignError(data.error || 'Assigning the On Call advisor failed'); return }
+      setThreads(prev => prev.map(t => t.id === current.id ? { ...t, assignee_name: data.advisorName, status: 'resolved' } : t))
+      fetchMessages(current.id)
+      return
+    }
+
     const res = await fetch('/api/admin/support/threads', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: selectedId, assignee_name: assignee || null }),
+      body: JSON.stringify({ id: current.id, assignee_name: assignee ? consoleUserName(assignee) : null }),
     })
     if (res.ok) {
       const updated = await res.json()
       setThreads(prev => prev.map(t => t.id === updated.id ? updated : t))
+    } else {
+      setAssignError('Assigning the thread failed')
     }
   }
+
+  const me = consoleUsers.find(u => u.id === currentUserId)
+  const assignedUser = thread ? consoleUsers.find(u => consoleUserName(u) === thread.assignee_name) : undefined
 
   const handleSummarize = async (threadId: string) => {
     const t = threads.find(th => th.id === threadId)
@@ -449,15 +492,23 @@ export function SupportClient({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {assignError && <span role="alert" className="text-[11px] text-red-600 max-w-[220px]">{assignError}</span>}
+                    {me && assignedUser?.id !== me.id && (
+                      <Button variant="secondary" size="sm" onClick={() => handleAssignee(me.id)}>
+                        {thread.module === 'On Call' ? 'Assign myself as advisor' : 'Assign to me'}
+                      </Button>
+                    )}
                     <select
-                      value={thread.assignee_name || ''}
+                      aria-label="Assigned to"
+                      value={assignedUser?.id || (thread.assignee_name ? '__other' : '')}
                       onChange={e => handleAssignee(e.target.value)}
                       className="bg-white border border-gray-200 rounded-md px-2.5 py-1.5 text-xs text-gray-700 outline-none cursor-pointer min-h-[44px] md:min-h-0"
                     >
-                      <option value="">Assign…</option>
-                      <option value="Alex K.">Alex K.</option>
-                      <option value="Maya R.">Maya R.</option>
-                      <option value="Sam L.">Sam L.</option>
+                      <option value="">{thread.module === 'On Call' ? 'Assign advisor…' : 'Unassigned'}</option>
+                      {thread.assignee_name && !assignedUser && <option value="__other" disabled>{thread.assignee_name}</option>}
+                      {consoleUsers.map(u => (
+                        <option key={u.id} value={u.id}>{u.id === currentUserId ? `Me (${consoleUserName(u)})` : consoleUserName(u)}</option>
+                      ))}
                     </select>
                     {thread.status !== 'resolved' && (
                       <Button variant="sage" size="sm" onClick={handleResolve}>
