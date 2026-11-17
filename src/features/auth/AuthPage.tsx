@@ -12,6 +12,10 @@ import {
 
 type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
 
+// The signup form, kept while its owner leaves to open an emailed sign-in link
+const SIGNUP_DRAFT_KEY = 'onetwo_signup_draft';
+const SIGNUP_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
@@ -172,6 +176,8 @@ export default function AuthPage() {
   // becomes a one-field sign-in instead of "choose a password". `error` is
   // shown when the password entered there is wrong.
   const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean } | null>(null);
+  // The emailed sign-in link, for someone who can't or won't use the password
+  const [emailLink, setEmailLink] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   // Chargebee Drop-in initialization
@@ -282,7 +288,68 @@ export default function AuthPage() {
     if (first) setFirstName(first);
     if (rest.length) setLastName(rest.join(' '));
     setBuildingChoices(null);
-    setAuthStep('signup-plan');
+    setExistingAccount(null);
+    // Back from an emailed sign-in link: pick the signup up where it stopped.
+    // The draft is consumed on first use, so a second call (the session check
+    // can run twice) must not send them back to the plan step.
+    if (restoreSignupDraft(user.email || '')) {
+      draftRestored.current = true;
+      setAuthStep('signup-account');
+    } else if (!draftRestored.current) {
+      setAuthStep('signup-plan');
+    }
+  };
+  const draftRestored = useRef(false);
+
+  const saveSignupDraft = (forEmail: string) => {
+    try {
+      localStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify({
+        savedAt: Date.now(), email: forEmail.trim().toLowerCase(),
+        selectedTier, billingInterval, addOns: [...selectedAddOns],
+        bldgName, bldgSubdomain, bldgStreet, bldgCity, bldgState, bldgZip, bldgUnits,
+        firstName, lastName, profilePhone, profileUnit, boardTitle,
+      }));
+    } catch { /* storage unavailable: they re-enter the form after the link */ }
+  };
+
+  /** Refill the form from a saved draft for this email. Returns whether one was restored. */
+  const restoreSignupDraft = (forEmail: string): boolean => {
+    try {
+      const raw = localStorage.getItem(SIGNUP_DRAFT_KEY);
+      if (!raw) return false;
+      localStorage.removeItem(SIGNUP_DRAFT_KEY);
+      const d = JSON.parse(raw);
+      if (!d || d.email !== forEmail.trim().toLowerCase()) return false;
+      if (typeof d.savedAt !== 'number' || Date.now() - d.savedAt > SIGNUP_DRAFT_MAX_AGE_MS) return false;
+      if (d.selectedTier === 'self_managed' || d.selectedTier === 'facilities') setSelectedTier(d.selectedTier);
+      if (d.billingInterval === 'monthly' || d.billingInterval === 'annual') setBillingInterval(d.billingInterval);
+      if (Array.isArray(d.addOns)) setSelectedAddOns(new Set(d.addOns as AddOnId[]));
+      const str = (v: unknown) => (typeof v === 'string' ? v : '');
+      setBldgName(str(d.bldgName));
+      subdomainManuallyEdited.current = true; // keep the short name they chose
+      setBldgSubdomain(str(d.bldgSubdomain));
+      setBldgStreet(str(d.bldgStreet)); setBldgCity(str(d.bldgCity)); setBldgState(str(d.bldgState));
+      setBldgZip(str(d.bldgZip)); setBldgUnits(str(d.bldgUnits));
+      if (str(d.firstName)) setFirstName(str(d.firstName));
+      if (str(d.lastName)) setLastName(str(d.lastName));
+      setProfilePhone(str(d.profilePhone)); setProfileUnit(str(d.profileUnit));
+      if (str(d.boardTitle)) setBoardTitle(str(d.boardTitle));
+      return !!str(d.bldgName);
+    } catch { return false; }
+  };
+
+  // Prove ownership of an existing account by email instead of by password.
+  // The link signs them in and returns here, where the saved form is restored.
+  const sendSignInLink = async () => {
+    const target = (profileEmail || email).trim();
+    if (!supabase || !target) return;
+    setEmailLink('sending');
+    saveSignupDraft(target);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: target,
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/login?create=1` },
+    });
+    setEmailLink(error ? 'failed' : 'sent');
   };
 
   // Poll for tenant provisioning after checkout success
@@ -1211,20 +1278,35 @@ export default function AuthPage() {
                       ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
+                        <input type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); setEmailLink('idle'); }}
                           className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
                       </div>
                       {existingAccount ? (
                         <div role="status" className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
                           <p className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
-                          <p className="mt-0.5 text-sm text-ink-700">Enter that account&apos;s password and this building will be added to it. No new password needed.</p>
+                          <p className="mt-0.5 text-sm text-ink-700">This building will be added to it. Confirm it&apos;s you with your password, or with a link we email you.</p>
                           <label htmlFor="existing-account-password" className="mt-3 block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
                           <input id="existing-account-password" type="password" value={password} autoFocus
                             onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
                             aria-invalid={existingAccount.error || undefined}
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
-                          {existingAccount.error && <p className="mt-1.5 text-sm text-red-700">That password doesn&apos;t match this account. Try again or reset it.</p>}
-                          <p className="mt-2 text-xs text-ink-500"><a href="/reset-password" className="text-accent-600 hover:underline">Forgot your password?</a></p>
+                          {existingAccount.error && <p className="mt-1.5 text-sm text-red-700">That password doesn&apos;t match this account. Try again, or use the email link below.</p>}
+                          <div className="mt-3 border-t border-ink-200 pt-3">
+                            {emailLink === 'sent' ? (
+                              <p role="status" className="text-sm text-ink-800">
+                                <span className="font-semibold">Check {existingAccount.email}.</span> Open the link in this browser and you&apos;ll come back here signed in, with this form filled in. The link expires in an hour.
+                              </p>
+                            ) : (
+                              <>
+                                <p className="text-sm text-ink-700">Don&apos;t know the password, or don&apos;t want to use it?</p>
+                                <button type="button" onClick={sendSignInLink} disabled={emailLink === 'sending'}
+                                  className="mt-1.5 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-semibold text-ink-900 hover:border-ink-900 disabled:opacity-50">
+                                  {emailLink === 'sending' ? 'Sending…' : 'Email me a sign-in link instead'}
+                                </button>
+                                {emailLink === 'failed' && <p className="mt-1.5 text-sm text-red-700">We couldn&apos;t send the email just now. Wait a minute and try again.</p>}
+                              </>
+                            )}
+                          </div>
                         </div>
                       ) : (
                       <div className="grid grid-cols-2 gap-3">
