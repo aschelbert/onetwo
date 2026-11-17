@@ -62,7 +62,8 @@ function trialDaysPlugin(): Plugin {
         signal: AbortSignal.timeout(5000),
       })
       const value: unknown = res.ok ? await res.json() : null
-      return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : DEFAULT_TRIAL_DAYS
+      // 0 is a real answer: the trial is turned off.
+      return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : DEFAULT_TRIAL_DAYS
     } catch {
       return DEFAULT_TRIAL_DAYS
     }

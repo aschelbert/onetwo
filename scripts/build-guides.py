@@ -276,7 +276,7 @@ p{{margin:0}}
 <header style="background:#ffffff;border-bottom:1px solid #e9edf2;position:sticky;top:0;z-index:5">
   <div class="wrap row" style="min-height:72px">
     <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0D1B2E"><img src="/onetwo-nav-logo.jpg" alt="ONE two" style="width:36px;height:34px;object-fit:cover;border-radius:6px"><span style="font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:22px">ONE <span style="font-weight:500">two</span></span></a>
-    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="guide-header">Start free trial</a></div>
+    <div style="display:flex;gap:10px"><a class="btn btn-outline" href="/login" style="min-height:42px;font-size:15px">Log in</a><a class="btn btn-red" href="/login?create=1" style="min-height:42px;font-size:15px" data-cta="guide-header" data-no-trial="Start today!">Start free trial</a></div>
   </div>
 </header>
 {main}
@@ -323,7 +323,7 @@ def page(g):
   <aside class="how">
     <h2>How ONE two helps</h2>
     <ul>{how}</ul>
-    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guide-{g['slug']}">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guide-{g['slug']}" data-no-trial="Start today!">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
   </aside>
   {sources}
   <nav class="related" aria-label="More guides"><h2>More guides for DC condo boards</h2><ul>{related}</ul></nav>
@@ -367,8 +367,8 @@ def index_page():
   <ul class="cards">{cards}</ul>
   <aside class="how">
     <h2>Run the building without a manager</h2>
-    <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month after a 21 day free trial.</p>
-    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+    <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month<span data-no-trial=""> after a <span data-trial-days>21</span> day free trial</span>.</p>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index" data-no-trial="Start today!">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
   </aside>
 </div>
 </main>"""

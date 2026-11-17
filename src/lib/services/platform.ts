@@ -44,6 +44,10 @@ export interface ChargebeeTrial {
   chargebeeTrialDays: number | null;
   storedTrialDays: number | null;
   inSync: boolean;
+  /** The trial is turned off (stored as 0 days) and skipped at checkout. */
+  trialOff?: boolean;
+  /** What a new signup gets: 0 when off, otherwise the length Chargebee holds. */
+  effectiveTrialDays?: number | null;
 }
 
 export type ChargebeeTrialResult =
