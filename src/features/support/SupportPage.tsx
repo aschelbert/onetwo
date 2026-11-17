@@ -93,14 +93,12 @@ export default function SupportPage() {
     }
 
     (async () => {
-      const { data: tenancy } = await db
-        .from('tenancies')
-        .select('id')
-        .eq('slug', tenant.subdomain)
-        .maybeSingle();
+      // The tenancies table is not readable with the anon key; this function
+      // returns only the id for a slug.
+      const { data: id } = await db.rpc('tenancy_id_for_slug', { p_slug: tenant.subdomain });
 
-      if (tenancy) {
-        setTenancyId(tenancy.id);
+      if (typeof id === 'string' && id) {
+        setTenancyId(id);
       } else {
         setLoadingThreads(false);
       }

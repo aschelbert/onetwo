@@ -46,10 +46,11 @@ function useThreads() {
     if (!live || !adminSupabase) return;
     let cancelled = false;
     (async () => {
-      const { data: t } = await adminSupabase.from('tenancies').select('id').eq('slug', tenant.subdomain).maybeSingle();
-      if (cancelled || !t) return;
-      setTenancyId(t.id);
-      const { data } = await adminSupabase.from('support_threads').select('id, subject, status, priority, module, updated_at, created_by_name').eq('tenancy_id', t.id).order('updated_at', { ascending: false }).limit(20);
+      // The tenancies table is not readable with the anon key; this function returns only the id for a slug.
+      const { data: id } = await adminSupabase.rpc('tenancy_id_for_slug', { p_slug: tenant.subdomain });
+      if (cancelled || typeof id !== 'string' || !id) return;
+      setTenancyId(id);
+      const { data } = await adminSupabase.from('support_threads').select('id, subject, status, priority, module, updated_at, created_by_name').eq('tenancy_id', id).order('updated_at', { ascending: false }).limit(20);
       if (!cancelled && data) setThreads(data as Thread[]);
     })();
     return () => { cancelled = true; };
