@@ -153,12 +153,37 @@ Deno.serve(async (req) => {
     const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
       headers: { Authorization: auth, apikey: SB_ANON },
     });
-    if (!userRes.ok) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-    const user = await userRes.json();
+    // deno-lint-ignore no-explicit-any
+    let user: any = userRes.ok ? await userRes.json() : null;
 
     const body = await req.json();
+
+    // Not signed in. Allowed in one case only: a new building for an email
+    // that already has an account, where the person chose to sign in after
+    // paying instead of before. The building is attached to that account by
+    // the webhook; this request gets no session and no access to the account,
+    // so nothing here needs the account's password. Every other caller,
+    // including the existing-tenant mode below, must be signed in.
+    if (!user?.id) {
+      const existingEmail = typeof body.existingEmail === "string" ? body.existingEmail.trim().toLowerCase() : "";
+      if (!body.building || body.tenantId || !existingEmail) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      const lookup = await fetch(`${SB_URL}/rest/v1/rpc/user_id_for_email`, {
+        method: "POST",
+        headers: {
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_email: existingEmail }),
+      });
+      const existingId = lookup.ok ? await lookup.json() : null;
+      if (typeof existingId !== "string" || !existingId) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      user = { id: existingId, email: existingEmail };
+    }
     const {
       plan,
       interval,
@@ -288,6 +313,24 @@ Deno.serve(async (req) => {
 
       if (!building.name) {
         return jsonResponse({ error: "building.name is required" }, 400);
+      }
+
+      // An account can own several buildings, but not the same one twice.
+      // The signup page checks this too when it has a session; this covers
+      // the sign-in-later path and anything that skips the page.
+      const ownedRes = await fetch(
+        `${SB_URL}/rest/v1/tenant_users?user_id=eq.${user.id}&select=tenants(name,address)`,
+        { headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` } },
+      );
+      if (ownedRes.ok) {
+        const owned = (await ownedRes.json()) as { tenants?: { name?: string; address?: { street?: string; zip?: string } } | null }[];
+        const wanted = buildingKey(building);
+        if (owned.some((o) => o.tenants && buildingKey(o.tenants) === wanted)) {
+          return jsonResponse(
+            { error: "This account already has this building. Sign in to open it." },
+            409,
+          );
+        }
       }
 
       // Fetch trial days for the hosted checkout page
