@@ -281,6 +281,8 @@ p{{margin:0}}
 </header>
 {main}
 <footer style="background:#08121f;color:#8fa0b3;padding:36px 0"><div class="wrap row" style="font-size:13px"><span>ONE two · Washington, DC</span><nav style="display:flex;gap:20px" aria-label="Footer"><a href="/guides" style="color:#8fa0b3">Guides</a><a href="/privacy" style="color:#8fa0b3">Privacy</a><a href="/terms" style="color:#8fa0b3">Terms</a><a href="mailto:hello@getonetwo.com" style="color:#8fa0b3">Contact</a></nav></div></footer>
+<script src="/site-config.js"></script>
+<script src="/trial-days.js"></script>
 </body>
 </html>
 """
@@ -321,7 +323,7 @@ def page(g):
   <aside class="how">
     <h2>How ONE two helps</h2>
     <ul>{how}</ul>
-    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guide-{g['slug']}">Start your free 21 day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guide-{g['slug']}">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
   </aside>
   {sources}
   <nav class="related" aria-label="More guides"><h2>More guides for DC condo boards</h2><ul>{related}</ul></nav>
@@ -366,7 +368,7 @@ def index_page():
   <aside class="how">
     <h2>Run the building without a manager</h2>
     <p style="margin:0 0 22px">ONE two does the manager's job for DC condo buildings: what is due, the meetings, the books, the repairs and the records. $179 a month after a 21 day free trial.</p>
-    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index">Start your free 21 day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
+    <div class="ctas"><a class="btn btn-red" href="/login?create=1" data-cta="guides-index">Start your free <span data-trial-days>21</span> day trial</a><a class="btn btn-ghost" href="/#pricing">See pricing</a></div>
   </aside>
 </div>
 </main>"""
