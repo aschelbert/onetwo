@@ -10,6 +10,10 @@ import {
   type TenantMembership,
 } from '@/lib/tenantMembership';
 
+/** A building added to an account that already existed, or a brand new signup. */
+const consentSource = (signedInAs: string | null, existingAccount: unknown) =>
+  (signedInAs || existingAccount ? 'add_building' : 'signup') as 'add_building' | 'signup';
+
 type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
 
 // The signup form, kept while its owner leaves to open an emailed sign-in link
@@ -19,6 +23,8 @@ const SIGNUP_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
+import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
+import ConsentBoxes from './ConsentBoxes';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -52,10 +58,13 @@ export default function AuthPage() {
     if (!demoFirstName.trim() || !demoLastName.trim()) { alert('Please enter your name.'); return; }
     if (!demoEmail.trim()) { alert('Please enter your email.'); return; }
     if (!demoCondoName.trim()) { alert('Please enter your condo / community name.'); return; }
+    const consentGap = missingConsent(consent);
+    if (consentGap) { alert(consentGap); return; }
 
     setDemoSubmitting(true);
     try {
       if (isBackendEnabled && supabase) {
+        await recordConsent(supabase, 'demo', demoEmail, consent);
         await supabase.rpc('submit_demo_lead', {
           p_name: `${demoFirstName.trim()} ${demoLastName.trim()}`,
           p_email: demoEmail.trim(),
@@ -176,6 +185,9 @@ export default function AuthPage() {
   // becomes a one-field sign-in instead of "choose a password". `error` is
   // shown when the password entered there is wrong.
   const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean } | null>(null);
+  // Terms, Privacy and (optional) product emails. Asked on every form that
+  // takes an email; nothing is pre-ticked.
+  const [consent, setConsent] = useState<Consent>(NO_CONSENT);
   // The emailed sign-in link, for someone who can't or won't use the password
   const [emailLink, setEmailLink] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
@@ -705,6 +717,8 @@ export default function AuthPage() {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
     if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
     if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+    const consentGap = missingConsent(consent);
+    if (consentGap) { alert(consentGap); return; }
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = profileEmail || email;
 
@@ -744,6 +758,8 @@ export default function AuthPage() {
           setSending(false);
           return;
         }
+
+        await recordConsent(supabase, 'invitation', finalEmail, consent);
 
         // Log in and redirect to tenant subdomain
         const member = {
@@ -847,6 +863,9 @@ export default function AuthPage() {
       // Get the session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+
+      // Proof of what was ticked on this form, stored before any payment step
+      await recordConsent(supabase, consentSource(signedInAs, existingAccount), signupEmail, consent);
 
       // An existing account may add another building. Only stop when this is
       // a building the account already has (same address, or same name when no
@@ -1340,6 +1359,7 @@ export default function AuthPage() {
                           <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option><option>Unit Owner</option>
                         </select>
                       </div>
+                      <ConsentBoxes idPrefix="signup-consent" value={consent} onChange={setConsent} />
                     </div>
 
                     <div className="flex flex-col items-center gap-3 mt-8">
@@ -1347,6 +1367,7 @@ export default function AuthPage() {
                         <button onClick={() => {
                             if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
+                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             if (existingAccount) {
                               if (!password) { alert('Please enter your ONE two password.'); return; }
                             } else if (!signedInAs) {
@@ -1364,6 +1385,7 @@ export default function AuthPage() {
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
                             if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
                             if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             handleCompleteOnboarding();
                           }}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all">
@@ -1567,6 +1589,7 @@ export default function AuthPage() {
                     <option key={tier.id} value={tier.id}>{tier.name} — ${tier.monthly}/mo</option>
                   ))}
                 </select></div>
+              <ConsentBoxes idPrefix="demo-consent" value={consent} onChange={setConsent} />
               <button onClick={handleDemoLeadSubmit} disabled={demoSubmitting}
                 className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50 mt-2">
                 {demoSubmitting ? 'Loading...' : 'Enter Demo →'}</button>
@@ -1647,6 +1670,7 @@ export default function AuthPage() {
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
                   <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               </div>
+              <ConsentBoxes idPrefix="join-consent" value={consent} onChange={setConsent} />
               <button onClick={handleCompleteJoin}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Create Account &amp; Enter</button>
             </div>
