@@ -24,6 +24,7 @@ const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
 import ConsentBoxes from './ConsentBoxes';
+import { setSignupInProgress } from '@/lib/authFlow';
 import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
 import { readAttribution } from '@/lib/attribution';
 
@@ -98,6 +99,30 @@ export default function AuthPage() {
   };
 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // True while this signup holds a session it created itself (a new account,
+  // or an existing one signed in so its checkout could run).
+  const signupOwnsSession = useRef(false);
+
+  // The signup stopped before a building was paid for. A session it created
+  // must not outlive it: otherwise the person is left signed in to an account
+  // they never chose to log in to, and the next signup greets them as signed in.
+  const abandonSignupSession = async () => {
+    setSignupInProgress(false);
+    if (!signupOwnsSession.current || !supabase) return;
+    signupOwnsSession.current = false;
+    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+  };
+
+  // Leave an account the signup found already signed in, and start the
+  // account step again with a blank form.
+  const signOutOfSignup = async () => {
+    try { await supabase?.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+    signupOwnsSession.current = false;
+    setSignedInAs(null);
+    setExistingAccount(null);
+    setProfileEmail(''); setFirstName(''); setLastName(''); setPassword(''); setConfirmPassword('');
+  };
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('self_managed');
@@ -785,6 +810,9 @@ export default function AuthPage() {
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
+      // From here until checkout succeeds or stops, any session is the signup's
+      setSignupInProgress(true);
+
       // Try to sign up — if the email already has an account, sign in instead
       const { error: authError } = alreadySignedIn || signInLater ? { error: null }
         : knownAccount ? { error: { message: 'already registered' } }
@@ -808,18 +836,21 @@ export default function AuthPage() {
             setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: knownAccount, mode: 'now' });
             setPassword('');
             setConfirmPassword('');
+            setSignupInProgress(false);
             setCheckoutLoading(false);
             return;
           }
-          setExistingAccount(null);
+          signupOwnsSession.current = true;
         } else {
-          alert(authError.message); setCheckoutLoading(false); return;
+          alert(authError.message); setSignupInProgress(false); setCheckoutLoading(false); return;
         }
+      } else if (!alreadySignedIn && !signInLater) {
+        signupOwnsSession.current = true; // a brand new account
       }
 
       // Get the session token
       const session = signInLater ? null : (await supabase.auth.getSession()).data.session;
-      if (!signInLater && !session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+      if (!signInLater && !session) { alert('Authentication failed. Please try again.'); await abandonSignupSession(); setCheckoutLoading(false); return; }
 
       // Proof of what was ticked on this form, stored before any payment step
       await recordConsent(supabase, consentSource(signedInAs, existingAccount), signupEmail, consent);
@@ -831,6 +862,7 @@ export default function AuthPage() {
       const memberships = session ? await fetchMemberships(supabase, session.user.id) : [];
       if (memberships === null) {
         alert('We could not check your account. Please try again.');
+        await abandonSignupSession();
         setCheckoutLoading(false);
         return;
       }
@@ -843,9 +875,7 @@ export default function AuthPage() {
       if (duplicateOf) {
         // Say which building it collides with and let them fix the address,
         // rather than a vague "already set up" and a bounce to the login page.
-        // They are signed in at this point, so the form stops asking for a password.
-        if (session?.user?.email) setSignedInAs(session.user.email);
-        setExistingAccount(null);
+        await abandonSignupSession();
         alert(`Your account already has this building: "${duplicateOf.tenant?.name || 'your existing building'}". To add another building, enter its own name and street address.`);
         setAuthStep('signup-building');
         setCheckoutLoading(false);
@@ -856,11 +886,14 @@ export default function AuthPage() {
       // Open Chargebee Drop-in checkout modal (lazy-init if needed)
       if (!ensureChargebee()) {
         alert('Payment system is still loading. Please try again in a moment.');
+        await abandonSignupSession();
         setCheckoutLoading(false);
         return;
       }
 
       const currentSession = session;
+      // Chargebee calls `close` after a successful checkout too
+      let checkoutSucceeded = false;
 
       // Save session tokens so we can restore them if Chargebee redirects away
       try {
@@ -949,6 +982,9 @@ export default function AuthPage() {
           }
         },
         success: async (_hostedPageId: string) => {
+          checkoutSucceeded = true;
+          setSignupInProgress(false);
+          signupOwnsSession.current = false; // paid for: the session is now a real login
           console.log('[checkout] Checkout success, polling for tenant...');
           // OpenAI Ads conversion: paid trial signup completed. Attach the
           // hashed email and user ID first so OpenAI can match it to the ad.
@@ -984,17 +1020,21 @@ export default function AuthPage() {
         },
         close: () => {
           console.log('[checkout] Checkout modal closed');
+          // Closed without paying: don't leave them signed in
+          if (!checkoutSucceeded) void abandonSignupSession();
           setCheckoutLoading(false);
         },
         error: (error: any) => {
           const detail = hostedPageError || error?.message || JSON.stringify(error);
           console.error('[checkout] Chargebee error:', detail, error);
           alert('Checkout failed: ' + detail);
+          if (!checkoutSucceeded) void abandonSignupSession();
           setCheckoutLoading(false);
         },
       });
     } catch (err: any) {
       alert(err.message || 'Checkout failed');
+      await abandonSignupSession();
       setCheckoutLoading(false);
     }
   };
@@ -1278,7 +1318,8 @@ export default function AuthPage() {
                       </div>
                       {signedInAs ? (
                         <p className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-700">
-                          Signed in as <span className="font-semibold">{signedInAs}</span>. This building is added to the same account.
+                          You&apos;re signed in as <span className="font-semibold">{signedInAs}</span> in this browser, so this building will be added to that account.{' '}
+                          <button type="button" onClick={signOutOfSignup} className="font-semibold text-accent-600 underline hover:text-accent-700">Not you? Sign out and start fresh</button>
                         </p>
                       ) : (<>
                       <div>
