@@ -6,6 +6,8 @@ import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
+import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
+import { readAttribution } from '@/lib/attribution';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -247,11 +249,11 @@ export default function AuthPage() {
     return false;
   };
 
-  // OpenAI Ads pixel: load only once the visitor is in the signup steps, so
+  // OpenAI and Reddit Ads pixels: load only once the visitor is in the signup steps, so
   // nobody signing in or using the app is tracked.
   const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
   useEffect(() => {
-    if (inSignupSteps) loadOpenAIPixel();
+    if (inSignupSteps) { loadOpenAIPixel(); loadRedditPixel(); }
   }, [inSignupSteps]);
 
   useEffect(() => {
@@ -822,6 +824,8 @@ export default function AuthPage() {
                     (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
                   // ChatGPT ad click reference, for the server-side conversion report
                   adClickRef: readAdClickRef(),
+                  // Which ad sent this visitor (UTM tags), saved on the building
+                  attribution: readAttribution(),
                 }),
               }
             );
@@ -849,6 +853,8 @@ export default function AuthPage() {
           // hashed email and user ID first so OpenAI can match it to the ad.
           await setOpenAIPixelUser({ email: signupEmail, userId: currentSession?.user?.id });
           window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
+          // Google Ads and Reddit Ads conversion for the same signup
+          trackBuildingCreated({ eventId: conversionEventId, plan: selectedTier, interval: billingInterval });
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {
