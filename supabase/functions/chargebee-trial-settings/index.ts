@@ -118,6 +118,36 @@ function summarize(prices: Awaited<ReturnType<typeof readPlanPrices>>, stored: n
   };
 }
 
+/**
+ * True when the caller presented a service role key for this project.
+ * The key the Admin Console holds need not be the same string as the one in
+ * this function's environment (a project can have several), so anything that
+ * claims to be a service key is checked against an endpoint only a service
+ * role can read, rather than compared to one known value.
+ */
+async function isServiceCaller(authHeader: string): Promise<boolean> {
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  if (SB_SERVICE_KEY && token === SB_SERVICE_KEY) return true;
+
+  let claimsService = token.startsWith("sb_secret_");
+  if (!claimsService) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      claimsService = payload?.role === "service_role";
+    } catch {
+      claimsService = false;
+    }
+  }
+  if (!claimsService) return false;
+
+  const res = await fetch(`${SB_URL}/auth/v1/admin/users?page=1&per_page=1`, {
+    headers: { apikey: token, Authorization: `Bearer ${token}` },
+  });
+  await res.body?.cancel();
+  return res.ok;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -130,7 +160,7 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("Authorization") || "";
     const body = await req.json().catch(() => ({}));
     let actor: string;
-    if (SB_SERVICE_KEY && auth === `Bearer ${SB_SERVICE_KEY}`) {
+    if (await isServiceCaller(auth)) {
       actor = typeof body?.actor === "string" && body.actor ? body.actor.slice(0, 200) : "Admin Console";
     } else {
       const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
