@@ -59,14 +59,21 @@ function signupPageUrl(origin: string | undefined): string | null {
 }
 
 /**
- * Identifies a building within one person's signups: street + ZIP, or the
- * name when there is no street. A retried checkout for the same building
- * yields the same key, so it reuses the same reserved building id.
+ * Identifies a building within one person's signups. A retried checkout for
+ * the same building yields the same key, so it reuses the same reserved
+ * building id, and a key equal to one of the account's existing buildings
+ * means it already owns this one.
+ *
+ * Street + ZIP when both are given. Without a ZIP the street alone is too
+ * weak to go on (a half-filled address such as "123" matches far too much),
+ * so the name is part of the key. With no street, the name alone.
  */
 function buildingKey(b: { name?: string; address?: { street?: string; zip?: string } }): string {
   const norm = (v: string | undefined) => (v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const street = norm(b.address?.street);
-  if (street) return `addr:${street}|${(b.address?.zip || "").replace(/\D/g, "").slice(0, 5)}`;
+  const zip = (b.address?.zip || "").replace(/\D/g, "").slice(0, 5);
+  if (street && zip) return `addr:${street}|${zip}`;
+  if (street) return `addr:${street}|name:${norm(b.name)}`;
   return `name:${norm(b.name)}`;
 }
 
