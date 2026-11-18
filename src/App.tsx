@@ -22,6 +22,7 @@ import PMProvider from '@/components/PMProvider';
 import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
+import UnsubscribePage from '@/features/auth/UnsubscribePage';
 import { isTenantHost } from '@/lib/tenantHost';
 import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
 import { isSignupInProgress } from '@/lib/authFlow';
@@ -229,6 +230,7 @@ export default function App() {
         {/* Landing page is served by static index.html via Vite middleware */}
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
 
         {/* Admin console — own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />
