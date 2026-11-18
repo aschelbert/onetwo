@@ -8,6 +8,7 @@ Disallow: /app.html
 Disallow: /login
 Disallow: /signup
 Disallow: /reset-password
+Disallow: /unsubscribe
 Disallow: /dashboard
 Disallow: /home
 Disallow: /setup

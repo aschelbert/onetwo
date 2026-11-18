@@ -28,6 +28,11 @@ enable_confirmations = false
 [functions.chargebee-webhook]
 verify_jwt = false
 
+# Reached from the Unsubscribe button in mail apps, which carry no sign-in:
+# the token in the link is the proof.
+[functions.unsubscribe]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 
