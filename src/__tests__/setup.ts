@@ -3,6 +3,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: null,
   isBackendEnabled: false,
   setActiveTenantId: () => {},
+  forgetLocalSession: () => {},
   getActiveTenantId: () => null,
   logDbError: () => {},
 }));
