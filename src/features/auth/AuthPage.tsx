@@ -21,6 +21,36 @@ const SIGN_IN_LATER_KEY = 'onetwo_sign_in_later';
 
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
+
+// The signup form as it stood when checkout opened (never a password). Chargebee
+// can show checkout as a full page; its "back to site" link reloads this page,
+// and this is what puts the visitor back on the account step with nothing lost.
+const SIGNUP_DRAFT_KEY = 'onetwo_signup_draft';
+
+interface SignupDraft {
+  tier: SubscriptionTier;
+  interval: BillingInterval;
+  addOns: AddOnId[];
+  building: { name: string; subdomain: string; street: string; city: string; state: string; zip: string; units: string };
+  profile: { firstName: string; lastName: string; email: string; phone: string; unit: string; boardTitle: string };
+  consent: Consent;
+  signedInAs: string | null;
+  existingAccount: { email: string; mode: 'now' | 'later' | null } | null;
+  /** The signup created or opened the session itself, so leaving checkout must end it. */
+  ownsSession: boolean;
+}
+
+/** Read the saved signup form and forget it. Null when there is none. */
+function takeSignupDraft(): SignupDraft | null {
+  try {
+    const raw = sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+    sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+    const d = raw ? JSON.parse(raw) : null;
+    return d && d.building && d.profile ? (d as SignupDraft) : null;
+  } catch {
+    return null;
+  }
+}
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
 import ConsentBoxes from './ConsentBoxes';
@@ -385,6 +415,46 @@ export default function AuthPage() {
     return false;
   };
 
+  // Back from Chargebee's checkout page without paying: put the signup form
+  // back as it was and return to the account step. Returns the saved form.
+  const canceledReturn = useRef<{ draft: SignupDraft | null } | null>(null);
+  const restoreSignupDraft = (): SignupDraft | null => {
+    const d = takeSignupDraft();
+    // Nothing was paid for: drop what was saved for the return from a payment
+    try {
+      sessionStorage.removeItem('onetwo_checkout_tokens');
+      sessionStorage.removeItem(KNOWN_TENANTS_KEY);
+      sessionStorage.removeItem(SIGN_IN_LATER_KEY);
+    } catch { /* ignore */ }
+    setSignInLaterFor(null);
+    if (!d) {
+      // Form not saved (e.g. opened in another tab): start the signup again
+      setAuthStep('signup-plan');
+      return null;
+    }
+    if (d.tier === 'self_managed' || d.tier === 'facilities') setSelectedTier(d.tier);
+    if (d.interval === 'monthly' || d.interval === 'annual') setBillingInterval(d.interval);
+    if (Array.isArray(d.addOns)) setSelectedAddOns(new Set(d.addOns));
+    subdomainManuallyEdited.current = !!d.building.subdomain; // keep theirs, don't re-suggest
+    setBldgName(d.building.name || '');
+    setBldgSubdomain(d.building.subdomain || '');
+    setBldgStreet(d.building.street || '');
+    setBldgCity(d.building.city || '');
+    setBldgState(d.building.state || '');
+    setBldgZip(d.building.zip || '');
+    setBldgUnits(d.building.units || '');
+    setFirstName(d.profile.firstName || '');
+    setLastName(d.profile.lastName || '');
+    setProfileEmail(d.profile.email || '');
+    setProfilePhone(d.profile.phone || '');
+    setProfileUnit(d.profile.unit || '');
+    setBoardTitle(d.profile.boardTitle || 'President');
+    if (d.consent) setConsent({ ...NO_CONSENT, ...d.consent });
+    setExistingAccount(d.existingAccount ? { ...d.existingAccount, error: false } : null);
+    setAuthStep('signup-account');
+    return d;
+  };
+
   // OpenAI and Reddit Ads pixels: load only once the visitor is in the signup steps, so
   // nobody signing in or using the app is tracked.
   const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
@@ -408,9 +478,22 @@ export default function AuthPage() {
     if (urlPlan === 'self_managed' || urlPlan === 'facilities') setSelectedTier(urlPlan);
     if (urlInterval === 'annual') setBillingInterval('annual');
 
+    // Chargebee's "back to site" link: return to the account step, form intact.
+    // Handled once (the ref), so a repeated run of this effect keeps the result.
+    if (params.get('checkout') === 'canceled' && !canceledReturn.current) {
+      const draft = restoreSignupDraft();
+      canceledReturn.current = { draft };
+      // A reload from here is an ordinary signup page, not another "canceled" return
+      window.history.replaceState({}, '', draft?.signedInAs ? '/login?create=1&add=1' : '/login?create=1');
+    }
+    const isCheckoutCanceled = !!canceledReturn.current;
+    const canceledDraft = canceledReturn.current?.draft ?? null;
+
     // Direct /login visit (e.g. "Log In" button) — go straight to login form
     // /login?create=1 (e.g. "Get Started" button) — jump to signup-plan
-    if (params.get('create') === '1') {
+    if (isCheckoutCanceled) {
+      // step already set by restoreSignupDraft
+    } else if (params.get('create') === '1') {
       setAuthStep('signup-plan');
     } else if (authStep === 'welcome') {
       setAuthStep('login');
@@ -450,6 +533,23 @@ export default function AuthPage() {
 
           // If URL tokens are present (subdomain handoff), restore that session
           let user = (await supabase!.auth.getSession()).data.session?.user ?? null;
+
+          // Left checkout without paying. Same as closing the checkout window:
+          // a session the signup made for itself ends here, and someone adding
+          // a building to the account they are signed in to stays signed in.
+          if (isCheckoutCanceled) {
+            const addingAs = canceledDraft?.signedInAs || null;
+            if (user && addingAs && user.email?.toLowerCase() === addingAs.toLowerCase()) {
+              setSignedInAs(addingAs);
+            } else if (user && canceledDraft?.ownsSession) {
+              try { await supabase!.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+            }
+            setSignupInProgress(false);
+            clearTimeout(timeout);
+            setSessionChecking(false);
+            setLoginLoading(false);
+            return;
+          }
 
           // Handle token_hash from admin console (platform admin handoff)
           if (tokenHash && !user) {
@@ -950,6 +1050,19 @@ export default function AuthPage() {
         } else {
           sessionStorage.setItem(SIGN_IN_LATER_KEY, bldgName.trim());
         }
+        // The form itself, for Chargebee's "back to site" link (see SIGNUP_DRAFT_KEY)
+        const draft: SignupDraft = {
+          tier: selectedTier,
+          interval: billingInterval,
+          addOns: [...selectedAddOns],
+          building: { name: bldgName, subdomain: bldgSubdomain, street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip, units: bldgUnits },
+          profile: { firstName, lastName, email: signupEmail, phone: profilePhone, unit: profileUnit, boardTitle },
+          consent,
+          signedInAs: alreadySignedIn ? signedInAs : null,
+          existingAccount: knownAccount && existingAccount ? { email: existingAccount.email, mode: existingAccount.mode } : null,
+          ownsSession: signupOwnsSession.current,
+        };
+        sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
       } catch { /* sessionStorage may be unavailable */ }
 
       console.log('[checkout] Opening Chargebee Drop-in...');
@@ -1027,6 +1140,7 @@ export default function AuthPage() {
         },
         success: async (_hostedPageId: string) => {
           checkoutSucceeded = true;
+          try { sessionStorage.removeItem(SIGNUP_DRAFT_KEY); } catch { /* ignore */ }
           setSignupInProgress(false);
           signupOwnsSession.current = false; // paid for: the session is now a real login
           console.log('[checkout] Checkout success, polling for tenant...');
