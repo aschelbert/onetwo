@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { passwordError } from '@/lib/passwordPolicy';
+import PasswordRules from './PasswordRules';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -64,7 +66,7 @@ export default function ResetPasswordPage() {
 
   const handleSetPassword = async () => {
     if (!password) { setError('Please enter a new password.'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    { const weak = passwordError(password); if (weak) { setError(weak); return; } }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     if (!isBackendEnabled || !supabase) { setError('Backend not configured.'); return; }
 
@@ -158,6 +160,7 @@ export default function ResetPasswordPage() {
                     placeholder="••••••••"
                   />
                 </div>
+                <PasswordRules password={password} />
 
                 {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
                 {message && <p className="text-sm text-sage-700 bg-sage-50 border border-sage-200 rounded-lg px-3 py-2">{message}</p>}
