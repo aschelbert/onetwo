@@ -49,6 +49,16 @@ describe('Me', () => {
     expect(screen.queryByTestId('legacy-account')).toBeNull();
   });
 
+  it('a board member confirms their own board position on My Account', () => {
+    renderAt('/account');
+    const profile = document.querySelector('[aria-label="Profile"]') as HTMLElement;
+    expect(within(profile).getByText('Board position')).toBeTruthy();
+    fireEvent.click(within(profile).getByRole('button', { name: 'Confirm' }));
+    fireEvent.change(within(profile).getByLabelText('Board position'), { target: { value: 'secretary' } });
+    fireEvent.click(within(profile).getByRole('button', { name: 'Save' }));
+    expect(within(profile).getByText(/^Secretary · shown in the board directory/)).toBeTruthy();
+  });
+
   it('My Unit shows the balance, the resale packet, the unit card and receipts', () => {
     renderAt('/my-unit');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^My Unit/);
