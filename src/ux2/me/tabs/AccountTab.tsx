@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
+import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { myPreference, setMyPreference } from '@/lib/marketingPrefs';
 import { Button, Card, Chip, Inner, SectionLabel, Cell, Why, Field, INPUT } from '../../components';
 import StewardshipCard from '../../home/StewardshipCard';
 import { dayLabel } from '../../home/calendar';
@@ -26,6 +28,39 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
     <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? 'bg-ux2-navy' : 'bg-ux2-line-strong'}`}>
       <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
     </button>
+  );
+}
+
+/**
+ * Product news, tips and offers by email: the same answer as the checkbox at
+ * signup and the Unsubscribe link in those emails. Kept on the account, not
+ * in this browser, because it decides what we are allowed to send. Hidden in
+ * the demo and whenever the current answer cannot be read.
+ */
+function ProductEmailsRow() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!isBackendEnabled || !supabase) return;
+    let cancelled = false;
+    myPreference(supabase).then(v => { if (!cancelled) setOn(v); });
+    return () => { cancelled = true; };
+  }, []);
+  if (on === null || !supabase) return null;
+  const sb = supabase;
+  const change = async (next: boolean) => {
+    setOn(next);
+    setFailed(false);
+    if (!(await setMyPreference(sb, next))) { setOn(!next); setFailed(true); }
+  };
+  return (
+    <Inner className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-3">
+        <Cell title="Product news and offers by email" note="Tips, new features and offers from ONE two. Account and building emails are sent either way." />
+        <Toggle on={on} onChange={change} label="Product news and offers by email" />
+      </div>
+      {failed && <p role="alert" className="text-xs text-ux2-red-ink">That didn&apos;t save. Try again in a moment.</p>}
+    </Inner>
   );
 }
 
@@ -189,6 +224,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
               ['Daily digest email, 7am', 'New posts, requests and what is due today', digest, (v: boolean) => { setPref('digest', v); updateProfile({ notifications: { ...user.notifications, email: v } }); }],
               ['Weekly board digest, Monday', 'Actions, bills awaiting approval, obligations', weekly, (v: boolean) => setPref('weekly', v)],
             ].map(([t, d, on, set]) => <Inner key={String(t)} className="flex items-center justify-between gap-3"><Cell title={String(t)} note={String(d)} /><Toggle on={on as boolean} onChange={set as (v: boolean) => void} label={String(t)} /></Inner>)}
+            <ProductEmailsRow />
           </Card>
           <Card aria-label="Units on this account" className="gap-2">
             <div className="flex items-center justify-between gap-2"><SectionLabel>Units on this account</SectionLabel>{mine.length > 1 && <button type="button" onClick={() => navigate('/my-unit')} className="text-xs font-semibold text-ux2-teal hover:underline">See both units together</button>}</div>
@@ -203,7 +239,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
           <Card aria-label="Switch building" className="gap-2">
             <SectionLabel>Switch building</SectionLabel>
             <Inner className="flex items-center justify-between gap-3"><Cell title={tenant.name} note={`${snap.viewer.officerTitle ?? snap.viewer.role.replace('_', ' ').toLowerCase()}${snap.viewer.linkedUnits[0] ? ` · Unit ${snap.viewer.linkedUnits[0]}` : ''}`} /><Chip tone="navy">Current</Chip></Inner>
-            <Button size="sm" variant="ghost" className="self-start" onClick={() => navigate('/login')}>Add a building</Button>
+            <Button size="sm" variant="ghost" className="self-start" onClick={() => navigate('/login?create=1&add=1')}>Add a building</Button>
             <Why>One sign-in, one building at a time. Add another and the avatar menu lets you switch.</Why>
           </Card>
         </div>

@@ -37,6 +37,7 @@
     { "source": "/login", "destination": "/app.html" },
     { "source": "/signup", "destination": "/app.html" },
     { "source": "/reset-password", "destination": "/app.html" },
+    { "source": "/unsubscribe", "destination": "/app.html" },
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/home", "destination": "/app.html" },
     { "source": "/setup", "destination": "/app.html" },
