@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
-import { chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
+import { addressLine, chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
 import { ROOT_DOMAIN, isEnvironmentHost, tenantLoginUrl } from '@/lib/tenantHost';
 import type { Role } from '@/types/auth';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -500,6 +500,8 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   }
 
   // Block access for churned tenants
+  // Someone who belongs to other buildings can still get to those from here
+  const otherBuildings = buildings.filter(b => b.tenant_id !== tenant.id);
   if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
     return (
       <TenantContext.Provider value={contextValue}>
@@ -515,6 +517,25 @@ export default function TenantProvider({ children }: { children: React.ReactNode
               Your subscription has ended and access to {tenant.name} is no longer available.
               Please contact support or a board member to reactivate your account.
             </p>
+            {otherBuildings.length > 0 && (
+              <div className="mb-6 text-left">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Open another building</p>
+                <div className="flex flex-col gap-2">
+                  {otherBuildings.map(b => (
+                    <button
+                      key={b.tenant_id}
+                      onClick={() => { void switchBuilding(b.tenant_id); }}
+                      className="w-full px-4 py-3 border border-ink-200 rounded-xl text-left hover:border-accent-400 hover:bg-accent-50 transition-all"
+                    >
+                      <span className="block text-sm font-semibold text-ink-900">{b.tenant?.name || 'Building'}</span>
+                      {addressLine(b.tenant?.address) && (
+                        <span className="block text-xs text-ink-500">{addressLine(b.tenant?.address)}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col gap-3">
               <a
                 href="mailto:support@getonetwo.com"
