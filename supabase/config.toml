@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.unsubscribe]
 verify_jwt = false
 
+[functions.send-marketing-confirmations]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 
