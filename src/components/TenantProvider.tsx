@@ -544,6 +544,15 @@ export default function TenantProvider({ children }: { children: React.ReactNode
               >
                 Contact Support
               </a>
+              {/* Signup lives on the root host in production; elsewhere it is this host */}
+              <a
+                href={isEnvironmentHost(window.location.hostname)
+                  ? '/login?create=1&add=1'
+                  : `https://app.${ROOT_DOMAIN}/login?create=1&add=1`}
+                className="w-full py-3 border border-ink-200 text-ink-600 rounded-xl font-semibold text-sm hover:bg-ink-50 transition-all text-center"
+              >
+                Set up a new building
+              </a>
               <button
                 onClick={async () => {
                   // Finish signing out before leaving the page. Navigating
