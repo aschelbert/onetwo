@@ -120,6 +120,13 @@ Deno.serve(async (req) => {
 
     const senderName = body.senderName || user.email?.split("@")[0] || "A board member";
     const resendCode = body.resendCode || null;
+    // Name the inviter only when we have a real name; the part of their email before the @ isn't one.
+    const emailLocal = (user.email || "").split("@")[0].toLowerCase();
+    const meta = user.user_metadata || {};
+    const namedSender = String(body.senderName || meta.full_name || meta.name || "").trim();
+    const realSenderName = namedSender && !namedSender.includes("@") && namedSender.toLowerCase() !== emailLocal ? namedSender : "";
+    const invitedLine = (roleLabel: string, unitText: string) =>
+      realSenderName ? `${realSenderName} has invited you to join as ${roleLabel}${unitText}` : `You've been invited to join as ${roleLabel}${unitText}`;
     const results: Array<{ email: string; code: string; sent: boolean; error?: string }> = [];
 
     for (const inv of invitees) {
@@ -140,7 +147,7 @@ Deno.serve(async (req) => {
             <div style="text-align: center; margin-bottom: 32px;">
               <div style="display: inline-block; background: #3D3D3D; border-radius: 8px; width: 48px; height: 48px; line-height: 48px; color: white; font-weight: bold; font-size: 24px;">+</div>
               <h1 style="font-size: 20px; color: #1a1a1a; margin: 16px 0 4px;">Reminder: You're invited to ${tenant.name}</h1>
-              <p style="color: #666; font-size: 14px; margin: 0;">${senderName} has invited you to join as ${roleLabel}${unitText}</p>
+              <p style="color: #666; font-size: 14px; margin: 0;">${invitedLine(roleLabel, unitText)}</p>
             </div>
             <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
               <p style="color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px;">Your invitation code</p>
@@ -155,7 +162,7 @@ Deno.serve(async (req) => {
             </div>
           </div>
         `;
-        const textBody = `Reminder: You're invited to ${tenant.name}!\n\n${senderName} has invited you to join as ${roleLabel}${unitText}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.`;
+        const textBody = `Reminder: You're invited to ${tenant.name}!\n\n${invitedLine(roleLabel, unitText)}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.`;
 
         if (MJ_API_KEY && MJ_SECRET_KEY) {
           const sent = await sendMailjet({
@@ -226,7 +233,7 @@ Deno.serve(async (req) => {
           <div style="text-align: center; margin-bottom: 32px;">
             <div style="display: inline-block; background: #3D3D3D; border-radius: 8px; width: 48px; height: 48px; line-height: 48px; color: white; font-weight: bold; font-size: 24px;">+</div>
             <h1 style="font-size: 20px; color: #1a1a1a; margin: 16px 0 4px;">You're invited to ${tenant.name}</h1>
-            <p style="color: #666; font-size: 14px; margin: 0;">${senderName} has invited you to join as ${roleLabel}${unitText}</p>
+            <p style="color: #666; font-size: 14px; margin: 0;">${invitedLine(roleLabel, unitText)}</p>
           </div>
           <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
             <p style="color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px;">Your invitation code</p>
@@ -242,7 +249,7 @@ Deno.serve(async (req) => {
         </div>
       `;
 
-      const textBody = `You're invited to ${tenant.name}!\n\n${senderName} has invited you to join as ${roleLabel}${unitText}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.\n\nThis invitation expires in 30 days.`;
+      const textBody = `You're invited to ${tenant.name}!\n\n${invitedLine(roleLabel, unitText)}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.\n\nThis invitation expires in 30 days.`;
 
       // Send via Mailjet
       if (MJ_API_KEY && MJ_SECRET_KEY) {
