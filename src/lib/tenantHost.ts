@@ -49,3 +49,9 @@ export function tenantLoginUrl(
   const q = new URLSearchParams({ sb_access: tokens.accessToken, sb_refresh: tokens.refreshToken });
   return `https://${subdomain}.${ROOT_DOMAIN}/login?${q.toString()}`;
 }
+
+/** Whether a login URL carries a session handed over from another host. */
+export function hasSessionHandoff(search: string): boolean {
+  const q = new URLSearchParams(search);
+  return !!(q.get('sb_access') && q.get('sb_refresh'));
+}

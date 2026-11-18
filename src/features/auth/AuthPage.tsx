@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
+import { supabase, isBackendEnabled, setActiveTenantId, forgetLocalSession } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
@@ -326,6 +326,9 @@ export default function AuthPage() {
       refreshToken: sessionData?.session?.refresh_token || '',
     });
     if (target) {
+      // The session now belongs to the building's host; keep no copy here
+      forgetLocalSession();
+      useAuthStore.getState().clearSession();
       window.location.href = target;
       return true; // redirecting
     }
@@ -563,15 +566,18 @@ export default function AuthPage() {
             }
           }
 
-          if (hasUrlTokens && !user) {
+          // A handed-over session is the newest one: it replaces whatever
+          // this browser had saved, which may be an old session that no
+          // longer works. The tokens leave the address bar either way.
+          if (hasUrlTokens) {
             const { data, error } = await supabase!.auth.setSession({
               access_token: sbAccess!,
               refresh_token: sbRefresh!,
             });
-            if (!error && data.user) {
-              user = data.user;
-              window.history.replaceState({}, '', '/login');
-            }
+            if (!error && data.user) user = data.user;
+            window.history.replaceState({}, '', '/login');
+            // Nothing usable arrived and nothing was saved: not signed in
+            if (!user) useAuthStore.getState().clearSession();
           }
 
           // Restore session from pre-checkout save if session was lost during Stripe redirect
