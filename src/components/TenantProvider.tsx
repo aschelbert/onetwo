@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
-import { addressLine, chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
+import { addressLine, chooseTenant, fetchMemberships, hasEnded, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
 import { ROOT_DOMAIN, isEnvironmentHost, tenantLoginUrl } from '@/lib/tenantHost';
 import type { Role } from '@/types/auth';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -500,8 +500,9 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   }
 
   // Block access for churned tenants
-  // Someone who belongs to other buildings can still get to those from here
-  const otherBuildings = buildings.filter(b => b.tenant_id !== tenant.id);
+  // Someone who belongs to other buildings can still get to those from here.
+  // Ones that have ended too are left out: they only lead to this notice.
+  const otherBuildings = buildings.filter(b => b.tenant_id !== tenant.id && !hasEnded(b));
   if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
     return (
       <TenantContext.Provider value={contextValue}>

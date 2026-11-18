@@ -26,6 +26,13 @@ export interface TenantMembership {
   /** Subscription state, when the lookup could read it (`my_buildings`). */
   subscription_status?: string | null;
   trial_ends_at?: string | null;
+  /** The building's own status (`tenants.status`), when the lookup returns it. */
+  tenant_status?: string | null;
+}
+
+/** A building whose subscription ended: opening it only shows the inactive notice. */
+export function hasEnded(m: Pick<TenantMembership, 'tenant_status'>): boolean {
+  return m.tenant_status === 'churned';
 }
 
 /**
@@ -49,6 +56,7 @@ export async function fetchMemberships(sb: SupabaseClient, userId: string): Prom
       tenant: { name: r.name ?? null, subdomain: r.subdomain ?? null, address: r.address ?? null },
       subscription_status: r.subscription_status ?? null,
       trial_ends_at: r.trial_ends_at ?? null,
+      tenant_status: r.tenant_status ?? null,
     }));
   }
 
