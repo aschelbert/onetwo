@@ -5,7 +5,7 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import { chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
-import { tenantLoginUrl } from '@/lib/tenantHost';
+import { ROOT_DOMAIN, isEnvironmentHost, tenantLoginUrl } from '@/lib/tenantHost';
 import type { Role } from '@/types/auth';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -523,9 +523,24 @@ export default function TenantProvider({ children }: { children: React.ReactNode
                 Contact Support
               </a>
               <button
-                onClick={() => {
-                  useAuthStore.getState().signOut();
-                  window.location.href = '/login';
+                onClick={async () => {
+                  // Finish signing out before leaving the page. Navigating
+                  // first cancelled the sign-out, so the next page found the
+                  // session still there, signed straight back in and showed
+                  // this notice again with no way out.
+                  if (supabase) {
+                    try {
+                      const { error } = await supabase.auth.signOut();
+                      if (error) await supabase.auth.signOut({ scope: 'local' });
+                    } catch {
+                      try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* nothing left to clear */ }
+                    }
+                  }
+                  useAuthStore.getState().clearSession();
+                  // Out to the public site; staging, previews and localhost have none
+                  window.location.href = isEnvironmentHost(window.location.hostname)
+                    ? '/login'
+                    : `https://${ROOT_DOMAIN}`;
                 }}
                 className="w-full py-3 border border-ink-200 text-ink-600 rounded-xl font-semibold text-sm hover:bg-ink-50 transition-all"
               >
