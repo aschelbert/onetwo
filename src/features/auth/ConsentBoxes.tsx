@@ -31,7 +31,7 @@ export default function ConsentBoxes({ value, onChange, idPrefix }: {
         <input id={`${idPrefix}-marketing`} type="checkbox" className={box} checked={value.marketing}
           onChange={e => onChange({ ...value, marketing: e.target.checked })} />
         <span>
-          Email me ONE two product news, tips and offers. Optional; you can unsubscribe at any time.
+          Email me ONE two product news, tips and offers. Optional; we&apos;ll email you a link to confirm, and you can unsubscribe at any time.
           <span className="mt-0.5 block text-xs text-ink-500">Emails about your account and building, such as invoices, notices and password resets, are sent either way.</span>
         </span>
       </label>

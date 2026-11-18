@@ -23,6 +23,7 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import UnsubscribePage from '@/features/auth/UnsubscribePage';
+import ConfirmEmailPage from '@/features/auth/ConfirmEmailPage';
 import { hasSessionHandoff, isTenantHost } from '@/lib/tenantHost';
 import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
 import { isSignupInProgress } from '@/lib/authFlow';
@@ -236,6 +237,7 @@ export default function App() {
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
+        <Route path="/confirm-email" element={<ConfirmEmailPage />} />
 
         {/* Admin console — own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />

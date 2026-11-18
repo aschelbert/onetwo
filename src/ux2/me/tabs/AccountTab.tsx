@@ -6,7 +6,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
-import { myPreference, setMyPreference } from '@/lib/marketingPrefs';
+import { myPreference, setMyPreference, type MyPreference } from '@/lib/marketingPrefs';
 import { Button, Card, Chip, Inner, SectionLabel, Cell, Why, Field, INPUT } from '../../components';
 import StewardshipCard from '../../home/StewardshipCard';
 import { dayLabel } from '../../home/calendar';
@@ -38,27 +38,30 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
  * the demo and whenever the current answer cannot be read.
  */
 function ProductEmailsRow() {
-  const [on, setOn] = useState<boolean | null>(null);
+  const [pref, setPref] = useState<MyPreference | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!isBackendEnabled || !supabase) return;
     let cancelled = false;
-    myPreference(supabase).then(v => { if (!cancelled) setOn(v); });
+    myPreference(supabase).then(v => { if (!cancelled) setPref(v); });
     return () => { cancelled = true; };
   }, []);
-  if (on === null || !supabase) return null;
+  if (pref === null || !supabase) return null;
   const sb = supabase;
   const change = async (next: boolean) => {
-    setOn(next);
+    const before = pref;
+    setPref(next ? 'pending' : 'off');
     setFailed(false);
-    if (!(await setMyPreference(sb, next))) { setOn(!next); setFailed(true); }
+    const saved = await setMyPreference(sb, next);
+    if (saved === null) { setPref(before); setFailed(true); } else setPref(saved);
   };
   return (
     <Inner className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-3">
         <Cell title="Product news and offers by email" note="Tips, new features and offers from ONE two. Account and building emails are sent either way." />
-        <Toggle on={on} onChange={change} label="Product news and offers by email" />
+        <Toggle on={pref !== 'off'} onChange={change} label="Product news and offers by email" />
       </div>
+      {pref === 'pending' && <p role="status" className="text-xs text-ux2-muted">We emailed you a link. Press Confirm in that email to start getting product emails.</p>}
       {failed && <p role="alert" className="text-xs text-ux2-red-ink">That didn&apos;t save. Try again in a moment.</p>}
     </Inner>
   );

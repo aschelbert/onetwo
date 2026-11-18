@@ -268,6 +268,26 @@ supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy stripe-account-status
 ```
 
+### Product email confirmations (double opt-in)
+
+Ticking "Email me ONE two product news" (any form) or turning it on under Account
+does not subscribe the address until someone presses Confirm on `/confirm-email`,
+linked from a confirmation email (migration `20261118140000_marketing_double_opt_in`).
+Opt-outs and the unsubscribe page's Subscribe again take effect at once. At most one
+confirmation email per address per day; links last 7 days.
+
+The migration stores a `marketing_confirm_cron_secret` in Vault and schedules
+`onetwo-marketing-confirmations` every minute; it calls the edge function only when a
+confirmation is waiting. The function sends through Mailjet (`MAILJET_API_KEY`,
+`MAILJET_SECRET_KEY`) and must be deployed without JWT verification:
+
+```bash
+supabase functions deploy send-marketing-confirmations --no-verify-jwt
+```
+
+Deploy the app (the `/confirm-email` page) before applying the migration in
+production, so the first confirmation emails do not link to a missing page.
+
 ### Printed Mail (DocuPost or LetterStream)
 
 Printed letters go through a vendor the **building** holds its own account with and pays
