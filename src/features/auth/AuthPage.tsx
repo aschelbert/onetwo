@@ -24,6 +24,8 @@ const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
 import ConsentBoxes from './ConsentBoxes';
+import PasswordRules from './PasswordRules';
+import { passwordError } from '@/lib/passwordPolicy';
 import { setSignupInProgress } from '@/lib/authFlow';
 import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
 import { readAttribution } from '@/lib/attribution';
@@ -715,7 +717,7 @@ export default function AuthPage() {
 
   const handleCompleteJoin = async () => {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
-    if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+    { const weak = passwordError(password); if (weak) { alert(weak); return; } }
     if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
     const consentGap = missingConsent(consent);
     if (consentGap) { alert(consentGap); return; }
@@ -827,7 +829,12 @@ export default function AuthPage() {
       // attaches the building to that account once it has been paid for.
       const signInLater = knownAccount && existingAccount?.mode === 'later';
 
-      if (!alreadySignedIn && !knownAccount && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      // A new password must meet the policy. Not asked of someone signing in
+      // to an account they already have, whose password predates it.
+      if (!alreadySignedIn && !knownAccount) {
+        const weak = passwordError(password);
+        if (weak) { alert(weak); setCheckoutLoading(false); return; }
+      }
       if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
@@ -1424,6 +1431,7 @@ export default function AuthPage() {
                           <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
+                        <div className="col-span-2"><PasswordRules password={password} /></div>
                       </div>
                       )}
                       </>)}
@@ -1457,7 +1465,7 @@ export default function AuthPage() {
                               if (!existingAccount.mode) { alert('Please choose how you want to continue with your existing account.'); return; }
                               if (existingAccount.mode === 'now' && !password) { alert('Please enter your ONE two password, or pick another option.'); return; }
                             } else if (!signedInAs) {
-                              if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                              { const weak = passwordError(password); if (weak) { alert(weak); return; } }
                               if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
                             }
                             handleCheckout();
@@ -1471,7 +1479,7 @@ export default function AuthPage() {
                         <button onClick={() => {
                             if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                            { const weak = passwordError(password); if (weak) { alert(weak); return; } }
                             if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
                             { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             handleCompleteOnboarding();
@@ -1764,6 +1772,7 @@ export default function AuthPage() {
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
                   <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               </div>
+              <PasswordRules password={password} />
               <ConsentBoxes idPrefix="join-consent" value={consent} onChange={setConsent} />
               <button onClick={handleCompleteJoin}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Create Account &amp; Enter</button>
