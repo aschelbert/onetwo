@@ -1,6 +1,6 @@
 # ONE two
 
-> ONE two is software that does a property manager's job for Washington, DC condo buildings. It knows what is due, runs the meeting, handles the leak, keeps the books, plans for the roof and proves it to the owners. The board makes the decisions; a stewardship score shows the board and every owner how the building is doing. Plans start at $179 a month after a 21 day free trial.
+> ONE two is software that does a property manager's job for Washington, DC condo buildings. It knows what is due, tracks to local laws, runs the meeting, wrangles reported issues, keeps the books, plans for the future and proves it to the owners. The board makes the decisions; a stewardship score shows the board and every owner how the building is doing. Plans start at $179 a month after a 21 day free trial.
 
 ## Who it is for
 
@@ -17,7 +17,7 @@
 - Funds: ledger, monthly close and an owner statement every month
 - Escalation from friendly notice to certified demand, lien and Small Claims packet, with attorney handoff when the board decides
 - Notices and letters by email, portal, first class or certified mail, with postage at cost and tracking filed in the Archive
-- Work orders, vendors, W-9s and 1099s; vendors are paid directly at their own price, with no markups
+- Work orders, vendors and W-9s; vendors are paid directly at their own price, with no markups
 - Asset registry with replacement years, reserve balance and funding targets
 - Owner portal and a seven year Archive for records requests (DC Code 42-1903.14)
 - Stewardship score across five dimensions: Timeliness, Compliance, Oversight, Reach and Impact
@@ -25,7 +25,7 @@
 ## Pricing
 
 - Self-Managed: $179 a month, or $1,790 a year. For walk-ups and small buildings with no elevator, pool or staff.
-- Plus Facilities: $279 a month, or $2,790 a year. Adds an inspection and permit calendar (elevator, pool, fire systems, boiler), reserve study tools, bids and insurance claims workflows, amenity reservations and a staff role.
+- Plus Facilities: $279 a month, or $2,790 a year. Adds an inspection and permit calendar (elevator, pool, fire systems, boiler), reserve study tools, bids and insurance claims workflows, amenity reservations, a staff role, and 1099s prepared and e-filed.
 - Add-on, On Call: $249 a month for a named advisor who knows the building (monthly call, replies within a business day, budget and year-end review, a seat at the annual meeting; up to 2 hours a month).
 - Add-on, Property Manager Seat: $79 a month for a manager who keeps operations but works inside the association's records.
 - 21 day free trial. Postage and card processing fees at cost. Cancel any time; records export with you.
