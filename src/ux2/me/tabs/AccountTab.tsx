@@ -7,6 +7,7 @@ import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import { myPreference, setMyPreference, type MyPreference } from '@/lib/marketingPrefs';
+import { SEATS } from '@/features/setup/invites';
 import { Button, Card, Chip, Inner, SectionLabel, Cell, Why, Field, INPUT } from '../../components';
 import StewardshipCard from '../../home/StewardshipCard';
 import { dayLabel } from '../../home/calendar';
@@ -63,6 +64,59 @@ function ProductEmailsRow() {
       </div>
       {pref === 'pending' && <p role="status" className="text-xs text-ux2-muted">We emailed you a link. Press Confirm in that email to start getting product emails.</p>}
       {failed && <p role="alert" className="text-xs text-ux2-red-ink">That didn&apos;t save. Try again in a moment.</p>}
+    </Inner>
+  );
+}
+
+/**
+ * A board member's own seat. An invitation can make someone a board member
+ * without naming the seat, so they confirm it here. In a live building the
+ * server decides (set_my_board_seat): an officer seat someone else holds is
+ * refused with that person's name.
+ */
+function BoardSeatRow({ tenantId, live }: { tenantId: string; live: boolean }) {
+  const user = useAuthStore(s => s.currentUser);
+  const mine = useBuildingStore(s => s.board.find(b => b.name === user.name || (!!b.email && b.email.toLowerCase() === user.email.toLowerCase())));
+  const current = SEATS.find(s => s.label === mine?.role);
+  const [editing, setEditing] = useState(false);
+  const [seat, setSeat] = useState(current?.key ?? SEATS[0].key);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    const label = SEATS.find(s => s.key === seat)?.label ?? '';
+    setError('');
+    if (live && supabase) {
+      setSaving(true);
+      const { data, error: failed } = await supabase.rpc('set_my_board_seat', { p_tenant_id: tenantId, p_seat: seat });
+      setSaving(false);
+      if (failed || !data?.success) { setError(data?.error ?? 'That didn\u2019t save. Try again in a moment.'); return; }
+    }
+    // The server has already written the directory row, so only this screen's copy changes.
+    useBuildingStore.setState(s => ({
+      board: mine
+        ? s.board.map(b => b.id === mine.id ? { ...b, role: label } : b)
+        : [...s.board, { id: `seat-${user.id}`, name: user.name, role: label, email: user.email, phone: user.phone ?? '', term: '' }],
+    }));
+    setEditing(false);
+  };
+  return (
+    <Inner className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {editing ? (
+          <form onSubmit={e => { e.preventDefault(); void save(); }} className="flex flex-1 flex-wrap items-end gap-2">
+            <Field label="Board position" className="min-w-[200px] flex-1">
+              <select value={seat} onChange={e => setSeat(e.target.value)} className={INPUT}>{SEATS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>
+            </Field>
+            <Button type="submit" size="sm" disabled={saving}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setError(''); }}>Cancel</Button>
+          </form>
+        ) : (
+          <>
+            <Cell title="Board position" note={current ? `${current.label} · shown in the board directory` : 'Not confirmed yet · tell the building which seat you hold'} />
+            <Button size="sm" variant={current ? 'ghost' : 'primary'} onClick={() => { setSeat(current?.key ?? SEATS[0].key); setEditing(true); }}>{current ? 'Change' : 'Confirm'}</Button>
+          </>
+        )}
+      </div>
+      {error && <p role="alert" className="text-xs text-ux2-red-ink">{error}</p>}
     </Inner>
   );
 }
@@ -198,6 +252,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
             <SectionLabel>Profile</SectionLabel>
             <ProfileRow label="Name" value={user.name} onSave={v => updateProfile({ name: v })} />
             <ProfileRow label="Email" value={user.email} note="verified" type="email" onSave={v => updateProfile({ email: v })} />
+            {snap.viewer.role === 'BOARD_MEMBER' && <BoardSeatRow tenantId={tenant.id} live={isBackendEnabled && !tenant.isDemo} />}
             <ProfileRow label="Phone" value={user.phone} note="for the directory and support calls only" type="tel" onSave={v => updateProfile({ phone: v })} />
             <ProfileRow label="Password" value="••••••••" note="change from the sign-in page" onSave={() => navigate('/reset-password')} />
             <ProfileRow label="Two-factor sign-in" value="off" note="set it up from the sign-in page" />
