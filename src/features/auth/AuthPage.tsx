@@ -1,11 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { supabase, isBackendEnabled } from '@/lib/supabase';
+import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
 import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
 import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
+import {
+  addressLine, chooseTenant, fetchMemberships, isSameBuilding, needsBuildingChoice, pickMembership, subscriptionLabel,
+  type TenantMembership,
+} from '@/lib/tenantMembership';
+
+/** A building added to an account that already existed, or a brand new signup. */
+const consentSource = (signedInAs: string | null, existingAccount: unknown) =>
+  (signedInAs || existingAccount ? 'add_building' : 'signup') as 'add_building' | 'signup';
+
+type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
+
+// Name of a building paid for without signing in; survives Chargebee's redirect
+const SIGN_IN_LATER_KEY = 'onetwo_sign_in_later';
+
+// Buildings the account had before checkout began, kept across the Chargebee redirect
+const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
+import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
+import ConsentBoxes from './ConsentBoxes';
+import { setSignupInProgress } from '@/lib/authFlow';
 import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
 import { readAttribution } from '@/lib/attribution';
 
@@ -41,10 +60,13 @@ export default function AuthPage() {
     if (!demoFirstName.trim() || !demoLastName.trim()) { alert('Please enter your name.'); return; }
     if (!demoEmail.trim()) { alert('Please enter your email.'); return; }
     if (!demoCondoName.trim()) { alert('Please enter your condo / community name.'); return; }
+    const consentGap = missingConsent(consent);
+    if (consentGap) { alert(consentGap); return; }
 
     setDemoSubmitting(true);
     try {
       if (isBackendEnabled && supabase) {
+        await recordConsent(supabase, 'demo', demoEmail, consent);
         await supabase.rpc('submit_demo_lead', {
           p_name: `${demoFirstName.trim()} ${demoLastName.trim()}`,
           p_email: demoEmail.trim(),
@@ -77,6 +99,30 @@ export default function AuthPage() {
   };
 
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // True while this signup holds a session it created itself (a new account,
+  // or an existing one signed in so its checkout could run).
+  const signupOwnsSession = useRef(false);
+
+  // The signup stopped before a building was paid for. A session it created
+  // must not outlive it: otherwise the person is left signed in to an account
+  // they never chose to log in to, and the next signup greets them as signed in.
+  const abandonSignupSession = async () => {
+    setSignupInProgress(false);
+    if (!signupOwnsSession.current || !supabase) return;
+    signupOwnsSession.current = false;
+    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+  };
+
+  // Leave an account the signup found already signed in, and start the
+  // account step again with a blank form.
+  const signOutOfSignup = async () => {
+    try { await supabase?.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+    signupOwnsSession.current = false;
+    setSignedInAs(null);
+    setExistingAccount(null);
+    setProfileEmail(''); setFirstName(''); setLastName(''); setPassword(''); setConfirmPassword('');
+  };
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('self_managed');
@@ -158,6 +204,25 @@ export default function AuthPage() {
   }, [bldgSubdomain]);
 
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
+  // "Which building?" — set when a signed-in account has several and none is implied by the host
+  const [buildingChoices, setBuildingChoices] = useState<{ user: SessionUser; rows: TenantMembership[] } | null>(null);
+  const [rememberBuilding, setRememberBuilding] = useState(false);
+  // Set while an already signed-in person is setting up another building: no email or password to enter
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
+  // Signing up with an email that already has an account: the account step
+  // becomes a one-field sign-in instead of "choose a password". `error` is
+  // shown when the password entered there is wrong.
+  // `mode` is how they chose to continue: sign in to that account now, or
+  // skip signing in and have the building attached to it after payment.
+  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean; mode: 'now' | 'later' | null } | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  // Set after a "sign in later" checkout: the login form explains what to do next
+  const [signInLaterFor, setSignInLaterFor] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(SIGN_IN_LATER_KEY); } catch { return null; }
+  });
+  // Terms, Privacy and (optional) product emails. Asked on every form that
+  // takes an email; nothing is pre-ticked.
+  const [consent, setConsent] = useState<Consent>(NO_CONSENT);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
 
   // Chargebee Drop-in initialization
@@ -198,7 +263,15 @@ export default function AuthPage() {
       .eq('id', tu.tenant_id)
       .maybeSingle();
 
-    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', property_manager: 'PROPERTY_MANAGER' };
+    // Signed in: the "sign in to open your new building" note has done its job
+    try { sessionStorage.removeItem(SIGN_IN_LATER_KEY); } catch { /* ignore */ }
+    setSignInLaterFor(null);
+
+    // This is now the building this browser is in
+    chooseTenant(tu.tenant_id);
+    setActiveTenantId(tu.tenant_id);
+
+    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
     const m = {
       id: user.id,
       name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -224,19 +297,80 @@ export default function AuthPage() {
       window.location.href = target;
       return true; // redirecting
     }
+    // Added a building while already signed in on this host: reload so the
+    // app starts clean in the new building instead of staying on signup.
+    if (new URLSearchParams(window.location.search).get('create') === '1') {
+      window.location.assign('/home');
+      return true;
+    }
     return false;
   };
 
+  // Enter the account's building, or ask which one when it has several.
+  // Returns false when the account has no building at all.
+  const enterBuilding = async (user: SessionUser): Promise<boolean> => {
+    // Signing in to finish a "sign in later" signup: open the building that
+    // was just paid for, not the one they had before and not the picker. It
+    // is attached by the payment webhook, so give it a few seconds to appear.
+    let paidFor: string | null = null;
+    try { paidFor = sessionStorage.getItem(SIGN_IN_LATER_KEY); } catch { /* ignore */ }
+    if (paidFor) {
+      const wanted = paidFor.trim().toLowerCase();
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const found = (await fetchMemberships(supabase!, user.id))
+          ?.find(m => (m.tenant?.name || '').trim().toLowerCase() === wanted);
+        if (found) {
+          await loginWithTenantUser(user, found);
+          return true;
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      }
+      // Still not there: carry on to whatever they do have; the note stays up
+    }
+
+    const rows = await fetchMemberships(supabase!, user.id);
+    if (!rows || rows.length === 0) return false;
+    if (needsBuildingChoice(rows)) {
+      setBuildingChoices({ user, rows });
+      return true;
+    }
+    await loginWithTenantUser(user, pickMembership(rows)!);
+    return true;
+  };
+
+  const pickBuilding = async (m: TenantMembership) => {
+    if (!buildingChoices) return;
+    chooseTenant(m.tenant_id, rememberBuilding);
+    setLoginLoading(true);
+    const redirecting = await loginWithTenantUser(buildingChoices.user, m);
+    if (!redirecting) setBuildingChoices(null);
+    setLoginLoading(false);
+  };
+
+  // A signed-in person setting up another building: skip straight to the
+  // plan step with their details filled in.
+  const startAddBuilding = (user: SessionUser) => {
+    const [first = '', ...rest] = (user.user_metadata?.full_name || '').trim().split(/\s+/);
+    setSignedInAs(user.email || '');
+    setProfileEmail(user.email || '');
+    if (first) setFirstName(first);
+    if (rest.length) setLastName(rest.join(' '));
+    setBuildingChoices(null);
+    setExistingAccount(null);
+    setAuthStep('signup-plan');
+  };
+
+
   // Poll for tenant provisioning after checkout success
-  const pollForTenantAndRedirect = async (userId: string, user: any) => {
+  // `knownTenantIds` are buildings the user already had before this checkout:
+  // someone adding another building must wait for the new one, not land in an old one.
+  const pollForTenantAndRedirect = async (userId: string, user: any, knownTenantIds: string[] = []) => {
     setProvisioningStatus('Setting up your building...');
     for (let attempt = 0; attempt < 15; attempt++) {
-      const { data: tu } = await supabase!
-        .from('tenant_users')
-        .select('tenant_id, role, board_title, unit')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const rows = await fetchMemberships(supabase!, userId);
+      const tu = rows?.find(r => !knownTenantIds.includes(r.tenant_id));
       if (tu) {
+        try { sessionStorage.removeItem(KNOWN_TENANTS_KEY); } catch { /* ignore */ }
         setProvisioningStatus('Redirecting to your building...');
         await loginWithTenantUser(user, tu);
         setProvisioningStatus(null);
@@ -360,16 +494,20 @@ export default function AuthPage() {
               setProvisioningStatus('Setting up your building...');
               window.history.replaceState({}, '', '/login');
               const maxAttempts = 15;
+              // Buildings the user had before this checkout (saved by handleCheckout)
+              let knownTenantIds: string[] = [];
+              try {
+                const savedKnown = JSON.parse(sessionStorage.getItem(KNOWN_TENANTS_KEY) || '[]');
+                if (Array.isArray(savedKnown)) knownTenantIds = savedKnown;
+              } catch { /* ignore parse errors */ }
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                const { data: tu } = await supabase!
-                  .from('tenant_users')
-                  .select('tenant_id, role, board_title, unit')
-                  .eq('user_id', user.id)
-                  .maybeSingle();
+                const rows = await fetchMemberships(supabase!, user.id);
+                const tu = rows?.find(r => !knownTenantIds.includes(r.tenant_id));
 
                 if (tu) {
                   setProvisioningStatus('Redirecting to your building...');
                   sessionStorage.removeItem('onetwo_checkout_tokens');
+                  sessionStorage.removeItem(KNOWN_TENANTS_KEY);
                   await loginWithTenantUser(user, tu);
                   clearTimeout(timeout);
                   setSessionChecking(false);
@@ -390,14 +528,20 @@ export default function AuthPage() {
               return;
             }
 
-            const { data: tu } = await supabase!
-              .from('tenant_users')
-              .select('tenant_id, role, board_title, unit')
-              .eq('user_id', user.id)
-              .maybeSingle();
+            // Signup (?create=1). Only "Set up another building" from inside
+            // the app (?add=1) continues as the signed-in person. A plain
+            // signup link starts blank even if this browser still holds a
+            // session: the visitor did not ask to act as that account, and if
+            // they enter its email the form asks how they want to continue.
+            if (params.get('create') === '1') {
+              if (params.get('add') === '1') startAddBuilding(user);
+              setLoginLoading(false);
+              clearTimeout(timeout);
+              setSessionChecking(false);
+              return;
+            }
 
-            if (tu) {
-              await loginWithTenantUser(user, tu);
+            if (await enterBuilding(user)) {
               setLoginLoading(false);
               clearTimeout(timeout);
               setSessionChecking(false);
@@ -499,53 +643,7 @@ export default function AuthPage() {
           }
 
           // Check if user belongs to a tenant
-          const { data: tenantUser } = await supabase!
-            .from('tenant_users')
-            .select('tenant_id, role, board_title, unit')
-            .eq('user_id', data.user.id)
-            .maybeSingle();
-
-          if (tenantUser) {
-            const { data: tenant } = await supabase!
-              .from('tenants')
-              .select('name, subdomain')
-              .eq('id', tenantUser.tenant_id)
-              .maybeSingle();
-
-            const roleMap: Record<string, Role> = {
-              board_member: 'BOARD_MEMBER',
-              resident: 'RESIDENT',
-              staff: 'STAFF',
-              property_manager: 'PROPERTY_MANAGER',
-            };
-
-            const member = {
-              id: data.user.id,
-              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              email: data.user.email || email,
-              phone: '',
-              role: roleMap[tenantUser.role] || ('BOARD_MEMBER' as Role),
-              unit: tenantUser.unit || '',
-              status: 'active' as const,
-              joined: new Date().toISOString().split('T')[0],
-              boardTitle: tenantUser.board_title || null,
-            };
-
-            addMember(member);
-            login(member);
-
-            // Hop to the building's own host in production (the session rides
-            // along in the URL); stay put on staging, previews and localhost.
-            const { data: sessionData } = await supabase.auth.getSession();
-            const target = tenantLoginUrl(tenant?.subdomain, {
-              accessToken: sessionData?.session?.access_token || '',
-              refreshToken: sessionData?.session?.refresh_token || '',
-            });
-            if (target) {
-              window.location.href = target;
-              return;
-            }
-
+          if (await enterBuilding(data.user)) {
             setLoginLoading(false);
             return;
           }
@@ -619,6 +717,8 @@ export default function AuthPage() {
     if (!firstName || !lastName) { alert('Please enter your name.'); return; }
     if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
     if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+    const consentGap = missingConsent(consent);
+    if (consentGap) { alert(consentGap); return; }
     const name = `${firstName.trim()} ${lastName.trim()}`;
     const finalEmail = profileEmail || email;
 
@@ -658,6 +758,8 @@ export default function AuthPage() {
           setSending(false);
           return;
         }
+
+        await recordConsent(supabase, 'invitation', finalEmail, consent);
 
         // Log in and redirect to tenant subdomain
         const member = {
@@ -712,68 +814,135 @@ export default function AuthPage() {
       // Validate required fields before creating auth user
       const signupEmail = profileEmail || email;
       if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
-      if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
+      // Already signed in as this person (setting up another building): no
+      // password to check and no account to create.
+      const { data: { session: openSession } } = await supabase.auth.getSession();
+      const alreadySignedIn = !!signedInAs
+        && openSession?.user?.email?.toLowerCase() === signupEmail.toLowerCase();
+
+      // The email is already known to have an account: sign in, don't sign up
+      const knownAccount = !alreadySignedIn && existingAccount?.email === signupEmail.trim().toLowerCase();
+
+      // They chose not to sign in now: no account is touched here. The server
+      // attaches the building to that account once it has been paid for.
+      const signInLater = knownAccount && existingAccount?.mode === 'later';
+
+      if (!alreadySignedIn && !knownAccount && (!password || password.length < 6)) { alert('Please enter a password (at least 6 characters).'); setCheckoutLoading(false); return; }
       if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
-      // Try to sign up — if user already exists (e.g., abandoned checkout), sign them in instead
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: signupEmail,
-        password: password,
-        options: { data: { full_name: fullName } },
-      });
+      // From here until checkout succeeds or stops, any session is the signup's
+      setSignupInProgress(true);
+
+      // This browser may still hold a sign-in the visitor did not ask to use
+      // (they opened a plain signup, not "Set up another building"). Drop it,
+      // so the signup acts only on what they choose here: otherwise "sign in
+      // later" would finish with them already inside their existing building.
+      if (!alreadySignedIn && openSession) {
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
+      }
+
+      // Try to sign up — if the email already has an account, sign in instead
+      const { error: authError } = alreadySignedIn || signInLater ? { error: null }
+        : knownAccount ? { error: { message: 'already registered' } }
+        : await supabase.auth.signUp({
+          email: signupEmail,
+          password: password,
+          options: { data: { full_name: fullName } },
+        });
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          // User exists from a previous attempt — sign in and continue to checkout
+          // First time we learn this email has an account: always stop and
+          // ask how they want to continue. Never sign the account in on the
+          // strength of a password typed as a "new" one, even if it matches.
+          if (!knownAccount) {
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: false, mode: null });
+            setPassword('');
+            setConfirmPassword('');
+            setSignupInProgress(false);
+            setCheckoutLoading(false);
+            return;
+          }
+          // They chose "sign in now" and entered the account's password
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: signupEmail,
             password: password,
           });
           if (signInError) {
-            alert('An account with this email already exists. Please sign in with the correct password, or use a different email.');
+            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: true, mode: 'now' });
+            setPassword('');
+            setSignupInProgress(false);
             setCheckoutLoading(false);
             return;
           }
+          signupOwnsSession.current = true;
         } else {
-          alert(authError.message); setCheckoutLoading(false); return;
+          alert(authError.message); setSignupInProgress(false); setCheckoutLoading(false); return;
         }
+      } else if (!alreadySignedIn && !signInLater) {
+        signupOwnsSession.current = true; // a brand new account
       }
 
       // Get the session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { alert('Authentication failed. Please try again.'); setCheckoutLoading(false); return; }
+      const session = signInLater ? null : (await supabase.auth.getSession()).data.session;
+      if (!signInLater && !session) { alert('Authentication failed. Please try again.'); await abandonSignupSession(); setCheckoutLoading(false); return; }
 
-      // Check if user already has a tenant (completed checkout before) — skip to login
-      const { data: existingTenant } = await supabase
-        .from('tenant_users')
-        .select('tenant_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+      // Proof of what was ticked on this form, stored before any payment step
+      await recordConsent(supabase, consentSource(signedInAs, existingAccount), signupEmail, consent);
 
-      if (existingTenant) {
-        alert('Your account is already set up. Redirecting to login...');
-        setAuthStep('login');
+      // An existing account may add another building. Only stop when this is
+      // a building the account already has (same address, or same name when no
+      // address is on file) — that is a repeat of a finished checkout.
+      // (Without a session the server makes the same check before checkout.)
+      const memberships = session ? await fetchMemberships(supabase, session.user.id) : [];
+      if (memberships === null) {
+        alert('We could not check your account. Please try again.');
+        await abandonSignupSession();
         setCheckoutLoading(false);
         return;
       }
+      const newBuilding = {
+        name: bldgName,
+        address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
+      };
+      const duplicateOf = memberships.find(m =>
+        !!m.tenant && isSameBuilding(newBuilding, { name: m.tenant.name, address: m.tenant.address }));
+      if (duplicateOf) {
+        // Say which building it collides with and let them fix the address,
+        // rather than a vague "already set up" and a bounce to the login page.
+        await abandonSignupSession();
+        alert(`Your account already has this building: "${duplicateOf.tenant?.name || 'your existing building'}". To add another building, enter its own name and street address.`);
+        setAuthStep('signup-building');
+        setCheckoutLoading(false);
+        return;
+      }
+      const knownTenantIds = memberships.map(m => m.tenant_id);
 
       // Open Chargebee Drop-in checkout modal (lazy-init if needed)
       if (!ensureChargebee()) {
         alert('Payment system is still loading. Please try again in a moment.');
+        await abandonSignupSession();
         setCheckoutLoading(false);
         return;
       }
 
       const currentSession = session;
+      // Chargebee calls `close` after a successful checkout too
+      let checkoutSucceeded = false;
 
       // Save session tokens so we can restore them if Chargebee redirects away
       try {
-        sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        }));
+        if (session) {
+          sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          }));
+          sessionStorage.setItem(KNOWN_TENANTS_KEY, JSON.stringify(knownTenantIds));
+        } else {
+          sessionStorage.setItem(SIGN_IN_LATER_KEY, bldgName.trim());
+        }
       } catch { /* sessionStorage may be unavailable */ }
 
       console.log('[checkout] Opening Chargebee Drop-in...');
@@ -799,7 +968,8 @@ export default function AuthPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${currentSession.access_token}`,
+                  // No session when signing in later: the server then goes by existingEmail
+                  'Authorization': `Bearer ${currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                   'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
                 },
                 body: JSON.stringify({
@@ -818,6 +988,7 @@ export default function AuthPage() {
                     lastName: lastName.trim(),
                   },
                   origin: window.location.origin,
+                  ...(signInLater ? { existingEmail: signupEmail.trim().toLowerCase() } : {}),
                   conversionEventId,
                   // Global Privacy Control: skip the server-side OpenAI Ads report too
                   adMeasurementOptOut:
@@ -848,6 +1019,9 @@ export default function AuthPage() {
           }
         },
         success: async (_hostedPageId: string) => {
+          checkoutSucceeded = true;
+          setSignupInProgress(false);
+          signupOwnsSession.current = false; // paid for: the session is now a real login
           console.log('[checkout] Checkout success, polling for tenant...');
           // OpenAI Ads conversion: paid trial signup completed. Attach the
           // hashed email and user ID first so OpenAI can match it to the ad.
@@ -855,6 +1029,17 @@ export default function AuthPage() {
           window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
           // Google Ads and Reddit Ads conversion for the same signup
           trackBuildingCreated({ eventId: conversionEventId, plan: selectedTier, interval: billingInterval });
+          if (signInLater) {
+            // Paid without signing in: the building is being attached to
+            // their account. Send them to sign in, with the next step spelled out.
+            setSignInLaterFor(bldgName.trim());
+            setExistingAccount(null);
+            setEmail(signupEmail.trim());
+            setPassword('');
+            setAuthStep('login');
+            setCheckoutLoading(false);
+            return;
+          }
           let user = (await supabase!.auth.getUser()).data?.user;
           // Fall back to the session we saved if getUser fails
           if (!user && currentSession?.user) {
@@ -862,7 +1047,7 @@ export default function AuthPage() {
             user = currentSession.user;
           }
           if (user) {
-            await pollForTenantAndRedirect(user.id, user);
+            await pollForTenantAndRedirect(user.id, user, knownTenantIds);
           } else {
             console.error('[checkout] No user available after checkout success');
             // Redirect to provisioned page so session-check can retry
@@ -872,17 +1057,21 @@ export default function AuthPage() {
         },
         close: () => {
           console.log('[checkout] Checkout modal closed');
+          // Closed without paying: don't leave them signed in
+          if (!checkoutSucceeded) void abandonSignupSession();
           setCheckoutLoading(false);
         },
         error: (error: any) => {
           const detail = hostedPageError || error?.message || JSON.stringify(error);
           console.error('[checkout] Chargebee error:', detail, error);
           alert('Checkout failed: ' + detail);
+          if (!checkoutSucceeded) void abandonSignupSession();
           setCheckoutLoading(false);
         },
       });
     } catch (err: any) {
       alert(err.message || 'Checkout failed');
+      await abandonSignupSession();
       setCheckoutLoading(false);
     }
   };
@@ -950,8 +1139,13 @@ export default function AuthPage() {
               ))}
             </div>
             <div className="flex items-center gap-2.5 text-sm">
+              {signedInAs ? (
+                // Signed in already: leaving signup goes back to their buildings
+                <a href="/login" className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Cancel</a>
+              ) : (<>
               <span className="text-navy-300 hidden sm:inline">Already have an account?</span>
               <a onClick={() => setAuthStep('login')} className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Log in</a>
+              </>)}
             </div>
           </div>
         </header>
@@ -1159,11 +1353,66 @@ export default function AuthPage() {
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" />
                         </div>
                       </div>
+                      {signedInAs ? (
+                        <p className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-700">
+                          You&apos;re signed in as <span className="font-semibold">{signedInAs}</span> in this browser, so this building will be added to that account.{' '}
+                          <button type="button" onClick={signOutOfSignup} className="font-semibold text-accent-600 underline hover:text-accent-700">Not you? Sign out and start fresh</button>
+                        </p>
+                      ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)}
+                        <input ref={emailInputRef} type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
                           className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
                       </div>
+                      {existingAccount ? (
+                        <fieldset className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
+                          <legend className="sr-only">This email already has an account</legend>
+                          <p role="status" className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
+                          <p className="mt-0.5 text-sm text-ink-700">How would you like to continue?</p>
+
+                          <div className="mt-3 space-y-2">
+                            <label htmlFor="existing-now" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
+                              <input id="existing-now" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
+                                checked={existingAccount.mode === 'now'}
+                                onChange={() => setExistingAccount(x => x && { ...x, mode: 'now', error: false })} />
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in now</span>
+                                <span className="block text-ink-600">Enter that account&apos;s password. You&apos;ll land in the new building after checkout.</span>
+                                {existingAccount.mode === 'now' && (
+                                  <span className="mt-2 block">
+                                    <label htmlFor="existing-account-password" className="block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
+                                    <input id="existing-account-password" type="password" value={password}
+                                      onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
+                                      aria-invalid={existingAccount.error || undefined}
+                                      className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
+                                    {existingAccount.error && <span className="mt-1.5 block text-sm text-red-700">That password doesn&apos;t match this account. Try again, or pick another option below.</span>}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+
+                            <label htmlFor="existing-later" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
+                              <input id="existing-later" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
+                                checked={existingAccount.mode === 'later'}
+                                onChange={() => { setPassword(''); setExistingAccount(x => x && { ...x, mode: 'later', error: false }); }} />
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in later</span>
+                                <span className="block text-ink-600">No password now. After checkout, sign in with that account&apos;s password to open the building, or reset it by email if you don&apos;t know it.</span>
+                              </span>
+                            </label>
+
+                            <button type="button"
+                              onClick={() => { setExistingAccount(null); setPassword(''); setConfirmPassword(''); setProfileEmail(''); setTimeout(() => emailInputRef.current?.focus(), 0); }}
+                              className="flex w-full items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-left text-sm text-ink-800 hover:border-ink-900">
+                              <span aria-hidden className="mt-0.5 h-4 w-4 flex-none text-center leading-4 text-ink-500">&rarr;</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="font-semibold text-ink-900">Keep it separate: use a different email</span>
+                                <span className="block text-ink-600">Creates a new account with its own password, not connected to the existing one.</span>
+                              </span>
+                            </button>
+                          </div>
+                        </fieldset>
+                      ) : (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
@@ -1176,6 +1425,8 @@ export default function AuthPage() {
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
                       </div>
+                      )}
+                      </>)}
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
                         <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
@@ -1193,6 +1444,7 @@ export default function AuthPage() {
                           <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option><option>Unit Owner</option>
                         </select>
                       </div>
+                      <ConsentBoxes idPrefix="signup-consent" value={consent} onChange={setConsent} />
                     </div>
 
                     <div className="flex flex-col items-center gap-3 mt-8">
@@ -1200,12 +1452,20 @@ export default function AuthPage() {
                         <button onClick={() => {
                             if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
-                            if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
+                            if (existingAccount) {
+                              if (!existingAccount.mode) { alert('Please choose how you want to continue with your existing account.'); return; }
+                              if (existingAccount.mode === 'now' && !password) { alert('Please enter your ONE two password, or pick another option.'); return; }
+                            } else if (!signedInAs) {
+                              if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
+                              if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            }
                             handleCheckout();
                           }} disabled={checkoutLoading}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
-                          {checkoutLoading ? 'Setting up...' : hasTrial ? 'Start Free Trial' : 'Start today!'}
+                          {checkoutLoading ? 'Setting up...'
+                            : existingAccount?.mode === 'now' ? (hasTrial ? 'Sign In & Start Free Trial' : 'Sign In & Start')
+                            : hasTrial ? 'Start Free Trial' : 'Start today!'}
                         </button>
                       ) : (
                         <button onClick={() => {
@@ -1213,6 +1473,7 @@ export default function AuthPage() {
                             if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
                             if (!password || password.length < 6) { alert('Please enter a password (at least 6 characters).'); return; }
                             if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
+                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
                             handleCompleteOnboarding();
                           }}
                           className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all">
@@ -1311,10 +1572,54 @@ export default function AuthPage() {
           </div>
         )}
 
-        {/* ══════ LOGIN ══════ */}
-        {authStep === 'login' && (
+        {/* ══════ WHICH BUILDING? ══════ */}
+        {buildingChoices && (
           <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
             <Logo />
+            <h1 className="text-center font-display text-xl font-bold text-ink-900">Which building?</h1>
+            <p className="mt-1 text-center text-sm text-ink-500">Signed in as {buildingChoices.user.email}</p>
+            <ul className="mt-5 space-y-2.5">
+              {buildingChoices.rows.map(m => {
+                const sub = subscriptionLabel(m);
+                const roleLabel = m.board_title || ({ board_member: 'Board member', resident: 'Resident', staff: 'Staff', property_manager: 'Property manager' } as Record<string, string>)[m.role] || 'Member';
+                const street = addressLine(m.tenant?.address);
+                return (
+                  <li key={m.tenant_id}>
+                    <button type="button" onClick={() => pickBuilding(m)} disabled={loginLoading}
+                      className="flex w-full items-center gap-3 rounded-xl border border-ink-200 px-4 py-3 text-left transition-colors hover:border-ink-900 focus-visible:border-ink-900 disabled:opacity-50">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-ink-900">{m.tenant?.name || 'Building'}</span>
+                        <span className="block truncate text-xs text-ink-500">{[street, roleLabel].filter(Boolean).join(' · ')}</span>
+                      </span>
+                      {sub && (
+                        <span className={`flex-none rounded-full px-2 py-0.5 text-[11px] font-semibold ${sub.tone === 'ok' ? 'bg-sage-50 text-sage-700' : sub.tone === 'bad' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>{sub.text}</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <label className="mt-4 flex items-center justify-center gap-2 text-sm text-ink-600">
+              <input id="remember-building" type="checkbox" checked={rememberBuilding} onChange={e => setRememberBuilding(e.target.checked)} className="h-4 w-4" />
+              Open the building I pick next time
+            </label>
+            <div className="border-t border-ink-100 mt-6 pt-4 flex items-center justify-between text-sm">
+              <a onClick={() => startAddBuilding(buildingChoices.user)} className="text-accent-600 font-semibold cursor-pointer hover:underline">+ Set up another building</a>
+              <a onClick={async () => { await supabase?.auth.signOut(); setBuildingChoices(null); setAuthStep('login'); }} className="text-ink-400 hover:text-ink-600 cursor-pointer">Sign out</a>
+            </div>
+          </div>
+        )}
+
+        {/* ══════ LOGIN ══════ */}
+        {authStep === 'login' && !buildingChoices && (
+          <div className="bg-white rounded-2xl shadow-xl border border-ink-100 p-8">
+            <Logo />
+            {signInLaterFor !== null && (
+              <div role="status" className="bg-sage-50 border border-sage-200 rounded-xl p-4 mb-4">
+                <p className="text-sm font-semibold text-ink-900 mb-1">{signInLaterFor ? `${signInLaterFor} is being set up` : 'Your building is being set up'}</p>
+                <p className="text-xs text-ink-700">It&apos;s being added to your existing ONE two account. Sign in below with that account&apos;s password to open it. If you don&apos;t know the password, use &ldquo;Forgot password?&rdquo; and we&apos;ll email you a reset link.</p>
+              </div>
+            )}
             {provisioningTimedOut && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
                 <p className="text-sm font-semibold text-amber-900 mb-1">Your building is still being set up</p>
@@ -1378,6 +1683,7 @@ export default function AuthPage() {
                     <option key={tier.id} value={tier.id}>{tier.name} — ${tier.monthly}/mo</option>
                   ))}
                 </select></div>
+              <ConsentBoxes idPrefix="demo-consent" value={consent} onChange={setConsent} />
               <button onClick={handleDemoLeadSubmit} disabled={demoSubmitting}
                 className="w-full py-3.5 bg-accent-600 text-white rounded-xl font-semibold text-sm hover:bg-accent-700 disabled:opacity-50 mt-2">
                 {demoSubmitting ? 'Loading...' : 'Enter Demo →'}</button>
@@ -1458,6 +1764,7 @@ export default function AuthPage() {
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
                   <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               </div>
+              <ConsentBoxes idPrefix="join-consent" value={consent} onChange={setConsent} />
               <button onClick={handleCompleteJoin}
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Create Account &amp; Enter</button>
             </div>

@@ -20,6 +20,8 @@ interface AuthState {
   login: (member: BuildingMember) => void;
   skipToDemo: () => void;
   signOut: () => void;
+  /** Forget the signed-in user in this tab only. Does not sign out of Supabase. */
+  clearSession: () => void;
   updateProfile: (updates: Partial<User>) => void;
   addMember: (member: BuildingMember) => void;
   removeMember: (id: string) => void;
@@ -116,6 +118,10 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
         supabase.auth.signOut().catch(() => {});
       }
     });
+    get().clearSession();
+  },
+
+  clearSession: () => {
     set({
       isAuthenticated: false,
       authStep: 'welcome',

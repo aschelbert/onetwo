@@ -415,6 +415,9 @@ Deno.serve(async (req) => {
             p_ssl: pending.ssl || null,
             p_ward: pending.ward || null,
             p_address_flag: pending.addressFlag || null,
+            // Building id reserved at checkout (the customer is cb_tenant_<id>).
+            // Absent on checkouts started before per-building customers.
+            ...(pending.tenantId ? { p_tenant_id: pending.tenantId } : {}),
           });
 
           console.log("Provisioned:", JSON.stringify(result));

@@ -23,6 +23,8 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import { isTenantHost } from '@/lib/tenantHost';
+import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
+import { isSignupInProgress } from '@/lib/authFlow';
 
 // Wait for Zustand persist to hydrate auth store from localStorage
 function HydrationGate({ children }: { children: React.ReactNode }) {
@@ -49,10 +51,15 @@ function AuthListener() {
     const sb = supabase; // narrow for TS inside async callback
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
-      const { isAuthenticated, signOut } = useAuthStore.getState();
+      const { isAuthenticated, clearSession } = useAuthStore.getState();
 
       if (event === 'SIGNED_OUT' || !session) {
-        if (isAuthenticated) signOut();
+        // The session is already gone; only this tab's state needs clearing.
+        // Calling signOut() here would send another sign-out to the server,
+        // and it signs out every session: when the event came from another
+        // tab, a late one of those revokes the session of whoever has just
+        // signed back in ("I had to log in twice").
+        if (isAuthenticated) clearSession();
         return;
       }
 
@@ -65,6 +72,8 @@ function AuthListener() {
       setTimeout(async () => {
         const { isAuthenticated, login, addMember } = useAuthStore.getState();
         if (isAuthenticated) return;
+        // A signup signs the account in to run its checkout; that is not a login
+        if (isSignupInProgress()) return;
         try {
           // Check if platform admin first
           const { data: admin } = await sb
@@ -116,11 +125,11 @@ function AuthListener() {
           }
 
           // Check tenant user
-          const { data: tu } = await sb
-            .from('tenant_users')
-            .select('role, unit, tenant_id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
+          // With several buildings and none implied by the host, the login
+          // page asks which one; don't pick for them here.
+          const memberships = await fetchMemberships(sb, session.user.id);
+          if (needsBuildingChoice(memberships)) return;
+          const tu = pickMembership(memberships);
 
           if (tu) {
             const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
@@ -161,7 +170,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function LoginRoute() {
   const { isAuthenticated, currentRole } = useAuthStore();
-  if (isAuthenticated) {
+  const location = useLocation();
+  // ?create=1 is signup. A signed-in board member setting up another building
+  // must reach it rather than being sent back into the building they are in.
+  const addingBuilding = new URLSearchParams(location.search).get('create') === '1'
+    && currentRole !== 'PLATFORM_ADMIN' && currentRole !== 'PM_COMPANY';
+  if (isAuthenticated && !addingBuilding) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'

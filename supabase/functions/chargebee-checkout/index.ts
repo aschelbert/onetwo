@@ -58,6 +58,25 @@ function signupPageUrl(origin: string | undefined): string | null {
   }
 }
 
+/**
+ * Identifies a building within one person's signups. A retried checkout for
+ * the same building yields the same key, so it reuses the same reserved
+ * building id, and a key equal to one of the account's existing buildings
+ * means it already owns this one.
+ *
+ * Street + ZIP when both are given. Without a ZIP the street alone is too
+ * weak to go on (a half-filled address such as "123" matches far too much),
+ * so the name is part of the key. With no street, the name alone.
+ */
+function buildingKey(b: { name?: string; address?: { street?: string; zip?: string } }): string {
+  const norm = (v: string | undefined) => (v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const street = norm(b.address?.street);
+  const zip = (b.address?.zip || "").replace(/\D/g, "").slice(0, 5);
+  if (street && zip) return `addr:${street}|${zip}`;
+  if (street) return `addr:${street}|name:${norm(b.name)}`;
+  return `name:${norm(b.name)}`;
+}
+
 /** Keep only the known attribution fields, as trimmed, length-capped strings. */
 function cleanAttribution(input: unknown): Record<string, string> | null {
   if (!input || typeof input !== "object") return null;
@@ -141,12 +160,37 @@ Deno.serve(async (req) => {
     const userRes = await fetch(`${SB_URL}/auth/v1/user`, {
       headers: { Authorization: auth, apikey: SB_ANON },
     });
-    if (!userRes.ok) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-    const user = await userRes.json();
+    // deno-lint-ignore no-explicit-any
+    let user: any = userRes.ok ? await userRes.json() : null;
 
     const body = await req.json();
+
+    // Not signed in. Allowed in one case only: a new building for an email
+    // that already has an account, where the person chose to sign in after
+    // paying instead of before. The building is attached to that account by
+    // the webhook; this request gets no session and no access to the account,
+    // so nothing here needs the account's password. Every other caller,
+    // including the existing-tenant mode below, must be signed in.
+    if (!user?.id) {
+      const existingEmail = typeof body.existingEmail === "string" ? body.existingEmail.trim().toLowerCase() : "";
+      if (!body.building || body.tenantId || !existingEmail) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      const lookup = await fetch(`${SB_URL}/rest/v1/rpc/user_id_for_email`, {
+        method: "POST",
+        headers: {
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_email: existingEmail }),
+      });
+      const existingId = lookup.ok ? await lookup.json() : null;
+      if (typeof existingId !== "string" || !existingId) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+      user = { id: existingId, email: existingEmail };
+    }
     const {
       plan,
       interval,
@@ -278,14 +322,65 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "building.name is required" }, 400);
       }
 
+      // An account can own several buildings, but not the same one twice.
+      // The signup page checks this too when it has a session; this covers
+      // the sign-in-later path and anything that skips the page.
+      const ownedRes = await fetch(
+        `${SB_URL}/rest/v1/tenant_users?user_id=eq.${user.id}&select=tenants(name,address)`,
+        { headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` } },
+      );
+      if (ownedRes.ok) {
+        const owned = (await ownedRes.json()) as { tenants?: { name?: string; address?: { street?: string; zip?: string } } | null }[];
+        const wanted = buildingKey(building);
+        if (owned.some((o) => o.tenants && buildingKey(o.tenants) === wanted)) {
+          return jsonResponse(
+            { error: "This account already has this building. Sign in to open it." },
+            409,
+          );
+        }
+      }
+
       // Fetch trial days for the hosted checkout page
       const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const supabaseAdmin = createClient(SB_URL, SB_SERVICE_KEY);
       const { data: trialDaysVal } = await supabaseAdmin.rpc('get_trial_days');
       const trialDays = typeof trialDaysVal === 'number' && trialDaysVal >= 0 ? trialDaysVal : 21;
 
-      // Get or create Chargebee customer so we can link pending_checkouts
-      const customerId = `cb_${user.id}`;
+      const pendingHeaders = {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+      };
+
+      // Each building is its own Chargebee customer (cb_tenant_<building id>),
+      // the same naming the existing-tenant mode uses. The building does not
+      // exist yet, so its id is only *reserved* here: it lives in the
+      // pending_checkouts row and nowhere else until the webhook provisions
+      // the building after payment. Nothing has to be undone if checkout is
+      // abandoned or fails.
+      //
+      // Coming back to change the plan or add-ons, or retrying after a failed
+      // card, is the same building: reuse its reserved id and customer rather
+      // than minting new ones.
+      const key = buildingKey(building);
+      let tenantId: string | null = null;
+      const priorRes = await fetch(
+        `${SB_URL}/rest/v1/pending_checkouts?user_id=eq.${user.id}&select=payload&order=created_at.desc`,
+        { headers: pendingHeaders },
+      );
+      if (priorRes.ok) {
+        const prior = (await priorRes.json()) as { payload?: { tenantId?: string; buildingKey?: string } }[];
+        tenantId = prior.find((r) => r.payload?.tenantId && r.payload?.buildingKey === key)?.payload?.tenantId ?? null;
+      }
+      if (tenantId) {
+        // A reserved id whose building already exists (provisioned, but its
+        // pending row was left behind) must not be reused for a new checkout.
+        const taken = await sbQuery("GET", "tenants", { id: `eq.${tenantId}`, select: "id" });
+        if (taken?.id) tenantId = null;
+      }
+      if (!tenantId) tenantId = crypto.randomUUID();
+
+      // Get or create the building's Chargebee customer
+      const customerId = `cb_tenant_${tenantId}`;
       const cp = new URLSearchParams();
       cp.append('email', user.email || '');
       cp.append('first_name', building.firstName || building.contactName || '');
@@ -310,10 +405,6 @@ Deno.serve(async (req) => {
       // Save building data for the webhook to provision after checkout.
       // A retried checkout replaces the earlier pending row: the webhook reads
       // exactly one row per customer, and the latest details should win.
-      const pendingHeaders = {
-        apikey: SB_SERVICE_KEY,
-        Authorization: `Bearer ${SB_SERVICE_KEY}`,
-      };
       await fetch(
         `${SB_URL}/rest/v1/pending_checkouts?chargebee_customer_id=eq.${encodeURIComponent(customerId)}`,
         { method: 'DELETE', headers: pendingHeaders },
@@ -322,6 +413,9 @@ Deno.serve(async (req) => {
         chargebee_customer_id: customerId,
         user_id: user.id,
         payload: {
+          // Reserved building id and the key it was reserved under
+          tenantId,
+          buildingKey: key,
           name: building.name,
           subdomain: building.subdomain || null,
           address: building.address || {},

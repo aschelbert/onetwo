@@ -4,6 +4,9 @@
 
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
+import { chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
+import { tenantLoginUrl } from '@/lib/tenantHost';
+import type { Role } from '@/types/auth';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
@@ -54,6 +57,10 @@ export interface TenantInfo {
 
 interface TenantContextValue extends TenantInfo {
   updateOnboardingStep: (step: keyof OnboardingState, value: boolean) => Promise<void>;
+  /** Every building this account belongs to, newest first. One entry for most people. */
+  buildings: TenantMembership[];
+  /** Leave this building for another one the account belongs to. Reloads the app. */
+  switchBuilding: (tenantId: string) => Promise<void>;
 }
 
 const defaultOnboarding: OnboardingState = {
@@ -71,6 +78,8 @@ const defaultTenant: TenantInfo = {
 const defaultContextValue: TenantContextValue = {
   ...defaultTenant,
   updateOnboardingStep: async () => {},
+  buildings: [],
+  switchBuilding: async () => {},
 };
 
 const TenantContext = createContext<TenantContextValue>(defaultContextValue);
@@ -111,6 +120,7 @@ function loadTenantStores(tenantId: string) {
 export default function TenantProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<TenantInfo>(defaultTenant);
   const [loaded, setLoaded] = useState(false);
+  const [buildings, setBuildings] = useState<TenantMembership[]>([]);
   const { currentUser, isAuthenticated } = useAuthStore();
   const updateName = useBuildingStore(s => s.updateName);
   const updateAddress = useBuildingStore(s => s.updateAddress);
@@ -339,16 +349,18 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     (async () => {
       try {
         // Get user's tenant membership
-        const { data: tu } = await supabase
-          .from('tenant_users')
-          .select('tenant_id')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
+        // A user can belong to several buildings: use this host's, else the
+        // one they last chose, else the newest
+        const memberships = await fetchMemberships(supabase, currentUser.id);
+        const tu = pickMembership(memberships);
 
         if (!tu?.tenant_id) {
           setLoaded(true);
           return;
         }
+        setBuildings(memberships ?? []);
+        // From here on every database request is for this building only
+        setActiveTenantId(tu.tenant_id);
 
         // Fetch tenant + subscription + features
         const { data: t } = await supabase
@@ -445,7 +457,36 @@ export default function TenantProvider({ children }: { children: React.ReactNode
     })();
   }, [isAuthenticated, currentUser?.id]);
 
-  const contextValue: TenantContextValue = { ...tenant, updateOnboardingStep };
+  const switchBuilding = useCallback(async (tenantId: string) => {
+    const target = buildings.find(b => b.tenant_id === tenantId);
+    if (!target || tenantId === tenant.id || !supabase) return;
+    chooseTenant(tenantId);
+
+    // Production: each building has its own host; hand the session over to it.
+    const { data } = await supabase.auth.getSession();
+    const url = tenantLoginUrl(target.tenant?.subdomain, {
+      accessToken: data.session?.access_token || '',
+      refreshToken: data.session?.refresh_token || '',
+    });
+    if (url) { window.location.assign(url); return; }
+
+    // Staging, previews, localhost: same host for every building. The role is
+    // per building, so update the signed-in user, then reload so every store
+    // starts clean in the other building.
+    const roleMap: Record<string, Role> = { board_member: 'BOARD_MEMBER', resident: 'RESIDENT', staff: 'STAFF', property_manager: 'PROPERTY_MANAGER' };
+    const { currentUser: me, login } = useAuthStore.getState();
+    const member = {
+      id: me.id, name: me.name, email: me.email, phone: me.phone || '',
+      role: roleMap[target.role] || ('BOARD_MEMBER' as Role),
+      unit: target.unit || '', status: 'active' as const,
+      joined: new Date().toISOString().split('T')[0],
+      boardTitle: target.board_title || null,
+    };
+    login(member);
+    window.location.assign('/home');
+  }, [buildings, tenant.id]);
+
+  const contextValue: TenantContextValue = { ...tenant, updateOnboardingStep, buildings, switchBuilding };
 
   if (!loaded) {
     return (
