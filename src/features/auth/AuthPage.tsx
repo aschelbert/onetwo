@@ -1488,7 +1488,7 @@ export default function AuthPage() {
                       ) : (<>
                       <div>
                         <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input ref={emailInputRef} type="email" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
+                        <input ref={emailInputRef} type="email" name="email" autoComplete="username" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
                           className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
                       </div>
                       {existingAccount ? (
@@ -1508,7 +1508,7 @@ export default function AuthPage() {
                                 {existingAccount.mode === 'now' && (
                                   <span className="mt-2 block">
                                     <label htmlFor="existing-account-password" className="block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
-                                    <input id="existing-account-password" type="password" value={password}
+                                    <input id="existing-account-password" type="password" name="current-password" autoComplete="current-password" value={password}
                                       onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
                                       aria-invalid={existingAccount.error || undefined}
                                       className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
@@ -1543,12 +1543,12 @@ export default function AuthPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                          <input type="password" name="new-password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                          <input type="password" name="confirm-password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
                             className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
                         </div>
                         <div className="col-span-2"><PasswordRules password={password} /></div>
@@ -1759,12 +1759,12 @@ export default function AuthPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                <input type="email" name="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="you@example.com" autoFocus />
               </div>
               <div>
                 <label className="block text-sm font-medium text-ink-700 mb-1">Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                <input type="password" name="current-password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)}
                   className="w-full px-4 py-3 border border-ink-200 rounded-xl text-sm" placeholder="••••••••"
                   onKeyDown={e => e.key === 'Enter' && handleLogin()} />
               </div>
@@ -1875,28 +1875,28 @@ export default function AuthPage() {
                 {inviteMatch.unit ? ` · Unit ${inviteMatch.unit}` : ''}
               </p>
             )}
-            <div className="space-y-3">
+            <form className="space-y-3" onSubmit={e => { e.preventDefault(); handleCompleteJoin(); }}>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
-                  <input value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" /></div>
+                  <input name="given-name" autoComplete="given-name" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" /></div>
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
-                  <input value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
+                  <input name="family-name" autoComplete="family-name" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" /></div>
               </div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Email</label>
-                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
+                <input type="email" name="email" autoComplete="username" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" /></div>
               <div><label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
-                <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
+                <input type="tel" name="tel" autoComplete="tel" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <input type="password" name="new-password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
                 <div><label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
+                  <input type="password" name="confirm-password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" /></div>
               </div>
               <PasswordRules password={password} />
               <ConsentBoxes idPrefix="join-consent" value={consent} onChange={setConsent} />
-              <button onClick={handleCompleteJoin}
+              <button type="submit"
                 className="w-full py-3 bg-ink-900 text-white rounded-xl font-semibold text-sm hover:bg-ink-800 mt-2">Create Account &amp; Enter</button>
-            </div>
+            </form>
             <div className="mt-4 text-center"><a onClick={() => setAuthStep('join-invite')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back</a></div>
           </div>
         )}
