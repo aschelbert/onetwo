@@ -5,7 +5,7 @@
 // Credentials live in mail_provider_accounts, which only the service role can
 // read; the app sees the provider, a masked credential and a connected flag.
 
-import { PROVIDER_INFO, PROVIDERS, isProvider, maskCredential, verifyCredentials, type MailProviderId } from "../_shared/mailProvider.ts";
+import { PROVIDER_INFO, PROVIDERS, isProvider, maskCredential, providerIsOpen, verifyCredentials, type MailProviderId } from "../_shared/mailProvider.ts";
 import { authUser, cors, jsonResponse, membership, restGetOne, restWrite } from "../_shared/supabaseRest.ts";
 
 type Row = { provider: MailProviderId; api_id: string | null; api_key: string; status: string; connected_at: string; last_verified_at: string | null; last_error: string | null };
@@ -57,6 +57,10 @@ Deno.serve(async (req) => {
       const provider = body.provider;
       if (!isProvider(provider)) return jsonResponse({ error: "Choose DocuPost or LetterStream" }, 400);
       const info = PROVIDER_INFO[provider];
+      // A vendor that isn't open yet is refused, unless the building is already on it and is only changing keys.
+      if (!providerIsOpen(provider) && (await account(tenantId))?.provider !== provider) {
+        return jsonResponse({ error: `${info.label} opens to buildings on ${info.availableFromLabel}. Until then, connect DocuPost.` }, 400);
+      }
       const apiId = String(body.apiId || "").trim();
       const apiKey = String(body.apiKey || "").trim();
       if (!apiKey || (info.credentials.includes("apiId") && !apiId)) {
