@@ -2,6 +2,9 @@
 // Sends a trial-ending reminder email to the account owner.
 // Called by chargebee-webhook on subscription_trial_end_reminder.
 // Idempotent: checks trial_reminder_sent_at before sending.
+// Server-to-server only: the caller must present the service role key, which
+// chargebee-webhook does. Anyone else is refused, so a stranger cannot spend a
+// building's one reminder early.
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -57,6 +60,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!SB_SERVICE_KEY || bearer !== SB_SERVICE_KEY) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: headers() });
+    }
+
     const { subscription_id, tenant_id } = await req.json();
 
     if (!subscription_id && !tenant_id) {
@@ -73,8 +81,8 @@ Deno.serve(async (req) => {
 
     // Find subscription
     const subFilter = subscription_id
-      ? `chargebee_subscription_id=eq.${subscription_id}`
-      : `tenant_id=eq.${tenant_id}`;
+      ? `chargebee_subscription_id=eq.${encodeURIComponent(String(subscription_id))}`
+      : `tenant_id=eq.${encodeURIComponent(String(tenant_id))}`;
     const subRes = await fetch(
       `${SB_URL}/rest/v1/subscriptions?${subFilter}&select=id,tenant_id,tier,trial_ends_at,trial_reminder_sent_at,billing_interval,addon_on_call,pm_addon`,
       { headers: svcHeaders }
