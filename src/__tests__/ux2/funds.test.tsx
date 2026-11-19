@@ -23,6 +23,9 @@ vi.mock('@/features/building/tabs/MailingSettingsTab', () => ({ default: () => <
 vi.mock('@/features/association-team/tabs/PayrollTab', () => ({ default: () => <div data-testid="legacy-payroll" /> }));
 vi.mock('@/features/unit-manager/tabs/MyBalanceTab', () => ({ default: ({ activeUnit }: { activeUnit: { number: string } }) => <div data-testid="legacy-balance">{activeUnit.number}</div> }));
 
+const emailUnitInvoice = vi.fn();
+vi.mock('@/lib/services/invoicing', async orig => ({ ...(await orig<typeof import('@/lib/services/invoicing')>()), emailUnitInvoice: (...a: unknown[]) => emailUnitInvoice(...a) }));
+
 import FundsPage from '@/ux2/funds/FundsPage';
 import { RedirectKeepQuery } from '@/ux2/shell/routes';
 import PayPage from '@/ux2/funds/PayPage';
@@ -85,6 +88,22 @@ describe('Funds', () => {
     const inv = document.querySelector('[aria-label="Invoices"]') as HTMLElement;
     expect(within(inv).getByRole('navigation', { name: 'Filter invoices' })).toBeTruthy();
     expect(within(inv).getByRole('button', { name: 'New invoice' })).toBeTruthy();
+  });
+
+  it('Email this invoice in the row menu sends the open invoice again for what is still owed', async () => {
+    emailUnitInvoice.mockReset();
+    emailUnitInvoice.mockResolvedValue({ sent: true, payLink: true });
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.email) ?? fin.units[0];
+    const invoice = fin.createUnitInvoice(unit.number, 'fee', 900, 'Repair charge · door closer');
+    useFinancialStore.setState(st => ({ unitInvoices: st.unitInvoices.map(x => (x.id === invoice.id ? { ...x, status: 'sent', paidAmount: 300 } : x)) }));
+    renderAt('/funds?tab=income&section=invoices');
+    const inv = document.querySelector('[aria-label="Invoices"]') as HTMLElement;
+    fireEvent.click(within(inv).getByRole('button', { name: `More for ${invoice.id}` }));
+    fireEvent.click(within(inv).getByRole('menuitem', { name: 'Email this invoice' }));
+    expect(emailUnitInvoice).toHaveBeenCalledTimes(1);
+    expect(emailUnitInvoice.mock.calls[0][0]).toMatchObject({ id: invoice.id, unitNumber: unit.number, amount: 600 });
+    expect((await within(inv).findByRole('status')).textContent).toContain('with a new link to pay online');
   });
 
   it('a payment recorded from the ledger form posts through the store', () => {
