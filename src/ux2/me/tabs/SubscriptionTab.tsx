@@ -10,6 +10,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
+import { useMailStore } from '@/store/useMailStore';
+import { mailProviderLabel } from '@/types/mail';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import { ADDONS, TIERS, getAddOnPrice, getTierById, type BillingInterval, type SubscriptionTier } from '@/lib/tiers';
@@ -98,6 +100,8 @@ export default function SubscriptionTab({ snap }: { snap: MeSnapshot }) {
   const tenant = useTenantContext();
   const members = useAuthStore(s => s.buildingMembers);
   const accounts = useFinancialStore(s => s.chartOfAccounts);
+  const mail = useMailStore(s => s.mailingSettings);
+  const mailOn = mail.mailConnected && !!mail.mailProvider;
   const { live, sub, invoices, busy, note, setNote, manage, portal } = useSubscription(snap.today);
   const [confirmText, setConfirmText] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -187,6 +191,15 @@ export default function SubscriptionTab({ snap }: { snap: MeSnapshot }) {
             </tbody>
           </Table>
         <Why>{nextInvoice ? `The next invoice arrives ${dayLabel(nextInvoice)}, thirty days before renewal, and goes to the billing contact. ` : ''}Each one posts to the operating ledger the day it is paid. PDFs open in the billing portal.</Why>
+      </Card>
+
+      <Card id="mail-vendor-card" aria-label="Mail vendor">
+        <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Mail vendor</SectionLabel><span className="text-xs text-ux2-muted">billed by the vendor, not on this subscription</span></div>
+        <Inner data-mail-vendor className="flex flex-wrap items-center justify-between gap-3">
+          <Cell title={mailOn ? mailProviderLabel(mail) : 'No mail vendor connected'} note={mailOn ? `The building's own account${mail.mailConnectedAt ? ` · connected ${dayLabel(mail.mailConnectedAt.slice(0, 10))}` : ''} · each letter is paid to ${mailProviderLabel(mail)} directly` : 'Letters print at the building until DocuPost or LetterStream is connected'} />
+          <span className="flex flex-wrap items-center gap-2">{mailOn && <Chip tone={mail.mailStatus === 'verified' ? 'sage' : 'amber'}>{mail.mailStatus === 'verified' ? 'Verified' : 'Not yet verified'}</Chip>}<Button size="sm" variant="ghost" onClick={() => navigate('/funds?tab=settings&section=mailing')}>{mailOn ? 'Manage vendor' : 'Choose a vendor'}</Button></span>
+        </Inner>
+        <Why>Printed and certified mail never appears on a ONE two invoice. Keys are changed and the account is disconnected under Funds › Accounts and ledger › Bank & Mail.</Why>
       </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
