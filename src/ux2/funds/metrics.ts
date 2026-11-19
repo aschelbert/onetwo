@@ -219,7 +219,7 @@ export function invoiceSummary(invoices: UnitInvoice[], month?: string) {
   const live = list.filter(i => i.status !== 'void');
   const paid = live.filter(i => i.status === 'paid');
   const open = live.filter(i => i.status !== 'paid');
-  const byType = { monthly: 0, special_assessment: 0, fee: 0, amenity_fee: 0 } as Record<UnitInvoice['type'], number>;
+  const byType = { monthly: 0, special_assessment: 0, fee: 0, amenity_fee: 0, other: 0 } as Record<UnitInvoice['type'], number>;
   for (const i of live) byType[i.type]++;
   return {
     sent: live.length,

@@ -1,5 +1,6 @@
 // supabase/functions/send-unit-invoice/index.ts
-// Creates a Stripe Checkout session for a unit invoice and emails the payment link.
+// Creates a Stripe Checkout session for an invoice and emails the payment link:
+// to a unit's owner, or to the vendor or outside party an invoice with no unit bills.
 // Only a signed-in board member, property manager or account owner of the
 // building may call it: the caller is verified before anything is read from
 // the body, and the building's name and Stripe account come from the database,
@@ -68,6 +69,10 @@ Deno.serve(async (req) => {
       stripeConnectId = settings.stripe_connect_id;
     }
 
+    // An invoice with no unit bills a vendor or an outside party, named by ownerName.
+    const outside = !unitNumber;
+    const billedTo: string = outside ? String(ownerName || "Invoice").slice(0, 120) : `Unit ${unitNumber}`;
+
     let paymentUrl = "";
     let stripeSessionId = "";
     let stripeError = "";
@@ -76,14 +81,15 @@ Deno.serve(async (req) => {
     if (STRIPE_KEY) {
       const stripeParams = new URLSearchParams();
       stripeParams.append("mode", "payment");
-      stripeParams.append("success_url", `${SITE_URL}/my-unit?payment=success&invoice=${invoiceId || ""}`);
-      stripeParams.append("cancel_url", `${SITE_URL}/my-unit?payment=cancelled`);
+      // An owner lands back in My Unit; an outside party has no login, so they get a page that needs none.
+      stripeParams.append("success_url", outside ? `${SITE_URL}/invoice-paid?status=success` : `${SITE_URL}/my-unit?payment=success&invoice=${invoiceId || ""}`);
+      stripeParams.append("cancel_url", outside ? `${SITE_URL}/invoice-paid?status=cancelled` : `${SITE_URL}/my-unit?payment=cancelled`);
       stripeParams.append("customer_email", ownerEmail);
       stripeParams.append("line_items[0][price_data][currency]", "usd");
       stripeParams.append("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)));
       stripeParams.append("line_items[0][price_data][product_data][name]", description);
       stripeParams.append("line_items[0][price_data][product_data][description]",
-        `Unit ${unitNumber || "N/A"} — ${buildingName || "HOA"}`);
+        `${billedTo} — ${buildingName || "HOA"}`);
       stripeParams.append("line_items[0][quantity]", "1");
       stripeParams.append("metadata[invoice_id]", invoiceId || "");
       stripeParams.append("metadata[unit_number]", unitNumber || "");
@@ -150,14 +156,14 @@ Deno.serve(async (req) => {
 
     // Format amount
     const fmtAmount = "$" + Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 });
-    const typeLabel = type === "fee" ? "Fee" : type === "special_assessment" ? "Special Assessment" : type === "monthly" ? "Dues" : type === "amenity_fee" ? "Amenity Fee" : "Invoice";
+    const typeLabel = outside ? "Invoice" : type === "fee" ? "Fee" : type === "special_assessment" ? "Special Assessment" : type === "monthly" ? "Dues" : type === "amenity_fee" ? "Amenity Fee" : "Invoice";
 
     // Send the email
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
         <div style="text-align: center; margin-bottom: 32px;">
           <div style="display: inline-block; background: #3D3D3D; border-radius: 8px; width: 48px; height: 48px; line-height: 48px; color: white; font-weight: bold; font-size: 24px;">+</div>
-          <h1 style="font-size: 20px; color: #1a1a1a; margin: 16px 0 4px;">New ${typeLabel} — Unit ${escapeHtml(unitNumber || "N/A")}</h1>
+          <h1 style="font-size: 20px; color: #1a1a1a; margin: 16px 0 4px;">New ${typeLabel} — ${escapeHtml(billedTo)}</h1>
           <p style="color: #666; font-size: 14px; margin: 0;">${escapeHtml(buildingName || "Your HOA")}</p>
         </div>
 
@@ -165,7 +171,7 @@ Deno.serve(async (req) => {
           <table style="width: 100%; font-size: 14px; color: #374151;">
             <tr><td style="padding: 8px 0; color: #6b7280;">Invoice</td><td style="padding: 8px 0; text-align: right; font-weight: 600;">${escapeHtml(invoiceId || "—")}</td></tr>
             <tr><td style="padding: 8px 0; color: #6b7280;">Type</td><td style="padding: 8px 0; text-align: right;">${typeLabel}</td></tr>
-            <tr><td style="padding: 8px 0; color: #6b7280;">Unit</td><td style="padding: 8px 0; text-align: right;">${escapeHtml(unitNumber || "N/A")}</td></tr>
+            <tr><td style="padding: 8px 0; color: #6b7280;">${outside ? "Billed to" : "Unit"}</td><td style="padding: 8px 0; text-align: right;">${escapeHtml(outside ? billedTo : unitNumber)}</td></tr>
             <tr><td style="padding: 8px 0; color: #6b7280;">Description</td><td style="padding: 8px 0; text-align: right;">${escapeHtml(description)}</td></tr>
             ${dueLabel ? `<tr><td style="padding: 8px 0; color: #6b7280;">Due</td><td style="padding: 8px 0; text-align: right; font-weight: 600;">${dueLabel}</td></tr>` : ""}
             ${buildingAddress ? `<tr><td style="padding: 8px 0; color: #6b7280;">Address</td><td style="padding: 8px 0; text-align: right; font-size: 12px;">${escapeHtml(buildingAddress)}</td></tr>` : ""}
@@ -180,7 +186,7 @@ Deno.serve(async (req) => {
         </div>
         ` : `
         <div style="text-align: center; margin-bottom: 24px;">
-          <p style="color: #6b7280; font-size: 14px;">Please contact your board for payment instructions.</p>
+          <p style="color: #6b7280; font-size: 14px;">${outside ? `Please contact ${escapeHtml(buildingName || "the association")} for payment instructions.` : "Please contact your board for payment instructions."}</p>
         </div>
         `}
 
@@ -191,12 +197,12 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    const textBody = `${typeLabel} — Unit ${unitNumber || "N/A"}\n\n${description}\nAmount Due: ${fmtAmount}${dueLabel ? `\nDue: ${dueLabel}` : ""}\n\n${paymentUrl ? `Pay now: ${paymentUrl}` : "Contact your board for payment instructions."}\n\n${buildingName || "Your HOA"}`;
+    const textBody = `${typeLabel} — ${billedTo}\n\n${description}\nAmount Due: ${fmtAmount}${dueLabel ? `\nDue: ${dueLabel}` : ""}\n\n${paymentUrl ? `Pay now: ${paymentUrl}` : "Contact your board for payment instructions."}\n\n${buildingName || "Your HOA"}`;
 
     const emailRes = await sendEmail({
       fromName: buildingName || "ONE two HOA",
       to: { email: ownerEmail, name: ownerName || ownerEmail.split("@")[0] },
-      subject: `${typeLabel}: ${fmtAmount} — Unit ${unitNumber || "N/A"} · ${buildingName || "HOA"}`,
+      subject: `${typeLabel}: ${fmtAmount} — ${billedTo} · ${buildingName || "HOA"}`,
       text: textBody,
       html: htmlBody,
     });

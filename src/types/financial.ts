@@ -83,6 +83,8 @@ export interface BalanceSheet {
     specialAR: number;
     lateFeesAR: number;
     insuranceAR: number;
+    /** Owed by vendors and outside parties, on invoices that are not for a unit. */
+    otherAR: number;
     prepaid: number;
     totalCurrent: number;
     totalReceivable: number;
@@ -105,8 +107,13 @@ export interface BalanceSheet {
 
 export interface UnitInvoice {
   id: string;
+  /** The unit charged; empty on an invoice to someone who is not a unit (see `payerName`). */
   unitNumber: string;
-  type: 'fee' | 'special_assessment' | 'monthly' | 'amenity_fee';
+  /** `other`: an invoice to a vendor or outside party, never part of a unit's balance. */
+  type: 'fee' | 'special_assessment' | 'monthly' | 'amenity_fee' | 'other';
+  /** Who is billed when it is not a unit: a vendor or an outside party. */
+  payerName?: string | null;
+  payerEmail?: string | null;
   description: string;
   amount: number;
   /** sent: open (possibly part paid, see paidAmount) · paid: settled in full · overdue: open past due · void: cancelled or waived. */

@@ -123,6 +123,8 @@ interface FinancialState {
   // ── Charges to units: the receivables sub-ledger. One invoice per charge; the unit's balance follows. ──
   /** Charge a unit. Posts Dr receivable / Cr income (unless `post: false`), applies any prepaid credit, and raises the balance. */
   createUnitInvoice: (unitNum: string, type: UnitInvoice['type'], amount: number, description: string, caseId?: string, dueDate?: string, opts?: InvoiceOptions) => UnitInvoice;
+  /** Invoice a vendor or an outside party: Dr other receivables / Cr other income. No unit's balance moves. */
+  createPayerInvoice: (payer: { name: string; email?: string }, amount: number, description: string, dueDate: string, opts?: { caseId?: string; date?: string }) => UnitInvoice;
   /** Pay one charge (in full, or `amount` of it). */
   payUnitInvoice: (invoiceId: string, method: string, opts?: { date?: string; amount?: number }) => void;
   /** Cancel what is still open on a charge: reverses the income and receivable for the unpaid part. */
@@ -224,6 +226,8 @@ export interface InvoiceOptions {
   date?: string;
   /** False when the amount is already in the ledger (a balance brought forward): the invoice is recorded, nothing is posted, the balance stays. */
   post?: boolean;
+  /** Who is billed when it is not a unit (type `other`). */
+  payer?: { name: string; email?: string };
 }
 
 /** The state of the books on the cutover date, as a treasurer finds the numbers. */
@@ -277,7 +281,9 @@ const invoiceSaves = new Map<string, Promise<string>>();
  */
 export const whenInvoiceSaved = (id: string): Promise<string> => invoiceSaves.get(id) ?? Promise.resolve(id);
 
-const invoiceSource = (type: UnitInvoice['type']): GLEntry['source'] => (type === 'fee' || type === 'amenity_fee' ? 'fee' : 'assessment');
+const invoiceSource = (type: UnitInvoice['type']): GLEntry['source'] => (type === 'fee' || type === 'amenity_fee' || type === 'other' ? 'fee' : 'assessment');
+/** Who an invoice is for, as the ledger memo names them. */
+const billedTo = (i: Pick<UnitInvoice, 'unitNumber' | 'payerName'>) => (i.unitNumber ? `Unit ${i.unitNumber}` : i.payerName || 'Outside party');
 
 // ── Sync helpers ──
 
@@ -718,11 +724,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const assets = {
       operating: acctBalance('1010'), reserves: acctBalance('1020'), pettyCash: acctBalance('1030'),
       assessmentsAR: acctBalance('1110'), specialAR: acctBalance('1120'), lateFeesAR: acctBalance('1130'),
-      insuranceAR: acctBalance('1140'), prepaid: acctBalance('1200'),
+      insuranceAR: acctBalance('1140'), otherAR: acctBalance(mappingOf(get().glAccountMapping).otherReceivable), prepaid: acctBalance('1200'),
       totalCurrent: 0, totalReceivable: 0, total: 0,
     };
     assets.totalCurrent = assets.operating + assets.reserves + assets.pettyCash;
-    assets.totalReceivable = assets.assessmentsAR + assets.specialAR + assets.lateFeesAR + assets.insuranceAR;
+    assets.totalReceivable = assets.assessmentsAR + assets.specialAR + assets.lateFeesAR + assets.insuranceAR + assets.otherAR;
     assets.total = assets.totalCurrent + assets.totalReceivable + assets.prepaid;
 
     const liabilities = {
@@ -1476,7 +1482,10 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const { arAcct, revenueAcct } = getGLAccountsForInvoice(type, m, fund);
     const post = opts.post !== false;
     const amt = r2(amount);
-    const glEntry = post ? s.glPost(date, `Invoice ${id} - Unit ${unitNum}: ${description}`, arAcct, revenueAcct, amt, invoiceSource(type), unitNum) : null;
+    const payer = type === 'other' ? { name: (opts.payer?.name || '').trim() || 'Outside party', email: (opts.payer?.email || '').trim() || null } : null;
+    // A building whose chart predates invoices to outside parties gets the account they post to.
+    if (payer && !s.chartOfAccounts.some(a => a.num === arAcct)) s.addCoAAccount(arAcct, 'Other Receivables', '1100', 'receivable');
+    const glEntry = post ? s.glPost(date, `Invoice ${id} - ${billedTo({ unitNumber: unitNum, payerName: payer?.name })}: ${description}`, arAcct, revenueAcct, amt, invoiceSource(type), unitNum || null) : null;
     // Money the owner paid ahead pays the new charge first.
     const unit = s.units.find(u => u.number === unitNum);
     const credit = post && unit ? r2(Math.min(creditOf(unit), amt)) : 0;
@@ -1488,6 +1497,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       paidAmount: credit > 0 ? credit : null, paymentMethod: credit > 0 ? 'credit' : null, stripePaymentLink: null,
       glEntryId: glEntry?.id || null, paymentGlEntryId: null,
       fund, forInvoiceId: opts.forInvoiceId ?? null,
+      ...(payer ? { payerName: payer.name, payerEmail: payer.email } : {}),
       ...(caseId ? { caseId } : {}),
     };
     set(st => ({
@@ -1521,6 +1531,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     return invoice;
   },
 
+  createPayerInvoice: (payer, amount, description, dueDate, opts: { caseId?: string; date?: string } = {}) =>
+    get().createUnitInvoice('', 'other', amount, description, opts.caseId, dueDate, { payer, date: opts.date }),
+
   payUnitInvoice: (invoiceId, method, opts: { date?: string; amount?: number } = {}) => {
     const date = opts.date ?? todayIso();
     const s = get();
@@ -1531,7 +1544,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (take <= 0) return;
     const m = mappingOf(s.glAccountMapping);
     const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
-    const glEntry = s.glPost(date, `Payment received - Invoice ${inv.id} Unit ${inv.unitNumber}`, m.bankAccount, arAcct, take, 'payment', inv.unitNumber);
+    const glEntry = s.glPost(date, `Payment received - Invoice ${inv.id} ${billedTo(inv)}`, m.bankAccount, arAcct, take, 'payment', inv.unitNumber || null);
     const paid = r2((inv.paidAmount ?? 0) + take);
     const full = paid >= inv.amount - 0.005;
     const patch: Partial<UnitInvoice> = { status: full ? 'paid' : inv.status, paidDate: full ? date : inv.paidDate, paidAmount: paid, paymentMethod: method, paymentGlEntryId: glEntry.id };
@@ -1556,7 +1569,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const remaining = invoiceRemaining(inv);
     const m = mappingOf(s.glAccountMapping);
     const { arAcct, revenueAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
-    if (remaining > 0) s.glPost(todayIso(), `Void - Invoice ${inv.id} Unit ${inv.unitNumber}: ${reason}`, revenueAcct, arAcct, remaining, invoiceSource(inv.type), inv.unitNumber);
+    if (remaining > 0) s.glPost(todayIso(), `Void - Invoice ${inv.id} ${billedTo(inv)}: ${reason}`, revenueAcct, arAcct, remaining, invoiceSource(inv.type), inv.unitNumber || null);
     set(st => ({
       unitInvoices: st.unitInvoices.map(i => (i.id === invoiceId ? { ...i, status: 'void' as const, refundReason: reason } : i)),
       units: st.units.map(u => u.number === inv.unitNumber ? {

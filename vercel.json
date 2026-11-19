@@ -38,6 +38,7 @@
     { "source": "/signup", "destination": "/app.html" },
     { "source": "/reset-password", "destination": "/app.html" },
     { "source": "/unsubscribe", "destination": "/app.html" },
+    { "source": "/invoice-paid", "destination": "/app.html" },
     { "source": "/confirm-email", "destination": "/app.html" },
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/home", "destination": "/app.html" },

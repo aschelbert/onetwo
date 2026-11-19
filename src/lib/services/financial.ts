@@ -365,6 +365,8 @@ export function rowToUnitInvoice(r: Record<string, unknown>): UnitInvoice {
     forInvoiceId: (r.for_invoice_id as string) || null,
     paymentMethod: (r.payment_method as string) || null,
     stripePaymentLink: (r.stripe_payment_link as string) || null,
+    payerName: (r.payer_name as string) || null,
+    payerEmail: (r.payer_email as string) || null,
     glEntryId: (r.gl_entry_id as string) || null,
     paymentGlEntryId: (r.payment_gl_entry_id as string) || null,
     stripeCheckoutSessionId: (r.stripe_checkout_session_id as string) || null,
@@ -403,6 +405,8 @@ export async function createUnitInvoice(tenantId: string, inv: UnitInvoice): Pro
       stripe_payment_intent_id: inv.stripePaymentIntentId || null,
       fund: inv.fund || null,
       for_invoice_id: inv.forInvoiceId || null,
+      // Only an invoice to an outside party names a payer, so every other invoice saves as it always has.
+      ...(inv.payerName ? { payer_name: inv.payerName, payer_email: inv.payerEmail || null } : {}),
     })
     .select()
     .single();

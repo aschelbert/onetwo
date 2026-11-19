@@ -47,6 +47,7 @@ export const seedChartOfAccounts: ChartOfAccountsEntry[] = [
   {num:'1120',name:'Special Assessments Receivable',type:'asset',sub:'receivable',parent:'1100'},
   {num:'1130',name:'Late Fees Receivable',type:'asset',sub:'receivable',parent:'1100'},
   {num:'1140',name:'Insurance Claims Receivable',type:'asset',sub:'receivable',parent:'1100'},
+  {num:'1150',name:'Other Receivables',type:'asset',sub:'receivable',parent:'1100'},
   {num:'1200',name:'Prepaid Expenses',type:'asset',sub:'prepaid',parent:'1000'},
   // LIABILITIES
   {num:'2000',name:'Liabilities',type:'liability',sub:'header',parent:null},

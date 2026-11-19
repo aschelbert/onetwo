@@ -9,7 +9,7 @@ import { DEFAULT_TRIAL_DAYS } from './src/lib/tiers'
 
 // Routes that should serve app.html instead of index.html (marketing)
 const APP_ROUTES = [
-  '/login', '/reset-password', '/unsubscribe', '/dashboard', '/home', '/setup', '/obligations', '/financial', '/funds', '/issues',
+  '/login', '/reset-password', '/unsubscribe', '/invoice-paid', '/dashboard', '/home', '/setup', '/obligations', '/financial', '/funds', '/issues',
   '/building', '/compliance', '/archives', '/voting', '/boardroom',
   '/board-ops', '/property-log', '/community', '/my-unit', '/account',
   '/admin', '/portfolio', '/support', '/subscription', '/association-team', '/cases',

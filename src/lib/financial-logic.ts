@@ -10,6 +10,10 @@ export type GLAccountMapping = {
   specialAssessmentRevenue: string;
   lateFeeRevenue: string;
   amenityRevenue: string;
+  /** Owed by vendors and outside parties, on invoices that are not for a unit. */
+  otherReceivable: string;
+  /** Income from those invoices. */
+  otherRevenue: string;
   /** Money owners paid ahead (a liability until the next dues are billed). */
   prepaidAssessments: string;
   /** Bills received and not yet paid. */
@@ -29,6 +33,8 @@ export const DEFAULT_GL_MAPPING: GLAccountMapping = {
   specialAssessmentRevenue: '4020',
   lateFeeRevenue: '4030',
   amenityRevenue: '4060',
+  otherReceivable: '1150',
+  otherRevenue: '4090',
   prepaidAssessments: '2020',
   accountsPayable: '2010',
   reserveBankAccount: '1020',
@@ -48,7 +54,7 @@ export const OPENING_BILL_PREFIX = 'OB-';
  * Returns the GL accounts (AR + revenue) for a given unit invoice type.
  */
 export function getGLAccountsForInvoice(
-  type: 'fee' | 'special_assessment' | 'amenity_fee' | 'monthly',
+  type: UnitInvoice['type'],
   mapping: GLAccountMapping = DEFAULT_GL_MAPPING,
   fund?: Fund | null,
 ): { arAcct: string; revenueAcct: string } {
@@ -63,6 +69,9 @@ export function getGLAccountsForInvoice(
       return { arAcct: mapping.specialAssessmentsReceivable, revenueAcct: mapping.specialAssessmentRevenue };
     case 'monthly':
       return { arAcct: mapping.assessmentsReceivable, revenueAcct: mapping.regularAssessmentRevenue };
+    case 'other':
+      // A mapping saved before these two existed has neither: the defaults stand in.
+      return { arAcct: mapping.otherReceivable || DEFAULT_GL_MAPPING.otherReceivable, revenueAcct: mapping.otherRevenue || DEFAULT_GL_MAPPING.otherRevenue };
   }
 }
 
@@ -96,7 +105,7 @@ export function legacyOwed(u: Unit, invoices: UnitInvoice[]): number {
  */
 export type PaymentOrder = 'dues-first' | 'oldest-first';
 export const PAYMENT_ORDER_LABEL: Record<PaymentOrder, string> = { 'dues-first': 'Dues first, then special assessments, then fees', 'oldest-first': 'Oldest charge first, whatever it is' };
-export const APPLICATION_ORDER: Record<UnitInvoice['type'], number> = { monthly: 0, special_assessment: 1, fee: 2, amenity_fee: 2 };
+export const APPLICATION_ORDER: Record<UnitInvoice['type'], number> = { monthly: 0, special_assessment: 1, fee: 2, amenity_fee: 2, other: 2 };
 export function openInvoicesInOrder(unitNum: string, invoices: UnitInvoice[], order: PaymentOrder = 'dues-first'): UnitInvoice[] {
   const rank = (i: UnitInvoice) => (order === 'oldest-first' ? 0 : APPLICATION_ORDER[i.type]);
   return invoices

@@ -13,27 +13,31 @@ export interface InvoiceEmailResult {
   reason?: string;
 }
 
+/** Who an invoice email goes to: a unit's owner, or the vendor or outside party the invoice bills. */
+export interface InvoiceRecipient { name: string; email: string; unit?: string }
+
 /**
- * Emails a unit invoice to the unit's owner. The email names the building,
- * the unit, the invoice number, what the charge is for, the amount and the
- * due date; when online payments are set up it also carries a Pay button (a
- * Stripe Checkout link, saved on the invoice). Nothing else is attached.
+ * Emails an invoice to the unit's owner, or to the vendor or outside party it
+ * bills. The email names the building, who is billed, the invoice number,
+ * what the charge is for, the amount and the due date; when online payments
+ * are set up it also carries a Pay button (a Stripe Checkout link, saved on
+ * the invoice), which needs no login. Nothing else is attached.
  */
 export async function sendInvoiceEmail(
   invoice: UnitInvoice,
-  unit: Unit,
+  recipient: InvoiceRecipient,
   stripeConnectId: string | null,
   tenantId: string | null,
 ): Promise<InvoiceEmailResult> {
-  const to = (unit.email || '').trim();
-  if (!to) return { sent: false, to, payLink: false, reason: `Unit ${unit.number} has no email on file (Building › Directory)` };
+  const to = (recipient.email || '').trim();
+  if (!to) return { sent: false, to, payLink: false, reason: recipient.unit ? `Unit ${recipient.unit} has no email on file (Building › Directory)` : `There is no email address for ${recipient.name || 'this payer'}` };
   if (!supabase) return { sent: false, to, payLink: false, reason: 'Email is not available offline' };
   try {
     const { data, error } = await supabase.functions.invoke('send-unit-invoice', {
       body: {
         invoiceId: invoice.id,
         unitNumber: invoice.unitNumber,
-        ownerName: unit.owner,
+        ownerName: recipient.name,
         ownerEmail: to,
         amount: Math.max(0, Math.round((invoice.amount - (invoice.paidAmount ?? 0)) * 100) / 100) || invoice.amount,
         description: invoice.description,
@@ -62,5 +66,5 @@ export async function sendInvoiceToStripe(
   stripeConnectId: string | null,
   tenantId: string,
 ): Promise<void> {
-  await sendInvoiceEmail(invoice, unit, stripeConnectId, tenantId);
+  await sendInvoiceEmail(invoice, { name: unit.owner, email: unit.email, unit: unit.number }, stripeConnectId, tenantId);
 }

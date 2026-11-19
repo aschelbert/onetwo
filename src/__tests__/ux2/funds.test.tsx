@@ -96,7 +96,7 @@ describe('Funds', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Add a special assessment' }));
     // The same form as New invoice, opened on this unit and type, with the due date filled in and required.
     const form = screen.getByRole('form', { name: 'New invoice' });
-    expect((within(form).getByLabelText('Unit') as HTMLSelectElement).value).toBe(unit.number);
+    expect((within(form).getByLabelText('Bill to') as HTMLSelectElement).value).toBe(unit.number);
     expect((within(form).getByLabelText('Type') as HTMLSelectElement).value).toBe('special_assessment');
     const due = within(form).getByLabelText('Due') as HTMLInputElement;
     expect(due.required).toBe(true);
@@ -119,7 +119,7 @@ describe('Funds', () => {
     const before = useFinancialStore.getState().unitInvoices.length;
     fireEvent.click(within(document.querySelector('[aria-label="Invoices"]') as HTMLElement).getByRole('button', { name: 'New invoice' }));
     const form = screen.getByRole('form', { name: 'New invoice' });
-    fireEvent.change(within(form).getByLabelText('Unit'), { target: { value: '*' } });
+    fireEvent.change(within(form).getByLabelText('Bill to'), { target: { value: '*' } });
     fireEvent.change(within(form).getByLabelText('Type'), { target: { value: 'special_assessment' } });
     fireEvent.change(within(form).getByLabelText('Total to split'), { target: { value: '10000' } });
     fireEvent.click(within(form).getByRole('button', { name: `Create ${units.length}` }));
@@ -128,6 +128,31 @@ describe('Funds', () => {
     expect(new Set(made.map(i => i.dueDate)).size).toBe(1);
     expect(made.every(i => i.dueDate > todayIso())).toBe(true);
     expect(made.reduce((t, i) => t + i.amount, 0)).toBeCloseTo(10000, 2);
+  });
+
+  it('an invoice can bill a vendor or outside party, on no unit', () => {
+    renderAt('/funds?tab=income&section=invoices');
+    const balances = useFinancialStore.getState().units.map(u => u.balance);
+    const card = () => document.querySelector('[aria-label="Invoices"]') as HTMLElement;
+    fireEvent.click(within(card()).getByRole('button', { name: 'New invoice' }));
+    const form = screen.getByRole('form', { name: 'New invoice' });
+    fireEvent.change(within(form).getByLabelText('Bill to'), { target: { value: '+' } });
+    // No unit, so no charge type: it is an invoice to a named payer.
+    expect(within(form).queryByLabelText('Type')).toBeNull();
+    fireEvent.change(within(form).getByLabelText('Amount'), { target: { value: '840' } });
+    expect((within(form).getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Harbor Movers LLC' } });
+    fireEvent.change(within(form).getByLabelText('Email'), { target: { value: 'billing@harbor.example' } });
+    fireEvent.change(within(form).getByLabelText('What for'), { target: { value: 'Elevator pad damage' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }));
+    const inv = useFinancialStore.getState().unitInvoices.find(i => i.payerName === 'Harbor Movers LLC')!;
+    expect(inv).toMatchObject({ type: 'other', unitNumber: '', payerEmail: 'billing@harbor.example', amount: 840 });
+    expect(inv.dueDate > todayIso()).toBe(true);
+    expect(useFinancialStore.getState().units.map(u => u.balance)).toEqual(balances);
+    expect(card().textContent).toContain('Harbor Movers LLC');
+    fireEvent.click(within(card()).getByRole('button', { name: `More for ${inv.id}` }));
+    expect(screen.getByRole('menuitem', { name: 'Email it to Harbor Movers LLC' })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'Open the unit ledger' })).toBeNull();
   });
 
   it('a payment recorded from the ledger form posts through the store', () => {

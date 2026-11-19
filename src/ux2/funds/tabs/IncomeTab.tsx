@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { fmt } from '@/lib/formatters';
 import type { Unit, UnitInvoice } from '@/types/financial';
 import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Ring, Table, Th, Td, Cell, RowMenu, SearchInput, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { addDays } from '@/lib/billingCycle';
 import { ONLINE_METHODS, agingTotals, behind, collected, invoiceSummary, monthName, ordinal, splitCharge, unitDues, unpaidFees, type BehindUnit, type FundsSnapshot, type SplitHow } from '../metrics';
-import { CHARGE_LABEL, createCharges, emailInvoices, type ChargeType } from '../charges';
+import { CHARGE_LABEL, billedToLabel, createCharges, emailInvoices, type ChargeType } from '../charges';
 import type { FundsTab } from '../FundsPage';
 
 type Section = 'ledger' | 'behind' | 'invoices';
@@ -85,13 +86,16 @@ function PaymentForm({ unit: start, units, onClose }: { unit?: string; units: Un
 }
 
 const EVERY = '*';
-const PLACEHOLDER: Record<ChargeType, string> = { fee: 'Repair charge · door closer', special_assessment: 'Roof · 2029 gap', amenity_fee: 'Party room · Dec 14', monthly: 'Dues · December' };
+/** Bill to someone who is not a unit: a vendor or an outside party. */
+const OUTSIDE = '+';
+const PLACEHOLDER: Record<ChargeType, string> = { fee: 'Repair charge · door closer', special_assessment: 'Roof · 2029 gap', amenity_fee: 'Party room · Dec 14', monthly: 'Dues · December', other: 'Damage to the lobby door · Oct 3' };
 
 /**
  * One form for every charge to a unit, whether it is opened from a unit's row
  * menu or from New invoice: both make the same invoice. A due date is always
  * asked for, so the charge has a date to track against and is never late by
- * default. "Every unit" levies one charge across the building.
+ * default. "Every unit" levies one charge across the building; "Someone else"
+ * invoices a vendor or an outside party, which touches no unit's balance.
  */
 function ChargeForm({ units, today, unit: start, type: startType = 'fee', stripe, onClose, onDone }: { units: Unit[]; today: string; unit?: string; type?: ChargeType; stripe: boolean; onClose: () => void; onDone: (invoices: UnitInvoice[], email: boolean) => void }) {
   const shares = units.length > 0 && units.every(u => u.votingPct > 0);
@@ -103,29 +107,51 @@ function ChargeForm({ units, today, unit: start, type: startType = 'fee', stripe
   const [desc, setDesc] = useState('');
   const [due, setDue] = useState(addDays(today, 30));
   const [email, setEmail] = useState(false);
+  const vendors = useBuildingStore(s => s.vendors);
+  const [payer, setPayer] = useState('');
+  const [payerEmail, setPayerEmail] = useState('');
   const every = who === EVERY;
+  const outside = who === OUTSIDE;
   const n = Number(amount);
-  const parts = !Number.isFinite(n) || n <= 0 ? [] : every ? splitCharge(units, n, how) : who ? [{ unit: who, amount: n }] : [];
+  const parts = !Number.isFinite(n) || n <= 0 ? [] : every ? splitCharge(units, n, how) : outside ? (payer.trim() ? [{ unit: '', amount: n }] : []) : who ? [{ unit: who, amount: n }] : [];
+  // A vendor picked by name brings its email along.
+  const namePayer = (name: string) => {
+    setPayer(name);
+    const v = vendors.find(x => x.name.toLowerCase() === name.trim().toLowerCase());
+    if (v?.email) setPayerEmail(v.email);
+  };
+  const canEmail = !outside || /\S+@\S+\.\S+/.test(payerEmail);
   const total = parts.reduce((t, p) => t + p.amount, 0);
   const lo = Math.min(...parts.map(p => p.amount));
   const hi = Math.max(...parts.map(p => p.amount));
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!parts.length || !due) return;
-    onDone(createCharges({ parts, type, fund, description: desc.trim() || CHARGE_LABEL[type], dueDate: due }), email);
+    const kind: ChargeType = outside ? 'other' : type;
+    onDone(createCharges({ parts, type: kind, fund, description: desc.trim() || CHARGE_LABEL[kind], dueDate: due, payer: outside ? { name: payer.trim(), email: payerEmail.trim() } : undefined }), email && canEmail);
     onClose();
   };
   return (
     <form aria-label="New invoice" onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <div className="w-full text-sm font-semibold text-ux2-ink">New invoice · fee, assessment, repair or amenity</div>
-      <Field label="Unit" className="w-[170px]">
-        <select value={who} onChange={e => setWho(e.target.value)} className={INPUT}>
+      <Field label="Bill to" className="w-[250px]">
+        <select value={who} onChange={e => { setWho(e.target.value); if (e.target.value === OUTSIDE) setEmail(true); }} className={INPUT}>
           {units.map(u => <option key={u.number} value={u.number}>{u.number} · {u.owner}</option>)}
           {units.length > 1 && <option value={EVERY}>Every unit · {units.length}</option>}
+          <option value={OUTSIDE}>Someone else · vendor or outside party</option>
         </select>
       </Field>
-      <Field label="Type" className="w-[200px]"><select value={type} onChange={e => setType(e.target.value as ChargeType)} className={INPUT}><option value="fee">Fee or repair charge</option><option value="special_assessment">Special assessment</option><option value="amenity_fee">Amenity fee</option><option value="monthly">Dues</option></select></Field>
-      {type === 'special_assessment' && <Field label="For" className="w-[200px]"><select aria-label="Assessment fund" value={fund} onChange={e => setFund(e.target.value as 'reserve' | 'operating')} className={INPUT}><option value="reserve">A major repair · reserve fund</option><option value="operating">An operating shortfall</option></select></Field>}
+      {outside && (
+        <>
+          <Field label="Name" className="w-[200px]">
+            <input list="invoice-payers" value={payer} onChange={e => namePayer(e.target.value)} placeholder="Vendor, insurer, contractor" className={INPUT} />
+            <datalist id="invoice-payers">{vendors.map(v => <option key={v.id} value={v.name} />)}</datalist>
+          </Field>
+          <Field label="Email" className="w-[210px]"><input type="email" value={payerEmail} onChange={e => setPayerEmail(e.target.value)} placeholder="billing@example.com" className={INPUT} /></Field>
+        </>
+      )}
+      {!outside && <Field label="Type" className="w-[200px]"><select value={type} onChange={e => setType(e.target.value as ChargeType)} className={INPUT}><option value="fee">Fee or repair charge</option><option value="special_assessment">Special assessment</option><option value="amenity_fee">Amenity fee</option><option value="monthly">Dues</option></select></Field>}
+      {!outside && type === 'special_assessment' && <Field label="For" className="w-[200px]"><select aria-label="Assessment fund" value={fund} onChange={e => setFund(e.target.value as 'reserve' | 'operating')} className={INPUT}><option value="reserve">A major repair · reserve fund</option><option value="operating">An operating shortfall</option></select></Field>}
       {every && (
         <Field label="Split" className="w-[190px]">
           <select aria-label="How to split" value={how} onChange={e => setHow(e.target.value as SplitHow)} className={INPUT}>
@@ -136,17 +162,20 @@ function ChargeForm({ units, today, unit: start, type: startType = 'fee', stripe
         </Field>
       )}
       <Field label={every && how !== 'each' ? 'Total to split' : 'Amount'} className="w-[130px]"><input inputMode="decimal" placeholder="$" value={amount} onChange={e => setAmount(e.target.value)} className={INPUT} /></Field>
-      <Field label="What for" className="min-w-[180px] flex-1"><input value={desc} onChange={e => setDesc(e.target.value)} placeholder={PLACEHOLDER[type]} className={INPUT} /></Field>
+      <Field label="What for" className="min-w-[180px] flex-1"><input value={desc} onChange={e => setDesc(e.target.value)} placeholder={PLACEHOLDER[outside ? 'other' : type]} className={INPUT} /></Field>
       <Field label="Due" className="w-[150px]"><input type="date" required value={due} onChange={e => setDue(e.target.value)} className={INPUT} /></Field>
       <div className="flex gap-2"><Button type="submit" size="sm" disabled={!parts.length || !due}>{every && parts.length ? `Create ${parts.length}` : 'Create'}</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
       <div className="flex w-full flex-col gap-1.5 text-xs text-ux2-muted">
         {every && parts.length > 0 && <span><b className="font-semibold text-ux2-ink">{parts.length} invoices · {fmt(total)} in all</b> · {lo === hi ? `${fmt(lo)} each` : `${fmt(lo)} to ${fmt(hi)} a unit`}{how === 'share' ? ', by each unit\u2019s percentage interest' : ''}</span>}
         {!due ? <span className="font-semibold text-ux2-red-ink">A due date is needed: it is the date the charge is tracked against.</span>
           : due < today ? <span className="font-semibold text-ux2-red-ink">{dayLabel(due)} has passed: this charge will show as overdue as soon as it is created.</span>
+          : outside ? <span>Due {dayLabel(due)}. This invoice is not on any unit: it posts to Other Receivables and Other Income, and shows as overdue after that date.</span>
           : <span>Due {dayLabel(due)}. Until then the unit is not behind; after it, the charge is past due.</span>}
         <label className="flex cursor-pointer items-start gap-2 text-ux2-ink">
-          <input type="checkbox" checked={email} onChange={e => setEmail(e.target.checked)} className="mt-0.5" />
-          <span>Email the invoice to the owner{every ? 's' : ''} now <span className="text-ux2-muted">· the email names the building and unit, the invoice number, what it is for, the amount and the due date{stripe ? ', with a Pay button' : '; a Pay button is added once Stripe is connected'}. Left unticked, nothing is sent: the owner sees the charge under My Unit, and you can email it later from the invoice's menu.</span></span>
+          <input type="checkbox" checked={email && canEmail} disabled={!canEmail} onChange={e => setEmail(e.target.checked)} className="mt-0.5" />
+          {outside
+            ? <span>Email the invoice to {payer.trim() || 'them'} now <span className="text-ux2-muted">· {canEmail ? `the email names the building, the invoice number, what it is for, the amount and the due date${stripe ? ', with a Pay button they can use without an account' : '; a Pay button is added once Stripe is connected, until then it asks them to contact the board'}.` : 'add their email address to send it.'} They have no login, so the email is how they receive it; you can send it again from the invoice's menu.</span></span>
+            : <span>Email the invoice to the owner{every ? 's' : ''} now <span className="text-ux2-muted">· the email names the building and unit, the invoice number, what it is for, the amount and the due date{stripe ? ', with a Pay button' : '; a Pay button is added once Stripe is connected'}. Left unticked, nothing is sent: the owner sees the charge under My Unit, and you can email it later from the invoice's menu.</span></span>}
         </label>
       </div>
     </form>
@@ -297,17 +326,18 @@ function InvoicesCard({ snap, onLedger, creating, setCreating, onDone, onEmail }
   const payUnitInvoice = useFinancialStore(s => s.payUnitInvoice);
   const voidUnitInvoice = useFinancialStore(s => s.voidUnitInvoice);
   const month = snap.today.slice(0, 7);
-  const live = useMemo(() => snap.unitInvoices.filter(i => i.status !== 'void').sort((a, b) => b.createdDate.localeCompare(a.createdDate)), [snap.unitInvoices]);
+  // Newest first; among invoices of the same day, the one made last leads, so a new invoice is always on top.
+  const live = useMemo(() => snap.unitInvoices.filter(i => i.status !== 'void').reverse().sort((a, b) => b.createdDate.localeCompare(a.createdDate)), [snap.unitInvoices]);
   const thisMonth = live.filter(i => i.createdDate.startsWith(month));
   const counts = { all: live.length, open: live.filter(i => i.status !== 'paid').length, paid: live.filter(i => i.status === 'paid').length, dues: live.filter(i => i.type === 'monthly').length, fees: live.filter(i => i.type !== 'monthly').length };
   const rows = live.filter(i => filter === 'all' ? true : filter === 'open' ? i.status !== 'paid' : filter === 'paid' ? i.status === 'paid' : filter === 'dues' ? i.type === 'monthly' : i.type !== 'monthly');
   const shown = all ? rows : rows.slice(0, 8);
   const owner = (n: string) => snap.units.find(u => u.number === n)?.owner ?? '';
-  const typeLabel: Record<UnitInvoice['type'], string> = { monthly: 'Dues', special_assessment: 'Special assessment', fee: 'Fee', amenity_fee: 'Amenity fee' };
+  const typeLabel: Record<UnitInvoice['type'], string> = { monthly: 'Dues', special_assessment: 'Special assessment', fee: 'Fee', amenity_fee: 'Amenity fee', other: 'Outside invoice' };
   return (
     <Card aria-label="Invoices" id="invoices">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Invoices</h2><span className="text-[13px] text-ux2-muted">{thisMonth.length} this month · every charge to a unit is recorded here, one row per charge</span></div>
+        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Invoices</h2><span className="text-[13px] text-ux2-muted">{thisMonth.length} this month · every charge to a unit, and every invoice to a vendor or outside party, one row each</span></div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <PillTabs size="filter" surface="white" aria-label="Filter invoices" value={filter} onChange={setFilter} tabs={[{ id: 'all', label: `All · ${counts.all}` }, { id: 'open', label: `Open · ${counts.open}` }, { id: 'paid', label: `Paid · ${counts.paid}` }, { id: 'dues', label: `Dues · ${counts.dues}` }, { id: 'fees', label: `Fees and charges · ${counts.fees}` }]} />
           <Button size="sm" className="h-9" onClick={() => setCreating(true)}>New invoice</Button>
@@ -316,12 +346,12 @@ function InvoicesCard({ snap, onLedger, creating, setCreating, onDone, onEmail }
       {creating && <ChargeForm units={snap.units} today={snap.today} stripe={snap.stripeOnboardingComplete} onClose={() => setCreating(false)} onDone={onDone} />}
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">No invoices here.</Inner> : (
         <Table>
-          <thead><tr><Th>Invoice</Th><Th>Unit</Th><Th>What for</Th><Th>Issued</Th><Th>Due</Th><Th num>Amount</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
+          <thead><tr><Th>Invoice</Th><Th>Billed to</Th><Th>What for</Th><Th>Issued</Th><Th>Due</Th><Th num>Amount</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
           <tbody>
             {shown.map(i => (
               <tr key={i.id}>
                 <Td className="font-semibold">{i.id}</Td>
-                <Td>{i.unitNumber}{owner(i.unitNumber) ? <span className="text-ux2-muted"> · {owner(i.unitNumber)}</span> : null}</Td>
+                <Td>{i.unitNumber || i.payerName || 'Outside party'}{i.unitNumber ? (owner(i.unitNumber) ? <span className="text-ux2-muted"> · {owner(i.unitNumber)}</span> : null) : <span className="text-ux2-muted"> · {i.payerEmail || 'no email'}</span>}</Td>
                 <Td>{typeLabel[i.type]}<span className="text-ux2-muted"> · {i.description}</span></Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{dayLabel(i.createdDate)}</Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{i.dueDate ? dayLabel(i.dueDate) : '–'}</Td>
@@ -329,8 +359,8 @@ function InvoicesCard({ snap, onLedger, creating, setCreating, onDone, onEmail }
                 <Td>{invoiceStatus(i, snap.today)}</Td>
                 <Td num>
                   <RowMenu label={`More for ${i.id}`} items={[
-                    ...(i.status !== 'paid' ? [{ label: 'Email it to the owner', onSelect: () => onEmail(i) }, { label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
-                    { label: 'Open the unit ledger', onSelect: onLedger },
+                    ...(i.status !== 'paid' ? [{ label: i.unitNumber ? 'Email it to the owner' : `Email it to ${i.payerName || 'the payer'}`, onSelect: () => onEmail(i) }, { label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
+                    ...(i.unitNumber ? [{ label: 'Open the unit ledger', onSelect: onLedger }] : []),
                   ]} />
                 </Td>
               </tr>
@@ -338,7 +368,7 @@ function InvoicesCard({ snap, onLedger, creating, setCreating, onDone, onEmail }
           </tbody>
         </Table>
       )}
-      <Why>Dues invoices are created by the billing run on the 1st, due on the {ordinal(snap.hoaDueDay)}; fees, special assessments, repair charges and amenity bookings are created here, from a unit's row menu in the ledger, or by their runbook, each with its own due date. Creating a charge emails no one unless you tick the box; Email it to the owner sends the invoice number, what it is for, the amount and the due date, with a Pay button when Stripe is connected. Every charge raises the unit's balance; a payment from the unit ledger settles dues first, then special assessments, then fees, oldest first. Cancelling a charge reverses it in the ledger; a paid charge is refunded under Online payments.</Why>
+      <Why>Dues invoices are created by the billing run on the 1st, due on the {ordinal(snap.hoaDueDay)}; fees, special assessments, repair charges and amenity bookings are created here, from a unit's row menu in the ledger, or by their runbook, each with its own due date. Creating a charge emails no one unless you tick the box; Email it to the owner sends the invoice number, what it is for, the amount and the due date, with a Pay button when Stripe is connected. An invoice to a vendor or outside party (Bill to › Someone else) is on no unit: it is owed under Other Receivables and paid by its emailed Pay button or recorded here. Every charge to a unit raises the unit's balance; a payment from the unit ledger settles dues first, then special assessments, then fees, oldest first. Cancelling a charge reverses it in the ledger; a paid charge is refunded under Online payments.</Why>
       {rows.length > 8 && <Button size="sm" variant="ghost" className="self-start" onClick={() => setAll(v => !v)}>{all ? 'Show fewer' : `Show the other ${rows.length - 8}`}</Button>}
     </Card>
   );
@@ -364,12 +394,12 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   const charged = (made: UnitInvoice[], email: boolean) => {
     if (!made.length) return;
     const lead = made.length === 1
-      ? `${CHARGE_LABEL[made[0].type]} of ${fmt(made[0].amount)} on unit ${made[0].unitNumber} created, due ${dayLabel(made[0].dueDate)}.`
+      ? `${CHARGE_LABEL[made[0].type]} of ${fmt(made[0].amount)} ${made[0].unitNumber ? 'on' : 'to'} ${billedToLabel(made[0])} created, due ${dayLabel(made[0].dueDate)}.`
       : `${made.length} ${CHARGE_LABEL[made[0].type].toLowerCase()} invoices created, ${fmt(made.reduce((t, i) => t + i.amount, 0))} in all, due ${dayLabel(made[0].dueDate)}.`;
     if (email) send(made.map(i => i.id), lead);
     else setNotice(`${lead} No email was sent.`);
   };
-  const emailOne = (i: UnitInvoice) => send([i.id], `${i.id} · unit ${i.unitNumber}.`);
+  const emailOne = (i: UnitInvoice) => send([i.id], `${i.id} · ${billedToLabel(i)}.`);
 
   const sections: TileSection<Section>[] = [
     {
@@ -446,7 +476,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
               <div className="rounded-xl border border-ux2-line bg-white px-3 py-2"><div className="text-[11px] text-ux2-muted"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-ux2-navy" />Paid</div><div className="text-[15px] font-semibold">{inv.paid} · {fmt(inv.paidAmount)}</div></div>
               <div className="rounded-xl border border-ux2-line bg-white px-3 py-2"><div className="text-[11px] text-ux2-muted"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-ux2-red" />Open</div><div className="text-[15px] font-semibold">{inv.open} · {fmt(inv.openAmount)}</div></div>
             </div>
-            <div className="text-xs text-ux2-muted">{inv.byType.monthly} dues · {inv.byType.special_assessment} special assessment · {inv.byType.fee} fee{inv.byType.fee === 1 ? '' : 's'} · {inv.byType.amenity_fee} amenity</div>
+            <div className="text-xs text-ux2-muted">{inv.byType.monthly} dues · {inv.byType.special_assessment} special assessment · {inv.byType.fee} fee{inv.byType.fee === 1 ? '' : 's'} · {inv.byType.amenity_fee} amenity{inv.byType.other ? ` · ${inv.byType.other} outside` : ''}</div>
           </>
         ),
         action: <><span className="min-w-0 truncate"><b className="font-semibold">New invoice</b> · fee, assessment, repair or amenity</span><button type="button" onClick={e => { e.stopPropagation(); setCreating(true); onSection('invoices'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Create</button></>,

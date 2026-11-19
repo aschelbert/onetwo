@@ -214,3 +214,39 @@ describe('refundUnitInvoice', () => {
     expect(st().refundCredit(unitNum, 10, 'again')).toBeNull();
   });
 });
+
+// ── Invoices to vendors and outside parties ─────────────────────────
+
+describe('createPayerInvoice', () => {
+  const acct = (num: string) => st().acctBalance(num);
+
+  it('bills someone who is not a unit: other receivables and other income, no unit touched', () => {
+    const before = st().units.map(u => u.balance);
+    const inv = st().createPayerInvoice({ name: 'Metro Elevator Co', email: 'ar@metro.example' }, 1200, 'Damage to the lobby door', '2099-03-01');
+    expect(inv).toMatchObject({ type: 'other', unitNumber: '', payerName: 'Metro Elevator Co', payerEmail: 'ar@metro.example', amount: 1200, status: 'sent', dueDate: '2099-03-01' });
+    expect(acct('1150')).toBe(1200);
+    expect(acct('4090')).toBe(1200);
+    expect(st().units.map(u => u.balance)).toEqual(before);
+    expect(st().getBalanceSheet().assets.otherAR).toBe(1200);
+    expect(st().getBalanceSheet().assets.totalReceivable).toBe(1200);
+  });
+
+  it('is paid and cancelled like any invoice, without a unit', () => {
+    const inv = st().createPayerInvoice({ name: 'Acme Insurance' }, 500, 'Claim deductible', '2099-03-01');
+    st().payUnitInvoice(inv.id, 'check', { amount: 200 });
+    expect(st().unitInvoices.find(i => i.id === inv.id)).toMatchObject({ status: 'sent', paidAmount: 200 });
+    expect(acct('1150')).toBe(300);
+    expect(acct('1010')).toBe(200);
+    st().voidUnitInvoice(inv.id, 'Settled for less');
+    expect(st().unitInvoices.find(i => i.id === inv.id)!.status).toBe('void');
+    expect(acct('1150')).toBe(0);
+    expect(acct('4090')).toBe(200);
+  });
+
+  it('adds the Other Receivables account to a chart that predates it', () => {
+    useFinancialStore.setState({ chartOfAccounts: seedChartOfAccounts.filter(a => a.num !== '1150') });
+    st().createPayerInvoice({ name: 'Acme Insurance' }, 75, 'Key fob', '2099-03-01');
+    expect(st().chartOfAccounts.find(a => a.num === '1150')).toMatchObject({ type: 'asset', sub: 'receivable', parent: '1100' });
+    expect(acct('1150')).toBe(75);
+  });
+});

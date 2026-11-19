@@ -48,6 +48,8 @@ const MAPPING_LABELS: { key: string; label: string; types: string[] }[] = [
   { key: 'specialAssessmentRevenue', label: 'Special assessment income', types: ['income'] },
   { key: 'lateFeeRevenue', label: 'Late fee income', types: ['income'] },
   { key: 'amenityRevenue', label: 'Amenity fees', types: ['income'] },
+  { key: 'otherReceivable', label: 'Owed by vendors and outside parties', types: ['asset'] },
+  { key: 'otherRevenue', label: 'Income from outside invoices', types: ['income'] },
 ];
 type QuickKind = 'vendor' | 'refund' | 'toReserves' | 'fromReserves' | 'claim' | 'otherIncome' | 'custom';
 const QUICK: { id: QuickKind; label: string }[] = [
