@@ -278,6 +278,11 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
             ].map(([how, note, cost]) => (
               <Inner key={how} className="flex items-center justify-between gap-3"><Cell title={how} note={note} /><Chip tone={/Free/.test(cost) ? 'sage' : 'amber'}>{cost}</Chip></Inner>
             ))}
+            <SectionLabel className="mt-1">Mail vendor</SectionLabel>
+            <Inner data-mail-vendor className="flex flex-wrap items-center justify-between gap-3">
+              <Cell title={settings.mailConnected && settings.mailProvider ? mailProviderLabel(settings) : 'No mail vendor connected'} note={settings.mailConnected && settings.mailProvider ? "The building's own account · billed by the vendor per letter" : 'Connect DocuPost or LetterStream so certified mail prints and mails itself'} />
+              <Button size="sm" variant="ghost" onClick={() => navigate('/funds?tab=settings&section=mailing')}>{settings.mailConnected && settings.mailProvider ? 'Manage vendor' : 'Choose a vendor'}</Button>
+            </Inner>
             <SectionLabel className="mt-1">Who it goes to</SectionLabel>
             <div className="flex flex-wrap gap-1.5"><Chip tone="navy">All owners · {units.length}</Chip><Chip tone="ghost">Board · {board.length}</Chip><Chip tone="ghost">One unit</Chip></div>
             <Why>A letter can use more than one method. Notices to all owners go in-app and by email; the {Math.max(0, units.length - reachable)} owner{units.length - reachable === 1 ? '' : 's'} without email get print and mail on their own. {METHOD_NOTE.certified ? '' : ''}</Why>

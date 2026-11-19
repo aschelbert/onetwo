@@ -31,6 +31,10 @@ export interface MailProviderInfo {
   trackingHint: string;
   /** Where in the vendor's site the balance is shown. */
   balanceHint: string;
+  /** First local day (YYYY-MM-DD) a building can pick the vendor; open already when absent. */
+  availableFrom?: string;
+  /** Shown on the picker until that day. */
+  comingLabel?: string;
 }
 
 export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
@@ -66,10 +70,24 @@ export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
     receiptNote: "The signed return receipt is kept in the building's LetterStream account.",
     trackingHint: 'the job in the LetterStream account',
     balanceHint: 'My Account',
+    availableFrom: '2026-12-01',
+    comingLabel: 'Coming Dec 1, 2026',
   },
 };
 
 export const DEFAULT_MAIL_PROVIDER: MailProviderId = 'docupost';
+
+/** Whether a building can pick the vendor yet. A vendor with a start day opens at local midnight on it. */
+export const isMailProviderAvailable = (id: MailProviderId, now: Date = new Date()): boolean => {
+  const from = MAIL_PROVIDERS[id].availableFrom;
+  if (!from) return true;
+  const [y, m, d] = from.split('-').map(Number);
+  return now.getTime() >= new Date(y, m - 1, d).getTime();
+};
+
+/** The vendor a picker starts on: the saved one if it is connected or open, otherwise the default. */
+export const initialMailProvider = (s: { mailProvider: MailProviderId | ''; mailConnected: boolean }): MailProviderId =>
+  s.mailProvider && (s.mailConnected || isMailProviderAvailable(s.mailProvider)) ? s.mailProvider : DEFAULT_MAIL_PROVIDER;
 
 export type MailDeliveryMethod =
   | 'first-class'
