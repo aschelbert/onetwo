@@ -54,6 +54,10 @@ export interface ProviderInfo {
   needsPdfUrl: boolean;
   /** Whether jobStatus() can ask the vendor. */
   hasStatusApi: boolean;
+  /** The instant new buildings can connect the vendor; open already when absent. */
+  availableFrom?: string;
+  /** How that day is named to the board. */
+  availableFromLabel?: string;
 }
 
 export const PROVIDER_INFO: Record<MailProviderId, ProviderInfo> = {
@@ -74,6 +78,9 @@ export const PROVIDER_INFO: Record<MailProviderId, ProviderInfo> = {
     credentials: ["apiId", "apiKey"],
     needsPdfUrl: false,
     hasStatusApi: true,
+    // Midnight US Eastern on Dec 1, 2026. The app's pickers (src/types/mail.ts) open on the same day.
+    availableFrom: "2026-12-01T05:00:00Z",
+    availableFromLabel: "Dec 1, 2026",
   },
 };
 
@@ -86,6 +93,12 @@ export const PROVIDER_INFO: Record<MailProviderId, ProviderInfo> = {
 export function actualDeliveryMethod(provider: MailProviderId, method: DeliveryMethod): DeliveryMethod {
   if (provider === "docupost" && method === "certified-return-receipt") return "certified-electronic-return-receipt";
   return method;
+}
+
+/** Whether a building can newly connect the vendor yet. */
+export function providerIsOpen(provider: MailProviderId, now: Date = new Date()): boolean {
+  const from = PROVIDER_INFO[provider].availableFrom;
+  return !from || now.getTime() >= Date.parse(from);
 }
 
 export type VerifyResult =

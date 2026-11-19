@@ -31,7 +31,7 @@ export interface MailProviderInfo {
   trackingHint: string;
   /** Where in the vendor's site the balance is shown. */
   balanceHint: string;
-  /** First local day (YYYY-MM-DD) a building can pick the vendor; open already when absent. */
+  /** First local day (YYYY-MM-DD) a building can pick the vendor; open already when absent. The server enforces the same day (supabase/functions/_shared/mailProvider.ts). */
   availableFrom?: string;
   /** Shown on the picker until that day. */
   comingLabel?: string;
