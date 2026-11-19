@@ -14,10 +14,10 @@
 // carries no news, and only asks for the click that proves the inbox's owner
 // agreed. Nothing more is sent to the address unless they confirm.
 
+import { emailConfigured, isTemporary, sendEmail } from "../_shared/email.ts";
+
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = (Deno.env.get("SITE_URL") || "https://app.getonetwo.com").replace(/\/+$/, "");
 
 const json = (data: unknown, status = 200) =>
@@ -76,32 +76,20 @@ function message(email: string, token: string) {
     `<p>If you didn't ask, ignore this email. You won't get product emails, and we won't ask again for at least a day.</p>` +
     `<p style="font-size:12px;color:#5F6C7B">The link works for 7 days. Emails about your account and building, such as invoices, notices and password resets, are not affected.</p>` +
     `</div>`;
-  return {
-    From: { Email: "noreply@getonetwo.com", Name: "ONE two" },
-    To: [{ Email: email }],
-    Subject: "Confirm ONE two product emails",
-    TextPart: text,
-    HTMLPart: html,
-  };
+  return { fromName: "ONE two", to: { email }, subject: "Confirm ONE two product emails", text, html };
 }
 
-/** "sent"; "retry" for an outage (5xx, 429, network); "rejected" when Mailjet refuses this message for good (e.g. an invalid address). */
+/** "sent"; "retry" for an outage or an account-wide refusal; "rejected" when the provider refuses this message for good (e.g. an invalid address). */
 async function send(email: string, token: string): Promise<"sent" | "retry" | "rejected"> {
-  const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
-    method: "POST",
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ Messages: [message(email, token)] }),
-  });
+  const res = await sendEmail(message(email, token));
   if (res.ok) return "sent";
-  console.error("Mailjet error:", res.status, (await res.text()).slice(0, 300));
-  return res.status >= 500 || res.status === 429 ? "retry" : "rejected";
+  return isTemporary(res) ? "retry" : "rejected";
 }
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   if (!(await authorized(req))) return json({ error: "Unauthorized" }, 401);
-  if (!MJ_API_KEY || !MJ_SECRET_KEY) return json({ error: "Mailjet is not configured" }, 500);
+  if (!emailConfigured()) return json({ error: "Email is not configured" }, 500);
 
   let batch: { token: string; email: string }[];
   try {

@@ -993,7 +993,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
           <label className="flex items-start gap-3 bg-accent-50 border border-accent-200 rounded-xl p-4 cursor-pointer hover:bg-accent-100 transition-colors">
             <input type="checkbox" checked={mForm.sendNotice} onChange={e => setMForm({ ...mForm, sendNotice: e.target.checked })} className="h-4 w-4 mt-0.5 accent-accent-600" />
             <div><span className="text-xs font-semibold text-accent-800">📧 Send meeting notice to all members</span>
-              <p className="text-[11px] text-accent-600 mt-0.5">Emails {buildingMembers.filter(m => m.email && m.status === 'active').length} active members with meeting details, agenda, and virtual link via Mailjet.</p>
+              <p className="text-[11px] text-accent-600 mt-0.5">Emails {buildingMembers.filter(m => m.email && m.status === 'active').length} active members with meeting details, agenda, and virtual link.</p>
             </div>
           </label>
         )}
@@ -1108,7 +1108,7 @@ export default function BoardRoomPage({ embedded, tab: forcedTab }: { embedded?:
           <div className="border-t border-ink-100 pt-3 mt-1">
             <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={f('annSendEmail') === 'true'} onChange={e => sf('annSendEmail', e.target.checked ? 'true' : 'false')} className="h-4 w-4 accent-accent-600 rounded" /><span className="text-sm text-ink-700">✉️ Also send via email</span><span className="text-[10px] text-ink-400">(to all building members)</span></label>
             {f('annSendEmail') === 'true' && (
-              <p className="text-[11px] text-ink-400 mt-1.5 ml-6">This announcement will be emailed to {buildingMembers.filter(m => m.email && m.status === 'active').length} active members via Mailjet.</p>
+              <p className="text-[11px] text-ink-400 mt-1.5 ml-6">This announcement will be emailed to {buildingMembers.filter(m => m.email && m.status === 'active').length} active members.</p>
             )}
           </div>
         </div>

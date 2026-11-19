@@ -98,6 +98,7 @@ supabase secrets set \
   STRIPE_SECRET_KEY=sk_test_YOUR_KEY \
   STRIPE_WEBHOOK_SECRET=whsec_YOUR_SECRET \
   SITE_URL=https://app.getonetwo.com \
+  BREVO_API_KEY=xkeysib-YOUR_KEY \
   GOVOPS_SUPABASE_URL=https://YOUR_GOVOPS_PROJECT_REF.supabase.co \
   GOVOPS_SUPABASE_SERVICE_ROLE_KEY=YOUR_GOVOPS_SERVICE_KEY \
   OPENAI_ADS_API_KEY=YOUR_OPENAI_ADS_CONVERSIONS_API_KEY \
@@ -108,6 +109,11 @@ supabase functions deploy create-hosted-page
 supabase functions deploy chargebee-webhook --no-verify-jwt
 supabase functions deploy provision-tenant
 ```
+
+> Email is sent through Brevo by `supabase/functions/_shared/email.ts`, from
+> `noreply@getonetwo.com`. In Brevo, leave "Block unknown IP addresses" off for API
+> keys (Security > Authorized IPs): edge functions have no fixed outbound address.
+> Redeploy every function that sends email after changing the shared file.
 
 > `chargebee-webhook` and `stripe-webhook` must be deployed **without** JWT
 > verification (`supabase/config.toml` sets `verify_jwt = false` for both, and
@@ -259,7 +265,7 @@ the board is told exactly once:
    `CRON_SECRET` function secret, which overrides it) in an `x-cron-secret` header.
 
 On verification the board member who connected (or every board member, if unknown)
-gets a confirmation email through Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`),
+gets a confirmation email through Brevo (`BREVO_API_KEY`),
 and a pinned "Pay online or set up autopay" announcement is posted for owners.
 
 ```bash
@@ -278,8 +284,7 @@ confirmation email per address per day; links last 7 days.
 
 The migration stores a `marketing_confirm_cron_secret` in Vault and schedules
 `onetwo-marketing-confirmations` every minute; it calls the edge function only when a
-confirmation is waiting. The function sends through Mailjet (`MAILJET_API_KEY`,
-`MAILJET_SECRET_KEY`) and must be deployed without JWT verification:
+confirmation is waiting. The function sends through Brevo (`BREVO_API_KEY`) and must be deployed without JWT verification:
 
 ```bash
 supabase functions deploy send-marketing-confirmations --no-verify-jwt

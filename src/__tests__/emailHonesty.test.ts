@@ -1,6 +1,6 @@
 /**
- * Emails the app sends say what really happened. A function without Mailjet
- * keys answers 200 with success: false, which is reported as email not being
+ * Emails the app sends say what really happened. A function without the Brevo
+ * key answers 200 with success: false, which is reported as email not being
  * set up, never as sent. A meeting notice is posted in-app and logged either
  * way, and the note says whether it was emailed.
  */
@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('callEmailFunction', () => {
   it('reports email not set up, sent counts, partial sends and missing functions honestly', async () => {
-    respond(200, { success: false, error: 'Email not configured — Mailjet credentials missing' });
+    respond(200, { success: false, error: 'Email not configured — provider credentials missing' });
     expect(await callEmailFunction('send-announcement', {})).toEqual({ sent: 0, reason: EMAIL_NOT_SET_UP });
     respond(200, { success: true, sent: 12, total: 12 });
     expect(await callEmailFunction('send-meeting-notice', {})).toEqual({ sent: 12 });

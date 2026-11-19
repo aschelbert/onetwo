@@ -1,6 +1,6 @@
 // supabase/functions/contact-form/index.ts
 // The "Contact" panel on getonetwo.com posts here. Two emails go out through
-// Mailjet: the message to the team inbox, and a short confirmation to the
+// the email provider: the message to the team inbox, and a short confirmation to the
 // sender.
 //
 // The team inbox is the CONTACT_INBOX secret. It lives only on the server: it
@@ -13,15 +13,15 @@
 // what the sender typed, so the form can't be used to mail arbitrary text to
 // someone else's address.
 
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
+import { emailConfigured, sendEmail } from "../_shared/email.ts";
+
 const INBOX = Deno.env.get("CONTACT_INBOX") || "";
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const IP_SALT = Deno.env.get("CONTACT_IP_SALT") || SB_SERVICE_KEY.slice(-16);
 
 const PUBLIC_REPLY_TO = "hello@getonetwo.com";
-const FROM = { Email: "noreply@getonetwo.com", Name: "ONE two" };
+const FROM_NAME = "ONE two";
 
 const TOPICS: Record<string, string> = {
   demo: "See a demo",
@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
   if (message.length > MAX_MESSAGE) fieldErrors.message = `Keep it under ${MAX_MESSAGE} characters.`;
   if (Object.keys(fieldErrors).length) return reply(req, { ok: false, fieldErrors }, 422);
 
-  if (!MJ_API_KEY || !MJ_SECRET_KEY || !INBOX || !SB_URL || !SB_SERVICE_KEY) {
-    console.error("contact-form is not configured: needs MAILJET_API_KEY, MAILJET_SECRET_KEY, CONTACT_INBOX");
+  if (!emailConfigured() || !INBOX || !SB_URL || !SB_SERVICE_KEY) {
+    console.error("contact-form is not configured: needs BREVO_API_KEY, CONTACT_INBOX");
     return reply(req, { ok: false, error: "unavailable" }, 503);
   }
 
@@ -170,36 +170,28 @@ Deno.serve(async (req) => {
   <p style="font-size:15px;line-height:1.6;margin:0 0 12px">Thanks for writing to ONE two about <strong>${esc(topic.toLowerCase())}</strong>. A person will reply within one business day.</p>
   <p style="font-size:15px;line-height:1.6;margin:0">If you need to add anything, just reply to this email.</p>`);
 
-  const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
-    method: "POST",
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      Messages: [
-        {
-          From: FROM,
-          To: [{ Email: INBOX }],
-          ReplyTo: { Email: email },
-          Subject: `Contact: ${topic} (${email})`,
-          TextPart: `New contact message\nFrom: ${email}\nTopic: ${topic}\n\n${message}`,
-          HTMLPart: internalHtml,
-        },
-        {
-          From: FROM,
-          To: [{ Email: email }],
-          ReplyTo: { Email: PUBLIC_REPLY_TO },
-          Subject: "We got your message",
-          TextPart: `Thanks for writing to ONE two about ${topic.toLowerCase()}. A person will reply within one business day.\n\nIf you need to add anything, just reply to this email.\n\nONE two · Washington, DC`,
-          HTMLPart: confirmHtml,
-        },
-      ],
-    }),
+  // The team's copy decides whether the form worked; the sender's confirmation is a courtesy.
+  const res = await sendEmail({
+    fromName: FROM_NAME,
+    to: { email: INBOX },
+    replyTo: { email },
+    subject: `Contact: ${topic} (${email})`,
+    text: `New contact message\nFrom: ${email}\nTopic: ${topic}\n\n${message}`,
+    html: internalHtml,
   });
 
   if (!res.ok) {
-    console.error("Mailjet error:", res.status, (await res.text()).slice(0, 300));
     return reply(req, { ok: false, error: "send_failed" }, 502);
   }
+
+  await sendEmail({
+    fromName: FROM_NAME,
+    to: { email },
+    replyTo: { email: PUBLIC_REPLY_TO },
+    subject: "We got your message",
+    text: `Thanks for writing to ONE two about ${topic.toLowerCase()}. A person will reply within one business day.\n\nIf you need to add anything, just reply to this email.\n\nONE two · Washington, DC`,
+    html: confirmHtml,
+  });
 
   if (id) await markDelivered(id);
   return reply(req, { ok: true });
