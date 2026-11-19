@@ -2,16 +2,66 @@
 // Sends an internal notification email to the CONTACT_INBOX secret when someone
 // signs up for the demo or a new building is provisioned.
 // Fire-and-forget from client — failures logged but don't block UX.
+//
+// Public by design: the demo form posts here from a logged-out page. It only
+// ever mails the CONTACT_INBOX secret, never an address from the request, and
+// it defends that inbox itself: a cap per caller and overall per hour (counted
+// in signup_notifications), length limits, and every value from the request
+// escaped before it goes into the email.
 
 const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
 const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const CONTACT_INBOX = Deno.env.get("CONTACT_INBOX") || "";
+const SB_URL = Deno.env.get("SUPABASE_URL") || "";
+const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const IP_SALT = Deno.env.get("CONTACT_IP_SALT") || SB_SERVICE_KEY.slice(-16);
+
+const PER_IP_PER_HOUR = 5;
+const TOTAL_PER_HOUR = 30;
+const MAX_FIELD = 200;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+/** A value from the request as one line of plain text, at most MAX_FIELD long. */
+function field(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/\s+/g, " ").trim().slice(0, MAX_FIELD);
+}
+
+async function sha256(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+const serviceHeaders = { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` };
+
+/** Notifications sent in the last hour, optionally only those matching `filter`. */
+async function recentCount(filter: Record<string, string> = {}): Promise<number> {
+  const url = new URL(`${SB_URL}/rest/v1/signup_notifications`);
+  url.searchParams.set("select", "id");
+  url.searchParams.set("created_at", `gte.${new Date(Date.now() - 3600_000).toISOString()}`);
+  for (const [k, v] of Object.entries(filter)) url.searchParams.set(k, v);
+  const res = await fetch(url, { method: "HEAD", headers: { ...serviceHeaders, Prefer: "count=exact" } });
+  const range = res.headers.get("content-range") || "*/0";
+  return Number(range.split("/")[1]) || 0;
+}
+
+async function recordNotification(type: string, ipHash: string | null): Promise<void> {
+  const res = await fetch(`${SB_URL}/rest/v1/signup_notifications`, {
+    method: "POST",
+    headers: { ...serviceHeaders, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ type, ip_hash: ipHash }),
+  });
+  if (!res.ok) console.error("signup_notifications insert failed:", res.status, (await res.text()).slice(0, 200));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -50,7 +100,12 @@ Deno.serve(async (req) => {
     let detailsText: string;
 
     if (type === "demo") {
-      const { name, email, condo_name, unit_count, member_type, subscription_interest } = body;
+      const name = field(body.name);
+      const email = field(body.email);
+      const condo_name = field(body.condo_name);
+      const unit_count = field(body.unit_count);
+      const member_type = field(body.member_type);
+      const subscription_interest = field(body.subscription_interest);
       if (!name || !email) {
         return new Response(
           JSON.stringify({ error: "Missing required fields for demo notification" }),
@@ -73,17 +128,19 @@ Deno.serve(async (req) => {
       };
 
       detailsHtml = `
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Name</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${name}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;font-weight:600;"><a href="mailto:${email}" style="color:#d62839;">${email}</a></td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Community</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${condo_name || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Units</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${unit_count || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Role</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${memberLabel[member_type] || member_type || "—"}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Tier Interest</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${tierLabel[subscription_interest] || subscription_interest || "—"}</td></tr>`;
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Name</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(name)}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;font-weight:600;"><a href="mailto:${esc(email)}" style="color:#d62839;">${esc(email)}</a></td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Community</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(condo_name || "—")}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Units</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(unit_count || "—")}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Role</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(memberLabel[member_type] || member_type || "—")}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Tier Interest</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(tierLabel[subscription_interest] || subscription_interest || "—")}</td></tr>`;
 
       detailsText = `Name: ${name}\nEmail: ${email}\nCommunity: ${condo_name || "—"}\nUnits: ${unit_count || "—"}\nRole: ${memberLabel[member_type] || member_type || "—"}\nTier Interest: ${tierLabel[subscription_interest] || subscription_interest || "—"}`;
     } else {
       // building — called by chargebee-checkout / provision_tenant
-      const { name, email, plan } = body;
+      const name = field(body.name);
+      const email = field(body.email);
+      const plan = field(body.plan);
       if (!name || !email) {
         return new Response(
           JSON.stringify({ error: "Missing required fields for building notification" }),
@@ -94,11 +151,29 @@ Deno.serve(async (req) => {
       subject = `New building: ${name}`;
 
       detailsHtml = `
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Building</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${name}</td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;font-weight:600;"><a href="mailto:${email}" style="color:#d62839;">${email}</a></td></tr>
-        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Plan</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${plan || "—"}</td></tr>`;
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Building</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(name)}</td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:8px 12px;font-size:13px;font-weight:600;"><a href="mailto:${esc(email)}" style="color:#d62839;">${esc(email)}</a></td></tr>
+        <tr><td style="padding:8px 12px;color:#64748b;font-size:13px;">Plan</td><td style="padding:8px 12px;font-size:13px;font-weight:600;">${esc(plan || "—")}</td></tr>`;
 
       detailsText = `Building: ${name}\nEmail: ${email}\nPlan: ${plan || "—"}`;
+    }
+
+    // Cap what one caller, and everyone together, can send to the inbox in an hour.
+    if (SB_URL && SB_SERVICE_KEY) {
+      const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+      const ipHash = ip ? await sha256(`${IP_SALT}:${ip}`) : null;
+      const [byIp, total] = await Promise.all([
+        ipHash ? recentCount({ ip_hash: `eq.${ipHash}` }) : Promise.resolve(0),
+        recentCount(),
+      ]);
+      if (byIp >= PER_IP_PER_HOUR || total >= TOTAL_PER_HOUR) {
+        console.warn(`notify-signup rate limited (caller ${byIp}, total ${total} in the last hour)`);
+        return new Response(
+          JSON.stringify({ sent: false, error: "rate_limited" }),
+          { status: 429, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
+      await recordNotification(type, ipHash);
     }
 
     const typeLabel = type === "demo" ? "Demo Signup" : "New Building";
