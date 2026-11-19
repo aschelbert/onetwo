@@ -8,6 +8,7 @@ import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Ri
 import { dayLabel } from '../../home/calendar';
 import { ONLINE_METHODS, agingTotals, behind, collected, invoiceSummary, monthName, openAssessments, ordinal, unpaidFees, type BehindUnit, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
+import { emailUnitInvoice } from '@/lib/services/invoicing';
 
 type Section = 'ledger' | 'behind' | 'invoices';
 const SECTIONS: Section[] = ['ledger', 'behind', 'invoices'];
@@ -44,8 +45,40 @@ function LastPayment({ u }: { u: Unit }) {
 
 type Panel = { kind: 'payment' | 'fee' | 'assessment'; unit?: string } | null;
 
+/** What happened to the email for the charge just created. */
+type ChargeNotice = { tone: 'busy' | 'ok' | 'warn'; text: string } | null;
+type OnCharged = (invoice: UnitInvoice) => void;
+
+/** A charge created by hand is emailed to the owner straight away; this reports how that went. */
+function useChargeEmail(): { notice: ChargeNotice; emailCharge: OnCharged; clear: () => void } {
+  const [notice, setNotice] = useState<ChargeNotice>(null);
+  const emailCharge: OnCharged = invoice => {
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.number === invoice.unitNumber);
+    const what = `${fmt(invoice.amount)} charge to Unit ${invoice.unitNumber}`;
+    if (invoice.status === 'paid') { setNotice({ tone: 'ok', text: `${what} recorded and paid from the unit's credit. No invoice was emailed.` }); return; }
+    setNotice({ tone: 'busy', text: `${what} recorded. Emailing the invoice to ${unit?.email || 'the owner'}…` });
+    void emailUnitInvoice(invoice, unit, fin.stripeConnectId, fin.tenantId).then(r => {
+      if (r.sent) setNotice({ tone: r.payLink ? 'ok' : 'warn', text: `${what} recorded. Invoice emailed to ${unit?.email}${r.payLink ? ' with a link to pay online.' : ', but without a link to pay online.'}` });
+      else setNotice({ tone: 'warn', text: `${what} recorded, but the invoice was not emailed: ${r.error}` });
+    });
+  };
+  return { notice, emailCharge, clear: () => setNotice(null) };
+}
+
+function ChargeNoticeLine({ notice, onDismiss }: { notice: ChargeNotice; onDismiss: () => void }) {
+  if (!notice) return null;
+  const tone = notice.tone === 'warn' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-ux2-line bg-ux2-surface text-ux2-ink';
+  return (
+    <div role="status" className={`flex items-start justify-between gap-3 rounded-[14px] border px-3.5 py-2.5 text-[13px] ${tone}`}>
+      <span className="min-w-0">{notice.text}</span>
+      {notice.tone !== 'busy' && <button type="button" onClick={onDismiss} className="shrink-0 font-semibold hover:underline">Dismiss</button>}
+    </div>
+  );
+}
+
 /** The inline forms that replaced the ledger modals: record a payment, add a fee, add a special assessment. */
-function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units: Unit[]; onClose: () => void }) {
+function UnitForm({ panel, units, onClose, onCharged }: { panel: NonNullable<Panel>; units: Unit[]; onClose: () => void; onCharged: OnCharged }) {
   const record = useFinancialStore(s => s.recordUnitPayment);
   const fee = useFinancialStore(s => s.imposeLateFee);
   const assess = useFinancialStore(s => s.addSpecialAssessment);
@@ -59,8 +92,8 @@ function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units:
     const n = Number(amount);
     if (!unit || !Number.isFinite(n) || n <= 0) return;
     if (panel.kind === 'payment') record(unit, n, method);
-    else if (panel.kind === 'fee') fee(unit, n, reason || 'Fee');
-    else assess(unit, n, reason || 'Special assessment');
+    else if (panel.kind === 'fee') onCharged(fee(unit, n, reason || 'Fee'));
+    else onCharged(assess(unit, n, reason || 'Special assessment'));
     onClose();
   };
   return (
@@ -86,7 +119,7 @@ function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units:
         </Field>
       )}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!amount}>{panel.kind === 'payment' ? 'Record' : 'Add'}</Button>
+        <Button type="submit" size="sm" disabled={!amount}>{panel.kind === 'payment' ? 'Record' : 'Add and email'}</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
       </div>
     </form>
@@ -127,7 +160,7 @@ const HEAD = (
 
 type LedgerFilter = 'all' | 'behind' | 'autopay' | 'fees';
 
-function UnitLedger({ snap, beh, panel, setPanel }: { snap: FundsSnapshot; beh: BehindUnit[]; panel: Panel; setPanel: (p: Panel) => void }) {
+function UnitLedger({ snap, beh, panel, setPanel, charge }: { snap: FundsSnapshot; beh: BehindUnit[]; panel: Panel; setPanel: (p: Panel) => void; charge: ReturnType<typeof useChargeEmail> }) {
   const [filter, setFilter] = useState<LedgerFilter>('all');
   const [q, setQ] = useState('');
   const navigate = useNavigate();
@@ -158,7 +191,8 @@ function UnitLedger({ snap, beh, panel, setPanel }: { snap: FundsSnapshot; beh: 
           <Button size="sm" className="h-9" onClick={() => setPanel({ kind: 'payment' })}>Record a payment</Button>
         </div>
       </div>
-      {panel && <UnitForm key={`${panel.kind}-${panel.unit}`} panel={panel} units={snap.units} onClose={() => setPanel(null)} />}
+      {panel && <UnitForm key={`${panel.kind}-${panel.unit}`} panel={panel} units={snap.units} onClose={() => setPanel(null)} onCharged={charge.emailCharge} />}
+      <ChargeNoticeLine notice={charge.notice} onDismiss={charge.clear} />
       {rows.length === 0 ? (
         <Inner className="text-sm text-ux2-muted">{snap.units.length === 0 ? 'No units yet. Add units under Building › Directory.' : 'No unit matches.'}</Inner>
       ) : (
@@ -221,7 +255,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
 
 type InvoiceFilter = 'all' | 'open' | 'paid' | 'dues' | 'fees';
 
-function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void }) {
+function InvoiceForm({ units, onClose, onCharged }: { units: Unit[]; onClose: () => void; onCharged: OnCharged }) {
   const create = useFinancialStore(s => s.createUnitInvoice);
   const [unit, setUnit] = useState(units[0]?.number ?? '');
   const [type, setType] = useState<UnitInvoice['type']>('fee');
@@ -232,7 +266,7 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
   return (
     <form
       aria-label="New invoice"
-      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; create(unit, type, n, desc || 'Invoice', undefined, due || undefined, type === 'special_assessment' ? { fund } : undefined); onClose(); }}
+      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; onCharged(create(unit, type, n, desc || 'Invoice', undefined, due || undefined, type === 'special_assessment' ? { fund } : undefined)); onClose(); }}
       className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
     >
       <div className="w-full text-sm font-semibold text-ux2-ink">New invoice · fee, assessment, repair or amenity</div>
@@ -242,7 +276,7 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
       <Field label="Amount" className="w-[120px]"><input inputMode="decimal" placeholder="$" value={amount} onChange={e => setAmount(e.target.value)} className={INPUT} /></Field>
       <Field label="What for" className="min-w-[180px] flex-1"><input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Repair charge · door closer" className={INPUT} /></Field>
       <Field label="Due" className="w-[150px]"><input type="date" value={due} onChange={e => setDue(e.target.value)} className={INPUT} /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!amount}>Create</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!amount}>Create and email</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
     </form>
   );
 }
@@ -254,7 +288,7 @@ function invoiceStatus(i: UnitInvoice, today: string) {
   return <Chip tone={part ? 'amber' : 'ghost'}>{part ? `Part paid${part}` : 'Open'}</Chip>;
 }
 
-function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSnapshot; onLedger: () => void; creating: boolean; setCreating: (v: boolean) => void }) {
+function InvoicesCard({ snap, onLedger, creating, setCreating, charge }: { snap: FundsSnapshot; onLedger: () => void; creating: boolean; setCreating: (v: boolean) => void; charge: ReturnType<typeof useChargeEmail> }) {
   const [filter, setFilter] = useState<InvoiceFilter>('all');
   const [all, setAll] = useState(false);
   const payUnitInvoice = useFinancialStore(s => s.payUnitInvoice);
@@ -276,7 +310,8 @@ function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSn
           <Button size="sm" className="h-9" onClick={() => setCreating(true)}>New invoice</Button>
         </div>
       </div>
-      {creating && <InvoiceForm units={snap.units} onClose={() => setCreating(false)} />}
+      {creating && <InvoiceForm units={snap.units} onClose={() => setCreating(false)} onCharged={charge.emailCharge} />}
+      <ChargeNoticeLine notice={charge.notice} onDismiss={charge.clear} />
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">No invoices here.</Inner> : (
         <Table>
           <thead><tr><Th>Invoice</Th><Th>Unit</Th><Th>What for</Th><Th>Issued</Th><Th>Due</Th><Th num>Amount</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
@@ -316,6 +351,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   const aging = agingTotals(beh);
   const [panel, setPanel] = useState<Panel>(null);
   const [creating, setCreating] = useState(false);
+  const charge = useChargeEmail();
   const payFrom = (unit: string) => { setPanel({ kind: 'payment', unit }); onSection('ledger'); };
 
   const sections: TileSection<Section>[] = [
@@ -337,7 +373,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         ),
         action: <><span className="min-w-0 truncate"><b className="font-semibold">Unit ledger</b> · every unit, what they pay and owe</span><Chip tone="white" className="!bg-white !text-ux2-teal">{col.units}</Chip></>,
       },
-      detail: <UnitLedger snap={snap} beh={beh} panel={panel} setPanel={setPanel} />,
+      detail: <UnitLedger snap={snap} beh={beh} panel={panel} setPanel={setPanel} charge={charge} />,
     },
     {
       id: 'behind',
@@ -397,7 +433,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         ),
         action: <><span className="min-w-0 truncate"><b className="font-semibold">New invoice</b> · fee, assessment, repair or amenity</span><button type="button" onClick={e => { e.stopPropagation(); setCreating(true); onSection('invoices'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Create</button></>,
       },
-      detail: <InvoicesCard snap={snap} onLedger={() => onSection('ledger')} creating={creating} setCreating={setCreating} />,
+      detail: <InvoicesCard snap={snap} onLedger={() => onSection('ledger')} creating={creating} setCreating={setCreating} charge={charge} />,
     },
   ];
 

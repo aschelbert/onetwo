@@ -9,6 +9,7 @@ import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { generateLocalId } from '@/lib/generateId';
+import { trackInvoiceSave } from '@/lib/services/invoicing';
 import { useBuildingStore } from '@/store/useBuildingStore';
 
 // ─── GL Filter state ─────────────────────────────────
@@ -1488,8 +1489,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (post) syncUnit(unitNum);
     if (isBackendEnabled) {
       const tid = s.tenantId || getActiveTenantId();
-      if (tid) financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
-        if (!dbRow) return;
+      if (tid) trackInvoiceSave(id, financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
+        if (!dbRow) return null;
         // The row has its database id now: the invoice, and everything that names it, follow.
         const latest = get().unitInvoices.find(x => x.id === id);
         set(st => ({
@@ -1503,9 +1504,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         // A payment that landed while the insert was in flight goes up now.
         if (latest && (latest.status !== invoice.status || latest.paidAmount !== invoice.paidAmount)) financialSvc.updateUnitInvoice(dbRow.id, { status: latest.status, paidAmount: latest.paidAmount, paidDate: latest.paidDate, paymentMethod: latest.paymentMethod, paymentGlEntryId: latest.paymentGlEntryId });
         syncUnit(unitNum);
+        return dbRow.id as string;
       }).catch(err => {
         console.error('[syncWrite] createUnitInvoice failed:', err);
-      });
+        return null;
+      }));
     }
     return invoice;
   },
