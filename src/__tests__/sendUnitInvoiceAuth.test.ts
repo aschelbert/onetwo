@@ -13,8 +13,7 @@ const env: Record<string, string> = {
   SUPABASE_ANON_KEY: 'anon-key',
   SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY,
   STRIPE_SECRET_KEY: 'sk_test_x',
-  MAILJET_API_KEY: 'mj',
-  MAILJET_SECRET_KEY: 'mj-secret',
+  BREVO_API_KEY: 'brevo-key',
 };
 
 type Handler = (req: Request) => Promise<Response>;
@@ -53,7 +52,7 @@ const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   if (url.origin === SB && url.pathname === '/rest/v1/unit_invoices') return new Response(null, { status: 204 });
   if (url.origin === SB && url.pathname === '/rest/v1/subscriptions') return json({}, 406);
   if (url.hostname === 'api.stripe.com') return json({ id: 'cs_test_1', url: 'https://checkout.stripe.test/cs_test_1' });
-  if (url.hostname === 'api.mailjet.com') return json({ Messages: [] });
+  if (url.hostname === 'api.brevo.com') return json({ messageId: 'm1' }, 201);
   throw new Error(`Unexpected request: ${url}`);
 });
 
@@ -109,7 +108,7 @@ beforeEach(() => {
 describe('send-unit-invoice: who may send', () => {
   const expectNothingSent = () => {
     expect(reached('api.stripe.com')).toHaveLength(0);
-    expect(reached('api.mailjet.com')).toHaveLength(0);
+    expect(reached('api.brevo.com')).toHaveLength(0);
     expect(calls.filter(c => c.method !== 'GET')).toHaveLength(0);
   };
 
@@ -167,11 +166,11 @@ describe('send-unit-invoice: who may send', () => {
     const patch = calls.find(c => c.method === 'PATCH')!;
     expect(new URL(patch.url).searchParams.get('tenant_id')).toBe(`eq.${TENANT}`);
 
-    const message = JSON.parse(reached('api.mailjet.com')[0].body).Messages[0];
-    expect(message.To[0].Email).toBe('pat@example.com');
-    expect(message.From.Name).toBe('Maple Court');
-    expect(message.HTMLPart).not.toContain('Some Other Building');
-    expect(message.HTMLPart).toContain('Fee &lt;b&gt;now&lt;/b&gt;');
+    const message = JSON.parse(reached('api.brevo.com')[0].body);
+    expect(message.to[0].email).toBe('pat@example.com');
+    expect(message.sender.name).toBe('Maple Court');
+    expect(message.htmlContent).not.toContain('Some Other Building');
+    expect(message.htmlContent).toContain('Fee &lt;b&gt;now&lt;/b&gt;');
   });
 
   it('lets property managers and the account owner send too', async () => {

@@ -1,7 +1,7 @@
 /**
- * Calling the app's email functions (Mailjet behind them) and telling the
+ * Calling the app's email functions (Brevo behind them) and telling the
  * truth about what happened: how many emails went out, and if none, why.
- * A function without Mailjet keys answers 200 with `success: false` and
+ * A function without the Brevo key answers 200 with `success: false` and
  * "Email not configured"; that's reported as email not being set up, not as
  * sent.
  */

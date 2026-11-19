@@ -8,8 +8,7 @@ const SB = 'https://sb.test';
 const env: Record<string, string> = {
   SUPABASE_URL: SB,
   SUPABASE_SERVICE_ROLE_KEY: 'service-key-0123456789abcdef',
-  MAILJET_API_KEY: 'mj',
-  MAILJET_SECRET_KEY: 'mj-secret',
+  BREVO_API_KEY: 'brevo-key',
   CONTACT_INBOX: 'team@inbox.test',
 };
 
@@ -18,7 +17,7 @@ let notify: Handler;
 
 /** Rows the stand-in signup_notifications table holds. */
 let rows: Array<{ type: string; ip_hash: string | null }>;
-let mails: Array<{ To: Array<{ Email: string }>; Subject: string; HTMLPart: string; TextPart: string }>;
+let mails: Array<{ to: Array<{ email: string }>; subject: string; htmlContent: string; textContent: string }>;
 
 const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(String(input));
@@ -31,9 +30,9 @@ const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     const n = rows.filter(r => !ip || r.ip_hash === ip).length;
     return new Response(null, { status: 200, headers: { 'content-range': `*/${n}` } });
   }
-  if (url.hostname === 'api.mailjet.com') {
-    mails.push(JSON.parse(String(init?.body)).Messages[0]);
-    return new Response('{}', { status: 200 });
+  if (url.hostname === 'api.brevo.com') {
+    mails.push(JSON.parse(String(init?.body)));
+    return new Response('{}', { status: 201 });
   }
   throw new Error(`Unexpected request: ${url}`);
 });
@@ -68,8 +67,8 @@ describe('notify-signup', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ sent: true });
     expect(mails).toHaveLength(1);
-    expect(mails[0].To).toEqual([{ Email: 'team@inbox.test' }]);
-    expect(mails[0].HTMLPart).toContain('Board Member');
+    expect(mails[0].to).toEqual([{ email: 'team@inbox.test' }]);
+    expect(mails[0].htmlContent).toContain('Board Member');
     expect(rows).toHaveLength(1);
     expect(rows[0].type).toBe('demo');
     expect(rows[0].ip_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -83,7 +82,7 @@ describe('notify-signup', () => {
       member_type: '<i>role</i>',
       subscription_interest: '<u>tier</u>',
     }));
-    const html = mails[0].HTMLPart;
+    const html = mails[0].htmlContent;
     for (const raw of ['<img', '<script', '<b>bold', '<i>role', '<u>tier', 'co">']) expect(html).not.toContain(raw);
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('mailto:a@b.co&quot;&gt;');
@@ -91,15 +90,15 @@ describe('notify-signup', () => {
 
   it('escapes the building notification too', async () => {
     await post({ type: 'building', name: '<h1>Tower</h1>', email: 'o@example.com', plan: '<a href=x>plan</a>' });
-    expect(mails[0].HTMLPart).not.toContain('<h1>');
-    expect(mails[0].HTMLPart).not.toContain('<a href=x>');
-    expect(mails[0].HTMLPart).toContain('&lt;h1&gt;Tower&lt;/h1&gt;');
+    expect(mails[0].htmlContent).not.toContain('<h1>');
+    expect(mails[0].htmlContent).not.toContain('<a href=x>');
+    expect(mails[0].htmlContent).toContain('&lt;h1&gt;Tower&lt;/h1&gt;');
   });
 
   it('keeps each field to one short line', async () => {
     await post(demo({ name: 'A'.repeat(5000), condo_name: 'line one\nline two' }));
-    expect(mails[0].Subject.length).toBeLessThan(250);
-    expect(mails[0].TextPart).toContain('Community: line one line two');
+    expect(mails[0].subject.length).toBeLessThan(250);
+    expect(mails[0].textContent).toContain('Community: line one line two');
   });
 
   it('stops one caller after five in an hour, without mailing or recording more', async () => {
