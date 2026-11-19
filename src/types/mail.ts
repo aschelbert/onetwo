@@ -21,6 +21,8 @@ export interface MailProviderInfo {
   billing: string;
   /** Whether the app can read tracking back from the vendor. */
   hasStatusApi: boolean;
+  /** Shown on the picker while the vendor isn't open to buildings yet. */
+  comingLabel?: string;
 }
 
 export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
@@ -45,6 +47,7 @@ export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
     credentialHint: 'My Account → API Information (only accounts opened through the partner link have it)',
     billing: 'Paid in the building\'s LetterStream account per letter, or from a prepaid balance',
     hasStatusApi: true,
+    comingLabel: 'Coming Dec 1, 2026',
   },
 };
 

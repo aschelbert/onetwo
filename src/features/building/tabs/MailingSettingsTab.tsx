@@ -144,7 +144,7 @@ export default function MailingSettingsTab() {
                 return (
                   <button key={id} type="button" role="radio" aria-checked={on} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setError(''); }}
                     className={`text-left rounded-xl border px-4 py-3 ${on ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'}`}>
-                    <p className="text-sm font-semibold text-ink-900">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent-600">Recommended</span>}</p>
+                    <p className="text-sm font-semibold text-ink-900">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent-600">Recommended</span>}{p.comingLabel && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">{p.comingLabel}</span>}</p>
                     <p className="text-xs text-ink-500 mt-0.5">{p.tagline}</p>
                   </button>
                 );
