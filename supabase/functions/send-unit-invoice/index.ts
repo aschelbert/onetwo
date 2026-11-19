@@ -36,6 +36,11 @@ Deno.serve(async (req) => {
       buildingAddress,
     } = body;
     const amount = Number(body.amount); // in dollars
+    // The due date, when the caller names one: shown in the email so the owner knows what to pay by.
+    const dueDate = typeof body.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.dueDate) ? body.dueDate : "";
+    const dueLabel = dueDate
+      ? new Date(`${dueDate}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+      : "";
 
     // May they bill units in this building?
     if (body.tenantId !== undefined && body.tenantId !== null && !(typeof body.tenantId === "string" && UUID.test(body.tenantId))) {
@@ -145,7 +150,7 @@ Deno.serve(async (req) => {
 
     // Format amount
     const fmtAmount = "$" + Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 });
-    const typeLabel = type === "fee" ? "Fee" : type === "special_assessment" ? "Special Assessment" : "Invoice";
+    const typeLabel = type === "fee" ? "Fee" : type === "special_assessment" ? "Special Assessment" : type === "monthly" ? "Dues" : type === "amenity_fee" ? "Amenity Fee" : "Invoice";
 
     // Send the email
     const htmlBody = `
@@ -162,6 +167,7 @@ Deno.serve(async (req) => {
             <tr><td style="padding: 8px 0; color: #6b7280;">Type</td><td style="padding: 8px 0; text-align: right;">${typeLabel}</td></tr>
             <tr><td style="padding: 8px 0; color: #6b7280;">Unit</td><td style="padding: 8px 0; text-align: right;">${escapeHtml(unitNumber || "N/A")}</td></tr>
             <tr><td style="padding: 8px 0; color: #6b7280;">Description</td><td style="padding: 8px 0; text-align: right;">${escapeHtml(description)}</td></tr>
+            ${dueLabel ? `<tr><td style="padding: 8px 0; color: #6b7280;">Due</td><td style="padding: 8px 0; text-align: right; font-weight: 600;">${dueLabel}</td></tr>` : ""}
             ${buildingAddress ? `<tr><td style="padding: 8px 0; color: #6b7280;">Address</td><td style="padding: 8px 0; text-align: right; font-size: 12px;">${escapeHtml(buildingAddress)}</td></tr>` : ""}
             <tr style="border-top: 2px solid #d1d5db;"><td style="padding: 12px 0; font-weight: bold; font-size: 16px;">Amount Due</td><td style="padding: 12px 0; text-align: right; font-weight: bold; font-size: 20px; color: #dc2626;">${fmtAmount}</td></tr>
           </table>
@@ -185,7 +191,7 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    const textBody = `${typeLabel} — Unit ${unitNumber || "N/A"}\n\n${description}\nAmount Due: ${fmtAmount}\n\n${paymentUrl ? `Pay now: ${paymentUrl}` : "Contact your board for payment instructions."}\n\n${buildingName || "Your HOA"}`;
+    const textBody = `${typeLabel} — Unit ${unitNumber || "N/A"}\n\n${description}\nAmount Due: ${fmtAmount}${dueLabel ? `\nDue: ${dueLabel}` : ""}\n\n${paymentUrl ? `Pay now: ${paymentUrl}` : "Contact your board for payment instructions."}\n\n${buildingName || "Your HOA"}`;
 
     const emailRes = await sendEmail({
       fromName: buildingName || "ONE two HOA",

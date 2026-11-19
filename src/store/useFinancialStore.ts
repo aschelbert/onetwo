@@ -268,6 +268,15 @@ const r2 = (n: number) => { const r = Math.round(n * 100) / 100; return r === 0 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 /** The mapping with defaults for keys added since it was saved. */
 const mappingOf = (m: GLAccountMapping): GLAccountMapping => ({ ...DEFAULT_GL_MAPPING, ...m });
+/** Invoices on their way to the database, by the id they were created with. */
+const invoiceSaves = new Map<string, Promise<string>>();
+/**
+ * The id an invoice ends up with: a new invoice has a local id until the
+ * database answers with its own. Anything that names the invoice outside the
+ * app (an email, a Stripe payment link) waits for this.
+ */
+export const whenInvoiceSaved = (id: string): Promise<string> => invoiceSaves.get(id) ?? Promise.resolve(id);
+
 const invoiceSource = (type: UnitInvoice['type']): GLEntry['source'] => (type === 'fee' || type === 'amenity_fee' ? 'fee' : 'assessment');
 
 // ── Sync helpers ──
@@ -1488,8 +1497,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (post) syncUnit(unitNum);
     if (isBackendEnabled) {
       const tid = s.tenantId || getActiveTenantId();
-      if (tid) financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
-        if (!dbRow) return;
+      if (tid) invoiceSaves.set(id, financialSvc.createUnitInvoice(tid, invoice).then(dbRow => {
+        if (!dbRow) return id;
         // The row has its database id now: the invoice, and everything that names it, follow.
         const latest = get().unitInvoices.find(x => x.id === id);
         set(st => ({
@@ -1503,9 +1512,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         // A payment that landed while the insert was in flight goes up now.
         if (latest && (latest.status !== invoice.status || latest.paidAmount !== invoice.paidAmount)) financialSvc.updateUnitInvoice(dbRow.id, { status: latest.status, paidAmount: latest.paidAmount, paidDate: latest.paidDate, paymentMethod: latest.paymentMethod, paymentGlEntryId: latest.paymentGlEntryId });
         syncUnit(unitNum);
+        return dbRow.id;
       }).catch(err => {
         console.error('[syncWrite] createUnitInvoice failed:', err);
-      });
+        return id;
+      }).finally(() => { setTimeout(() => invoiceSaves.delete(id), 60_000); }));
     }
     return invoice;
   },

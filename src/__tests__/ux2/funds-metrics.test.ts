@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agingTotals, behind, bills, budgetSummary, collected, doneForYou, healthLabel, healthScore, invoiceSummary, monthsOfCash, nextYearScenarios, ordinal, reserveSummary, type FundsSnapshot } from '@/ux2/funds/metrics';
+import { agingTotals, behind, splitCharge, unitDues, bills, budgetSummary, collected, doneForYou, healthLabel, healthScore, invoiceSummary, monthsOfCash, nextYearScenarios, ordinal, reserveSummary, type FundsSnapshot } from '@/ux2/funds/metrics';
 import { resolveTab } from '@/ux2/funds/FundsPage';
 import { nextTwelveMonths } from '@/ux2/funds/tabs/OverviewTab';
 
@@ -14,7 +14,8 @@ const snap: FundsSnapshot = {
     unit('1A', { payments: [{ date: '2026-11-01', amount: 400, method: 'stripe', note: '' }] }),
     unit('1B', { payments: [{ date: '2026-11-03', amount: 400, method: 'check', note: '' }] }),
     unit('3A', { balance: 1200, lateFees: [{ date: '2026-10-15', amount: 50, reason: 'late', waived: false }, { date: '2026-09-15', amount: 50, reason: 'late', waived: true }] }),
-    unit('5A', { balance: 400, status: 'FOR_SALE' }),
+    // 5A owes $400 from before the register and a $6,000 assessment that is not due until December.
+    unit('5A', { balance: 6400, status: 'FOR_SALE' }),
   ],
   unitInvoices: [
     { id: 'i1', unitNumber: '3A', type: 'monthly', description: 'Dues · August', amount: 400, status: 'overdue', createdDate: '2026-08-01', dueDate: '2026-08-01', paidDate: null, paidAmount: null, paymentMethod: null, stripePaymentLink: null, glEntryId: null, paymentGlEntryId: null },
@@ -62,7 +63,7 @@ describe('funds metrics', () => {
 
   it('counts this month\'s collections by method and who is paid up', () => {
     const c = collected(snap);
-    expect(c).toMatchObject({ month: '2026-11', billed: 1600, amount: 800, paidUnits: 2, units: 4, pct: 50, online: 1, check: 1, outstanding: 1650, behindUnits: 2 });
+    expect(c).toMatchObject({ month: '2026-11', billed: 1600, amount: 800, paidUnits: 2, units: 4, pct: 50, online: 1, check: 1, outstanding: 1650, behindUnits: 2, notYetDue: 6000 });
   });
 
   it('lists who is behind, oldest first, with unwaived fees and the aging buckets', () => {
@@ -72,6 +73,33 @@ describe('funds metrics', () => {
     expect(list[0].invoice?.id).toBe('i1');
     expect(list[1]).toMatchObject({ amount: 400, daysPastDue: 30, bucket: '0-30', forSale: true });
     expect(agingTotals(list)).toEqual({ '0-30': 400, '31-60': 0, '61-90': 0, '90+': 1250 });
+  });
+
+  it('does not call a unit behind for a charge that is not due yet', () => {
+    const owner = unit('2C', { balance: 2500, specialAssessments: [{ id: 'sa1', date: '2026-11-05', amount: 2500, reason: 'Roof', paid: false, paidDate: null, invoiceId: 'sa-inv' }] });
+    const inv = { ...snap.unitInvoices[2], id: 'sa-inv', unitNumber: '2C', amount: 2500, createdDate: '2026-11-05', dueDate: '2026-12-05' };
+    const s = { ...snap, units: [owner], unitInvoices: [inv] };
+    expect(behind(s)).toEqual([]);
+    expect(collected(s)).toMatchObject({ behindUnits: 0, outstanding: 0, notYetDue: 2500 });
+    expect(unitDues(owner, s.unitInvoices, s.today)).toMatchObject({ pastDue: 0, notYetDue: 2500, assessments: 2500, fees: 0 });
+    // The day after the due date it is past due, counted from that date.
+    const late = { ...s, today: '2026-12-08' };
+    expect(behind(late)[0]).toMatchObject({ number: '2C', amount: 2500, daysPastDue: 3, bucket: '0-30' });
+    // Part paid before the date: only the rest becomes past due.
+    const part = { ...late, units: [{ ...owner, balance: 1500 }], unitInvoices: [{ ...inv, paidAmount: 1000 }] };
+    expect(behind(part)[0].amount).toBe(1500);
+  });
+
+  it('splits one charge across every unit to the cent', () => {
+    const us = [unit('1', { votingPct: 50 }), unit('2', { votingPct: 30 }), unit('3', { votingPct: 20 })];
+    expect(splitCharge(us, 1000, 'share').map(p => p.amount)).toEqual([500, 300, 200]);
+    const equal = splitCharge(us, 100, 'equal');
+    expect(equal.map(p => p.amount)).toEqual([33.33, 33.33, 33.34]);
+    expect(equal.reduce((t, p) => t + p.amount, 0)).toBeCloseTo(100, 2);
+    expect(splitCharge(us, 250, 'each').map(p => p.amount)).toEqual([250, 250, 250]);
+    // No percentage interests on file: fall back to equal parts.
+    expect(splitCharge([unit('1', { votingPct: 0 }), unit('2', { votingPct: 0 })], 100, 'share').map(p => p.amount)).toEqual([50, 50]);
+    expect(splitCharge(us, 0, 'equal')).toEqual([]);
   });
 
   it('summarises the invoice register without voided invoices', () => {

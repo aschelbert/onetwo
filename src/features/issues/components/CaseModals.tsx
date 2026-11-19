@@ -608,10 +608,12 @@ export function InvoiceCreateModal({ caseId, caseUnit, store, onClose }: ModalPr
   const [invType, setInvType] = useState<'fee' | 'special_assessment'>('fee');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  // Every charge carries a due date: it is what the charge is tracked against, and what makes it late.
+  const [dueDate, setDueDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 30); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
 
   const handleSave = () => {
-    if (!unitNum || !amount || !description.trim()) return alert('Unit, amount, and description are required.');
-    const invoice = fin.createUnitInvoice(unitNum, invType, parseFloat(amount), description, caseId);
+    if (!unitNum || !amount || !description.trim() || !dueDate) return alert('Unit, amount, description and due date are required.');
+    const invoice = fin.createUnitInvoice(unitNum, invType, parseFloat(amount), description, caseId, dueDate);
     store.linkInvoice(caseId, invoice.id);
     onClose();
   };
@@ -645,6 +647,10 @@ export function InvoiceCreateModal({ caseId, caseUnit, store, onClose }: ModalPr
           <div>
             <label className="block text-sm font-medium text-ink-700 mb-1">Description *</label>
             <input value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" placeholder="Invoice description" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-700 mb-1">Due date *</label>
+            <input type="date" required aria-label="Due date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm" />
           </div>
           <div className="bg-mist-50 border border-mist-200 rounded-lg p-3">
             <p className="text-xs text-ink-600">This creates a unit invoice in Fiscal Lens and links it to action <strong>{caseId}</strong>.</p>

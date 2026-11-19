@@ -6,6 +6,7 @@
  */
 import type { Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
+import { invoiceRemaining, legacyOwed } from '@/lib/financial-logic';
 import { daysBetween } from '../runbook/model';
 
 export interface BudgetLine {
@@ -83,7 +84,35 @@ export function openAssessments(u: Unit): number {
   return u.specialAssessments.filter(a => !a.paid).reduce((t, a) => t + a.amount, 0);
 }
 
-/** Dues collected this month: who paid, how, and how much is still open. */
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * What a unit owes, split by its due dates. A charge that is not due yet is
+ * owed but not late: only `pastDue` makes a unit "behind". A balance with no
+ * invoice behind it (brought over from before the register) and fees from
+ * before the register have no due date to wait for, so they count as due.
+ */
+export function unitDues(u: Unit, invoices: UnitInvoice[], today: string) {
+  const open = invoices.filter(i => i.unitNumber === u.number && invoiceRemaining(i) > 0).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const late = open.filter(i => i.dueDate < today);
+  const upcoming = open.filter(i => i.dueDate >= today);
+  const sum = (list: UnitInvoice[]) => list.reduce((t, i) => t + invoiceRemaining(i), 0);
+  const balance = Math.max(0, u.balance);
+  const pastDue = cents(Math.min(balance, sum(late) + legacyOwed(u, invoices)) + unpaidFees(u));
+  const kind = (list: UnitInvoice[], special: boolean) => cents(sum(list.filter(i => (i.type === 'special_assessment') === special && i.type !== 'monthly')));
+  return {
+    pastDue,
+    /** Owed, with a due date still ahead. */
+    notYetDue: cents(Math.max(0, balance + unpaidFees(u) - pastDue)),
+    late,
+    upcoming,
+    /** Open fee, repair and amenity charges, and open special assessments, from the invoice register plus anything older. */
+    fees: cents(kind(open, false) + unpaidFees(u)),
+    assessments: cents(kind(open, true) + u.specialAssessments.filter(a => !a.paid && !a.invoiceId).reduce((t, a) => t + a.amount, 0)),
+  };
+}
+
+/** Dues collected this month: who paid, how, and how much is past due. */
 export function collected(s: FundsSnapshot) {
   const month = monthKey(s.today);
   const billed = s.units.reduce((t, u) => t + u.monthlyFee, 0);
@@ -91,6 +120,9 @@ export function collected(s: FundsSnapshot) {
   let online = 0;
   let check = 0;
   let paidUnits = 0;
+  let outstanding = 0;
+  let behindUnits = 0;
+  let notYetDue = 0;
   for (const u of s.units) {
     const pays = u.payments.filter(p => monthKey(p.date) === month);
     const sum = pays.reduce((t, p) => t + p.amount, 0);
@@ -98,9 +130,11 @@ export function collected(s: FundsSnapshot) {
     if (pays.some(p => ONLINE_METHODS.includes((p.method || '').toLowerCase()))) online++;
     else if (pays.length > 0) check++;
     if (u.balance <= 0 || sum >= u.monthlyFee) paidUnits++;
+    const d = unitDues(u, s.unitInvoices, s.today);
+    outstanding += d.pastDue;
+    notYetDue += d.notYetDue;
+    if (d.pastDue > 0) behindUnits++;
   }
-  const outstanding = s.units.reduce((t, u) => t + Math.max(0, u.balance) + unpaidFees(u), 0);
-  const behindUnits = s.units.filter(u => u.balance > 0).length;
   return {
     month,
     billed,
@@ -110,14 +144,18 @@ export function collected(s: FundsSnapshot) {
     pct: s.units.length ? Math.round((paidUnits / s.units.length) * 100) : 0,
     online,
     check,
-    outstanding,
+    /** Past due today. */
+    outstanding: cents(outstanding),
     behindUnits,
+    /** Charged, with the due date still ahead. */
+    notYetDue: cents(notYetDue),
   };
 }
 
 export interface BehindUnit {
   number: string;
   owner: string;
+  /** What is past due; a charge that is not due yet is not in it. */
   amount: number;
   daysPastDue: number;
   bucket: '0-30' | '31-60' | '61-90' | '90+';
@@ -126,30 +164,47 @@ export interface BehindUnit {
   invoice?: UnitInvoice;
 }
 
-/** Units with money owed, with how long the oldest unpaid charge has been open. */
+/** Units with money past due, with how long the oldest unpaid charge has been late. */
 export function behind(s: FundsSnapshot): BehindUnit[] {
   const out: BehindUnit[] = [];
   for (const u of s.units) {
-    const owed = Math.max(0, u.balance) + unpaidFees(u);
-    if (owed <= 0) continue;
-    const unpaid = s.unitInvoices
-      .filter(i => i.unitNumber === u.number && (i.status === 'sent' || i.status === 'overdue') && i.dueDate < s.today)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    const d = unitDues(u, s.unitInvoices, s.today);
+    if (d.pastDue <= 0) continue;
     let days: number;
-    if (unpaid.length > 0) days = -daysBetween(s.today, unpaid[0].dueDate);
-    else days = u.monthlyFee > 0 ? Math.round((u.balance / u.monthlyFee) * 30) : 30;
+    if (d.late.length > 0) days = -daysBetween(s.today, d.late[0].dueDate);
+    else days = u.monthlyFee > 0 ? Math.round((d.pastDue / u.monthlyFee) * 30) : 30;
     days = Math.max(1, days);
     out.push({
       number: u.number,
       owner: u.owner,
-      amount: owed,
+      amount: d.pastDue,
       daysPastDue: days,
       bucket: days > 90 ? '90+' : days > 60 ? '61-90' : days > 30 ? '31-60' : '0-30',
       forSale: u.status === 'FOR_SALE' || u.status === 'UNDER_CONTRACT',
-      invoice: unpaid[0],
+      invoice: d.late[0],
     });
   }
   return out.sort((a, b) => b.daysPastDue - a.daysPastDue || b.amount - a.amount);
+}
+
+/**
+ * One charge across every unit: by each unit's percentage interest, in equal
+ * parts, or the same amount on each. The parts of a split add up to the total
+ * to the cent; the last unit carries the rounding.
+ */
+export type SplitHow = 'share' | 'equal' | 'each';
+export function splitCharge(units: Unit[], amount: number, how: SplitHow): { unit: string; amount: number }[] {
+  if (!units.length || !(amount > 0)) return [];
+  if (how === 'each') return units.map(u => ({ unit: u.number, amount: cents(amount) }));
+  const weights = units.map(u => (how === 'share' ? Math.max(0, u.votingPct || 0) : 1));
+  const total = weights.reduce((t, w) => t + w, 0);
+  if (!(total > 0)) return splitCharge(units, amount, 'equal');
+  let left = cents(amount);
+  return units.map((u, i) => {
+    const part = i === units.length - 1 ? left : cents((amount * weights[i]) / total);
+    left = cents(left - part);
+    return { unit: u.number, amount: part };
+  }).filter(p => p.amount > 0);
 }
 
 export function agingTotals(list: BehindUnit[]) {

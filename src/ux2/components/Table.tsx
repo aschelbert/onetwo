@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type HTMLAttributes, type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/formatters';
 
 /**
@@ -49,15 +50,49 @@ export interface MenuItem {
   danger?: boolean;
 }
 
-/** The round ··· button with a small menu under it. */
+/**
+ * The round ··· button with a small menu under it. The menu is drawn on the
+ * page itself, not inside the row: a table clips whatever hangs out of it, so
+ * a menu on the last rows would be cut off. It opens upward when there is no
+ * room below, and closes when the page scrolls under it.
+ */
 export function RowMenu({ label, items, className }: { label: string; items: MenuItem[]; className?: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<CSSProperties | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    const btn = ref.current?.getBoundingClientRect();
+    if (!btn) return;
+    const h = menu.current?.offsetHeight ?? 0;
+    const gap = 4;
+    const below = window.innerHeight - btn.bottom;
+    const up = below < h + gap + 8 && btn.top > below;
+    setPos({
+      position: 'fixed',
+      right: Math.max(8, window.innerWidth - btn.right),
+      ...(up ? { bottom: window.innerHeight - btn.top + gap } : { top: btn.bottom + gap }),
+      maxHeight: Math.max(120, (up ? btn.top : below) - gap - 8),
+    });
+  }, [open, items.length]);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    const inside = (t: EventTarget | null) => !!t && (ref.current?.contains(t as Node) || menu.current?.contains(t as Node));
+    const down = (e: MouseEvent) => { if (!inside(e.target)) setOpen(false); };
+    const scroll = (e: Event) => { if (!menu.current?.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const close = () => setOpen(false);
+    document.addEventListener('mousedown', down);
+    document.addEventListener('keydown', key);
+    window.addEventListener('scroll', scroll, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', down);
+      document.removeEventListener('keydown', key);
+      window.removeEventListener('scroll', scroll, true);
+      window.removeEventListener('resize', close);
+    };
   }, [open]);
   return (
     <div ref={ref} className={cn('relative inline-block', className)}>
@@ -71,8 +106,8 @@ export function RowMenu({ label, items, className }: { label: string; items: Men
       >
         ···
       </button>
-      {open && (
-        <ul role="menu" className="absolute right-0 z-20 mt-1 min-w-[200px] list-none rounded-[14px] border border-ux2-line bg-white p-1.5 shadow-lg">
+      {open && createPortal(
+        <ul ref={menu} role="menu" style={pos ?? { position: 'fixed', visibility: 'hidden' }} className="z-[1000] m-0 min-w-[200px] list-none overflow-y-auto rounded-[14px] border border-ux2-line bg-white p-1.5 text-left shadow-lg">
           {items.map(it => (
             <li key={it.label} role="none">
               <button
@@ -85,7 +120,9 @@ export function RowMenu({ label, items, className }: { label: string; items: Men
               </button>
             </li>
           ))}
-        </ul>
+        </ul>,
+        // Inside the redesign's root, where its colours are defined.
+        (ref.current?.closest('.ux2') as HTMLElement | null) ?? document.body,
       )}
     </div>
   );

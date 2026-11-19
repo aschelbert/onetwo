@@ -87,6 +87,49 @@ describe('Funds', () => {
     expect(within(inv).getByRole('button', { name: 'New invoice' })).toBeTruthy();
   });
 
+  it('a special assessment from a unit\'s row menu is an invoice with a due date, and the unit is not behind', () => {
+    renderAt('/funds?tab=income');
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.balance <= 0 && !fin.unitInvoices.some(i => i.unitNumber === u.number && i.status !== 'paid' && i.status !== 'void'))!;
+    const behindBefore = document.querySelector('[aria-label="Filter units"]')!.textContent!.match(/Behind · (\d+)/)![1];
+    fireEvent.click(screen.getByRole('button', { name: `More for unit ${unit.number}` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add a special assessment' }));
+    // The same form as New invoice, opened on this unit and type, with the due date filled in and required.
+    const form = screen.getByRole('form', { name: 'New invoice' });
+    expect((within(form).getByLabelText('Unit') as HTMLSelectElement).value).toBe(unit.number);
+    expect((within(form).getByLabelText('Type') as HTMLSelectElement).value).toBe('special_assessment');
+    const due = within(form).getByLabelText('Due') as HTMLInputElement;
+    expect(due.required).toBe(true);
+    expect(due.value > todayIso()).toBe(true);
+    fireEvent.change(within(form).getByLabelText('Amount'), { target: { value: '1500' } });
+    fireEvent.change(due, { target: { value: '' } });
+    expect((within(form).getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(due, { target: { value: '2099-01-15' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }));
+    const inv = useFinancialStore.getState().unitInvoices.find(i => i.unitNumber === unit.number && i.type === 'special_assessment' && i.amount === 1500)!;
+    expect(inv.dueDate).toBe('2099-01-15');
+    expect(useFinancialStore.getState().units.find(u => u.number === unit.number)!.specialAssessments.some(a => a.invoiceId === inv.id)).toBe(true);
+    expect(document.querySelector('[aria-label="Filter units"]')!.textContent).toContain(`Behind · ${behindBefore}`);
+    expect(screen.getByRole('status').textContent).toContain('No email was sent');
+  });
+
+  it('one charge can be levied on every unit at once, split by percentage interest', () => {
+    renderAt('/funds?tab=income&section=invoices');
+    const units = useFinancialStore.getState().units;
+    const before = useFinancialStore.getState().unitInvoices.length;
+    fireEvent.click(within(document.querySelector('[aria-label="Invoices"]') as HTMLElement).getByRole('button', { name: 'New invoice' }));
+    const form = screen.getByRole('form', { name: 'New invoice' });
+    fireEvent.change(within(form).getByLabelText('Unit'), { target: { value: '*' } });
+    fireEvent.change(within(form).getByLabelText('Type'), { target: { value: 'special_assessment' } });
+    fireEvent.change(within(form).getByLabelText('Total to split'), { target: { value: '10000' } });
+    fireEvent.click(within(form).getByRole('button', { name: `Create ${units.length}` }));
+    const made = useFinancialStore.getState().unitInvoices.slice(before);
+    expect(made.length).toBe(units.length);
+    expect(new Set(made.map(i => i.dueDate)).size).toBe(1);
+    expect(made.every(i => i.dueDate > todayIso())).toBe(true);
+    expect(made.reduce((t, i) => t + i.amount, 0)).toBeCloseTo(10000, 2);
+  });
+
   it('a payment recorded from the ledger form posts through the store', () => {
     renderAt('/funds?tab=income');
     const unit = useFinancialStore.getState().units[0];
