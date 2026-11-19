@@ -50,7 +50,7 @@ type ChargeNotice = { tone: 'busy' | 'ok' | 'warn'; text: string } | null;
 type OnCharged = (invoice: UnitInvoice) => void;
 
 /** A charge created by hand is emailed to the owner straight away; this reports how that went. */
-function useChargeEmail(): { notice: ChargeNotice; emailCharge: OnCharged; clear: () => void } {
+function useChargeEmail(): { notice: ChargeNotice; emailCharge: OnCharged; resend: OnCharged; clear: () => void } {
   const [notice, setNotice] = useState<ChargeNotice>(null);
   const emailCharge: OnCharged = invoice => {
     const fin = useFinancialStore.getState();
@@ -63,7 +63,20 @@ function useChargeEmail(): { notice: ChargeNotice; emailCharge: OnCharged; clear
       else setNotice({ tone: 'warn', text: `${what} recorded, but the invoice was not emailed: ${r.error}` });
     });
   };
-  return { notice, emailCharge, clear: () => setNotice(null) };
+  /** Sends an open invoice again, for what is still owed on it. */
+  const resend: OnCharged = invoice => {
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.number === invoice.unitNumber);
+    const owed = Math.round((invoice.amount - (invoice.paidAmount ?? 0)) * 100) / 100;
+    if (invoice.status === 'paid' || owed <= 0) { setNotice({ tone: 'ok', text: `Invoice ${invoice.id} is paid, so it was not emailed.` }); return; }
+    const what = `Invoice ${invoice.id} for Unit ${invoice.unitNumber} (${fmt(owed)} owed)`;
+    setNotice({ tone: 'busy', text: `Emailing ${what} to ${unit?.email || 'the owner'}…` });
+    void emailUnitInvoice({ ...invoice, amount: owed }, unit, fin.stripeConnectId, fin.tenantId).then(r => {
+      if (r.sent) setNotice({ tone: r.payLink ? 'ok' : 'warn', text: `${what} emailed to ${unit?.email}${r.payLink ? ' with a new link to pay online.' : ', but without a link to pay online.'}` });
+      else setNotice({ tone: 'warn', text: `${what} was not emailed: ${r.error}` });
+    });
+  };
+  return { notice, emailCharge, resend, clear: () => setNotice(null) };
 }
 
 function ChargeNoticeLine({ notice, onDismiss }: { notice: ChargeNotice; onDismiss: () => void }) {
@@ -327,7 +340,7 @@ function InvoicesCard({ snap, onLedger, creating, setCreating, charge }: { snap:
                 <Td>{invoiceStatus(i, snap.today)}</Td>
                 <Td num>
                   <RowMenu label={`More for ${i.id}`} items={[
-                    ...(i.status !== 'paid' ? [{ label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
+                    ...(i.status !== 'paid' ? [{ label: 'Email this invoice', onSelect: () => charge.resend(i) }, { label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
                     { label: 'Open the unit ledger', onSelect: onLedger },
                   ]} />
                 </Td>
