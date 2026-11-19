@@ -611,7 +611,11 @@ describe('Setup · Send letters by mail (DocuPost or LetterStream)', () => {
     useBuildingStore.setState({ board: [{ id: 'b1', name: 'Ana Rivera', role: 'President', email: 'ana@example.com', phone: '', term: '' }], name: 'Maple Court', address: { street: '12 Maple Ct', city: 'Washington', state: 'DC', zip: '20001' } });
     useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailStatus: '', mailConnectedAt: '', letterstreamPartnerUrl: '' });
     useSetupStore.getState().setLater('payments', true);
+    // LetterStream opens to buildings on Dec 1, 2026; pin the day so these don't flip with the calendar.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 19));
   });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('is the fifth step: the Home card points at it once payments are handled, and Later moves on to Go live', () => {
     useSetupStore.setState({ docs: [{ id: 'f1', name: 'Minutes.pdf', size: 1000, mediaType: 'application/pdf', status: 'filed', addedAt: '2026-11-07' }] });
@@ -642,14 +646,39 @@ describe('Setup · Send letters by mail (DocuPost or LetterStream)', () => {
     // An empty token is refused before anything is sent.
     fireEvent.click(within(step).getByRole('button', { name: 'Connect DocuPost' }));
     expect(within(step).getByRole('status').textContent).toMatch(/Paste the API token/);
-    // LetterStream: two fields, its own estimates, and no partner link configured yet.
-    fireEvent.click(within(vendors).getByRole('radio', { name: /LetterStream/ }));
-    expect(within(step).getByLabelText('API ID')).toBeTruthy();
-    expect(within(step).getByText(/Partner link not configured yet/)).toBeTruthy();
-    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$8\.34/);
+    // LetterStream can't be picked before Dec 1, 2026: it is labelled, disabled, and a click changes nothing.
+    const ls = within(vendors).getByRole('radio', { name: /LetterStream/ }) as HTMLButtonElement;
+    expect(ls.textContent).toContain('Coming Dec 1, 2026');
+    expect(ls.disabled).toBe(true);
+    fireEvent.click(ls);
+    expect(step.getAttribute('data-mail-provider')).toBe('docupost');
+    expect(within(step).queryByLabelText('API ID')).toBeNull();
     fireEvent.click(within(step).getByRole('button', { name: 'Later' }));
     expect(useSetupStore.getState().later).toContain('mail');
     expect(screen.getByRole('heading', { name: /6 · Invite people/ })).toBeTruthy();
+  });
+
+  it('from Dec 1, 2026 LetterStream can be picked: two fields, its own estimates, and the partner link', () => {
+    vi.setSystemTime(new Date(2026, 11, 1));
+    renderSetup('/setup?step=mail');
+    const step = document.querySelector('[data-step="mail"]') as HTMLElement;
+    const ls = within(step).getByRole('radio', { name: /LetterStream/ }) as HTMLButtonElement;
+    expect(ls.disabled).toBe(false);
+    expect(ls.textContent).not.toContain('Coming');
+    fireEvent.click(ls);
+    expect(step.getAttribute('data-mail-provider')).toBe('letterstream');
+    expect(within(step).getByLabelText('API ID')).toBeTruthy();
+    expect(within(step).getByText(/Partner link not configured yet/)).toBeTruthy();
+    expect(document.querySelector('[data-mail-estimate]')?.textContent).toMatch(/Certified mail.*about \$8\.34/);
+  });
+
+  it('a building already on LetterStream keeps its account before Dec 1', () => {
+    useMailStore.getState().updateMailingSettings({ mailConnected: true, mailProvider: 'letterstream', mailCredentialMasked: '••••9876', mailStatus: 'verified', mailConnectedAt: '2026-11-10T00:00:00Z' });
+    renderSetup('/setup?step=mail');
+    const step = document.querySelector('[data-step="mail"]') as HTMLElement;
+    expect(within(step).getByLabelText('Mail account').textContent).toContain('by LetterStream');
+    fireEvent.click(within(step).getByRole('button', { name: 'Change keys' }));
+    expect(within(step).getByLabelText('API ID')).toBeTruthy();
   });
 
   it('connected: shows the account with the masked token and the Continue button; go live lists it under "also set up"', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMailStore } from '@/store/useMailStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, formatDeliveryMethod, pricingFor } from '@/types/mail';
+import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, formatDeliveryMethod, initialMailProvider, isMailProviderAvailable, pricingFor } from '@/types/mail';
 import type { MailDeliveryMethod, MailProviderId } from '@/types/mail';
 
 const DELIVERY_METHODS: MailDeliveryMethod[] = ['first-class', 'certified', 'certified-return-receipt', 'certified-electronic-return-receipt'];
@@ -19,7 +19,7 @@ export default function MailingSettingsTab() {
   const buildingStore = useBuildingStore();
   const settings = mailStore.mailingSettings;
 
-  const [provider, setProvider] = useState<MailProviderId>(settings.mailProvider || DEFAULT_MAIL_PROVIDER);
+  const [provider, setProvider] = useState<MailProviderId>(() => initialMailProvider(settings));
   const [showConnect, setShowConnect] = useState(false);
   const [apiId, setApiId] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -141,10 +141,11 @@ export default function MailingSettingsTab() {
               {PROVIDER_IDS.map(id => {
                 const p = MAIL_PROVIDERS[id];
                 const on = provider === id;
+                const open = isMailProviderAvailable(id);
                 return (
-                  <button key={id} type="button" role="radio" aria-checked={on} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setError(''); }}
-                    className={`text-left rounded-xl border px-4 py-3 ${on ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'}`}>
-                    <p className="text-sm font-semibold text-ink-900">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent-600">Recommended</span>}{p.comingLabel && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">{p.comingLabel}</span>}</p>
+                  <button key={id} type="button" role="radio" aria-checked={on} disabled={!open} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setError(''); }}
+                    className={`text-left rounded-xl border px-4 py-3 ${open ? '' : 'cursor-not-allowed opacity-60 '}${on ? 'border-accent-500 bg-accent-50' : 'border-ink-200 hover:border-ink-300'}`}>
+                    <p className="text-sm font-semibold text-ink-900">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent-600">Recommended</span>}{!open && p.comingLabel && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">{p.comingLabel}</span>}</p>
                     <p className="text-xs text-ink-500 mt-0.5">{p.tagline}</p>
                   </button>
                 );

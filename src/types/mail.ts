@@ -21,7 +21,9 @@ export interface MailProviderInfo {
   billing: string;
   /** Whether the app can read tracking back from the vendor. */
   hasStatusApi: boolean;
-  /** Shown on the picker while the vendor isn't open to buildings yet. */
+  /** First local day (YYYY-MM-DD) a building can pick the vendor; open already when absent. */
+  availableFrom?: string;
+  /** Shown on the picker until that day. */
   comingLabel?: string;
 }
 
@@ -47,11 +49,24 @@ export const MAIL_PROVIDERS: Record<MailProviderId, MailProviderInfo> = {
     credentialHint: 'My Account → API Information (only accounts opened through the partner link have it)',
     billing: 'Paid in the building\'s LetterStream account per letter, or from a prepaid balance',
     hasStatusApi: true,
+    availableFrom: '2026-12-01',
     comingLabel: 'Coming Dec 1, 2026',
   },
 };
 
 export const DEFAULT_MAIL_PROVIDER: MailProviderId = 'docupost';
+
+/** Whether a building can pick the vendor yet. A vendor with a start day opens at local midnight on it. */
+export const isMailProviderAvailable = (id: MailProviderId, now: Date = new Date()): boolean => {
+  const from = MAIL_PROVIDERS[id].availableFrom;
+  if (!from) return true;
+  const [y, m, d] = from.split('-').map(Number);
+  return now.getTime() >= new Date(y, m - 1, d).getTime();
+};
+
+/** The vendor a picker starts on: the saved one if it is connected or open, otherwise the default. */
+export const initialMailProvider = (s: { mailProvider: MailProviderId | ''; mailConnected: boolean }): MailProviderId =>
+  s.mailProvider && (s.mailConnected || isMailProviderAvailable(s.mailProvider)) ? s.mailProvider : DEFAULT_MAIL_PROVIDER;
 
 export type MailDeliveryMethod =
   | 'first-class'

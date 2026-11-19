@@ -15,7 +15,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore } from '@/features/setup/useSetupStore';
-import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, pricingFor } from '@/types/mail';
+import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, initialMailProvider, isMailProviderAvailable, pricingFor } from '@/types/mail';
 import type { MailProviderId } from '@/types/mail';
 import { Button, Chip } from '../components';
 import { useSetup } from './useSetup';
@@ -54,7 +54,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
   const connectMailProvider = useMailStore(x => x.connectMailProvider);
   const disconnectMailProvider = useMailStore(x => x.disconnectMailProvider);
   const setLater = useSetupStore(x => x.setLater);
-  const [provider, setProvider] = useState<MailProviderId>(settings.mailProvider || DEFAULT_MAIL_PROVIDER);
+  const [provider, setProvider] = useState<MailProviderId>(() => initialMailProvider(settings));
   const [apiId, setApiId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [changing, setChanging] = useState(false);
@@ -136,11 +136,12 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
                   {PROVIDER_IDS.map(id => {
                     const p = MAIL_PROVIDERS[id];
                     const on = provider === id;
+                    const open = isMailProviderAvailable(id);
                     return (
-                      <button key={id} type="button" role="radio" aria-checked={on} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setNote(null); }}
-                        className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left', on ? 'border-ux2-plum bg-ux2-plum-tint' : 'border-ux2-line bg-ux2-surface')}>
+                      <button key={id} type="button" role="radio" aria-checked={on} disabled={!open} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setNote(null); }}
+                        className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left', !open && 'cursor-not-allowed opacity-60', on ? 'border-ux2-plum bg-ux2-plum-tint' : 'border-ux2-line bg-ux2-surface')}>
                         <span aria-hidden="true" className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2', on ? 'border-ux2-plum' : 'border-ux2-line-strong')}>{on && <span className="h-2.5 w-2.5 rounded-full bg-ux2-plum" />}</span>
-                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}{p.comingLabel && <span className="ml-2 rounded-full bg-ux2-amber-tint px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-amber">{p.comingLabel}</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
+                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}{!open && p.comingLabel && <span className="ml-2 rounded-full bg-ux2-amber-tint px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-amber">{p.comingLabel}</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
                       </button>
                     );
                   })}
