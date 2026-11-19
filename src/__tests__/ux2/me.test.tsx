@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMailStore } from '@/store/useMailStore';
 import { searchHelp } from '@/ux2/me/help';
 
 vi.mock('@/components/TenantProvider', () => ({
@@ -153,6 +154,28 @@ describe('Me', () => {
     expect(useAuthStore.getState().buildingMembers.find(m => m.id === 'user2')?.unit).toBe(target);
     expect(screen.getByText(`Sarah Johnson is linked to unit ${target}.`)).toBeTruthy();
     useAuthStore.getState().updateMemberUnit('user2', '204');
+  });
+
+  it('Subscription names the mail vendor and sends the board to Funds to manage it', () => {
+    const before = useMailStore.getState().mailingSettings;
+    try {
+      useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailStatus: '', mailConnectedAt: '' });
+      renderAt('/subscription');
+      const card = document.querySelector('[aria-label="Mail vendor"]') as HTMLElement;
+      expect(card.textContent).toContain('No mail vendor connected');
+      expect(within(card).getByRole('button', { name: 'Choose a vendor' })).toBeTruthy();
+      cleanup();
+      useMailStore.getState().updateMailingSettings({ mailConnected: true, mailProvider: 'docupost', mailStatus: 'verified', mailConnectedAt: '2026-11-10T00:00:00Z' });
+      renderAt('/subscription');
+      const on = document.querySelector('[aria-label="Mail vendor"]') as HTMLElement;
+      expect(on.textContent).toContain('DocuPost');
+      expect(on.textContent).toContain('Verified');
+      expect(on.textContent).toContain('not on this subscription');
+      fireEvent.click(within(on).getByRole('button', { name: 'Manage vendor' }));
+      expect(screen.getByTestId('elsewhere')).toBeTruthy();
+    } finally {
+      useMailStore.getState().updateMailingSettings(before);
+    }
   });
 
   it('Subscription shows the plan, add-ons, billing, plans, invoices and cancel for a board member only', () => {
