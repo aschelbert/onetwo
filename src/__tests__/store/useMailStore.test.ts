@@ -15,6 +15,7 @@ import { resetStoresForRealTenant } from '@/store/resetStores';
 import { toStateCode } from '@/lib/usStates';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import type { MailingSettings } from '@/types/mail';
+import { MAIL_PROVIDERS, deliveryMethodsFor, effectiveDeliveryMethod, estimatedBalance, uspsTrackingUrl } from '@/types/mail';
 
 const notice = {
   caseId: 'case-1',
@@ -33,7 +34,7 @@ const notice = {
 
 beforeEach(() => {
   useMailStore.setState({ mailRecords: [] });
-  useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailStatus: '' });
+  useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailCredentialMasked: '', mailStatus: '', mailFundsLowAt: '', mailBalanceCents: null, mailBalanceRecordedAt: '' });
   useIssuesStore.setState({ cases: [] } as never);
 });
 
@@ -137,6 +138,75 @@ describe('useMailStore', () => {
     const c = useCommunicationsStore.getState().sendCommunication({ scope: 'unit', subject: 'Dues', body: 'Pay', templateId: null, templateName: null, channels: ['mail'], recipientUnit: '2B', recipientName: 'Pat', recipientEmail: null, mailDeliveryMethod: 'certified', mailLetterCount: 1, caseId: null, stepIdx: null, source: 'compose', createdBy: 'Board' } as never);
     const saved = useCommunicationsStore.getState().communications.find(x => x.id === (c as { id?: string })?.id) ?? useCommunicationsStore.getState().communications[0];
     expect(saved.mailCostCents).toBe(834);
+  });
+
+  it("sends DocuPost's only return receipt, the electronic one, when a green card is asked for", async () => {
+    expect(deliveryMethodsFor('docupost')).toEqual(['first-class', 'certified', 'certified-electronic-return-receipt']);
+    expect(deliveryMethodsFor('letterstream')).toContain('certified-return-receipt');
+    expect(effectiveDeliveryMethod('certified-return-receipt', 'docupost')).toBe('certified-electronic-return-receipt');
+    expect(effectiveDeliveryMethod('certified-return-receipt', 'letterstream')).toBe('certified-return-receipt');
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    const rec = await useMailStore.getState().sendNotice({ ...notice, deliveryMethod: 'certified-return-receipt' });
+    expect(rec.deliveryMethod).toBe('certified-electronic-return-receipt');
+    expect(MAIL_PROVIDERS.docupost.receiptNote).toMatch(/USPS tracking page/);
+  });
+
+  it('records the USPS tracking number and the outcome a board member reads off the vendor, with who and when', async () => {
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    const rec = await useMailStore.getState().sendNotice(notice);
+    await expect(useMailStore.getState().recordTracking(rec.id, { trackingNumber: 'nope' })).rejects.toThrow(/tracking number/);
+
+    await useMailStore.getState().recordTracking(rec.id, { trackingNumber: '9407 1000 0000 0000 0000 00' });
+    let saved = useMailStore.getState().mailRecords.find(r => r.id === rec.id)!;
+    expect(saved.trackingNumber).toBe('9407100000000000000000');
+    expect(saved.status).toBe('submitted');
+    expect(uspsTrackingUrl(saved.trackingNumber!)).toBe('https://tools.usps.com/go/TrackConfirmAction?tLabels=9407100000000000000000');
+
+    await useMailStore.getState().recordTracking(rec.id, { trackingNumber: saved.trackingNumber, status: 'delivered', date: '2026-11-12' });
+    saved = useMailStore.getState().mailRecords.find(r => r.id === rec.id)!;
+    expect(saved.status).toBe('delivered');
+    expect(saved.deliveredAt?.slice(0, 10)).toBe('2026-11-12');
+    const last = saved.statusHistory[saved.statusHistory.length - 1];
+    expect(last).toMatchObject({ status: 'delivered', source: 'board' });
+    // Saving the same thing again adds nothing to the history.
+    const n = saved.statusHistory.length;
+    await useMailStore.getState().recordTracking(rec.id, { trackingNumber: saved.trackingNumber, status: 'delivered' });
+    expect(useMailStore.getState().mailRecords.find(r => r.id === rec.id)!.statusHistory).toHaveLength(n);
+  });
+
+  it('a vendor with no status API has nothing to refresh, and says where the tracking is', async () => {
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    const rec = await useMailStore.getState().sendNotice(notice);
+    const r = await useMailStore.getState().refreshMailStatus(rec.id);
+    expect(r.note).toMatch(/no status API/);
+  });
+
+  it('keeps a running estimate of the vendor balance from the figure the board recorded', async () => {
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    expect(estimatedBalance(useMailStore.getState().mailingSettings, [])).toBeNull();
+    // A letter sent before the balance was recorded is already in the figure the board read.
+    await useMailStore.getState().sendNotice(notice);
+    await new Promise(res => setTimeout(res, 5));
+    await useMailStore.getState().setMailBalance(2000);
+    await new Promise(res => setTimeout(res, 5));
+    let b = estimatedBalance(useMailStore.getState().mailingSettings, useMailStore.getState().mailRecords)!;
+    expect(b).toMatchObject({ remainingCents: 2000, letters: 0 });
+    // Certified is about $11.73 at DocuPost; a failed letter costs nothing.
+    await useMailStore.getState().sendNotice(notice);
+    useMailStore.setState(s => ({ mailRecords: [{ ...s.mailRecords[0], id: 'mr_failed', status: 'failed' }, ...s.mailRecords] }));
+    b = estimatedBalance(useMailStore.getState().mailingSettings, useMailStore.getState().mailRecords)!;
+    expect(b).toMatchObject({ remainingCents: 2000 - 1173, spentCents: 1173, letters: 1 });
+    await useMailStore.getState().setMailBalance(null);
+    expect(estimatedBalance(useMailStore.getState().mailingSettings, useMailStore.getState().mailRecords)).toBeNull();
+  });
+
+  it('recording a balance clears the low-funds flag, and disconnecting forgets both', async () => {
+    await useMailStore.getState().connectMailProvider('docupost', { apiKey: 'k' });
+    useMailStore.getState().updateMailingSettings({ mailFundsLowAt: '2026-11-10T00:00:00Z' });
+    await useMailStore.getState().setMailBalance(5000);
+    expect(useMailStore.getState().mailingSettings.mailFundsLowAt).toBe('');
+    await useMailStore.getState().disconnectMailProvider();
+    expect(useMailStore.getState().mailingSettings).toMatchObject({ mailBalanceCents: null, mailBalanceRecordedAt: '', mailFundsLowAt: '' });
   });
 
   it('turns state names into USPS codes and leaves unknown values for the vendor to judge', () => {

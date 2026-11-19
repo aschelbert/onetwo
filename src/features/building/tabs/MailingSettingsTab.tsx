@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useMailStore } from '@/store/useMailStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, formatDeliveryMethod, pricingFor } from '@/types/mail';
+import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, deliveryMethodsFor, effectiveDeliveryMethod, estimatedBalance, formatDeliveryMethod, pricingFor } from '@/types/mail';
 import type { MailDeliveryMethod, MailProviderId } from '@/types/mail';
+import MailHistory from './MailHistory';
 
-const DELIVERY_METHODS: MailDeliveryMethod[] = ['first-class', 'certified', 'certified-return-receipt', 'certified-electronic-return-receipt'];
+const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const PROVIDER_IDS: MailProviderId[] = ['docupost', 'letterstream'];
 
 /**
@@ -34,8 +35,29 @@ export default function MailingSettingsTab() {
   const needsApiId = chosen.credentials.includes('apiId');
   const pricing = pricingFor(connected ? settings.mailProvider : provider);
 
-  const totalMailings = mailStore.mailRecords.length;
-  const totalCostCents = mailStore.mailRecords.reduce((sum, r) => sum + r.cost.totalCents, 0);
+  // Only what the connected vendor really offers; a saved default it does not offer shows as what it would send.
+  const methods = deliveryMethodsFor(connected ? settings.mailProvider : '');
+  const defaultMethod = effectiveDeliveryMethod(settings.defaultDeliveryMethod, connected ? settings.mailProvider : '');
+
+  const balance = estimatedBalance(settings, mailStore.mailRecords);
+  const [editingBalance, setEditingBalance] = useState(false);
+  const [balanceInput, setBalanceInput] = useState('');
+
+  const handleBalance = async (clear = false) => {
+    const dollars = Number(balanceInput.replace(/[^0-9.]/g, ''));
+    if (!clear && (balanceInput.trim() === '' || !Number.isFinite(dollars))) { setError(`Enter the balance shown in ${current?.label ?? 'the vendor account'}, for example 50.00.`); return; }
+    setLoading(true);
+    setError('');
+    try {
+      await mailStore.setMailBalance(clear ? null : Math.round(dollars * 100));
+      setEditingBalance(false);
+      setBalanceInput('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConnect = async () => {
     if (!apiKey.trim() || (needsApiId && !apiId.trim())) { setError(needsApiId ? 'Paste both the API ID and the API key from the LetterStream account.' : 'Paste the API token from the DocuPost account.'); return; }
@@ -129,8 +151,51 @@ export default function MailingSettingsTab() {
             </div>
             <p className="text-xs text-ink-500">
               Letters sent from the app land in this account. {current.billing}. Receipts and tracking live at {current.label}, under the building's name.
-              {!current.hasStatusApi && ` ${current.label} has no status API, so delivery is tracked in its dashboard.`}
+              {!current.hasStatusApi && ` ${current.label} has no status API, so each letter's USPS tracking number is copied from its dashboard into Mailing History below.`}
             </p>
+
+            {settings.mailFundsLowAt && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3" data-testid="mail-funds-low" role="alert">
+                <p className="text-sm text-red-700">
+                  <span className="font-semibold">{current.label} refused a letter for lack of funds on {new Date(settings.mailFundsLowAt).toLocaleDateString()}.</span> Nothing mails until the building adds money to its {current.label} account. Send the letter again once it has.
+                </p>
+                <a href={current.portalUrl} target="_blank" rel="noreferrer" className="text-xs text-red-700 underline font-medium">Add funds at {current.label} ↗</a>
+              </div>
+            )}
+
+            {/* Balance: the vendor's API does not report it, so the board records what the vendor shows. */}
+            <div className="border-t border-ink-100 pt-3" data-testid="mail-balance">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-ink-900">
+                    {balance
+                      ? <>About <span className={balance.remainingCents < pricingFor(settings.mailProvider)['certified'] ? 'text-red-600' : ''}>{usd(Math.max(0, balance.remainingCents))}</span> left in {current.label}</>
+                      : `${current.label} balance not recorded`}
+                  </p>
+                  <p className="text-xs text-ink-500">
+                    {balance
+                      ? `${usd(settings.mailBalanceCents ?? 0)} recorded on ${new Date(settings.mailBalanceRecordedAt).toLocaleDateString()}, less estimated postage for ${balance.letters} ${balance.letters === 1 ? 'letter' : 'letters'} sent since (${usd(balance.spentCents)}). An estimate: ${current.label}'s ${current.balanceHint} page has the exact figure.`
+                      : `${current.label}'s API does not report the balance. Record what its ${current.balanceHint} page shows${current.prepaid ? ' after each top-up' : ''}, and the app keeps a running estimate and warns before a letter that may not be covered.`}
+                  </p>
+                </div>
+                {!editingBalance && (
+                  <span className="flex gap-3">
+                    <button onClick={() => { setEditingBalance(true); setBalanceInput(''); setError(''); }} disabled={loading} className="text-xs text-accent-600 hover:text-accent-700 font-medium disabled:opacity-50">{balance ? 'Update balance' : 'Record balance'}</button>
+                    {balance && <button onClick={() => void handleBalance(true)} disabled={loading} className="text-xs text-ink-400 hover:text-ink-600 font-medium disabled:opacity-50">Clear</button>}
+                  </span>
+                )}
+              </div>
+              {editingBalance && (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <label className="block">
+                    <span className="block text-xs font-medium text-ink-700 mb-1">Balance shown in {current.label} today ($)</span>
+                    <input value={balanceInput} onChange={e => setBalanceInput(e.target.value)} inputMode="decimal" autoComplete="off" placeholder="50.00" className="w-40 px-3 py-2 border border-ink-200 rounded-lg text-sm" />
+                  </label>
+                  <button onClick={() => void handleBalance()} disabled={loading} className="px-4 py-2 bg-ink-900 hover:bg-ink-800 text-white rounded-lg text-sm font-semibold disabled:opacity-50">{loading ? 'Saving…' : 'Save'}</button>
+                  <button onClick={() => { setEditingBalance(false); setError(''); }} className="text-xs text-ink-500 hover:text-ink-700 py-2">Cancel</button>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -251,14 +316,17 @@ export default function MailingSettingsTab() {
           <div>
             <label className="block text-xs font-medium text-ink-700 mb-1">Default Delivery Method</label>
             <select
-              value={settings.defaultDeliveryMethod}
+              value={defaultMethod}
               onChange={e => mailStore.updateMailingSettings({ defaultDeliveryMethod: e.target.value as MailDeliveryMethod })}
               className="w-full px-3 py-2 border border-ink-200 rounded-lg text-sm"
             >
-              {DELIVERY_METHODS.map(m => (
+              {methods.map(m => (
                 <option key={m} value={m}>{formatDeliveryMethod(m)}</option>
               ))}
             </select>
+            {connected && current && current.methods.length < 4 && (
+              <p className="text-[11px] text-ink-400 mt-1">{current.receiptNote}</p>
+            )}
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -282,40 +350,8 @@ export default function MailingSettingsTab() {
         </div>
       </div>
 
-      {/* Mailing History Summary */}
-      <div className="bg-white border border-ink-200 rounded-xl p-5">
-        <h4 className="text-[10px] font-bold text-ink-400 uppercase tracking-widest mb-3">Mailing History</h4>
-        {totalMailings > 0 ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-mist-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-ink-900">{totalMailings}</p>
-                <p className="text-xs text-ink-500">Total Mailings</p>
-              </div>
-              <div className="bg-mist-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold text-ink-900">${(totalCostCents / 100).toFixed(2)}</p>
-                <p className="text-xs text-ink-500">Estimated Postage</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {mailStore.mailRecords.slice(0, 5).map(r => (
-                <div key={r.id} className="flex items-center justify-between py-2 border-b border-ink-50">
-                  <div>
-                    <p className="text-sm text-ink-700">{r.templateName}</p>
-                    <p className="text-xs text-ink-400">{r.recipient.name} &middot; {new Date(r.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-ink-900">${(r.cost.totalCents / 100).toFixed(2)}</p>
-                    <p className="text-xs text-ink-400 capitalize">{r.status.replace(/-/g, ' ')}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-ink-400 text-center py-4">No mailings sent yet</p>
-        )}
-      </div>
+      {/* Mailing History: the building's record, with tracking */}
+      <MailHistory />
     </div>
   );
 }
