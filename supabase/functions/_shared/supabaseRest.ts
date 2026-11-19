@@ -25,8 +25,8 @@ export async function authUser(req: Request): Promise<{ id: string; email?: stri
 }
 
 /** The caller's building and role, from tenant_users. */
-export async function membership(userId: string): Promise<{ tenant_id: string; role: string } | null> {
-  return await restGetOne("tenant_users", { "user_id": `eq.${userId}`, "select": "tenant_id,role", "limit": "1" });
+export async function membership(userId: string): Promise<{ tenant_id: string; role: string; is_account_owner?: boolean } | null> {
+  return await restGetOne("tenant_users", { "user_id": `eq.${userId}`, "select": "tenant_id,role,is_account_owner", "limit": "1" });
 }
 
 /** One row, or null when there is none. */

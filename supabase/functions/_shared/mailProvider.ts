@@ -84,6 +84,17 @@ export const PROVIDER_INFO: Record<MailProviderId, ProviderInfo> = {
   },
 };
 
+/**
+ * The delivery method a vendor will really use for the one that was asked for.
+ * DocuPost's only return receipt is USPS's electronic one (requested from the
+ * USPS tracking page once delivered); it has no mailed-back green card. So a
+ * green-card request there is sent, and recorded, as the electronic receipt.
+ */
+export function actualDeliveryMethod(provider: MailProviderId, method: DeliveryMethod): DeliveryMethod {
+  if (provider === "docupost" && method === "certified-return-receipt") return "certified-electronic-return-receipt";
+  return method;
+}
+
 /** Whether a building can newly connect the vendor yet. */
 export function providerIsOpen(provider: MailProviderId, now: Date = new Date()): boolean {
   const from = PROVIDER_INFO[provider].availableFrom;

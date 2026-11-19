@@ -114,6 +114,8 @@ function loadTenantStores(tenantId: string) {
     useTaskerStore.getState().load(tenantId),
     // Whether the building's own LetterStream account is connected (the keys stay server-side).
     useMailStore.getState().loadMailingSettings(tenantId).catch(() => { /* mail stays "not connected" until the function answers */ }),
+    // The building's letters and their tracking: the board's and the manager's only.
+    useMailStore.getState().loadMailRecords(tenantId).catch(() => { /* keeps what this browser has */ }),
   ]);
 }
 

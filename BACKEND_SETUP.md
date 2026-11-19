@@ -309,10 +309,33 @@ Credentials live in `mail_provider_accounts` (RLS on, no policies: service role 
 `financial_settings.mail_connected` / `mail_provider` are the non-secret flags the app
 reads. Functions:
 
-- `connect-mail-provider`: status / connect / disconnect for the building's account.
-- `send-mail`: renders the notice to PDF and pushes it into the building's account.
-- `check-mail-status`: reads the status back (LetterStream) or points at the dashboard
-  (DocuPost).
+- `connect-mail-provider`: status / connect / disconnect / set-balance for the
+  building's account.
+- `send-mail`: renders the notice to PDF, pushes it into the building's account and
+  writes the building's record of the letter to `mail_records`.
+- `check-mail-status`: reads the status back (LetterStream) and writes it onto the
+  letter's record, or points at the dashboard (DocuPost).
+
+**Letter history, tracking and balance** (migration `20261119120000_mail_records.sql`;
+apply it before deploying the three functions, which read its columns):
+
+- `mail_records` holds one row per letter, written by `send-mail` with the service
+  role (failed sends too). Board, property manager and account owner read it and may
+  update tracking; nothing in the app inserts or deletes rows. The app loads it at
+  sign-in, so every board member sees the same history on any device.
+- DocuPost has no status API, no webhooks and no balance API. For its letters a board
+  member copies the USPS tracking number from Letters → the letter → Letter Details
+  and marks the outcome under Mailing History; the app then links to USPS tracking.
+  LetterStream letters are refreshed from its status call when the board opens the app.
+- Balance: `mail_provider_accounts.funds_low_at` is set when the vendor refuses a
+  letter for lack of funds and cleared by the next letter it accepts. `balance_cents` /
+  `balance_recorded_at` hold the figure a board member read off the vendor's Funds
+  page; the app shows it less the estimated postage of letters sent since, and warns
+  before a letter the estimate does not cover.
+- DocuPost's return receipt is always USPS's Electronic Return Receipt (requested from
+  the USPS tracking page once delivered); it has no mailed-back green card. The app
+  offers only the methods the connected vendor has, and a green-card request to
+  DocuPost is sent and recorded as the electronic receipt.
 
 Optional secrets: `DOCUPOST_API_URL`, `DOCUPOST_PORTAL_URL`, `DOCUPOST_SIGNUP_URL`,
 `LETTERSTREAM_API_URL`, `LETTERSTREAM_PORTAL_URL`, `LETTERSTREAM_PARTNER_URL`.

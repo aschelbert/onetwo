@@ -8,8 +8,13 @@
 //   HTML in the body (max 9,000 characters). Names and the description are
 //   capped at 40 characters, states are 2-letter codes, ZIPs are 5 digits.
 //   class=usps_first_class with servicelevel=certified | certified_return_receipt
-//   for the certified options. Status is tracked in the DocuPost dashboard;
-//   there is no status API. A letter can be cancelled there for a short
+//   for the certified options. certified_return_receipt is USPS's Electronic
+//   Return Receipt: proof of delivery (signature, address, date, time) that
+//   the sender requests from the USPS tracking page; there is no mailed-back
+//   green card. Status is tracked in the DocuPost dashboard; there is no
+//   status API, no balance API and no webhooks, so the board records the USPS
+//   tracking number from the letter's page (mail_records) and the balance
+//   from the Funds page. A letter can be cancelled there for a short
 //   window after sending (five minutes to a few hours), and a sandbox mode
 //   can be switched on where the token is generated (sandbox still needs a
 //   funded balance: an unfunded account answers "Insufficient funds").
