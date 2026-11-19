@@ -1,9 +1,8 @@
 // supabase/functions/send-unit-invoice/index.ts
-// Creates a Stripe Checkout session for a unit invoice and emails the payment link via Mailjet
+// Creates a Stripe Checkout session for a unit invoice and emails the payment link
+import { sendEmail } from "../_shared/email.ts";
 
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -122,8 +121,7 @@ Deno.serve(async (req) => {
     const fmtAmount = "$" + Number(amount).toLocaleString("en-US", { minimumFractionDigits: 2 });
     const typeLabel = type === "fee" ? "Fee" : type === "special_assessment" ? "Special Assessment" : "Invoice";
 
-    // Send email via Mailjet
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
+    // Send the email
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
         <div style="text-align: center; margin-bottom: 32px;">
@@ -163,30 +161,18 @@ Deno.serve(async (req) => {
 
     const textBody = `${typeLabel} — Unit ${unitNumber || "N/A"}\n\n${description}\nAmount Due: ${fmtAmount}\n\n${paymentUrl ? `Pay now: ${paymentUrl}` : "Contact your board for payment instructions."}\n\n${buildingName || "Your HOA"}`;
 
-    const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        Messages: [{
-          From: { Email: "noreply@getonetwo.com", Name: buildingName || "ONE two HOA" },
-          To: [{ Email: ownerEmail, Name: ownerName || ownerEmail.split("@")[0] }],
-          Subject: `${typeLabel}: ${fmtAmount} — Unit ${unitNumber || "N/A"} · ${buildingName || "HOA"}`,
-          TextPart: textBody,
-          HTMLPart: htmlBody,
-        }],
-      }),
+    const emailRes = await sendEmail({
+      fromName: buildingName || "ONE two HOA",
+      to: { email: ownerEmail, name: ownerName || ownerEmail.split("@")[0] },
+      subject: `${typeLabel}: ${fmtAmount} — Unit ${unitNumber || "N/A"} · ${buildingName || "HOA"}`,
+      text: textBody,
+      html: htmlBody,
     });
 
     let emailSent = false;
-    if (mjRes.ok) {
+    if (emailRes.ok) {
       console.log("Invoice email sent to:", ownerEmail);
       emailSent = true;
-    } else {
-      const mjErr = await mjRes.text();
-      console.error("Mailjet error:", mjRes.status, mjErr);
     }
 
     return new Response(JSON.stringify({

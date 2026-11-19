@@ -216,7 +216,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
       if (data.success && data.emailSent) {
         return { sent: true, paymentUrl: data.paymentUrl, error: data.stripeError ? `Email sent but Stripe failed: ${data.stripeError}` : undefined };
       }
-      return { sent: false, error: data.error || 'Email delivery failed — check Mailjet sender domain.' };
+      return { sent: false, error: data.error || 'Email delivery failed — check the email sender domain.' };
     } catch (err) {
       console.error('sendInvoiceEmail network error:', err);
       return { sent: false, error: `Network error: ${String(err)}` };

@@ -2,11 +2,10 @@
 // Sends a trial-ending reminder email to the account owner.
 // Called by chargebee-webhook on subscription_trial_end_reminder.
 // Idempotent: checks trial_reminder_sent_at before sending.
+import { emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -20,34 +19,19 @@ const headers = (extra?: Record<string, string>) => ({
   ...extra,
 });
 
-async function sendMailjet(params: {
+async function sendReminder(params: {
   to: string;
   toName: string;
   subject: string;
   htmlBody: string;
   textBody: string;
 }) {
-  const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${auth}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      Messages: [{
-        From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" },
-        To: [{ Email: params.to, Name: params.toName }],
-        Subject: params.subject,
-        TextPart: params.textBody,
-        HTMLPart: params.htmlBody,
-      }],
-    }),
+  const res = await sendEmail({
+    to: { email: params.to, name: params.toName },
+    subject: params.subject,
+    text: params.textBody,
+    html: params.htmlBody,
   });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("Mailjet error:", res.status, body);
-  }
   return res.ok;
 }
 
@@ -147,8 +131,8 @@ Deno.serve(async (req) => {
 
     // Send email
     let sent = false;
-    if (MJ_API_KEY && MJ_SECRET_KEY) {
-      sent = await sendMailjet({
+    if (emailConfigured()) {
+      sent = await sendReminder({
         to: owner.email,
         toName: owner.email.split("@")[0],
         subject: `Your ONE two trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`,

@@ -4,13 +4,13 @@
 // Check now), stripe-webhook (Stripe's own account.updated) and
 // stripe-account-status (the daily sweep), so the account is marked verified
 // and the board is told exactly once, whichever path notices first.
-// Zero dependencies: raw fetch to Stripe, the Supabase REST and Auth APIs, and Mailjet.
+// Raw fetch to Stripe and the Supabase REST and Auth APIs; email goes through email.ts.
+
+import { sendEmail } from "./email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 export const STRIPE_SETTINGS_SELECT = "tenant_id,stripe_connect_id,stripe_onboarding_complete,stripe_connected_by,stripe_verified_at,hoa_due_day";
@@ -139,15 +139,8 @@ async function boardRecipients(settings: StripeSettings): Promise<{ email: strin
 
 const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][(n % 100 - 20) % 10] ?? ["th", "st", "nd", "rd"][n % 100] ?? "th"}`;
 
-async function sendMailjet(to: { email: string; name: string }, subject: string, htmlBody: string, textBody: string) {
-  if (!MJ_API_KEY || !MJ_SECRET_KEY) { console.warn("Mailjet is not configured; Stripe confirmation email not sent"); return false; }
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
-    method: "POST",
-    headers: { "Authorization": `Basic ${btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`)}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ Messages: [{ From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" }, To: [{ Email: to.email, Name: to.name }], Subject: subject, TextPart: textBody, HTMLPart: htmlBody }] }),
-  });
-  if (!res.ok) console.error("Mailjet error:", res.status, await res.text());
-  return res.ok;
+async function sendConfirmation(to: { email: string; name: string }, subject: string, htmlBody: string, textBody: string) {
+  return (await sendEmail({ to, subject, text: textBody, html: htmlBody })).ok;
 }
 
 /** Stripe has verified the association: email the board and post the owners' announcement. Returns how many emails went out. */
@@ -184,7 +177,7 @@ export async function notifyVerified(settings: StripeSettings): Promise<number> 
 
   let emailed = 0;
   for (const to of await boardRecipients(settings)) {
-    if (await sendMailjet(to, `${building}: owners can now pay online`, htmlBody, textBody)) emailed++;
+    if (await sendConfirmation(to, `${building}: owners can now pay online`, htmlBody, textBody)) emailed++;
   }
 
   // Owners' Home card and announcement. Posted once, when verified; a building still setting up shows it to owners the day they are invited.

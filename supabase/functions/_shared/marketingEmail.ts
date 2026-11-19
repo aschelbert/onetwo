@@ -9,9 +9,9 @@
 //
 //   if (!(await marketingAllowed(to))) return;          // never send without consent
 //   const unsub = await unsubscribeFor(to);
-//   Mailjet message: { ..., Headers: unsub.headers,
-//                      TextPart: body + unsub.footerText,
-//                      HTMLPart: html + unsub.footerHtml }
+//   sendEmail({ ..., headers: unsub.headers,
+//               text: body + unsub.footerText,
+//               html: html + unsub.footerHtml })
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";

@@ -1,7 +1,7 @@
 /**
  * Consent given on the signup, invitation and demo forms.
  *
- * Mailjet (our email provider) requires provable opt-in: a checkbox that is
+ * Product emails need provable opt-in: a checkbox that is
  * unticked by default and separate from accepting the privacy policy. The
  * three answers are stored by `record_consent()` together with who, when and
  * from where, which the database fills in itself.

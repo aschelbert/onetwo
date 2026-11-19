@@ -2,9 +2,8 @@
 // Sends an internal notification email to the CONTACT_INBOX secret when someone
 // signs up for the demo or a new building is provisioned.
 // Fire-and-forget from client — failures logged but don't block UX.
+import { emailConfigured, sendEmail } from "../_shared/email.ts";
 
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const CONTACT_INBOX = Deno.env.get("CONTACT_INBOX") || "";
 
 const cors = {
@@ -37,8 +36,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
-      console.warn("Mailjet not configured — skipping notification email");
+    if (!emailConfigured()) {
+      console.warn("Email not configured — skipping notification email");
       return new Response(
         JSON.stringify({ sent: false, error: "Email not configured" }),
         { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
@@ -128,29 +127,14 @@ Deno.serve(async (req) => {
 
     const textBody = `${typeLabel}\n${"=".repeat(30)}\n${detailsText}`;
 
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-    const res = await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        Messages: [
-          {
-            From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" },
-            To: [{ Email: CONTACT_INBOX }],
-            Subject: subject,
-            TextPart: textBody,
-            HTMLPart: htmlBody,
-          },
-        ],
-      }),
+    const res = await sendEmail({
+      to: { email: CONTACT_INBOX },
+      subject: subject,
+      text: textBody,
+      html: htmlBody,
     });
 
-    const resBody = await res.text();
     if (!res.ok) {
-      console.error("Mailjet error:", res.status, resBody);
       return new Response(
         JSON.stringify({ sent: false, error: "Email delivery failed" }),
         { status: 200, headers: { ...cors, "Content-Type": "application/json" } },

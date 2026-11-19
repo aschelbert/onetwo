@@ -1,13 +1,12 @@
 // supabase/functions/send-invite/index.ts
-// Creates invitation(s) in DB and sends email(s) via Mailjet
+// Creates invitation(s) in DB and sends email(s)
 // Supports single invite or bulk (array of invitees)
 // Zero dependencies — raw fetch
+import { emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -25,8 +24,8 @@ function generateCode(subdomain: string, role: string): string {
   return `${sub}-${rolePrefix}-${rand}`;
 }
 
-// Send email via Mailjet
-async function sendMailjet(params: {
+// Send one invitation email
+async function sendInviteEmail(params: {
   to: string;
   toName: string;
   replyTo: string;
@@ -35,30 +34,13 @@ async function sendMailjet(params: {
   htmlBody: string;
   textBody: string;
 }) {
-  const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-  const res = await fetch("https://api.mailjet.com/v3.1/send", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${auth}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      Messages: [{
-        From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" },
-        ReplyTo: { Email: params.replyTo, Name: params.replyToName },
-        To: [{ Email: params.to, Name: params.toName }],
-        Subject: params.subject,
-        TextPart: params.textBody,
-        HTMLPart: params.htmlBody,
-      }],
-    }),
+  const res = await sendEmail({
+    to: { email: params.to, name: params.toName },
+    replyTo: { email: params.replyTo, name: params.replyToName },
+    subject: params.subject,
+    text: params.textBody,
+    html: params.htmlBody,
   });
-  const resBody = await res.text();
-  if (!res.ok) {
-    console.error("Mailjet error:", res.status, resBody);
-  } else {
-    console.log("Mailjet sent:", res.status);
-  }
   return res.ok;
 }
 
@@ -157,8 +139,8 @@ Deno.serve(async (req) => {
         `;
         const textBody = `Reminder: You're invited to ${tenant.name}!\n\n${senderName} has invited you to join as ${roleLabel}${unitText}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.`;
 
-        if (MJ_API_KEY && MJ_SECRET_KEY) {
-          const sent = await sendMailjet({
+        if (emailConfigured()) {
+          const sent = await sendInviteEmail({
             to: email, toName: email.split("@")[0],
             replyTo: user.email || "noreply@getonetwo.com", replyToName: senderName,
             subject: `Reminder: You're invited to join ${tenant.name} on ONE two`,
@@ -244,9 +226,9 @@ Deno.serve(async (req) => {
 
       const textBody = `You're invited to ${tenant.name}!\n\n${senderName} has invited you to join as ${roleLabel}${unitText}.\n\nYour invitation code: ${code}\n\nAccept here: ${inviteUrl}\n\nOr go to ${SITE_URL}/login and enter the code.\n\nThis invitation expires in 30 days.`;
 
-      // Send via Mailjet
-      if (MJ_API_KEY && MJ_SECRET_KEY) {
-        const sent = await sendMailjet({
+      // Send the email
+      if (emailConfigured()) {
+        const sent = await sendInviteEmail({
           to: email,
           toName: email.split("@")[0],
           replyTo: user.email || "noreply@getonetwo.com",
@@ -257,7 +239,7 @@ Deno.serve(async (req) => {
         });
         results.push({ email, code, sent });
       } else {
-        // No Mailjet configured — still create the invitation
+        // Email not set up — still create the invitation
         results.push({ email, code, sent: false, error: "Email not configured" });
       }
     }

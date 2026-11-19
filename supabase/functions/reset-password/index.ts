@@ -1,11 +1,10 @@
 // supabase/functions/reset-password/index.ts
-// Uses Supabase Admin API to generate reset link, sends via Mailjet
+// Uses Supabase Admin API to generate reset link, sends it by email
 // Zero dependencies
+import { emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -28,9 +27,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // The app's own email (Mailjet) isn't set up: tell the page, which asks Supabase Auth to send its
+    // The app's own email isn't set up: tell the page, which asks Supabase Auth to send its
     // built-in reset email instead. Answered before any lookup, so it says nothing about whether the user exists.
-    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
+    if (!emailConfigured()) {
       return new Response(JSON.stringify({ success: true, fallback: true }), {
         status: 200, headers: { ...cors, "Content-Type": "application/json" },
       });
@@ -86,8 +85,7 @@ Deno.serve(async (req) => {
       resetLink += `&redirect_to=${redirectTo}`;
     }
 
-    // Send via Mailjet
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
+    // Send the email
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px;">
         <div style="text-align: center; margin-bottom: 32px;">
@@ -108,29 +106,14 @@ Deno.serve(async (req) => {
 
     const textBody = `Reset your password\n\nClick this link to reset your password:\n${resetLink}\n\nIf you didn't request this, you can safely ignore this email.\nThis link expires in 1 hour.`;
 
-    const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        Messages: [{
-          From: { Email: "noreply@getonetwo.com", Name: "ONE two HOA" },
-          To: [{ Email: email, Name: email.split("@")[0] }],
-          Subject: "Reset your ONE two password",
-          TextPart: textBody,
-          HTMLPart: htmlBody,
-        }],
-      }),
+    const emailRes = await sendEmail({
+      to: { email: email, name: email.split("@")[0] },
+      subject: "Reset your ONE two password",
+      text: textBody,
+      html: htmlBody,
     });
 
-    if (!mjRes.ok) {
-      const mjErr = await mjRes.text();
-      console.error("Mailjet error:", mjRes.status, mjErr);
-    } else {
-      console.log("Reset email sent to:", email);
-    }
+    if (emailRes.ok) console.log("Reset email sent to:", email);
 
     // Always return success (don't reveal if user exists)
     return new Response(JSON.stringify({ success: true }), {

@@ -1,12 +1,11 @@
 // supabase/functions/send-status-update/index.ts
 // Sends an email to the issue reporter when the status changes
 // Called by the issues store when updateIssueStatus is invoked with backend enabled
+import { EMAIL_NOT_CONFIGURED, emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -73,8 +72,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
-      return new Response(JSON.stringify({ success: false, error: "Email not configured" }), {
+    if (!emailConfigured()) {
+      return new Response(JSON.stringify({ success: false, error: EMAIL_NOT_CONFIGURED }), {
         status: 200, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
@@ -106,22 +105,12 @@ Deno.serve(async (req) => {
 
     const textBody = `Issue Status Update — ${buildingName}\n\n${issueTitle}\nNew Status: ${statusLabel}\n${boardComment ? `\nBoard Comment: ${boardComment}` : ''}\n\nView details: ${SITE_URL}`;
 
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
-    const res = await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        Messages: [{
-          From: { Email: "noreply@getonetwo.com", Name: buildingName },
-          To: [{ Email: recipientEmail, Name: recipientName || recipientEmail.split("@")[0] }],
-          Subject: `${buildingName} — Your issue "${issueTitle}" is now ${statusLabel}`,
-          TextPart: textBody,
-          HTMLPart: htmlBody,
-        }],
-      }),
+    const res = await sendEmail({
+      fromName: buildingName,
+      to: { email: recipientEmail, name: recipientName || recipientEmail.split("@")[0] },
+      subject: `${buildingName} — Your issue "${issueTitle}" is now ${statusLabel}`,
+      text: textBody,
+      html: htmlBody,
     });
 
     return new Response(JSON.stringify({ success: res.ok, sent: res.ok ? 1 : 0 }), {

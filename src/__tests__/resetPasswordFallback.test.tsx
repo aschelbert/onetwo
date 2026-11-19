@@ -1,5 +1,5 @@
 /**
- * Password reset when the app's own email (Mailjet) isn't set up: the
+ * Password reset when the app's own email (Brevo) isn't set up: the
  * reset-password function says so (fallback), and the page asks Supabase
  * Auth to send its built-in reset email instead of claiming one was sent.
  */
