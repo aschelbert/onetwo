@@ -140,7 +140,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
                       <button key={id} type="button" role="radio" aria-checked={on} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setNote(null); }}
                         className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left', on ? 'border-ux2-plum bg-ux2-plum-tint' : 'border-ux2-line bg-ux2-surface')}>
                         <span aria-hidden="true" className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2', on ? 'border-ux2-plum' : 'border-ux2-line-strong')}>{on && <span className="h-2.5 w-2.5 rounded-full bg-ux2-plum" />}</span>
-                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
+                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}{p.comingLabel && <span className="ml-2 rounded-full bg-ux2-amber-tint px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-amber">{p.comingLabel}</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
                       </button>
                     );
                   })}

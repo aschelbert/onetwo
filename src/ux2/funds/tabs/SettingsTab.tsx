@@ -420,7 +420,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
       </Card>
 
       <Card id="mailing-card" aria-label="Mailing">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Mailing</span><span className="text-xs text-ux2-muted">printed letters are billed by LetterStream to the building's own account</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Mailing</span><span className="text-xs text-ux2-muted">printed letters are billed by the mail vendor to the building's own account</span></div>
         <div className="ux2-legacy"><MailingSettingsTab /></div>
         <Why>Jump to the <button type="button" className="underline" onClick={() => onSection('ledger')}>ledger</button>, the <button type="button" className="underline" onClick={() => onSection('accounts')}>chart of accounts</button> or the <button type="button" className="underline" onClick={() => onSection('fees')}>fee schedule</button>.</Why>
       </Card>
