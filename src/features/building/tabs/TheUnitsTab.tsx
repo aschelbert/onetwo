@@ -224,6 +224,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
       if (data.success && data.emailSent) {
         return { sent: true, paymentUrl: data.paymentUrl, error: data.stripeError ? `Email sent but Stripe failed: ${data.stripeError}` : undefined };
       }
+      if (data.emailOptedOut) return { sent: false, error: 'This owner has email turned off, so the invoice was not emailed. They can turn it back on from their Account page, or you can from Users.' };
       return { sent: false, error: data.error || 'Email delivery failed — check the email sender domain.' };
     } catch (err) {
       console.error('sendInvoiceEmail network error:', err);

@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
 
     // One email per recipient, so nobody sees the rest of the list
     let sentCount = 0;
+    let optedOut = 0;
     const errors: string[] = [];
 
     for (const recipient of emailRecipients) {
@@ -188,6 +189,8 @@ Deno.serve(async (req) => {
         if (res.ok) {
           sentCount++;
           console.log("Announcement email sent to:", recipient.email);
+        } else if (res.optedOut) {
+          optedOut++;
         } else {
           console.error("Announcement email failed for", recipient.email, ":", res.status);
           errors.push(`${recipient.email}: ${res.status}`);
@@ -202,6 +205,7 @@ Deno.serve(async (req) => {
       success: true,
       sent: sentCount,
       total: emailRecipients.length,
+      optedOut,
       errors: errors.length > 0 ? errors : undefined,
     }), {
       status: 200, headers: { ...cors, "Content-Type": "application/json" },

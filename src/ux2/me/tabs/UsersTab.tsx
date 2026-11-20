@@ -13,6 +13,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import { getInitials } from '@/lib/formatters';
+import { buildingEmailOff, memberEmailOffLabel, restoreMemberEmail, type MemberEmailOff } from '@/lib/emailStatus';
 import type { Role } from '@/types/auth';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, SearchInput, SectionLabel, Table, Td, Th, Tile, TileRow, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -161,6 +162,22 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
   const tenant = useTenantContext();
   const units = useFinancialStore(s => s.units);
   const { live, loading, people, pending, note, setNote, invite, revoke, resend, changeRole, linkUnit, remove } = usePeople(snap.viewer.name, snap.viewer.email);
+  // Members our email is not reaching (they pressed Unsubscribe, or their mailbox turned us away), by address
+  const [emailOff, setEmailOff] = useState<Record<string, MemberEmailOff>>({});
+  useEffect(() => {
+    if (!live || !supabase) return;
+    let cancelled = false;
+    buildingEmailOff(supabase, tenant.id).then(list => { if (!cancelled) setEmailOff(Object.fromEntries(list.map(m => [m.email, m]))); });
+    return () => { cancelled = true; };
+  }, [live, tenant.id]);
+  const offFor = (email: string) => emailOff[email.trim().toLowerCase()];
+  const turnEmailOn = async (p: { name: string; email: string }) => {
+    if (!supabase) return;
+    const problem = await restoreMemberEmail(supabase, tenant.id, p.email);
+    if (problem) { setNote(problem); return; }
+    setEmailOff(prev => { const next = { ...prev }; delete next[p.email.trim().toLowerCase()]; return next; });
+    setNote(`Email is back on for ${p.name}. Notices and invoices will reach ${p.email} again.`);
+  };
   const [filter, setFilter] = useState<'all' | 'board' | 'owners' | 'staff'>('all');
   const [q, setQ] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -236,6 +253,13 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
 
       {note && <Inner className="flex items-center justify-between gap-3 text-sm text-ux2-ink"><span>{note}</span><button type="button" className="text-xs text-ux2-muted hover:underline" onClick={() => setNote(null)}>Dismiss</button></Inner>}
 
+      {Object.keys(emailOff).length > 0 && (
+        <Inner role="status" className="flex flex-col gap-1 border border-ux2-red-ink/30 text-sm text-ux2-ink">
+          <b className="font-semibold">{Object.keys(emailOff).length === 1 ? '1 member is' : `${Object.keys(emailOff).length} members are`} not getting email</b>
+          <span className="text-xs text-ux2-muted">{Object.values(emailOff).map(m => `${people.find(p => p.email.trim().toLowerCase() === m.email)?.name ?? m.email} (${memberEmailOffLabel(m.reason)})`).join(' · ')}. Notices, invoices and password resets to them are not sent. Use Turn email back on in their row menu, or they can do it from their own Account page. Until then, reach them by mail.</span>
+        </Inner>
+      )}
+
       <Card aria-label="Members">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SectionLabel>Members · {active.length} with access · as of today, {dayLabel(snap.today)}</SectionLabel>
@@ -253,8 +277,8 @@ export default function UsersTab({ snap }: { snap: MeSnapshot }) {
                   <Td>{[p.boardTitle, p.unit ? `Unit ${p.unit}` : null].filter(Boolean).join(' · ') || ACCESS_LABEL[p.access]}</Td>
                   <Td><Chip tone={ACCESS_TONE[p.access]}>{ACCESS_LABEL[p.access]}</Chip></Td>
                   <Td>{p.you ? 'Now' : p.lastActive ? dayLabel(p.lastActive) : '—'}</Td>
-                  <Td>{p.status === 'active' ? 'Active' : p.status}</Td>
-                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, ...(snap.viewer.isBoard ? [{ label: p.unit ? 'Change unit' : 'Link to unit', onSelect: () => { setLinking(p); setLinkTo(p.unit); } }] : []), { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page; the link goes to ${p.email}.`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? They lose access to this building. Their unit, ledger and votes stay.`)) void remove(p); } }]} />}</Td>
+                  <Td>{p.status === 'active' ? 'Active' : p.status}{offFor(p.email) && <Chip tone="red" className="ml-2" title={`Not getting email: ${memberEmailOffLabel(offFor(p.email)!.reason)}`}>Email off</Chip>}</Td>
+                  <Td num>{!p.you && <RowMenu label={`Actions for ${p.name}`} items={[{ label: 'Change role', onSelect: () => setChanging(p) }, ...(snap.viewer.isBoard ? [{ label: p.unit ? 'Change unit' : 'Link to unit', onSelect: () => { setLinking(p); setLinkTo(p.unit); } }] : []), ...(offFor(p.email) ? [{ label: 'Turn email back on', onSelect: () => void turnEmailOn(p) }] : []), { label: 'Reset password', onSelect: () => setNote(`${p.name} resets their password from the sign-in page, or changes it under Account once signed in.${offFor(p.email) ? ' Their email is off, so turn it back on first.' : ` The link goes to ${p.email}.`}`) }, { label: 'Resend welcome', onSelect: () => setNote(live ? 'The welcome packet re-sends on their next sign-in.' : `Welcome re-sent to ${p.email}.`) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove ${p.name}? They lose access to this building. Their unit, ledger and votes stay.`)) void remove(p); } }]} />}</Td>
                 </tr>
               ))}
               {visible.length === 0 && <tr><Td colSpan={6}><span className="text-ux2-muted">{loading ? 'Loading members…' : 'No one matches.'}</span></Td></tr>}

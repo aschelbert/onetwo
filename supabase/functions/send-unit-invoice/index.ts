@@ -204,6 +204,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       success: true,
       emailSent,
+      emailOptedOut: !!emailRes.optedOut,
       paymentUrl,
       stripeSessionId,
       stripeError: stripeError || null,

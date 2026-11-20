@@ -1,10 +1,11 @@
 // supabase/functions/reset-password/index.ts
 // Uses Supabase Admin API to generate reset link, sends it by email
 // Zero dependencies
-import { emailConfigured, sendEmail } from "../_shared/email.ts";
+import { emailConfigured, sendEmail, suppressionReason } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -114,6 +115,19 @@ Deno.serve(async (req) => {
     });
 
     if (emailRes.ok) console.log("Reset email sent to:", email);
+
+    // They pressed Unsubscribe at some point, so our provider drops everything
+    // we send them, this included. A reset they asked for should still arrive:
+    // Supabase Auth sends its own, which does not go through that provider.
+    // Not after a spam report or a dead mailbox.
+    if (emailRes.optedOut && ["unsubscribed", "blocked"].includes((await suppressionReason(email)) || "")) {
+      const recover = await fetch(`${SB_URL}/auth/v1/recover?redirect_to=${redirectTo}`, {
+        method: "POST",
+        headers: { "apikey": SB_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!recover.ok) console.error("Fallback reset email failed:", recover.status, (await recover.text()).slice(0, 200));
+    }
 
     // Always return success (don't reveal if user exists)
     return new Response(JSON.stringify({ success: true }), {

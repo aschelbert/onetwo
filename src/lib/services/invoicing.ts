@@ -68,6 +68,7 @@ export async function emailUnitInvoice(
       return { sent: false, payLink: false, error: detail || error.message || 'The email could not be sent.' };
     }
     if (data?.success && data.emailSent) return { sent: true, payLink: !!data.paymentUrl };
+    if (data?.emailOptedOut) return { sent: false, payLink: false, error: `Unit ${invoice.unitNumber}'s owner has email turned off, so the invoice was not emailed. They can turn it back on from their Account page, or the board can from Users.` };
     return { sent: false, payLink: false, error: data?.error || 'The email was not accepted for delivery.' };
   } catch (err) {
     return { sent: false, payLink: false, error: String(err) };

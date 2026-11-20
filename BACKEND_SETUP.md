@@ -274,6 +274,37 @@ supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy stripe-account-status
 ```
 
+### People our email is not reaching
+
+Brevo adds its own Unsubscribe to every email, including notices, invoices and
+password resets. One click puts the address on Brevo's blocked list, and Brevo then
+accepts our emails for that address and drops them. A dead mailbox or a spam report
+does the same. Migration `20261120120000_email_suppressions` keeps our copy of that
+list so the app can say so: `sendEmail()` skips those addresses and reports them as
+not sent, Users shows the board who is not being reached, and the person (Account) or
+the board (Users) can turn email back on.
+
+1. Pick a long random token and save it as the `BREVO_WEBHOOK_TOKEN` function secret.
+2. Deploy `brevo-webhook` (without JWT verification) and `email-suppression`, and
+   redeploy every function that sends email, since they share `_shared/email.ts`.
+3. In Brevo, add a transactional webhook to
+   `https://YOUR_PROJECT_REF.supabase.co/functions/v1/brevo-webhook` for the events
+   unsubscribed, hard bounce, spam, invalid, blocked and delivered, with bearer
+   authentication set to the same token. Through the API:
+
+```bash
+curl https://api.brevo.com/v3/webhooks \
+  -H "api-key: $BREVO_API_KEY" -H "content-type: application/json" \
+  -d '{"type":"transactional","description":"ONE two: addresses email is not reaching",
+       "url":"https://YOUR_PROJECT_REF.supabase.co/functions/v1/brevo-webhook",
+       "events":["unsubscribed","hardBounce","spam","invalid","blocked","delivered"],
+       "auth":{"type":"bearer","token":"THE_SAME_TOKEN"}}'
+```
+
+Addresses blocked before the webhook existed are picked up the next time Brevo
+refuses a send to them. A password reset to an address that pressed Unsubscribe is
+sent by Supabase Auth's own mailer instead, so a locked-out person is not stranded.
+
 ### Product email confirmations (double opt-in)
 
 Ticking "Email me ONE two product news" (any form) or turning it on under Account

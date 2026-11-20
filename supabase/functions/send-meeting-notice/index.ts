@@ -140,6 +140,7 @@ Deno.serve(async (req) => {
     }
 
     let sentCount = 0;
+    let optedOut = 0;
 
     for (const recipient of emailRecipients) {
       try {
@@ -151,12 +152,13 @@ Deno.serve(async (req) => {
           html: htmlBody,
         });
         if (res.ok) sentCount++;
+        else if (res.optedOut) optedOut++;
       } catch (e) {
         console.error("Send error for", recipient.email, ":", e);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, sent: sentCount, total: emailRecipients.length }), {
+    return new Response(JSON.stringify({ success: true, sent: sentCount, total: emailRecipients.length, optedOut }), {
       status: 200, headers: { ...cors, "Content-Type": "application/json" },
     });
 
