@@ -190,6 +190,22 @@ Deno.serve(async (req) => {
               p_stripe_payment_intent_id: session.payment_intent || null,
             });
             console.log("Reconciliation result:", JSON.stringify(result));
+            // The invoice keeps only its latest payment link. A payment that came
+            // through an older link, or after the invoice was settled another way,
+            // matches nothing above, yet the owner was charged. Post it to the unit
+            // (open charges first, the rest as credit) so no money goes unrecorded.
+            // The reference is the session, so a session already posted is skipped.
+            const unmatched = !result || result.error || result.already;
+            if (unmatched && session.payment_status === "paid" && meta.unit_number && meta.tenant_id && session.amount_total) {
+              const fallback = await sbRpc("record_unit_payment", {
+                p_tenant_id: meta.tenant_id,
+                p_unit_number: meta.unit_number,
+                p_amount: session.amount_total / 100,
+                p_method: "stripe",
+                p_reference: `stripe:${session.id}`,
+              });
+              console.log(`Invoice ${meta.invoice_id} did not take this payment; posted to unit ${meta.unit_number}:`, JSON.stringify(fallback));
+            }
           } else if (meta.unit_number && meta.tenant_id && session.amount_total) {
             // The owner paid a balance from the Pay page (connect-stripe-account create_checkout).
             console.log(`Unit checkout: unit=${meta.unit_number} tenant=${meta.tenant_id}`);

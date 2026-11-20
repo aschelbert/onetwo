@@ -26,6 +26,8 @@ let world: {
   users: Record<string, { id: string }>;
   memberships: Array<{ user_id: string; tenant_id: string; role: string; is_account_owner?: boolean; status?: string }>;
   stripeConnectId: string | null;
+  /** The invoice row as saved, when the request names one that exists. */
+  invoice: { status: string; stripe_checkout_session_id: string | null } | null;
 };
 let calls: Array<{ url: string; method: string; body: string }>;
 
@@ -49,7 +51,10 @@ const fakeFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   }
   if (url.origin === SB && url.pathname === '/rest/v1/tenants') return json({ name: 'Maple Court' });
   if (url.origin === SB && url.pathname === '/rest/v1/financial_settings') return json({ stripe_connect_id: world.stripeConnectId });
-  if (url.origin === SB && url.pathname === '/rest/v1/unit_invoices') return new Response(null, { status: 204 });
+  if (url.origin === SB && url.pathname === '/rest/v1/unit_invoices') {
+    if ((init?.method || 'GET') !== 'GET') return new Response(null, { status: 204 });
+    return world.invoice ? json(world.invoice) : json({}, 406);
+  }
   if (url.origin === SB && url.pathname === '/rest/v1/subscriptions') return json({}, 406);
   if (url.hostname === 'api.stripe.com') return json({ id: 'cs_test_1', url: 'https://checkout.stripe.test/cs_test_1' });
   if (url.hostname === 'api.brevo.com') return json({ messageId: 'm1' }, 201);
@@ -102,7 +107,34 @@ beforeEach(() => {
       { user_id: 'u-outsider', tenant_id: OTHER_TENANT, role: 'board_member' },
     ],
     stripeConnectId: 'acct_1234567890',
+    invoice: null,
   };
+});
+
+describe('send-unit-invoice: one payable link per invoice', () => {
+  const stripePaths = () => reached('api.stripe.com').map(c => new URL(c.url).pathname);
+
+  it('retires the previous payment link before making a new one', async () => {
+    world.invoice = { status: 'sent', stripe_checkout_session_id: 'cs_old_1' };
+    const res = await post(sendInvoice, invoiceBody(), 'board-token');
+    expect(res.status).toBe(200);
+    expect(stripePaths()).toEqual(['/v1/checkout/sessions/cs_old_1/expire', '/v1/checkout/sessions']);
+    expect(reached('api.brevo.com')).toHaveLength(1);
+  });
+
+  it('makes one link and retires nothing when the invoice has none yet', async () => {
+    world.invoice = { status: 'sent', stripe_checkout_session_id: null };
+    await post(sendInvoice, invoiceBody(), 'board-token');
+    expect(stripePaths()).toEqual(['/v1/checkout/sessions']);
+  });
+
+  it.each(['paid', 'void'])('does not bill or email an invoice that is %s', async status => {
+    world.invoice = { status, stripe_checkout_session_id: 'cs_old_1' };
+    const res = await post(sendInvoice, invoiceBody(), 'board-token');
+    expect(res.status).toBe(409);
+    expect(reached('api.stripe.com')).toHaveLength(0);
+    expect(reached('api.brevo.com')).toHaveLength(0);
+  });
 });
 
 describe('send-unit-invoice: who may send', () => {

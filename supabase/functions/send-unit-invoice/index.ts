@@ -63,6 +63,15 @@ Deno.serve(async (req) => {
       stripeConnectId = settings.stripe_connect_id;
     }
 
+    // The invoice as saved, when there is one: a settled invoice is not billed
+    // again, and its previous payment link is retired below.
+    const savedInvoice = typeof invoiceId === "string" && UUID.test(invoiceId)
+      ? await restGetOne("unit_invoices", { "id": `eq.${invoiceId}`, "tenant_id": `eq.${tenantId}`, "select": "status,stripe_checkout_session_id" })
+      : null;
+    if (savedInvoice && (savedInvoice.status === "paid" || savedInvoice.status === "void")) {
+      return jsonResponse({ error: savedInvoice.status === "paid" ? "This invoice is already paid" : "This invoice was cancelled" }, 409);
+    }
+
     let paymentUrl = "";
     let stripeSessionId = "";
     let stripeError = "";
@@ -97,6 +106,19 @@ Deno.serve(async (req) => {
         // Add application fee (2.9% platform fee)
         stripeParams.append("payment_intent_data[application_fee_amount]", String(Math.round(amount * 100 * 0.029)));
         console.log("Creating Checkout on connected account:", stripeConnectId);
+      }
+
+      // One payable link per invoice: retire the previous one before making a new
+      // one, so an owner holding two emails cannot pay twice. Stripe refuses to
+      // expire a session that is already paid or expired; that is fine.
+      const previousSession: string = savedInvoice?.stripe_checkout_session_id || "";
+      if (previousSession) {
+        try {
+          const expireRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(previousSession)}/expire`, { method: "POST", headers });
+          console.log("Retired previous payment link:", previousSession, expireRes.status);
+        } catch (e) {
+          console.error("Could not retire previous payment link:", e);
+        }
       }
 
       const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
