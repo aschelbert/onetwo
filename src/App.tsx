@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -231,6 +232,7 @@ export default function App() {
     <HydrationGate>
     <BrowserRouter>
       <AuthListener />
+      <Analytics />
       <Routes>
         {/* Public */}
         {/* Landing page is served by static index.html via Vite middleware */}
