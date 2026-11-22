@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
@@ -281,6 +282,7 @@ export default function App() {
       {/* AI Advisor hidden — revisiting how it fits with workflow context widget */}
       {/* <AIAdvisorWrapper /> */}
     </BrowserRouter>
+    <Analytics />
     </HydrationGate>
     </ErrorBoundary>
   );
