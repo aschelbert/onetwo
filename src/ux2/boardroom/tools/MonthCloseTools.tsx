@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
+import { bookLinesFor, matchStatement, parseBankCsv } from '@/lib/bankMatch';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -18,10 +20,31 @@ function Reconcile({ acct, name, period }: { acct: string; name: string; period:
   const gl = useFinancialStore(s => s.generalLedger);
   const end = monthEnd(period + '-01');
   const books = balanceOf(acct, 'asset', gl.filter(e => e.date <= end));
-  const [rec, save] = useToolDoc<Reconciliation>('reconciliation', acct + ':' + period, blankReconciliation(acct, period));
-  const [bank, setBank] = useState(rec.bankBalance ? String(rec.bankBalance) : '');
+  const [saved, save] = useToolDoc<Reconciliation>('reconciliation', acct + ':' + period, blankReconciliation(acct, period));
+  const others = useActionRecordsStore(s => s.records).filter(r => r.kind === 'reconciliation').map(r => r.data as unknown as Reconciliation).filter(d => d.acct === acct && d.period !== period);
+  const accts = useFinancialStore(s => s.chartOfAccounts).filter(a => a.sub !== 'header' && a.num !== acct);
+  const post = useFinancialStore(s => s.postManualEntry);
+  const [bank, setBank] = useState(saved.bankBalance ? String(saved.bankBalance) : '');
   const [what, setWhat] = useState('');
   const [amount, setAmount] = useState('');
+  const [problem, setProblem] = useState('');
+  const [bookTo, setBookTo] = useState<Record<string, string>>({});
+  const picker = useRef<HTMLInputElement>(null);
+  // With the bank's lines uploaded, what cleared and what is still outstanding are worked out from the ledger, live, until someone signs.
+  const clearedElsewhere = new Set(others.flatMap(d => d.clearedIds ?? []));
+  const match = saved.statement.length && !saved.signedOn ? matchStatement(saved.statement, bookLinesFor(acct, gl, end).filter(b => !clearedElsewhere.has(b.id))) : null;
+  const rec: Reconciliation = match ? { ...saved, clearedIds: match.matched.map(m => m.book.id), outstanding: match.bookOnly.map(b => ({ id: b.id, what: b.date + ' · ' + b.memo, amount: b.amount })) } : saved;
+  const upload = async (file: File) => {
+    const parsed = parseBankCsv(await file.text());
+    setProblem(parsed.problem);
+    if (parsed.lines.length) save({ statement: parsed.lines, preparedOn: '', preparedBy: '' });
+  };
+  const bookIt = (line: { id: string; date: string; description: string; amount: number }) => {
+    const other = bookTo[line.id];
+    if (!other) return;
+    try { if (line.amount < 0) post(line.date, 'Bank: ' + line.description, other, acct, -line.amount); else post(line.date, 'Bank: ' + line.description, acct, other, line.amount); setProblem(''); }
+    catch (e) { setProblem(e instanceof Error ? e.message : 'That could not be posted.'); }
+  };
   const { adjustedBank, leftToExplain } = reconcile(rec, books);
   const blocker = signBlocker(rec, books, me);
   const locked = !!rec.signedOn;
@@ -38,14 +61,27 @@ function Reconcile({ acct, name, period }: { acct: string; name: string; period:
         <>
           <div className={FORM}>
             <Field label={'Closing balance on the ' + periodLabel(period) + ' statement'} className="w-[260px]"><input inputMode="decimal" value={bank} onChange={e => setBank(e.target.value)} onBlur={() => save({ bankBalance: signed(bank), preparedOn: '', preparedBy: '' })} placeholder="$" className={INPUT} /></Field>
+            <span className="pb-0.5"><input ref={picker} type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} /><Button size="sm" variant="ghost" onClick={() => picker.current?.click()}>{saved.statement.length ? 'Replace the statement file' : 'Upload the statement (CSV)'}</Button></span>
+          </div>
+          {problem && <span className="text-xs text-ux2-red-ink">{problem}</span>}
+          {match && (
+            <div className="flex flex-col gap-2 rounded-[10px] border border-ux2-line bg-white px-3 py-2.5">
+              <span className="text-sm text-ux2-ink"><b className="font-semibold">{match.matched.length} of {saved.statement.length} bank lines matched themselves</b> · {match.bankOnly.length} on the statement and not in the books · {match.bookOnly.length} in the books and not yet at the bank</span>
+              {match.bankOnly.map(l => (
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink" data-bank-line={l.id}><span>{l.date} · {l.description || 'No description'}</span><span className="flex flex-wrap items-center gap-2"><b className="font-semibold">{fmt(l.amount)}</b><select aria-label={'Account for ' + l.description} value={bookTo[l.id] ?? ''} onChange={e => setBookTo(m => ({ ...m, [l.id]: e.target.value }))} className="rounded-[8px] border border-ux2-line-strong px-2 py-1 text-xs"><option value="">Book it to</option>{accts.map(a => <option key={a.num} value={a.num}>{a.num} {a.name}</option>)}</select><Button size="sm" variant="ghost" disabled={!bookTo[l.id]} onClick={() => bookIt(l)}>Post</Button></span></div>
+              ))}
+              {match.bankOnly.length > 0 && <span className="text-xs text-ux2-muted">A deposit that is an owner's payment belongs in Funds as a payment on that unit, not here; record it there and it matches itself.</span>}
+            </div>
+          )}
+          {!match && <div className={FORM}>
             <Field label="Check not cashed, or deposit not yet in" className="min-w-[200px] flex-1"><input value={what} onChange={e => setWhat(e.target.value)} placeholder="Check 1160, Apex Roofing" className={INPUT} /></Field>
             <Field label="Amount (minus for a check)" className="w-[180px]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="-310.00" className={INPUT} /></Field>
             <Button size="sm" variant="ghost" disabled={!what.trim() || !signed(amount)} onClick={() => { save({ outstanding: [...rec.outstanding, { id: 'o' + Date.now().toString(36), what: what.trim(), amount: signed(amount) }], preparedOn: '', preparedBy: '' }); setWhat(''); setAmount(''); }}>Add</Button>
-          </div>
-          {rec.outstanding.length > 0 && <ul className="m-0 flex list-none flex-col gap-1 p-0">{rec.outstanding.map(o => <li key={o.id} className="flex items-center justify-between gap-2 text-sm text-ux2-ink"><span>{o.what}</span><span className="flex items-center gap-3">{fmt(o.amount)}<button type="button" onClick={() => save({ outstanding: rec.outstanding.filter(x => x.id !== o.id), preparedOn: '', preparedBy: '' })} className="text-xs font-semibold text-ux2-red-ink hover:underline">Remove</button></span></li>)}</ul>}
+          </div>}
+          {rec.outstanding.length > 0 && <ul className="m-0 flex list-none flex-col gap-1 p-0">{rec.outstanding.map(o => <li key={o.id} className="flex items-center justify-between gap-2 text-sm text-ux2-ink"><span>{o.what}</span><span className="flex items-center gap-3">{fmt(o.amount)}{!match && <button type="button" onClick={() => save({ outstanding: rec.outstanding.filter(x => x.id !== o.id), preparedOn: '', preparedBy: '' })} className="text-xs font-semibold text-ux2-red-ink hover:underline">Remove</button>}</span></li>)}</ul>}
           <div className="flex flex-wrap items-center gap-2">
-            {!rec.preparedOn && <Button size="sm" disabled={!rec.bankBalance || leftToExplain !== 0} onClick={() => save({ preparedBy: me, preparedOn: todayIso() })}>{!rec.bankBalance ? 'Enter the bank balance' : leftToExplain !== 0 ? fmt(Math.abs(leftToExplain)) + ' left to explain' : 'I prepared this: it ties out'}</Button>}
-            {rec.preparedOn && <Button size="sm" disabled={!!blocker} onClick={() => save({ signedBy: me, signedOn: todayIso() })}>Sign as {me}</Button>}
+            {!rec.preparedOn && <Button size="sm" disabled={!rec.bankBalance || leftToExplain !== 0} onClick={() => save({ preparedBy: me, preparedOn: todayIso(), outstanding: rec.outstanding, clearedIds: rec.clearedIds })}>{!rec.bankBalance ? 'Enter the bank balance' : leftToExplain !== 0 ? fmt(Math.abs(leftToExplain)) + ' left to explain' : 'I prepared this: it ties out'}</Button>}
+            {rec.preparedOn && <Button size="sm" disabled={!!blocker} onClick={() => save({ signedBy: me, signedOn: todayIso(), outstanding: rec.outstanding, clearedIds: rec.clearedIds })}>Sign as {me}</Button>}
             {rec.preparedOn && blocker && <span className="text-xs text-ux2-muted">{blocker}.</span>}
           </div>
         </>
@@ -94,12 +130,16 @@ function StatementPacket({ period }: { period: string }) {
 /** Month close: reconcile each bank account, with a second person signing, and the statement packet. */
 export default function MonthCloseTools({ period }: { period: string }) {
   const banks = useFinancialStore(s => s.chartOfAccounts).filter(a => a.sub === 'bank');
+  const any = useActionRecordsStore(s => s.records.some(r => r.kind === 'reconciliation'));
+  const [controls, setControls] = useToolDoc<{ requireReconciliation?: boolean }>('controls', 'building', {});
+  const required = controls.requireReconciliation ?? any;
   return (
     <Card aria-label="Reconcile and report" className="gap-3">
       <SectionLabel>Reconcile and report · {periodLabel(period)}</SectionLabel>
       {banks.map(a => <Reconcile key={a.num} acct={a.num} name={a.name} period={period} />)}
       <StatementPacket period={period} />
-      <Why>Each account is reconciled by one person and signed by another: whoever prepared a reconciliation cannot sign it. Close the books for the month after both are signed.</Why>
+      <label className="flex items-center gap-2 text-xs font-semibold text-ux2-ink"><input type="checkbox" checked={required} onChange={e => setControls({ requireReconciliation: e.target.checked })} />Ask for a signed reconciliation of every bank account before a month's books are closed</label>
+      <Why>Each account is reconciled by one person and signed by another: whoever prepared a reconciliation cannot sign it. With the box ticked, closing the books for a month that is missing a signature asks first, and going ahead anyway is recorded with the person's name.</Why>
     </Card>
   );
 }

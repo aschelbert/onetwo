@@ -16,12 +16,15 @@ export interface Reconciliation {
   bankBalance: number;
   /** Money the books show that the bank has not seen yet: uncashed checks (negative) and deposits in transit (positive). */
   outstanding: { id: string; what: string; amount: number }[];
+  /** The statement's own lines, when the bank's CSV was uploaded, and the ledger entries they cleared. */
+  statement: { id: string; date: string; description: string; amount: number }[];
+  clearedIds: string[];
   preparedBy: string;
   preparedOn: string;
   signedBy: string;
   signedOn: string;
 }
-export const blankReconciliation = (acct: string, period: string): Reconciliation => ({ acct, period, bankBalance: 0, outstanding: [], preparedBy: '', preparedOn: '', signedBy: '', signedOn: '' });
+export const blankReconciliation = (acct: string, period: string): Reconciliation => ({ acct, period, bankBalance: 0, outstanding: [], statement: [], clearedIds: [], preparedBy: '', preparedOn: '', signedBy: '', signedOn: '' });
 
 /** The bank's balance once uncashed checks and deposits in transit are counted, and what is still unexplained against the books. */
 export function reconcile(rec: Reconciliation, bookBalance: number) {
@@ -35,6 +38,11 @@ export function signBlocker(rec: Reconciliation, bookBalance: number, who: strin
   if (reconcile(rec, bookBalance).leftToExplain !== 0) return 'There is still a difference to explain';
   if (who.trim().toLowerCase() === rec.preparedBy.trim().toLowerCase()) return 'Whoever prepared it cannot also sign it';
   return '';
+}
+
+/** Which months' reconciliations must be signed before the books close through a date: each bank account that has moved. Returns the accounts still unsigned. */
+export function unsignedAccounts(banks: { num: string; name: string }[], active: Set<string>, signed: Set<string>): string[] {
+  return banks.filter(b => active.has(b.num) && !signed.has(b.num)).map(b => b.name);
 }
 
 // ── Allowance for dues that may not be collected (year-end) ───────────────────

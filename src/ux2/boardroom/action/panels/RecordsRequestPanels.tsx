@@ -24,16 +24,16 @@ function Log({ r, patch }: PanelProps<RecordsRequestData>) {
         <Field label="Unit" className="w-[130px]"><select value={unit} onChange={e => { setUnit(e.target.value); const x = units.find(y => y.number === e.target.value); if (x && !who.trim()) setWho(x.owner); }} className={INPUT}><option value="">—</option>{units.map(x => <option key={x.number} value={x.number}>{x.number}</option>)}</select></Field>
         <Field label="Who asked" className="min-w-[200px] flex-1"><input value={who} onChange={e => setWho(e.target.value)} className={INPUT} /></Field>
         <Field label="Asked on" className="w-[170px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
-        <Field label="Days to reply" className="w-[120px]"><input inputMode="numeric" value={days} onChange={e => setDays(e.target.value)} className={INPUT} /></Field>
+        <Field label="Reply within, days" className="w-[150px]"><input inputMode="numeric" value={days} onChange={e => setDays(e.target.value)} className={INPUT} /></Field>
       </div>
-      {u && <Inner><KV label="Owner of record">{u.owner}</KV><KV label="Balance">{u.balance > 0 ? `$${u.balance.toLocaleString('en-US')} owed` : 'Current'}</KV></Inner>}
+      {u && <Inner><KV label="Owner on file">{u.owner}</KV><KV label="Balance">{u.balance > 0 ? `$${u.balance.toLocaleString('en-US')} owed` : 'Current'}</KV></Inner>}
       <div className={FORM}>
         <label className="flex items-center gap-2 pb-2.5 text-xs font-semibold text-ux2-ink"><input type="checkbox" checked={writing} onChange={e => setWriting(e.target.checked)} />Asked in writing</label>
-        <Field label="Is the person asking an owner of record, or their authorised agent?" className="w-[340px]"><select value={owner} onChange={e => setOwner(e.target.value as RecordsRequestData['ownerOfRecord'])} className={INPUT}><option value="">Choose</option><option value="yes">Yes</option><option value="no">No</option></select></Field>
+        <Field label="An owner in good standing (or their agent), asking for a purpose tied to their membership?" className="w-[420px]"><select value={owner} onChange={e => setOwner(e.target.value as RecordsRequestData['ownerOfRecord'])} className={INPUT}><option value="">Choose</option><option value="yes">Yes</option><option value="no">No</option></select></Field>
         <Button size="sm" disabled={!who.trim() || !on || !owner} onClick={() => { patch({ requester: who.trim(), askedOn: on, inWriting: writing, ownerOfRecord: owner }); setRecord(r.id, { unit, dueOn: plusDays(on, Math.max(1, Number(days) || 10)) }); }}>Log it</Button>
       </div>
-      {owner === 'no' && <p className={NOTE}>Only owners, their lenders and their authorised agents have the right to inspect. A request from anyone else can be declined in step 2, with that as the reason.</p>}
-      <Why>Owners may examine the association's books, minutes and records at a reasonable time (DC Code § 42-1903.14). Check the bylaws for the number of days to reply; ten is used until it is changed here. Owing dues does not take the right away.</Why>
+      {owner === 'no' && <p className={NOTE}>The right belongs to owners in good standing and their authorised agents, for a proper purpose related to their membership. A request outside that can be declined in step 2, with that as the reason.</p>}
+      <Why>An owner in good standing, or their agent, may examine and copy the association's books and records for a proper purpose related to their membership, during reasonable hours on business days (DC Code § 42-1903.14). The statute sets no number of days to reply, so the deadline here is the board's own, or the bylaws' if they set one; ten is the starting figure. Whether an owner who owes dues is in good standing is for the bylaws. The association may charge the actual cost of copies.</Why>
     </>
   );
 }
@@ -58,7 +58,7 @@ function Choose({ r, patch }: PanelProps<RecordsRequestData>) {
         ))}
       </ul>
       {!r.data.sentOn && <div className={FORM}><Field label="What was asked for" className="min-w-[260px] flex-1"><input value={what} onChange={e => setWhat(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} placeholder="2026 general ledger" className={INPUT} /></Field><Button size="sm" variant="ghost" disabled={!what.trim()} onClick={add}>Add the item</Button></div>}
-      <Inner><b className="text-xs font-semibold text-ux2-ink">Usually held back</b><ul className="m-0 mt-1 list-disc pl-5 text-xs text-ux2-muted">{USUALLY_WITHHELD.map(w => <li key={w}>{w}</li>)}</ul></Inner>
+      <Inner><b className="text-xs font-semibold text-ux2-ink">May be withheld · DC Code § 42-1903.14(c)</b><ul className="m-0 mt-1 list-disc pl-5 text-xs text-ux2-muted">{USUALLY_WITHHELD.map(w => <li key={w}>{w}</li>)}</ul></Inner>
       <Why>The secretary decides item by item. Anything not shared in full goes out with its reason. A ledger export names units: share it with other owners' details removed unless the bylaws say otherwise.</Why>
     </>
   );

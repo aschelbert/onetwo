@@ -1,7 +1,11 @@
 import type { Photo } from '@/lib/services/photos';
 import { stepsFrom, type ActionKind } from './types';
 
-/** The fire alarm instructions the District has a building give every resident, in writing, and post. DC Code § 6-751.11. */
+/**
+ * Fire alarm instructions for residents, in writing and posted. The District required this of buildings with four or
+ * more units, condominiums included, until 2016 (former DC Code § 6-751.11, repealed by D.C. Law 21-118). It is kept
+ * here as good practice, with the four points that law asked for.
+ */
 export interface FireNoticeData {
   /** 'all' for the building's notice; 'unit' for the copy a new owner or tenant gets. */
   scope: 'all' | 'unit';
@@ -26,7 +30,7 @@ export interface FireNoticeData {
 
 export const answered = (d: FireNoticeData) => !!d.pullStations.trim() && !!d.linkedToUnits && !!d.monitored && !!d.evacuation.trim();
 
-/** The notice itself, written from the answers. The first four paragraphs are the points the law asks for and are always present. */
+/** The notice itself, written from the answers. The first four paragraphs are the points the former law asked for and are always present. */
 export function noticeText(d: FireNoticeData, building: { name: string; address: string }): string[] {
   return [
     `${building.name} · ${building.address}`,
@@ -40,13 +44,13 @@ export function noticeText(d: FireNoticeData, building: { name: string; address:
       : 'The smoke detector in your unit is separate. It sounds only inside your unit and does not set off the building alarm.',
     `When the building alarm sounds: ${d.evacuation.trim()}`,
     ...(d.extra.trim() ? [d.extra.trim()] : []),
-    `Given under DC Code § 6-751.11.${d.contact.trim() ? ` Questions: ${d.contact.trim()}.` : ''}`,
+    ...(d.contact.trim() ? [`Questions: ${d.contact.trim()}.`] : []),
   ];
 }
 
 export const FIRE_NOTICE: ActionKind<FireNoticeData> = {
   kind: 'fire-notice', runbookId: 'fire-alarm-notice', name: 'Fire alarm notice',
-  trigger: 'No notice on record, a change to the alarm system, or a new owner or tenant', blurb: 'Write, deliver and post the fire alarm instructions every resident must be given.',
+  trigger: 'No notice on record, a change to the alarm system, or a new owner or tenant', blurb: 'Write, deliver and post the fire alarm instructions every resident should have.',
   catId: 'legal', role: 'Vice President', visibility: 'board',
   stepTitles: [['questions', 'Answer four questions about the alarm'], ['review', 'Review the notice'], ['deliver', 'Deliver it to every unit'], ['post', 'Post it in the common areas']],
   how: {

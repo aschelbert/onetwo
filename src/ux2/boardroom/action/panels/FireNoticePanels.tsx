@@ -56,12 +56,12 @@ function Review({ r, patch, step }: PanelProps<FireNoticeData>) {
   return (
     <>
       <Inner className="flex flex-col gap-2 bg-white" aria-label="The notice"><span className="text-xs text-ux2-muted">{lines[0]}</span><b className="text-lg font-semibold text-ux2-ink">{lines[1]}</b>{lines.slice(2).map((l, i) => <p key={i} className="m-0 text-sm text-ux2-ink">{l}</p>)}</Inner>
-      <Field label="Anything to add (the required points above stay as they are)"><textarea aria-label="Anything to add" rows={2} value={extra} onChange={e => setExtra(e.target.value)} className={AREA} /></Field>
+      <Field label="Anything to add (the four points above stay as they are)"><textarea aria-label="Anything to add" rows={2} value={extra} onChange={e => setExtra(e.target.value)} className={AREA} /></Field>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" disabled={!!step.waitsOn} onClick={() => patch({ extra: extra.trim(), reviewedOn: todayIso(), reviewedBy: me })}>{r.data.reviewedOn ? 'Confirm the wording again' : 'Looks right'}</Button>
         <Button size="sm" variant="ghost" onClick={() => printNotice(lines)}>Print the notice</Button>
       </div>
-      <Why>Written from step 1's answers: how to sound the alarm, whether it is connected to unit detectors, whether it calls the fire department, and to call 911.</Why>
+      <Why>Written from step 1's answers: how to sound the alarm, whether it is connected to unit detectors, whether it calls the fire department, and to call 911. District law required this notice until 2016; it is no longer required, and is kept here as good practice.</Why>
     </>
   );
 }
@@ -88,7 +88,7 @@ function Deliver({ r, patch, step }: PanelProps<FireNoticeData>) {
         <Field label={method === 'mail' ? 'Mailed on' : 'Handed over by'} className="w-[180px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
         <Button size="sm" disabled={!!step.waitsOn || !everyone || !on} onClick={() => patch({ method, deliveredOn: on })}>{everyone ? 'Record the delivery' : `${units.length - units.filter(u => got.has(u.number)).length} units left`}</Button>
       </div>
-      <p className={NOTE}>Email alone does not count: the law asks for delivery by hand or first-class mail. Where a unit is rented, the tenant gets a copy too.</p>
+      <p className={NOTE}>Hand it over or mail it: an email is easy to miss, and this is the notice people need to have seen. Where a unit is rented, the tenant gets a copy too.</p>
     </>
   );
 }

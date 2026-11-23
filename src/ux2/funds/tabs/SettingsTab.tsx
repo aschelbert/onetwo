@@ -19,6 +19,8 @@ import { fmt } from '@/lib/formatters';
 import { PAYMENT_ORDER_LABEL, type PaymentOrder } from '@/lib/financial-logic';
 import { budgetLineAccounts, fundOf } from '@/lib/ledger';
 import type { ChartOfAccountsEntry, GLEntry } from '@/types/financial';
+import { useAuthStore } from '@/store/useAuthStore';
+import { closeBooksChecked } from '../../boardroom/tools/docs';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, SearchInput, SectionLabel, Table, Td, Th, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { ordinal, type FundsSnapshot } from '../metrics';
@@ -277,7 +279,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
           <div><span className="text-[17px] font-semibold text-ux2-ink">Ledger</span><span className="ml-2 text-xs text-ux2-muted">{ledger.length.toLocaleString()} entries · {closedEntries.toLocaleString()} in closed months · every bill, payment and transfer ends up here</span></div>
           <span className="flex flex-wrap items-center gap-2" aria-label="Books closed through">
             <Chip tone={closedThrough ? 'navy' : 'ghost'}>{closedThrough ? `Closed through ${dayLabel(closedThrough)}` : 'No month closed yet'}</Chip>
-            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(priorEnd); setNote(`Books closed through ${dayLabel(priorEnd)}. Entries on or before that date are locked; a correction posts dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
+            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { const r = closeBooksChecked(priorEnd, useAuthStore.getState().currentUser.name); if (r.closed) setNote(`Books closed through ${dayLabel(priorEnd)}${r.overrode ? ' without a signed reconciliation, recorded under your name' : ''}. Entries on or before that date are locked; a correction posts dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
             {closedThrough && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(null); setNote('Books reopened. Every month can be posted to again.'); }}>Reopen</Button>}
           </span>
         </div>

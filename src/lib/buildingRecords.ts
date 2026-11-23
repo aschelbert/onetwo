@@ -118,9 +118,9 @@ export const RECORD_KINDS: RecordKind[] = [
   {
     id: 'fire-alarm-notice', label: 'Fire alarm instructions to residents', group: 'Fire and life safety',
     what: 'A written notice, posted in the common areas and given to every unit owner or tenant by hand or first-class mail: how the building fire alarm works, whether it is connected to the unit smoke detectors and to the Fire and EMS Department, and that 911 must be called in a fire.',
-    cite: 'DC Code § 6-751.11', cycle: { type: 'once' }, postedWhere: 'Conspicuous places in the common areas',
-    dateLabel: 'Last given to every unit', states: ['DC'], applies: always,
-    appliesNote: 'Give it again when the alarm system changes and to each new owner or tenant.',
+    cite: 'Good practice; the law that required it (former DC Code § 6-751.11) was repealed in 2016', cycle: { type: 'once' }, postedWhere: 'Conspicuous places in the common areas',
+    dateLabel: 'Last given to every unit', states: ['DC'], applies: () => 'check',
+    appliesNote: 'No longer required by District law, but still worth doing: residents should know whether the building alarm calls the fire department. Give it again when the alarm system changes and to each new owner or tenant.',
   },
   {
     id: 'energy-benchmarking', label: 'Energy and water benchmarking report', group: 'Energy',

@@ -8,8 +8,9 @@ const ids = (f: BuildingFacts, want?: 'yes' | 'check') => kindsFor(f).filter(k =
 
 describe('which records a building should hold', () => {
   it('gives a large DC building with an elevator and boiler the full list', () => {
-    expect(ids(facts(), 'yes')).toEqual(['certificate-of-occupancy', 'elevator-certificate', 'boiler-certificate', 'heating-inspection', 'fire-alarm-test', 'fire-extinguishers', 'smoke-detector-test', 'fire-alarm-notice', 'energy-benchmarking']);
-    expect(ids(facts(), 'check')).toEqual(['business-licence']);
+    expect(ids(facts(), 'yes')).toEqual(['certificate-of-occupancy', 'elevator-certificate', 'boiler-certificate', 'heating-inspection', 'fire-alarm-test', 'fire-extinguishers', 'smoke-detector-test', 'energy-benchmarking']);
+    // The fire alarm notice is good practice, not law, since its statute was repealed in 2016.
+    expect(ids(facts(), 'check')).toEqual(['business-licence', 'fire-alarm-notice']);
   });
   it('finds DC however the state was typed', () => {
     expect(ids(facts({ state: 'District of Columbia' }))).toContain('certificate-of-occupancy');
@@ -80,9 +81,9 @@ describe('building record gaps', () => {
     const rows = recordRows(snap([]));
     const sum = recordsSummary(rows);
     expect(sum.gaps.map(r => r.kind.id)).not.toContain('business-licence');
-    expect(sum.toCheck.map(r => r.kind.id)).toEqual(['business-licence']);
+    expect(sum.toCheck.map(r => r.kind.id)).toEqual(['business-licence', 'fire-alarm-notice']);
     expect(sum.inOrder).toBe(0);
-    expect(sum.expected).toBe(9);
+    expect(sum.expected).toBe(8);
   });
   it('flags a certificate that is on file but not posted, and clears it once posted', () => {
     const need = (records: BuildingRecord[]) => recordRows(snap(records)).find(r => r.kind.id === 'certificate-of-occupancy')!.needs;
@@ -92,7 +93,7 @@ describe('building record gaps', () => {
   it('counts a "check" kind once the building records one', () => {
     const rows = recordRows(snap([rec('business-licence', { expiresOn: '2026-10-01', posted: true })]));
     expect(rows.find(r => r.kind.id === 'business-licence')!.needs).toBe('lapsed');
-    expect(recordsSummary(rows).expected).toBe(10);
+    expect(recordsSummary(rows).expected).toBe(9);
   });
 });
 

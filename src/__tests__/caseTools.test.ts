@@ -150,3 +150,66 @@ describe('where the tools show', () => {
     expect(readToolDoc('reconciliation', '1010:2026-10', blankReconciliation('1010', '2026-10'))).toMatchObject({ bankBalance: 100, preparedBy: 'Dana' });
   });
 });
+
+import { bankAmount, bankDate, bookLinesFor, matchStatement, parseBankCsv } from '@/lib/bankMatch';
+import { closeBlocker } from '@/ux2/boardroom/tools/docs';
+
+describe('matching a bank statement to the ledger', () => {
+  it('reads dates and amounts the way banks write them', () => {
+    expect(bankDate('10/5/2026')).toBe('2026-10-05');
+    expect(bankDate('10/15/26')).toBe('2026-10-15');
+    expect(bankDate('Pending')).toBe('');
+    expect(bankAmount('$1,234.50')).toBe(1234.5);
+    expect(bankAmount('(18.00)')).toBe(-18);
+    expect(bankAmount('')).toBeNull();
+  });
+  it('reads a signed amount column, or separate money-out and money-in columns', () => {
+    const one = parseBankCsv('Account 4471\nDate,Description,Amount,Balance\n10/15/2026,"SERVICE FEE, MONTHLY",-18.00,100\n10/22/2026,DEPOSIT,450.00,550\n,,,\n');
+    expect(one.lines.map(l => [l.date, l.description, l.amount])).toEqual([['2026-10-15', 'SERVICE FEE, MONTHLY', -18], ['2026-10-22', 'DEPOSIT', 450]]);
+    const two = parseBankCsv('Posting Date,Payee,Debit,Credit\n2026-10-03,Check 1158,310.00,\n2026-10-04,ACH IN,,475.00\n');
+    expect(two.lines.map(l => l.amount)).toEqual([-310, 475]);
+    expect(parseBankCsv('hello\nworld').problem).toContain('No heading row');
+  });
+  it('pairs each bank line with one ledger entry of the same amount, nearest in date', () => {
+    const books = [
+      { id: 'a', date: '2026-10-01', memo: 'Dues 101', amount: 450 }, { id: 'b', date: '2026-10-20', memo: 'Dues 102', amount: 450 },
+      { id: 'c', date: '2026-08-12', memo: 'Check 1160', amount: -310 }, { id: 'd', date: '2026-10-28', memo: 'Check 1171', amount: -900 },
+    ];
+    const lines = [{ id: '1', date: '2026-10-21', description: 'DEPOSIT', amount: 450 }, { id: '2', date: '2026-10-02', description: 'DEPOSIT', amount: 450 }, { id: '3', date: '2026-10-15', description: 'FEE', amount: -18 }];
+    const m = matchStatement(lines, books);
+    expect(m.matched.map(x => [x.line.id, x.book.id])).toEqual([['2', 'a'], ['1', 'b']]);
+    expect(m.bankOnly.map(l => l.id)).toEqual(['3']);
+    // The August check is too old to pair by chance, and stays outstanding with the unpaid October one.
+    expect(m.bookOnly.map(b => b.id)).toEqual(['c', 'd']);
+  });
+  it('signs ledger entries by which side of the bank account they are on', () => {
+    const gl = [
+      { id: 'x', date: '2026-10-02', memo: 'in', debitAcct: '1010', creditAcct: '1110', amount: 450, status: 'posted' },
+      { id: 'y', date: '2026-10-03', memo: 'out', debitAcct: '2010', creditAcct: '1010', amount: 310, status: 'posted' },
+      { id: 'z', date: '2026-11-03', memo: 'later', debitAcct: '1010', creditAcct: '1110', amount: 5, status: 'posted' },
+      { id: 'v', date: '2026-10-03', memo: 'void', debitAcct: '1010', creditAcct: '1110', amount: 5, status: 'void' },
+    ];
+    expect(bookLinesFor('1010', gl, '2026-10-31').map(b => [b.id, b.amount])).toEqual([['x', 450], ['y', -310]]);
+  });
+});
+
+describe('closing the books', () => {
+  beforeEach(() => {
+    useActionRecordsStore.setState({ records: [] });
+    useFinancialStore.setState({ generalLedger: [{ id: 'g', date: '2026-10-05', memo: 'Dues', debitAcct: '1010', creditAcct: '1110', amount: 450, source: 'payment', sourceId: null, posted: '2026-10-05', status: 'posted' }] as never });
+  });
+  it('asks for nothing until the building reconciles, then for a signature on every account that moved', () => {
+    expect(closeBlocker('2026-10-31')).toBe('');
+    saveToolDoc('reconciliation', '1010:2026-10', blankReconciliation('1010', '2026-10'), { bankBalance: 450, preparedBy: 'Dana', preparedOn: '2026-11-02' }, '2026-11-02');
+    expect(closeBlocker('2026-10-31')).toBe('Operating Checking has no signed reconciliation for 2026-10');
+    saveToolDoc('reconciliation', '1010:2026-10', blankReconciliation('1010', '2026-10'), { signedBy: 'Ann', signedOn: '2026-11-03' });
+    expect(closeBlocker('2026-10-31')).toBe('');
+    // The reserve account has not moved, so it is not asked for; the next month is.
+    expect(closeBlocker('2026-11-30')).toContain('2026-11');
+  });
+  it('can be switched off', () => {
+    saveToolDoc('reconciliation', '1010:2026-10', blankReconciliation('1010', '2026-10'), { bankBalance: 450 });
+    saveToolDoc('controls', 'building', {}, { requireReconciliation: false });
+    expect(closeBlocker('2026-10-31')).toBe('');
+  });
+});
