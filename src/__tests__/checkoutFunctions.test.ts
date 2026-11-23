@@ -458,6 +458,25 @@ describe('chargebee-webhook', () => {
     expect(Object.keys(world.events)).toHaveLength(0);
   });
 
+  it('says in the log why a delivery was refused, without the secret', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const reason = async (auth: string) => {
+      warn.mockClear();
+      expect((await hook(subscriptionEvent('subscription_created'), auth)).status).toBe(401);
+      return String(warn.mock.calls[0]?.[0] ?? '');
+    };
+    expect(await reason('')).toContain('no Authorization header');
+    expect(await reason('Bearer abc')).toContain('not Basic');
+    expect(await reason('Basic ' + btoa('hook-pass:onetwo'))).toContain('swapped');
+    expect(await reason('Basic ' + btoa('onetwo:hook-pass '))).toContain('password Chargebee sends has a space');
+    expect(await reason('Basic ' + btoa('someone:hook-pass'))).toContain('username does not match');
+    const wrongPass = await reason('Basic ' + btoa('onetwo:guess-123'));
+    expect(wrongPass).toContain('password does not match');
+    expect(wrongPass).not.toContain('hook-pass');
+    expect(wrongPass).not.toContain('guess-123');
+    warn.mockRestore();
+  });
+
   it('subscription_created provisions the building the checkout saved', async () => {
     world.pending = [{
       id: 'p1', chargebee_customer_id: 'cb_tenant_abc', user_id: 'user-dana',
