@@ -2,12 +2,16 @@ import type { ActionKind, ActionRecord, ActionStep } from './types';
 import { BID_REQUEST } from './bidRequest';
 import { REPAIR } from './repair';
 import { INSPECTION } from './inspection';
+import { FIRE_NOTICE } from './fireNotice';
+import { RECORDS_REQUEST } from './recordsRequest';
+import { BUDGET_AMENDMENT } from './budgetAmendment';
+import { PAYROLL_FILING } from './payrollFiling';
 
 export type { ActionKind, ActionRecord, ActionStep } from './types';
 
 /** Every record-backed action there is. Adding a kind here gives it a runbook, a plan and a place in the Board Room. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const ACTION_KINDS: ActionKind<any>[] = [BID_REQUEST, REPAIR, INSPECTION];
+export const ACTION_KINDS: ActionKind<any>[] = [BID_REQUEST, REPAIR, INSPECTION, FIRE_NOTICE, RECORDS_REQUEST, BUDGET_AMENDMENT, PAYROLL_FILING];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const actionKind = (kind: string): ActionKind<any> | undefined => ACTION_KINDS.find(k => k.kind === kind);

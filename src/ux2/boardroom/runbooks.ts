@@ -87,9 +87,15 @@ const CATALOGUE: RunbookDef[] = [
 ];
 
 /** One runbook per record-backed action: it starts as its record is started, and every step ticks itself from the record. */
-const RECORD_RUNBOOKS: RunbookDef[] = ACTION_KINDS.map(k => ({ id: k.runbookId, name: k.name, trigger: k.trigger, steps: k.stepTitles.length, automated: k.stepTitles.length, visibility: k.visibility, defaultOn: true, wired: true, autoSteps: k.stepTitles.map((_, i) => i), desc: k.blurb }));
+const RECORD_RUNBOOKS: RunbookDef[] = ACTION_KINDS.map(k => {
+  // Replacing a by-hand runbook, it keeps that runbook's situation, so the situation is not listed twice.
+  const was = CATALOGUE.find(c => c.id === k.runbookId);
+  return { id: k.runbookId, name: k.name, trigger: k.trigger, steps: k.stepTitles.length, automated: k.stepTitles.length, ...(was?.sitId ? { sitId: was.sitId, catId: was.catId } : {}), visibility: k.visibility, defaultOn: true, wired: true, autoSteps: k.stepTitles.map((_, i) => i), desc: k.blurb };
+});
+/** A guided action replaces the by-hand runbook of the same id. */
+const REPLACED = new Set(RECORD_RUNBOOKS.map(r => r.id));
 
-export const RUNBOOKS: RunbookDef[] = [...CATALOGUE, ...RECORD_RUNBOOKS];
+export const RUNBOOKS: RunbookDef[] = [...CATALOGUE.filter(c => !REPLACED.has(c.id)), ...RECORD_RUNBOOKS];
 
 /** Situations the wizard offers that no catalogue runbook runs on: each one is a runbook opened by hand, with the situation's steps. */
 const COVERED = new Set(RUNBOOKS.map(r => r.sitId).filter(Boolean));

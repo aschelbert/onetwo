@@ -16,6 +16,11 @@ import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { ACTION_KINDS, actionKind, actionKindByRunbook, stepsOf, type ActionRecord } from '@/lib/actions';
 import type { CaseTrackerCase } from '@/types/issues';
 import { pointsFor, watched, type InspectionData } from '@/lib/actions/inspection';
+import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
+import { usePayrollStore } from '@/store/usePayrollStore';
+import { amended, passed, type BudgetAmendmentData } from '@/lib/actions/budgetAmendment';
+import type { FireNoticeData } from '@/lib/actions/fireNotice';
+import { lastFinishedQuarter, returnsFor, type PayrollFilingData } from '@/lib/actions/payrollFiling';
 import { todayIso } from '../runbook/adapters';
 
 export const actionSourceId = (r: Pick<ActionRecord, 'kind' | 'id'>) => `${actionKind(r.kind)?.runbookId ?? r.kind}:${r.id}`;
@@ -40,6 +45,61 @@ export const syncPaidWorkOrder: Sync = (r, today) => {
   if (wo?.status === 'paid') useActionRecordsStore.getState().patchData(r.id, { paidOn: wo.paidDate || today });
 };
 SYNC.repair = syncPaidWorkOrder;
+
+/** A passed amendment changes the budget lines, once, and closes. A failed one closes with the budget untouched. */
+SYNC['budget-amendment'] = (r, today) => {
+  const d = r.data as unknown as BudgetAmendmentData;
+  const store = useActionRecordsStore.getState();
+  if (r.closedOn || d.leaveOver || !d.vote.on) return;
+  if (passed(d) && !d.appliedOn) {
+    const fin = useFinancialStore.getState();
+    const after = amended(fin.budgetCategories, d);
+    after.forEach((l, i) => { if (l.budgeted !== fin.budgetCategories[i].budgeted) fin.updateBudgetCategory(l.id, { budgeted: l.budgeted }); });
+    store.patchData(r.id, { appliedOn: today });
+  }
+  if (!passed(d) || d.ownersNotice) store.patch(r.id, { closedOn: today });
+};
+
+/** A posted building-wide notice fills in the "fire alarm instructions" record under Building › Obligations. */
+SYNC['fire-notice'] = (r, today) => {
+  const d = r.data as unknown as FireNoticeData;
+  if (r.closedOn) return;
+  if (d.scope === 'unit') { if (d.deliveredOn) useActionRecordsStore.getState().patch(r.id, { closedOn: today }); return; }
+  if (!d.postedOn) return;
+  useBuildingRecordsStore.getState().addRecord({
+    kind: 'fire-alarm-notice', name: '', number: '', doneOn: d.deliveredOn || d.postedOn, expiresOn: '', posted: true,
+    notes: `Given to ${d.delivered.length} units ${d.method === 'mail' ? 'by first-class mail' : 'by hand'}; posted ${d.postedOn} at ${d.places.map(p => p.where).join(', ') || 'the common areas'}. From the fire alarm notice action.`,
+  });
+  useActionRecordsStore.getState().patch(r.id, { closedOn: today });
+};
+
+/** Wages paid in a period, from the pay runs. */
+export function wagesIn(start: string, end: string): number {
+  const staff = new Map(usePayrollStore.getState().staff.map(s => [s.id, s.type]));
+  return Math.round(usePayrollStore.getState().payRuns.filter(p => p.status === 'paid' && staff.get(p.staffId) === 'employee' && p.periodEnd >= start && p.periodEnd <= end).reduce((t, p) => t + p.grossPay, 0) * 100) / 100;
+}
+
+/** Start the payroll filing for a quarter (the last finished one by default), unless it already has one. */
+export function startPayrollFiling(today: string = todayIso(), quarter = lastFinishedQuarter(today)) {
+  const existing = useActionRecordsStore.getState().records.find(r => r.kind === 'payroll-filing' && (r.data as unknown as PayrollFilingData).period === quarter.period);
+  if (existing) return { recordId: existing.id, caseId: recordCase(useIssuesStore.getState().cases, existing)?.id ?? null };
+  const returns = returnsFor(quarter.period);
+  const data: Partial<PayrollFilingData> = { period: quarter.period, periodStart: quarter.start, periodEnd: quarter.end, wages: wagesIn(quarter.start, quarter.end), returns };
+  return startAction('payroll-filing', `${quarter.period.replace('-Q', ', quarter ')}`, data as Record<string, unknown>, { dueOn: returns.map(x => x.dueOn).sort()[0] }, today);
+}
+
+/** The building-wide fire alarm notice last finished, whose answers a single unit's copy reuses. */
+export const lastFireNotice = () => useActionRecordsStore.getState().records
+  .filter(r => r.kind === 'fire-notice' && !!r.closedOn && (r.data as unknown as FireNoticeData).scope === 'all')
+  .sort((a, b) => b.closedOn.localeCompare(a.closedOn))[0];
+
+/** Give the notice to one unit's new owner or tenant, with the wording already settled. */
+export function startUnitFireNotice(unit: string, today: string = todayIso()) {
+  const last = lastFireNotice();
+  if (!last) return startAction('fire-notice', `Unit ${unit}`, { scope: 'unit' }, { unit }, today);
+  const d = last.data as unknown as FireNoticeData;
+  return startAction('fire-notice', `Unit ${unit}, new resident`, { scope: 'unit', pullStations: d.pullStations, linkedToUnits: d.linkedToUnits, monitored: d.monitored, evacuation: d.evacuation, contact: d.contact, extra: d.extra, reviewedOn: d.reviewedOn, reviewedBy: d.reviewedBy }, { unit }, today);
+}
 
 /** Start a record-backed action: adds the record, opens its action, and returns the action's case id. */
 export function startAction(kind: string, title: string, data: Record<string, unknown> = {}, extra: { unit?: string; dueOn?: string } = {}, today: string = todayIso()): { recordId: string; caseId: string | null } {
@@ -74,9 +134,18 @@ export function startInspection(title: string, opts: { scheduleId?: string; by?:
   return startAction('inspection', title, { template, scheduleId: opts.scheduleId ?? '', by: opts.by ?? '', points }, {}, today);
 }
 
+/** Actions that open on the calendar: the payroll filing, in the two months after a quarter in which employees were paid. */
+export function runActionTriggers(today: string = todayIso()): void {
+  if (useFinancialStore.getState().runbooksOff.includes('payroll-filing')) return;
+  const q = lastFinishedQuarter(today);
+  const sinceEnd = Math.round((Date.parse(today) - Date.parse(q.end)) / 86400000);
+  if (sinceEnd <= 60 && wagesIn(q.start, q.end) > 0) startPayrollFiling(today, q);
+}
+
 export interface RecordActionsRun { opened: string[] }
 
-export function runRecordActions(today: string = todayIso()): RecordActionsRun {
+export function runRecordActions(today: string = todayIso(), triggers = false): RecordActionsRun {
+  if (triggers) runActionTriggers(today);
   const off = useFinancialStore.getState().runbooksOff;
   const out: RecordActionsRun = { opened: [] };
   const kinds = new Set(ACTION_KINDS.map(k => k.kind));

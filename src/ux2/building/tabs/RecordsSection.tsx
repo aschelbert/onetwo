@@ -1,4 +1,5 @@
 import { Fragment, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
 import { canStoreFiles, downloadDocumentFile, uploadDocumentFile } from '@/lib/services/documentFiles';
 import { generateLocalId } from '@/lib/generateId';
@@ -6,6 +7,9 @@ import { recordStatus, type BuildingRecord, type RecordKind, type RecordStatus }
 import { Button, Card, Chip, Inner, SectionLabel, Field, INPUT, Why } from '../../components';
 import { toStateCode } from '@/lib/usStates';
 import { recordRows, recordsSummary, type BuildingSnapshot, type RecordRow } from '../metrics';
+
+/** Records an action produces: the row offers the action that does the work and fills the record in. */
+const ACTION_FOR: Record<string, [kind: string, label: string]> = { 'fire-alarm-notice': ['fire-notice', 'Give the notice'], 'energy-benchmarking': ['benchmarking', 'Start the report'] };
 
 const GROUPS: RecordKind['group'][] = ['Occupancy and licences', 'Equipment certificates', 'Fire and life safety', 'Heating', 'Energy'];
 const fullDay = (iso: string) => { const d = new Date(iso + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
@@ -75,6 +79,7 @@ function History({ entries, isBoard }: { entries: BuildingRecord[]; isBoard: boo
 
 /** Building › Obligations › Licences and certificates. */
 export default function RecordsSection({ snap, isBoard, onEditDetails }: { snap: BuildingSnapshot; isBoard: boolean; onEditDetails: () => void }) {
+  const navigate = useNavigate();
   const rows = recordRows(snap);
   const sum = recordsSummary(rows);
   const update = useBuildingRecordsStore(s => s.updateRecord);
@@ -118,6 +123,7 @@ export default function RecordsSection({ snap, isBoard, onEditDetails }: { snap:
                             ? <button type="button" role="switch" aria-checked={cur.posted} aria-label={`${r.kind.label} posted`} onClick={() => update(cur.id, { posted: !cur.posted })} className="rounded-full"><Chip tone={cur.posted ? 'sage' : 'amber'}>{cur.posted ? 'Posted' : 'Not posted'}</Chip></button>
                             : <Chip tone={cur.posted ? 'sage' : 'amber'}>{cur.posted ? 'Posted' : 'Not posted'}</Chip>)}
                           <Chip tone={chip.tone}>{chip.label}</Chip>
+                          {isBoard && ACTION_FOR[r.kind.id] && <Button size="sm" onClick={() => navigate(`/boardroom?start=${ACTION_FOR[r.kind.id][0]}`)}>{ACTION_FOR[r.kind.id][1]}</Button>}
                           {isBoard && <Button size="sm" variant="ghost" onClick={() => { setAdding(adding === r.kind.id ? null : r.kind.id); setOpen(r.kind.id); }}>{cur ? (r.kind.cycle.type === 'once' ? 'Replace' : 'Record the next one') : 'Record it'}</Button>}
                         </span>
                       </div>
