@@ -405,6 +405,20 @@ describe('Setup screens', () => {
     expect(useFinancialStore.getState().units.map(u => u.monthlyFee)).toEqual([600, 400]);
   });
 
+  it('leaves no scroll timer running after the page is left', () => {
+    vi.useFakeTimers();
+    try {
+      const view = renderSetup('/setup?step=documents');
+      const before = vi.getTimerCount();
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Setup steps' })).getAllByRole('button')[1]);
+      expect(vi.getTimerCount()).toBe(before + 1);
+      view.unmount();
+      expect(vi.getTimerCount()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says so when going live fails instead of leaving the building half live', async () => {
     const unit = { number: '1A', owner: 'Ana Rivera', email: '', phone: '', monthlyFee: 400, votingPct: 100, status: 'ACTIVE' as const, balance: 0, moveIn: null, sqft: 0, bedrooms: 0, parking: null, payments: [], lateFees: [], specialAssessments: [] };
     useFinancialStore.setState({ units: [unit], budgetCategories: [] });
