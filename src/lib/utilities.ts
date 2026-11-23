@@ -105,3 +105,30 @@ export const SPIKE_CHECKS: Record<Utility, string[]> = {
   electricity: ['New equipment added, or equipment running that is usually off', 'Timers and schedules for lighting and ventilation', 'A hotter or colder month than usual', 'A motor, pump or compressor running without stopping', 'Anything plugged into common-area outlets'],
   gas: ['A colder month than usual', 'Boiler settings, and whether it is short-cycling', 'Hot-water temperature and recirculation pump', 'The smell of gas anywhere: call the gas company at once', 'When the boiler was last serviced'],
 };
+
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const UNIT_WORDS: Record<Utility, RegExp> = { electricity: /([\d,]+(?:\.\d+)?)\s*kwh/i, gas: /([\d,]+(?:\.\d+)?)\s*(?:therms?|ccf)/i, water: /([\d,]+(?:\.\d+)?)\s*(?:gallons?|gal\b|ccf)/i };
+const toNum = (s: string) => Number(s.replace(/,/g, ''));
+
+/**
+ * A first reading of a utility bill's text: the amount due, the use in the
+ * meter's unit, and the month the service period ends in. Bills differ, so
+ * every figure is a suggestion for a person to confirm; anything not found
+ * is left out.
+ */
+export function readBill(text: string, utility: Utility): { use?: number; cost?: number; month?: string; estimated?: boolean } {
+  const out: { use?: number; cost?: number; month?: string; estimated?: boolean } = {};
+  const due = /(?:total\s+)?(?:amount|balance)\s+due[^$\d]{0,40}\$?\s*([\d,]+\.\d{2})/i.exec(text) ?? /(?:total\s+(?:current\s+)?charges|new\s+charges)[^$\d]{0,40}\$?\s*([\d,]+\.\d{2})/i.exec(text);
+  if (due) out.cost = toNum(due[1]);
+  const uses = [...text.matchAll(new RegExp(UNIT_WORDS[utility].source, 'gi'))].map(m => toNum(m[1])).filter(n => n > 0);
+  // The largest figure in the meter's unit is nearly always the period's total, not a rate tier.
+  if (uses.length) out.use = Math.max(...uses);
+  const period = /(?:service|billing)\s+(?:period|dates?)[^\d]{0,30}(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\s*(?:-|to|through|–)\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/i.exec(text);
+  if (period) { const y = period[6].length === 2 ? '20' + period[6] : period[6]; out.month = y + '-' + period[4].padStart(2, '0'); }
+  else {
+    const named = new RegExp('(?:service|billing)\\s+(?:period|dates?)[^\\n]{0,60}?(' + MONTH_NAMES.join('|') + ')[a-z]*\\.?\\s+\\d{1,2},?\\s+(\\d{4})\\s*$', 'im').exec(text);
+    if (named) out.month = named[2] + '-' + String(MONTH_NAMES.indexOf(named[1].toLowerCase()) + 1).padStart(2, '0');
+  }
+  if (/\bestimated?\s+(?:read|reading|bill|usage)/i.test(text)) out.estimated = true;
+  return out;
+}

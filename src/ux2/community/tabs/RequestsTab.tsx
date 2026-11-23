@@ -9,7 +9,7 @@ import { generateLocalId } from '@/lib/generateId';
 import { dayLabel } from '../../home/calendar';
 import { requestRows, requestsSummary, type RequestRow, type CommunitySnapshot } from '../metrics';
 
-const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'Something else'];
+const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'See the association records', 'Something else'];
 const longDay = (iso: string) => { const d = new Date(iso.slice(0, 10) + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
 
 /** The owner's request form: the same `addIssue` call the Community Room makes. */

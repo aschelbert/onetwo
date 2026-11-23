@@ -9,7 +9,7 @@ import { todayIso } from '../../runbook/adapters';
  * Each is one action record of its own kind, found by a key (the month, the
  * fiscal year, the action it belongs to).
  */
-export type ToolKind = 'reconciliation' | 'statement-packet' | 'write-off' | 'rebuild-check' | 'objectives' | 'budget-spread' | 'allowance' | 'disposal-review' | 'controls' | 'payroll-returns';
+export type ToolKind = 'reconciliation' | 'statement-packet' | 'write-off' | 'rebuild-check' | 'objectives' | 'budget-spread' | 'allowance' | 'disposal-review' | 'controls' | 'payroll-returns' | 'owner-statements';
 
 const find = (kind: ToolKind, key: string) => useActionRecordsStore.getState().records.find(r => r.kind === kind && (r.data as { key?: string }).key === key);
 

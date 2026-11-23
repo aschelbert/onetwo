@@ -73,7 +73,7 @@ function Submit({ r, patch, step }: PanelProps<BenchmarkingData>) {
         <Field label="Submitted in Portfolio Manager on" className="w-[240px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
         <Button size="sm" disabled={!!step.waitsOn || !on} onClick={() => patch({ submittedOn: on })}>Record the submission date</Button>
       </div>
-      <Why>The file is a spreadsheet of every meter's monthly use and cost, one row a month, to enter or upload in ENERGY STAR Portfolio Manager. The board submits the report there itself; nothing is sent from here.</Why>
+      <Why>The file lists every meter's bills in order: start date, end date, usage, cost and whether the read was estimated. Portfolio Manager only accepts its own upload template, which it generates for your account with its meter IDs: download that template there, paste each meter's rows from this file into it, and upload it. The board submits the report there itself; nothing is sent from here.</Why>
     </>
   );
 }

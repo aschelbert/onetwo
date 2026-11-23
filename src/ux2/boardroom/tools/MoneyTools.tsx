@@ -10,6 +10,7 @@ import { blankRebuildCheck, parseMoney, rebuildStanding, type RebuildCheck } fro
 import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '../../components';
 import { todayIso } from '../../runbook/adapters';
 import { useToolDoc } from './docs';
+import BoardVoteRoll from './BoardVoteRoll';
 
 const FORM = 'flex flex-wrap items-end gap-3';
 const AREA = 'w-full rounded-[10px] border border-ux2-line-strong px-3 py-2 text-sm';
@@ -33,9 +34,6 @@ export function WriteOffTool({ unitNum, caseId, sourceId }: { unitNum: string; c
   const unit = useFinancialStore(s => s.units.find(u => u.number === unitNum));
   const [w, save] = useToolDoc<WriteOff>('write-off', sourceId, BLANK_WRITE_OFF);
   const [reason, setReason] = useState(w.reason);
-  const [on, setOn] = useState(todayIso());
-  const [yes, setYes] = useState('');
-  const [no, setNo] = useState('0');
   const owed = unit?.balance ?? 0;
   const passed = !!w.voteOn && w.inFavor > w.against;
   return (
@@ -48,14 +46,7 @@ export function WriteOffTool({ unitNum, caseId, sourceId }: { unitNum: string; c
           <div><Button size="sm" disabled={!reason.trim() || owed <= 0} onClick={() => save({ reason: reason.trim(), askedOn: todayIso(), askedBy: me })}>Ask the board</Button></div>
         </>
       )}
-      {w.askedOn && !w.voteOn && (
-        <div className={FORM}>
-          <Field label="Voted on" className="w-[170px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
-          <Field label="In favour" className="w-[110px]"><input inputMode="numeric" value={yes} onChange={e => setYes(e.target.value)} className={INPUT} /></Field>
-          <Field label="Against" className="w-[110px]"><input inputMode="numeric" value={no} onChange={e => setNo(e.target.value)} className={INPUT} /></Field>
-          <Button size="sm" disabled={!on || yes === ''} onClick={() => save({ voteOn: on, inFavor: whole(yes), against: whole(no) })}>Record the vote</Button>
-        </div>
-      )}
+      {w.askedOn && !w.voteOn && <BoardVoteRoll caseId={caseId} motion={'Write off ' + fmt(owed) + ' owed by unit ' + unitNum + ': ' + w.reason} onClose={v => save({ voteOn: v.on, inFavor: v.inFavor, against: v.against })} />}
       {passed && !w.postedOn && <div><Button size="sm" onClick={() => { const amount = postWriteOff(unitNum, caseId, w); save({ amount, postedOn: todayIso() }); }}>Write off {fmt(owed)} and close this action</Button></div>}
       <Why>Nothing is written off without a recorded board vote. The charges stay as billed, so the year's income is unchanged; the loss is taken against the allowance for doubtful accounts first and bad debt expense after that. Money that arrives later is recorded as a payment in Funds.</Why>
     </Card>

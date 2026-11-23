@@ -1,3 +1,6 @@
+import { useIssuesStore } from '@/store/useIssuesStore';
+import { recordCase, startProjectBidRequest } from '../recordActions';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { useMemo, useState, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
@@ -154,6 +157,9 @@ function PermitPanel({ p, patch }: PanelProps) {
 function BidsPanel({ p, patch }: PanelProps) {
   const vendors = useBuildingStore(s => s.vendors);
   const wanted = bidsNeeded(p, spendingLimit());
+  const navigate = useNavigate();
+  const rfp = useActionRecordsStore(st => st.records.find(r => r.kind === 'bid-request' && (r.data as { projectId?: string }).projectId === p.id));
+  const rfpCase = useIssuesStore(st => (rfp ? recordCase(st.cases, rfp)?.id : undefined));
   const [scope, setScope] = useState(p.scope || (permitNeeded(p) && p.permit.pulledBy === 'contractor' ? 'The contractor obtains the building permit and books its inspections.\n' : ''));
   const [vendor, setVendor] = useState('');
   const [amount, setAmount] = useState('');
@@ -169,6 +175,7 @@ function BidsPanel({ p, patch }: PanelProps) {
     <>
       <Field label="Scope of work · what every bidder prices"><textarea aria-label="Scope of work" value={scope} onChange={e => setScope(e.target.value)} rows={5} placeholder="What is to be done and how · work hours · timetable · insurance required · warranty · when bids are due" className={AREA} /></Field>
       <div><Button size="sm" disabled={!scope.trim() || scope.trim() === p.scope} onClick={() => patch({ scope: scope.trim() })}>Save the scope</Button></div>
+      {wanted > 1 && <Inner className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink"><span>{rfp ? 'The bidding is running as a request for proposals. Bids entered there appear here.' : 'With several bidders, run the bidding as a request for proposals: invitations, bidders\' questions and a like-for-like comparison.'}</span><Button size="sm" variant="ghost" disabled={!rfp && !p.scope.trim()} onClick={() => { const id = rfpCase ?? startProjectBidRequest(p, wanted); if (id) navigate(`/boardroom?view=case:${id}`); }}>{rfp ? 'Open the request for proposals' : 'Run it as a request for proposals'}</Button></Inner>}
       <SectionLabel>Bids · {p.bids.length} of {wanted} needed</SectionLabel>
       {p.bids.length > 0 && (
         <Table minWidth={560}>

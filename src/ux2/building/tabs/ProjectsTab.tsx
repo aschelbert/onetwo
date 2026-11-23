@@ -8,6 +8,7 @@ import { fmt } from '@/lib/formatters';
 import { FUNDING_LABEL, awardedBid, blankProject, permitNeeded, projectCost, projectSteps, type CapitalProject } from '@/lib/capitalProject';
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT, HeaderActions } from '../../components';
 import { projectCase, runCapitalImprovement } from '../../boardroom/capitalImprovement';
+import PermitRegister from './PermitRegister';
 
 function StartForm({ today, onStarted, onClose }: { today: string; onStarted: (projectId: string) => void; onClose: () => void }) {
   const add = useCapitalProjectsStore(s => s.add);
@@ -91,6 +92,7 @@ export default function ProjectsTab({ today, isBoard }: { today: string; isBoard
         )}
         <Why>A project is worked in its action, step by step: the options and what each pays back, how it is paid for, whether it needs a permit, the scope and bids, the award, the work, the sign-off, and the close-out that resets its reserve component. This list is where the results are read.</Why>
       </Card>
+      <PermitRegister isBoard={isBoard} />
     </div>
   );
 }

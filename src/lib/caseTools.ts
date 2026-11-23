@@ -45,6 +45,16 @@ export function unsignedAccounts(banks: { num: string; name: string }[], active:
   return banks.filter(b => active.has(b.num) && !signed.has(b.num)).map(b => b.name);
 }
 
+// ── A board vote taken by name ────────────────────────────────────────────────
+export type RollVote = 'approve' | 'deny' | 'abstain';
+/** The result of a roll call: it carries when more vote for than against and a majority of the board's seats voted. */
+export function tally(votes: RollVote[], seats: number) {
+  const inFavor = votes.filter(v => v === 'approve').length, against = votes.filter(v => v === 'deny').length, abstained = votes.filter(v => v === 'abstain').length;
+  const cast = votes.length, needed = Math.floor(Math.max(1, seats) / 2) + 1;
+  const quorum = cast >= needed;
+  return { inFavor, against, abstained, cast, needed, quorum, passed: quorum && inFavor > against };
+}
+
 // ── Allowance for dues that may not be collected (year-end) ───────────────────
 export type BucketId = 'recent' | 'late' | 'old';
 export interface AgingBucket { id: BucketId; label: string; owed: number; units: number; pct: number }

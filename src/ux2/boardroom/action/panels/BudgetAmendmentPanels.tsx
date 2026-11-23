@@ -6,6 +6,9 @@ import { Button, Chip, Inner, KV, Why, Field, INPUT } from '../../../components'
 import { todayIso } from '../../../runbook/adapters';
 import { AREA, FORM, NOTE, money } from '../ActionShell';
 import type { PanelProps } from '../RecordAction';
+import BoardVoteRoll from '../../tools/BoardVoteRoll';
+import { recordCase } from '../../recordActions';
+import { useIssuesStore } from '@/store/useIssuesStore';
 
 function Say({ r, patch, close }: PanelProps<BudgetAmendmentData>) {
   const getVariance = useFinancialStore(s => s.getBudgetVariance);
@@ -46,21 +49,15 @@ function Say({ r, patch, close }: PanelProps<BudgetAmendmentData>) {
 }
 
 function Vote({ r, patch, step }: PanelProps<BudgetAmendmentData>) {
+  const cases = useIssuesStore(s => s.cases);
   const [motion, setMotion] = useState(r.data.motion || motionText(r.data));
-  const [on, setOn] = useState(todayIso());
-  const [yes, setYes] = useState('');
-  const [no, setNo] = useState('0');
+  const c = recordCase(cases, r);
   if (r.data.vote.on) return <Inner><KV label="Motion">{r.data.motion}</KV><KV label="Vote">{passed(r.data) ? <Chip tone="sage">Passed</Chip> : <Chip tone="red">Failed</Chip>} {r.data.vote.inFavor} to {r.data.vote.against} on {r.data.vote.on}</KV></Inner>;
   return (
     <>
       <Field label="The motion, as it goes on the agenda"><textarea aria-label="The motion" rows={3} value={motion} onChange={e => setMotion(e.target.value)} className={AREA} /></Field>
-      <div className={FORM}>
-        <Field label="Voted on" className="w-[170px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
-        <Field label="In favour" className="w-[110px]"><input inputMode="numeric" value={yes} onChange={e => setYes(e.target.value)} className={INPUT} /></Field>
-        <Field label="Against" className="w-[110px]"><input inputMode="numeric" value={no} onChange={e => setNo(e.target.value)} className={INPUT} /></Field>
-        <Button size="sm" disabled={!!step.waitsOn || !on || yes === ''} onClick={() => patch({ motion: motion.trim(), vote: { on, inFavor: Math.max(0, Number(yes) || 0), against: Math.max(0, Number(no) || 0) } })}>Record the vote</Button>
-      </div>
-      <Why>The vote is taken at a board meeting and recorded here from the minutes. If it passes, the budget lines change by themselves.</Why>
+      {step.waitsOn ? <p className={NOTE}>Say what moves and why first.</p> : c && <BoardVoteRoll caseId={c.id} motion={motion.trim()} onClose={v => patch({ motion: motion.trim(), vote: { on: v.on, inFavor: v.inFavor, against: v.against } })} />}
+      <Why>The board votes here, by name. If the motion carries, the budget lines change by themselves.</Why>
     </>
   );
 }

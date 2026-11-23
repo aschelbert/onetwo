@@ -13,6 +13,8 @@ export interface PayrollFilingData {
   paid: number;
   paidOn: string;
   paidNote: string;
+  /** The ledger entry the payment posted as, when it was posted from here. */
+  paidPosted: boolean;
   proofOn: string;
 }
 export interface PayrollReturn { id: string; name: string; to: string; dueOn: string; applies: boolean; filedOn: string; confirmation: string }
@@ -33,11 +35,11 @@ export const lastFinishedQuarter = (today: string) => { const q = quarterOf(toda
  * the board's to confirm with its payroll provider or accountant; due dates
  * are the usual ones and can be corrected.
  */
-export function returnsFor(period: string): PayrollReturn[] {
+export function returnsFor(period: string, notApplicable: string[] = []): PayrollReturn[] {
   const y = Number(period.slice(0, 4)), q = Number(period.slice(6));
   const ny = q === 4 ? y + 1 : y, nm = q === 4 ? 1 : q * 3 + 1;
   const monthEnd = lastDay(ny, nm);
-  const row = (id: string, name: string, to: string, dueOn: string): PayrollReturn => ({ id, name, to, dueOn, applies: true, filedOn: '', confirmation: '' });
+  const row = (id: string, name: string, to: string, dueOn: string): PayrollReturn => ({ id, name, to, dueOn, applies: !notApplicable.includes(id), filedOn: '', confirmation: '' });
   return [
     row('dc-withholding', 'District income tax withheld', 'Office of Tax and Revenue', iso(ny, nm, 20)),
     row('federal-941', 'Federal payroll tax return (Form 941)', 'IRS', monthEnd),
@@ -61,7 +63,7 @@ export const PAYROLL_FILING: ActionKind<PayrollFilingData> = {
     pay: 'Ticks itself when the payment, or that nothing was owed, is recorded',
     proof: 'Ticks itself when the confirmations are filed with the wage records, which closes it',
   },
-  blank: () => ({ period: '', periodStart: '', periodEnd: '', wages: 0, wagesCheckedOn: '', returns: [], paid: 0, paidOn: '', paidNote: '', proofOn: '' }),
+  blank: () => ({ period: '', periodStart: '', periodEnd: '', wages: 0, wagesCheckedOn: '', returns: [], paid: 0, paidOn: '', paidNote: '', paidPosted: false, proofOn: '' }),
   steps: (r) => {
     const d = r.data, list = due(d), filed = list.filter(x => x.filedOn).length;
     return stepsFrom(PAYROLL_FILING, {

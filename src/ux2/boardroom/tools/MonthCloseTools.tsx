@@ -10,6 +10,7 @@ import { blankReconciliation, reconcile, signBlocker, type Reconciliation } from
 import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '../../components';
 import { todayIso } from '../../runbook/adapters';
 import { periodLabel } from '../monthClose';
+import { emailAnnouncement } from '../../community/notify';
 import { esc, printPage, rowsHtml, useToolDoc } from './docs';
 
 const FORM = 'flex flex-wrap items-end gap-3';
@@ -91,38 +92,51 @@ function Reconcile({ acct, name, period }: { acct: string; name: string; period:
   );
 }
 
-interface Packet { sentOn: string; sentBy: string }
+interface Packet { sentOn: string; sentBy: string; emailed: number; note: string }
+
+/** The packet's sections as headed rows, so it can be printed or put in an email. */
+export function packetSections(period: string, fyEnd: string): { title: string; rows: [string, string][] }[] {
+  const fin = useFinancialStore.getState();
+  const end = monthEnd(period + '-01'), start = period + '-01', fy = fiscalYearStart(end, fyEnd);
+  const month = fin.getIncomeStatement(start, end), ytd = fin.getIncomeStatement(fy, end), bs = fin.getBalanceSheet();
+  const statement = (st: typeof month): [string, string][] => [
+    ...Object.values(st.income as Record<string, { name: string; amount: number }>).map(i => [i.name, fmt(i.amount)] as [string, string]),
+    ['Total income', fmt(st.totalIncome)],
+    ...Object.values(st.expenses as Record<string, { name: string; amount: number }>).map(i => [i.name, fmt(i.amount)] as [string, string]),
+    ['Total expenses', fmt(st.totalExpenses)],
+    ['Income less expenses', fmt(st.netIncome)],
+  ];
+  const late = fin.units.filter(u => u.balance > 0);
+  return [
+    { title: 'Operating statement, ' + periodLabel(period), rows: statement(month) },
+    { title: 'Year to date, from ' + fy, rows: statement(ytd) },
+    { title: 'Balance sheet by fund, today', rows: [['Operating fund', fmt(bs.equity.operatingFund)], ['Reserve fund', fmt(bs.equity.reserveFund)], ['Total liabilities', fmt(bs.liabilities.total)]] },
+    { title: 'Dues owed', rows: [['Units with a balance', late.length + ' of ' + fin.units.length], ['Total owed', fmt(late.reduce((t, u) => t + u.balance, 0))]] },
+  ];
+}
 
 function StatementPacket({ period }: { period: string }) {
   const me = useAuthStore(s => s.currentUser.name);
   const building = useBuildingStore(s => s.name);
   const fyEnd = useBuildingStore(s => s.details?.fiscalYearEnd) || '12-31';
-  const [packet, save] = useToolDoc<Packet>('statement-packet', period, { sentOn: '', sentBy: '' });
-  const print = () => {
-    const fin = useFinancialStore.getState();
-    const end = monthEnd(period + '-01'), start = period + '-01', fy = fiscalYearStart(end, fyEnd);
-    const month = fin.getIncomeStatement(start, end), ytd = fin.getIncomeStatement(fy, end), bs = fin.getBalanceSheet();
-    const money = (n: number) => fmt(n);
-    const statement = (title: string, st: typeof month) => '<h2 style="font-size:16px;margin-top:24px">' + esc(title) + '</h2>' + rowsHtml([
-      ...Object.values(st.income as Record<string, { name: string; amount: number }>).map(i => [i.name, money(i.amount)] as [string, string]),
-      ['Total income', money(st.totalIncome)],
-      ...Object.values(st.expenses as Record<string, { name: string; amount: number }>).map(i => [i.name, money(i.amount)] as [string, string]),
-      ['Total expenses', money(st.totalExpenses)],
-      ['Income less expenses', money(st.netIncome)],
-    ]);
-    const late = fin.units.filter(u => u.balance > 0);
-    printPage(building + ' · ' + periodLabel(period), '<h1 style="font-size:22px">' + esc(building) + '</h1><p>Statement packet for ' + esc(periodLabel(period)) + '</p>'
-      + statement('Operating statement, ' + periodLabel(period), month)
-      + statement('Year to date, from ' + fy, ytd)
-      + '<h2 style="font-size:16px;margin-top:24px">Balance sheet by fund, today</h2>' + rowsHtml([['Operating fund', money(bs.equity.operatingFund)], ['Reserve fund', money(bs.equity.reserveFund)], ['Total liabilities', money(bs.liabilities.total)]])
-      + '<h2 style="font-size:16px;margin-top:24px">Dues owed</h2>' + rowsHtml([['Units with a balance', String(late.length) + ' of ' + fin.units.length], ['Total owed', money(late.reduce((t, u) => t + u.balance, 0))]])
-      + '<p style="font-size:12px;color:#555;margin-top:24px">No unit is named in this packet.</p>');
+  const units = useFinancialStore(s => s.units);
+  const [packet, save] = useToolDoc<Packet>('statement-packet', period, { sentOn: '', sentBy: '', emailed: 0, note: '' });
+  const [busy, setBusy] = useState(false);
+  const withEmail = units.filter(u => u.email);
+  const print = () => printPage(building + ' · ' + periodLabel(period), '<h1 style="font-size:22px">' + esc(building) + '</h1><p>Statement packet for ' + esc(periodLabel(period)) + '</p>' + packetSections(period, fyEnd).map(sec => '<h2 style="font-size:16px;margin-top:24px">' + esc(sec.title) + '</h2>' + rowsHtml(sec.rows)).join('') + '<p style="font-size:12px;color:#555;margin-top:24px">No unit is named in this packet.</p>');
+  const email = async () => {
+    setBusy(true);
+    const body = packetSections(period, fyEnd).map(sec => sec.title.toUpperCase() + '\n' + sec.rows.map(([a, b]) => a + ': ' + b).join('\n')).join('\n\n') + '\n\nNo unit is named in this packet.';
+    const r = await emailAnnouncement({ title: building + ': statement packet for ' + periodLabel(period), body, category: 'financial', postedBy: me, recipients: withEmail.map(u => ({ email: u.email, name: u.owner })) });
+    save({ sentOn: r.sent ? todayIso() : packet.sentOn, sentBy: r.sent ? me : packet.sentBy, emailed: r.sent, note: r.note ?? '' });
+    setBusy(false);
   };
   return (
     <Inner className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Statement packet for owners</b>{packet.sentOn ? <Chip tone="sage">Sent {packet.sentOn} by {packet.sentBy}</Chip> : <Chip tone="ghost">Not sent</Chip>}</div>
-      <div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={print}>Print or save the packet</Button>{!packet.sentOn && <Button size="sm" onClick={() => save({ sentOn: todayIso(), sentBy: me })}>It went to owners today</Button>}</div>
-      <span className="text-xs text-ux2-muted">The month and year-to-date operating statements, fund balances and a dues summary with no unit named. Save it as a PDF from the print window and attach it to the notice; this records the day it went out.</span>
+      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Statement packet for owners</b>{packet.sentOn ? <Chip tone="sage">Sent {packet.sentOn} by {packet.sentBy}{packet.emailed ? ' · ' + packet.emailed + ' emailed' : ''}</Chip> : <Chip tone="ghost">Not sent</Chip>}</div>
+      <div className="flex flex-wrap gap-2"><Button size="sm" disabled={busy || !withEmail.length} onClick={() => void email()}>{busy ? 'Sending' : 'Email it to ' + withEmail.length + ' owners'}</Button><Button size="sm" variant="ghost" onClick={print}>Print or save the packet</Button>{!packet.sentOn && <Button size="sm" variant="ghost" onClick={() => save({ sentOn: todayIso(), sentBy: me })}>It went out another way today</Button>}</div>
+      {packet.note && <span className="text-xs text-ux2-red-ink">{packet.note}</span>}
+      <span className="text-xs text-ux2-muted">The month and year-to-date operating statements, fund balances and a dues summary with no unit named. Emailing puts the figures in the message itself; {units.length - withEmail.length} unit{units.length - withEmail.length === 1 ? ' has' : 's have'} no email on file and need a printed copy.</span>
     </Inner>
   );
 }

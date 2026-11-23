@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
-import { UTILITIES, missingMonths, monthLabel, monthsOf, paybackYears, spikeOf, totalsFor, utilitiesFrom, type Meter, type Utility, type UtilitiesDoc } from '@/lib/utilities';
+import { UTILITIES, missingMonths, monthLabel, monthsOf, paybackYears, readBill, spikeOf, totalsFor, utilitiesFrom, type Meter, type Utility, type UtilitiesDoc } from '@/lib/utilities';
 import { stageOf } from '@/lib/actions';
 import { benchmarkDue, type BenchmarkingData } from '@/lib/actions/benchmarking';
 import type { UtilitySpikeData } from '@/lib/actions/utilitySpike';
@@ -29,6 +29,21 @@ function BillForm({ doc, today, onDone }: { doc: UtilitiesDoc; today: string; on
   const [debit, setDebit] = useState(expense.find(a => /utilit|electric|water|gas/i.test(a.name))?.num ?? expense[0]?.num ?? '');
   const [credit, setCredit] = useState(cash.find(a => /operating/i.test(a.name))?.num ?? cash[0]?.num ?? '');
   const meter = doc.meters.find(m => m.id === meterId);
+  const picker = useRef<HTMLInputElement>(null);
+  const [read, setRead] = useState('');
+  const readPdf = async (file: File) => {
+    if (!meter) return;
+    try {
+      const { pdfLines } = await import('@/features/setup/pdfText');
+      const found = readBill((await pdfLines(file)).flat().join('\n'), meter.utility);
+      if (found.use != null) setUse(String(found.use));
+      if (found.cost != null) setCost(String(found.cost));
+      if (found.month && found.month <= today.slice(0, 7)) setMonth(found.month);
+      if (found.estimated) setEstimated(true);
+      const got = [found.use != null && 'use', found.cost != null && 'cost', found.month && 'month'].filter(Boolean);
+      setRead(got.length ? `Read ${got.join(', ')} from ${file.name}. Check each figure against the bill before saving.` : `Nothing could be read from ${file.name}. Type the figures in.`);
+    } catch { setRead(`${file.name} could not be read. Type the figures in.`); }
+  };
   const replacing = doc.bills.some(b => b.meterId === meterId && b.month === month);
   const save = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +64,11 @@ function BillForm({ doc, today, onDone }: { doc: UtilitiesDoc; today: string; on
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex items-center gap-2 pb-2.5 text-xs font-semibold text-ux2-ink"><input type="checkbox" checked={toLedger} onChange={e => setToLedger(e.target.checked)} />Also post the expense to the ledger</label>
         {toLedger && <><Field label="Expense account" className="w-[230px]"><select value={debit} onChange={e => setDebit(e.target.value)} className={INPUT}>{expense.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}</select></Field><Field label="Paid from" className="w-[230px]"><select value={credit} onChange={e => setCredit(e.target.value)} className={INPUT}>{cash.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}</select></Field></>}
+        <span className="pb-0.5"><input ref={picker} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void readPdf(f); e.target.value = ''; }} /><Button type="button" size="sm" variant="ghost" onClick={() => picker.current?.click()}>Read a PDF bill</Button></span>
         <Button type="submit" size="sm" disabled={!meter || !month || !use}>{replacing ? 'Replace that month' : 'Save the bill'}</Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => onDone(null)}>Cancel</Button>
       </div>
+      {read && <span className="text-xs font-semibold text-ux2-ink">{read}</span>}
       <span className="text-xs text-ux2-muted">Leave the ledger box off when the bill is paid through a work order or already entered in Funds, so the expense is not counted twice.</span>
     </form>
   );

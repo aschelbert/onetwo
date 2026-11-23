@@ -27,6 +27,10 @@ import { kindsFor, parseSqft } from '@/lib/buildingRecords';
 import { SPIKE_CHECKS, UTILITIES, missingMonths, monthLabel, spikeOf, utilitiesFrom, type UtilitiesDoc, type UtilityBill } from '@/lib/utilities';
 import { benchmarkDue, type BenchmarkingData } from '@/lib/actions/benchmarking';
 import type { UtilitySpikeData } from '@/lib/actions/utilitySpike';
+import { RECORDS_REQUEST_CATEGORY, type RecordsRequestData } from '@/lib/actions/recordsRequest';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
+import { projectCost, type CapitalProject } from '@/lib/capitalProject';
+import { BID_REQUEST, trueCost, type BidRequestData } from '@/lib/actions/bidRequest';
 import { todayIso } from '../runbook/adapters';
 
 export const actionSourceId = (r: Pick<ActionRecord, 'kind' | 'id'>) => `${actionKind(r.kind)?.runbookId ?? r.kind}:${r.id}`;
@@ -143,6 +147,24 @@ export function benchmarkingApplies(): 'yes' | 'check' | 'no' {
   return found ? found.applies : 'no';
 }
 
+/** Run a capital project's bidding as a request for proposals: the scope and the budget carry over. Returns the action's case id. */
+export function startProjectBidRequest(p: CapitalProject, minBids: number, today: string = todayIso()): string | null {
+  const blank = BID_REQUEST.blank();
+  return startAction('bid-request', p.title, { projectId: p.id, minBids, budget: projectCost(p), scope: { ...blank.scope, what: p.scope } }, {}, today).caseId;
+}
+
+/** A request for proposals run for a capital project hands its bids back to the project, until the project awards. */
+SYNC['bid-request'] = (r) => {
+  const d = r.data as unknown as BidRequestData;
+  if (!d.projectId) return;
+  const store = useCapitalProjectsStore.getState();
+  const p = store.projects.find(x => x.id === d.projectId);
+  if (!p || p.awardedBidId || p.closedOn) return;
+  const bids = d.bids.map(b => ({ id: b.id, vendor: b.vendor, amount: trueCost(b), meetsScope: !b.addBack, insuranceOk: b.insuranceOk, notes: [b.addBack ? `Bid ${b.amount}, plus ${b.addBack} for what it leaves out` : '', b.id === d.recommendedBidId ? `Recommended${d.reason ? `: ${d.reason}` : ''}` : ''].filter(Boolean).join('. ') }));
+  const merged = [...p.bids.filter(b => !bids.some(x => x.id === b.id)), ...bids];
+  if (JSON.stringify(merged) !== JSON.stringify(p.bids)) store.patch(p.id, { bids: merged });
+};
+
 /** Wages paid in a period, from the pay runs. */
 export function wagesIn(start: string, end: string): number {
   const staff = new Map(usePayrollStore.getState().staff.map(s => [s.id, s.type]));
@@ -153,9 +175,11 @@ export function wagesIn(start: string, end: string): number {
 export function startPayrollFiling(today: string = todayIso(), quarter = lastFinishedQuarter(today)) {
   const existing = useActionRecordsStore.getState().records.find(r => r.kind === 'payroll-filing' && (r.data as unknown as PayrollFilingData).period === quarter.period);
   if (existing) return { recordId: existing.id, caseId: recordCase(useIssuesStore.getState().cases, existing)?.id ?? null };
-  const returns = returnsFor(quarter.period);
+  // Which returns this building does not file is remembered from quarter to quarter.
+  const skip = (useActionRecordsStore.getState().records.find(r => r.kind === 'payroll-returns')?.data as { notApplicable?: string[] } | undefined)?.notApplicable ?? [];
+  const returns = returnsFor(quarter.period, skip);
   const data: Partial<PayrollFilingData> = { period: quarter.period, periodStart: quarter.start, periodEnd: quarter.end, wages: wagesIn(quarter.start, quarter.end), returns };
-  return startAction('payroll-filing', `${quarter.period.replace('-Q', ', quarter ')}`, data as Record<string, unknown>, { dueOn: returns.map(x => x.dueOn).sort()[0] }, today);
+  return startAction('payroll-filing', `${quarter.period.replace('-Q', ', quarter ')}`, data as Record<string, unknown>, { dueOn: returns.filter(x => x.applies).map(x => x.dueOn).sort()[0] }, today);
 }
 
 /** The building-wide fire alarm notice last finished, whose answers a single unit's copy reuses. */
@@ -211,6 +235,15 @@ export function runActionTriggers(today: string = todayIso()): void {
     const q = lastFinishedQuarter(today);
     const sinceEnd = Math.round((Date.parse(today) - Date.parse(q.end)) / 86400000);
     if (sinceEnd <= 60 && wagesIn(q.start, q.end) > 0) startPayrollFiling(today, q);
+  }
+  // An owner asking to see the records under Community › Requests starts a records request, once.
+  if (!off.includes('records-request')) {
+    const have = new Set(useActionRecordsStore.getState().records.filter(r => r.kind === 'records-request').map(r => (r.data as unknown as RecordsRequestData).issueId).filter(Boolean));
+    for (const i of useIssuesStore.getState().issues) {
+      if (i.category !== RECORDS_REQUEST_CATEGORY || have.has(i.id) || i.status === 'RESOLVED' || i.status === 'CLOSED') continue;
+      const asked = i.submittedDate.slice(0, 10);
+      startAction('records-request', i.title || `Unit ${i.unitNumber ?? ''} asks to see records`, { requester: i.reporterName, askedOn: asked, inWriting: true, purpose: i.description, issueId: i.id, items: i.title ? [{ id: 'i0', what: i.title, share: '', reason: '' }] : [] }, { unit: i.unitNumber ?? '', dueOn: plusDays(asked, 10) }, today);
+    }
   }
   // Energy benchmarking: from January 1 to the April 1 deadline, for a building the rule covers, until last year's report is on record.
   if (!off.includes('energy-benchmarking') && today.slice(5) <= '04-01' && benchmarkingApplies() === 'yes') {

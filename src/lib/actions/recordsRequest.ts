@@ -1,6 +1,7 @@
 import { stepsFrom, type ActionKind } from './types';
 
 /** An owner asks to see the association's books and records. */
+export const RECORDS_REQUEST_CATEGORY = 'See the association records';
 export interface RecordsRequestData {
   requester: string;
   askedOn: string;
@@ -14,6 +15,8 @@ export interface RecordsRequestData {
   /** What the owner was told about anything held back. */
   withheldNote: string;
   filedOn: string;
+  /** The owner's own request under Community › Requests, when it started there. */
+  issueId: string;
 }
 export interface RequestedItem { id: string; what: string; share: '' | 'full' | 'redacted' | 'later' | 'no'; reason: string }
 
@@ -36,7 +39,7 @@ const decided = (d: RecordsRequestData) => d.items.length > 0 && d.items.every(i
 
 export const RECORDS_REQUEST: ActionKind<RecordsRequestData> = {
   kind: 'records-request', runbookId: 'records-request', name: 'Records request',
-  trigger: 'An owner asks to see the books or records', blurb: 'Answer an owner who asks to see the books: what is shared, what is held back and why, by the deadline.',
+  trigger: 'An owner asks to see the records, under Community › Requests or in writing', blurb: 'Answer an owner who asks to see the books: what is shared, what is held back and why, by the deadline.',
   catId: 'governance', role: 'Secretary', visibility: 'board',
   stepTitles: [['log', 'Log the request and check standing'], ['choose', 'Choose what to share'], ['send', 'Send it, or offer a time to inspect'], ['file', 'File what was sent and withheld']],
   how: {
@@ -45,7 +48,7 @@ export const RECORDS_REQUEST: ActionKind<RecordsRequestData> = {
     send: 'Ticks itself when the date it was sent or offered is entered',
     file: 'Ticks itself when the request is filed, which closes it',
   },
-  blank: () => ({ requester: '', askedOn: '', inWriting: true, ownerOfRecord: '', purpose: '', items: [], how: '', sentOn: '', withheldNote: '', filedOn: '' }),
+  blank: () => ({ requester: '', askedOn: '', inWriting: true, ownerOfRecord: '', purpose: '', items: [], how: '', sentOn: '', withheldNote: '', filedOn: '', issueId: '' }),
   steps: (r) => {
     const d = r.data, logged = !!d.requester.trim() && !!d.askedOn && !!d.ownerOfRecord;
     const held = withheld(d).length;

@@ -140,3 +140,67 @@ describe('payroll filing', () => {
     expect(store().records).toHaveLength(0);
   });
 });
+
+import { tally } from '@/lib/caseTools';
+import { readBill } from '@/lib/utilities';
+import { blankProject } from '@/lib/capitalProject';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
+import { startProjectBidRequest } from '@/ux2/boardroom/recordActions';
+import { permitStanding } from '@/ux2/building/tabs/PermitRegister';
+import { RECORDS_REQUEST_CATEGORY } from '@/lib/actions/recordsRequest';
+
+describe('follow-ups to the guided actions', () => {
+  it('a roll call carries on more for than against once a majority of the board has voted', () => {
+    expect(tally(['approve', 'approve'], 5)).toMatchObject({ quorum: false, passed: false, needed: 3 });
+    expect(tally(['approve', 'approve', 'deny'], 5)).toMatchObject({ quorum: true, passed: true, inFavor: 2, against: 1 });
+    expect(tally(['approve', 'deny', 'abstain'], 5)).toMatchObject({ quorum: true, passed: false });
+    expect(tally(['approve'], 1).passed).toBe(true);
+  });
+
+  it('reads the use, the amount due and the month off a bill, and leaves out what it cannot find', () => {
+    const text = 'Account 12345\nService Period 09/04/2026 - 10/05/2026\nTotal usage 16,200 kWh\nTier 1 500 kWh\nTotal Amount Due $2,268.40\n';
+    expect(readBill(text, 'electricity')).toEqual({ use: 16200, cost: 2268.4, month: '2026-10' });
+    expect(readBill('Estimated reading this month. 1,480 therms. Amount due: $1,717.00', 'gas')).toEqual({ use: 1480, cost: 1717, estimated: true });
+    expect(readBill('Thank you for your payment', 'water')).toEqual({});
+  });
+
+  it('a permit is needed, then open, then finished', () => {
+    expect(permitStanding({ number: '', finalInspectionOn: '' }).label).toBe('Needed, not on file');
+    expect(permitStanding({ number: 'B2601', finalInspectionOn: '' }).tone).toBe('amber');
+    expect(permitStanding({ number: 'B2601', finalInspectionOn: '2026-12-01' }).tone).toBe('sage');
+  });
+
+  it("a capital project's bidding runs as a request for proposals, and its bids come back to the project", () => {
+    useCapitalProjectsStore.setState({ projects: [] });
+    const id = useCapitalProjectsStore.getState().add({ ...blankProject('Garage gate', 'Failing', '2026-11-01'), scope: 'Replace the operator and controller' });
+    const project = () => useCapitalProjectsStore.getState().projects.find(p => p.id === id)!;
+    expect(startProjectBidRequest(project(), 3, '2026-11-02')).toBeTruthy();
+    const rfp = store().records.find(r => r.kind === 'bid-request')!;
+    expect(rfp.data).toMatchObject({ projectId: id, minBids: 3, scope: { what: 'Replace the operator and controller' } });
+    store().patchData(rfp.id, { bids: [{ id: 'b1', vendor: 'Gate Co', amount: 43800, addBack: 0, insuranceOk: true, licenceOk: true, warranty: '', references: '' }, { id: 'b2', vendor: 'Entry Inc', amount: 41000, addBack: 2500, insuranceOk: false, licenceOk: true, warranty: '', references: '' }], recommendedBidId: 'b1', reason: 'Whole scope' });
+    runRecordActions('2026-11-20'); runRecordActions('2026-11-21');
+    expect(project().bids.map(b => [b.vendor, b.amount, b.meetsScope, b.insuranceOk])).toEqual([['Gate Co', 43800, true, true], ['Entry Inc', 43500, false, false]]);
+    expect(project().bids[0].notes).toContain('Recommended');
+  });
+
+  it('an owner asking to see the records under Community starts a records request, once', () => {
+    useIssuesStore.setState({ issues: [{ id: 'iss1', type: 'UNIT_PRIVATE', category: RECORDS_REQUEST_CATEGORY, priority: 'MEDIUM', status: 'SUBMITTED', title: '2026 ledger', description: 'Checking the landscaping spend', reportedBy: 'u1', reporterName: 'Lisa Chen', reporterEmail: '', unitNumber: '201', submittedDate: '2026-11-18T10:00:00Z', upvotes: [], viewCount: 0, comments: [] }] as never });
+    runActionTriggers('2026-11-19'); runActionTriggers('2026-11-20');
+    const reqs = store().records.filter(r => r.kind === 'records-request');
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0]).toMatchObject({ unit: '201', dueOn: '2026-11-28', title: '2026 ledger' });
+    expect(reqs[0].data).toMatchObject({ requester: 'Lisa Chen', askedOn: '2026-11-18', issueId: 'iss1', items: [{ what: '2026 ledger' }] });
+    useIssuesStore.setState({ issues: [] });
+  });
+
+  it('remembers which payroll returns the building does not file', () => {
+    usePayrollStore.setState({ staff: [], payRuns: [] });
+    useActionRecordsStore.setState({ records: [] });
+    useActionRecordsStore.getState().add({ kind: 'payroll-returns', title: 'building', unit: '', openedOn: '2026-01-01', dueOn: '', closedOn: '', data: { key: 'building', notApplicable: ['dc-withholding'] } });
+    const { recordId } = startPayrollFiling('2026-10-05');
+    const d = data<PayrollFilingData>(recordId);
+    expect(d.returns.find(r => r.id === 'dc-withholding')!.applies).toBe(false);
+    // The action's due date is the first return that does apply.
+    expect(store().records.find(r => r.id === recordId)!.dueOn).toBe('2026-10-31');
+  });
+});

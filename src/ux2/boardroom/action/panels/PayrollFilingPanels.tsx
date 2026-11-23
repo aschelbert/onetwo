@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePayrollStore } from '@/store/usePayrollStore';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import { saveToolDoc } from '../../tools/docs';
 import { fmt } from '@/lib/formatters';
 import { due, type PayrollFilingData, type PayrollReturn } from '@/lib/actions/payrollFiling';
 import { Button, Chip, Inner, KV, Why, Field, INPUT } from '../../../components';
@@ -51,7 +53,12 @@ function ReturnRow({ x, locked, onChange }: { x: PayrollReturn; locked: boolean;
 }
 
 function FileReturns({ r, patch, step }: PanelProps<PayrollFilingData>) {
-  const set = (id: string, c: Partial<PayrollReturn>) => patch({ returns: r.data.returns.map(x => (x.id === id ? { ...x, ...c } : x)) });
+  const set = (id: string, c: Partial<PayrollReturn>) => {
+    const returns = r.data.returns.map(x => (x.id === id ? { ...x, ...c } : x));
+    patch({ returns });
+    // Whether a return applies is the building's standing answer, kept for the next quarter (year-end forms aside).
+    if ('applies' in c) saveToolDoc('payroll-returns', 'building', { notApplicable: [] as string[] }, { notApplicable: returns.filter(x => !x.applies).map(x => x.id) });
+  };
   return (
     <>
       {step.waitsOn && <p className={NOTE}>Check the wage records first.</p>}
@@ -62,19 +69,38 @@ function FileReturns({ r, patch, step }: PanelProps<PayrollFilingData>) {
 }
 
 function Pay({ r, patch }: PanelProps<PayrollFilingData>) {
+  const accts = useFinancialStore(s => s.chartOfAccounts).filter(a => a.sub !== 'header');
+  const post = useFinancialStore(s => s.postManualEntry);
+  const owedAccts = accts.filter(a => a.type === 'liability' || a.type === 'expense');
+  const banks = accts.filter(a => a.sub === 'bank');
   const [amount, setAmount] = useState(r.data.paid ? String(r.data.paid) : '');
   const [on, setOn] = useState(r.data.paidOn || todayIso());
   const [note, setNote] = useState(r.data.paidNote);
-  if (r.data.paidOn) return <Inner><KV label="Paid">{r.data.paid ? fmt(r.data.paid) : 'Nothing owed'}</KV><KV label="On">{r.data.paidOn}</KV>{r.data.paidNote && <KV label="Note">{r.data.paidNote}</KV>}</Inner>;
+  const [toLedger, setToLedger] = useState(true);
+  const [debit, setDebit] = useState(owedAccts.find(a => /payroll tax|withh/i.test(a.name))?.num ?? owedAccts.find(a => /accrued/i.test(a.name))?.num ?? owedAccts[0]?.num ?? '');
+  const [credit, setCredit] = useState(banks.find(a => /operating/i.test(a.name))?.num ?? banks[0]?.num ?? '');
+  const [problem, setProblem] = useState('');
+  if (r.data.paidOn) return <Inner><KV label="Paid">{r.data.paid ? fmt(r.data.paid) : 'Nothing owed'}</KV><KV label="On">{r.data.paidOn}</KV><KV label="Ledger">{r.data.paidPosted ? 'Posted from here' : 'Not posted from here'}</KV>{r.data.paidNote && <KV label="Note">{r.data.paidNote}</KV>}</Inner>;
+  const record = () => {
+    const paid = money(amount), posting = toLedger && paid > 0 && !!debit && !!credit;
+    try { if (posting) post(on, 'Payroll taxes, ' + r.data.period + (note.trim() ? ': ' + note.trim() : ''), debit, credit, paid); }
+    catch (e) { setProblem(e instanceof Error ? e.message : 'That could not be posted.'); return; }
+    patch({ paid, paidOn: on, paidNote: note.trim(), paidPosted: posting });
+  };
   return (
     <>
       <div className={FORM}>
         <Field label="Paid with the returns" className="w-[150px]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="$" className={INPUT} /></Field>
         <Field label="On" className="w-[170px]"><input type="date" value={on} max={todayIso()} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
         <Field label="Note" className="min-w-[200px] flex-1"><input value={note} onChange={e => setNote(e.target.value)} placeholder="Paid by the payroll provider from operating" className={INPUT} /></Field>
-        <Button size="sm" disabled={!on} onClick={() => patch({ paid: money(amount), paidOn: on, paidNote: note.trim() })}>{money(amount) ? 'Record the payment' : 'Nothing was owed'}</Button>
       </div>
-      <Why>This records what was paid and when. It does not post to the ledger: withholding is posted with each pay run, and a payment made outside a pay run is entered in Funds.</Why>
+      <div className={FORM}>
+        <label className="flex items-center gap-2 pb-2.5 text-xs font-semibold text-ux2-ink"><input type="checkbox" checked={toLedger} onChange={e => setToLedger(e.target.checked)} />Post the payment to the ledger</label>
+        {toLedger && <><Field label="Against" className="w-[240px]"><select value={debit} onChange={e => setDebit(e.target.value)} className={INPUT}>{owedAccts.map(a => <option key={a.num} value={a.num}>{a.num} {a.name}</option>)}</select></Field><Field label="Paid from" className="w-[220px]"><select value={credit} onChange={e => setCredit(e.target.value)} className={INPUT}>{banks.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}</select></Field></>}
+        <Button size="sm" disabled={!on} onClick={record}>{money(amount) ? 'Record the payment' : 'Nothing was owed'}</Button>
+      </div>
+      {problem && <span className="text-xs text-ux2-red-ink">{problem}</span>}
+      <Why>Posting takes the payment out of the bank account and against the account chosen: the liability where withheld tax was parked, or a payroll tax expense for the employer's own share. Untick it when the payroll provider's pay runs already posted this money.</Why>
     </>
   );
 }

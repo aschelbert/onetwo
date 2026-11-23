@@ -11,6 +11,7 @@ import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '
 import { todayIso } from '../../runbook/adapters';
 import { esc, printPage, rowsHtml, useToolDoc } from './docs';
 import { measuredNow } from './planNumbers';
+import { emailAnnouncement } from '../../community/notify';
 
 interface Allowance { pct: Record<BucketId, number>; postedOn: string; posted: number }
 
@@ -61,15 +62,40 @@ function Outcomes({ year }: { year: string }) {
   );
 }
 
+/** One unit's year-end statement as rows: each payment in the year, the total, and what is owed today. */
+export function ownerStatementRows(u: { payments: { date: string; amount: number; method: string; note: string }[]; balance: number }, fyStart: string, fyEnd: string): [string, string][] {
+  const paid = u.payments.filter(p => p.date >= fyStart && p.date <= fyEnd);
+  return [...paid.map(p => [p.date + ' · ' + (p.note || p.method), fmt(p.amount)] as [string, string]), ['Paid in the year', fmt(paid.reduce((t, p) => t + p.amount, 0))], ['Owed today', fmt(Math.max(0, u.balance))]];
+}
+
+interface OwnerSend { sentOn: string; emailed: number; note: string }
+
 function OwnerStatements({ fyStart, fyEnd }: { fyStart: string; fyEnd: string }) {
+  const me = useAuthStore(s => s.currentUser.name);
   const units = useFinancialStore(s => s.units);
   const building = useBuildingStore(s => s.name);
-  const paid = (u: (typeof units)[number]) => u.payments.filter(p => p.date >= fyStart && p.date <= fyEnd);
-  const print = () => printPage(building + ' · year-end statements', units.map(u => '<section style="page-break-after:always"><h1 style="font-size:20px">' + esc(building) + '</h1><p>Year-end statement for unit ' + esc(u.number) + ' · ' + esc(u.owner) + '<br>' + esc(fyStart) + ' to ' + esc(fyEnd) + '</p>' + rowsHtml([...paid(u).map(p => [p.date + ' · ' + (p.note || p.method), fmt(p.amount)] as [string, string]), ['Paid in the year', fmt(paid(u).reduce((t, p) => t + p.amount, 0))], ['Owed today', fmt(Math.max(0, u.balance))]]) + '</section>').join(''));
+  const [sent, save] = useToolDoc<OwnerSend>('owner-statements', fyEnd, { sentOn: '', emailed: 0, note: '' });
+  const [busy, setBusy] = useState(false);
+  const withEmail = units.filter(u => u.email);
+  const total = units.reduce((t, u) => t + u.payments.filter(p => p.date >= fyStart && p.date <= fyEnd).reduce((x, p) => x + p.amount, 0), 0);
+  const print = () => printPage(building + ' · year-end statements', units.map(u => '<section style="page-break-after:always"><h1 style="font-size:20px">' + esc(building) + '</h1><p>Year-end statement for unit ' + esc(u.number) + ' · ' + esc(u.owner) + '<br>' + esc(fyStart) + ' to ' + esc(fyEnd) + '</p>' + rowsHtml(ownerStatementRows(u, fyStart, fyEnd)) + '</section>').join(''));
+  const email = async () => {
+    setBusy(true);
+    let count = 0, note = '';
+    // One message per owner: each sees only their own unit.
+    for (const u of withEmail) {
+      const r = await emailAnnouncement({ title: building + ': your year-end statement, unit ' + u.number, body: 'Unit ' + u.number + ', ' + fyStart + ' to ' + fyEnd + '\n\n' + ownerStatementRows(u, fyStart, fyEnd).map(([a, b]) => a + ': ' + b).join('\n'), category: 'financial', postedBy: me, recipients: [{ email: u.email, name: u.owner }] });
+      count += r.sent; if (r.note) note = r.note;
+      if (!r.sent && !count) break;
+    }
+    save({ sentOn: count ? todayIso() : sent.sentOn, emailed: count, note });
+    setBusy(false);
+  };
   return (
-    <Inner className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-sm text-ux2-ink"><b className="font-semibold">Each owner's year-end statement</b><span className="block text-xs text-ux2-muted">{units.length} units · {fmt(units.reduce((t, u) => t + paid(u).reduce((x, p) => x + p.amount, 0), 0))} paid between {fyStart} and {fyEnd}</span></span>
-      <Button size="sm" variant="ghost" onClick={print}>Print every unit's statement</Button>
+    <Inner className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm text-ux2-ink"><b className="font-semibold">Each owner's year-end statement</b><span className="block text-xs text-ux2-muted">{units.length} units · {fmt(total)} paid between {fyStart} and {fyEnd}</span></span>{sent.sentOn && <Chip tone="sage">{sent.emailed} emailed {sent.sentOn}</Chip>}</div>
+      <div className="flex flex-wrap gap-2"><Button size="sm" disabled={busy || !withEmail.length} onClick={() => void email()}>{busy ? 'Sending' : 'Email ' + withEmail.length + ' owners their own statement'}</Button><Button size="sm" variant="ghost" onClick={print}>Print every unit's statement</Button></div>
+      {sent.note && <span className="text-xs text-ux2-red-ink">{sent.note}</span>}
     </Inner>
   );
 }
