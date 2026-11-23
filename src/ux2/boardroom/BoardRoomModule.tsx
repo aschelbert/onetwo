@@ -35,6 +35,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import RegisterTab, { registerSummary } from './tabs/RegisterTab';
 import ProjectAction from './project/ProjectAction';
 import { projectIdOf } from './capitalImprovement';
+import CaseTools, { toolsFor } from './tools/CaseTools';
 import RecordAction from './action/RecordAction';
 import StartAction from './action/StartAction';
 import { recordIdOf } from './recordActions';
@@ -117,6 +118,8 @@ export default function BoardRoomModule() {
   }
 
   if (view && (view === 'new' || view.startsWith('case:'))) {
+    const toolCase = view.startsWith('case:') ? snap.cases.find(c => c.id === view.slice(5)) : undefined;
+    if (toolCase && toolsFor(toolCase)) return <div className="flex flex-col gap-4"><CaseFrame snap={snap} view={view} onBack={() => go('open')} onOpenCase={openCase} /><CaseTools c={toolCase} /></div>;
     return <CaseFrame snap={snap} view={view} prefill={params.get('cat') && params.get('sit') ? { catId: params.get('cat')!, sitId: params.get('sit')! } : undefined} onBack={() => go('open')} onOpenCase={openCase} />;
   }
 

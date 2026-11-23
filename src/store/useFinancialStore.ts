@@ -132,6 +132,13 @@ interface FinancialState {
   voidUnitInvoice: (invoiceId: string, reason: string) => boolean;
   /** Turn a balance no invoice stands behind (brought over from before the register) into one invoice, without posting again. */
   billOutstandingBalance: (unitNum: string) => UnitInvoice | null;
+  /**
+   * Write off everything a unit still owes, after a board vote: the income stays as billed and the loss is taken
+   * (Dr allowance for doubtful accounts as far as it reaches, then Dr bad debt expense / Cr the receivable). Returns the amount.
+   */
+  writeOffUnit: (unitNum: string, reason: string, date?: string) => number;
+  /** Bring the allowance for doubtful accounts to a target: one entry for the difference (Dr bad debt expense / Cr allowance, or the reverse). Returns the change. */
+  setAllowance: (target: number, date?: string, memo?: string) => number;
 
   // CoA mutations
   addCoASection: (num: string, name: string, type: string) => void;
@@ -366,6 +373,12 @@ const todayIso = () => new Date().toISOString().split('T')[0];
 const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 /** Removed before their insert returned: deleted as soon as it does. */
 const removedBeforeSaved = new Set<string>();
+
+/** Allowance for doubtful accounts: a credit balance against the receivables. Added to a building's chart the first time it is used. */
+export const ALLOWANCE_ACCT = '1190';
+export const BAD_DEBT_ACCT = '5300';
+/** How a written-off charge is marked: the charge stands as billed, unlike a void. */
+export const WRITTEN_OFF_MARK = 'Written off';
 
 export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
   tenantId: null,
@@ -1595,6 +1608,47 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     if (isBackendEnabled && isDbId(invoiceId)) financialSvc.updateUnitInvoice(invoiceId, { status: 'void', refundReason: reason });
     syncUnit(inv.unitNumber);
     return true;
+  },
+
+  writeOffUnit: (unitNum, reason, date = todayIso()) => {
+    get().addCoAAccount(ALLOWANCE_ACCT, 'Allowance for Doubtful Accounts', '1100', 'receivable');
+    get().addCoAAccount(BAD_DEBT_ACCT, 'Bad Debt Expense', '5000', 'operating');
+    get().billOutstandingBalance(unitNum);
+    const s = get();
+    const m = mappingOf(s.glAccountMapping);
+    const open = s.unitInvoices.filter(i => i.unitNumber === unitNum && isOpenInvoice(i));
+    // The allowance is a credit balance on an asset account, so it reads negative.
+    let allowance = Math.max(0, -balanceOf(ALLOWANCE_ACCT, 'asset', s.generalLedger));
+    let total = 0;
+    for (const inv of open) {
+      const remaining = invoiceRemaining(inv);
+      if (remaining <= 0) continue;
+      const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+      const fromAllowance = r2(Math.min(allowance, remaining));
+      if (fromAllowance > 0) s.glPost(date, `Write-off - Invoice ${inv.id} Unit ${unitNum}: ${reason}`, ALLOWANCE_ACCT, arAcct, fromAllowance, 'manual', unitNum);
+      if (remaining - fromAllowance > 0) s.glPost(date, `Write-off - Invoice ${inv.id} Unit ${unitNum}: ${reason}`, BAD_DEBT_ACCT, arAcct, r2(remaining - fromAllowance), 'manual', unitNum);
+      allowance = r2(allowance - fromAllowance);
+      total = r2(total + remaining);
+      if (isBackendEnabled && isDbId(inv.id)) financialSvc.updateUnitInvoice(inv.id, { status: 'void', refundReason: `${WRITTEN_OFF_MARK}: ${reason}` });
+    }
+    const ids = new Set(open.map(i => i.id));
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (ids.has(i.id) ? { ...i, status: 'void' as const, refundReason: `${WRITTEN_OFF_MARK}: ${reason}` } : i)),
+      units: st.units.map(u => u.number === unitNum ? { ...u, balance: r2(u.balance - total), lateFees: u.lateFees.map(f => (f.invoiceId && ids.has(f.invoiceId) ? { ...f, waived: true } : f)), specialAssessments: u.specialAssessments.filter(a => !a.invoiceId || !ids.has(a.invoiceId)) } : u),
+    }));
+    syncUnit(unitNum);
+    return total;
+  },
+
+  setAllowance: (target, date = todayIso(), memo = 'Allowance for doubtful accounts') => {
+    get().addCoAAccount(ALLOWANCE_ACCT, 'Allowance for Doubtful Accounts', '1100', 'receivable');
+    get().addCoAAccount(BAD_DEBT_ACCT, 'Bad Debt Expense', '5000', 'operating');
+    const s = get();
+    const now = Math.max(0, -balanceOf(ALLOWANCE_ACCT, 'asset', s.generalLedger));
+    const change = r2(Math.max(0, target) - now);
+    if (change > 0) s.glPost(date, memo, BAD_DEBT_ACCT, ALLOWANCE_ACCT, change, 'manual', null);
+    if (change < 0) s.glPost(date, memo, ALLOWANCE_ACCT, BAD_DEBT_ACCT, -change, 'manual', null);
+    return change;
   },
 
   billOutstandingBalance: (unitNum) => {
