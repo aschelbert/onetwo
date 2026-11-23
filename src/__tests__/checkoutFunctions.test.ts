@@ -454,6 +454,7 @@ describe('chargebee-webhook', () => {
   it('refuses a caller without the webhook password', async () => {
     const res = await hook(subscriptionEvent('subscription_created'), 'Basic ' + btoa('onetwo:wrong'));
     expect(res.status).toBe(401);
+    expect(res.headers.get('WWW-Authenticate')).toContain('Basic');
     expect(world.rpc).toHaveLength(0);
     expect(Object.keys(world.events)).toHaveLength(0);
   });

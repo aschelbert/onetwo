@@ -253,7 +253,12 @@ Deno.serve(async (req) => {
     const expected = "Basic " + btoa(`${WEBHOOK_USER}:${WEBHOOK_PASS}`);
     if (authHeader !== expected) {
       console.warn(`chargebee-webhook: refused a delivery, ${authFailureReason(authHeader)}`);
-      return new Response("Unauthorized", { status: 401 });
+      // The challenge header matters: a client that only sends its
+      // credentials once asked for them never would without it.
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: { "WWW-Authenticate": 'Basic realm="chargebee-webhook"' },
+      });
     }
   }
 
