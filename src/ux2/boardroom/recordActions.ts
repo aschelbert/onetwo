@@ -14,6 +14,7 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { ACTION_KINDS, actionKind, actionKindByRunbook, stepsOf, type ActionRecord } from '@/lib/actions';
+import { plusDays } from '@/lib/actions/types';
 import type { CaseTrackerCase } from '@/types/issues';
 import { pointsFor, watched, type InspectionData } from '@/lib/actions/inspection';
 import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
@@ -21,6 +22,11 @@ import { usePayrollStore } from '@/store/usePayrollStore';
 import { amended, passed, type BudgetAmendmentData } from '@/lib/actions/budgetAmendment';
 import type { FireNoticeData } from '@/lib/actions/fireNotice';
 import { lastFinishedQuarter, returnsFor, type PayrollFilingData } from '@/lib/actions/payrollFiling';
+import { useBuildingStore } from '@/store/useBuildingStore';
+import { kindsFor, parseSqft } from '@/lib/buildingRecords';
+import { SPIKE_CHECKS, UTILITIES, missingMonths, monthLabel, spikeOf, utilitiesFrom, type UtilitiesDoc, type UtilityBill } from '@/lib/utilities';
+import { benchmarkDue, type BenchmarkingData } from '@/lib/actions/benchmarking';
+import type { UtilitySpikeData } from '@/lib/actions/utilitySpike';
 import { todayIso } from '../runbook/adapters';
 
 export const actionSourceId = (r: Pick<ActionRecord, 'kind' | 'id'>) => `${actionKind(r.kind)?.runbookId ?? r.kind}:${r.id}`;
@@ -72,6 +78,70 @@ SYNC['fire-notice'] = (r, today) => {
   });
   useActionRecordsStore.getState().patch(r.id, { closedOn: today });
 };
+
+/** The building's meters and bills. */
+export const utilitiesDoc = (): UtilitiesDoc => utilitiesFrom(useActionRecordsStore.getState().doc('utilities')?.data);
+const saveUtilities = (doc: UtilitiesDoc, today: string) => useActionRecordsStore.getState().setDoc('utilities', 'Utility meters and bills', doc as unknown as Record<string, unknown>, today);
+export const saveUtilitiesDoc = saveUtilities;
+
+/**
+ * Enter a utility bill (or correct the one already entered for that meter and
+ * month). A bill far above the meter's usual opens a utility spike action the
+ * same day. Returns the action's case id when one opened.
+ */
+export function enterBill(bill: Omit<UtilityBill, 'id' | 'enteredOn'>, today: string = todayIso()): string | null {
+  const doc = utilitiesDoc();
+  const entry: UtilityBill = { ...bill, id: `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, enteredOn: today };
+  const bills = [...doc.bills.filter(b => !(b.meterId === bill.meterId && b.month === bill.month)), entry];
+  saveUtilities({ ...doc, bills }, today);
+  const spike = spikeOf(entry, bills), meter = doc.meters.find(m => m.id === bill.meterId);
+  const already = useActionRecordsStore.getState().records.some(r => r.kind === 'utility-spike' && (r.data as unknown as UtilitySpikeData).meterId === bill.meterId && (r.data as unknown as UtilitySpikeData).month === bill.month);
+  if (!spike || !meter || already || useFinancialStore.getState().runbooksOff.includes('utility-spike')) { runRecordActions(today); return null; }
+  const data: Partial<UtilitySpikeData> = { meterId: meter.id, meterName: meter.name, utility: meter.utility, unit: UTILITIES[meter.utility].unit, month: bill.month, use: bill.use, usual: spike.usual, cost: bill.cost, extraCost: spike.extraCost, checks: SPIKE_CHECKS[meter.utility].map(label => ({ label, note: '', done: false })) };
+  return startAction('utility-spike', `${meter.name} ${spike.ratio}× usual in ${monthLabel(bill.month)}`, data as Record<string, unknown>, { dueOn: plusDays(today, 7) }, today).caseId;
+}
+
+/** A spike learns of the meter's next bill, and closes on it; a wrong bill closes at once. */
+SYNC['utility-spike'] = (r, today) => {
+  const d = r.data as unknown as UtilitySpikeData;
+  const store = useActionRecordsStore.getState();
+  if (r.closedOn) return;
+  if (d.billRight === 'no') { store.patch(r.id, { closedOn: today }); return; }
+  if (!d.outcome) return;
+  const next = utilitiesDoc().bills.filter(b => b.meterId === d.meterId && b.month > d.month).sort((a, b) => a.month.localeCompare(b.month))[0];
+  if (next && !d.nextMonth) { store.patchData(r.id, { nextMonth: next.month, nextUse: next.use }); store.patch(r.id, { closedOn: today }); }
+};
+
+/** Benchmarking keeps count of the meters still missing months, files the Obligations record on confirmation, and closes. */
+SYNC.benchmarking = (r, today) => {
+  const d = r.data as unknown as BenchmarkingData;
+  const store = useActionRecordsStore.getState();
+  if (r.closedOn) return;
+  if (d.covered === 'no') { store.patch(r.id, { closedOn: today }); return; }
+  const doc = utilitiesDoc();
+  const missing = doc.meters.filter(m => missingMonths(doc, m.id, d.year).length > 0).length;
+  if (d.meters !== doc.meters.length || d.metersMissing !== missing) store.patchData(r.id, { meters: doc.meters.length, metersMissing: missing });
+  if (d.submittedOn && d.confirmation.trim()) {
+    useBuildingRecordsStore.getState().addRecord({ kind: 'energy-benchmarking', name: '', number: d.confirmation.trim(), doneOn: d.submittedOn, expiresOn: '', posted: false, notes: `Report for ${d.year}. From the energy benchmarking action.` });
+    store.patch(r.id, { closedOn: today });
+  }
+};
+
+/** Start the benchmarking report for a year (last year by default), unless it already has one. */
+export function startBenchmarking(today: string = todayIso(), year = Number(today.slice(0, 4)) - 1) {
+  const existing = useActionRecordsStore.getState().records.find(r => r.kind === 'benchmarking' && (r.data as unknown as BenchmarkingData).year === year);
+  if (existing) return { recordId: existing.id, caseId: recordCase(useIssuesStore.getState().cases, existing)?.id ?? null };
+  const b = useBuildingStore.getState();
+  const data: Partial<BenchmarkingData> = { year, sqft: parseSqft(b.details?.sqft) ?? 0, occupants: 0 };
+  return startAction('benchmarking', `Report for ${year}`, data as Record<string, unknown>, { dueOn: benchmarkDue(year) }, today);
+}
+
+/** Whether the benchmarking rule applies to this building: 'yes', 'check' or 'no'. */
+export function benchmarkingApplies(): 'yes' | 'check' | 'no' {
+  const b = useBuildingStore.getState();
+  const found = kindsFor({ state: b.address?.state ?? '', grossSqft: parseSqft(b.details?.sqft), hasElevator: false, hasBoiler: false }).find(k => k.kind.id === 'energy-benchmarking');
+  return found ? found.applies : 'no';
+}
 
 /** Wages paid in a period, from the pay runs. */
 export function wagesIn(start: string, end: string): number {
@@ -136,10 +206,18 @@ export function startInspection(title: string, opts: { scheduleId?: string; by?:
 
 /** Actions that open on the calendar: the payroll filing, in the two months after a quarter in which employees were paid. */
 export function runActionTriggers(today: string = todayIso()): void {
-  if (useFinancialStore.getState().runbooksOff.includes('payroll-filing')) return;
-  const q = lastFinishedQuarter(today);
-  const sinceEnd = Math.round((Date.parse(today) - Date.parse(q.end)) / 86400000);
-  if (sinceEnd <= 60 && wagesIn(q.start, q.end) > 0) startPayrollFiling(today, q);
+  const off = useFinancialStore.getState().runbooksOff;
+  if (!off.includes('payroll-filing')) {
+    const q = lastFinishedQuarter(today);
+    const sinceEnd = Math.round((Date.parse(today) - Date.parse(q.end)) / 86400000);
+    if (sinceEnd <= 60 && wagesIn(q.start, q.end) > 0) startPayrollFiling(today, q);
+  }
+  // Energy benchmarking: from January 1 to the April 1 deadline, for a building the rule covers, until last year's report is on record.
+  if (!off.includes('energy-benchmarking') && today.slice(5) <= '04-01' && benchmarkingApplies() === 'yes') {
+    const year = Number(today.slice(0, 4)) - 1;
+    const onFile = useBuildingRecordsStore.getState().records.some(x => x.kind === 'energy-benchmarking' && x.doneOn >= `${year + 1}-01-01`);
+    if (!onFile) startBenchmarking(today, year);
+  }
 }
 
 export interface RecordActionsRun { opened: string[] }
