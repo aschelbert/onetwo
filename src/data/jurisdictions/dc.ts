@@ -123,6 +123,15 @@ export const dc: JurisdictionData = {
       legalRef: 'DC Code § 42-1903.14',
       tip: 'Open to owners in good standing for a proper purpose, during reasonable hours on business days. Some records may be withheld (§ 42-1903.14(c)). Copies at actual cost.',
       due: 'Per request',
+      consequence: 'An owner who is refused records can take the dispute to court. The statute sets no response deadline or penalty of its own; unreasonable delay still invites a dispute and legal costs.',
+      howTo: [
+        'Establish written inspection policy',
+        'Respond within the period the bylaws set, or the board\'s own target (the statute sets no number of days)',
+        'Allow examination and copying during reasonable hours on business days',
+        'May charge the actual cost of materials and labor for copies (§ 42-1903.14(d))',
+        'Withhold only what § 42-1903.14(c) lists (e.g. legal counsel communications, executive session minutes, other owners\' files)',
+        'Document every request and fulfillment',
+      ],
     },
     o4: {
       legalRef: 'D.C. Law 21-241 (Owner Bill of Rights); no annual notice required',
