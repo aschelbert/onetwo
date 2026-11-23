@@ -3,6 +3,8 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
+import { parseSqft } from '@/lib/buildingRecords';
 import { useTenantContext } from '@/components/TenantProvider';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
 import { todayIso } from '../runbook/adapters';
@@ -16,6 +18,12 @@ export function useBuildingSnapshot(today: string = todayIso()): BuildingSnapsho
   const filings = useComplianceStore(s => s.filings);
   const contracts = useVendorTrackerStore(s => s.contracts);
   const workOrders = useFinancialStore(s => s.workOrders);
+  const records = useBuildingRecordsStore(s => s.records);
+  // Which equipment the building has decides which certificates it needs.
+  const facts = useMemo(() => {
+    const named = [...building.assets.map(a => a.name), ...building.maintenanceSchedules.map(m => `${m.task} ${m.category}`)].join(' | ');
+    return { state: building.address.state, grossSqft: parseSqft(building.details.sqft), hasElevator: /elevator|\blift\b/i.test(named), hasBoiler: /boiler|furnace|central heat|heating plant/i.test(named) };
+  }, [building.address.state, building.details.sqft, building.assets, building.maintenanceSchedules]);
 
   const obligations = useMemo(() => refreshComplianceRequirements({
     state: building.address.state,
@@ -42,5 +50,7 @@ export function useBuildingSnapshot(today: string = todayIso()): BuildingSnapsho
     completions,
     filings,
     maintenance: building.maintenanceSchedules,
-  }), [building.maintenanceSchedules, today, tenant.name, building.address, building.details, building.management.company, building.legalCounsel.length, building.board, building.legalDocuments, building.insurance, building.vendors, contracts, workOrders, obligations, completions, filings]);
+    records,
+    facts,
+  }), [building.maintenanceSchedules, records, facts, today, tenant.name, building.address, building.details, building.management.company, building.legalCounsel.length, building.board, building.legalDocuments, building.insurance, building.vendors, contracts, workOrders, obligations, completions, filings]);
 }

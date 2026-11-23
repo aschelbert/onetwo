@@ -10,7 +10,7 @@ import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, 
 import { dayLabel } from '../../home/calendar';
 import { daysBetween } from '../../runbook/model';
 import { ISO_DATE } from '../../runbook/adapters';
-import { contractRows, contractsSummary, documentsSummary, insuranceStatus, maintenanceOverdue, type BuildingSnapshot } from '../metrics';
+import { contractRows, contractsSummary, documentsSummary, insuranceStatus, maintenanceOverdue, recordRows, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
 import MaintenanceCard from './MaintenanceCard';
 
@@ -37,9 +37,15 @@ export function needsYou(snap: BuildingSnapshot): NeedsYouItem[] {
   for (const m of maintenanceOverdue(snap).slice(0, 3)) out.push({ id: `mnt:${m.id}`, title: `${m.task} is overdue`, detail: `${m.vendor || 'Building staff'} · was due ${dayLabel(m.nextDue)} · mark it done or put it off with a reason`, tone: 'red', chip: `Due ${dayLabel(m.nextDue)}`, action: { label: 'Maintenance', tab: 'overview', section: 'maintenance' } });
   for (const r of con.insuranceExpiring) out.push({ id: `coi:${r.vendorId}`, title: `${r.vendor}'s insurance certificate expires ${dayLabel(r.insurance.worst!.expires)}`, detail: `${r.service} · ask for the renewal`, tone: 'amber', chip: `${r.insurance.daysLeft} days`, action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of con.insuranceMissing) out.push({ id: `coi:${r.vendorId}`, title: `No certificate of insurance from ${r.vendor}`, detail: `${r.service} · general liability should be on file before they work on the property`, tone: 'amber', chip: 'Missing', action: { label: 'Contracts', tab: 'contracts' } });
+  for (const r of recordRows(snap)) {
+    if (!r.needs) continue;
+    const due = r.status.due ? dayLabel(r.status.due) : '';
+    const title = r.needs === 'missing' ? `No ${r.kind.label.toLowerCase()} on file` : r.needs === 'lapsed' ? `${r.kind.label} ${r.kind.cycle.type === 'expires' ? 'has expired' : 'is overdue'}` : r.needs === 'due-soon' ? `${r.kind.label} ${r.kind.cycle.type === 'expires' ? 'expires' : 'is due'} ${due}` : `${r.kind.label} is not marked as posted`;
+    out.push({ id: `rec:${r.kind.id}`, title, detail: r.needs === 'unposted' ? `Post it: ${r.kind.postedWhere?.toLowerCase()}` : r.kind.cite ?? r.kind.group, tone: r.needs === 'lapsed' ? 'red' : 'amber', chip: r.needs === 'missing' ? 'Missing' : r.needs === 'unposted' ? 'Not posted' : r.needs === 'lapsed' ? `Was due ${due}` : `${r.status.daysLeft} days`, action: { label: 'Licences and certificates', tab: 'obligations', section: 'records' } });
+  }
   const docs = documentsSummary(snap);
   for (const d of docs.reviewDue) out.push({ id: `doc:${d.id}`, title: `${d.name} is due for review`, detail: 'Its obligation stays open until the reviewed version is on file', tone: 'amber', chip: 'Review due', action: { label: 'Documents', tab: 'documents' } });
-  return out;
+  return out.sort((a, b) => (a.tone === 'red' ? 0 : 1) - (b.tone === 'red' ? 0 : 1));
 }
 
 const money = (s: string) => Number((s || '').replace(/[^0-9.]/g, '')) || 0;
@@ -56,10 +62,11 @@ function DetailsForm({ snap, onClose }: { snap: BuildingSnapshot; onClose: () =>
   const [built, setBuilt] = useState(snap.details.yearBuilt);
   const [floors, setFloors] = useState(String(snap.details.floors || ''));
   const [fy, setFy] = useState(snap.details.fiscalYearEnd || '12-31');
+  const [sqft, setSqft] = useState(useBuildingStore.getState().details.sqft || '');
   const [meetEvery, setMeetEvery] = useState(String(useBuildingStore.getState().details.boardMeetingEveryDays || 61));
   const [entity, setEntity] = useState<'incorporated' | 'unincorporated'>(snap.details.entityType as 'incorporated' | 'unincorporated');
   return (
-    <form aria-label="Edit details" onSubmit={e => { e.preventDefault(); updateAddress({ street, city, state, zip }); updateDetails({ totalUnits: Number(units) || 0, yearBuilt: built, floors: Number(floors) || 0, fiscalYearEnd: fy, entityType: entity, boardMeetingEveryDays: Math.min(366, Math.max(7, Number(meetEvery) || 61)) }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+    <form aria-label="Edit details" onSubmit={e => { e.preventDefault(); updateAddress({ street, city, state, zip }); updateDetails({ totalUnits: Number(units) || 0, yearBuilt: built, floors: Number(floors) || 0, sqft: sqft.trim(), fiscalYearEnd: fy, entityType: entity, boardMeetingEveryDays: Math.min(366, Math.max(7, Number(meetEvery) || 61)) }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <Field label="Street" className="min-w-[220px] flex-1"><input value={street} onChange={e => setStreet(e.target.value)} className={INPUT} /></Field>
       <Field label="City" className="w-[150px]"><input value={city} onChange={e => setCity(e.target.value)} className={INPUT} /></Field>
       <Field label="State" className="w-[80px]"><input value={state} onChange={e => setState(e.target.value)} className={INPUT} /></Field>
@@ -67,6 +74,7 @@ function DetailsForm({ snap, onClose }: { snap: BuildingSnapshot; onClose: () =>
       <Field label="Units" className="w-[90px]"><input inputMode="numeric" value={units} onChange={e => setUnits(e.target.value)} className={INPUT} /></Field>
       <Field label="Built" className="w-[90px]"><input value={built} onChange={e => setBuilt(e.target.value)} className={INPUT} /></Field>
       <Field label="Floors" className="w-[90px]"><input inputMode="numeric" value={floors} onChange={e => setFloors(e.target.value)} className={INPUT} /></Field>
+      <Field label="Gross floor area (sq ft)" className="w-[170px]"><input inputMode="numeric" value={sqft} onChange={e => setSqft(e.target.value)} placeholder="78,500" className={INPUT} /></Field>
       <Field label="FY ends (MM-DD)" className="w-[130px]"><input value={fy} onChange={e => setFy(e.target.value)} className={INPUT} /></Field>
       <Field label="Board meets every (days)" className="w-[170px]"><input inputMode="numeric" value={meetEvery} onChange={e => setMeetEvery(e.target.value)} className={INPUT} /></Field>
       <Field label="Entity" className="w-[170px]"><select value={entity} onChange={e => setEntity(e.target.value as 'incorporated' | 'unincorporated')} className={INPUT}><option value="incorporated">Incorporated</option><option value="unincorporated">Unincorporated</option></select></Field>
@@ -186,6 +194,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
             <KV label="Address">{snap.address.street}, {snap.address.city}, {snap.address.state} {snap.address.zip}</KV>
             <KV label="Units">{snap.details.totalUnits || '—'}{snap.details.floors ? ` · ${snap.details.floors} floors` : ''}</KV>
             <KV label="Built">{snap.details.yearBuilt || '—'}</KV>
+            <KV label="Gross floor area">{snap.facts?.grossSqft ? `${snap.facts.grossSqft.toLocaleString()} sq ft` : <span className="text-ux2-muted">Not entered</span>} <span className="text-xs font-normal text-ux2-muted">· decides whether energy benchmarking applies</span></KV>
             <KV label="Management">{management.company || 'Self-managed'} <Chip tone="ghost" className="ml-1.5">{management.company ? management.contact || 'Manager' : 'No manager'}</Chip></KV>
             <KV label="Fiscal year ends">{fyLabel(snap.details.fiscalYearEnd)}</KV>
             <KV label="Board meets">every {boardMeetingEveryDays} days <span className="text-xs font-normal text-ux2-muted">per the bylaws · the Board meeting cycle runbook follows it</span></KV>

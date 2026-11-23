@@ -10,6 +10,7 @@ import type { RegulatoryFiling } from '@/store/useComplianceStore';
 import type { BoardMember, InsurancePolicy, LegalDocument, MaintenanceSchedule, Vendor } from '@/store/useBuildingStore';
 import { vendorInsuranceStatus, type VendorInsuranceStatus } from '@/lib/vendorInsurance';
 import { scheduleState } from '@/lib/maintenance';
+import { kindsFor, recordStatus, type Applies, type BuildingFacts, type BuildingRecord, type RecordKind, type RecordStatus } from '@/lib/buildingRecords';
 import type { VendorContract } from '@/lib/services/vendorTracker';
 import type { WorkOrder } from '@/data/financial';
 import { daysBetween } from '../runbook/model';
@@ -33,6 +34,10 @@ export interface BuildingSnapshot {
   filings: RegulatoryFiling[];
   /** Recurring maintenance and inspections. */
   maintenance?: MaintenanceSchedule[];
+  /** Licences, certificates, tests and notices on file. */
+  records?: BuildingRecord[];
+  /** What decides which records apply: the state, the floor area, the equipment. */
+  facts?: BuildingFacts;
 }
 
 /** The Dashboard's building health: documents 35, insurance 35, governance 30. Unchanged. */
@@ -140,6 +145,36 @@ export function contractsSummary(rows: ContractRow[]) {
 /** Scheduled maintenance that is past due, oldest first. */
 export function maintenanceOverdue(s: BuildingSnapshot): MaintenanceSchedule[] {
   return (s.maintenance ?? []).filter(m => scheduleState(m, s.today) === 'overdue').sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+}
+
+export interface RecordRow {
+  kind: RecordKind;
+  applies: Applies;
+  status: RecordStatus;
+  /** A gap someone has to close: it applies and is missing, lapsed, due soon, or not posted. */
+  needs: 'missing' | 'lapsed' | 'due-soon' | 'unposted' | null;
+}
+
+/** Every record kind this building should look at, with where it stands. Kinds that only might apply never count as a gap while empty. */
+export function recordRows(s: BuildingSnapshot): RecordRow[] {
+  const facts = s.facts ?? { state: s.address.state, grossSqft: null, hasElevator: false, hasBoiler: false };
+  const all = s.records ?? [];
+  return kindsFor(facts).map(({ kind, applies }) => {
+    const status = recordStatus(kind, all.filter(r => r.kind === kind.id), s.today);
+    // A kind that only might apply is not a gap until the building records one.
+    const needs: RecordRow['needs'] = applies === 'check' && !status.current ? null : status.state === 'missing' ? (applies === 'yes' ? 'missing' : null) : status.state === 'lapsed' ? 'lapsed' : status.state === 'due-soon' ? 'due-soon' : status.unposted ? 'unposted' : null;
+    return { kind, applies, status, needs };
+  });
+}
+
+export function recordsSummary(rows: RecordRow[]) {
+  const expected = rows.filter(r => r.applies === 'yes' || !!r.status.current);
+  return {
+    expected: expected.length,
+    inOrder: expected.filter(r => !r.needs).length,
+    gaps: rows.filter(r => r.needs),
+    toCheck: rows.filter(r => r.applies === 'check' && !r.status.current),
+  };
 }
 
 export type ObligationState = 'met' | 'auto' | 'overdue' | 'in-progress' | 'upcoming' | 'ongoing';

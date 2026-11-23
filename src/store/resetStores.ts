@@ -13,6 +13,7 @@ import { useIssuesStore } from './useIssuesStore';
 import { useVendorTrackerStore } from './useVendorTrackerStore';
 import { useSpendingStore } from './useSpendingStore';
 import { usePropertyLogStore } from './usePropertyLogStore';
+import { useBuildingRecordsStore } from './useBuildingRecordsStore';
 import { useReportStore } from './useReportStore';
 import { useScorecardStore } from './useScorecardStore';
 import { useCommunicationsStore } from './useCommunicationsStore';
@@ -114,6 +115,8 @@ export function resetStoresForRealTenant() {
   useSpendingStore.setState({ approvals: [] });
 
   usePropertyLogStore.setState({ logs: [] });
+
+  useBuildingRecordsStore.setState({ records: [], saveError: null });
 
   useReportStore.setState({ configs: [], reports: [] });
 

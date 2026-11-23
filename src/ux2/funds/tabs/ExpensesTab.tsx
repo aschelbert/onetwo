@@ -360,7 +360,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
             <KV dark label="Due this week">{bl.dueSoon.length} · {fmt(bl.dueSoonAmount)}</KV>
           </div>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">{bl.ready.length ? `Approve all ${bl.ready.length} signed off and within budget` : bl.unsigned.length ? `${bl.unsigned.length} waiting on a work sign-off` : 'Nothing to approve'}</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.ready.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">Approve</button></>,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{bl.ready.length ? `Approve all ${bl.ready.length} signed off and within budget` : bl.unsigned.length ? `${bl.unsigned.length} waiting on a work sign-off` : 'Nothing to approve'}</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.ready.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">{bl.ready.length ? 'Approve' : 'Open'}</button></>,
       },
       detail: <BillsCard snap={snap} onSection={onSection} />,
     },
