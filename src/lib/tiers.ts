@@ -1,10 +1,18 @@
 // Shared tier configuration — single source of truth for subscription tiers
 // Used by AuthPage (onboarding), SubscriptionPage (management), and edge functions
 
-export const DEFAULT_TRIAL_DAYS = 21;
+//
+// Prices come from the checkout's pricing module, which the server charges
+// from, so what this file shows and what Chargebee bills cannot drift apart.
+import {
+  DEFAULT_TRIAL_DAYS as CHECKOUT_DEFAULT_TRIAL_DAYS, addonPrice, planPrice,
+  type AddonId, type BillingPeriod, type PlanId,
+} from '../../supabase/functions/_shared/checkoutPricing';
 
-export type SubscriptionTier = 'self_managed' | 'facilities';
-export type BillingInterval = 'monthly' | 'annual';
+export const DEFAULT_TRIAL_DAYS = CHECKOUT_DEFAULT_TRIAL_DAYS;
+
+export type SubscriptionTier = PlanId;
+export type BillingInterval = BillingPeriod;
 
 export interface TierConfig {
   id: SubscriptionTier;
@@ -20,8 +28,8 @@ export const TIERS: TierConfig[] = [
     id: 'self_managed',
     name: 'Self-Managed',
     tagline: 'The board runs the building. ONE two keeps it compliant.',
-    monthly: 179,
-    annual: 1790,
+    monthly: planPrice('self_managed', 'monthly'),
+    annual: planPrice('self_managed', 'annual'),
     features: [
       'Runbook of 45 DC obligations, Board Health score',
       'Meetings, elections, votes and minutes',
@@ -35,8 +43,8 @@ export const TIERS: TierConfig[] = [
     id: 'facilities',
     name: 'Plus Facilities',
     tagline: 'Everything in Self-Managed, plus inspected equipment and staff.',
-    monthly: 279,
-    annual: 2790,
+    monthly: planPrice('facilities', 'monthly'),
+    annual: planPrice('facilities', 'annual'),
     features: [
       'Everything in Self-Managed',
       'Inspection and permit calendar: elevator, pool, fire systems, boiler',
@@ -48,7 +56,7 @@ export const TIERS: TierConfig[] = [
   },
 ];
 
-export type AddOnId = 'on_call' | 'pm_seat';
+export type AddOnId = AddonId;
 
 export interface AddOnConfig {
   id: AddOnId;
@@ -56,7 +64,7 @@ export interface AddOnConfig {
   description: string;
   monthly: number;
   annual: number;
-  /** Per-tier price overrides. Falls back to top-level monthly/annual if tier not listed. */
+  /** Per-tier prices, where they differ from the top-level monthly/annual. */
   tierPricing?: Partial<Record<SubscriptionTier, { monthly: number; annual: number }>>;
 }
 
@@ -65,25 +73,24 @@ export const ADDONS: AddOnConfig[] = [
     id: 'on_call',
     name: 'On Call',
     description: 'A named advisor who knows your building. Monthly call, replies within a business day, budget and year-end reviewed, a seat at the annual meeting.',
-    monthly: 249,
-    annual: 2490,
+    monthly: addonPrice('on_call', 'self_managed', 'monthly'),
+    annual: addonPrice('on_call', 'self_managed', 'annual'),
     tierPricing: {
-      facilities: { monthly: 499, annual: 4990 },
+      facilities: { monthly: addonPrice('on_call', 'facilities', 'monthly'), annual: addonPrice('on_call', 'facilities', 'annual') },
     },
   },
   {
     id: 'pm_seat',
     name: 'Property Manager Seat',
     description: 'Keeping a manager for operations? Give them a seat so they work inside your records instead of theirs.',
-    monthly: 79,
-    annual: 790,
+    monthly: addonPrice('pm_seat', 'self_managed', 'monthly'),
+    annual: addonPrice('pm_seat', 'self_managed', 'annual'),
   },
 ];
 
 /** Get the effective price for an add-on given the selected tier. */
 export function getAddOnPrice(addon: AddOnConfig, tier: SubscriptionTier, interval: BillingInterval): number {
-  const tp = addon.tierPricing?.[tier];
-  return interval === 'annual' ? (tp?.annual ?? addon.annual) : (tp?.monthly ?? addon.monthly);
+  return addonPrice(addon.id, tier, interval);
 }
 
 export function getTierById(id: string): TierConfig | undefined {

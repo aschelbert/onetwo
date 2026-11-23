@@ -1,3 +1,4 @@
+import { ADDON_MONTHLY } from "../_shared/checkoutPricing.ts";
 // supabase/functions/manage-subscription/index.ts
 // Chargebee subscription management actions for board members.
 // Actions: change-plan, set-on-call, set-pm-seat, buy-setup, set-interval, cancel, reactivate
@@ -53,7 +54,10 @@ function setupPriceId(plan: PlanId): string {
 // ── Pricing (cents) ──
 
 const PLAN_MONTHLY: Record<PlanId, number> = { self_managed: 17900, facilities: 27900 };
-const ON_CALL_MONTHLY: Record<PlanId, number> = { self_managed: 24900, facilities: 49900 };
+const ON_CALL_MONTHLY: Record<PlanId, number> = {
+  self_managed: ADDON_MONTHLY.on_call.self_managed * 100,
+  facilities: ADDON_MONTHLY.on_call.facilities * 100,
+};
 const PM_SEAT_MONTHLY = 7900;
 
 function computeMonthlyRate(plan: PlanId, onCall: boolean, pmSeat: boolean): number {

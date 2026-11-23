@@ -3,6 +3,7 @@
 // Zero dependencies -- raw fetch to Supabase REST API.
 
 import { reportSignupConversion } from "../_shared/openaiAds.ts";
+import { ADDON_MONTHLY, PLAN_MONTHLY as PLAN_DOLLARS } from "../_shared/checkoutPricing.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -73,9 +74,18 @@ interface ParsedSubscription {
 }
 
 // Prices in cents
-const PLAN_MONTHLY: Record<PlanId, number> = { self_managed: 17900, facilities: 27900 };
-const ON_CALL_MONTHLY: Record<PlanId, number> = { self_managed: 24900, facilities: 49900 };
-const PM_SEAT_MONTHLY = 7900;
+const PLAN_MONTHLY: Record<PlanId, number> = {
+  self_managed: PLAN_DOLLARS.self_managed * 100,
+  facilities: PLAN_DOLLARS.facilities * 100,
+};
+const ON_CALL_MONTHLY: Record<PlanId, number> = {
+  self_managed: ADDON_MONTHLY.on_call.self_managed * 100,
+  facilities: ADDON_MONTHLY.on_call.facilities * 100,
+};
+const PM_SEAT_MONTHLY: Record<PlanId, number> = {
+  self_managed: ADDON_MONTHLY.pm_seat.self_managed * 100,
+  facilities: ADDON_MONTHLY.pm_seat.facilities * 100,
+};
 
 function parseSubscriptionItems(
   // deno-lint-ignore no-explicit-any
@@ -113,7 +123,7 @@ function parseSubscriptionItems(
 
   let monthlyRate = PLAN_MONTHLY[plan];
   if (onCall) monthlyRate += ON_CALL_MONTHLY[plan];
-  if (pmSeat) monthlyRate += PM_SEAT_MONTHLY;
+  if (pmSeat) monthlyRate += PM_SEAT_MONTHLY[plan];
 
   return { plan, interval, onCall, pmSeat, monthlyRate };
 }
@@ -430,6 +440,28 @@ Deno.serve(async (req) => {
               {},
               { tenant_id: result.tenant_id },
             );
+
+            // provision_tenant works the monthly rate out from its own
+            // price table. Record the rate of the items Chargebee actually
+            // holds, so the building's subscription shows what it is billed.
+            await sbQuery("PATCH", "subscriptions", { tenant_id: `eq.${result.tenant_id}` }, {
+              monthly_rate: parsed.monthlyRate,
+            }).catch(() => false);
+
+            // The one-page signup no longer asks which board seat the person
+            // holds; provision_tenant would record them as President. Leave
+            // the seat unset instead (a null board_title means "not confirmed
+            // yet"), so My Account asks them to confirm it.
+            if (pending.seatUnconfirmed === true && pending.userId) {
+              await sbQuery("PATCH", "tenant_users", {
+                tenant_id: `eq.${result.tenant_id}`,
+                user_id: `eq.${pending.userId}`,
+              }, { board_title: null, role_key: null }).catch(() => false);
+              await sbQuery("DELETE", "board_members", {
+                tenant_id: `eq.${result.tenant_id}`,
+                email: `eq.${pending.contactEmail || ""}`,
+              }).catch(() => false);
+            }
 
             // Record which ad sent this signup. Best effort: a failure here
             // must not undo a provisioned building.

@@ -2,17 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, isBackendEnabled, setActiveTenantId, forgetLocalSession } from '@/lib/supabase';
 import type { Role } from '@/types/auth';
-import { TIERS, ADDONS, DEFAULT_TRIAL_DAYS, getAddOnPrice } from '@/lib/tiers';
-import type { SubscriptionTier, BillingInterval, AddOnId } from '@/lib/tiers';
+import { TIERS, DEFAULT_TRIAL_DAYS } from '@/lib/tiers';
+import type { SubscriptionTier } from '@/lib/tiers';
 import { tenantLoginUrl } from '@/lib/tenantHost';
 import {
-  addressLine, chooseTenant, fetchMemberships, isSameBuilding, needsBuildingChoice, pickMembership, subscriptionLabel,
+  addressLine, chooseTenant, fetchMemberships, needsBuildingChoice, pickMembership, subscriptionLabel,
   type TenantMembership,
 } from '@/lib/tenantMembership';
-
-/** A building added to an account that already existed, or a brand new signup. */
-const consentSource = (signedInAs: string | null, existingAccount: unknown) =>
-  (signedInAs || existingAccount ? 'add_building' : 'signup') as 'add_building' | 'signup';
 
 type SessionUser = { id: string; email?: string | null; user_metadata?: { full_name?: string } };
 
@@ -22,43 +18,11 @@ const SIGN_IN_LATER_KEY = 'onetwo_sign_in_later';
 // Buildings the account had before checkout began, kept across the Chargebee redirect
 const KNOWN_TENANTS_KEY = 'onetwo_checkout_known_tenants';
 
-// The signup form as it stood when checkout opened (never a password). Chargebee
-// can show checkout as a full page; its "back to site" link reloads this page,
-// and this is what puts the visitor back on the account step with nothing lost.
-const SIGNUP_DRAFT_KEY = 'onetwo_signup_draft';
-
-interface SignupDraft {
-  tier: SubscriptionTier;
-  interval: BillingInterval;
-  addOns: AddOnId[];
-  building: { name: string; subdomain: string; street: string; city: string; state: string; zip: string; units: string };
-  profile: { firstName: string; lastName: string; email: string; phone: string; unit: string; boardTitle: string };
-  consent: Consent;
-  signedInAs: string | null;
-  existingAccount: { email: string; mode: 'now' | 'later' | null } | null;
-  /** The signup created or opened the session itself, so leaving checkout must end it. */
-  ownsSession: boolean;
-}
-
-/** Read the saved signup form and forget it. Null when there is none. */
-function takeSignupDraft(): SignupDraft | null {
-  try {
-    const raw = sessionStorage.getItem(SIGNUP_DRAFT_KEY);
-    sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
-    const d = raw ? JSON.parse(raw) : null;
-    return d && d.building && d.profile ? (d as SignupDraft) : null;
-  } catch {
-    return null;
-  }
-}
-import { loadOpenAIPixel, readAdClickRef, setOpenAIPixelUser } from '@/lib/openaiPixel';
 import { NO_CONSENT, missingConsent, recordConsent, type Consent } from '@/lib/consent';
 import ConsentBoxes from './ConsentBoxes';
 import PasswordRules from './PasswordRules';
 import { passwordError } from '@/lib/passwordPolicy';
-import { setSignupInProgress } from '@/lib/authFlow';
-import { loadRedditPixel, trackBuildingCreated } from '@/lib/adConversions';
-import { readAttribution } from '@/lib/attribution';
+import SignupCheckout from './signup/SignupCheckout';
 
 const Logo = () => (
   <div className="text-center mb-8">
@@ -130,44 +94,15 @@ export default function AuthPage() {
     skipToDemo();
   };
 
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-
-  // True while this signup holds a session it created itself (a new account,
-  // or an existing one signed in so its checkout could run).
-  const signupOwnsSession = useRef(false);
-
-  // The signup stopped before a building was paid for. A session it created
-  // must not outlive it: otherwise the person is left signed in to an account
-  // they never chose to log in to, and the next signup greets them as signed in.
-  const abandonSignupSession = async () => {
-    setSignupInProgress(false);
-    if (!signupOwnsSession.current || !supabase) return;
-    signupOwnsSession.current = false;
-    try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
-  };
-
   // Leave an account the signup found already signed in, and start the
   // account step again with a blank form.
   const signOutOfSignup = async () => {
     try { await supabase?.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
-    signupOwnsSession.current = false;
     setSignedInAs(null);
-    setExistingAccount(null);
     setProfileEmail(''); setFirstName(''); setLastName(''); setPassword(''); setConfirmPassword('');
   };
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sending, setSending] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('self_managed');
-  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
-  const [selectedAddOns, setSelectedAddOns] = useState<Set<AddOnId>>(new Set());
-
-  const toggleAddOn = (id: AddOnId) => {
-    setSelectedAddOns(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
   const [trialDays, setTrialDays] = useState(DEFAULT_TRIAL_DAYS);
   // The trial can be turned off in the Admin Console (0 days): billing then starts at signup.
   const hasTrial = trialDays > 0;
@@ -189,65 +124,12 @@ export default function AuthPage() {
 
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Building form
-  const [bldgName, setBldgName] = useState('');
-  const [bldgSubdomain, setBldgSubdomain] = useState('');
-  const [subdomainStatus, setSubdomainStatus] = useState<'idle'|'checking'|'available'|'taken'>('idle');
-  const [bldgStreet, setBldgStreet] = useState('');
-  const [bldgCity, setBldgCity] = useState('');
-  const [bldgState, setBldgState] = useState('');
-  const [bldgZip, setBldgZip] = useState('');
-  const [bldgUnits, setBldgUnits] = useState('');
-
-  // Auto-suggest subdomain from building name
-  const sanitizeSubdomain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
-  const subdomainManuallyEdited = useRef(false);
-
-  useEffect(() => {
-    // Only auto-suggest if user hasn't manually edited the subdomain
-    if (!subdomainManuallyEdited.current) {
-      const suggested = sanitizeSubdomain(
-        bldgName.replace(/\b(condominium|condos?|hoa|association|residences|towers|gardens|estates|the|of)\b/gi, '')
-      );
-      setBldgSubdomain(suggested);
-    }
-  }, [bldgName]);
-
-  // Check subdomain uniqueness with debounce
-  useEffect(() => {
-    if (!bldgSubdomain || bldgSubdomain.length < 3 || !isBackendEnabled || !supabase) {
-      setSubdomainStatus('idle');
-      return;
-    }
-    setSubdomainStatus('checking');
-    const timer = setTimeout(async () => {
-      try {
-        const { data, error } = await supabase!
-          .from('tenants')
-          .select('id')
-          .eq('subdomain', bldgSubdomain)
-          .maybeSingle();
-        setSubdomainStatus(data ? 'taken' : 'available');
-      } catch {
-        setSubdomainStatus('idle');
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [bldgSubdomain]);
-
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
   // "Which building?" — set when a signed-in account has several and none is implied by the host
   const [buildingChoices, setBuildingChoices] = useState<{ user: SessionUser; rows: TenantMembership[] } | null>(null);
   const [rememberBuilding, setRememberBuilding] = useState(false);
   // Set while an already signed-in person is setting up another building: no email or password to enter
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
-  // Signing up with an email that already has an account: the account step
-  // becomes a one-field sign-in instead of "choose a password". `error` is
-  // shown when the password entered there is wrong.
-  // `mode` is how they chose to continue: sign in to that account now, or
-  // skip signing in and have the building attached to it after payment.
-  const [existingAccount, setExistingAccount] = useState<{ email: string; error: boolean; mode: 'now' | 'later' | null } | null>(null);
-  const emailInputRef = useRef<HTMLInputElement>(null);
   // Set after a "sign in later" checkout: the login form explains what to do next
   const [signInLaterFor, setSignInLaterFor] = useState<string | null>(() => {
     try { return sessionStorage.getItem(SIGN_IN_LATER_KEY); } catch { return null; }
@@ -256,32 +138,6 @@ export default function AuthPage() {
   // takes an email; nothing is pre-ticked.
   const [consent, setConsent] = useState<Consent>(NO_CONSENT);
   const [provisioningTimedOut, setProvisioningTimedOut] = useState(false);
-
-  // Chargebee Drop-in initialization
-  const cbInstanceRef = useRef<any>(null);
-
-  const ensureChargebee = () => {
-    if (cbInstanceRef.current) return cbInstanceRef.current;
-    const cbSite = import.meta.env.VITE_CB_SITE || import.meta.env.VITE_CHARGEBEE_SITE;
-    if (!cbSite || !(window as any).Chargebee) return null;
-    try {
-      cbInstanceRef.current = (window as any).Chargebee.init({ site: cbSite });
-    } catch (e) {
-      console.warn('Chargebee init failed:', e);
-    }
-    return cbInstanceRef.current;
-  };
-
-  useEffect(() => {
-    if (!isBackendEnabled) return;
-    if ((window as any).Chargebee) { ensureChargebee(); }
-    else {
-      const timer = setInterval(() => {
-        if ((window as any).Chargebee) { clearInterval(timer); ensureChargebee(); }
-      }, 200);
-      setTimeout(() => clearInterval(timer), 5000);
-    }
-  }, []);
 
   // Helper: look up tenant_users and log the user in + redirect to subdomain
   // Extracted to component level so both session-check and handleCheckout can use it
@@ -391,7 +247,6 @@ export default function AuthPage() {
     if (first) setFirstName(first);
     if (rest.length) setLastName(rest.join(' '));
     setBuildingChoices(null);
-    setExistingAccount(null);
     setAuthStep('signup-plan');
   };
 
@@ -418,53 +273,6 @@ export default function AuthPage() {
     return false;
   };
 
-  // Back from Chargebee's checkout page without paying: put the signup form
-  // back as it was and return to the account step. Returns the saved form.
-  const canceledReturn = useRef<{ draft: SignupDraft | null } | null>(null);
-  const restoreSignupDraft = (): SignupDraft | null => {
-    const d = takeSignupDraft();
-    // Nothing was paid for: drop what was saved for the return from a payment
-    try {
-      sessionStorage.removeItem('onetwo_checkout_tokens');
-      sessionStorage.removeItem(KNOWN_TENANTS_KEY);
-      sessionStorage.removeItem(SIGN_IN_LATER_KEY);
-    } catch { /* ignore */ }
-    setSignInLaterFor(null);
-    if (!d) {
-      // Form not saved (e.g. opened in another tab): start the signup again
-      setAuthStep('signup-plan');
-      return null;
-    }
-    if (d.tier === 'self_managed' || d.tier === 'facilities') setSelectedTier(d.tier);
-    if (d.interval === 'monthly' || d.interval === 'annual') setBillingInterval(d.interval);
-    if (Array.isArray(d.addOns)) setSelectedAddOns(new Set(d.addOns));
-    subdomainManuallyEdited.current = !!d.building.subdomain; // keep theirs, don't re-suggest
-    setBldgName(d.building.name || '');
-    setBldgSubdomain(d.building.subdomain || '');
-    setBldgStreet(d.building.street || '');
-    setBldgCity(d.building.city || '');
-    setBldgState(d.building.state || '');
-    setBldgZip(d.building.zip || '');
-    setBldgUnits(d.building.units || '');
-    setFirstName(d.profile.firstName || '');
-    setLastName(d.profile.lastName || '');
-    setProfileEmail(d.profile.email || '');
-    setProfilePhone(d.profile.phone || '');
-    setProfileUnit(d.profile.unit || '');
-    setBoardTitle(d.profile.boardTitle || 'President');
-    if (d.consent) setConsent({ ...NO_CONSENT, ...d.consent });
-    setExistingAccount(d.existingAccount ? { ...d.existingAccount, error: false } : null);
-    setAuthStep('signup-account');
-    return d;
-  };
-
-  // OpenAI and Reddit Ads pixels: load only once the visitor is in the signup steps, so
-  // nobody signing in or using the app is tracked.
-  const inSignupSteps = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
-  useEffect(() => {
-    if (inSignupSteps) { loadOpenAIPixel(); loadRedditPixel(); }
-  }, [inSignupSteps]);
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -475,28 +283,9 @@ export default function AuthPage() {
       return;
     }
 
-    // Read plan/interval from marketing page CTAs
-    const urlPlan = params.get('plan');
-    const urlInterval = params.get('interval');
-    if (urlPlan === 'self_managed' || urlPlan === 'facilities') setSelectedTier(urlPlan);
-    if (urlInterval === 'annual') setBillingInterval('annual');
-
-    // Chargebee's "back to site" link: return to the account step, form intact.
-    // Handled once (the ref), so a repeated run of this effect keeps the result.
-    if (params.get('checkout') === 'canceled' && !canceledReturn.current) {
-      const draft = restoreSignupDraft();
-      canceledReturn.current = { draft };
-      // A reload from here is an ordinary signup page, not another "canceled" return
-      window.history.replaceState({}, '', draft?.signedInAs ? '/login?create=1&add=1' : '/login?create=1');
-    }
-    const isCheckoutCanceled = !!canceledReturn.current;
-    const canceledDraft = canceledReturn.current?.draft ?? null;
-
     // Direct /login visit (e.g. "Log In" button) — go straight to login form
     // /login?create=1 (e.g. "Get Started" button) — jump to signup-plan
-    if (isCheckoutCanceled) {
-      // step already set by restoreSignupDraft
-    } else if (params.get('create') === '1') {
+    if (params.get('create') === '1') {
       setAuthStep('signup-plan');
     } else if (authStep === 'welcome') {
       setAuthStep('login');
@@ -536,23 +325,6 @@ export default function AuthPage() {
 
           // If URL tokens are present (subdomain handoff), restore that session
           let user = (await supabase!.auth.getSession()).data.session?.user ?? null;
-
-          // Left checkout without paying. Same as closing the checkout window:
-          // a session the signup made for itself ends here, and someone adding
-          // a building to the account they are signed in to stays signed in.
-          if (isCheckoutCanceled) {
-            const addingAs = canceledDraft?.signedInAs || null;
-            if (user && addingAs && user.email?.toLowerCase() === addingAs.toLowerCase()) {
-              setSignedInAs(addingAs);
-            } else if (user && canceledDraft?.ownsSession) {
-              try { await supabase!.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
-            }
-            setSignupInProgress(false);
-            clearTimeout(timeout);
-            setSessionChecking(false);
-            setLoginLoading(false);
-            return;
-          }
 
           // Handle token_hash from admin console (platform admin handoff)
           if (tokenHash && !user) {
@@ -909,313 +681,6 @@ export default function AuthPage() {
     login(newMember);
   };
 
-  // Chargebee Checkout — creates a checkout session and redirects
-  const handleCheckout = async () => {
-    if (!isBackendEnabled || !supabase) {
-      // Demo mode fallback — skip payment
-      handleCompleteOnboarding();
-      return;
-    }
-
-    setCheckoutLoading(true);
-    try {
-      // Validate required fields before creating auth user
-      const signupEmail = profileEmail || email;
-      if (!signupEmail) { alert('Please enter your email first.'); setCheckoutLoading(false); return; }
-      // Already signed in as this person (setting up another building): no
-      // password to check and no account to create.
-      const { data: { session: openSession } } = await supabase.auth.getSession();
-      const alreadySignedIn = !!signedInAs
-        && openSession?.user?.email?.toLowerCase() === signupEmail.toLowerCase();
-
-      // The email is already known to have an account: sign in, don't sign up
-      const knownAccount = !alreadySignedIn && existingAccount?.email === signupEmail.trim().toLowerCase();
-
-      // They chose not to sign in now: no account is touched here. The server
-      // attaches the building to that account once it has been paid for.
-      const signInLater = knownAccount && existingAccount?.mode === 'later';
-
-      // A new password must meet the policy. Not asked of someone signing in
-      // to an account they already have, whose password predates it.
-      if (!alreadySignedIn && !knownAccount) {
-        const weak = passwordError(password);
-        if (weak) { alert(weak); setCheckoutLoading(false); return; }
-      }
-      if (!firstName || !lastName) { alert('Please enter your name.'); setCheckoutLoading(false); return; }
-
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-
-      // From here until checkout succeeds or stops, any session is the signup's
-      setSignupInProgress(true);
-
-      // This browser may still hold a sign-in the visitor did not ask to use
-      // (they opened a plain signup, not "Set up another building"). Drop it,
-      // so the signup acts only on what they choose here: otherwise "sign in
-      // later" would finish with them already inside their existing building.
-      if (!alreadySignedIn && openSession) {
-        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* already gone */ }
-      }
-
-      // Try to sign up — if the email already has an account, sign in instead
-      const { error: authError } = alreadySignedIn || signInLater ? { error: null }
-        : knownAccount ? { error: { message: 'already registered' } }
-        : await supabase.auth.signUp({
-          email: signupEmail,
-          password: password,
-          options: { data: { full_name: fullName } },
-        });
-
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          // First time we learn this email has an account: always stop and
-          // ask how they want to continue. Never sign the account in on the
-          // strength of a password typed as a "new" one, even if it matches.
-          if (!knownAccount) {
-            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: false, mode: null });
-            setPassword('');
-            setConfirmPassword('');
-            setSignupInProgress(false);
-            setCheckoutLoading(false);
-            return;
-          }
-          // They chose "sign in now" and entered the account's password
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: signupEmail,
-            password: password,
-          });
-          if (signInError) {
-            setExistingAccount({ email: signupEmail.trim().toLowerCase(), error: true, mode: 'now' });
-            setPassword('');
-            setSignupInProgress(false);
-            setCheckoutLoading(false);
-            return;
-          }
-          signupOwnsSession.current = true;
-        } else {
-          alert(authError.message); setSignupInProgress(false); setCheckoutLoading(false); return;
-        }
-      } else if (!alreadySignedIn && !signInLater) {
-        signupOwnsSession.current = true; // a brand new account
-      }
-
-      // Get the session token
-      const session = signInLater ? null : (await supabase.auth.getSession()).data.session;
-      if (!signInLater && !session) { alert('Authentication failed. Please try again.'); await abandonSignupSession(); setCheckoutLoading(false); return; }
-
-      // Proof of what was ticked on this form, stored before any payment step
-      await recordConsent(supabase, consentSource(signedInAs, existingAccount), signupEmail, consent);
-
-      // An existing account may add another building. Only stop when this is
-      // a building the account already has (same address, or same name when no
-      // address is on file) — that is a repeat of a finished checkout.
-      // (Without a session the server makes the same check before checkout.)
-      const memberships = session ? await fetchMemberships(supabase, session.user.id) : [];
-      if (memberships === null) {
-        alert('We could not check your account. Please try again.');
-        await abandonSignupSession();
-        setCheckoutLoading(false);
-        return;
-      }
-      const newBuilding = {
-        name: bldgName,
-        address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
-      };
-      const duplicateOf = memberships.find(m =>
-        !!m.tenant && isSameBuilding(newBuilding, { name: m.tenant.name, address: m.tenant.address }));
-      if (duplicateOf) {
-        // Say which building it collides with and let them fix the address,
-        // rather than a vague "already set up" and a bounce to the login page.
-        await abandonSignupSession();
-        alert(`Your account already has this building: "${duplicateOf.tenant?.name || 'your existing building'}". To add another building, enter its own name and street address.`);
-        setAuthStep('signup-building');
-        setCheckoutLoading(false);
-        return;
-      }
-      const knownTenantIds = memberships.map(m => m.tenant_id);
-
-      // Open Chargebee Drop-in checkout modal (lazy-init if needed)
-      if (!ensureChargebee()) {
-        alert('Payment system is still loading. Please try again in a moment.');
-        await abandonSignupSession();
-        setCheckoutLoading(false);
-        return;
-      }
-
-      const currentSession = session;
-      // Chargebee calls `close` after a successful checkout too
-      let checkoutSucceeded = false;
-
-      // Save session tokens so we can restore them if Chargebee redirects away
-      try {
-        if (session) {
-          sessionStorage.setItem('onetwo_checkout_tokens', JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-          }));
-          sessionStorage.setItem(KNOWN_TENANTS_KEY, JSON.stringify(knownTenantIds));
-        } else {
-          sessionStorage.setItem(SIGN_IN_LATER_KEY, bldgName.trim());
-        }
-        // The form itself, for Chargebee's "back to site" link (see SIGNUP_DRAFT_KEY)
-        const draft: SignupDraft = {
-          tier: selectedTier,
-          interval: billingInterval,
-          addOns: [...selectedAddOns],
-          building: { name: bldgName, subdomain: bldgSubdomain, street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip, units: bldgUnits },
-          profile: { firstName, lastName, email: signupEmail, phone: profilePhone, unit: profileUnit, boardTitle },
-          consent,
-          signedInAs: alreadySignedIn ? signedInAs : null,
-          existingAccount: knownAccount && existingAccount ? { email: existingAccount.email, mode: existingAccount.mode } : null,
-          ownsSession: signupOwnsSession.current,
-        };
-        sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
-      } catch { /* sessionStorage may be unavailable */ }
-
-      console.log('[checkout] Opening Chargebee Drop-in...');
-
-      // Track hostedPage errors separately since Chargebee swallows them
-      let hostedPageError: string | null = null;
-
-      // One id shared by the browser pixel and the server-side conversion
-      // report, so OpenAI Ads counts this signup once.
-      const conversionEventId = `signup_${
-        typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-      }`;
-
-      cbInstanceRef.current.openCheckout({
-        hostedPage: async () => {
-          try {
-            console.log('[checkout] Fetching hosted page from edge function...');
-            const res = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chargebee-checkout`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  // No session when signing in later: the server then goes by existingEmail
-                  'Authorization': `Bearer ${currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                  'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify({
-                  plan: selectedTier,
-                  interval: billingInterval,
-                  onCall: selectedAddOns.has('on_call'),
-                  pmSeat: selectedAddOns.has('pm_seat'),
-                  building: {
-                    name: bldgName,
-                    subdomain: bldgSubdomain,
-                    address: { street: bldgStreet, city: bldgCity, state: bldgState, zip: bldgZip },
-                    totalUnits: parseInt(bldgUnits) || 0,
-                    contactName: `${firstName} ${lastName}`.trim(),
-                    boardTitle,
-                    firstName: firstName.trim(),
-                    lastName: lastName.trim(),
-                  },
-                  origin: window.location.origin,
-                  ...(signInLater ? { existingEmail: signupEmail.trim().toLowerCase() } : {}),
-                  conversionEventId,
-                  // Global Privacy Control: skip the server-side OpenAI Ads report too
-                  adMeasurementOptOut:
-                    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
-                  // ChatGPT ad click reference, for the server-side conversion report
-                  adClickRef: readAdClickRef(),
-                  // Which ad sent this visitor (UTM tags), saved on the building
-                  attribution: readAttribution(),
-                }),
-              }
-            );
-            const data = await res.json();
-            console.log('[checkout] Edge function response:', JSON.stringify(data).slice(0, 500));
-            if (data.error) {
-              hostedPageError = data.error;
-              throw new Error(data.error);
-            }
-            if (!data.hosted_page) {
-              hostedPageError = 'No hosted_page in response: ' + JSON.stringify(data).slice(0, 200);
-              throw new Error(hostedPageError);
-            }
-            console.log('[checkout] hosted_page id:', data.hosted_page.id, 'embed:', data.hosted_page.embed);
-            return data.hosted_page;
-          } catch (e: any) {
-            hostedPageError = hostedPageError || e.message || String(e);
-            console.error('[checkout] hostedPage callback error:', hostedPageError);
-            throw e;
-          }
-        },
-        success: async (_hostedPageId: string) => {
-          checkoutSucceeded = true;
-          try { sessionStorage.removeItem(SIGNUP_DRAFT_KEY); } catch { /* ignore */ }
-          setSignupInProgress(false);
-          signupOwnsSession.current = false; // paid for: the session is now a real login
-          console.log('[checkout] Checkout success, polling for tenant...');
-          // OpenAI Ads conversion: paid trial signup completed. Attach the
-          // hashed email and user ID first so OpenAI can match it to the ad.
-          await setOpenAIPixelUser({ email: signupEmail, userId: currentSession?.user?.id });
-          window.oaiq?.('measure', 'trial_started', { type: 'plan_enrollment' }, { event_id: conversionEventId });
-          // Google Ads and Reddit Ads conversion for the same signup
-          trackBuildingCreated({ eventId: conversionEventId, plan: selectedTier, interval: billingInterval });
-          if (signInLater) {
-            // Paid without signing in: the building is being attached to
-            // their account. Send them to sign in, with the next step spelled out.
-            setSignInLaterFor(bldgName.trim());
-            setExistingAccount(null);
-            setEmail(signupEmail.trim());
-            setPassword('');
-            setAuthStep('login');
-            setCheckoutLoading(false);
-            return;
-          }
-          let user = (await supabase!.auth.getUser()).data?.user;
-          // Fall back to the session we saved if getUser fails
-          if (!user && currentSession?.user) {
-            console.log('[checkout] getUser failed, using saved session user');
-            user = currentSession.user;
-          }
-          if (user) {
-            await pollForTenantAndRedirect(user.id, user, knownTenantIds);
-          } else {
-            console.error('[checkout] No user available after checkout success');
-            // Redirect to provisioned page so session-check can retry
-            window.location.href = '/login?provisioned=1';
-          }
-          setCheckoutLoading(false);
-        },
-        close: () => {
-          console.log('[checkout] Checkout modal closed');
-          // Closed without paying: don't leave them signed in
-          if (!checkoutSucceeded) void abandonSignupSession();
-          setCheckoutLoading(false);
-        },
-        error: (error: any) => {
-          const detail = hostedPageError || error?.message || JSON.stringify(error);
-          console.error('[checkout] Chargebee error:', detail, error);
-          alert('Checkout failed: ' + detail);
-          if (!checkoutSucceeded) void abandonSignupSession();
-          setCheckoutLoading(false);
-        },
-      });
-    } catch (err: any) {
-      alert(err.message || 'Checkout failed');
-      await abandonSignupSession();
-      setCheckoutLoading(false);
-    }
-  };
-
-  // Non-Stripe onboarding completion (demo mode)
-  const handleCompleteOnboarding = () => {
-    if (!firstName || !lastName) { alert('Please enter your name.'); return; }
-    const name = `${firstName.trim()} ${lastName.trim()}`;
-    const newMember = {
-      id: `user-${Date.now()}`, name, email: profileEmail, phone: profilePhone,
-      role: 'BOARD_MEMBER' as Role, unit: profileUnit, status: 'active' as const,
-      joined: new Date().toISOString().split('T')[0], boardTitle,
-    };
-    addMember(newMember);
-    login(newMember);
-  };
-
   // ── Loading state ──
   if (sessionChecking) {
     return (
@@ -1228,441 +693,33 @@ export default function AuthPage() {
     );
   }
 
-  // ── Signup steps: production-style layout ──
+  // ── Signup: account, plan, add-ons, address and payment on one page ──
   const isSignupStep = authStep === 'signup-plan' || authStep === 'signup-building' || authStep === 'signup-account';
 
   if (isSignupStep) {
-    const currentStepIndex = authStep === 'signup-plan' ? 0 : authStep === 'signup-building' ? 1 : 2;
-    const stepLabels = ['Your plan', 'Your building', 'Your account'];
-    const currentTier = TIERS.find(t => t.id === selectedTier);
-    const tierMonthly = billingInterval === 'annual' ? Math.round((currentTier?.annual ?? 0) / 12) : (currentTier?.monthly ?? 0);
-    const tierAnnual = currentTier?.annual ?? 0;
-    const addOnMonthly = ADDONS.filter(a => selectedAddOns.has(a.id))
-      .reduce((sum, a) => sum + (billingInterval === 'annual' ? Math.round(getAddOnPrice(a, selectedTier, 'annual') / 12) : getAddOnPrice(a, selectedTier, billingInterval)), 0);
-    const addOnAnnual = ADDONS.filter(a => selectedAddOns.has(a.id))
-      .reduce((sum, a) => sum + getAddOnPrice(a, selectedTier, 'annual'), 0);
-    const totalMonthly = tierMonthly + addOnMonthly;
-    const totalAnnual = tierAnnual + addOnAnnual;
-    // With no trial, the first period is charged at signup.
-    const dueToday = `$${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly}`;
-
     return (
-      <div className="fixed inset-0 z-[100] bg-bg-page overflow-y-auto">
-        {/* ── Top nav bar ── */}
-        <header className="sticky top-0 z-50 bg-navy">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ minHeight: 72 }}>
-            <a href="https://getonetwo.com" className="flex items-center gap-2.5 no-underline">
-              <img src="/onetwo-logo-navy.jpg" alt="ONE two" className="w-9 h-[34px] object-cover" />
-              <span className="font-display text-[22px] font-bold text-white">ONE <span className="font-medium">two</span></span>
-            </a>
-            <div className="hidden lg:flex items-center gap-3 text-sm">
-              {stepLabels.map((label, i) => (
-                <span key={label} className="flex items-center gap-3">
-                  {i > 0 && <span className="text-navy-500">&middot;</span>}
-                  <span className={i === currentStepIndex ? 'font-bold text-white' : i < currentStepIndex ? 'text-navy-300' : 'text-navy-500'}>
-                    {i + 1} {label}
-                  </span>
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-2.5 text-sm">
-              {signedInAs ? (
-                // Signed in already: leaving signup goes back to their buildings
-                <a href="/login" className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Cancel</a>
-              ) : (<>
-              <span className="text-navy-300 hidden sm:inline">Already have an account?</span>
-              <a onClick={() => setAuthStep('login')} className="inline-flex items-center justify-center px-4 font-semibold text-sm text-white border border-[rgba(255,255,255,0.45)] rounded-[10px] cursor-pointer hover:border-white" style={{ minHeight: 42 }}>Log in</a>
-              </>)}
-            </div>
-          </div>
-        </header>
-
-        {/* ── Two-column content ── */}
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
-
-            {/* ── Main card ── */}
-            <div className="flex-1 min-w-0">
-              <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8">
-
-                {/* Breadcrumb */}
-                <div className="border-b border-ink-100 pb-4 mb-6">
-                  <div className="flex items-center gap-1 sm:gap-3 text-sm">
-                    {stepLabels.map((label, i) => (
-                      <span key={label} className="flex items-center gap-1 sm:gap-3">
-                        {i > 0 && <span className="text-ink-300">&middot;</span>}
-                        <span className={i === currentStepIndex ? 'font-bold text-ink-900' : i < currentStepIndex ? 'text-ink-600' : 'text-ink-400'}>
-                          {i + 1} {label}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mobile order summary bar */}
-                <div className="lg:hidden bg-navy text-white p-3 rounded-lg mb-6 flex items-center justify-between">
-                  <span className="text-sm font-medium">{currentTier?.name}, ${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly} / {billingInterval === 'annual' ? 'yr' : 'mo'}</span>
-                  <span className="text-sm font-bold">Due today $0</span>
-                </div>
-
-                {/* ══════ STEP 1 — Pick your plan ══════ */}
-                {authStep === 'signup-plan' && (
-                  <>
-                    <h1 className="font-display text-3xl font-bold text-ink-900 mb-2">Pick your plan</h1>
-                    <p className="text-ink-500 mb-6">{hasTrial ? 'Choose one to continue; nothing is billed until your trial ends.' : 'Choose one to continue.'}</p>
-
-                    {/* Billing toggle */}
-                    <div className="mb-6">
-                      <div className="inline-flex rounded-full border border-ink-200 p-0.5">
-                        <button onClick={() => setBillingInterval('monthly')}
-                          className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                            billingInterval === 'monthly' ? 'bg-navy text-white' : 'text-ink-500 hover:text-ink-700'
-                          }`}>Monthly</button>
-                        <button onClick={() => setBillingInterval('annual')}
-                          className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                            billingInterval === 'annual' ? 'bg-navy text-white' : 'text-ink-500 hover:text-ink-700'
-                          }`}>Annual, two months free</button>
-                      </div>
-                    </div>
-
-                    {/* Plan cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                      {TIERS.map(tier => {
-                        const displayPrice = billingInterval === 'annual' ? Math.round(tier.annual / 12) : tier.monthly;
-                        const isSelected = selectedTier === tier.id;
-                        return (
-                          <button key={tier.id} onClick={() => setSelectedTier(tier.id)}
-                            className={`p-6 rounded-2xl border-2 text-left transition-all ${
-                              isSelected ? 'border-solid border-brand-teal bg-[#F0FBFF]' : 'border-dashed border-ink-200 hover:border-ink-300'
-                            }`}>
-                            <p className="font-bold text-ink-900 text-lg">{tier.name}</p>
-                            <p className="font-bold text-brand-teal text-lg mt-1">${displayPrice}<span className="font-normal text-brand-teal"> / mo</span></p>
-                            {billingInterval === 'annual' && (
-                              <p className="text-xs text-ink-400 mt-0.5">${tier.annual.toLocaleString()} / yr</p>
-                            )}
-                            <p className="text-sm text-ink-400 mt-2">{tier.tagline}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Add-ons */}
-                    <div className="mb-8">
-                      <p className="text-sm font-bold text-ink-900 mb-3">Add-ons for {currentTier?.name}{hasTrial ? ', free during your trial' : ''}</p>
-                      <div className="space-y-3">
-                        {ADDONS.map(addon => {
-                          const isSelected = selectedAddOns.has(addon.id);
-                          const price = billingInterval === 'annual' ? Math.round(getAddOnPrice(addon, selectedTier, 'annual') / 12) : getAddOnPrice(addon, selectedTier, billingInterval);
-                          return (
-                            <button key={addon.id} onClick={() => toggleAddOn(addon.id)}
-                              className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                                isSelected ? 'border-brand-teal bg-[#F0FBFF]' : 'border-ink-200 hover:border-ink-300'
-                              }`}>
-                              <div className="flex items-start gap-3">
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                  isSelected ? 'bg-brand-teal border-brand-teal' : 'border-ink-300'
-                                }`}>
-                                  {isSelected && <span className="text-white text-xs">&#10003;</span>}
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold text-ink-900">{addon.name}, ${price} / mo{hasTrial ? ' after the trial' : ''}</p>
-                                  <p className="text-xs text-ink-400 mt-1">{addon.description}</p>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Continue button */}
-                    <div className="flex justify-end">
-                      <button onClick={() => setAuthStep('signup-building')}
-                        className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all">
-                        Continue
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* ══════ STEP 2 — Your building ══════ */}
-                {authStep === 'signup-building' && (
-                  <>
-                    <h1 className="font-display text-3xl font-bold text-ink-900 mb-6">Your building</h1>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Building / Association Name *</label>
-                        <input value={bldgName} onChange={e => setBldgName(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., Sunny Acres Condominium" autoFocus />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Building Short Name (URL) *</label>
-                        <div className="flex items-center gap-0">
-                          <input value={bldgSubdomain}
-                            onChange={e => { subdomainManuallyEdited.current = true; setBldgSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)); }}
-                            className={`flex-1 px-3 py-2.5 border rounded-l-lg text-sm font-mono ${
-                              subdomainStatus === 'taken' ? 'border-red-400 bg-red-50' :
-                              subdomainStatus === 'available' ? 'border-sage-400 bg-sage-50' :
-                              'border-ink-200'
-                            }`}
-                            placeholder="sunnyacres" />
-                          <span className="px-3 py-2.5 bg-ink-100 border border-l-0 border-ink-200 rounded-r-lg text-xs text-ink-500">.getonetwo.com</span>
-                        </div>
-                        <div className="mt-1 h-4">
-                          {subdomainStatus === 'checking' && <p className="text-xs text-ink-400">Checking availability...</p>}
-                          {subdomainStatus === 'available' && bldgSubdomain.length >= 3 && <p className="text-xs text-sage-600">&#10003; {bldgSubdomain}.getonetwo.com is available</p>}
-                          {subdomainStatus === 'taken' && <p className="text-xs text-red-600">&#10007; Already taken — try a different name</p>}
-                          {subdomainStatus === 'idle' && bldgSubdomain.length > 0 && bldgSubdomain.length < 3 && <p className="text-xs text-ink-400">Must be at least 3 characters</p>}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Street Address *</label>
-                        <input value={bldgStreet} onChange={e => setBldgStreet(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="123 Main St" />
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">City</label>
-                          <input value={bldgCity} onChange={e => setBldgCity(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="City" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">State</label>
-                          <input value={bldgState} onChange={e => setBldgState(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="DC" maxLength={2} />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">ZIP</label>
-                          <input value={bldgZip} onChange={e => setBldgZip(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="20001" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Total Units</label>
-                        <input value={bldgUnits} onChange={e => setBldgUnits(e.target.value)} type="number"
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="14" />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-3 mt-8">
-                      <button onClick={() => {
-                          if (!bldgName.trim()) { alert('Please enter your building name.'); return; }
-                          if (!bldgSubdomain || bldgSubdomain.length < 3) { alert('Please enter a short name (at least 3 characters) for your building URL.'); return; }
-                          if (subdomainStatus === 'taken') { alert('That short name is already taken. Please choose another.'); return; }
-                          if (subdomainStatus === 'checking') { alert('Still checking availability — please wait a moment.'); return; }
-                          if (!bldgStreet.trim()) { alert('Please enter your building\'s street address.'); return; }
-                          setAuthStep('signup-account');
-                        }}
-                        className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all">
-                        Continue
-                      </button>
-                      <a onClick={() => setAuthStep('signup-plan')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Plan</a>
-                    </div>
-                  </>
-                )}
-
-                {/* ══════ STEP 3 — Your account ══════ */}
-                {authStep === 'signup-account' && (
-                  <>
-                    <h1 className="font-display text-3xl font-bold text-ink-900 mb-6">Your account</h1>
-
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">First Name *</label>
-                          <input value={firstName} onChange={e => setFirstName(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="First" autoFocus />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">Last Name *</label>
-                          <input value={lastName} onChange={e => setLastName(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="Last" />
-                        </div>
-                      </div>
-                      {signedInAs ? (
-                        <p className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2.5 text-sm text-ink-700">
-                          You&apos;re signed in as <span className="font-semibold">{signedInAs}</span> in this browser, so this building will be added to that account.{' '}
-                          <button type="button" onClick={signOutOfSignup} className="font-semibold text-accent-600 underline hover:text-accent-700">Not you? Sign out and start fresh</button>
-                        </p>
-                      ) : (<>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Email *</label>
-                        <input ref={emailInputRef} type="email" name="email" autoComplete="username" value={profileEmail} onChange={e => { setProfileEmail(e.target.value); setExistingAccount(null); }}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="you@example.com" />
-                      </div>
-                      {existingAccount ? (
-                        <fieldset className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-3">
-                          <legend className="sr-only">This email already has an account</legend>
-                          <p role="status" className="text-sm font-semibold text-ink-900">You already have a ONE two account with this email.</p>
-                          <p className="mt-0.5 text-sm text-ink-700">How would you like to continue?</p>
-
-                          <div className="mt-3 space-y-2">
-                            <label htmlFor="existing-now" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
-                              <input id="existing-now" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
-                                checked={existingAccount.mode === 'now'}
-                                onChange={() => setExistingAccount(x => x && { ...x, mode: 'now', error: false })} />
-                              <span className="min-w-0 flex-1">
-                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in now</span>
-                                <span className="block text-ink-600">Enter that account&apos;s password. You&apos;ll land in the new building after checkout.</span>
-                                {existingAccount.mode === 'now' && (
-                                  <span className="mt-2 block">
-                                    <label htmlFor="existing-account-password" className="block text-xs font-medium text-ink-700 mb-1">Your ONE two password *</label>
-                                    <input id="existing-account-password" type="password" name="current-password" autoComplete="current-password" value={password}
-                                      onChange={e => { setPassword(e.target.value); setExistingAccount(x => x && { ...x, error: false }); }}
-                                      aria-invalid={existingAccount.error || undefined}
-                                      className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white" placeholder="••••••••" />
-                                    {existingAccount.error && <span className="mt-1.5 block text-sm text-red-700">That password doesn&apos;t match this account. Try again, or pick another option below.</span>}
-                                  </span>
-                                )}
-                              </span>
-                            </label>
-
-                            <label htmlFor="existing-later" className="flex items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-800">
-                              <input id="existing-later" type="radio" name="existing-account-mode" className="mt-0.5 h-4 w-4 flex-none"
-                                checked={existingAccount.mode === 'later'}
-                                onChange={() => { setPassword(''); setExistingAccount(x => x && { ...x, mode: 'later', error: false }); }} />
-                              <span className="min-w-0 flex-1">
-                                <span className="font-semibold text-ink-900">Add this building to my account, and sign in later</span>
-                                <span className="block text-ink-600">No password now. After checkout, sign in with that account&apos;s password to open the building, or reset it by email if you don&apos;t know it.</span>
-                              </span>
-                            </label>
-
-                            <button type="button"
-                              onClick={() => { setExistingAccount(null); setPassword(''); setConfirmPassword(''); setProfileEmail(''); setTimeout(() => emailInputRef.current?.focus(), 0); }}
-                              className="flex w-full items-start gap-2.5 rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-left text-sm text-ink-800 hover:border-ink-900">
-                              <span aria-hidden className="mt-0.5 h-4 w-4 flex-none text-center leading-4 text-ink-500">&rarr;</span>
-                              <span className="min-w-0 flex-1">
-                                <span className="font-semibold text-ink-900">Keep it separate: use a different email</span>
-                                <span className="block text-ink-600">Creates a new account with its own password, not connected to the existing one.</span>
-                              </span>
-                            </button>
-                          </div>
-                        </fieldset>
-                      ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">Password *</label>
-                          <input type="password" name="new-password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-ink-700 mb-1">Confirm *</label>
-                          <input type="password" name="confirm-password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                            className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="••••••••" />
-                        </div>
-                        <div className="col-span-2"><PasswordRules password={password} /></div>
-                      </div>
-                      )}
-                      </>)}
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Phone</label>
-                        <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="(xxx) xxx-xxxx" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Your Unit # (optional)</label>
-                        <input value={profileUnit} onChange={e => setProfileUnit(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm" placeholder="e.g., 301" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-ink-700 mb-1">Association Role</label>
-                        <select value={boardTitle} onChange={e => setBoardTitle(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm bg-white">
-                          <option>President</option><option>Vice President</option><option>Treasurer</option><option>Secretary</option><option>Member at Large</option><option>Unit Owner</option>
-                        </select>
-                      </div>
-                      <ConsentBoxes idPrefix="signup-consent" value={consent} onChange={setConsent} />
-                    </div>
-
-                    <div className="flex flex-col items-center gap-3 mt-8">
-                      {isBackendEnabled ? (
-                        <button onClick={() => {
-                            if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
-                            if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
-                            if (existingAccount) {
-                              if (!existingAccount.mode) { alert('Please choose how you want to continue with your existing account.'); return; }
-                              if (existingAccount.mode === 'now' && !password) { alert('Please enter your ONE two password, or pick another option.'); return; }
-                            } else if (!signedInAs) {
-                              { const weak = passwordError(password); if (weak) { alert(weak); return; } }
-                              if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
-                            }
-                            handleCheckout();
-                          }} disabled={checkoutLoading}
-                          className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all disabled:opacity-50">
-                          {checkoutLoading ? 'Setting up...'
-                            : existingAccount?.mode === 'now' ? (hasTrial ? 'Sign In & Start Free Trial' : 'Sign In & Start')
-                            : hasTrial ? 'Start Free Trial' : 'Start today!'}
-                        </button>
-                      ) : (
-                        <button onClick={() => {
-                            if (!firstName.trim() || !lastName.trim()) { alert('Please enter your name.'); return; }
-                            if (!profileEmail.trim()) { alert('Please enter your email.'); return; }
-                            { const weak = passwordError(password); if (weak) { alert(weak); return; } }
-                            if (password !== confirmPassword) { alert('Passwords do not match.'); return; }
-                            { const gap = missingConsent(consent); if (gap) { alert(gap); return; } }
-                            handleCompleteOnboarding();
-                          }}
-                          className="bg-brand-red hover:bg-[#B82230] text-white rounded-full px-10 py-3 font-semibold text-sm transition-all">
-                          Create Account &amp; Enter
-                        </button>
-                      )}
-                      {hasTrial && <p className="text-[10px] text-ink-400">No charge during your {trialDays}-day trial.</p>}
-                      <a onClick={() => setAuthStep('signup-building')} className="text-sm text-ink-400 hover:text-ink-600 cursor-pointer">&larr; Back to Building</a>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* ── Desktop order summary card ── */}
-            <div className="hidden lg:block w-[340px] flex-shrink-0">
-              <div className="bg-navy rounded-2xl p-6 text-white sticky top-20">
-                <p className="text-brand-cyan text-xs font-bold uppercase tracking-wide">{hasTrial ? `YOUR ${trialDays} DAY TRIAL` : 'YOUR PLAN'}</p>
-                <div className="w-12 h-0.5 bg-brand-cyan mt-1 mb-4" />
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">{currentTier?.name}</span>
-                    <span className="text-sm font-semibold">${billingInterval === 'annual' ? tierAnnual.toLocaleString() : tierMonthly} / {billingInterval === 'annual' ? 'yr' : 'mo'}</span>
-                  </div>
-                  {ADDONS.filter(a => selectedAddOns.has(a.id)).map(addon => {
-                    const addonPrice = getAddOnPrice(addon, selectedTier, billingInterval);
-                    return (
-                      <div key={addon.id} className="flex items-center justify-between">
-                        <span className="text-sm text-navy-300">{addon.name}</span>
-                        <span className="text-sm font-semibold">${addonPrice.toLocaleString()} / {billingInterval === 'annual' ? 'yr' : 'mo'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="border-t border-navy-700 pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Due today</span>
-                    <span className="text-3xl font-bold text-brand-cyan">{hasTrial ? '$0' : dueToday}</span>
-                  </div>
-                  <p className="text-sm text-navy-300 mt-1">{hasTrial ? `After ${trialDays} days: ` : 'Then '}${billingInterval === 'annual' ? totalAnnual.toLocaleString() : totalMonthly} / {billingInterval === 'annual' ? 'yr' : 'mo'}, before tax.</p>
-                </div>
-
-                <div className="bg-navy-800 rounded-xl p-4 mt-4">
-                  <p className="font-bold text-sm mb-2">What happens next</p>
-                  <p className="text-xs text-navy-300 leading-relaxed">You land in your own building in Setup Season. Add your units and bylaws facts, or load a sample building to look around first. Invite the board, the owners or your manager whenever you like.</p>
-                </div>
-
-                {authStep !== 'signup-plan' && bldgName && (
-                  <div className="border-t border-navy-700 mt-4 pt-4">
-                    <p className="text-xs text-navy-300">{bldgName}</p>
-                    {bldgSubdomain && <p className="text-xs text-navy-400 font-mono">{bldgSubdomain}.getonetwo.com</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
+      <SignupCheckout
+        trialDays={trialDays}
+        signedInAs={signedInAs}
+        signedInName={`${firstName} ${lastName}`.trim()}
+        onLogIn={() => setAuthStep('login')}
+        onSignOut={signOutOfSignup}
+        provisioningStatus={provisioningStatus}
+        onSubscribed={async (user, knownTenantIds) => {
+          const opened = await pollForTenantAndRedirect(user.id, user, knownTenantIds);
+          // Still being set up: the login form explains, and offers to check again
+          if (!opened) setAuthStep('login');
+        }}
+        onDemoSignup={who => {
+          const newMember = {
+            id: `user-${Date.now()}`, name: `${who.firstName} ${who.lastName}`.trim(), email: who.email, phone: '',
+            role: 'BOARD_MEMBER' as Role, unit: '', status: 'active' as const,
+            joined: new Date().toISOString().split('T')[0], boardTitle: null,
+          };
+          addMember(newMember);
+          login(newMember);
+        }}
+      />
     );
   }
 
