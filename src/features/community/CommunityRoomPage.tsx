@@ -243,7 +243,7 @@ export default function CommunityRoomPage({ embedded, tab: forcedTab }: { embedd
                   </div>
                   <button onClick={handleSubmitRequest} className="px-6 py-2 bg-accent-600 text-white rounded-lg text-sm font-medium hover:bg-accent-700 mt-4">Submit Request</button>
                 </div>
-                <p className="text-[10px] text-ink-400">Requests are sent to the board and/or property management. Response required within 14 days per DC Code § 42-1903.14(c).</p>
+                <p className="text-[10px] text-ink-400">Requests are sent to the board and/or property management. The board aims to respond within 14 days.</p>
               </div>
             )}
 
