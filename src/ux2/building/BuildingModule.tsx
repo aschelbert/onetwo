@@ -27,13 +27,15 @@ import { buildingScore, contractRows, contractsSummary, insuranceStatus, obligat
 import { dayLabel } from '../home/calendar';
 import OverviewTab from './tabs/OverviewTab';
 import DocumentsTab from './tabs/DocumentsTab';
+import ProjectsTab from './tabs/ProjectsTab';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
 import ObligationsTab from './tabs/ObligationsTab';
 import ContractsTab from './tabs/ContractsTab';
 import DirectoryTab from './tabs/DirectoryTab';
 import ArchiveSection from './tabs/ArchiveSection';
 
-export type BuildingTab = 'overview' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
-const TAB_IDS: BuildingTab[] = ['overview', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
+export type BuildingTab = 'overview' | 'projects' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
+const TAB_IDS: BuildingTab[] = ['overview', 'projects', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
 
 /** Legacy tab ids (Building page, Association Team, Archives, Board Room) → Building tab and section. */
 export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }> = {
@@ -98,8 +100,10 @@ export default function BuildingModule() {
     fy ? `FY ends ${fy}` : null,
   ].filter(Boolean).join(' · ');
 
+  const openProjects = useCapitalProjectsStore(s => s.projects.filter(x => !x.closedOn).length);
   const tabs = [
     { id: 'overview' as BuildingTab, label: 'Overview' },
+    { id: 'projects' as BuildingTab, label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const },
     { id: 'documents' as BuildingTab, label: 'Documents' },
     { id: 'obligations' as BuildingTab, label: 'Obligations', badge: obl.overdue.length + obl.inProgress.length || undefined, badgeTone: obl.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'contracts' as BuildingTab, label: 'Contracts', badge: con.lapsed.length ? `${con.lapsed.length} lapsed` : undefined, badgeTone: 'red' as const },
@@ -116,6 +120,7 @@ export default function BuildingModule() {
           title={snap.name}
           subtitle={<><span className="block font-semibold">{line}</span><span className="mt-1 block">{{
             overview: 'What the building is, what protects it, what it is made of and who keeps it running. The board edits; every owner can read it.',
+            projects: 'What is being replaced or improved, what it costs and how it is paid for. Each project is worked in its Board Room action; every owner can read where it stands.',
             documents: "The building's papers: what governs it, what insures it, and the record of each year.",
             obligations: "The things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.",
             contracts: 'Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.',
@@ -134,6 +139,7 @@ export default function BuildingModule() {
         />
 
         {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
+        {tab === 'projects' && <ProjectsTab today={snap.today} isBoard={isBoard} />}
         {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}
         {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
         {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}

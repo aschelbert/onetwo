@@ -15,6 +15,7 @@ import { useSpendingStore } from './useSpendingStore';
 import { usePropertyLogStore } from './usePropertyLogStore';
 import { useBuildingRecordsStore } from './useBuildingRecordsStore';
 import { useRegisterStore } from './useRegisterStore';
+import { useCapitalProjectsStore } from './useCapitalProjectsStore';
 import { useReportStore } from './useReportStore';
 import { useScorecardStore } from './useScorecardStore';
 import { useCommunicationsStore } from './useCommunicationsStore';
@@ -120,6 +121,8 @@ export function resetStoresForRealTenant() {
   useBuildingRecordsStore.setState({ records: [], saveError: null });
 
   useRegisterStore.setState({ entries: [], saveError: null });
+
+  useCapitalProjectsStore.setState({ projects: [], saveError: null });
 
   useReportStore.setState({ configs: [], reports: [] });
 

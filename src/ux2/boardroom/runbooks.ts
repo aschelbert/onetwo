@@ -1,5 +1,6 @@
 /**
- * The runbook catalogue — the 32 runbooks from the design. A runbook that
+ * The runbook catalogue — the 32 runbooks from the design, and the ones
+ * added since (capital improvement). A runbook that
  * maps to a production situation (`sitId` in the case wizard's CATS) opens
  * its case through the same wizard and steps. Only a runbook marked `wired`
  * starts itself today (month close, collections, insurance renewal, year-end
@@ -9,7 +10,7 @@
  * onboarding, special assessments, the reserve study, covenant violations and
  * resale certificates, each from a module next to this file,
  * with a database twin except the bookings, the bids and the register's two
- * (violations, resale certificates), which live only in the app); the rest
+ * (violations, resale certificates) and capital improvements, which live only in the app); the rest
  * open by hand, from a request or from an obligation, and their `trigger`
  * and `automated` count describe the plan for each, so the board can see
  * what is meant to run and switch any one off.
@@ -69,6 +70,7 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'amenity-booking', name: 'Amenity booking', trigger: 'A booking needs the board\'s approval', steps: 4, automated: 2, sitId: 'amenities', catId: 'operations', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'work-order', name: 'Work order', trigger: 'A work order is raised on its own', steps: 4, automated: 3, sitId: 'common-area-repairs', catId: 'maintenance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
   { id: 'spending-request', name: 'Spending request', trigger: 'A request waits for the board', steps: 4, automated: 3, sitId: 'capital-projects', catId: 'strategic', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 3] },
+  { id: 'capital-improvement', name: 'Capital improvement', trigger: 'A project is started under Building › Projects', steps: 10, automated: 10, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] },
   { id: 'vendor-onboarding', name: 'Vendor onboarding and W-9', trigger: 'A new vendor is paid for the first time', steps: 4, automated: 3, visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1, 3] },
   { id: '1099', name: '1099 filing', trigger: 'January 1, when a vendor was paid $600 or more', steps: 4, automated: 2, visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 1] },
   { id: 'year-end', name: 'Year-end close', trigger: 'Fiscal year end', steps: 6, automated: 2, visibility: 'owners', defaultOn: true, wired: true, autoSteps: [2, 3] },

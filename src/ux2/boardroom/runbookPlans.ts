@@ -12,6 +12,7 @@
  */
 import { CATS } from '@/store/useIssuesStore';
 import type { RunbookDef } from './runbooks';
+import { CAPITAL_PLAN } from './capitalPlan';
 
 export interface PlanStep {
   title: string;
@@ -47,6 +48,7 @@ const OWN: Record<string, Own> = {
     ['Switch Funds to the new budget and dues', 'Done on the first day of the year: the lines, every unit’s dues, the reserve transfer'],
     ['File the adopted budget under Building › Documents'],
   ],
+  'capital-improvement': CAPITAL_PLAN,
   'covenant-violation': [
     ['Log the violation', 'Done as the action opens, from the register entry'],
     ['Send the owner the notice of violation, with the days to put it right', 'Ticks itself when the notice date is entered on the register'],

@@ -89,7 +89,7 @@ describe('board room metrics', () => {
   });
 
   it('reports every workflow: the 32 runbooks, the other wizard situations and custom actions, with switches, use, open cases and last run', () => {
-    expect(RUNBOOKS.length).toBe(32);
+    expect(RUNBOOKS.length).toBe(33);
     // Every situation Take Action offers is on the list, once as its own runbook when no catalogue runbook runs on it.
     const sits = CATS.flatMap(c => c.sits.map(s => s.id));
     for (const id of sits) expect(ALL_RUNBOOKS.some(r => r.sitId === id)).toBe(true);

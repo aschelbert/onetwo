@@ -33,6 +33,8 @@ import { Button, Card, Chip, Inner, PillTabs, SectionLabel, ModuleHeader, STATUS
 import { useBoardRoomSnapshot } from './useBoardRoomSnapshot';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import RegisterTab, { registerSummary } from './tabs/RegisterTab';
+import ProjectAction from './project/ProjectAction';
+import { projectIdOf } from './capitalImprovement';
 import { useRegisterStore } from '@/store/useRegisterStore';
 import { caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
@@ -80,14 +82,14 @@ export default function BoardRoomModule() {
   const go = (next: BoardRoomTab) => {
     setParams(prev => {
       const p = new URLSearchParams(prev);
-      p.delete('view'); p.delete('cat'); p.delete('sit'); p.delete('runbook');
+      p.delete('view'); p.delete('cat'); p.delete('sit'); p.delete('runbook'); p.delete('record');
       if (next !== 'register') p.delete('section');
       if (next === 'open') p.delete('tab'); else p.set('tab', next);
       if (next === 'inbox') p.set('caseTab', 'issues'); else p.delete('caseTab');
       return p;
     }, { replace: true });
   };
-  const openCase = (id: string) => setParams(prev => { const p = new URLSearchParams(prev); p.set('view', `case:${id}`); return p; }, { replace: true });
+  const openCase = (id: string) => setParams(prev => { const p = new URLSearchParams(prev); p.set('view', `case:${id}`); p.delete('record'); return p; }, { replace: true });
   const newCase = (prefill?: { catId: string; sitId: string }) => setParams(prev => {
     const p = new URLSearchParams(prev);
     p.set('view', 'new');
@@ -97,6 +99,12 @@ export default function BoardRoomModule() {
 
   if (!view && (params.get('tab') === 'archive' || params.get('caseTab') === 'archive')) return <Navigate to={ARCHIVE_PATH} replace />;
 
+  // A capital improvement's action has its own page: the ten steps, each with its work. The case record (notes, decision trail) stays one click away.
+  const capitalProjectId = view?.startsWith('case:') && params.get('record') !== '1' ? projectIdOf(snap.cases.find(c => c.id === view.slice(5))) : null;
+  if (view && capitalProjectId) {
+    return <ProjectAction projectId={capitalProjectId} caseId={view.slice(5)} onBack={() => go('open')} onOpenRecord={() => setParams(prev => { const p = new URLSearchParams(prev); p.set('record', '1'); return p; }, { replace: true })} />;
+  }
+
   if (view && (view === 'new' || view.startsWith('case:'))) {
     return <CaseFrame snap={snap} view={view} prefill={params.get('cat') && params.get('sit') ? { catId: params.get('cat')!, sitId: params.get('sit')! } : undefined} onBack={() => go('open')} onOpenCase={openCase} />;
   }
@@ -105,7 +113,7 @@ export default function BoardRoomModule() {
     open: 'Operations for the board, manager and staff: current actions, owner requests, the runbooks that run them, and the outbox. An owner sees only an action about their own unit.',
     register: 'The matters with a clock of their own: rule violations, owners\' requests to alter a unit, resale certificates and liens. Each opens an action and ticks its steps as the dates are entered here.',
     inbox: 'What owners have asked the board for, and the 14-day clock on each one. Owners see the status of their own request in Community › Requests.',
-    runbooks: 'All 32 are on from day one. Month close starts itself on the building\'s day; the rest open by hand until their triggers are wired. Turn one off only if the building does not want it.',
+    runbooks: 'Every runbook is on from day one. Month close starts itself on the building\'s day; the rest open by hand until their triggers are wired. Turn one off only if the building does not want it.',
     outbox: 'Every letter and notice the board sends, drafted from a template, delivered the way the bylaws require, and kept with proof of delivery.',
     tasks: 'The team\'s board: what the manager, staff and officers are working on, dragged from to-do to done, each linked to the action, log entry or vendor behind it.',
     intercom: 'The team\'s channels: the board, the manager and staff talking in one place, with a board-only channel. Owners never see it.',
