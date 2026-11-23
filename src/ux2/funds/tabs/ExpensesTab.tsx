@@ -6,6 +6,7 @@ import { useSpendingStore, type SpendingApproval } from '@/store/useSpendingStor
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
+import { approvalsNeeded } from '@/lib/spendingRules';
 import type { WorkOrder } from '@/data/financial';
 import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Table, Th, Td, Cell, RowMenu, KV, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -149,7 +150,8 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const approvals = useSpendingStore(s => s.approvals);
   const castVote = useSpendingStore(s => s.castVote);
   const update = useSpendingStore(s => s.updateApproval);
-  const boardSize = useBuildingStore(s => s.board.length) || 5;
+  // The board as entered; a building that has listed nobody yet has the one person using it.
+  const boardSize = useBuildingStore(s => s.board.length) || 1;
   const me = useAuthStore(s => s.currentUser.name);
   const navigate = useNavigate();
   const pending = useMemo(() => approvals.filter(a => a.status === 'pending'), [approvals]);
@@ -161,12 +163,23 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const units = Math.max(1, snap.units.length);
   const next = () => setPos(p => (pending.length > 1 ? (p + 1) % pending.length : 0));
   const prev = () => setPos(p => (pending.length > 1 ? (p - 1 + pending.length) % pending.length : 0));
+  const [voteNote, setVoteNote] = useState('');
+  /** One member's vote. The request is decided only once it has the approvals its size calls for. */
   const decide = (status: 'approved' | 'denied') => {
     if (!a) return;
-    castVote(a.id, me, status === 'approved' ? 'approve' : 'deny');
-    update(a.id, { status, decidedAt: snap.today });
-    setDecided(d => d + 1);
-    setPos(p => Math.max(0, Math.min(p, pending.length - 2)));
+    const line = lineFor(snap, a);
+    const needed = approvalsNeeded(a, boardSize, !!line && a.amount > Math.max(0, line.budgeted - line.actual));
+    castVote(a.id, me, status === 'approved' ? 'approve' : 'deny', needed);
+    const now = useSpendingStore.getState().approvals.find(x => x.id === a.id);
+    if (now && now.status !== 'pending') {
+      setDecided(d => d + 1);
+      setVoteNote('');
+      setPos(p => Math.max(0, Math.min(p, pending.length - 2)));
+    } else {
+      const have = (now?.votes ?? []).filter(v => v.vote === (status === 'approved' ? 'approve' : 'deny')).length;
+      setVoteNote(`Your vote on ${a.title} is recorded: ${have} of ${needed} needed to ${status === 'approved' ? 'approve' : 'deny'} it. It stays open until another board member votes.`);
+      next();
+    }
   };
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -199,7 +212,9 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const perUnit = Math.round(a.amount / units);
   const after = Math.max(0, res.funded - a.amount);
   const afterPct = res.needed ? Math.round((after / res.needed) * 100) : 0;
-  const statusChip = overLimit ? <Chip tone="plum">Board vote · {approves.length} of {boardSize}</Chip> : overLine ? <Chip tone="amber">Over budget line</Chip> : <Chip tone="ghost">New</Chip>;
+  const needed = approvalsNeeded(a, boardSize, overLine);
+  const myVote = a.votes.find(v => v.member === me)?.vote;
+  const statusChip = overLimit ? <Chip tone="plum">Board vote · {approves.length} of {needed} needed</Chip> : overLine ? <Chip tone="amber">Over budget line · {approves.length} of {needed}</Chip> : <Chip tone="ghost">New</Chip>;
   return (
     <Card aria-label="Spending decisions" id="decisions">
       {header}
@@ -217,14 +232,15 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
               return <button key={s.id} type="button" onClick={() => update(a.id, { fundingSource: s.id })} aria-pressed={a.fundingSource === s.id} className="rounded-full"><Chip tone={a.fundingSource === s.id ? 'navy' : 'ghost'}>{s.label}{note}</Chip></button>;
             })}
           </div>
-          <div className="rounded-[10px] bg-ux2-amber-tint px-3 py-2 text-xs text-ux2-ink"><b className="font-semibold">{overLimit ? 'Over' : 'Under'} the ${a.threshold.toLocaleString()} limit</b> · {overLimit ? 'the bylaws let the board approve this from reserves; a special assessment would need an owner vote' : overLine ? 'the Treasurer can approve alone, but the line is over budget so it needs a second signature' : 'the Treasurer can approve alone; it is logged to the decision trail either way'}</div>
+          <div className="rounded-[10px] bg-ux2-amber-tint px-3 py-2 text-xs text-ux2-ink"><b className="font-semibold">{overLimit ? 'Over' : 'Under'} the ${a.threshold.toLocaleString()} limit</b> · {overLimit ? 'the bylaws let the board approve this from reserves; a special assessment would need an owner vote' : overLine ? 'the line is over budget, so it needs two approvals' : 'the Treasurer can approve alone; it is logged to the decision trail either way'}</div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => decide('approved')}>Approve and next</Button>
-            <Button size="sm" variant="ghost" onClick={() => decide('denied')}>Deny and next</Button>
+            <Button size="sm" onClick={() => decide('approved')} disabled={myVote === 'approve'}>{myVote === 'approve' ? 'You approved' : needed > 1 ? 'Vote to approve' : 'Approve and next'}</Button>
+            <Button size="sm" variant="ghost" onClick={() => decide('denied')} disabled={myVote === 'deny'}>{myVote === 'deny' ? 'You voted to deny' : needed > 1 ? 'Vote to deny' : 'Deny and next'}</Button>
             <Button size="sm" variant="ghost" onClick={next}>Skip for now</Button>
             <Button size="sm" variant="ghost" onClick={() => navigate(a.caseId ? `/issues?view=case:${a.caseId}` : '/issues?view=new')}>Open the action</Button>
           </div>
-          <Why>{overLimit ? `Votes so far: ${approves.length ? approves.join(', ') + ' approve.' : 'none.'} ${approves.length < boardSize ? `Waiting on ${boardSize - approves.length} more.` : ''}` : overLine ? 'Needs: Treasurer plus one officer.' : 'No vote needed. Approve, deny, or ask for a second bid.'}</Why>
+          {voteNote && <div role="status" className="rounded-[10px] bg-ux2-sage-tint px-3 py-2 text-xs text-ux2-ink">{voteNote}</div>}
+          <Why>{needed > 1 ? `${overLimit ? `Over the limit, so a majority of the board decides: ${needed} of ${boardSize}.` : 'Over its budget line, so it needs two approvals.'} Approvals so far: ${approves.length ? approves.join(', ') : 'none'}.${approves.length < needed ? ` Waiting on ${needed - approves.length} more.` : ''}` : 'No vote needed. Approve, deny, or ask for a second bid.'}</Why>
         </Inner>
         <Card tone="navy" className="gap-1">
           <div className="text-base font-semibold">Know before you decide</div>

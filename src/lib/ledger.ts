@@ -43,6 +43,35 @@ export function balanceOf(acctNum: string, acctType: ChartOfAccountsEntry['type'
   return round(DEBIT_NORMAL.has(acctType) ? bal : -bal);
 }
 
+const lineKey = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * The expense accounts a budget line is measured against: the ones linked to it,
+ * or, when none is linked, an unlinked expense account with the same name (the
+ * default chart and the starter budget lines share names). No match means the
+ * line has no ledger actuals yet.
+ */
+export function budgetLineAccounts(line: { id: string; name: string }, chart: ChartOfAccountsEntry[]): ChartOfAccountsEntry[] {
+  const linked = chart.filter(a => a.budgetCat === line.id);
+  if (linked.length) return linked;
+  const key = lineKey(line.name);
+  return chart.filter(a => a.type === 'expense' && a.sub !== 'header' && !a.budgetCat && lineKey(a.name) === key);
+}
+
+/** Operating expenses booked in each month of `year` (index 0 = January), from the ledger. */
+export function operatingSpendByMonth(year: string, chart: ChartOfAccountsEntry[], entries: GLEntry[]): number[] {
+  const operating = new Set(chart.filter(a => a.type === 'expense' && a.sub !== 'header' && fundOf(a) === 'operating').map(a => a.num));
+  const out = Array(12).fill(0) as number[];
+  for (const e of entries) {
+    if (e.status === 'void' || !e.date?.startsWith(year)) continue;
+    const m = Number(e.date.slice(5, 7)) - 1;
+    if (m < 0 || m > 11) continue;
+    if (operating.has(e.debitAcct)) out[m] += e.amount;
+    if (operating.has(e.creditAcct)) out[m] -= e.amount;
+  }
+  return out.map(round);
+}
+
 export const round = (n: number) => { const r = Math.round(n * 100) / 100; return r === 0 ? 0 : r; };
 
 export interface FundTotals {

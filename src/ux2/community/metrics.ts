@@ -10,7 +10,8 @@ import type { Election } from '@/store/useElectionStore';
 import type { Announcement, OwnerCommunication } from '@/store/useComplianceStore';
 import type { Unit } from '@/types/financial';
 import { daysBetween, addDays } from '../runbook/model';
-import { ISO_DATE, NOTICE_LEAD_DAYS, REQUEST_SLA_DAYS, noticeSentFor } from '../runbook/adapters';
+import { ISO_DATE, REQUEST_SLA_DAYS, noticeSentFor } from '../runbook/adapters';
+import { noticeLeadDays } from '@/data/jurisdictions';
 
 export interface CommunitySnapshot {
   today: string;
@@ -21,6 +22,8 @@ export interface CommunitySnapshot {
   elections: Election[];
   issues: Issue[];
   units: Unit[];
+  /** The building's state, as entered; sets the statutory notice period. */
+  state?: string;
 }
 
 // ── Notices ──────────────────────────────────────────────────────────────────
@@ -45,6 +48,8 @@ export interface MeetingRow {
   state: 'upcoming' | 'past' | 'cancelled';
   noticeSent: boolean;
   noticeDue: string;
+  /** Days of notice this meeting needs. */
+  noticeDays: number;
   noticeOverdue: boolean;
   /** Scheduled, but its date has passed without being completed or cancelled. */
   datePassed: boolean;
@@ -63,13 +68,15 @@ export function meetingRows(s: CommunitySnapshot): MeetingRow[] {
       // Production calls a SCHEDULED or RESCHEDULED meeting upcoming whatever its date; keep that so both views agree.
       const state: MeetingRow['state'] = m.status === 'CANCELLED' ? 'cancelled' : m.status === 'SCHEDULED' || m.status === 'RESCHEDULED' || m.status === 'IN_PROGRESS' ? 'upcoming' : 'past';
       const noticeSent = !!m.noticeSentAt || noticeSentFor(m, s.communications);
-      const noticeDue = addDays(m.date, -NOTICE_LEAD_DAYS);
+      const noticeDays = noticeLeadDays(m.type, s.state);
+      const noticeDue = addDays(m.date, -noticeDays);
       return {
         meeting: m,
         daysLeft: d,
         state,
         noticeSent,
         noticeDue,
+        noticeDays,
         noticeOverdue: state === 'upcoming' && !noticeSent && daysBetween(s.today, noticeDue) < 0,
         datePassed: state === 'upcoming' && d < 0 && !m.startedAt,
         agendaCount: m.agenda.length,

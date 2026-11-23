@@ -17,7 +17,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { fmt } from '@/lib/formatters';
 import { PAYMENT_ORDER_LABEL, type PaymentOrder } from '@/lib/financial-logic';
-import { fundOf } from '@/lib/ledger';
+import { budgetLineAccounts, fundOf } from '@/lib/ledger';
 import type { ChartOfAccountsEntry, GLEntry } from '@/types/financial';
 import { Button, Card, Cell, Chip, Field, INPUT, Inner, KV, PillTabs, RowMenu, SearchInput, SectionLabel, Table, Td, Th, Why } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -192,6 +192,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
   const addCoAAccount = useFinancialStore(s => s.addCoAAccount);
   const addCoASection = useFinancialStore(s => s.addCoASection);
   const updateCoAAccount = useFinancialStore(s => s.updateCoAAccount);
+  const setBudgetLineAccount = useFinancialStore(s => s.setBudgetLineAccount);
   const mapping = useFinancialStore(s => s.glAccountMapping);
   const setMapping = useFinancialStore(s => s.setGlAccountMapping);
   const closedThrough = useFinancialStore(s => s.closedThrough);
@@ -251,7 +252,8 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
   const locked = (date: string) => !!closedThrough && date <= closedThrough;
 
   const tiers = useMemo(() => { const m = new Map<number, number>(); snap.units.forEach(u => m.set(u.monthlyFee, (m.get(u.monthlyFee) ?? 0) + 1)); return Array.from(m.entries()).sort((a, b) => a[0] - b[0]); }, [snap.units]);
-  const lineMaps = budgetCategories.map(c => ({ name: c.name, acct: coa.find(a => a.budgetCat === c.id) }));
+  const lineMaps = budgetCategories.map(c => ({ id: c.id, name: c.name, acct: budgetLineAccounts(c, coa)[0] }));
+  const expenseAccts = coa.filter(a => a.type === 'expense' && a.sub !== 'header');
   const autopayUnits = new Set(snap.units.flatMap(u => u.payments.filter(p => /card|stripe|online|ach|bank/i.test(p.method || '')).map(() => u.number))).size;
 
   return (
@@ -375,7 +377,15 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
         </div>
         <SectionLabel>Budget lines to expense accounts</SectionLabel>
         <Inner className="py-1">
-          {(showAllLines ? lineMaps : lineMaps.slice(0, 4)).map(l => <KV key={l.name} label={l.name}>{l.acct ? l.acct.num : 'by category'}</KV>)}
+          {(showAllLines ? lineMaps : lineMaps.slice(0, 4)).map(l => (
+            <label key={l.id} className="flex items-center justify-between gap-3 py-1 text-sm text-ux2-ink"><span>{l.name}</span>
+              <select aria-label={`Expense account for ${l.name}`} value={l.acct?.num ?? ''} onChange={e => { setBudgetLineAccount(l.id, e.target.value); setNote(e.target.value ? `${l.name} is now measured against ${e.target.value}.` : `Link removed for ${l.name}. A line that shares its name with an account is still measured against that account.`); }} className={`${INPUT} !h-9 !w-[200px]`}>
+                <option value="">Not linked</option>
+                {expenseAccts.map(a => <option key={a.num} value={a.num}>{a.num} · {a.name}</option>)}
+              </select>
+            </label>
+          ))}
+          {lineMaps.some(l => !l.acct) && <div className="pt-1 text-xs text-ux2-muted">A line with no account shows nothing spent: bills are booked to accounts, so link each line to the account its bills go to.</div>}
           {lineMaps.length > 4 && <button type="button" className="pt-1 text-xs font-semibold text-ux2-ink underline" onClick={() => setShowAllLines(v => !v)}>{showAllLines ? 'Show fewer' : `${lineMaps.length - 4} more lines · Show all`}</button>}
         </Inner>
         <div><Button size="sm" onClick={() => { setMapping(draftMap as never); setNote('Mapping saved. It affects new entries only.'); }}>Save mapping</Button></div>

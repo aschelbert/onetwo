@@ -14,6 +14,8 @@ export interface BudgetLine {
   budgeted: number;
   actual: number;
   acctNum?: string;
+  /** Every ledger account the line is measured against. */
+  acctNums?: string[];
 }
 
 export interface ReserveLine {
@@ -44,7 +46,7 @@ export interface FundsSnapshot {
   lateFee: { enabled: boolean; amount: number; graceDays: number };
   stripeConnected: boolean;
   stripeOnboardingComplete: boolean;
-  /** This year's operating spend by month (Jan first), from the budget lines' expenses. */
+  /** This year's operating spend by month (Jan first), from the ledger (or the budget lines' own expenses when it has none). */
   spendByMonth?: number[];
   /** First day of the current fiscal year (calendar year when absent). */
   fiscalYearStart?: string;
@@ -179,11 +181,12 @@ export function invoiceSummary(invoices: UnitInvoice[], month?: string) {
 
 /** Bills are invoiced work orders; a bill is flagged when paying it would push its budget line over. */
 export function bills(s: FundsSnapshot) {
-  const byAcct = new Map(s.budget.filter(b => b.acctNum).map(b => [b.acctNum!, b]));
+  const byAcct = new Map(s.budget.flatMap(b => (b.acctNums?.length ? b.acctNums : b.acctNum ? [b.acctNum] : []).map(n => [n, b] as const)));
   const toApprove = s.workOrders.filter(w => w.status === 'invoiced');
   const flagged = toApprove.filter(w => {
     const line = byAcct.get(w.acctNum);
-    return !!line && line.budgeted > 0 && line.actual + w.amount > line.budgeted;
+    // A bill booked when it arrived is already in the line's actual; only an unbooked one adds to it.
+    return !!line && line.budgeted > 0 && line.actual + (w.accrualGlEntryId ? 0 : w.amount) > line.budgeted;
   });
   const flaggedIds = new Set(flagged.map(w => w.id));
   const within = toApprove.filter(w => !flaggedIds.has(w.id));

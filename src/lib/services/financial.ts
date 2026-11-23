@@ -26,8 +26,19 @@ export function rowToUnit(r: Record<string, unknown>): Unit {
   };
 }
 
+/**
+ * The building's units as this member may see them: the board and the manager
+ * get every field; anyone else gets the roster with other owners' contact
+ * details and money blanked (units_for_member, migration 20261123120000).
+ * A database without that function yet falls back to the table, where row
+ * policies decide.
+ */
 export async function fetchUnits(tenantId: string): Promise<Unit[] | null> {
   if (!supabase) return null;
+  const roster = await supabase.rpc('units_for_member', { p_tenant_id: tenantId });
+  if (!roster.error && Array.isArray(roster.data)) {
+    return (roster.data as Record<string, unknown>[]).map(rowToUnit).sort((a, b) => a.number.localeCompare(b.number));
+  }
   const { data, error } = await supabase
     .from('units')
     .select('*')

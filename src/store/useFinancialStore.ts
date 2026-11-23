@@ -4,7 +4,7 @@ import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping, type PaymentOrder } from '@/lib/financial-logic';
-import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
+import { balanceOf, budgetLineAccounts, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
@@ -135,6 +135,8 @@ interface FinancialState {
   addCoASection: (num: string, name: string, type: string) => void;
   addCoAAccount: (num: string, name: string, parent: string, sub: string) => void;
   updateCoAAccount: (num: string, name: string, active: boolean) => void;
+  /** Measure a budget line against one expense account ('' unlinks it). */
+  setBudgetLineAccount: (categoryId: string, acctNum: string) => void;
   deleteCoAAccount: (num: string) => void;
 
   // Manual GL
@@ -777,12 +779,13 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const fyStart = fiscalYearStart(today, useBuildingStore.getState().details?.fiscalYearEnd || '12-31');
     const thisYear = generalLedger.filter(e => e.date >= fyStart && e.date <= today);
     return budgetCategories.map((cat) => {
-      const glAcct = chartOfAccounts.find((a) => a.budgetCat === cat.id);
-      const actual = glAcct ? balanceOf(glAcct.num, glAcct.type, thisYear) : getCategorySpent(cat);
+      // A line is measured against its ledger accounts; one with no account falls back to expenses typed on the line itself.
+      const accts = budgetLineAccounts(cat, chartOfAccounts);
+      const actual = accts.length ? Math.round(accts.reduce((t, a) => t + balanceOf(a.num, a.type, thisYear), 0) * 100) / 100 : getCategorySpent(cat);
       const budgeted = cat.budgeted;
       const variance = budgeted - actual;
       const pct = budgeted > 0 ? Math.round((actual / budgeted) * 100) : 0;
-      return { id: cat.id, name: cat.name, budgeted, actual, variance, pct, acctNum: glAcct?.num };
+      return { id: cat.id, name: cat.name, budgeted, actual, variance, pct, acctNum: accts[0]?.num, acctNums: accts.map(a => a.num) };
     });
   },
 
@@ -851,6 +854,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
           set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
           // Anything changed while it was being saved goes up now.
           if (latest && (latest.name !== cat.name || latest.budgeted !== cat.budgeted)) financialSvc.updateBudgetCategory(dbRow.id, { name: latest.name, budgeted: latest.budgeted });
+          // Accounts linked to the line while it was saving follow it to its saved id.
+          const chart = get().chartOfAccounts;
+          if (chart.some(a => a.budgetCat === id)) {
+            set(s => ({ chartOfAccounts: s.chartOfAccounts.map(a => a.budgetCat === id ? { ...a, budgetCat: dbRow.id } : a) }));
+            get().chartOfAccounts.filter(a => a.budgetCat === dbRow.id).forEach(a => { void financialSvc.upsertCoAEntry(tid, a); });
+          }
           // Update any building assets referencing the old local ID
           const bStore = useBuildingStore.getState();
           bStore.assets.filter(a => a.budgetCategoryId === id).forEach(a => {
@@ -1080,6 +1089,20 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       const entry = s.chartOfAccounts.find(a => a.num === num);
       const tid = s.tenantId || getActiveTenantId();
       if (entry && tid) financialSvc.upsertCoAEntry(tid, entry);
+    }
+  },
+
+  setBudgetLineAccount: (categoryId, acctNum) => {
+    const before = get().chartOfAccounts;
+    const next = before.map(a => {
+      if (a.num === acctNum) return a.budgetCat === categoryId ? a : { ...a, budgetCat: categoryId };
+      if (a.budgetCat === categoryId) { const { budgetCat: _b, ...rest } = a; return rest; }
+      return a;
+    });
+    set({ chartOfAccounts: next });
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) next.filter((a, i) => a !== before[i]).forEach(a => { void financialSvc.upsertCoAEntry(tid, a); });
     }
   },
 
