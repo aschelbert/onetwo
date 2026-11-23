@@ -190,6 +190,8 @@ export function bills(s: FundsSnapshot) {
   });
   const flaggedIds = new Set(flagged.map(w => w.id));
   const within = toApprove.filter(w => !flaggedIds.has(w.id));
+  /** Signed off and inside its line: safe to pay in one go. */
+  const ready = within.filter(w => !!w.signoff);
   const dueSoon = toApprove.filter(w => w.invoiceDate && daysBetween(s.today, w.invoiceDate) >= -30);
   const sum = (list: WorkOrder[]) => list.reduce((t, w) => t + w.amount, 0);
   const month = monthKey(s.today);
@@ -198,6 +200,8 @@ export function bills(s: FundsSnapshot) {
     amount: sum(toApprove),
     within,
     withinAmount: sum(within),
+    ready,
+    unsigned: toApprove.filter(w => !w.signoff),
     flagged,
     flaggedAmount: sum(flagged),
     dueSoon,

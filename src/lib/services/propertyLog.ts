@@ -1,4 +1,6 @@
 import { supabase, logDbError } from '@/lib/supabase';
+import type { Photo } from '@/lib/services/photos';
+import { missingColumn } from '@/lib/services/missingColumn';
 
 export interface PropertyLogEntry {
   id: string;
@@ -11,6 +13,8 @@ export interface PropertyLogEntry {
   findings: Array<{ area: string; condition: string; notes: string; severity: string }>;
   actionItems: Array<{ description: string; assignedTo: string; dueDate: string; status: string; taskId?: string }>;
   notes: string;
+  /** Photos taken on the walk or at the incident. */
+  attachments?: Photo[];
 }
 
 function rowToLog(r: Record<string, unknown>): PropertyLogEntry {
@@ -25,6 +29,7 @@ function rowToLog(r: Record<string, unknown>): PropertyLogEntry {
     findings: (r.findings || []) as PropertyLogEntry['findings'],
     actionItems: (r.action_items || []) as PropertyLogEntry['actionItems'],
     notes: r.notes as string,
+    attachments: Array.isArray(r.attachments) ? (r.attachments as Photo[]) : [],
   };
 }
 
@@ -39,6 +44,7 @@ function logToRow(l: Partial<PropertyLogEntry>): Record<string, unknown> {
   if (l.findings !== undefined) row.findings = l.findings;
   if (l.actionItems !== undefined) row.action_items = l.actionItems;
   if (l.notes !== undefined) row.notes = l.notes;
+  if (l.attachments?.length) row.attachments = l.attachments;
   return row;
 }
 
@@ -57,18 +63,21 @@ export async function createLog(tenantId: string, log: Omit<PropertyLogEntry, 'i
   if (!supabase) return null;
   const row = logToRow(log);
   row.tenant_id = tenantId;
-  const { data, error } = await supabase
-    .from('property_logs')
-    .insert(row)
-    .select()
-    .single();
-  if (error) { logDbError('createLog error:', error); return null; }
+  let { data, error } = await supabase.from('property_logs').insert(row).select().single();
+  // The entry matters more than its photos: a database without the attachments column yet still takes the entry.
+  if (error && 'attachments' in row && missingColumn(error, 'attachments')) {
+    const { attachments: _a, ...rest } = row;
+    ({ data, error } = await supabase.from('property_logs').insert(rest).select().single());
+  }
+  if (error || !data) { logDbError('createLog error:', error); return null; }
   return rowToLog(data);
 }
 
 export async function updateLog(id: string, updates: Partial<PropertyLogEntry>): Promise<boolean> {
   if (!supabase) return false;
   const row = logToRow(updates);
+  if (updates.attachments !== undefined) row.attachments = updates.attachments;
+  if (Object.keys(row).length === 0) return true;
   const { error } = await supabase.from('property_logs').update(row).eq('id', id);
   if (error) { logDbError('updateLog error:', error); return false; }
   return true;

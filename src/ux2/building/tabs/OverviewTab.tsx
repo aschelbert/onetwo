@@ -5,12 +5,14 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { fmt } from '@/lib/formatters';
+import { scheduleState } from '@/lib/maintenance';
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { daysBetween } from '../../runbook/model';
 import { ISO_DATE } from '../../runbook/adapters';
-import { contractRows, contractsSummary, documentsSummary, insuranceStatus, type BuildingSnapshot } from '../metrics';
+import { contractRows, contractsSummary, documentsSummary, insuranceStatus, maintenanceOverdue, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
+import MaintenanceCard from './MaintenanceCard';
 
 export interface NeedsYouItem {
   id: string;
@@ -31,6 +33,10 @@ export function needsYou(snap: BuildingSnapshot): NeedsYouItem[] {
   const con = contractsSummary(contractRows(snap));
   for (const r of con.lapsed) out.push({ id: `con:${r.vendorId}`, title: `Countersign the ${(r.contract?.title ?? r.service).toLowerCase()}`, detail: `${r.vendor} · lapsed ${r.ends ? dayLabel(r.ends) : ''} · sign the renewal or close it out`, tone: 'red', chip: `Overdue ${r.ends ? dayLabel(r.ends) : ''}`, action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of con.ending) out.push({ id: `con:${r.vendorId}`, title: `${r.contract?.title ?? r.service} ends ${r.ends ? dayLabel(r.ends) : ''}`, detail: `${r.vendor} · collect bids or renew`, tone: 'amber', chip: `${r.daysLeft} days`, action: { label: 'Contracts', tab: 'contracts' } });
+  for (const r of con.insuranceLapsed) out.push({ id: `coi:${r.vendorId}`, title: `${r.vendor}'s insurance certificate has lapsed`, detail: `${r.service} · ask for the renewed certificate before their next visit`, tone: 'red', chip: r.insurance.worst?.expires ? `Lapsed ${dayLabel(r.insurance.worst.expires)}` : 'Lapsed', action: { label: 'Contracts', tab: 'contracts' } });
+  for (const m of maintenanceOverdue(snap).slice(0, 3)) out.push({ id: `mnt:${m.id}`, title: `${m.task} is overdue`, detail: `${m.vendor || 'Building staff'} · was due ${dayLabel(m.nextDue)} · mark it done or put it off with a reason`, tone: 'red', chip: `Due ${dayLabel(m.nextDue)}`, action: { label: 'Maintenance', tab: 'overview', section: 'maintenance' } });
+  for (const r of con.insuranceExpiring) out.push({ id: `coi:${r.vendorId}`, title: `${r.vendor}'s insurance certificate expires ${dayLabel(r.insurance.worst!.expires)}`, detail: `${r.service} · ask for the renewal`, tone: 'amber', chip: `${r.insurance.daysLeft} days`, action: { label: 'Contracts', tab: 'contracts' } });
+  for (const r of con.insuranceMissing) out.push({ id: `coi:${r.vendorId}`, title: `No certificate of insurance from ${r.vendor}`, detail: `${r.service} · general liability should be on file before they work on the property`, tone: 'amber', chip: 'Missing', action: { label: 'Contracts', tab: 'contracts' } });
   const docs = documentsSummary(snap);
   for (const d of docs.reviewDue) out.push({ id: `doc:${d.id}`, title: `${d.name} is due for review`, detail: 'Its obligation stays open until the reviewed version is on file', tone: 'amber', chip: 'Review due', action: { label: 'Documents', tab: 'documents' } });
   return out;
@@ -131,7 +137,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
   const year = Number(snap.today.slice(0, 4));
 
   const visits = useMemo(() => schedules
-    .filter(m => ISO_DATE.test(m.nextDue) && m.status !== 'completed')
+    .filter(m => ISO_DATE.test(m.nextDue) && scheduleState(m, snap.today) !== 'completed')
     .map(m => ({ ...m, days: daysBetween(snap.today, m.nextDue) }))
     .filter(m => m.days >= -30 && m.days <= 120)
     .sort((a, b) => a.nextDue.localeCompare(b.nextDue))
@@ -145,7 +151,8 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
   const limits = (p?: InsurancePolicy) => (p ? `${p.type.replace(/\s*\(.*\)/, '')} ${p.coverage}` : '');
 
   const assetRows = assets.map(a => {
-    const sched = schedules.filter(s => a.maintenanceScheduleIds.includes(s.id) && s.status !== 'completed').sort((x, y) => x.nextDue.localeCompare(y.nextDue))[0];
+    const due = schedules.filter(s => a.maintenanceScheduleIds.includes(s.id) && scheduleState(s, snap.today) !== 'completed').sort((x, y) => x.nextDue.localeCompare(y.nextDue))[0];
+    const sched = due ? { ...due, status: scheduleState(due, snap.today) } : undefined;
     const reserve = reserveItems.find(r => r.id === a.reserveItemId);
     const replaceYear = reserve ? year + Math.max(0, Math.round(reserve.yearsRemaining)) : a.remainingLifeYears ? year + a.remainingLifeYears : undefined;
     const vendor = sched?.vendor || '';
@@ -162,7 +169,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
         <Card aria-label="Needs you" className="gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Needs you</SectionLabel><span className="text-xs text-ux2-muted">{needs.length === 1 ? 'Also a Home card for the Treasurer' : 'Each is also a Home card for the Treasurer'}</span></div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {needs.slice(0, 4).map(n => (
+            {needs.slice(0, 6).map(n => (
               <button key={n.id} type="button" onClick={() => onGo(n.action.tab, n.action.section)} className="flex items-center justify-between gap-3 rounded-[14px] border border-ux2-line bg-white px-3.5 py-3 text-left hover:border-ux2-line-strong">
                 <span className="min-w-0"><span className="block text-sm font-semibold text-ux2-ink">{n.title}</span><span className="block text-xs text-ux2-muted">{n.detail}</span></span>
                 <Chip tone={n.tone}>{n.chip}</Chip>
@@ -239,6 +246,8 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
           </div>
         )}
       </Card>
+
+      <MaintenanceCard today={snap.today} isBoard={isBoard} />
 
       <Card aria-label="Mailing address and contact" className="gap-2.5">
         <div className="flex items-center justify-between gap-2"><SectionLabel>Mailing address and contact preferences</SectionLabel>{isBoard && <button type="button" onClick={() => navigate('/funds?tab=settings&section=mailing')} className="text-xs font-semibold text-ux2-teal hover:underline">Edit</button>}</div>

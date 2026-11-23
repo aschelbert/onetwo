@@ -6,6 +6,7 @@ import * as casesSvc from '@/lib/services/cases';
 import type { Issue, CaseTrackerCase, CaseStep, CaseComm, CaseAttachment, BoardVote, CaseApproach, CasePriority, AdditionalApproach, CaseCheckItem, SpendingDecision, Bid, ConflictCheck, ConflictDeclaration, DecisionTrailEntry, Action, PersistentAction, BudgetFinancials } from '@/types/issues';
 import { ANNUAL_BUDGET_FINANCIALS } from '@/features/issues/components/shell/budgetData';
 import { generateLocalId } from '@/lib/generateId';
+import type { Photo } from '@/lib/services/photos';
 import { deriveChecks } from '@/features/issues/stepGuide';
 
 // ─── Situation Templates ───────────────────────────────────
@@ -2398,6 +2399,7 @@ interface IssuesState {
   upvoteIssue: (issueId: string, userId: string, userName: string, unitNumber: string) => void;
   updateIssueStatus: (issueId: string, status: Issue['status']) => void;
   addIssueComment: (issueId: string, author: string, text: string) => void;
+  addIssuePhotos: (issueId: string, photos: Photo[]) => void;
   addIssueComm: (issueId: string, comm: Omit<CaseComm, 'id'>) => void;
 
   // Case actions
@@ -2539,6 +2541,13 @@ export const useIssuesStore = create<IssuesState>()(persist((set, get) => ({
         set(s => ({ issues: s.issues.filter(x => x.id !== localId) }));
       });
     }
+  },
+
+  addIssuePhotos: (issueId, photos) => {
+    if (!photos.length) return;
+    set(s => ({ issues: s.issues.map(i => i.id === issueId ? { ...i, photos: [...(i.photos ?? []), ...photos] } : i) }));
+    const all = get().issues.find(i => i.id === issueId)?.photos ?? [];
+    if (isBackendEnabled && !issueId.startsWith('iss-')) void issuesSvc.updateIssuePhotos(issueId, all);
   },
 
   upvoteIssue: (issueId, userId, userName, unitNumber) => {

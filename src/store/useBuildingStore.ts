@@ -42,9 +42,26 @@ export interface InsurancePolicy {
   id: string; type: string; carrier: string; coverage: string; premium: string; expires: string; policyNum: string;
   attachments: Array<{ name: string; size: string; uploadedAt: string; type: string }>;
 }
+/** One line of a vendor's certificate of insurance: a coverage, who writes it, its limit and when it ends. */
+export interface VendorCertificate {
+  id: string;
+  coverage: 'general_liability' | 'workers_comp' | 'umbrella' | 'auto' | 'professional';
+  carrier: string;
+  policyNum: string;
+  /** As written on the certificate, e.g. "$1,000,000 per occurrence". */
+  limit: string;
+  expires: string;
+  /** Whether the association is named as additional insured. */
+  additionalInsured?: boolean;
+  /** The certificate itself, when uploaded (building-documents bucket). */
+  file?: { name: string; path: string };
+  addedAt: string;
+}
 export interface Vendor {
   id: string; name: string; service: string; contact: string; phone: string; email: string; contract: string; status: 'active' | 'inactive';
   w9OnFile?: boolean;
+  /** Certificates of insurance the vendor has provided. */
+  insurance?: VendorCertificate[];
 }
 export interface BuildingAddress {
   street: string; city: string; state: string; zip: string;

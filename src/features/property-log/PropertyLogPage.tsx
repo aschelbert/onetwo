@@ -4,6 +4,8 @@ import { useTaskTrackingStore } from '@/store/useTaskTrackingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getActiveTenantId } from '@/lib/supabase';
 import Modal from '@/components/ui/Modal';
+import { PhotoPicker, PhotoStrip } from '@/ux2/components';
+import { MAX_PHOTOS, uploadPhotos } from '@/lib/services/photos';
 
 type ModalMode = null | 'add' | 'edit';
 type TypeFilter = 'all' | PropertyLogEntry['type'];
@@ -493,6 +495,26 @@ export default function PropertyLogPage() {
                           <div className="bg-mist-50 rounded-lg p-4 text-sm text-ink-700 whitespace-pre-wrap">
                             {log.notes}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Photos */}
+                      {(canManage || !!log.attachments?.length) && (
+                        <div>
+                          <p className="font-bold text-ink-900 mb-2">Photos</p>
+                          <PhotoStrip photos={log.attachments} className="mb-2" />
+                          {canManage && (log.attachments?.length ?? 0) < MAX_PHOTOS && (
+                            <PhotoPicker
+                              label={log.attachments?.length ? 'Add another photo' : 'Add photos'}
+                              max={MAX_PHOTOS - (log.attachments?.length ?? 0)}
+                              onPick={files => {
+                                void uploadPhotos(`log/${log.id}`, files, currentUser.name).then(up => {
+                                  if (up.photos.length) updateLog(log.id, { attachments: [...(log.attachments ?? []), ...up.photos] });
+                                  if (up.skipped.length) window.alert(`Not attached: ${up.skipped.join('; ')}.`);
+                                });
+                              }}
+                            />
+                          )}
                         </div>
                       )}
 

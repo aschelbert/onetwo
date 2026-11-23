@@ -1,3 +1,4 @@
+import { missingColumn } from '@/lib/services/missingColumn';
 import { supabase, logDbError } from '@/lib/supabase';
 import type {
   BoardMember, ManagementInfo, LegalCounsel,
@@ -288,6 +289,7 @@ export async function fetchVendors(tenantId: string): Promise<Vendor[] | null> {
     phone: r.phone, email: r.email, contract: r.contract,
     status: r.status as 'active' | 'inactive',
     w9OnFile: !!r.w9_on_file,
+    insurance: Array.isArray(r.insurance) ? r.insurance : [],
   }));
 }
 
@@ -319,7 +321,13 @@ export async function updateVendor(id: string, v: Partial<Vendor>): Promise<bool
   if (v.contract !== undefined) row.contract = v.contract;
   if (v.status !== undefined) row.status = v.status;
   if (v.w9OnFile !== undefined) row.w9_on_file = v.w9OnFile;
-  const { error } = await supabase.from('vendors').update(row).eq('id', id);
+  if (v.insurance !== undefined) row.insurance = v.insurance;
+  let { error } = await supabase.from('vendors').update(row).eq('id', id);
+  // A database that has not had the certificates column added yet still saves the rest of the vendor.
+  if (error && 'insurance' in row && missingColumn(error, 'insurance')) {
+    const { insurance: _i, ...rest } = row;
+    ({ error } = await supabase.from('vendors').update(rest).eq('id', id));
+  }
   if (error) { logDbError('updateVendor error:', error); return false; }
   return true;
 }

@@ -20,12 +20,12 @@ const DAY = 86400000;
 const plusDays = (iso: string, n: number) => new Date(Date.parse(iso) + n * DAY).toISOString().slice(0, 10);
 
 function useLines(snap: FundsSnapshot) {
-  return useMemo(() => new Map(snap.budget.filter(b => b.acctNum).map(b => [b.acctNum!, b])), [snap.budget]);
+  return useMemo(() => new Map(snap.budget.flatMap(b => (b.acctNums?.length ? b.acctNums : b.acctNum ? [b.acctNum] : []).map(n => [n, b] as const))), [snap.budget]);
 }
 
 function woStatus(w: WorkOrder, flagged: boolean) {
   if (w.status === 'paid') return <Chip tone="sage">Paid{w.paidDate ? ` · ${dayLabel(w.paidDate)}` : ''}</Chip>;
-  if (w.status === 'invoiced') return flagged ? <Chip tone="red">Flagged · over budget</Chip> : <Chip tone="cyan">Invoiced</Chip>;
+  if (w.status === 'invoiced') return flagged ? <Chip tone="red">Flagged · over budget</Chip> : w.signoff ? <Chip tone="cyan">Signed off · ready to pay</Chip> : <Chip tone="amber">Invoiced · work not signed off</Chip>;
   if (w.status === 'approved') return <Chip tone="teal">Approved · awaiting invoice</Chip>;
   return <Chip tone="ghost">Draft</Chip>;
 }
@@ -77,6 +77,9 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   const navigate = useNavigate();
   const approve = useFinancialStore(s => s.approveWorkOrder);
   const pay = useFinancialStore(s => s.payWorkOrder);
+  const signOff = useFinancialStore(s => s.signOffWorkOrder);
+  const me = useAuthStore(s => s.currentUser.name);
+  const [signing, setSigning] = useState<{ id: string; notes: string } | null>(null);
   const [filter, setFilter] = useState<BillFilter>('toapprove');
   const [form, setForm] = useState<{ kind: 'receive'; id?: string } | null>(null);
   const [all, setAll] = useState(false);
@@ -84,7 +87,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   const rows = { toapprove: bl.toApprove, flagged: bl.flagged, approved: bl.approved, drafts: bl.drafts, paid: [...snap.workOrders.filter(w => w.status === 'paid')].sort((a, b) => (b.paidDate ?? '').localeCompare(a.paidDate ?? '')) }[filter];
   const shown = all ? rows : rows.slice(0, 8);
   const actionFor = (w: WorkOrder) => {
-    if (w.status === 'invoiced') return <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button>;
+    if (w.status === 'invoiced') return w.signoff ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : <Button size="sm" variant="ghost" onClick={() => setSigning({ id: w.id, notes: '' })}>Sign off work</Button>;
     if (w.status === 'approved') return <Button size="sm" variant="ghost" onClick={() => setForm({ kind: 'receive', id: w.id })}>Receive invoice</Button>;
     if (w.status === 'draft') return <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button>;
     return null;
@@ -92,14 +95,22 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   return (
     <Card aria-label="Bills" id="bills">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Bills</h2><span className="max-w-[560px] text-[13px] text-ux2-muted">Approve here means pay: the spending was already decided. Each bill sits on a work order, so the vendor, the budget line and the approval travel together</span></div>
+        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Bills</h2><span className="max-w-[560px] text-[13px] text-ux2-muted">Approve here means pay: the spending was already decided. A bill is paid once someone has signed off that the work was done. Each bill sits on a work order, so the vendor, the budget line and the approval travel together</span></div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <PillTabs size="filter" surface="white" aria-label="Filter bills" value={filter} onChange={setFilter} tabs={[{ id: 'toapprove', label: `To approve · ${bl.toApprove.length}` }, { id: 'flagged', label: `Flagged · ${bl.flagged.length}` }, { id: 'approved', label: `Approved · ${bl.approved.length}` }, { id: 'drafts', label: `Drafts · ${bl.drafts.length}` }, { id: 'paid', label: 'Paid' }]} />
           <Button size="sm" className="h-9" variant="ghost" onClick={() => setForm({ kind: 'receive' })} disabled={bl.approved.length === 0}>Receive an invoice</Button>
-          <Button size="sm" className="h-9" onClick={() => bl.within.forEach(w => pay(w.id))} disabled={bl.within.length === 0}>Approve all {bl.within.length} within budget</Button>
+          <Button size="sm" className="h-9" onClick={() => bl.ready.forEach(w => pay(w.id))} disabled={bl.ready.length === 0}>Approve all {bl.ready.length} signed off and within budget</Button>
         </div>
       </div>
       {form && <ReceiveInvoiceForm key={form.id ?? 'any'} candidates={bl.approved} initial={form.id} today={snap.today} onClose={() => setForm(null)} />}
+      {signing && (() => { const w = snap.workOrders.find(x => x.id === signing.id); return w ? (
+        <form aria-label={`Sign off ${w.title}`} onSubmit={e => { e.preventDefault(); signOff(w.id, me, signing.notes); setSigning(null); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+          <div className="w-full text-sm font-semibold text-ux2-ink">Sign off the work · {w.title} · {w.vendor}</div>
+          <Field label="Anything the vendor still has to put right (leave blank if none)" className="min-w-[280px] flex-1"><input value={signing.notes} onChange={e => setSigning({ id: w.id, notes: e.target.value })} placeholder="Touch-up paint on the second-floor landing" className={INPUT} /></Field>
+          <div className="flex gap-2"><Button type="submit" size="sm">I checked it: sign off as {me}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setSigning(null)}>Cancel</Button></div>
+          <Why className="basis-full">Signing off says the work was inspected and matches what was ordered. Your name and today's date go on the work order, and the bill can then be approved for payment.</Why>
+        </form>
+      ) : null; })()}
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{filter === 'toapprove' ? 'Nothing is waiting for approval.' : 'Nothing here.'}</Inner> : (
         <Table>
           <thead><tr><Th>Bill</Th><Th>Vendor</Th><Th>Budget line</Th><Th num>Amount</Th><Th>Due</Th><Th>Status</Th><Th aria-label="Approve" /><Th aria-label="Actions" /></tr></thead>
@@ -107,17 +118,17 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
             {shown.map(w => {
               const line = lines.get(w.acctNum);
               const isFlag = flagged.has(w.id);
-              const over = line ? line.actual + w.amount - line.budgeted : 0;
+              const over = line ? line.actual + (w.accrualGlEntryId ? 0 : w.amount) - line.budgeted : 0;
               return (
                 <tr key={w.id} className={isFlag ? 'bg-ux2-red-tint/60' : ''}>
-                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}`} /></Td>
+                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}${w.signoff ? ` · signed off ${dayLabel(w.signoff.date)} by ${w.signoff.by}${w.signoff.notes ? ` · to fix: ${w.signoff.notes}` : ''}` : ''}`} /></Td>
                   <Td>{w.vendor}</Td>
                   <Td>{line?.name ?? w.acctNum}{isFlag && <span className="text-xs text-ux2-muted"> · over by {fmt(over)}</span>}</Td>
                   <Td num className="font-semibold">{w.amount ? (w.status === 'approved' || w.status === 'draft' ? `est. ${fmt(w.amount)}` : fmt(w.amount)) : '–'}</Td>
                   <Td className="whitespace-nowrap text-ux2-muted">{w.status === 'invoiced' && w.invoiceDate ? dayLabel(plusDays(w.invoiceDate, 30)) : '–'}</Td>
                   <Td>{woStatus(w, isFlag)}</Td>
                   <Td num>{actionFor(w)}</Td>
-                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
+                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status === 'invoiced' && !w.signoff ? [{ label: 'Sign off work', onSelect: () => setSigning({ id: w.id, notes: '' }) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
                 </tr>
               );
             })}
@@ -128,7 +139,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
         {rows.length > 8 && <button type="button" onClick={() => setAll(v => !v)} className="shrink-0"><Chip tone="ghost">{all ? 'Show fewer' : `${rows.length - 8} more`}</Chip></button>}
         <Why>A flagged bill pushes a budget line past 100%. Approving it is fine; it moves the line to Planning's "over" list and asks where the money comes from.</Why>
       </div>
-      <Why>A work order moves Draft, then Approved, then Invoiced, then Paid. Approving a bill here pays it on its due date from operating cash and posts the ledger entry; "Mark paid" covers a check written by hand. <button type="button" onClick={() => onSection('workorders')} className="font-semibold text-ux2-teal hover:underline">All work orders</button></Why>
+      <Why>A work order moves Draft, then Approved, then Invoiced, then Paid. Once the work is signed off, approving a bill here pays it from operating cash and posts the ledger entry; "Mark paid" covers a check written by hand. <button type="button" onClick={() => onSection('workorders')} className="font-semibold text-ux2-teal hover:underline">All work orders</button></Why>
     </Card>
   );
 }
@@ -299,7 +310,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
                 <Td num className="font-semibold">{w.amount ? (w.status === 'approved' || w.status === 'draft' ? `est. ${fmt(w.amount)}` : fmt(w.amount)) : '–'}</Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{dayLabel(w.createdDate)}</Td>
                 <Td>{woStatus(w, flagged.has(w.id))}</Td>
-                <Td num>{w.status === 'draft' ? <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button> : w.status === 'approved' ? <Button size="sm" variant="ghost" onClick={() => setReceive(w.id)}>Receive invoice</Button> : w.status === 'invoiced' ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : null}</Td>
+                <Td num>{w.status === 'draft' ? <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button> : w.status === 'approved' ? <Button size="sm" variant="ghost" onClick={() => setReceive(w.id)}>Receive invoice</Button> : w.status === 'invoiced' ? (w.signoff ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : <Button size="sm" variant="ghost" onClick={() => onSection('bills')}>Sign off in Bills</Button>) : null}</Td>
                 <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), { label: 'Show in Bills', onSelect: () => onSection('bills') }, { label: 'The vendor · Building › Contracts', onSelect: () => navigate('/building?tab=contracts') }]} /></Td>
               </tr>
             ))}
@@ -349,7 +360,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
             <KV dark label="Due this week">{bl.dueSoon.length} · {fmt(bl.dueSoonAmount)}</KV>
           </div>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">Approve all {bl.within.length} within budget</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.within.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">Approve</button></>,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{bl.ready.length ? `Approve all ${bl.ready.length} signed off and within budget` : bl.unsigned.length ? `${bl.unsigned.length} waiting on a work sign-off` : 'Nothing to approve'}</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.ready.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">Approve</button></>,
       },
       detail: <BillsCard snap={snap} onSection={onSection} />,
     },

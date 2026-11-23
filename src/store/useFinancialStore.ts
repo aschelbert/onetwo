@@ -112,6 +112,8 @@ interface FinancialState {
   // Work Orders
   createWorkOrder: (wo: { title: string; vendor: string; amount: number; acctNum: string; caseId?: string }) => void;
   approveWorkOrder: (id: string) => void;
+  /** Someone checked the finished work against what was ordered; a bill is paid only after this. */
+  signOffWorkOrder: (id: string, by: string, notes?: string, date?: string) => void;
   /** Change a work order before its invoice arrives: the vendor, the amount or the title (a rebooked or resized job). */
   updateWorkOrder: (id: string, patch: Partial<Pick<WorkOrder, 'title' | 'vendor' | 'amount' | 'description'>>) => void;
   /** Link a work order to the case that drives it (the Work order runbook's, or a parent case). */
@@ -1013,6 +1015,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
         w.id === id && w.status === 'draft' ? { ...w, status: 'approved' as const, approvedDate: new Date().toISOString().split('T')[0] } : w
       ),
     }));
+    syncWorkOrder(id);
+  },
+
+  signOffWorkOrder: (id, by, notes = '', date = todayIso()) => {
+    set((s) => ({ workOrders: s.workOrders.map((w) => (w.id === id && w.status !== 'draft' ? { ...w, signoff: { date, by, notes: notes.trim() } } : w)) }));
     syncWorkOrder(id);
   },
 

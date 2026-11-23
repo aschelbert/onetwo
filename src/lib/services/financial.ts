@@ -1,4 +1,5 @@
 import { supabase, logDbError } from '@/lib/supabase';
+import { missingColumn } from '@/lib/services/missingColumn';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
 import type { PaymentOrder } from '@/lib/financial-logic';
@@ -307,6 +308,7 @@ export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
     glEntryId: (r.gl_entry_id as string) || null,
     attachments: (r.attachments || []) as WorkOrder['attachments'],
     accrualGlEntryId: (r.accrual_gl_entry_id as string) || null,
+    signoff: (r.signoff as WorkOrder['signoff']) || null,
   };
 }
 
@@ -353,7 +355,13 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
   if (updates.accrualGlEntryId !== undefined) row.accrual_gl_entry_id = updates.accrualGlEntryId;
-  const { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  if (updates.signoff) row.signoff = updates.signoff;
+  let { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  // A database without the sign-off column yet still saves the rest of the work order.
+  if (error && 'signoff' in row && missingColumn(error, 'signoff')) {
+    const { signoff: _s, ...rest } = row;
+    ({ error } = await supabase.from('work_orders').update(rest).eq('tenant_id', tenantId).eq('local_id', localId));
+  }
   if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;
 }
