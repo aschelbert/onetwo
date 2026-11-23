@@ -6,6 +6,7 @@ import { FREQUENCIES, deferralOf, frequencyMonths, scheduleState } from '@/lib/m
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, RowMenu, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { kindOf, markDone, putOff } from '../maintenanceActions';
+import { startInspection } from '../../boardroom/recordActions';
 
 const SYSTEMS = ['HVAC', 'Elevator', 'Fire Safety', 'Plumbing', 'Electrical', 'Roof and envelope', 'Grounds', 'Parking', 'Common areas', 'General'];
 const FORM = 'flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3';
@@ -131,14 +132,14 @@ export default function MaintenanceCard({ today, isBoard }: { today: string; isB
                 <Td>{m.lastCompleted ? dayLabel(m.lastCompleted) : <span className="text-ux2-muted">Not yet</span>}</Td>
                 <Td>{m.nextDue ? dayLabel(m.nextDue) : <span className="text-ux2-muted">—</span>}{deferral && state !== 'completed' && <span className="block text-xs text-ux2-muted">first due {dayLabel(deferral.from)} · {deferral.reason}</span>}</Td>
                 <Td><Chip tone={state === 'overdue' ? 'red' : state === 'due-soon' ? 'amber' : state === 'completed' ? 'ghost' : deferral ? 'plum' : 'sage'}>{state === 'overdue' ? 'Overdue' : state === 'due-soon' ? 'Due soon' : state === 'completed' ? 'Done' : deferral ? 'Deferred' : 'On schedule'}</Chip></Td>
-                {isBoard && <Td><span className="flex items-center justify-end gap-2">{state !== 'completed' && <Button size="sm" variant="ghost" onClick={() => setOpen({ kind: 'done', id: m.id })}>Mark done</Button>}<RowMenu label={`Actions for ${m.task}`} items={[...(state !== 'completed' ? [{ label: 'Put off', onSelect: () => setOpen({ kind: 'defer', id: m.id }) }] : []), { label: 'Edit', onSelect: () => setOpen({ kind: 'edit', id: m.id }) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove “${m.task}” from the schedule? Past visits stay in the log.`)) remove(m.id); } }]} /></span></Td>}
+                {isBoard && <Td><span className="flex items-center justify-end gap-2">{state !== 'completed' && (kindOf(m) === 'Inspection' ? <Button size="sm" variant="ghost" onClick={() => { const { caseId } = startInspection(m.task, { scheduleId: m.id, by: m.vendor }); if (caseId) navigate(`/boardroom?view=case:${caseId}`); }}>Start the inspection</Button> : <Button size="sm" variant="ghost" onClick={() => setOpen({ kind: 'done', id: m.id })}>Mark done</Button>)}<RowMenu label={`Actions for ${m.task}`} items={[...(state !== 'completed' && kindOf(m) === 'Inspection' ? [{ label: 'Mark done without a checklist', onSelect: () => setOpen({ kind: 'done', id: m.id }) }] : []), ...(state !== 'completed' ? [{ label: 'Put off', onSelect: () => setOpen({ kind: 'defer', id: m.id }) }] : []), { label: 'Edit', onSelect: () => setOpen({ kind: 'edit', id: m.id }) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove “${m.task}” from the schedule? Past visits stay in the log.`)) remove(m.id); } }]} /></span></Td>}
               </tr>
             ))}
           </tbody>
         </Table>
       )}
       {rows.length > 8 && <button type="button" className="self-start text-xs font-semibold text-ux2-ink underline" onClick={() => setShowAll(v => !v)}>{showAll ? 'Show fewer' : `${rows.length - 8} more · Show all`}</button>}
-      <Why>Marking a task done sets the next one from how often it repeats and files the visit in the property log: who did it, when, and what they found. A task that is put off keeps the date it was first due, so deferred work stays visible.</Why>
+      <Why>An inspection is walked in its own action, with a checklist and photos. Marking any other task done sets the next one from how often it repeats and files the visit in the property log: who did it, when, and what they found. A task that is put off keeps the date it was first due, so deferred work stays visible.</Why>
     </Card>
   );
 }

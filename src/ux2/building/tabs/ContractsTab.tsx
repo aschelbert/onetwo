@@ -11,6 +11,7 @@ import { useRunbookSwitches } from '../../boardroom/store';
 import { contractRows, contractsSummary, type ContractRow, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
 import VendorInsurance, { insuranceChip } from './VendorInsurance';
+import { startAction } from '../../boardroom/recordActions';
 
 const STATE_TONE: Record<ContractRow['state'], 'red' | 'amber' | 'sage' | 'ghost'> = { lapsed: 'red', ending: 'amber', active: 'sage', none: 'ghost', inactive: 'ghost' };
 function stateLabel(r: ContractRow): string {
@@ -79,7 +80,7 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
 
   return (
     <div className="flex flex-col gap-4">
-      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => navigate('/boardroom?view=new&cat=maintenance&sit=vendor-management')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></HeaderActions>}
+      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => navigate('/boardroom?start=bid-request')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></HeaderActions>}
       {adding && <VendorForm onClose={() => setAdding(false)} />}
 
       {needs.length > 0 && (
@@ -121,6 +122,7 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
                     <Td>{r.needs1099 ? <span>Yes{!r.w9OnFile && <span className="text-xs text-ux2-red-ink"> · W-9 missing</span>}</span> : <Chip tone="ghost">Under $600</Chip>}</Td>
                     <Td><button type="button" aria-label={`Insurance for ${r.vendor}`} aria-expanded={insuring === r.vendorId} onClick={() => setInsuring(insuring === r.vendorId ? null : r.vendorId)} className="rounded-full"><Chip tone={insuranceChip(r.insurance).tone}>{insuranceChip(r.insurance).label}</Chip></button></Td>
                     <Td>
+                      {isBoard && r.state === 'ending' && r.contract && <button type="button" onClick={() => { const { caseId } = startAction('bid-request', `${r.contract!.title}, next term`, { budget: r.contract!.amount }); if (caseId) navigate(`/boardroom?view=case:${caseId}`); }} className="mr-1.5 rounded-full"><Chip tone="ghost">Collect bids</Chip></button>}
                       {isBoard && (r.state === 'lapsed' || r.state === 'ending' || r.state === 'none')
                         ? <button type="button" onClick={() => setRenewing(renewing === r.vendorId ? null : r.vendorId)} className="rounded-full"><Chip tone={STATE_TONE[r.state]}>{r.state === 'none' ? 'Add contract' : stateLabel(r)}</Chip></button>
                         : <Chip tone={STATE_TONE[r.state]}>{r.state === 'none' ? 'Per job' : stateLabel(r)}</Chip>}

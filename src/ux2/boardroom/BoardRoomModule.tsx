@@ -35,6 +35,9 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import RegisterTab, { registerSummary } from './tabs/RegisterTab';
 import ProjectAction from './project/ProjectAction';
 import { projectIdOf } from './capitalImprovement';
+import RecordAction from './action/RecordAction';
+import StartAction from './action/StartAction';
+import { recordIdOf } from './recordActions';
 import { useRegisterStore } from '@/store/useRegisterStore';
 import { caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
@@ -67,6 +70,9 @@ export default function BoardRoomModule() {
   const tab = resolveBoardRoomTab(params.get('tab'), params.get('caseTab'), pmSeat);
   const snap = useBoardRoomSnapshot();
   const [composeLetter, setComposeLetter] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
+  const starting = startOpen || !!params.get('start');
+  const setStarting = (on: boolean) => { setStartOpen(on); if (!on && params.get('start')) setParams(prev => { const p = new URLSearchParams(prev); p.delete('start'); return p; }, { replace: true }); };
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const openTasks = useTaskTrackingStore(s => s.tasks).filter(t => t.status !== 'done').length;
 
@@ -89,7 +95,7 @@ export default function BoardRoomModule() {
       return p;
     }, { replace: true });
   };
-  const openCase = (id: string) => setParams(prev => { const p = new URLSearchParams(prev); p.set('view', `case:${id}`); p.delete('record'); return p; }, { replace: true });
+  const openCase = (id: string) => setParams(prev => { const p = new URLSearchParams(prev); p.set('view', `case:${id}`); p.delete('record'); p.delete('start'); return p; }, { replace: true });
   const newCase = (prefill?: { catId: string; sitId: string }) => setParams(prev => {
     const p = new URLSearchParams(prev);
     p.set('view', 'new');
@@ -103,6 +109,11 @@ export default function BoardRoomModule() {
   const capitalProjectId = view?.startsWith('case:') && params.get('record') !== '1' ? projectIdOf(snap.cases.find(c => c.id === view.slice(5))) : null;
   if (view && capitalProjectId) {
     return <ProjectAction projectId={capitalProjectId} caseId={view.slice(5)} onBack={() => go('open')} onOpenRecord={() => setParams(prev => { const p = new URLSearchParams(prev); p.set('record', '1'); return p; }, { replace: true })} />;
+  }
+
+  const actionRecordId = view?.startsWith('case:') && params.get('record') !== '1' ? recordIdOf(snap.cases.find(c => c.id === view.slice(5))) : null;
+  if (view && actionRecordId) {
+    return <RecordAction recordId={actionRecordId} caseId={view.slice(5)} onBack={() => go('open')} onOpenRecord={() => setParams(prev => { const p = new URLSearchParams(prev); p.set('record', '1'); return p; }, { replace: true })} />;
   }
 
   if (view && (view === 'new' || view.startsWith('case:'))) {
@@ -140,9 +151,10 @@ export default function BoardRoomModule() {
           subtitle={subtitle}
           status={cases.overdue.length > 0 ? <Chip tone="red" className={STATUS_CHIP}>{cases.overdue.length} overdue</Chip> : undefined}
           tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Board Room sections" />}
-          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <Button onClick={() => newCase()}>Take Action</Button>}
+          actions={tab === 'outbox' ? <Button onClick={() => setComposeLetter(true)}>New letter</Button> : <><Button variant="ghost" onClick={() => setStarting(!starting)}>Guided action</Button><Button onClick={() => newCase()}>Take Action</Button></>}
         />
 
+        {starting && <StartAction initialKind={params.get('start') ?? undefined} key={params.get('start') ?? 'pick'} onOpenCase={id => { setStartOpen(false); openCase(id); }} onClose={() => setStarting(false)} />}
         {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
         {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
         {tab === 'register' && <RegisterTab section={params.get('section') ?? undefined} onSection={s => setParams(prev => { const p = new URLSearchParams(prev); p.set('section', s); return p; }, { replace: true })} onOpenCase={openCase} />}

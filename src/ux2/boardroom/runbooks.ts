@@ -21,6 +21,7 @@
  * action in metrics), so the Runbooks list shows every workflow there is.
  */
 import { CATS } from '@/store/useIssuesStore';
+import { ACTION_KINDS } from '@/lib/actions';
 
 export interface RunbookDef {
   id: string;
@@ -48,7 +49,8 @@ export interface RunbookDef {
   stepTitles?: string[];
 }
 
-export const RUNBOOKS: RunbookDef[] = [
+/** The design's catalogue, and the runbooks written by hand since. The record-backed actions are appended below. */
+const CATALOGUE: RunbookDef[] = [
   { id: 'annual-budget', name: 'Annual budget', trigger: '90 days before the fiscal year', steps: 10, automated: 4, sitId: 'annual-budgeting', catId: 'financial', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 6, 7, 8] },
   { id: 'board-meeting', name: 'Board meeting cycle', trigger: 'Bylaws cadence', steps: 5, automated: 3, sitId: 'board-meetings', catId: 'governance', visibility: 'owners', defaultOn: true, wired: true, autoSteps: [0, 2, 3] },
   { id: 'resident-request', name: 'Resident request', trigger: 'A request arrives', steps: 4, automated: 2, sitId: 'board-action-item', catId: 'governance', visibility: 'board', defaultOn: true, wired: true, autoSteps: [0, 3] },
@@ -83,6 +85,11 @@ export const RUNBOOKS: RunbookDef[] = [
   { id: 'payroll', name: 'Staff and payroll', trigger: 'Pay period', steps: 4, automated: 3, visibility: 'board', defaultOn: true },
   { id: 'setup', name: 'New building setup', trigger: 'First sign-in', steps: 9, automated: 6, visibility: 'board', defaultOn: true },
 ];
+
+/** One runbook per record-backed action: it starts as its record is started, and every step ticks itself from the record. */
+const RECORD_RUNBOOKS: RunbookDef[] = ACTION_KINDS.map(k => ({ id: k.runbookId, name: k.name, trigger: k.trigger, steps: k.stepTitles.length, automated: k.stepTitles.length, visibility: k.visibility, defaultOn: true, wired: true, autoSteps: k.stepTitles.map((_, i) => i), desc: k.blurb }));
+
+export const RUNBOOKS: RunbookDef[] = [...CATALOGUE, ...RECORD_RUNBOOKS];
 
 /** Situations the wizard offers that no catalogue runbook runs on: each one is a runbook opened by hand, with the situation's steps. */
 const COVERED = new Set(RUNBOOKS.map(r => r.sitId).filter(Boolean));

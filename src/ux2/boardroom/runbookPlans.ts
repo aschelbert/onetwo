@@ -13,6 +13,7 @@
 import { CATS } from '@/store/useIssuesStore';
 import type { RunbookDef } from './runbooks';
 import { CAPITAL_PLAN } from './capitalPlan';
+import { actionKindByRunbook } from '@/lib/actions';
 
 export interface PlanStep {
   title: string;
@@ -206,6 +207,8 @@ function situationSteps(sitId?: string): string[] {
 
 export function runbookPlan(def: RunbookDef): RunbookPlan {
   if (def.kind === 'custom') return { source: 'custom', live: false, steps: (def.stepTitles ?? []).map(title => ({ title, auto: false })) };
+  const kind = actionKindByRunbook(def.id);
+  if (kind) return { source: 'runbook', live: true, steps: kind.stepTitles.map(([key, title]) => ({ title, auto: true, how: kind.how[key] })) };
   const own = OWN[def.id];
   if (own) return { source: 'runbook', live: !!def.wired, steps: own.map(([title, how]) => ({ title, auto: !!how, how })) };
   const titles = situationSteps(def.sitId);
