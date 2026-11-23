@@ -227,6 +227,8 @@ export interface InvoiceOptions {
   forInvoiceId?: string | null;
   /** The charge date (today by default). */
   date?: string;
+  /** Book the income to this account instead of the type's usual one (a fine to Fines, a certificate fee to Other income). Ignored when the chart has no such account. */
+  revenueAcct?: string;
   /** False when the amount is already in the ledger (a balance brought forward): the invoice is recorded, nothing is posted, the balance stays. */
   post?: boolean;
 }
@@ -1495,7 +1497,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const id = generateLocalId('INV-U');
     const m = mappingOf(s.glAccountMapping);
     const fund = type === 'special_assessment' ? (opts.fund ?? 'reserve') : null;
-    const { arAcct, revenueAcct } = getGLAccountsForInvoice(type, m, fund);
+    const usual = getGLAccountsForInvoice(type, m, fund);
+    const arAcct = usual.arAcct;
+    const revenueAcct = opts.revenueAcct && s.chartOfAccounts.some(a => a.num === opts.revenueAcct && a.type === 'income') ? opts.revenueAcct : usual.revenueAcct;
     const post = opts.post !== false;
     const amt = r2(amount);
     const glEntry = post ? s.glPost(date, `Invoice ${id} - Unit ${unitNum}: ${description}`, arAcct, revenueAcct, amt, invoiceSource(type), unitNum) : null;

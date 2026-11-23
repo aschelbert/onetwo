@@ -21,6 +21,7 @@ import { useSpendingStore } from '@/store/useSpendingStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
+import { useRegisterStore } from '@/store/useRegisterStore';
 import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
@@ -105,6 +106,7 @@ function loadTenantStores(tenantId: string) {
     useLetterStore.getState().loadFromDb(tenantId),
     usePropertyLogStore.getState().loadFromDb(tenantId),
     useBuildingRecordsStore.getState().loadFromDb(tenantId),
+    useRegisterStore.getState().loadFromDb(tenantId),
     useReportStore.getState().loadFromDb(tenantId),
     useScorecardStore.getState().loadFromDb(tenantId),
     usePayrollStore.getState().loadFromDb(tenantId),

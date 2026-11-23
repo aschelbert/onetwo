@@ -51,7 +51,7 @@ describe('Board Room', () => {
     renderAt('/boardroom');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Board Room');
     const nav = screen.getByRole('navigation', { name: 'Board Room sections' });
-    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Runbooks', 'Outbox', 'Tasks', 'Intercom']);
+    expect(within(nav).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Register', 'Runbooks', 'Outbox', 'Tasks', 'Intercom']);
     const open = useIssuesStore.getState().cases.filter(c => c.status === 'open').length;
     expect(document.querySelectorAll('tr[data-case]').length).toBe(open);
   });
@@ -160,15 +160,16 @@ describe('Board Room', () => {
   });
 
   it('A deep link opens a runbook; one that opens by hand lists its workflow steps and opens the wizard', () => {
-    renderAt('/boardroom?tab=runbooks&runbook=covenant-violation');
-    const detail = document.querySelector('[data-runbook-detail="covenant-violation"]') as HTMLElement;
+    // The elections runbook still opens by hand; covenant violations start themselves from the register now.
+    renderAt('/boardroom?tab=runbooks&runbook=elections');
+    const detail = document.querySelector('[data-runbook-detail="elections"]') as HTMLElement;
     expect(detail.textContent).toContain('Opens by hand today');
     expect(detail.querySelectorAll('li[data-step]').length).toBeGreaterThan(3);
     expect(detail.querySelectorAll('li[data-step][data-auto="1"]').length).toBe(0);
     const start = within(detail).queryByRole('button', { name: 'Take Action' });
     if (start) {
       fireEvent.click(start);
-      expect(screen.getByTestId('legacy-issues').textContent).toBe('enforcement/covenant-violations');
+      expect(screen.getByTestId('legacy-issues').textContent).toBe('governance/elections');
     }
   });
 
@@ -200,7 +201,7 @@ describe('Board Room', () => {
     renderAt('/boardroom?tab=intercom');
     const navs = screen.getAllByRole('navigation', { name: 'Board Room sections' });
     const last = navs[navs.length - 1];
-    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Runbooks', 'Outbox']);
+    expect(within(last).getAllByRole('button').map(b => (b.textContent ?? '').replace(/(\d+ open|\d+ drafts?|\d+)$/, '').trim())).toEqual(['Current Actions', 'Inbox', 'Register', 'Runbooks', 'Outbox']);
     expect(screen.getAllByTestId('legacy-intercom').length).toBe(1);
   });
 

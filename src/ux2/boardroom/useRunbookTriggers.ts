@@ -37,12 +37,14 @@ import { runSpendingRequests } from './spendingRequest';
 import { runVendorOnboarding } from './vendorOnboarding';
 import { runSpecialAssessments } from './specialAssessment';
 import { runReserveStudy } from './reserveStudy';
+import { runRegister } from './register';
+import { useRegisterStore } from '@/store/useRegisterStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 
 /** Every wired runbook, once; each guards itself. */
 export function runRunbookTriggers(today?: string): void {
-  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure], ['resident request', runResidentRequest], ['move in or out', runMoves], ['amenity booking', runAmenityBooking], ['vendor bids', runVendorBids], ['work order', runWorkOrders], ['spending request', runSpendingRequests], ['vendor onboarding', runVendorOnboarding], ['special assessment', runSpecialAssessments], ['reserve study', runReserveStudy]] as const) {
+  for (const [name, run] of [['month close', runMonthClose], ['collections', runCollections], ['insurance renewal', runInsuranceRenewal], ['year-end close', runYearEndClose], ['annual budget', runAnnualBudget], ['filings', runFilings], ['annual meeting', runAnnualMeeting], ['board meeting cycle', runBoardMeeting], ['elevator inspection', runElevatorInspection], ['boiler and fire systems', runBoilerFire], ['1099 filing', runForm1099], ['owner disclosure', runOwnerDisclosure], ['resident request', runResidentRequest], ['move in or out', runMoves], ['amenity booking', runAmenityBooking], ['vendor bids', runVendorBids], ['work order', runWorkOrders], ['spending request', runSpendingRequests], ['vendor onboarding', runVendorOnboarding], ['special assessment', runSpecialAssessments], ['reserve study', runReserveStudy], ['register', runRegister]] as const) {
     try { run(today); } catch (err) { console.error(`[runbooks] ${name} failed:`, err); }
   }
 }
@@ -77,11 +79,12 @@ export function useRunbookTriggers(enabled = true) {
   const reserveStudyDate = useFinancialStore(s => s.reserveStudyDate);
   const reserveStudyEveryYears = useFinancialStore(s => s.reserveStudyEveryYears);
   const legalDocuments = useBuildingStore(s => s.legalDocuments);
+  const register = useRegisterStore(s => s.entries);
   useEffect(() => {
     if (!enabled || !casesLoaded) return;
     if (role !== 'BOARD_MEMBER' && role !== 'PROPERTY_MANAGER' && role !== 'PM_COMPANY') return;
     runRunbookTriggers();
-  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders, issues, moveEvents, reservations, approvals, caseCount, contracts, reserveStudyDate, reserveStudyEveryYears, legalDocuments]);
+  }, [enabled, casesLoaded, role, startDay, closedThrough, invoices, units, off, monthCloseEnabled, insurance, fiscalYearEnd, ledgerCount, reserveAnnual, announcements, filings, communications, meetings, cadence, schedules, vendors, workOrders, issues, moveEvents, reservations, approvals, caseCount, contracts, reserveStudyDate, reserveStudyEveryYears, legalDocuments, register]);
 }
 
 /** The old name, for the month close alone. */

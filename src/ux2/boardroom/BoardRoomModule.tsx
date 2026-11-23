@@ -31,6 +31,9 @@ import TaskTrackingTab from '@/features/association-team/tabs/TaskTrackingTab';
 import IntercomTab from '@/features/association-team/tabs/CommunicationsTab';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useBoardRoomSnapshot } from './useBoardRoomSnapshot';
+import { useFinancialStore } from '@/store/useFinancialStore';
+import RegisterTab, { registerSummary } from './tabs/RegisterTab';
+import { useRegisterStore } from '@/store/useRegisterStore';
 import { caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary } from './metrics';
 import OpenTab from './tabs/OpenTab';
 import InboxTab from './tabs/InboxTab';
@@ -38,8 +41,8 @@ import RunbooksTab from './tabs/RunbooksTab';
 import OutboxTab from './tabs/OutboxTab';
 import CaseFrame from './tabs/CaseFrame';
 
-export type BoardRoomTab = 'open' | 'inbox' | 'runbooks' | 'outbox' | 'tasks' | 'intercom';
-const TAB_IDS: BoardRoomTab[] = ['open', 'inbox', 'runbooks', 'outbox', 'tasks', 'intercom'];
+export type BoardRoomTab = 'open' | 'inbox' | 'register' | 'runbooks' | 'outbox' | 'tasks' | 'intercom';
+const TAB_IDS: BoardRoomTab[] = ['open', 'inbox', 'register', 'runbooks', 'outbox', 'tasks', 'intercom'];
 /** The Archive lives in Building now. */
 export const ARCHIVE_PATH = '/building?tab=archive';
 /** Tabs that exist only with the Property Manager Seat add-on. */
@@ -69,12 +72,16 @@ export default function BoardRoomModule() {
   const inbox = inboxSummary(inboxRows(snap));
   const runbooks = runbooksSummary(runbookStatuses(snap));
   const outbox = outboxSummary(snap);
+  const registerEntries = useRegisterStore(s => s.entries);
+  const unitBalances = useFinancialStore(s => s.units);
+  const register = registerSummary(registerEntries, snap.today, unit => unitBalances.find(u => u.number === unit)?.balance ?? 0);
 
   /** Change the module tab and keep the embedded Issues page on the matching list. */
   const go = (next: BoardRoomTab) => {
     setParams(prev => {
       const p = new URLSearchParams(prev);
       p.delete('view'); p.delete('cat'); p.delete('sit'); p.delete('runbook');
+      if (next !== 'register') p.delete('section');
       if (next === 'open') p.delete('tab'); else p.set('tab', next);
       if (next === 'inbox') p.set('caseTab', 'issues'); else p.delete('caseTab');
       return p;
@@ -96,6 +103,7 @@ export default function BoardRoomModule() {
 
   const subtitle = {
     open: 'Operations for the board, manager and staff: current actions, owner requests, the runbooks that run them, and the outbox. An owner sees only an action about their own unit.',
+    register: 'The matters with a clock of their own: rule violations, owners\' requests to alter a unit, resale certificates and liens. Each opens an action and ticks its steps as the dates are entered here.',
     inbox: 'What owners have asked the board for, and the 14-day clock on each one. Owners see the status of their own request in Community › Requests.',
     runbooks: 'All 32 are on from day one. Month close starts itself on the building\'s day; the rest open by hand until their triggers are wired. Turn one off only if the building does not want it.',
     outbox: 'Every letter and notice the board sends, drafted from a template, delivered the way the bylaws require, and kept with proof of delivery.',
@@ -106,6 +114,7 @@ export default function BoardRoomModule() {
   const tabs = [
     { id: 'open' as BoardRoomTab, label: 'Current Actions', badge: cases.open.length || undefined, badgeTone: cases.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'inbox' as BoardRoomTab, label: 'Inbox', badge: inbox.open.length || undefined, badgeTone: inbox.overdue.length ? 'red' as const : 'amber' as const },
+    { id: 'register' as BoardRoomTab, label: 'Register', badge: register.waiting || undefined, badgeTone: register.overdue ? 'red' as const : 'amber' as const },
     { id: 'runbooks' as BoardRoomTab, label: 'Runbooks', badge: runbooks.withOpenCase.length ? `${runbooks.withOpenCase.length} open` : undefined, badgeTone: 'teal' as const },
     { id: 'outbox' as BoardRoomTab, label: 'Outbox', badge: outbox.drafts.length ? `${outbox.drafts.length} draft${outbox.drafts.length === 1 ? '' : 's'}` : undefined, badgeTone: 'cyan' as const },
     ...(pmSeat ? [
@@ -128,6 +137,7 @@ export default function BoardRoomModule() {
 
         {tab === 'open' && <OpenTab snap={snap} onOpenCase={openCase} />}
         {tab === 'inbox' && <InboxTab snap={snap} onOpenCase={openCase} />}
+        {tab === 'register' && <RegisterTab section={params.get('section') ?? undefined} onSection={s => setParams(prev => { const p = new URLSearchParams(prev); p.set('section', s); return p; }, { replace: true })} onOpenCase={openCase} />}
         {tab === 'runbooks' && <RunbooksTab snap={snap} onOpenCase={openCase} onNewCase={newCase} />}
         {tab === 'outbox' && <OutboxTab snap={snap} onOpenCase={openCase} compose={composeLetter} onComposeDone={() => setComposeLetter(false)} />}
         {tab === 'tasks' && pmSeat && (
