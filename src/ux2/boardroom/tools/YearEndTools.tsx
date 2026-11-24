@@ -57,7 +57,7 @@ function Outcomes({ year }: { year: string }) {
           {m != null && <Chip tone={m ? 'sage' : 'red'}>{m ? 'Met' : 'Missed'}</Chip>}</li>
       ); })}</ul>
       <div className="flex flex-wrap gap-2">{!plan.outcomeOn && <Button size="sm" disabled={!ready} onClick={() => save({ outcomeOn: todayIso(), outcomeBy: me })}>The board approved this report</Button>}<Button size="sm" variant="ghost" onClick={print}>Print the outcome report</Button></div>
-      <span className="text-xs text-ux2-muted">Reserve funding, late dues and utility cost are read from the app's own records; the dues increase and anything else are entered. Once approved it shows on Building › Plan as the year's outcome.</span>
+      <span className="text-xs text-ux2-muted">Reserve funding, late dues and utility cost are read from the app's own records; the dues increase and anything else are entered. Once approved it shows on Building › Goals as the year's outcome.</span>
     </Inner>
   );
 }

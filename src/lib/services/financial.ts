@@ -252,6 +252,7 @@ export function rowToGLEntry(r: Record<string, unknown>): GLEntry {
     source: r.source as GLEntry['source'],
     sourceId: (r.source_id as string) || null,
     posted: r.posted as string,
+    postedBy: (r.posted_by as string) || undefined,
     status: r.status as 'posted' | 'void',
   };
 }
@@ -269,11 +270,18 @@ export async function fetchGeneralLedger(tenantId: string): Promise<GLEntry[] | 
 
 export async function createGLEntry(tenantId: string, entry: GLEntry): Promise<boolean> {
   if (!supabase) return false;
-  const { error } = await supabase.from('general_ledger').insert({
+  const row: Record<string, unknown> = {
     tenant_id: tenantId, local_id: entry.id, date: entry.date, memo: entry.memo,
     debit_acct: entry.debitAcct, credit_acct: entry.creditAcct, amount: entry.amount,
     source: entry.source, source_id: entry.sourceId, posted: entry.posted, status: entry.status,
-  });
+    ...(entry.postedBy ? { posted_by: entry.postedBy } : {}),
+  };
+  let { error } = await supabase.from('general_ledger').insert(row);
+  // A database without the posted-by column yet still takes the entry.
+  if (error && 'posted_by' in row && missingColumn(error, 'posted_by')) {
+    const { posted_by: _p, ...rest } = row;
+    ({ error } = await supabase.from('general_ledger').insert(rest));
+  }
   if (error) { logDbError('createGLEntry error:', error); return false; }
   return true;
 }
@@ -309,6 +317,7 @@ export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
     attachments: (r.attachments || []) as WorkOrder['attachments'],
     accrualGlEntryId: (r.accrual_gl_entry_id as string) || null,
     signoff: (r.signoff as WorkOrder['signoff']) || null,
+    people: (r.people as WorkOrder['people']) || null,
   };
 }
 
@@ -356,11 +365,14 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
   if (updates.accrualGlEntryId !== undefined) row.accrual_gl_entry_id = updates.accrualGlEntryId;
   if (updates.signoff) row.signoff = updates.signoff;
+  if (updates.people) row.people = updates.people;
   let { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
-  // A database without the sign-off column yet still saves the rest of the work order.
-  if (error && 'signoff' in row && missingColumn(error, 'signoff')) {
-    const { signoff: _s, ...rest } = row;
-    ({ error } = await supabase.from('work_orders').update(rest).eq('tenant_id', tenantId).eq('local_id', localId));
+  // A database without the sign-off or people columns yet still saves the rest of the work order.
+  for (const col of ['signoff', 'people']) {
+    if (error && col in row && missingColumn(error, col)) {
+      delete row[col];
+      ({ error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId));
+    }
   }
   if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;

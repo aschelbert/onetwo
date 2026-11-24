@@ -130,6 +130,8 @@ export interface WorkOrder {
   accrualGlEntryId?: string | null;
   /** Who confirmed the work was done as specified, when, and anything left for the vendor to put right. */
   signoff?: { date: string; by: string; notes: string } | null;
+  /** Who raised, approved and paid it, for the rule that a bill needs two people. */
+  people?: { raisedBy?: string; approvedBy?: string; paidBy?: string } | null;
 }
 
 export const seedWorkOrders: WorkOrder[] = [

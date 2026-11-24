@@ -4,6 +4,7 @@
  * functions over a snapshot so the tiles are testable and the production
  * tabs underneath keep owning every mutation.
  */
+import { componentsOf, percentFunded } from '@/lib/reservePlan';
 import type { Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
 import { daysBetween } from '../runbook/model';
@@ -25,6 +26,9 @@ export interface ReserveLine {
   currentFunding: number;
   yearsRemaining: number;
   isContingency?: boolean;
+  /** Carried through for the funding plan; absent on older test data, where years left stands in. */
+  usefulLife?: number;
+  lastReplaced?: string;
 }
 
 export interface FundsSnapshot {
@@ -251,7 +255,8 @@ export function reserveSummary(s: FundsSnapshot) {
     allocated,
     /** Reserve cash not yet split across the components (negative when the split claims more than the bank holds). */
     unallocated: Math.round((funded - allocated) * 100) / 100,
-    pct: needed > 0 ? Math.round((funded / needed) * 100) : 0,
+    /** Percent funded: the reserve balance against what should be set aside by now (src/lib/reservePlan.ts), the one figure used everywhere. */
+    pct: percentFunded(funded, componentsOf(s.reserves.map(r => ({ ...r, usefulLife: r.usefulLife ?? Math.max(1, Math.round(r.yearsRemaining) || 1), lastReplaced: r.lastReplaced ?? '', isContingency: !!r.isContingency })), year)) ?? 0,
     gap: Math.max(0, needed - funded),
     monthly: Math.round(s.annualReserveContribution / 12),
     recommendedMonthly: Math.round(s.recommendedAnnualReserve / 12),

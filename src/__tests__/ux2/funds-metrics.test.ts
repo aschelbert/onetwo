@@ -35,8 +35,8 @@ const snap: FundsSnapshot = {
     { name: 'Cleaning', budgeted: 9600, actual: 9800, acctNum: '5020' },
   ],
   reserves: [
-    { id: 'r1', name: 'Roof', estimatedCost: 410000, currentFunding: 196800, yearsRemaining: 3 },
-    { id: 'r2', name: 'Boiler', estimatedCost: 60000, currentFunding: 40000, yearsRemaining: 5 },
+    { id: 'r1', name: 'Roof', estimatedCost: 410000, currentFunding: 196800, yearsRemaining: 3, usefulLife: 25 },
+    { id: 'r2', name: 'Boiler', estimatedCost: 60000, currentFunding: 40000, yearsRemaining: 5, usefulLife: 20 },
     { id: 'r3', name: 'Contingency', estimatedCost: 10000, currentFunding: 10000, yearsRemaining: 0, isContingency: true },
   ],
   annualReserveContribution: 28800,
@@ -97,9 +97,10 @@ describe('funds metrics', () => {
 
   it('finds the reserve gap and the next big repair', () => {
     const r = reserveSummary(snap);
-    expect(r).toMatchObject({ needed: 480000, funded: 246800, allocated: 246800, unallocated: 0, pct: 51, monthly: 2400, recommendedMonthly: 5925, onSchedule: false });
+    expect(r).toMatchObject({ needed: 480000, funded: 246800, allocated: 246800, unallocated: 0, pct: 61, monthly: 2400, recommendedMonthly: 5925, onSchedule: false });
+    // Percent funded is the balance against what should be set aside by now: 22 of 25 years of the roof and 15 of 20 of the boiler, $405,800.
     // Funded is the reserve account's cash; the per-item set-aside is a split of it.
-    expect(reserveSummary({ ...snap, reservesCash: 250000 })).toMatchObject({ funded: 250000, allocated: 246800, unallocated: 3200, pct: 52 });
+    expect(reserveSummary({ ...snap, reservesCash: 250000 })).toMatchObject({ funded: 250000, allocated: 246800, unallocated: 3200, pct: 62 });
     expect(r.next).toEqual({ name: 'Roof', year: 2029, cost: 410000, funded: 196800 });
     expect(monthsOfCash(snap)).toEqual({ months: 69.4, monthlyOut: 2050 });
   });

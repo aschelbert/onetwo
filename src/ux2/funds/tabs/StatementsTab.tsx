@@ -6,6 +6,7 @@
  * store's report helpers; a packet downloads as a file and "Send to owners"
  * posts it as a financial notice.
  */
+import StatementViews from '../statements/StatementViews';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -227,6 +228,8 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
           <Why>The budget variance report is the same {variance.length} lines as Planning, with the difference column; it is included in every monthly packet.</Why>
         </Card>
       </div>
+
+      <StatementViews today={snap.today} />
 
       <Card aria-label="Monthly statement packets">
         <div className="flex flex-wrap items-center justify-between gap-2">

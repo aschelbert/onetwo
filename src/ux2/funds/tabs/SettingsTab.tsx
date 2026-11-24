@@ -9,6 +9,7 @@
  * `=mailing`, …) open the page that holds the card and scroll to it. Every
  * write goes through the financial and fee-schedule stores.
  */
+import { ControlsGroup, ReconciliationList } from '../controls/ControlViews';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import MailingSettingsTab from '@/features/building/tabs/MailingSettingsTab';
 import { useFeeScheduleStore } from '@/store/useFeeScheduleStore';
@@ -29,16 +30,17 @@ import OpeningBalances from '../OpeningBalances';
 
 type LedgerView = 'month' | 'payments' | 'bills' | 'transfers' | 'manual' | 'all';
 /** The gear's sub-navigation: one group per pill, each a page of cards. */
-export type SettingsGroup = 'ledger' | 'accounts' | 'mapping' | 'billing' | 'bank';
+export type SettingsGroup = 'ledger' | 'accounts' | 'mapping' | 'billing' | 'bank' | 'controls';
 export const GROUPS: { id: SettingsGroup; label: string }[] = [
   { id: 'ledger', label: 'Ledger' },
   { id: 'accounts', label: 'Chart of Accounts' },
   { id: 'mapping', label: 'GL mapping' },
   { id: 'billing', label: 'Fees & Billing' },
   { id: 'bank', label: 'Bank & Mail' },
+  { id: 'controls', label: 'Who can do what' },
 ];
 /** Deep-link sections (`?section=`) → the group that shows them; a group id is its own section. */
-export const GROUP_OF: Record<string, SettingsGroup> = { ledger: 'ledger', opening: 'ledger', accounts: 'accounts', mapping: 'mapping', billing: 'billing', rules: 'billing', fees: 'billing', bank: 'bank', mailing: 'bank' };
+export const GROUP_OF: Record<string, SettingsGroup> = { ledger: 'ledger', opening: 'ledger', controls: 'controls', reconciliations: 'ledger', accounts: 'accounts', mapping: 'mapping', billing: 'billing', rules: 'billing', fees: 'billing', bank: 'bank', mailing: 'bank' };
 const SOURCE_LABEL: Record<GLEntry['source'], string> = { manual: 'By hand', assessment: 'Billing run', payment: 'Payment', expense: 'Bill', case: 'Action', transfer: 'Transfer', fee: 'Fee', refund: 'Refund', payroll: 'Payroll' };
 const SECTION_LABEL: Record<string, string> = { asset: 'Owns', liability: 'Owes', equity: 'Fund balances', income: 'Income', expense: 'Expenses' };
 const MAPPING_LABELS: { key: string; label: string; types: string[] }[] = [
@@ -273,7 +275,10 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
 
       <PillTabs aria-label="Accounts and ledger sections" surface="white" value={group} onChange={g => onSection(g)} tabs={GROUPS} />
 
+      {group === 'controls' && <ControlsGroup />}
+
       {group === 'ledger' && (<>
+        <ReconciliationList />
       <Card id="ledger-card" aria-label="Ledger">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><span className="text-[17px] font-semibold text-ux2-ink">Ledger</span><span className="ml-2 text-xs text-ux2-muted">{ledger.length.toLocaleString()} entries · {closedEntries.toLocaleString()} in closed months · every bill, payment and transfer ends up here</span></div>
@@ -301,7 +306,7 @@ export default function SettingsTab({ snap, section, onSection, onGo }: { snap: 
               return (
                 <tr key={e.id} data-entry={e.id}>
                   <Td>{dayLabel(e.date)}</Td>
-                  <Td><Cell title={e.memo} note={`${e.id}${e.sourceId ? ` · ${e.sourceId}` : ''}`} /></Td>
+                  <Td><Cell title={e.memo} note={`${e.id}${e.sourceId ? ` · ${e.sourceId}` : ''}${e.postedBy ? ` · posted by ${e.postedBy}` : ''}`} /></Td>
                   <Td><span className="text-ux2-ink">{e.debitAcct} {getAcctName(e.debitAcct)}</span> <span className="text-ux2-muted">←</span> <span className="text-ux2-ink">{e.creditAcct} {getAcctName(e.creditAcct)}</span></Td>
                   <Td num>{fmt(e.amount)}</Td>
                   <Td>{SOURCE_LABEL[e.source] ?? e.source}</Td>

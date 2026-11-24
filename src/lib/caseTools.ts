@@ -108,8 +108,17 @@ export const MEASURES: Record<Measure, { label: string; unit: 'pct' | 'usd' | ''
   utilities: { label: 'Hold utility cost down', unit: 'usd', direction: 'at-most', from: "The year's bills under Building, Utilities" },
   custom: { label: 'Something else', unit: '', direction: 'at-least', from: 'Entered by the board at year end' },
 };
-export interface Objective { id: string; measure: Measure; text: string; target: number; result: number | null; note: string }
-export interface YearPlan { year: string; objectives: Objective[]; setOn: string; outcomeOn: string; outcomeBy: string }
+export interface Objective {
+  id: string; measure: Measure; text: string; target: number; result: number | null; note: string;
+  /** A longer target, and the year it is for: "70% funded by 2029". */
+  longTarget?: number | null;
+  longBy?: string;
+}
+export interface YearPlan {
+  year: string; objectives: Objective[]; setOn: string; outcomeOn: string; outcomeBy: string;
+  /** When the board adopted them by vote; until then they are a draft owners do not see. */
+  adoptedOn?: string;
+}
 export const blankPlan = (year: string): YearPlan => ({ year, objectives: [], setOn: '', outcomeOn: '', outcomeBy: '' });
 
 /** Whether an objective was met, or null while it has no result. */
