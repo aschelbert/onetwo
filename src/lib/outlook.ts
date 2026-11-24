@@ -25,6 +25,10 @@ export interface Loan {
   covenant: string;
   /** The capital project it paid for, when it paid for one. */
   projectId: string;
+  /** The day the money arrived, once that is in the ledger. */
+  drawnOn?: string;
+  /** The months whose payment is in the ledger, 'YYYY-MM'. */
+  posted?: string[];
 }
 
 export function monthlyPayment(l: Pick<Loan, 'principal' | 'ratePct' | 'years'>): number {
@@ -53,6 +57,13 @@ export function loanStanding(l: Loan, month: string) {
 export const paysIn = (l: Loan, month: string) => { const k = monthsBetween(l.firstPayment, month); return k >= 0 && k < Math.max(1, Math.round(l.years * 12)); };
 /** What the loans cost in a calendar year. */
 export const loanPaymentsIn = (loans: Loan[], year: number) => r0(loans.reduce((t, l) => t + monthlyPayment(l) * Array.from({ length: 12 }, (_, m) => `${year}-${String(m + 1).padStart(2, '0')}`).filter(m => paysIn(l, m)).length, 0));
+
+/** What the loans cost between two months, both included ('YYYY-MM'). */
+export function loanPaymentsBetween(loans: Loan[], from: string, to: string): number {
+  let total = 0;
+  for (let m = from, n = 0; m <= to && n < 600; m = addMonths(m, 1), n++) total += loans.filter(l => paysIn(l, m)).reduce((t, l) => t + monthlyPayment(l), 0);
+  return r0(total);
+}
 
 // ── Five-year outlook ────────────────────────────────────────────────────────
 export interface OutlookLine { id: string; name: string; budgeted: number }
@@ -97,6 +108,19 @@ export interface OutlookInput {
   comps: Component[];
   assumptions?: PlanAssumptions;
   loans: Loan[];
+  /**
+   * Next year's budget as drafted, when there is a draft: the outlook's second
+   * year is then the draft itself, and growth runs from it, not from this year.
+   */
+  next?: {
+    lines: OutlookLine[];
+    /** The cushion, as a share of the operating lines, in percent. */
+    contingencyPct: number;
+    /** Capital jobs paid from dues next year: in that year only. */
+    capital: number;
+    /** What all units pay a month under the draft, once the dues are picked. */
+    duesMonthlyTotal?: number;
+  };
 }
 
 /**
@@ -111,15 +135,18 @@ export function outlook(i: OutlookInput): OutlookYear[] {
   const plan = project(i.reserveBalance, i.reserveMonthly, i.comps, i.year, a, OUTLOOK_YEARS + 1);
   const rate = (l: OutlookLine) => (i.rates[l.id] ?? suggestedGrowth(l.name)) / 100;
   const rows: OutlookYear[] = [];
-  let base = 0;
+  const grown = (lines: OutlookLine[], n: number) => lines.reduce((t, l) => t + l.budgeted * Math.pow(1 + rate(l), n), 0);
+  let base = 0, baseDues = i.duesNow;
   for (let n = 0; n <= OUTLOOK_YEARS; n++) {
     const year = i.year + n;
-    const operating = r0(i.lines.reduce((t, l) => t + l.budgeted * Math.pow(1 + rate(l), n), 0));
+    const operating = r0(n === 0 || !i.next ? grown(i.lines, n) : grown(i.next.lines, n - 1) * (1 + i.next.contingencyPct / 100) + (n === 1 ? i.next.capital : 0));
     const reserve = n === 0 ? r0((i.reserveMonthlyNow ?? i.reserveMonthly) * 12) : plan[n]?.contribution ?? 0;
     const loans = loanPaymentsIn(i.loans, year);
     const toRaise = operating + reserve + loans;
     if (n === 0) base = toRaise;
-    const dues = base > 0 && i.units > 0 ? r0((i.duesNow * (toRaise / base)) / i.units / 12) : 0;
+    // Once next year's dues are picked, they are the dues; the years after move in step from there.
+    if (n === 1 && i.next?.duesMonthlyTotal) { base = toRaise; baseDues = i.next.duesMonthlyTotal * 12; }
+    const dues = base > 0 && i.units > 0 ? r0((baseDues * (toRaise / base)) / i.units / 12) : 0;
     const before = rows[n - 1]?.dues ?? 0;
     const due = i.comps.filter(c => year >= c.replaceYear && (year - c.replaceYear) % c.life === 0);
     rows.push({

@@ -196,9 +196,9 @@ function LinesStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) =>
                 const fresh = isNewLine(l);
                 return (
                   <tr key={l.id} data-line={l.id} className="border-t border-ux2-line">
-                    <td className="px-3 py-2 font-semibold text-ux2-ink">{l.name}{fresh && <span className="ml-1.5 align-middle"><Chip tone="ghost">New</Chip></span>}</td>
-                    <td className="px-3 py-2 text-right">{fresh ? <span className="text-ux2-muted">—</span> : usd(l.budgeted)}</td>
-                    <td className={cn('px-3 py-2 text-right', l.projected > l.budgeted && 'font-semibold text-ux2-red')}>{fresh ? <span className="text-ux2-muted">—</span> : usd(l.projected)}</td>
+                    <td className="px-3 py-2 font-semibold text-ux2-ink">{l.name}{fresh && <span className="ml-1.5 align-middle"><Chip tone="ghost">New</Chip></span>}{l.kind && <span className="ml-1.5 align-middle"><Chip tone="navy">{l.kind === 'capital' ? 'Capital' : 'From the loan register'}</Chip></span>}</td>
+                    <td className="px-3 py-2 text-right">{fresh || l.kind ? <span className="text-ux2-muted">—</span> : usd(l.budgeted)}</td>
+                    <td className={cn('px-3 py-2 text-right', l.projected > l.budgeted && 'font-semibold text-ux2-red')}>{fresh || l.kind ? <span className="text-ux2-muted">—</span> : usd(l.projected)}</td>
                     <td className="px-3 py-2">{l.suggested > 0 && <b className="font-semibold">{usd(l.suggested)}</b>}<span className="block max-w-[220px] text-xs text-ux2-muted">{l.why}</span></td>
                     <td className="px-3 py-2 text-right"><MoneyInput label={`${l.name} next year`} value={l.amount} onChange={n => setLine(l.id, { amount: n, reviewed: true })} /></td>
                     <td className="px-3 py-2 text-right">

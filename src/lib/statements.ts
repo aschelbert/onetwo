@@ -4,7 +4,7 @@
  * Pure: a chart of accounts and a list of entries in, rows out.
  */
 import type { ChartOfAccountsEntry, GLEntry } from '@/types/financial';
-import { balanceOf, fundOf } from './ledger';
+import { fundStatements, balanceOf, fundOf, type Fund } from './ledger';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const live = (gl: GLEntry[], from: string, to: string) => gl.filter(e => e.status !== 'void' && e.date >= from && e.date <= to);
@@ -137,4 +137,17 @@ export function periodDates(id: PeriodId, today: string, fyStart: string): { fro
   }
   const days = Math.max(1, Math.round((Date.parse(today) - Date.parse(fyStart)) / 86400000) + 1);
   return { from: fyStart, to: today, label: `${fyStart} to ${today}`, yearShare: Math.min(1, days / 365) };
+}
+
+export interface BalanceRow { num: string; name: string; fund: Fund; amount: number }
+/**
+ * The balance sheet by fund as of a date: every asset and liability account
+ * with a balance, each fund's totals, and how each fund balance came about
+ * since `from` (the start of the fiscal year the date falls in).
+ */
+export function balanceSheet(coa: ChartOfAccountsEntry[], gl: GLEntry[], from: string, asOf: string) {
+  const upTo = gl.filter(e => e.status !== 'void' && e.date <= asOf);
+  const rows = (type: 'asset' | 'liability'): BalanceRow[] => coa.filter(a => a.sub !== 'header' && a.type === type)
+    .map(a => ({ num: a.num, name: a.name, fund: fundOf(a, a.num), amount: balanceOf(a.num, type, upTo) })).filter(r => Math.abs(r.amount) >= 0.005);
+  return { asOf, from, assets: rows('asset'), liabilities: rows('liability'), funds: fundStatements(coa, gl, from, asOf) };
 }

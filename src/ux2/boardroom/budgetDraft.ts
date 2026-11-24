@@ -27,6 +27,10 @@ export interface DraftLine {
   /** What the board puts in. */
   amount: number;
   reviewed: boolean;
+  /** A line the app keeps in step with something else: a capital job paid from the operating budget, or the year's loan payments. Absent on an ordinary line. */
+  kind?: 'capital' | 'debt';
+  /** The capital project a capital line is for. */
+  sourceId?: string;
 }
 
 /** A known cost for next year: a vendor contract or an insurance premium. */
@@ -109,7 +113,7 @@ export function starterLines(existing: { name: string }[], stamp: string): Draft
 }
 
 /** A line the draft added (not one of this year's budget lines): it has no year behind it to suggest from. */
-export const isNewLine = (l: DraftLine) => !l.categoryId && l.budgeted === 0 && l.actual === 0;
+export const isNewLine = (l: DraftLine) => !l.kind && !l.categoryId && l.budgeted === 0 && l.actual === 0;
 
 export const INFLATION = 0.03;
 export const CONTINGENCY_OPTIONS = [3, 5, 10];
@@ -200,15 +204,46 @@ export function seedDraft(i: SeedInput): BudgetDraft {
 
 /** What the lines, the cushion and the reserves add up to, and the dues that pay for them. */
 export function draftTotals(d: BudgetDraft) {
-  const operating = d.lines.reduce((t, l) => t + (l.amount || 0), 0);
+  const operating = d.lines.filter(l => !l.kind).reduce((t, l) => t + (l.amount || 0), 0);
+  // Capital jobs paid from dues and loan payments are raised from owners too, but the cushion is a share of running costs only.
+  const capital = d.lines.filter(l => l.kind).reduce((t, l) => t + (l.amount || 0), 0);
   const contingency = Math.round(operating * ((d.contingencyPct ?? 0) / 100));
   const reserve = d.reserve.annual || 0;
-  const needed = operating + contingency + reserve;
+  const needed = operating + contingency + capital + reserve;
   const neededMonthly = Math.ceil(needed / 12);
   const monthly = d.dues.option === 'needed' || d.dues.option === null ? neededMonthly : d.dues.option === 'keep' ? d.base.monthlyDues : d.dues.monthlyTotal;
   const change = d.base.monthlyDues > 0 ? (monthly - d.base.monthlyDues) / d.base.monthlyDues : 0;
   const shortfall = Math.max(0, needed - monthly * 12);
-  return { operating, contingency, reserve, needed, neededMonthly, monthly, change, shortfall };
+  return { operating, capital, contingency, reserve, needed, neededMonthly, monthly, change, shortfall };
+}
+
+export const CAPITAL_LINE = 'Capital · ';
+export const DEBT_LINE_NAME = 'Loan payments';
+
+export interface CapitalSource { projectId: string; title: string; cost: number; decidedOn: string }
+
+/**
+ * The draft's capital and loan lines, in step with what the board has decided
+ * elsewhere: one line for each open capital project that is paid from the
+ * operating budget, and one for the year's loan payments. A line the board
+ * has already looked at keeps its amount; its suggestion still follows.
+ * Nothing moves once the budget is adopted.
+ */
+export function withCapitalLines(d: BudgetDraft, projects: CapitalSource[], loanPayments: number): BudgetDraft {
+  if (d.adoptedAt) return d;
+  const want: DraftLine[] = projects.filter(p => p.cost > 0).map(p => ({
+    id: `capital:${p.projectId}`, kind: 'capital' as const, sourceId: p.projectId, name: `${CAPITAL_LINE}${p.title}`, budgeted: 0, actual: 0, projected: 0,
+    suggested: Math.round(p.cost), why: `A capital improvement the board decided${p.decidedOn ? ` on ${p.decidedOn}` : ''} to pay from the operating budget`, amount: Math.round(p.cost), reviewed: false,
+  }));
+  if (loanPayments > 0) want.push({ id: 'debt', kind: 'debt', name: DEBT_LINE_NAME, budgeted: 0, actual: 0, projected: 0, suggested: Math.round(loanPayments), why: "The year's payments on the loans under Funds › Planning › Cash and loans", amount: Math.round(loanPayments), reviewed: false });
+  const had = d.lines.filter(l => l.kind);
+  const next = want.map(w => {
+    const h = had.find(x => x.id === w.id);
+    if (!h) return w;
+    return { ...h, name: w.name, suggested: w.suggested, why: w.why, amount: h.reviewed ? h.amount : w.amount };
+  });
+  if (JSON.stringify(next) === JSON.stringify(had)) return d;
+  return { ...d, lines: [...d.lines.filter(l => !l.kind), ...next] };
 }
 
 type DuesUnit = { number: string; monthlyFee: number; votingPct: number };

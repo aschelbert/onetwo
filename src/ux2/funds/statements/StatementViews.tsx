@@ -4,11 +4,13 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { budgetLineAccounts, fiscalYearStart } from '@/lib/ledger';
 import { fmt } from '@/lib/formatters';
-import { cashFlow, operatingStatement, periodDates, trialBalance, wantsReason, type PeriodId } from '@/lib/statements';
-import { Card, Chip, Inner, KV, PillTabs, Table, Th, Td, Why } from '../../components';
+import { balanceSheet, cashFlow, operatingStatement, periodDates, trialBalance, wantsReason, type PeriodId } from '@/lib/statements';
+import { budgetFor } from '@/lib/budgetYear';
+import { useBudgetYears } from '../planning/budgetYears';
+import { Button, Card, Chip, Inner, KV, PillTabs, SectionLabel, Table, Th, Td, Why } from '../../components';
 import { useToolDoc } from '../../boardroom/tools/docs';
 
-type View = 'operating' | 'cash' | 'trial';
+type View = 'balance' | 'operating' | 'cash' | 'trial';
 const signed = (n: number) => (n < 0 ? `−${fmt(-n)}` : fmt(n));
 
 /**
@@ -23,14 +25,27 @@ export default function StatementViews({ today }: { today: string }) {
   const lines = useFinancialStore(s => s.budgetCategories);
   const fyEnd = useBuildingStore(s => s.details?.fiscalYearEnd) || '12-31';
   const isBoard = useAuthStore(s => s.currentUser.role) !== 'RESIDENT';
-  const [view, setView] = useState<View>('operating');
+  const [view, setView] = useState<View>('balance');
+  const [full, setFull] = useState(false);
+  const by = useBudgetYears(today);
   const [period, setPeriod] = useState<PeriodId>('month');
   const p = periodDates(period, today, fiscalYearStart(today, fyEnd));
   const [notes, saveNotes] = useToolDoc<{ notes: Record<string, string> }>('variance-notes', `${p.from}:${p.to}`, { notes: {} });
 
-  // A line's budget for the period: its yearly figure times the share of the year covered, on the first account it is measured against.
+  // A line's budget for the period is its own months inside it, on the first account it is measured against.
+  // Last year reads the budget kept for that year; a year with none on record falls back to this year's lines.
+  const keptYear = period === 'last-year' ? by.years.find(y => y.key === p.from) : undefined;
+  const budgetLines = keptYear ? keptYear.lines.map(l => ({ id: l.id, name: l.name, months: l.months })) : lines.map(l => ({ id: l.id, name: l.name, months: by.lines.find(x => x.id === l.id)?.months ?? [] }));
   const budgetOf = new Map<string, number>();
-  for (const l of lines) { const a = budgetLineAccounts(l, coa)[0]; if (a) budgetOf.set(a.num, (budgetOf.get(a.num) ?? 0) + l.budgeted * p.yearShare); }
+  for (const l of budgetLines) { const a = budgetLineAccounts(l, coa)[0]; if (a) budgetOf.set(a.num, (budgetOf.get(a.num) ?? 0) + budgetFor(l.months, p.from, p.to)); }
+  const bs = balanceSheet(coa, gl, fiscalYearStart(p.to, fyEnd), p.to);
+  const fs = bs.funds;
+  const cell = (fund: 'operating' | 'reserve', r: { fund: string; amount: number }) => (r.fund === fund ? fmt(r.amount) : '');
+  const group = (rows: typeof bs.assets, test: (r: (typeof bs.assets)[number]) => boolean) => { const g = rows.filter(test); return { operating: g.filter(r => r.fund === 'operating').reduce((t, r) => t + r.amount, 0), reserve: g.filter(r => r.fund === 'reserve').reduce((t, r) => t + r.amount, 0) }; };
+  const subOf = (num: string) => coa.find(a => a.num === num)?.sub ?? '';
+  const cash = group(bs.assets, r => subOf(r.num) === 'bank' || /cash/i.test(r.name));
+  const otherAssets = group(bs.assets, r => !(subOf(r.num) === 'bank' || /cash/i.test(r.name)));
+  const three = (label: React.ReactNode, o: number, r: number, bold = false) => <tr className={bold ? 'font-semibold' : ''}><Td>{label}</Td><Td num>{fmt(o)}</Td><Td num>{fmt(r)}</Td><Td num>{fmt(o + r)}</Td></tr>;
   const os = operatingStatement(coa, gl, p.from, p.to, num => (budgetOf.has(num) ? Math.round(budgetOf.get(num)!) : null));
   const cf = cashFlow(coa, gl, p.from, p.to);
   const tb = trialBalance(coa, gl, p.to);
@@ -38,10 +53,36 @@ export default function StatementViews({ today }: { today: string }) {
   return (
     <Card aria-label="Statements for a period" className="gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <PillTabs size="filter" surface="white" aria-label="Statement" value={view} onChange={v => setView(v as View)} tabs={[{ id: 'operating', label: 'Operating statement' }, { id: 'cash', label: 'Cash flow' }, { id: 'trial', label: 'Trial balance' }]} />
+        <PillTabs size="filter" surface="white" aria-label="Statement" value={view} onChange={v => setView(v as View)} tabs={[{ id: 'balance', label: 'Balance sheet' }, { id: 'operating', label: 'Operating statement' }, { id: 'cash', label: 'Cash flow' }, { id: 'trial', label: 'Trial balance' }]} />
         <PillTabs size="filter" surface="white" aria-label="Period" value={period} onChange={v => setPeriod(v as PeriodId)} tabs={[{ id: 'month', label: 'Last month' }, { id: 'ytd', label: 'Year to date' }, { id: 'last-year', label: 'Last year' }]} />
       </div>
-      <span className="text-xs text-ux2-muted">{view === 'trial' ? `As of ${p.to}` : p.label}</span>
+      <span className="text-xs text-ux2-muted">{view === 'trial' || view === 'balance' ? `As of ${p.to}` : p.label}{view === 'operating' && period === 'last-year' && (keptYear ? ` · against the ${keptYear.label} budget as kept` : " · no budget kept for that year, so this year's lines stand in")}</span>
+
+      {view === 'balance' && (
+        <>
+          <Table minWidth={520}>
+            <thead><tr><Th>&nbsp;</Th><Th num>Operating</Th><Th num>Reserve</Th><Th num>Total</Th></tr></thead>
+            <tbody data-balance-as-of={bs.asOf}>
+              <tr><Td colSpan={4}><SectionLabel>Owns</SectionLabel></Td></tr>
+              {full ? bs.assets.map(r => <tr key={r.num}><Td>{r.name} <span className="text-ux2-muted">· {r.num}</span></Td><Td num>{cell('operating', r)}</Td><Td num>{cell('reserve', r)}</Td><Td num>{fmt(r.amount)}</Td></tr>) : <>{three('Cash in the bank', cash.operating, cash.reserve)}{three('Owed by owners, and other assets', otherAssets.operating, otherAssets.reserve)}</>}
+              {three('Total owns', fs.operating.assets, fs.reserve.assets, true)}
+              <tr><Td colSpan={4}><SectionLabel>Owes</SectionLabel></Td></tr>
+              {full ? bs.liabilities.map(r => <tr key={r.num}><Td>{r.name} <span className="text-ux2-muted">· {r.num}</span></Td><Td num>{cell('operating', r)}</Td><Td num>{cell('reserve', r)}</Td><Td num>{fmt(r.amount)}</Td></tr>) : null}
+              {three('Total owes', fs.operating.liabilities, fs.reserve.liabilities, true)}
+              <tr><Td colSpan={4}><SectionLabel>Fund balances · what is left after the bills</SectionLabel></Td></tr>
+              {three('At the start of the fiscal year', fs.operating.openingBalance, fs.reserve.openingBalance)}
+              {three('Income less expenses since', fs.operating.period.revenue - fs.operating.period.expenses, fs.reserve.period.revenue - fs.reserve.period.expenses)}
+              {three('Moved between the funds since', fs.operating.period.transfersIn, fs.reserve.period.transfersIn)}
+              {three(`Fund balance on ${bs.asOf}`, fs.operating.fundBalance, fs.reserve.fundBalance, true)}
+            </tbody>
+          </Table>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setFull(v => !v)}>{full ? 'Show the short balance sheet' : 'Open the full balance sheet'}</Button>
+            <Chip tone={fs.total.ties ? 'sage' : 'red'}>{fs.total.ties ? 'Owns − owes = fund balances ✓' : 'Does not tie: an account is missing from the chart'}</Chip>
+          </div>
+          <Why>As of the end of the period chosen above: last month's end, today, or the last day of last year. Two funds, as association accounting requires: the operating fund pays the bills, the reserve fund saves for major repairs. Money moved between them shows on its own line, and a loan shows under Owes until it is repaid.</Why>
+        </>
+      )}
 
       {view === 'operating' && (
         <>
@@ -68,7 +109,7 @@ export default function StatementViews({ today }: { today: string }) {
               <tr className="font-semibold"><Td>Left in the operating fund</Td><Td num>{signed(os.left)}</Td><Td /><Td /><Td /></tr>
             </tbody>
           </Table>
-          <Why>A line's budget for the period is its yearly figure times the share of the year the period covers. A line more than 10% and $500 over asks for a sentence, which goes to owners with the statement. Reserve spending is not here: it is the reserve fund's, and shows on the balance sheet and the cash-flow statement.</Why>
+          <Why>A line's budget for the period is its own months inside it: even across the year, or in the shape of last year's spending where the budget action set it so. A line more than 10% and $500 over asks for a sentence, which goes to owners with the statement. Reserve spending is not here: it is the reserve fund's, and shows on the balance sheet and the cash-flow statement.</Why>
         </>
       )}
 

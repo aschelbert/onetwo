@@ -7,6 +7,7 @@ import { cashForecast, loanStanding, monthlyPayment, type Loan } from '@/lib/out
 import { Button, Card, Chip, Inner, Table, Th, Td, Why, Field, INPUT } from '../../components';
 import type { FundsSnapshot } from '../metrics';
 import { savePlanning, usePlanningDoc } from './planningDoc';
+import { bankAccounts, nextUnposted, recordPayment, recordProceeds } from './loans';
 
 const num = (s: string) => Math.max(0, Number(String(s).replace(/[^0-9.]/g, '')) || 0);
 const monthName = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
@@ -33,11 +34,12 @@ export function useCash(snap: FundsSnapshot) {
   return { rows, low, floor, collected, planning, shaped };
 }
 
-function LoanForm({ today, onClose }: { today: string; onClose: () => void }) {
+/** The loan's terms. `preset` starts it from a capital project that chose to borrow. */
+export function LoanForm({ today, onClose, preset }: { today: string; onClose: () => void; preset?: { name: string; principal: number; projectId: string } }) {
   const planning = usePlanningDoc();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(preset?.name ?? '');
   const [lender, setLender] = useState('');
-  const [principal, setPrincipal] = useState('');
+  const [principal, setPrincipal] = useState(preset?.principal ? String(preset.principal) : '');
   const [rate, setRate] = useState('');
   const [years, setYears] = useState('');
   const [first, setFirst] = useState(today.slice(0, 7));
@@ -46,7 +48,7 @@ function LoanForm({ today, onClose }: { today: string; onClose: () => void }) {
   const ok = !!name.trim() && num(principal) > 0 && num(years) > 0 && !!first;
   const draft = { principal: num(principal), ratePct: num(rate), years: num(years) };
   return (
-    <form aria-label="Add a loan" onSubmit={e => { e.preventDefault(); if (!ok) return; const loan: Loan = { id: `ln${Date.now().toString(36)}`, name: name.trim(), lender: lender.trim(), ...draft, firstPayment: first, securedBy: securedBy.trim(), covenant: covenant.trim(), projectId: '' }; savePlanning({ loans: [...planning.loans, loan] }, today); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+    <form aria-label="Add a loan" onSubmit={e => { e.preventDefault(); if (!ok) return; const loan: Loan = { id: `ln${Date.now().toString(36)}`, name: name.trim(), lender: lender.trim(), ...draft, firstPayment: first, securedBy: securedBy.trim(), covenant: covenant.trim(), projectId: preset?.projectId ?? '' }; savePlanning({ loans: [...planning.loans, loan] }, today); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <Field label="What it paid for" className="min-w-[200px] flex-1"><input value={name} onChange={e => setName(e.target.value)} placeholder="Elevator modernisation" className={INPUT} /></Field>
       <Field label="Lender" className="w-[180px]"><input value={lender} onChange={e => setLender(e.target.value)} className={INPUT} /></Field>
       <Field label="Borrowed" className="w-[140px]"><input inputMode="decimal" value={principal} onChange={e => setPrincipal(e.target.value)} placeholder="$" className={INPUT} /></Field>
@@ -71,7 +73,11 @@ export default function CashLoansPanel({ snap }: { snap: FundsSnapshot }) {
   useFinancialStore(s => s.generalLedger);
   const { rows, low, floor, collected, planning, shaped } = useCash(snap);
   const [adding, setAdding] = useState(false);
+  const [note, setNote] = useState('');
   const today = snap.today;
+  const banks = bankAccounts();
+  const [bank, setBank] = useState(banks[0]?.num ?? '1010');
+  const post = (err: string, ok: string) => setNote(err || ok);
   const peak = Math.max(1, floor, ...rows.map(r => Math.abs(r.end)));
   const under = rows.filter(r => r.underFloor);
   const shown = rows.slice(0, 6);
@@ -108,21 +114,28 @@ export default function CashLoansPanel({ snap }: { snap: FundsSnapshot }) {
       <div className="flex flex-col gap-2" aria-label="Loans">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[17px] font-semibold text-ux2-ink">Loans</span>{isBoard && <Button size="sm" variant="ghost" onClick={() => setAdding(v => !v)}>Add a loan</Button>}</div>
         {adding && <LoanForm today={today} onClose={() => setAdding(false)} />}
+        {isBoard && planning.loans.length > 0 && banks.length > 1 && <label className="flex items-center gap-2 text-xs text-ux2-muted">Paid into and from <select aria-label="Bank account for loans" value={bank} onChange={e => setBank(e.target.value)} className="rounded-[8px] border border-ux2-line-strong bg-white px-2 py-1 text-ux2-ink">{banks.map(a => <option key={a.num} value={a.num}>{a.name}</option>)}</select></label>}
+        {note && <Inner className="text-sm text-ux2-ink" role="status">{note}</Inner>}
         {planning.loans.length === 0 ? <Inner className="text-sm text-ux2-muted">The association has no loans on record.</Inner> : (
           <Table minWidth={860}>
-            <thead><tr><Th>Loan</Th><Th num>Borrowed</Th><Th num>Rate</Th><Th num>A month</Th><Th num>Owed today</Th><Th>Paid off</Th><Th>This month</Th>{isBoard && <Th aria-label="Remove" />}</tr></thead>
-            <tbody>{planning.loans.map(l => { const st = loanStanding(l, today.slice(0, 7)); return (
+            <thead><tr><Th>Loan</Th><Th num>Borrowed</Th><Th num>Rate</Th><Th num>A month</Th><Th num>Owed today</Th><Th>Paid off</Th><Th>In the ledger</Th>{isBoard && <Th aria-label="Remove" />}</tr></thead>
+            <tbody>{planning.loans.map(l => { const st = loanStanding(l, today.slice(0, 7)); const due = nextUnposted(l, today.slice(0, 7)); const dueSplit = due ? loanStanding(l, due) : null; return (
               <tr key={l.id} data-loan={l.id}>
-                <Td><b className="font-semibold">{l.name}</b><span className="block text-xs text-ux2-muted">{[l.lender, l.securedBy && `secured by ${l.securedBy.toLowerCase()}`, l.covenant].filter(Boolean).join(' · ')}</span></Td>
+                <Td><b className="font-semibold">{l.name}</b><span className="block text-xs text-ux2-muted">{[l.lender, l.securedBy && `secured by ${l.securedBy.toLowerCase()}`, l.covenant, l.projectId && 'from a capital improvement'].filter(Boolean).join(' · ')}</span></Td>
                 <Td num>{fmt(l.principal)}</Td><Td num>{l.ratePct}%</Td><Td num>{fmt(st.payment)}</Td><Td num>{fmt(st.owed)}</Td><Td>{monthYear(st.paidOff)}</Td>
-                <Td className="text-xs">{st.active ? `${fmt(st.interestThis)} interest · ${fmt(st.principalThis)} principal` : st.made ? 'Paid off' : `Starts ${monthYear(l.firstPayment)}`}</Td>
-                {isBoard && <Td num><Button size="sm" variant="ghost" aria-label={`Remove ${l.name}`} onClick={() => { if (window.confirm(`Remove ${l.name} from the loan register?`)) savePlanning({ loans: planning.loans.filter(x => x.id !== l.id) }, today); }}>Remove</Button></Td>}
+                <Td className="text-xs">
+                  <span className="flex flex-col items-start gap-1">
+                    {l.drawnOn ? <span>Proceeds in {l.drawnOn}</span> : isBoard ? <Button size="sm" variant="ghost" aria-label={`Record the proceeds of ${l.name}`} onClick={() => post(recordProceeds(l.id, today, bank, today), `${fmt(l.principal)} recorded as borrowed.`)}>Record the {fmt(l.principal)} arriving</Button> : <span>Proceeds not recorded</span>}
+                    {due && dueSplit ? (isBoard ? <Button size="sm" variant="ghost" aria-label={`Record the ${monthYear(due)} payment on ${l.name}`} onClick={() => post(recordPayment(l.id, due, today, bank, today), `${monthYear(due)} payment recorded: ${fmt(dueSplit.interestThis)} interest, ${fmt(dueSplit.principalThis)} principal.`)}>Record {monthYear(due)}: {fmt(dueSplit.interestThis)} interest · {fmt(dueSplit.principalThis)} principal</Button> : <span>{monthYear(due)} payment not recorded</span>) : <span>{(l.posted ?? []).length ? `Payments recorded through ${monthYear([...(l.posted ?? [])].sort().pop()!)}` : st.made ? 'Paid off' : `First payment ${monthYear(l.firstPayment)}`}</span>}
+                  </span>
+                </Td>
+                {isBoard && <Td num><Button size="sm" variant="ghost" aria-label={`Remove ${l.name}`} onClick={() => { if (window.confirm(`Remove ${l.name} from the loan register?${l.drawnOn || (l.posted ?? []).length ? ' Its entries stay in the ledger.' : ''}`)) savePlanning({ loans: planning.loans.filter(x => x.id !== l.id) }, today); }}>Remove</Button></Td>}
               </tr>
             ); })}</tbody>
           </Table>
         )}
       </div>
-      <Why>A loan's payments carry into this forecast and into the five-year outlook. The register works out each payment's interest and principal from the terms entered; it does not post them, so a payment is still recorded in Funds when it is made. Whether to borrow at all is decided in a capital improvement action, which compares it with reserves and a special assessment. What already happened to cash is a statement, under Statements &amp; taxes.</Why>
+      <Why>A loan's payments carry into this forecast and into the five-year outlook. The register works out each payment's interest and principal from the terms entered, and one tap records the month's payment in the ledger: interest as an expense, principal against what is owed. A loan chosen in a capital improvement action is added here from that action. Whether to borrow at all is decided in a capital improvement action, which compares it with reserves and a special assessment. What already happened to cash is a statement, under Statements &amp; taxes.</Why>
     </Card>
   );
 }

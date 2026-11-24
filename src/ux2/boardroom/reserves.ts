@@ -42,6 +42,21 @@ export function standingNow(today: string = todayIso()) {
   return reserveStanding(fin.reserveItems, reserveBalance(), fin.annualReserveContribution, Number(today.slice(0, 4)), planDoc().assumptions);
 }
 
+/**
+ * What paying a job from reserves does to the plan: percent funded now and
+ * after, and the first short year after, if there is one. When the job
+ * replaces a reserve component, that component's clock restarts, so the
+ * money is not counted as still owed to it.
+ */
+export function afterPaying(amount: number, reserveItemId: string, today: string = todayIso()): { pct: number | null; pctAfter: number | null; shortAfter: number | null } {
+  const fin = useFinancialStore.getState();
+  const year = Number(today.slice(0, 4)), a = planDoc().assumptions, balance = reserveBalance();
+  const now = reserveStanding(fin.reserveItems, balance, fin.annualReserveContribution, year, a);
+  const items = fin.reserveItems.map(r => (r.id === reserveItemId ? { ...r, ...replaced(r, today) } : r));
+  const after = reserveStanding(items, balance - amount, fin.annualReserveContribution, year, a);
+  return { pct: now.pct, pctAfter: after.pct, shortAfter: after.short?.year ?? null };
+}
+
 const reviews = () => useActionRecordsStore.getState().records.filter(r => r.kind === 'reserve-review');
 /** The review that is open, if one is. */
 export const openReview = (): ActionRecord | undefined => reviews().find(r => !r.closedOn);

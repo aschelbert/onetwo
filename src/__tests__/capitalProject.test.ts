@@ -31,11 +31,11 @@ describe('payback', () => {
 });
 
 describe('ways to pay', () => {
-  const ctx = { units: 50, reserveCash: 342450, reserveNeeded: 800000, operatingCash: 58300 };
+  const ctx = { units: 50, reserveCash: 342450, operatingCash: 58300, reservePct: 43, reservePctAfter: 30, shortAfter: 2031 as number | null };
   it('shows what each does to this building', () => {
     const rows = fundingEffects(103000, ctx);
     expect(rows.map(r => r.source)).toEqual(['reserves', 'operating', 'special_assessment', 'loan']);
-    expect(rows[0]).toMatchObject({ possible: true, decides: 'Board', effect: 'Reserves go from 43% to 30% of the plan' });
+    expect(rows[0]).toMatchObject({ possible: true, decides: 'Board', effect: 'Reserves go from 43% to 30% funded · the plan then runs short in 2031' });
     expect(rows[1].possible).toBe(false);
     expect(rows[2].effect).toContain('$2,060 a unit, once');
     expect(rows[3].decides).toBe("Owners' vote");
