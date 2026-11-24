@@ -182,6 +182,13 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
   const [showAll, setShowAll] = useState(false);
   // `?add=unit` (from an owner's empty unit picker, or setup) opens the add form.
   const [params, setParams] = useSearchParams();
+  const seeBalances = useFinancialStore(st => st.ownersSeeBalances);
+  const seeContacts = useFinancialStore(st => st.ownersSeeContacts);
+  const [shareNote, setShareNote] = useState('');
+  const share = async (which: 'balances' | 'contacts', on: boolean) => {
+    const ok = await useFinancialStore.getState().setOwnerSharing(which, on);
+    setShareNote(ok ? '' : "That could not be saved. The building's database may be waiting on an update.");
+  };
   const [editingUnit, setEditingUnit] = useState<string | null>(isBoard && params.get('add') === 'unit' ? 'new' : null);
   const removeUnit = useFinancialStore(s => s.removeUnit);
   useEffect(() => { if (editingUnit === 'new' && params.get('add') === 'unit') document.getElementById('dir-units')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -241,6 +248,17 @@ export default function DirectoryTab({ snap, section, onSection, isBoard }: { sn
 
       <Card id="dir-units" aria-label="Units and owners" className="gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex flex-wrap items-center gap-2"><SectionLabel>Units and owners · {units.length}</SectionLabel>{isBoard && editingUnit !== 'new' && <Button size="sm" variant="ghost" onClick={() => setEditingUnit('new')}>Add a unit</Button>}</span><span className="text-xs text-ux2-muted">{fees.length ? `Dues ${fmt(Math.min(...fees))} to ${fmt(Math.max(...fees))} · ` : ''}{paid} of {units.length} paid this month · {units.length ? `shares ${shareTotal}% · ` : ''}{units.filter(autopay).length} on autopay · <button type="button" onClick={() => navigate('/funds?tab=income')} className="font-semibold text-ux2-teal hover:underline">Unit ledgers in Funds</button></span></div>
+        {isBoard ? (
+          <Inner aria-label="What owners see of each other" className="flex flex-col gap-2">
+            <b className="text-sm font-semibold text-ux2-ink">What owners see of each other</b>
+            <label className="flex items-start gap-2.5 text-sm text-ux2-ink"><input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={seeBalances} onChange={e => void share('balances', e.target.checked)} /><span>Every member sees every unit's balance<span className="block text-xs text-ux2-muted">Who is behind, and by how much. Payment history, late fees and assessments stay private either way.</span></span></label>
+            <label className="flex items-start gap-2.5 text-sm text-ux2-ink"><input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={seeContacts} onChange={e => void share('contacts', e.target.checked)} /><span>Every member sees every unit's email and phone<span className="block text-xs text-ux2-muted">Off, owners see each other's names and unit numbers only.</span></span></label>
+            {shareNote && <span className="text-xs font-semibold text-ux2-red-ink">{shareNote}</span>}
+            <span className="text-xs text-ux2-muted">Both are off unless the board turns them on. The board and the manager always see everything; the building's own income, budget and totals owed are open to every owner whatever is chosen here. A change shows for owners the next time they open the app.</span>
+          </Inner>
+        ) : (
+          <span className="text-xs text-ux2-muted">{seeBalances && seeContacts ? "The board has chosen to share each unit's balance and contact details with all members." : seeBalances ? "The board has chosen to share each unit's balance with all members. Other owners' contact details are private." : seeContacts ? "The board has chosen to share owners' contact details with all members. Other units' balances are private." : "Other owners' balances and contact details are private. The board can choose to share them."}</span>
+        )}
         {isBoard && units.length > 0 && !sharesComplete && (
           <div data-shares-incomplete className="rounded-xl bg-ux2-amber-tint/70 px-3 py-2 text-[13px] text-ux2-ink">
             <b className="font-semibold">{noShare === units.length ? 'No unit has a share on file.' : `The shares add up to ${shareTotal}%, not 100%${noShare ? `, and ${noShare} unit${noShare === 1 ? ' has' : 's have'} none` : ''}.`}</b>{' '}

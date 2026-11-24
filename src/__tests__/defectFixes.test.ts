@@ -97,3 +97,15 @@ describe('spending approvals', () => {
     expect(decisionFrom([{ vote: 'deny' }, { vote: 'deny' }], 2)).toBe('denied');
   });
 });
+
+describe('what owners see of each other is the board\'s choice', () => {
+  it('starts private, and each switch moves on its own', async () => {
+    const { useFinancialStore } = await import('@/store/useFinancialStore');
+    useFinancialStore.setState({ ownersSeeBalances: false, ownersSeeContacts: false });
+    expect(await useFinancialStore.getState().setOwnerSharing('balances', true)).toBe(true);
+    expect(useFinancialStore.getState()).toMatchObject({ ownersSeeBalances: true, ownersSeeContacts: false });
+    await useFinancialStore.getState().setOwnerSharing('contacts', true);
+    await useFinancialStore.getState().setOwnerSharing('balances', false);
+    expect(useFinancialStore.getState()).toMatchObject({ ownersSeeBalances: false, ownersSeeContacts: true });
+  });
+});

@@ -191,6 +191,11 @@ interface FinancialState {
   /** The Month close runbook's switch, shared with the database job that runs it every morning. */
   monthCloseEnabled: boolean;
   setMonthCloseEnabled: (on: boolean) => void;
+  /** The board's choice of what members see of other units: each unit's balance, and each unit's email and phone. Both off unless switched on. */
+  ownersSeeBalances: boolean;
+  ownersSeeContacts: boolean;
+  /** Change one of them. Resolves false, and puts the switch back, when the database did not take it. */
+  setOwnerSharing: (which: 'balances' | 'contacts', on: boolean) => Promise<boolean>;
   /** Runbooks switched off, by id, shared with the database jobs that run them (collections, insurance renewal, month close). */
   runbooksOff: string[];
   setRunbookOff: (id: string, off: boolean) => void;
@@ -463,6 +468,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.monthCloseStartDay = data.settings.monthCloseStartDay || 1;
       updates.monthCloseEnabled = data.settings.monthCloseEnabled ?? true;
       updates.runbooksOff = data.settings.runbooksOff ?? [];
+      updates.ownersSeeBalances = data.settings.ownersSeeBalances === true;
+      updates.ownersSeeContacts = data.settings.ownersSeeContacts === true;
       updates.reserveStudyDate = data.settings.reserveStudyDate ?? null;
       updates.reserveStudyEveryYears = data.settings.reserveStudyEveryYears || 3;
       updates.taskerLimit = Number.isFinite(data.settings.taskerLimit) ? data.settings.taskerLimit : 300;
@@ -1332,6 +1339,20 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ monthCloseEnabled: on });
     syncSettings();
   },
+  ownersSeeBalances: false,
+  ownersSeeContacts: false,
+  setOwnerSharing: async (which, on) => {
+    const key = which === 'balances' ? 'ownersSeeBalances' : 'ownersSeeContacts';
+    const was = get()[key];
+    if (was === on) return true;
+    set({ [key]: on } as Pick<FinancialState, typeof key>);
+    if (!isBackendEnabled) return true;
+    const tid = resolveTenantId();
+    // Saved on its own, not with the other settings: a database that has not had this column added yet must not fail every other setting.
+    const ok = tid ? await financialSvc.upsertFinancialSettings(tid, { [key]: on }).catch(() => false) : false;
+    if (!ok) set({ [key]: was } as Pick<FinancialState, typeof key>);
+    return ok;
+  },
   reserveStudyDate: null,
   reserveStudyEveryYears: 3,
   setReserveStudy: (date, everyYears) => {
@@ -1690,6 +1711,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     paymentOrder: state.paymentOrder,
     monthCloseStartDay: state.monthCloseStartDay,
     monthCloseEnabled: state.monthCloseEnabled,
+    ownersSeeBalances: state.ownersSeeBalances,
+    ownersSeeContacts: state.ownersSeeContacts,
     taskerLimit: state.taskerLimit,
     runbooksOff: state.runbooksOff,
     reserveStudyDate: state.reserveStudyDate,

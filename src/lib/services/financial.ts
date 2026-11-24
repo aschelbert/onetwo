@@ -476,6 +476,9 @@ export interface FinancialSettingsRow {
   monthCloseEnabled: boolean;
   /** Runbooks the building switched off, by id, for every runbook the database also runs. */
   runbooksOff: string[];
+  /** The board's choice: every member sees every unit's balance, or every unit's email and phone. Off unless switched on. */
+  ownersSeeBalances: boolean;
+  ownersSeeContacts: boolean;
   /** When the last professional reserve study was done (YYYY-MM-DD), and how many years one lasts. */
   reserveStudyDate: string | null;
   reserveStudyEveryYears: number;
@@ -510,6 +513,8 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     monthCloseStartDay: Number(data.month_close_start_day ?? 1) || 1,
     monthCloseEnabled: (data.month_close_enabled as boolean) ?? true,
     runbooksOff: Array.isArray(data.runbooks_off) ? (data.runbooks_off as string[]) : [],
+    ownersSeeBalances: data.owners_see_balances === true,
+    ownersSeeContacts: data.owners_see_contacts === true,
     reserveStudyDate: (data.reserve_study_date as string) || null,
     reserveStudyEveryYears: Number(data.reserve_study_every_years ?? 3) || 3,
     taskerLimit: data.tasker_limit == null ? 300 : Number(data.tasker_limit),
@@ -536,6 +541,8 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.monthCloseStartDay !== undefined) row.month_close_start_day = s.monthCloseStartDay;
   if (s.monthCloseEnabled !== undefined) row.month_close_enabled = s.monthCloseEnabled;
   if (s.runbooksOff !== undefined) row.runbooks_off = s.runbooksOff;
+  if (s.ownersSeeBalances !== undefined) row.owners_see_balances = s.ownersSeeBalances;
+  if (s.ownersSeeContacts !== undefined) row.owners_see_contacts = s.ownersSeeContacts;
   if (s.reserveStudyDate !== undefined) row.reserve_study_date = s.reserveStudyDate;
   if (s.reserveStudyEveryYears !== undefined) row.reserve_study_every_years = s.reserveStudyEveryYears;
   if (s.taskerLimit !== undefined) row.tasker_limit = s.taskerLimit;
