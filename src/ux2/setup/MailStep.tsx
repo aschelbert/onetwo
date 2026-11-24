@@ -15,7 +15,7 @@ import { useBuildingStore } from '@/store/useBuildingStore';
 import { useMailStore } from '@/store/useMailStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { useSetupStore } from '@/features/setup/useSetupStore';
-import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, pricingFor } from '@/types/mail';
+import { DEFAULT_MAIL_PROVIDER, ESTIMATE_NOTE, MAIL_PROVIDERS, initialMailProvider, isMailProviderAvailable, pricingFor } from '@/types/mail';
 import type { MailProviderId } from '@/types/mail';
 import { Button, Chip } from '../components';
 import { useSetup } from './useSetup';
@@ -54,7 +54,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
   const connectMailProvider = useMailStore(x => x.connectMailProvider);
   const disconnectMailProvider = useMailStore(x => x.disconnectMailProvider);
   const setLater = useSetupStore(x => x.setLater);
-  const [provider, setProvider] = useState<MailProviderId>(settings.mailProvider || DEFAULT_MAIL_PROVIDER);
+  const [provider, setProvider] = useState<MailProviderId>(() => initialMailProvider(settings));
   const [apiId, setApiId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [changing, setChanging] = useState(false);
@@ -67,7 +67,6 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
   const signupUrl = provider === 'letterstream' ? settings.letterstreamPartnerUrl : chosen.signupUrl;
   const needsApiId = chosen.credentials.includes('apiId');
   const pricing = pricingFor(provider);
-  const showForm = status === 'off' || changing;
 
   const connect = async () => {
     if (!apiKey.trim() || (needsApiId && !apiId.trim())) { setNote({ tone: 'red', text: needsApiId ? 'Paste both the API ID and the API key from the LetterStream account.' : 'Paste the API token from the DocuPost account.' }); return; }
@@ -88,6 +87,26 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
     catch (e) { setNote({ tone: 'red', text: e instanceof Error ? e.message : 'Could not disconnect.' }); }
     finally { setBusy(false); }
   };
+
+  const credentialsForm = (
+    <div className={cn(CARD, 'gap-3')} aria-label="Mail account credentials">
+      <span className={EYEBROW}>{status === 'on' ? `New ${chosen.label} keys` : `Paste the ${needsApiId ? 'keys' : 'token'} from ${chosen.label}`}</span>
+      <div className={cn('grid grid-cols-1 gap-3', status === 'on' && 'md:grid-cols-2')}>
+        {needsApiId && (
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-700">API ID
+            <input value={apiId} onChange={e => setApiId(e.target.value)} autoComplete="off" className={INPUT} placeholder="From My Account → API Information" />
+          </label>
+        )}
+        <label className={cn('flex flex-col gap-1 text-xs font-semibold text-ink-700', !needsApiId && 'md:col-span-2')}>{needsApiId ? 'API key' : 'API token'}
+          <input value={apiKey} onChange={e => setApiKey(e.target.value)} type="password" autoComplete="off" className={INPUT} placeholder="Kept server-side, never shown again" />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="plum" disabled={busy} onClick={() => void connect()}>{busy ? `Checking with ${chosen.label}…` : status === 'on' ? 'Save the new keys' : `Connect ${chosen.label}`}</Button>
+        <span className="text-xs text-ux2-muted">We check {needsApiId ? 'the keys' : 'the token'} with {chosen.label} before saving. Nothing is mailed or charged by the check.</span>
+      </div>
+    </div>
+  );
 
   return (
     <div data-step="mail" data-mail-status={status} data-mail-provider={settings.mailProvider || provider} className="flex flex-col gap-[18px]">
@@ -117,11 +136,12 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
                   {PROVIDER_IDS.map(id => {
                     const p = MAIL_PROVIDERS[id];
                     const on = provider === id;
+                    const open = isMailProviderAvailable(id);
                     return (
-                      <button key={id} type="button" role="radio" aria-checked={on} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setNote(null); }}
-                        className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left', on ? 'border-ux2-plum bg-ux2-plum-tint' : 'border-ux2-line bg-ux2-surface')}>
+                      <button key={id} type="button" role="radio" aria-checked={on} disabled={!open} onClick={() => { setProvider(id); setApiId(''); setApiKey(''); setNote(null); }}
+                        className={cn('flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left', !open && 'cursor-not-allowed opacity-60', on ? 'border-ux2-plum bg-ux2-plum-tint' : 'border-ux2-line bg-ux2-surface')}>
                         <span aria-hidden="true" className={cn('mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2', on ? 'border-ux2-plum' : 'border-ux2-line-strong')}>{on && <span className="h-2.5 w-2.5 rounded-full bg-ux2-plum" />}</span>
-                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
+                        <span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{p.label}{id === DEFAULT_MAIL_PROVIDER && <span className="ml-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-plum">Recommended</span>}{!open && p.comingLabel && <span className="ml-2 rounded-full bg-ux2-amber-tint px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-ux2-amber">{p.comingLabel}</span>}</span><span className="text-xs text-ux2-muted">{p.tagline}</span></span>
                       </button>
                     );
                   })}
@@ -139,7 +159,10 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
                 </div>
                 <p className="m-0 text-xs leading-relaxed text-ux2-muted">Nothing here blocks going live. Left for later, it stays on your Home card and under Funds › Accounts and ledger › Bank & Mail.</p>
               </div>
-              <div className={CARD}>
+              {credentialsForm}
+            </div>
+            <div className="flex flex-col gap-3.5">
+              <div className={CARD} aria-label="What happens">
                 <span className={EYEBROW}>What happens</span>
                 <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
                   {STEPS[provider].map(([t, d], i) => (
@@ -149,11 +172,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
                     </li>
                   ))}
                 </ol>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3.5">
-              <div className={CARD} aria-label="Have ready">
-                <span className={EYEBROW}>Have ready</span>
+                <span className={cn(EYEBROW, 'mt-1 border-t border-ux2-line pt-3')}>Have ready</span>
                 {[["The association's email address", `The ${chosen.label} account belongs to the building, not to a person; use the board's or treasurer's address.`], ["The association's card", provider === 'docupost' ? 'To add funds. From $10; each letter is deducted when sent.' : "LetterStream takes the building's own card or bank, never a third party's. Needed to pay for letters or to prepay a balance."], ['The return address', address.street ? `${name}, ${address.street}, ${address.city}, ${address.state} ${address.zip} · from Building › Contacts` : 'Set under Building › Contacts; it goes on every envelope.']].map(([t, n]) => (
                   <div key={t} className={ROW}><span className="flex min-w-0 flex-col gap-0.5"><span className="text-sm font-semibold">{t}</span><span className="text-xs text-ux2-muted">{n}</span></span><Chip tone="amber" className="shrink-0">Have it handy</Chip></div>
                 ))}
@@ -197,25 +216,7 @@ export default function MailStep({ onBack, onNext }: { onBack: () => void; onNex
           </div>
         )}
 
-        {showForm && (
-          <div className={cn(CARD, 'gap-3')} aria-label="Mail account credentials">
-            <span className={EYEBROW}>{status === 'on' ? `New ${chosen.label} keys` : `Paste the ${needsApiId ? 'keys' : 'token'} from ${chosen.label}`}</span>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {needsApiId && (
-                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-700">API ID
-                  <input value={apiId} onChange={e => setApiId(e.target.value)} autoComplete="off" className={INPUT} placeholder="From My Account → API Information" />
-                </label>
-              )}
-              <label className={cn('flex flex-col gap-1 text-xs font-semibold text-ink-700', !needsApiId && 'md:col-span-2')}>{needsApiId ? 'API key' : 'API token'}
-                <input value={apiKey} onChange={e => setApiKey(e.target.value)} type="password" autoComplete="off" className={INPUT} placeholder="Kept server-side, never shown again" />
-              </label>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="plum" disabled={busy} onClick={() => void connect()}>{busy ? `Checking with ${chosen.label}…` : status === 'on' ? 'Save the new keys' : `Connect ${chosen.label}`}</Button>
-              <span className="text-xs text-ux2-muted">We check {needsApiId ? 'the keys' : 'the token'} with {chosen.label} before saving. Nothing is mailed or charged by the check.</span>
-            </div>
-          </div>
-        )}
+        {status === 'on' && changing && credentialsForm}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-2.5">

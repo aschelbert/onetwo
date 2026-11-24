@@ -47,6 +47,19 @@ export const supabase = supabaseUrl && supabaseAnonKey
 
 export const isBackendEnabled = !!supabase;
 
+/**
+ * Drop this host's saved copy of the session without signing out. Used when
+ * the session is handed to a building's own host: both hosts would otherwise
+ * hold the same single-use refresh token, and whichever used it second would
+ * be signed out (and could take the other down with it).
+ */
+export function forgetLocalSession(): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const key = (supabase?.auth as any)?.storageKey as string | undefined;
+  if (!key) return;
+  try { window.localStorage.removeItem(key); } catch { /* nothing saved */ }
+}
+
 export function setActiveTenantId(id: string | null) { _activeTenantId = id; }
 export function getActiveTenantId(): string | null { return _activeTenantId; }
 

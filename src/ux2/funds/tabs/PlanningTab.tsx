@@ -1,3 +1,8 @@
+import OutlookPanel, { useOutlook } from '../planning/OutlookPanel';
+import CashLoansPanel, { useCash } from '../planning/CashLoansPanel';
+import { standingNow } from '../../boardroom/reserves';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
+import ReservesPanel from '../reserves/ReservesPanel';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -16,8 +21,8 @@ import { draftTotals } from '../../boardroom/budgetDraft';
 import { fiscalLabel, nextFiscalYear } from '../../boardroom/fiscal';
 import { casePath } from '../../shell/caseDock';
 
-type Section = 'budget' | 'draft' | 'reserves';
-const SECTIONS: Section[] = ['budget', 'draft', 'reserves'];
+type Section = 'budget' | 'draft' | 'outlook' | 'reserves' | 'cash';
+const SECTIONS: Section[] = ['budget', 'draft', 'outlook', 'reserves', 'cash'];
 
 function lineStatus(b: BudgetLine) {
   if (b.budgeted <= 0) return <Chip tone="ghost">No budget</Chip>;
@@ -324,6 +329,12 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
 export default function PlanningTab({ snap, section, onSection, onGo }: { snap: FundsSnapshot; section?: string; onSection: (s: string) => void; onGo: (tab: FundsTab, section?: string) => void }) {
   const bud = budgetSummary(snap);
   const res = reserveSummary(snap);
+  const plan = standingNow(snap.today);
+  const review = useActionRecordsStore(st => st.records.some(r => r.kind === 'reserve-review' && !r.closedOn));
+  const ol = useOutlook(snap.today);
+  const lastChange = ol.rows.length > 1 ? Math.round((ol.rows.slice(1).reduce((t, r) => t + (r.change ?? 0), 0) / (ol.rows.length - 1)) * 10) / 10 : null;
+  const olShort = ol.rows.find(r => r.reservesEnd < 0);
+  const cash = useCash(snap);
   const draft = nextYearScenarios(snap);
   const nb = useNextBudget(snap.today);
   const nt = nb.draft ? draftTotals(nb.draft) : null;
@@ -380,24 +391,60 @@ export default function PlanningTab({ snap, section, onSection, onGo }: { snap: 
       detail: <NextYearCard snap={snap} />,
     },
     {
+      id: 'outlook',
+      tile: {
+        tone: 'grey',
+        label: 'Five-year outlook',
+        meta: `${year} to ${Number(year) + 5}`,
+        value: lastChange == null ? '—' : `${lastChange >= 0 ? '+' : ''}${lastChange}%`,
+        unit: 'dues a year, as things stand',
+        children: (
+          <div>
+            <KV label={`Dues in ${Number(year) + 5}`}>{fmt(ol.rows[5]?.dues ?? 0)} a unit</KV>
+            <KV label="Replacements due">{fmt(ol.rows.reduce((t, r) => t + r.replacements.reduce((x, c) => x + c.cost, 0), 0))}</KV>
+          </div>
+        ),
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{olShort ? `Reserves run short in ${olShort.year}` : 'Where today\'s decisions lead'}</b></span><Chip tone={olShort ? 'red' : 'sage'}>{olShort ? 'Short' : 'Open'}</Chip></>,
+      },
+      detail: <OutlookPanel today={snap.today} />,
+    },
+    {
       id: 'reserves',
       tile: {
         tone: res.pct < 50 ? 'red' : 'grey',
-        label: res.next ? `Reserves · ${res.next.name.toLowerCase()} gap` : 'Reserves',
-        meta: 'study update due Mar 31',
+        label: 'Reserves',
+        meta: plan.short ? `first short year ${plan.short.year}` : 'no short year in the plan',
         value: `${res.pct}%`,
-        unit: `${fmt(res.funded)} of ${fmt(res.needed)}${res.next ? `, due ${res.next.year}` : ''}`,
+        unit: `funded · ${fmt(res.funded)} held`,
         children: (
           <div>
-            <KV dark={res.pct < 50} label={res.onSchedule ? `On schedule at ${fmt(res.monthly)} a month` : `Short at ${fmt(res.monthly)} a month`}>{fmt(res.gap)}</KV>
-            {res.next && <KV dark={res.pct < 50} label={`${res.next.name} · ${fmt(res.next.cost)}`}>{res.next.cost ? Math.round((res.next.funded / res.next.cost) * 100) : 0}% funded</KV>}
+            <KV dark={res.pct < 50} label="Contribution">{fmt(res.monthly)} a month</KV>
+            {res.next && <KV dark={res.pct < 50} label={`Next: ${res.next.name}`}>{res.next.year} · {fmt(res.next.cost)}</KV>}
           </div>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">Set the monthly contribution</b> · {fmt(res.monthly)} today, {fmt(res.recommendedMonthly)} recommended</span><Chip tone="white" className={res.pct < 50 ? '!bg-white !text-ux2-red-ink' : '!bg-ux2-navy !text-white'}>Lever</Chip></>,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{review ? 'A reserve funding review is open' : 'Components, the 30-year plan, the contribution'}</b></span><Chip tone="white" className={res.pct < 50 ? '!bg-white !text-ux2-red-ink' : '!bg-white !text-ux2-navy'}>{review ? 'Review' : 'Open'}</Chip></>,
       },
-      detail: <ReservesCard snap={snap} />,
+      detail: <ReservesPanel today={snap.today} />,
+    },
+    {
+      id: 'cash',
+      tile: {
+        tone: cash.rows.some(r => r.underFloor) ? 'red' : 'grey',
+        label: 'Cash and loans',
+        meta: `${cash.planning.loans.length || 'no'} loan${cash.planning.loans.length === 1 ? '' : 's'}`,
+        value: fmt(snap.operatingCash),
+        unit: 'operating cash today',
+        children: (
+          <div>
+            <KV dark={cash.rows.some(r => r.underFloor)} label="Lowest in 12 months">{fmt(cash.low?.end ?? 0)}</KV>
+            <KV dark={cash.rows.some(r => r.underFloor)} label="Floor">{fmt(cash.floor)}</KV>
+          </div>
+        ),
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{cash.rows.some(r => r.underFloor) ? 'Under the floor within the year' : 'Above the floor all year'}</b></span><Chip tone="white" className={cash.rows.some(r => r.underFloor) ? '!bg-white !text-ux2-red-ink' : '!bg-white !text-ux2-navy'}>Open</Chip></>,
+      },
+      detail: <CashLoansPanel snap={snap} />,
     },
   ];
 
-  return <TileSwitcher sections={sections} value={current} onChange={onSection} hint="Tap a tile to open its detail below. The other two stay one tap away." />;
+  return <TileSwitcher sections={sections} value={current} onChange={onSection} hint="Tap a tile to open its detail below. The others stay one tap away." />;
 }

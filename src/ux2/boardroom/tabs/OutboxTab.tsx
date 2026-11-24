@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore } from '@/store/useMailStore';
-import { mailProviderLabel } from '@/types/mail';
+import { formatMailStatus, mailProviderLabel } from '@/types/mail';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -233,7 +233,7 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
                         <Td><LetterCell l={l} /></Td>
                         <Td><ToCell l={l} /></Td>
                         <Td><Cell title={<span className="font-normal">{d.how}</span>} note={d.note} /></Td>
-                        <Td><Cell title={<Chip tone={rec || (!l.unitNumber && !toBoard(l)) ? 'sage' : 'ghost'}>{rec ? `${rec.status[0].toUpperCase()}${rec.status.slice(1)}` : l.unitNumber || toBoard(l) ? 'Logged' : `Posted to ${units.length} owners`}</Chip>} note={rec?.letterstreamJobId ? `tracking ${rec.letterstreamJobId}` : l.unitNumber || toBoard(l) ? 'delivered outside the app' : 'pinned in Community › Notices'} /></Td>
+                        <Td><Cell title={<Chip tone={rec || (!l.unitNumber && !toBoard(l)) ? 'sage' : 'ghost'}>{rec ? formatMailStatus(rec.status) : l.unitNumber || toBoard(l) ? 'Logged' : `Posted to ${units.length} owners`}</Chip>} note={rec?.trackingNumber ? `USPS tracking ${rec.trackingNumber}` : rec ? 'tracking under Funds › Bank & Mail' : l.unitNumber || toBoard(l) ? 'delivered outside the app' : 'pinned in Community › Notices'} /></Td>
                         <Td className="whitespace-nowrap text-ux2-muted">{l.createdBy} · {l.sentDate ? dayLabel(l.sentDate.slice(0, 10)) : '—'}</Td>
                         <Td num><span className="flex justify-end gap-1.5"><Button size="sm" variant="ghost" onClick={() => setViewing(viewing === l.id ? null : l.id)}>View</Button>{mailtoFor(l) && <a href={mailtoFor(l)} className="inline-flex h-9 items-center rounded-full px-3 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Open in email</a>}<Button size="sm" variant="ghost" onClick={() => resend(l)}>Resend</Button></span></Td>
                       </tr>
@@ -278,6 +278,11 @@ export default function OutboxTab({ snap, onOpenCase, compose, onComposeDone }: 
             ].map(([how, note, cost]) => (
               <Inner key={how} className="flex items-center justify-between gap-3"><Cell title={how} note={note} /><Chip tone={/Free/.test(cost) ? 'sage' : 'amber'}>{cost}</Chip></Inner>
             ))}
+            <SectionLabel className="mt-1">Mail vendor</SectionLabel>
+            <Inner data-mail-vendor className="flex flex-wrap items-center justify-between gap-3">
+              <Cell title={settings.mailConnected && settings.mailProvider ? mailProviderLabel(settings) : 'No mail vendor connected'} note={settings.mailConnected && settings.mailProvider ? "The building's own account · billed by the vendor per letter" : 'Connect DocuPost or LetterStream so certified mail prints and mails itself'} />
+              <Button size="sm" variant="ghost" onClick={() => navigate('/funds?tab=settings&section=mailing')}>{settings.mailConnected && settings.mailProvider ? 'Manage vendor' : 'Choose a vendor'}</Button>
+            </Inner>
             <SectionLabel className="mt-1">Who it goes to</SectionLabel>
             <div className="flex flex-wrap gap-1.5"><Chip tone="navy">All owners · {units.length}</Chip><Chip tone="ghost">Board · {board.length}</Chip><Chip tone="ghost">One unit</Chip></div>
             <Why>A letter can use more than one method. Notices to all owners go in-app and by email; the {Math.max(0, units.length - reachable)} owner{units.length - reachable === 1 ? '' : 's'} without email get print and mail on their own. {METHOD_NOTE.certified ? '' : ''}</Why>

@@ -143,6 +143,8 @@ export default function ResetPasswordPage() {
                   <label className="block text-xs font-medium text-ink-700 mb-1">New Password</label>
                   <input
                     type="password"
+                    name="new-password"
+                    autoComplete="new-password"
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     className="w-full px-3 py-2.5 border border-ink-200 rounded-lg text-sm"
@@ -153,6 +155,8 @@ export default function ResetPasswordPage() {
                   <label className="block text-xs font-medium text-ink-700 mb-1">Confirm Password</label>
                   <input
                     type="password"
+                    name="confirm-password"
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={e => { setConfirmPassword(e.target.value); setError(''); }}
                     onKeyDown={e => e.key === 'Enter' && handleSetPassword()}

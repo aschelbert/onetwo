@@ -1,12 +1,11 @@
 // supabase/functions/send-meeting-notice/index.ts
 // Sends a meeting notice email to all building members
 // Called from BoardRoomPage when scheduling or notifying about meetings
+import { EMAIL_NOT_CONFIGURED, emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -61,8 +60,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
-      return new Response(JSON.stringify({ success: false, error: "Email not configured" }), {
+    if (!emailConfigured()) {
+      return new Response(JSON.stringify({ success: false, error: EMAIL_NOT_CONFIGURED }), {
         status: 200, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
@@ -140,34 +139,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
     let sentCount = 0;
+    let optedOut = 0;
 
     for (const recipient of emailRecipients) {
       try {
-        const res = await fetch("https://api.mailjet.com/v3.1/send", {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${auth}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            Messages: [{
-              From: { Email: "noreply@getonetwo.com", Name: buildingName },
-              To: [{ Email: recipient.email, Name: recipient.name }],
-              Subject: `${buildingName} — Meeting Notice: ${title} (${formattedDate})`,
-              TextPart: textBody,
-              HTMLPart: htmlBody,
-            }],
-          }),
+        const res = await sendEmail({
+          fromName: buildingName,
+          to: { email: recipient.email, name: recipient.name },
+          subject: `${buildingName} — Meeting Notice: ${title} (${formattedDate})`,
+          text: textBody,
+          html: htmlBody,
         });
         if (res.ok) sentCount++;
+        else if (res.optedOut) optedOut++;
       } catch (e) {
         console.error("Send error for", recipient.email, ":", e);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, sent: sentCount, total: emailRecipients.length }), {
+    return new Response(JSON.stringify({ success: true, sent: sentCount, total: emailRecipients.length, optedOut }), {
       status: 200, headers: { ...cors, "Content-Type": "application/json" },
     });
 

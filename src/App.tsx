@@ -23,7 +23,8 @@ import PortfolioShell from '@/components/layout/PortfolioShell';
 import PortfolioDashboardPage from '@/features/portfolio/PortfolioDashboardPage';
 import ResetPasswordPage from '@/features/auth/ResetPasswordPage';
 import UnsubscribePage from '@/features/auth/UnsubscribePage';
-import { isTenantHost } from '@/lib/tenantHost';
+import ConfirmEmailPage from '@/features/auth/ConfirmEmailPage';
+import { hasSessionHandoff, isTenantHost } from '@/lib/tenantHost';
 import { fetchMemberships, needsBuildingChoice, pickMembership } from '@/lib/tenantMembership';
 import { isSignupInProgress } from '@/lib/authFlow';
 
@@ -176,7 +177,12 @@ function LoginRoute() {
   // must reach it rather than being sent back into the building they are in.
   const addingBuilding = new URLSearchParams(location.search).get('create') === '1'
     && currentRole !== 'PLATFORM_ADMIN' && currentRole !== 'PM_COMPANY';
-  if (isAuthenticated && !addingBuilding) {
+  // Arriving with a session handed over in the URL (from the root login or
+  // another building): the sign-in page has to take it, even if this browser
+  // still looks signed in. What it remembers may be an old, dead session, and
+  // skipping the handover sent people back to the login form to sign in again.
+  const handoff = hasSessionHandoff(window.location.search);
+  if (isAuthenticated && !addingBuilding && !handoff) {
     // On tenant subdomains, platform admins should see the tenant dashboard
     const isTenantSubdomain = isTenantHost(window.location.hostname);
     const target = currentRole === 'PM_COMPANY'
@@ -231,6 +237,7 @@ export default function App() {
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/unsubscribe" element={<UnsubscribePage />} />
+        <Route path="/confirm-email" element={<ConfirmEmailPage />} />
 
         {/* Admin console — own layout (sidebar nav), outside AppShell */}
         <Route path="/admin/console" element={<RequireAuth><TenantProvider><ErrorBoundary fallbackLevel="page"><PlatformAdminPage /></ErrorBoundary></TenantProvider></RequireAuth>} />

@@ -13,6 +13,9 @@ const db = vi.hoisted(() => ({
     { id: 'm-owner', user_id: 'u-owner', role: 'resident', unit: '101', board_title: null, status: 'active', created_at: '2026-02-01', name: 'Olu Owner', email: 'olu@example.com' },
   ],
   rpc: vi.fn(),
+  // Members our email is not reaching, as building_email_suppressions answers
+  emailOff: [] as { email: string; reason: string; since: string }[],
+  invoke: vi.fn(),
 }));
 
 function query(rows: unknown[]) {
@@ -28,7 +31,9 @@ vi.mock('@/lib/supabase', () => ({
   logDbError: () => {},
   supabase: {
     from: (table: string) => query(table === 'tenant_users' ? db.members : []),
-    rpc: db.rpc,
+    // The page reads who has email turned off as it loads; every other call is the action under test
+    rpc: (name: string, args?: unknown) => name === 'building_email_suppressions' ? Promise.resolve({ data: db.emailOff, error: null }) : db.rpc(name, args),
+    functions: { invoke: db.invoke },
     auth: { getSession: async () => ({ data: { session: null } }) },
     channel: () => ({ on: () => ({ subscribe: () => ({}) }) }),
     removeChannel: () => {},
@@ -56,6 +61,8 @@ const openMenu = async (name: string) => {
 describe('User Management on a live building', () => {
   beforeEach(() => {
     db.rpc.mockReset();
+    db.invoke.mockReset();
+    db.emailOff = [];
     useAuthStore.setState({ currentRole: 'BOARD_MEMBER' });
   });
 
@@ -93,5 +100,28 @@ describe('User Management on a live building', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(db.rpc).toHaveBeenCalledWith('set_member_unit', { p_member_id: 'm-owner', p_unit: null }));
     expect(await screen.findByText('Olu Owner is no longer linked to a unit.')).toBeTruthy();
+  });
+
+  it('shows who is not getting email and turns it back on for them', async () => {
+    db.emailOff = [{ email: 'olu@example.com', reason: 'unsubscribed', since: '2026-11-19T23:09:08Z' }];
+    renderUsers();
+    expect(await screen.findByText('1 member is not getting email')).toBeTruthy();
+    expect(screen.getByText(/Olu Owner \(pressed Unsubscribe\)/)).toBeTruthy();
+    const row = document.querySelector('[data-member="m-owner"]') as HTMLElement;
+    expect(within(row).getByText('Email off')).toBeTruthy();
+
+    db.invoke.mockResolvedValueOnce({ data: { success: true }, error: null });
+    await openMenu('Olu Owner');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Turn email back on' }));
+    await waitFor(() => expect(db.invoke).toHaveBeenCalledWith('email-suppression', { body: { action: 'restore-member', tenantId: 't1', email: 'olu@example.com' } }));
+    expect(await screen.findByText('Email is back on for Olu Owner. Notices and invoices will reach olu@example.com again.')).toBeTruthy();
+    expect(screen.queryByText('Email off')).toBeNull();
+  });
+
+  it('offers no restore to members whose email is getting through', async () => {
+    renderUsers();
+    await openMenu('Olu Owner');
+    expect(screen.queryByRole('menuitem', { name: 'Turn email back on' })).toBeNull();
+    expect(screen.queryByText(/not getting email/)).toBeNull();
   });
 });

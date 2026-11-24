@@ -33,6 +33,8 @@ export interface JurisdictionData {
   filingAgency: string;
   /** How complete this data is */
   coverage: JurisdictionCoverage;
+  /** Minimum notice, in days, the state requires for owner meetings */
+  meetingNotice?: { annualOrRegularDays: number; otherOwnerDays: number; cite: string };
   /** Notes about the jurisdiction's regulatory environment */
   regulatoryNotes: string[];
   /** Per-item overrides keyed by compliance item ID (e.g. "g3", "f1") */

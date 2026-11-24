@@ -128,6 +128,10 @@ export interface WorkOrder {
   glEntryId: string | null; attachments: Array<{name:string;type:string;date:string;size:string}>;
   /** The entry posted when the invoice arrived (Dr expense / Cr accounts payable). Absent on bills invoiced before accrual. */
   accrualGlEntryId?: string | null;
+  /** Who confirmed the work was done as specified, when, and anything left for the vendor to put right. */
+  signoff?: { date: string; by: string; notes: string } | null;
+  /** Who raised, approved and paid it, for the rule that a bill needs two people. */
+  people?: { raisedBy?: string; approvedBy?: string; paidBy?: string } | null;
 }
 
 export const seedWorkOrders: WorkOrder[] = [

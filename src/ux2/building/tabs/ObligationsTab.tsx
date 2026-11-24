@@ -8,9 +8,10 @@ import { useBuildingStore, type GoverningClause } from '@/store/useBuildingStore
 import { cn } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
+import RecordsSection from './RecordsSection';
 import { dutyCounts, obligationRows, obligationsSummary, roleLoads, type ObligationRow, type ObligationState, type BuildingSnapshot } from '../metrics';
 
-type View = 'month' | 'byrole' | 'bycategory' | 'filings' | 'ongoing' | 'duties';
+type View = 'month' | 'byrole' | 'bycategory' | 'filings' | 'records' | 'ongoing' | 'duties';
 
 const COUNT_TONES: Record<string, { name: string; box: string; ink: string; muted: string }> = {
   Met: { name: 'navy', box: 'border-ux2-navy bg-ux2-navy', ink: 'text-white', muted: 'text-white/[0.72]' },
@@ -236,7 +237,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
   const navigate = useNavigate();
   const rows = useMemo(() => obligationRows(snap), [snap]);
   const sum = obligationsSummary(rows);
-  const view: View = section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'bycategory' ? 'bycategory' : 'month';
+  const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'bycategory' ? 'bycategory' : 'month';
   const month = snap.today.slice(0, 7);
   const monthName = new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'long' });
   const thisMonth = rows.filter(r => r.state === 'overdue' || r.state === 'in-progress' || (r.dated && r.due.startsWith(month)));
@@ -247,8 +248,9 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
 
   return (
     <div className="flex flex-col gap-4">
-      <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'ongoing', label: `Ongoing · ${sum.ongoing}` }, { id: 'duties', label: 'Duties and roles' }]} />
-      {view !== 'duties' && (
+      <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'records', label: 'Licences and certificates' }, { id: 'ongoing', label: `Ongoing · ${sum.ongoing}` }, { id: 'duties', label: 'Duties and roles' }]} />
+      {view === 'records' && <RecordsSection snap={snap} isBoard={isBoard} onEditDetails={() => navigate('/building?tab=overview&section=details')} />}
+      {view !== 'duties' && view !== 'records' && (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="Obligation counts">
             {[
@@ -276,7 +278,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
         </>
       )}
       {view === 'duties' && <Duties rows={rows} snap={snap} />}
-      {view !== 'duties' && <Why>Runbooks, current actions and the outbox are operations, so they live in <button type="button" onClick={() => navigate('/boardroom?tab=runbooks')} className="font-semibold text-ux2-teal hover:underline">Board Room</button>. Nothing here is deeper than tab › section; whatever needs someone this week is also a Home card.</Why>}
+      {view !== 'duties' && view !== 'records' && <Why>Runbooks, current actions and the outbox are operations, so they live in <button type="button" onClick={() => navigate('/boardroom?tab=runbooks')} className="font-semibold text-ux2-teal hover:underline">Board Room</button>. Nothing here is deeper than tab › section; whatever needs someone this week is also a Home card.</Why>}
     </div>
   );
 }

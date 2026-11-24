@@ -26,13 +26,14 @@ import { useIssuesStore } from '@/store/useIssuesStore';
 import { useMeetingsStore } from '@/store/useMeetingsStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { refreshComplianceRequirements } from '@/lib/complianceRefresh';
+import { BYLAWS_NOTICE_DAYS, noticeLeadDays } from '@/data/jurisdictions';
 import { addDays, daysBetween, type CardInput, type CaseStep, type CardContext } from './model';
 import { caseProgress, obligationCase } from './obligationCases';
 
 /** Owner requests get this many days for a first reply (the design's SLA chip). */
 export const REQUEST_SLA_DAYS = 14;
-/** Meeting notices are due this many days before the meeting (DC Condo Act minimum is 10). */
-export const NOTICE_LEAD_DAYS = 10;
+/** Meeting notices are due this many days before the meeting, unless the state asks for more (see noticeLeadDays). */
+export const NOTICE_LEAD_DAYS = BYLAWS_NOTICE_DAYS;
 
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,6 +74,8 @@ export interface StoreSnapshot {
   hoaDueDay: number;
   budgetVariance: { name: string; budgeted: number; actual: number }[];
   aging: { days30: Unit[]; days60: Unit[]; days90plus: Unit[] };
+  /** The building's state, as entered; sets the statutory notice period. */
+  state?: string;
 }
 
 const APP_ROLES: Role[] = ['BOARD_MEMBER', 'RESIDENT', 'PROPERTY_MANAGER', 'STAFF', 'PLATFORM_ADMIN', 'PM_COMPANY'];
@@ -186,7 +189,7 @@ export function buildCardInput(s: StoreSnapshot): CardInput {
       title: m.title,
       date: m.date,
       noticeSent: noticeSentFor(m, s.communications),
-      noticeDue: addDays(m.date, -NOTICE_LEAD_DAYS),
+      noticeDue: addDays(m.date, -noticeLeadDays(m.type, s.state)),
       minutesStatus: m.minutes ? (m.minutesApprovals.length > 0 ? 'approved' : 'draft') : 'none',
       rsvped: m.attendees.board.includes(v.name) || m.attendees.owners.includes(v.name),
     }));
@@ -300,7 +303,8 @@ export function useStoreSnapshot(today: string = todayIso()): StoreSnapshot {
     hoaDueDay: fin.hoaDueDay,
     budgetVariance,
     aging,
-  }), [today, viewer, obligations, comp.completions, comp.filings, comp.communications, cases, issues, meetings, elections, approvals, building.insurance, building.board, fin.units, fin.unitInvoices, fin.hoaDueDay, budgetVariance, aging]);
+    state: building.address.state,
+  }), [today, viewer, obligations, comp.completions, comp.filings, comp.communications, cases, issues, meetings, elections, approvals, building.insurance, building.board, fin.units, fin.unitInvoices, fin.hoaDueDay, budgetVariance, aging, building.address.state]);
 }
 
 export function useCardInput(snapshot: StoreSnapshot): CardInput {

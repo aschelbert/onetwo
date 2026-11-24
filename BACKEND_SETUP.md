@@ -98,6 +98,7 @@ supabase secrets set \
   STRIPE_SECRET_KEY=sk_test_YOUR_KEY \
   STRIPE_WEBHOOK_SECRET=whsec_YOUR_SECRET \
   SITE_URL=https://app.getonetwo.com \
+  BREVO_API_KEY=xkeysib-YOUR_KEY \
   GOVOPS_SUPABASE_URL=https://YOUR_GOVOPS_PROJECT_REF.supabase.co \
   GOVOPS_SUPABASE_SERVICE_ROLE_KEY=YOUR_GOVOPS_SERVICE_KEY \
   OPENAI_ADS_API_KEY=YOUR_OPENAI_ADS_CONVERSIONS_API_KEY \
@@ -108,6 +109,11 @@ supabase functions deploy create-hosted-page
 supabase functions deploy chargebee-webhook --no-verify-jwt
 supabase functions deploy provision-tenant
 ```
+
+> Email is sent through Brevo by `supabase/functions/_shared/email.ts`, from
+> `noreply@getonetwo.com`. In Brevo, leave "Block unknown IP addresses" off for API
+> keys (Security > Authorized IPs): edge functions have no fixed outbound address.
+> Redeploy every function that sends email after changing the shared file.
 
 > `chargebee-webhook` and `stripe-webhook` must be deployed **without** JWT
 > verification (`supabase/config.toml` sets `verify_jwt = false` for both, and
@@ -259,7 +265,7 @@ the board is told exactly once:
    `CRON_SECRET` function secret, which overrides it) in an `x-cron-secret` header.
 
 On verification the board member who connected (or every board member, if unknown)
-gets a confirmation email through Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`),
+gets a confirmation email through Brevo (`BREVO_API_KEY`),
 and a pinned "Pay online or set up autopay" announcement is posted for owners.
 
 ```bash
@@ -267,6 +273,56 @@ supabase functions deploy connect-stripe-account
 supabase functions deploy stripe-webhook --no-verify-jwt
 supabase functions deploy stripe-account-status
 ```
+
+### People our email is not reaching
+
+Brevo adds its own Unsubscribe to every email, including notices, invoices and
+password resets. One click puts the address on Brevo's blocked list, and Brevo then
+accepts our emails for that address and drops them. A dead mailbox or a spam report
+does the same. Migration `20261120120000_email_suppressions` keeps our copy of that
+list so the app can say so: `sendEmail()` skips those addresses and reports them as
+not sent, Users shows the board who is not being reached, and the person (Account) or
+the board (Users) can turn email back on.
+
+1. Pick a long random token and save it as the `BREVO_WEBHOOK_TOKEN` function secret.
+2. Deploy `brevo-webhook` (without JWT verification) and `email-suppression`, and
+   redeploy every function that sends email, since they share `_shared/email.ts`.
+3. In Brevo, add a transactional webhook to
+   `https://YOUR_PROJECT_REF.supabase.co/functions/v1/brevo-webhook` for the events
+   unsubscribed, hard bounce, spam, invalid, blocked and delivered, with bearer
+   authentication set to the same token. Through the API:
+
+```bash
+curl https://api.brevo.com/v3/webhooks \
+  -H "api-key: $BREVO_API_KEY" -H "content-type: application/json" \
+  -d '{"type":"transactional","description":"ONE two: addresses email is not reaching",
+       "url":"https://YOUR_PROJECT_REF.supabase.co/functions/v1/brevo-webhook",
+       "events":["unsubscribed","hardBounce","spam","invalid","blocked","delivered"],
+       "auth":{"type":"bearer","token":"THE_SAME_TOKEN"}}'
+```
+
+Addresses blocked before the webhook existed are picked up the next time Brevo
+refuses a send to them. A password reset to an address that pressed Unsubscribe is
+sent by Supabase Auth's own mailer instead, so a locked-out person is not stranded.
+
+### Product email confirmations (double opt-in)
+
+Ticking "Email me ONE two product news" (any form) or turning it on under Account
+does not subscribe the address until someone presses Confirm on `/confirm-email`,
+linked from a confirmation email (migration `20261118140000_marketing_double_opt_in`).
+Opt-outs and the unsubscribe page's Subscribe again take effect at once. At most one
+confirmation email per address per day; links last 7 days.
+
+The migration stores a `marketing_confirm_cron_secret` in Vault and schedules
+`onetwo-marketing-confirmations` every minute; it calls the edge function only when a
+confirmation is waiting. The function sends through Brevo (`BREVO_API_KEY`) and must be deployed without JWT verification:
+
+```bash
+supabase functions deploy send-marketing-confirmations --no-verify-jwt
+```
+
+Deploy the app (the `/confirm-email` page) before applying the migration in
+production, so the first confirmation emails do not link to a missing page.
 
 ### Printed Mail (DocuPost or LetterStream)
 
@@ -289,10 +345,33 @@ Credentials live in `mail_provider_accounts` (RLS on, no policies: service role 
 `financial_settings.mail_connected` / `mail_provider` are the non-secret flags the app
 reads. Functions:
 
-- `connect-mail-provider`: status / connect / disconnect for the building's account.
-- `send-mail`: renders the notice to PDF and pushes it into the building's account.
-- `check-mail-status`: reads the status back (LetterStream) or points at the dashboard
-  (DocuPost).
+- `connect-mail-provider`: status / connect / disconnect / set-balance for the
+  building's account.
+- `send-mail`: renders the notice to PDF, pushes it into the building's account and
+  writes the building's record of the letter to `mail_records`.
+- `check-mail-status`: reads the status back (LetterStream) and writes it onto the
+  letter's record, or points at the dashboard (DocuPost).
+
+**Letter history, tracking and balance** (migration `20261119120000_mail_records.sql`;
+apply it before deploying the three functions, which read its columns):
+
+- `mail_records` holds one row per letter, written by `send-mail` with the service
+  role (failed sends too). Board, property manager and account owner read it and may
+  update tracking; nothing in the app inserts or deletes rows. The app loads it at
+  sign-in, so every board member sees the same history on any device.
+- DocuPost has no status API, no webhooks and no balance API. For its letters a board
+  member copies the USPS tracking number from Letters → the letter → Letter Details
+  and marks the outcome under Mailing History; the app then links to USPS tracking.
+  LetterStream letters are refreshed from its status call when the board opens the app.
+- Balance: `mail_provider_accounts.funds_low_at` is set when the vendor refuses a
+  letter for lack of funds and cleared by the next letter it accepts. `balance_cents` /
+  `balance_recorded_at` hold the figure a board member read off the vendor's Funds
+  page; the app shows it less the estimated postage of letters sent since, and warns
+  before a letter the estimate does not cover.
+- DocuPost's return receipt is always USPS's Electronic Return Receipt (requested from
+  the USPS tracking page once delivered); it has no mailed-back green card. The app
+  offers only the methods the connected vendor has, and a green-card request to
+  DocuPost is sent and recorded as the electronic receipt.
 
 Optional secrets: `DOCUPOST_API_URL`, `DOCUPOST_PORTAL_URL`, `DOCUPOST_SIGNUP_URL`,
 `LETTERSTREAM_API_URL`, `LETTERSTREAM_PORTAL_URL`, `LETTERSTREAM_PARTNER_URL`.

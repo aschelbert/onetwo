@@ -50,6 +50,8 @@ export interface GLEntry {
   source: 'manual' | 'assessment' | 'payment' | 'expense' | 'case' | 'transfer' | 'fee' | 'refund' | 'payroll';
   sourceId: string | null;
   posted: string;
+  /** Who posted it: a person's name, or the automatic job that did. Absent on entries from before this was recorded. */
+  postedBy?: string;
   status: 'posted' | 'void';
 }
 

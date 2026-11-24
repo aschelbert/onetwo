@@ -2,12 +2,16 @@ import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
+import { useMailStore } from '@/store/useMailStore';
+import { mailProviderLabel } from '@/types/mail';
 import { fmt } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, KV, Why, Field, INPUT, HeaderActions } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { useRunbookSwitches } from '../../boardroom/store';
 import { contractRows, contractsSummary, type ContractRow, type BuildingSnapshot } from '../metrics';
 import type { BuildingTab } from '../BuildingModule';
+import VendorInsurance, { insuranceChip } from './VendorInsurance';
+import { startAction } from '../../boardroom/recordActions';
 
 const STATE_TONE: Record<ContractRow['state'], 'red' | 'amber' | 'sage' | 'ghost'> = { lapsed: 'red', ending: 'amber', active: 'sage', none: 'ghost', inactive: 'ghost' };
 function stateLabel(r: ContractRow): string {
@@ -63,15 +67,20 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
   const bidsOn = useRunbookSwitches(s => s.isOn('vendor-bids'));
   const setOn = useRunbookSwitches(s => s.setOn);
   const updateVendor = useBuildingStore(s => s.updateVendor);
+  const mail = useMailStore(s => s.mailingSettings);
+  const mailOn = mail.mailConnected && !!mail.mailProvider;
+  const manageMail = () => navigate('/funds?tab=settings&section=mailing');
   const [adding, setAdding] = useState(false);
   const [renewing, setRenewing] = useState<string | null>(null);
+  const [insuring, setInsuring] = useState<string | null>(null);
+  const vendors = useBuildingStore(s => s.vendors);
   const needs = [...sum.lapsed, ...sum.ending].slice(0, 2);
   const certs = rows.filter(r => r.state !== 'inactive');
   const signed = certs.filter(r => !!r.contract && r.state !== 'lapsed').length;
 
   return (
     <div className="flex flex-col gap-4">
-      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => navigate('/boardroom?view=new&cat=maintenance&sit=vendor-management')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></HeaderActions>}
+      {isBoard && <HeaderActions><Button variant="ghost" onClick={() => navigate('/boardroom?start=bid-request')}>Request bids</Button><Button onClick={() => setAdding(v => !v)}>Add a vendor</Button></HeaderActions>}
       {adding && <VendorForm onClose={() => setAdding(false)} />}
 
       {needs.length > 0 && (
@@ -98,9 +107,9 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
             {isBoard && <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>Add vendor</Button>}
           </div>
         </div>
-        {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">No vendors yet.</Inner> : (
+        {rows.length === 0 && !mailOn ? <Inner className="text-sm text-ux2-muted">No vendors yet.</Inner> : (
           <Table minWidth={860}>
-            <thead><tr><Th>Vendor</Th><Th>What they do</Th><Th>Contract</Th><Th>Ends</Th><Th num>Paid this year</Th><Th>1099</Th><Th>Status</Th></tr></thead>
+            <thead><tr><Th>Vendor</Th><Th>What they do</Th><Th>Contract</Th><Th>Ends</Th><Th num>Paid this year</Th><Th>1099</Th><Th>Insurance</Th><Th>Status</Th></tr></thead>
             <tbody>
               {rows.map(r => (
                 <Fragment key={r.vendorId}>
@@ -111,19 +120,34 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
                     <Td className={`whitespace-nowrap ${r.state === 'lapsed' ? 'font-semibold text-ux2-red-ink' : ''}`}>{r.ends ? `${dayLabel(r.ends)}${r.state === 'lapsed' ? ' · lapsed' : ''}` : '—'}</Td>
                     <Td num className="font-semibold">{fmt(r.paidThisYear)}</Td>
                     <Td>{r.needs1099 ? <span>Yes{!r.w9OnFile && <span className="text-xs text-ux2-red-ink"> · W-9 missing</span>}</span> : <Chip tone="ghost">Under $600</Chip>}</Td>
+                    <Td><button type="button" aria-label={`Insurance for ${r.vendor}`} aria-expanded={insuring === r.vendorId} onClick={() => setInsuring(insuring === r.vendorId ? null : r.vendorId)} className="rounded-full"><Chip tone={insuranceChip(r.insurance).tone}>{insuranceChip(r.insurance).label}</Chip></button></Td>
                     <Td>
+                      {isBoard && r.state === 'ending' && r.contract && <button type="button" onClick={() => { const { caseId } = startAction('bid-request', `${r.contract!.title}, next term`, { budget: r.contract!.amount }); if (caseId) navigate(`/boardroom?view=case:${caseId}`); }} className="mr-1.5 rounded-full"><Chip tone="ghost">Collect bids</Chip></button>}
                       {isBoard && (r.state === 'lapsed' || r.state === 'ending' || r.state === 'none')
                         ? <button type="button" onClick={() => setRenewing(renewing === r.vendorId ? null : r.vendorId)} className="rounded-full"><Chip tone={STATE_TONE[r.state]}>{r.state === 'none' ? 'Add contract' : stateLabel(r)}</Chip></button>
                         : <Chip tone={STATE_TONE[r.state]}>{r.state === 'none' ? 'Per job' : stateLabel(r)}</Chip>}
                     </Td>
                   </tr>
-                  {renewing === r.vendorId && <tr><td colSpan={7} className="px-3 py-2"><RenewForm r={r} onClose={() => setRenewing(null)} /></td></tr>}
+                  {renewing === r.vendorId && <tr><td colSpan={8} className="px-3 py-2"><RenewForm r={r} onClose={() => setRenewing(null)} /></td></tr>}
+                  {insuring === r.vendorId && vendors.find(v => v.id === r.vendorId) && <tr><td colSpan={8} className="px-3 py-2"><VendorInsurance vendor={vendors.find(v => v.id === r.vendorId)!} today={snap.today} isBoard={isBoard} onClose={() => setInsuring(null)} /></td></tr>}
                 </Fragment>
               ))}
+              {mailOn && (
+                <tr data-mail-vendor={mail.mailProvider}>
+                  <Td><Cell title={mailProviderLabel(mail)} note="mail vendor" /></Td>
+                  <Td>Prints and mails certified notices and letters</Td>
+                  <Td>Pay per letter · the building's own account</Td>
+                  <Td>—</Td>
+                  <Td num className="text-xs text-ux2-muted">Billed by {mailProviderLabel(mail)}</Td>
+                  <Td>—</Td>
+                  <Td>—</Td>
+                  <Td>{isBoard ? <button type="button" onClick={manageMail} className="rounded-full"><Chip tone={mail.mailStatus === 'verified' ? 'sage' : 'amber'}>Manage</Chip></button> : <Chip tone="sage">Connected</Chip>}</Td>
+                </tr>
+              )}
             </tbody>
           </Table>
         )}
-        <Why>{sum.vendors} vendor{sum.vendors === 1 ? '' : 's'}. {sum.needs1099.length} {sum.needs1099.length === 1 ? 'is' : 'are'} over $600 this year, so their 1099s go out Jan 31 from Funds. Bills, work orders and payments stay in <button type="button" onClick={() => navigate('/funds?tab=expenses')} className="font-semibold text-ux2-teal hover:underline">Funds › Expenses</button>; this list is who they are and what they signed.</Why>
+        <Why>{sum.vendors} vendor{sum.vendors === 1 ? '' : 's'}. {sum.needs1099.length} {sum.needs1099.length === 1 ? 'is' : 'are'} over $600 this year, so their 1099s go out Jan 31 from Funds. Bills, work orders and payments stay in <button type="button" onClick={() => navigate('/funds?tab=expenses')} className="font-semibold text-ux2-teal hover:underline">Funds › Expenses</button>; this list is who they are and what they signed.{mailOn ? ` ${mailProviderLabel(mail)} is the building's mail vendor; it bills the building per letter and is managed under Funds › Accounts and ledger › Bank & Mail.` : isBoard ? <> No mail vendor is connected yet; <button type="button" onClick={manageMail} className="font-semibold text-ux2-teal hover:underline">choose one</button> so certified letters print and mail themselves.</> : null}</Why>
       </Card>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -139,7 +163,7 @@ export default function ContractsTab({ snap, isBoard }: { snap: BuildingSnapshot
           <SectionLabel>Paperwork on file</SectionLabel>
           <Inner className="py-1">
             <KV label="W-9s">{sum.needs1099.length - sum.missingW9.length} of {sum.needs1099.length} <span className="text-xs font-normal text-ux2-muted">{sum.missingW9.length ? `· ${sum.missingW9.map(r => r.vendor).join(', ')} missing · needed for the 1099 by Jan 31` : '· every vendor over $600'}</span>{isBoard && sum.missingW9[0] && <button type="button" onClick={() => updateVendor(sum.missingW9[0].vendorId, { w9OnFile: true })} className="ml-2 text-xs font-semibold text-ux2-teal hover:underline">Mark received</button>}</KV>
-            <KV label="Certificates of insurance">{certs.filter(r => !!r.contract).length} of {certs.length} <span className="text-xs font-normal text-ux2-muted">· asked for with each contract</span></KV>
+            <KV label="Certificates of insurance">{sum.insured} of {certs.length} <span className="text-xs font-normal text-ux2-muted">{sum.insuranceLapsed.length ? `· ${sum.insuranceLapsed.map(r => r.vendor).join(', ')} lapsed` : sum.insured < certs.length ? '· general liability, in force · add each from the Insurance column' : '· general liability, in force'}</span></KV>
             <KV label="Signed contracts">{signed} of {certs.length} <span className="text-xs font-normal text-ux2-muted">{sum.lapsed.length ? `· ${sum.lapsed.map(r => (r.contract?.title ?? r.service).toLowerCase()).join(', ')} unsigned` : ''}</span></KV>
           </Inner>
           <Why>Each gap is an obligation on Building › Obligations and a Home card for the Treasurer until the file lands in Documents.</Why>

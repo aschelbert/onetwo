@@ -25,8 +25,36 @@ export async function authUser(req: Request): Promise<{ id: string; email?: stri
 }
 
 /** The caller's building and role, from tenant_users. */
-export async function membership(userId: string): Promise<{ tenant_id: string; role: string } | null> {
-  return await restGetOne("tenant_users", { "user_id": `eq.${userId}`, "select": "tenant_id,role", "limit": "1" });
+export async function membership(userId: string): Promise<{ tenant_id: string; role: string; is_account_owner?: boolean } | null> {
+  return await restGetOne("tenant_users", { "user_id": `eq.${userId}`, "select": "tenant_id,role,is_account_owner", "limit": "1" });
+}
+
+/**
+ * The caller's membership of one building, or null when they are not an
+ * active member of it. A person can belong to several buildings, so anything
+ * that acts on a building named in the request must check that building, not
+ * whichever row comes back first. With no tenantId, answers only when the
+ * caller belongs to exactly one building.
+ */
+export async function membershipIn(userId: string, tenantId?: string): Promise<{ tenant_id: string; role: string; is_account_owner?: boolean } | null> {
+  const url = new URL(`${SB_URL}/rest/v1/tenant_users`);
+  url.searchParams.set("user_id", `eq.${userId}`);
+  url.searchParams.set("status", "eq.active");
+  url.searchParams.set("select", "tenant_id,role,is_account_owner");
+  if (tenantId) url.searchParams.set("tenant_id", `eq.${tenantId}`);
+  const res = await fetch(url.toString(), { headers: { ...serviceHeaders, "Accept": "application/json" } });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+}
+
+/** Board members, property managers and the account owner run the building's money and mail. */
+export const canManageBuilding = (tu: { role: string; is_account_owner?: boolean } | null): boolean =>
+  !!tu && (tu.role === "board_member" || tu.role === "property_manager" || !!tu.is_account_owner);
+
+/** Text from a request, made safe to place in an HTML email. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
 /** One row, or null when there is none. */

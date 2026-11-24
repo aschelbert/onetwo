@@ -7,3 +7,4 @@ export { TileSwitcher, type TileSection, type TileSwitcherProps } from './TileSw
 export { Ring } from './Ring';
 export { Table, Th, Td, Cell, RowMenu, Bar, KV, SearchInput, Why, Field, INPUT, type MenuItem } from './Table';
 export { ModuleHeader, HeaderActions, HeaderSlotProvider, ACTION_BUTTON, STATUS_CHIP } from './ModuleHeader';
+export { PhotoStrip, PhotoPicker } from './Photos';

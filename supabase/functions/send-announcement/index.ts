@@ -1,12 +1,11 @@
 // supabase/functions/send-announcement/index.ts
-// Sends an announcement email to all residents/owners in the building via Mailjet
+// Sends an announcement email to all residents/owners in the building
 // Called by board members when posting an announcement with "also send via email" checked
+import { EMAIL_NOT_CONFIGURED, emailConfigured, sendEmail } from "../_shared/email.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const MJ_API_KEY = Deno.env.get("MAILJET_API_KEY") || "";
-const MJ_SECRET_KEY = Deno.env.get("MAILJET_SECRET_KEY") || "";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://app.getonetwo.com";
 
 const cors = {
@@ -165,44 +164,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check Mailjet credentials
-    if (!MJ_API_KEY || !MJ_SECRET_KEY) {
-      return new Response(JSON.stringify({ success: false, error: "Email not configured — Mailjet credentials missing" }), {
+    // Email has to be set up
+    if (!emailConfigured()) {
+      return new Response(JSON.stringify({ success: false, error: EMAIL_NOT_CONFIGURED }), {
         status: 200, headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
-    // Send emails (Mailjet supports up to 50 recipients per Messages array entry)
-    // We'll send individually to personalize and avoid exposing recipient lists
-    const auth = btoa(`${MJ_API_KEY}:${MJ_SECRET_KEY}`);
+    // One email per recipient, so nobody sees the rest of the list
     let sentCount = 0;
+    let optedOut = 0;
     const errors: string[] = [];
 
     for (const recipient of emailRecipients) {
       try {
-        const res = await fetch("https://api.mailjet.com/v3.1/send", {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${auth}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            Messages: [{
-              From: { Email: "noreply@getonetwo.com", Name: buildingName },
-              To: [{ Email: recipient.email, Name: recipient.name }],
-              Subject: subject,
-              TextPart: textBody,
-              HTMLPart: htmlBody,
-            }],
-          }),
+        const res = await sendEmail({
+          fromName: buildingName,
+          to: { email: recipient.email, name: recipient.name },
+          subject: subject,
+          text: textBody,
+          html: htmlBody,
         });
 
         if (res.ok) {
           sentCount++;
           console.log("Announcement email sent to:", recipient.email);
+        } else if (res.optedOut) {
+          optedOut++;
         } else {
-          const errText = await res.text();
-          console.error("Mailjet error for", recipient.email, ":", res.status, errText);
+          console.error("Announcement email failed for", recipient.email, ":", res.status);
           errors.push(`${recipient.email}: ${res.status}`);
         }
       } catch (e) {
@@ -215,6 +205,7 @@ Deno.serve(async (req) => {
       success: true,
       sent: sentCount,
       total: emailRecipients.length,
+      optedOut,
       errors: errors.length > 0 ? errors : undefined,
     }), {
       status: 200, headers: { ...cors, "Content-Type": "application/json" },

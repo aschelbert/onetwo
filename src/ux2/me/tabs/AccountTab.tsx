@@ -6,7 +6,11 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useTenantContext } from '@/components/TenantProvider';
 import { fmt } from '@/lib/formatters';
 import { supabase, isBackendEnabled } from '@/lib/supabase';
-import { myPreference, setMyPreference } from '@/lib/marketingPrefs';
+import { myPreference, setMyPreference, type MyPreference } from '@/lib/marketingPrefs';
+import { emailOffExplanation, myEmailOff, restoreMyEmail, type EmailOff } from '@/lib/emailStatus';
+import { passwordError } from '@/lib/passwordPolicy';
+import PasswordRules from '@/features/auth/PasswordRules';
+import { SEATS } from '@/features/setup/invites';
 import { Button, Card, Chip, Inner, SectionLabel, Cell, Why, Field, INPUT } from '../../components';
 import StewardshipCard from '../../home/StewardshipCard';
 import { dayLabel } from '../../home/calendar';
@@ -38,28 +42,170 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
  * the demo and whenever the current answer cannot be read.
  */
 function ProductEmailsRow() {
-  const [on, setOn] = useState<boolean | null>(null);
+  const [pref, setPref] = useState<MyPreference | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!isBackendEnabled || !supabase) return;
     let cancelled = false;
-    myPreference(supabase).then(v => { if (!cancelled) setOn(v); });
+    myPreference(supabase).then(v => { if (!cancelled) setPref(v); });
     return () => { cancelled = true; };
   }, []);
-  if (on === null || !supabase) return null;
+  if (pref === null || !supabase) return null;
   const sb = supabase;
   const change = async (next: boolean) => {
-    setOn(next);
+    const before = pref;
+    setPref(next ? 'pending' : 'off');
     setFailed(false);
-    if (!(await setMyPreference(sb, next))) { setOn(!next); setFailed(true); }
+    const saved = await setMyPreference(sb, next);
+    if (saved === null) { setPref(before); setFailed(true); } else setPref(saved);
   };
   return (
     <Inner className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-3">
         <Cell title="Product news and offers by email" note="Tips, new features and offers from ONE two. Account and building emails are sent either way." />
-        <Toggle on={on} onChange={change} label="Product news and offers by email" />
+        <Toggle on={pref !== 'off'} onChange={change} label="Product news and offers by email" />
       </div>
+      {pref === 'pending' && <p role="status" className="text-xs text-ux2-muted">We emailed you a link. Press Confirm in that email to start getting product emails.</p>}
       {failed && <p role="alert" className="text-xs text-ux2-red-ink">That didn&apos;t save. Try again in a moment.</p>}
+    </Inner>
+  );
+}
+
+/**
+ * Shown only when email from the app is not reaching this person: they
+ * pressed the Unsubscribe our email provider adds to every message (which
+ * stops notices, invoices and password resets too), or their mailbox turned
+ * us away. Says so plainly and turns email back on in one press.
+ */
+export function EmailOffRow() {
+  const [off, setOff] = useState<EmailOff | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (!isBackendEnabled || !supabase) return;
+    let cancelled = false;
+    myEmailOff(supabase).then(v => { if (!cancelled) setOff(v); });
+    return () => { cancelled = true; };
+  }, []);
+  if (restored) return <Inner><p role="status" className="m-0 text-sm text-ux2-ink">Email is back on. Notices, invoices and password resets will reach you again.</p></Inner>;
+  if (!off || !supabase) return null;
+  const sb = supabase;
+  const turnOn = async () => {
+    setBusy(true); setError('');
+    const problem = await restoreMyEmail(sb);
+    setBusy(false);
+    if (problem) setError(problem); else { setOff(null); setRestored(true); }
+  };
+  return (
+    <Inner className="flex flex-col gap-1 border border-ux2-red-ink/30">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Cell title="Email to you is turned off" note={`${emailOffExplanation(off.reason)}${off.since ? ` Since ${dayLabel(off.since.slice(0, 10))}.` : ''} Meeting notices, invoices and password resets are not reaching you.`} />
+        <Button size="sm" disabled={busy} onClick={() => void turnOn()}>{busy ? 'Turning on…' : 'Turn email back on'}</Button>
+      </div>
+      {error && <p role="alert" className="text-xs text-ux2-red-ink">{error}</p>}
+    </Inner>
+  );
+}
+
+/**
+ * Change the password without leaving the account or waiting for an email.
+ * Someone who is signed in has already proved who they are; the reset link
+ * from the sign-in page is for people who are locked out.
+ */
+export function PasswordRow({ live }: { live: boolean }) {
+  const navigate = useNavigate();
+  const [editing, setEditing] = useState(false);
+  const [password, setPassword] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+  const close = () => { setEditing(false); setPassword(''); setAgain(''); setError(''); };
+  const save = async () => {
+    const problem = passwordError(password) ?? (password !== again ? 'The two passwords don\u2019t match.' : null);
+    if (problem) { setError(problem); return; }
+    if (!supabase) return;
+    setBusy(true); setError('');
+    const { error: failed } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (failed) { setError(/reauth|recent/i.test(failed.message) ? 'For your security, sign out and back in, then change your password.' : failed.message || 'That didn\u2019t save. Try again in a moment.'); return; }
+    close(); setDone(true);
+  };
+  if (!live || !supabase) {
+    return <Inner className="flex flex-wrap items-center justify-between gap-3"><Cell title="Password" note="•••••••• · change from the sign-in page" /><Button size="sm" variant="ghost" onClick={() => navigate('/reset-password')}>Change</Button></Inner>;
+  }
+  return (
+    <Inner className="flex flex-col gap-2">
+      {editing ? (
+        <form onSubmit={e => { e.preventDefault(); void save(); }} className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Field label="New password"><input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className={INPUT} aria-describedby="account-password-rules" /></Field>
+            <Field label="New password, again"><input type="password" autoComplete="new-password" value={again} onChange={e => setAgain(e.target.value)} className={INPUT} /></Field>
+          </div>
+          <PasswordRules password={password} id="account-password-rules" />
+          {error && <p role="alert" className="m-0 text-xs text-ux2-red-ink">{error}</p>}
+          <div className="flex gap-2"><Button type="submit" size="sm" disabled={busy}>{busy ? 'Saving…' : 'Save password'}</Button><Button type="button" size="sm" variant="ghost" onClick={close}>Cancel</Button></div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Cell title="Password" note={done ? 'Changed just now. Use the new one next time you sign in.' : '•••••••• · change it here, no email needed'} />
+          <Button size="sm" variant="ghost" onClick={() => { setDone(false); setEditing(true); }}>Change</Button>
+        </div>
+      )}
+    </Inner>
+  );
+}
+
+/**
+ * A board member's own seat. An invitation can make someone a board member
+ * without naming the seat, so they confirm it here. In a live building the
+ * server decides (set_my_board_seat): an officer seat someone else holds is
+ * refused with that person's name.
+ */
+function BoardSeatRow({ tenantId, live }: { tenantId: string; live: boolean }) {
+  const user = useAuthStore(s => s.currentUser);
+  const mine = useBuildingStore(s => s.board.find(b => b.name === user.name || (!!b.email && b.email.toLowerCase() === user.email.toLowerCase())));
+  const current = SEATS.find(s => s.label === mine?.role);
+  const [editing, setEditing] = useState(false);
+  const [seat, setSeat] = useState(current?.key ?? SEATS[0].key);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    const label = SEATS.find(s => s.key === seat)?.label ?? '';
+    setError('');
+    if (live && supabase) {
+      setSaving(true);
+      const { data, error: failed } = await supabase.rpc('set_my_board_seat', { p_tenant_id: tenantId, p_seat: seat });
+      setSaving(false);
+      if (failed || !data?.success) { setError(data?.error ?? 'That didn\u2019t save. Try again in a moment.'); return; }
+    }
+    // The server has already written the directory row, so only this screen's copy changes.
+    useBuildingStore.setState(s => ({
+      board: mine
+        ? s.board.map(b => b.id === mine.id ? { ...b, role: label } : b)
+        : [...s.board, { id: `seat-${user.id}`, name: user.name, role: label, email: user.email, phone: user.phone ?? '', term: '' }],
+    }));
+    setEditing(false);
+  };
+  return (
+    <Inner className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {editing ? (
+          <form onSubmit={e => { e.preventDefault(); void save(); }} className="flex flex-1 flex-wrap items-end gap-2">
+            <Field label="Board position" className="min-w-[200px] flex-1">
+              <select value={seat} onChange={e => setSeat(e.target.value)} className={INPUT}>{SEATS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>
+            </Field>
+            <Button type="submit" size="sm" disabled={saving}>Save</Button><Button type="button" size="sm" variant="ghost" onClick={() => { setEditing(false); setError(''); }}>Cancel</Button>
+          </form>
+        ) : (
+          <>
+            <Cell title="Board position" note={current ? `${current.label} · shown in the board directory` : 'Not confirmed yet · tell the building which seat you hold'} />
+            <Button size="sm" variant={current ? 'ghost' : 'primary'} onClick={() => { setSeat(current?.key ?? SEATS[0].key); setEditing(true); }}>{current ? 'Change' : 'Confirm'}</Button>
+          </>
+        )}
+      </div>
+      {error && <p role="alert" className="text-xs text-ux2-red-ink">{error}</p>}
     </Inner>
   );
 }
@@ -195,8 +341,9 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
             <SectionLabel>Profile</SectionLabel>
             <ProfileRow label="Name" value={user.name} onSave={v => updateProfile({ name: v })} />
             <ProfileRow label="Email" value={user.email} note="verified" type="email" onSave={v => updateProfile({ email: v })} />
+            {snap.viewer.role === 'BOARD_MEMBER' && <BoardSeatRow tenantId={tenant.id} live={isBackendEnabled && !tenant.isDemo} />}
             <ProfileRow label="Phone" value={user.phone} note="for the directory and support calls only" type="tel" onSave={v => updateProfile({ phone: v })} />
-            <ProfileRow label="Password" value="••••••••" note="change from the sign-in page" onSave={() => navigate('/reset-password')} />
+            <PasswordRow live={isBackendEnabled && !tenant.isDemo} />
             <ProfileRow label="Two-factor sign-in" value="off" note="set it up from the sign-in page" />
             <Inner className="flex items-center justify-between gap-3"><Cell title="Linked units" note={snap.viewer.linkedUnits.length ? snap.viewer.linkedUnits.map(u => `${u} · owner`).join(', ') : 'none'} /><Button size="sm" variant="ghost" onClick={() => navigate('/my-unit')}>My Unit</Button></Inner>
           </Card>
@@ -219,6 +366,7 @@ export default function AccountTab({ snap }: { snap: MeSnapshot }) {
         <div className="flex flex-col gap-4">
           <Card aria-label="Notifications" className="gap-2">
             <SectionLabel>Notifications</SectionLabel>
+            <EmailOffRow />
             {[
               ['Home cards', 'Approvals, replies, meeting and vote reminders', cards, (v: boolean) => setPref('cards', v)],
               ['Daily digest email, 7am', 'New posts, requests and what is due today', digest, (v: boolean) => { setPref('digest', v); updateProfile({ notifications: { ...user.notifications, email: v } }); }],

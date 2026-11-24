@@ -8,6 +8,7 @@ import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Ri
 import { dayLabel } from '../../home/calendar';
 import { ONLINE_METHODS, agingTotals, behind, collected, invoiceSummary, monthName, openAssessments, ordinal, unpaidFees, type BehindUnit, type FundsSnapshot } from '../metrics';
 import type { FundsTab } from '../FundsPage';
+import { emailUnitInvoice } from '@/lib/services/invoicing';
 
 type Section = 'ledger' | 'behind' | 'invoices';
 const SECTIONS: Section[] = ['ledger', 'behind', 'invoices'];
@@ -44,8 +45,53 @@ function LastPayment({ u }: { u: Unit }) {
 
 type Panel = { kind: 'payment' | 'fee' | 'assessment'; unit?: string } | null;
 
+/** What happened to the email for the charge just created. */
+type ChargeNotice = { tone: 'busy' | 'ok' | 'warn'; text: string } | null;
+type OnCharged = (invoice: UnitInvoice) => void;
+
+/** A charge created by hand is emailed to the owner straight away; this reports how that went. */
+function useChargeEmail(): { notice: ChargeNotice; emailCharge: OnCharged; resend: OnCharged; clear: () => void } {
+  const [notice, setNotice] = useState<ChargeNotice>(null);
+  const emailCharge: OnCharged = invoice => {
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.number === invoice.unitNumber);
+    const what = `${fmt(invoice.amount)} charge to Unit ${invoice.unitNumber}`;
+    if (invoice.status === 'paid') { setNotice({ tone: 'ok', text: `${what} recorded and paid from the unit's credit. No invoice was emailed.` }); return; }
+    setNotice({ tone: 'busy', text: `${what} recorded. Emailing the invoice to ${unit?.email || 'the owner'}…` });
+    void emailUnitInvoice(invoice, unit, fin.stripeConnectId, fin.tenantId).then(r => {
+      if (r.sent) setNotice({ tone: r.payLink ? 'ok' : 'warn', text: `${what} recorded. Invoice emailed to ${unit?.email}${r.payLink ? ' with a link to pay online.' : ', but without a link to pay online.'}` });
+      else setNotice({ tone: 'warn', text: `${what} recorded, but the invoice was not emailed: ${r.error}` });
+    });
+  };
+  /** Sends an open invoice again, for what is still owed on it. */
+  const resend: OnCharged = invoice => {
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.number === invoice.unitNumber);
+    const owed = Math.round((invoice.amount - (invoice.paidAmount ?? 0)) * 100) / 100;
+    if (invoice.status === 'paid' || owed <= 0) { setNotice({ tone: 'ok', text: `Invoice ${invoice.id} is paid, so it was not emailed.` }); return; }
+    const what = `Invoice ${invoice.id} for Unit ${invoice.unitNumber} (${fmt(owed)} owed)`;
+    setNotice({ tone: 'busy', text: `Emailing ${what} to ${unit?.email || 'the owner'}…` });
+    void emailUnitInvoice({ ...invoice, amount: owed }, unit, fin.stripeConnectId, fin.tenantId).then(r => {
+      if (r.sent) setNotice({ tone: r.payLink ? 'ok' : 'warn', text: `${what} emailed to ${unit?.email}${r.payLink ? ' with a new link to pay online.' : ', but without a link to pay online.'}` });
+      else setNotice({ tone: 'warn', text: `${what} was not emailed: ${r.error}` });
+    });
+  };
+  return { notice, emailCharge, resend, clear: () => setNotice(null) };
+}
+
+function ChargeNoticeLine({ notice, onDismiss }: { notice: ChargeNotice; onDismiss: () => void }) {
+  if (!notice) return null;
+  const tone = notice.tone === 'warn' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-ux2-line bg-ux2-surface text-ux2-ink';
+  return (
+    <div role="status" className={`flex items-start justify-between gap-3 rounded-[14px] border px-3.5 py-2.5 text-[13px] ${tone}`}>
+      <span className="min-w-0">{notice.text}</span>
+      {notice.tone !== 'busy' && <button type="button" onClick={onDismiss} className="shrink-0 font-semibold hover:underline">Dismiss</button>}
+    </div>
+  );
+}
+
 /** The inline forms that replaced the ledger modals: record a payment, add a fee, add a special assessment. */
-function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units: Unit[]; onClose: () => void }) {
+function UnitForm({ panel, units, onClose, onCharged }: { panel: NonNullable<Panel>; units: Unit[]; onClose: () => void; onCharged: OnCharged }) {
   const record = useFinancialStore(s => s.recordUnitPayment);
   const fee = useFinancialStore(s => s.imposeLateFee);
   const assess = useFinancialStore(s => s.addSpecialAssessment);
@@ -59,8 +105,8 @@ function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units:
     const n = Number(amount);
     if (!unit || !Number.isFinite(n) || n <= 0) return;
     if (panel.kind === 'payment') record(unit, n, method);
-    else if (panel.kind === 'fee') fee(unit, n, reason || 'Fee');
-    else assess(unit, n, reason || 'Special assessment');
+    else if (panel.kind === 'fee') onCharged(fee(unit, n, reason || 'Fee'));
+    else onCharged(assess(unit, n, reason || 'Special assessment'));
     onClose();
   };
   return (
@@ -86,7 +132,7 @@ function UnitForm({ panel, units, onClose }: { panel: NonNullable<Panel>; units:
         </Field>
       )}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!amount}>{panel.kind === 'payment' ? 'Record' : 'Add'}</Button>
+        <Button type="submit" size="sm" disabled={!amount}>{panel.kind === 'payment' ? 'Record' : 'Add and email'}</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
       </div>
     </form>
@@ -127,7 +173,7 @@ const HEAD = (
 
 type LedgerFilter = 'all' | 'behind' | 'autopay' | 'fees';
 
-function UnitLedger({ snap, beh, panel, setPanel }: { snap: FundsSnapshot; beh: BehindUnit[]; panel: Panel; setPanel: (p: Panel) => void }) {
+function UnitLedger({ snap, beh, panel, setPanel, charge }: { snap: FundsSnapshot; beh: BehindUnit[]; panel: Panel; setPanel: (p: Panel) => void; charge: ReturnType<typeof useChargeEmail> }) {
   const [filter, setFilter] = useState<LedgerFilter>('all');
   const [q, setQ] = useState('');
   const navigate = useNavigate();
@@ -158,7 +204,8 @@ function UnitLedger({ snap, beh, panel, setPanel }: { snap: FundsSnapshot; beh: 
           <Button size="sm" className="h-9" onClick={() => setPanel({ kind: 'payment' })}>Record a payment</Button>
         </div>
       </div>
-      {panel && <UnitForm key={`${panel.kind}-${panel.unit}`} panel={panel} units={snap.units} onClose={() => setPanel(null)} />}
+      {panel && <UnitForm key={`${panel.kind}-${panel.unit}`} panel={panel} units={snap.units} onClose={() => setPanel(null)} onCharged={charge.emailCharge} />}
+      <ChargeNoticeLine notice={charge.notice} onDismiss={charge.clear} />
       {rows.length === 0 ? (
         <Inner className="text-sm text-ux2-muted">{snap.units.length === 0 ? 'No units yet. Add units under Building › Directory.' : 'No unit matches.'}</Inner>
       ) : (
@@ -183,7 +230,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
   const steps = beh.map(b => {
     const c = caseFor(b.number);
     if (b.forSale) return { unit: b.number, title: 'resale certificate', text: `${fmt(b.amount)} collected at closing · dues ${b.daysPastDue > 30 ? 'behind' : 'current'}`, chip: <Chip tone="ghost">On track</Chip>, go: () => navigate('/building?tab=directory') };
-    if (b.daysPastDue > 60) return { unit: b.number, title: 'demand letter', text: `collections runbook${c?.steps ? ` step ${Math.max(1, c.steps.findIndex(s => !s.done) + 1)} of ${c.steps.length}` : ''} · ${b.daysPastDue} days · lien allowed at 90 days, § 42-1903.13${c ? ` · ${c.sitId}` : ''}`, chip: <Chip tone="red">{c ? 'Send · drafted' : 'Start collections'}</Chip>, go: () => navigate(c ? `/issues?view=case:${c.id}` : '/issues?view=new') };
+    if (b.daysPastDue > 60) return { unit: b.number, title: 'demand letter', text: `collections runbook${c?.steps ? ` step ${Math.max(1, c.steps.findIndex(s => !s.done) + 1)} of ${c.steps.length}` : ''} · ${b.daysPastDue} days · lien referral at 90 days under the collection policy${c ? ` · ${c.sitId}` : ''}`, chip: <Chip tone="red">{c ? 'Send · drafted' : 'Start collections'}</Chip>, go: () => navigate(c ? `/issues?view=case:${c.id}` : '/issues?view=new') };
     return { unit: b.number, title: 'friendly reminder', text: `${b.daysPastDue > 30 ? '1 month' : `${b.daysPastDue} days`}, ${fmt(b.amount)} · ${snap.lateFee.enabled ? `late fee $${snap.lateFee.amount} on ${monthName(snap.today.slice(0, 7))} ${lateDay} unless paid` : 'no automatic late fee'} · goes from the app, not from you`, chip: <Chip tone="amber">Send reminder</Chip>, go: () => navigate('/boardroom?tab=outbox') };
   });
   return (
@@ -212,7 +259,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
         </>
       )}
       <Why>
-        Aging: 0 to 30 days {fmt(totals['0-30'])} · 31 to 60 days {fmt(totals['31-60'])} · 61 to 90 days {fmt(totals['61-90'])} · over 90 days {fmt(totals['90+'])}. {snap.lateFee.enabled ? `Late fee $${snap.lateFee.amount} on the ${ordinal(lateDay)}, ` : ''}60-day notice by certified mail, demand letter at 60 days, lien at 90: the runbook runs these on its own and asks you only to send.
+        Aging: 0 to 30 days {fmt(totals['0-30'])} · 31 to 60 days {fmt(totals['31-60'])} · 61 to 90 days {fmt(totals['61-90'])} · over 90 days {fmt(totals['90+'])}. {snap.lateFee.enabled ? `Late fee $${snap.lateFee.amount} on the ${ordinal(lateDay)}, ` : ''}60-day notice by certified mail, demand letter at 60 days, referral for a lien at 90 (the building's collection policy; under DC Code § 42-1903.13 an unpaid assessment is a lien from the day it falls due): the runbook runs these on its own and asks you only to send.
         {' '}<button type="button" onClick={onLedger} className="font-semibold text-ux2-teal hover:underline">Open the ledger</button>
       </Why>
     </Card>
@@ -221,7 +268,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
 
 type InvoiceFilter = 'all' | 'open' | 'paid' | 'dues' | 'fees';
 
-function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void }) {
+function InvoiceForm({ units, onClose, onCharged }: { units: Unit[]; onClose: () => void; onCharged: OnCharged }) {
   const create = useFinancialStore(s => s.createUnitInvoice);
   const [unit, setUnit] = useState(units[0]?.number ?? '');
   const [type, setType] = useState<UnitInvoice['type']>('fee');
@@ -232,7 +279,7 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
   return (
     <form
       aria-label="New invoice"
-      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; create(unit, type, n, desc || 'Invoice', undefined, due || undefined, type === 'special_assessment' ? { fund } : undefined); onClose(); }}
+      onSubmit={e => { e.preventDefault(); const n = Number(amount); if (!unit || !Number.isFinite(n) || n <= 0) return; onCharged(create(unit, type, n, desc || 'Invoice', undefined, due || undefined, type === 'special_assessment' ? { fund } : undefined)); onClose(); }}
       className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3"
     >
       <div className="w-full text-sm font-semibold text-ux2-ink">New invoice · fee, assessment, repair or amenity</div>
@@ -242,7 +289,7 @@ function InvoiceForm({ units, onClose }: { units: Unit[]; onClose: () => void })
       <Field label="Amount" className="w-[120px]"><input inputMode="decimal" placeholder="$" value={amount} onChange={e => setAmount(e.target.value)} className={INPUT} /></Field>
       <Field label="What for" className="min-w-[180px] flex-1"><input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Repair charge · door closer" className={INPUT} /></Field>
       <Field label="Due" className="w-[150px]"><input type="date" value={due} onChange={e => setDue(e.target.value)} className={INPUT} /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!amount}>Create</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!amount}>Create and email</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
     </form>
   );
 }
@@ -254,7 +301,7 @@ function invoiceStatus(i: UnitInvoice, today: string) {
   return <Chip tone={part ? 'amber' : 'ghost'}>{part ? `Part paid${part}` : 'Open'}</Chip>;
 }
 
-function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSnapshot; onLedger: () => void; creating: boolean; setCreating: (v: boolean) => void }) {
+function InvoicesCard({ snap, onLedger, creating, setCreating, charge }: { snap: FundsSnapshot; onLedger: () => void; creating: boolean; setCreating: (v: boolean) => void; charge: ReturnType<typeof useChargeEmail> }) {
   const [filter, setFilter] = useState<InvoiceFilter>('all');
   const [all, setAll] = useState(false);
   const payUnitInvoice = useFinancialStore(s => s.payUnitInvoice);
@@ -276,7 +323,8 @@ function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSn
           <Button size="sm" className="h-9" onClick={() => setCreating(true)}>New invoice</Button>
         </div>
       </div>
-      {creating && <InvoiceForm units={snap.units} onClose={() => setCreating(false)} />}
+      {creating && <InvoiceForm units={snap.units} onClose={() => setCreating(false)} onCharged={charge.emailCharge} />}
+      <ChargeNoticeLine notice={charge.notice} onDismiss={charge.clear} />
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">No invoices here.</Inner> : (
         <Table>
           <thead><tr><Th>Invoice</Th><Th>Unit</Th><Th>What for</Th><Th>Issued</Th><Th>Due</Th><Th num>Amount</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
@@ -292,7 +340,7 @@ function InvoicesCard({ snap, onLedger, creating, setCreating }: { snap: FundsSn
                 <Td>{invoiceStatus(i, snap.today)}</Td>
                 <Td num>
                   <RowMenu label={`More for ${i.id}`} items={[
-                    ...(i.status !== 'paid' ? [{ label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
+                    ...(i.status !== 'paid' ? [{ label: 'Email this invoice', onSelect: () => charge.resend(i) }, { label: 'Record a payment in full', onSelect: () => payUnitInvoice(i.id, 'check') }, { label: 'Cancel this charge', onSelect: () => voidUnitInvoice(i.id, 'Cancelled from the invoice register') }] : []),
                     { label: 'Open the unit ledger', onSelect: onLedger },
                   ]} />
                 </Td>
@@ -316,6 +364,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
   const aging = agingTotals(beh);
   const [panel, setPanel] = useState<Panel>(null);
   const [creating, setCreating] = useState(false);
+  const charge = useChargeEmail();
   const payFrom = (unit: string) => { setPanel({ kind: 'payment', unit }); onSection('ledger'); };
 
   const sections: TileSection<Section>[] = [
@@ -337,7 +386,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         ),
         action: <><span className="min-w-0 truncate"><b className="font-semibold">Unit ledger</b> · every unit, what they pay and owe</span><Chip tone="white" className="!bg-white !text-ux2-teal">{col.units}</Chip></>,
       },
-      detail: <UnitLedger snap={snap} beh={beh} panel={panel} setPanel={setPanel} />,
+      detail: <UnitLedger snap={snap} beh={beh} panel={panel} setPanel={setPanel} charge={charge} />,
     },
     {
       id: 'behind',
@@ -351,7 +400,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
               <div>
                 <div className="text-[32px] font-semibold leading-none tracking-[-0.03em]">{fmt(outstanding)}</div>
                 <div className="text-xs text-white/[0.72]">{beh.length ? 'outstanding' : 'outstanding · every unit is current'}</div>
-                <div className="mt-2 text-xs text-white/[0.72]">Lien allowed at 90 days <span className="opacity-70">§ 42-1903.13</span></div>
+                <div className="mt-2 text-xs text-white/[0.72]">Lien referral at 90 days <span className="opacity-70">collection policy · the lien itself arises when an assessment falls due, § 42-1903.13</span></div>
               </div>
               <div className="flex items-end gap-2" aria-label="Outstanding by age">
                 {(['0-30', '31-60', '61-90', '90+'] as const).map(b => {
@@ -397,7 +446,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
         ),
         action: <><span className="min-w-0 truncate"><b className="font-semibold">New invoice</b> · fee, assessment, repair or amenity</span><button type="button" onClick={e => { e.stopPropagation(); setCreating(true); onSection('invoices'); }} className="inline-flex h-9 shrink-0 items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">Create</button></>,
       },
-      detail: <InvoicesCard snap={snap} onLedger={() => onSection('ledger')} creating={creating} setCreating={setCreating} />,
+      detail: <InvoicesCard snap={snap} onLedger={() => onSection('ledger')} creating={creating} setCreating={setCreating} charge={charge} />,
     },
   ];
 

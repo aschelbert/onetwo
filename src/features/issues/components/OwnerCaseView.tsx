@@ -103,7 +103,7 @@ export function OwnerCaseView({ c, onBack }: OwnerCaseViewProps) {
             <span className="text-lg mt-0.5">🤝</span>
             <div>
               <p className="text-sm font-medium text-ink-800">Request Mediation</p>
-              <p className="text-xs text-ink-500">You may request mediation per DC Code § 42-1903.14.</p>
+              <p className="text-xs text-ink-500">You may ask the board to agree to mediation; check your bylaws for any dispute-resolution process.</p>
             </div>
           </div>
           <div className="flex items-start gap-3 p-3 bg-mist-50 rounded-lg">
@@ -122,9 +122,9 @@ export function OwnerCaseView({ c, onBack }: OwnerCaseViewProps) {
         <div className="space-y-2 text-xs text-ink-600">
           <p>• Right to cure before fines (DC Code § 42-1903.13)</p>
           <p>• Right to hearing before the board (Bylaws, Article VII)</p>
-          <p>• Right to inspect association records (DC Code § 42-1903.14)</p>
-          <p>• Right to attend board meetings (DC Code § 42-1903.14(c))</p>
-          <p>• Right to mediation (DC Code § 42-1903.14)</p>
+          <p>• Right to examine and copy association records, for owners in good standing with a proper purpose (DC Code § 42-1903.14)</p>
+          <p>• Board meetings are open to owners in good standing (DC Code § 42-1903.03)</p>
+          <p>• Mediation, if your bylaws provide for it or the board agrees</p>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ Disallow: /login
 Disallow: /signup
 Disallow: /reset-password
 Disallow: /unsubscribe
+Disallow: /confirm-email
 Disallow: /dashboard
 Disallow: /home
 Disallow: /setup

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { act, cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useComplianceStore } from '@/store/useComplianceStore';
+import { useMailStore } from '@/store/useMailStore';
 
 vi.mock('@/components/TenantProvider', () => ({
   useTenantContext: () => ({ name: 'Sunny Acres', isDemo: false, status: 'active', features: {}, id: 't1' }),
@@ -40,7 +41,7 @@ describe('Building', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Building sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Goals', 'Projects', 'Utilities', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     expect(document.querySelector('[aria-label="Details"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Insurance"]')).toBeTruthy();
@@ -104,6 +105,25 @@ describe('Building', () => {
     expect(document.querySelector('[aria-label="Paperwork on file"]')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add a vendor' }));
     expect(screen.getByRole('form', { name: 'Add a vendor' })).toBeTruthy();
+  });
+
+  it('Contracts lists the connected mail vendor as its own row, with Manage going to Funds', () => {
+    const before = useMailStore.getState().mailingSettings;
+    try {
+      useMailStore.getState().updateMailingSettings({ mailConnected: false, mailProvider: '', mailStatus: '' });
+      renderAt('/building?tab=contracts');
+      expect(document.querySelector('tr[data-mail-vendor]')).toBeNull();
+      expect(screen.getByRole('button', { name: 'choose one' })).toBeTruthy();
+      cleanup();
+      useMailStore.getState().updateMailingSettings({ mailConnected: true, mailProvider: 'docupost', mailStatus: 'verified' });
+      renderAt('/building?tab=contracts');
+      const row = document.querySelector('tr[data-mail-vendor="docupost"]') as HTMLElement;
+      expect(row.textContent).toContain('DocuPost');
+      expect(row.textContent).toContain('Pay per letter');
+      expect(within(row).getByRole('button', { name: 'Manage' })).toBeTruthy();
+    } finally {
+      useMailStore.getState().updateMailingSettings(before);
+    }
   });
 
   it('Directory lists units and owners, the board, management, staff and emergency contacts', () => {

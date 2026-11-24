@@ -33,10 +33,18 @@ verify_jwt = false
 [functions.unsubscribe]
 verify_jwt = false
 
+[functions.send-marketing-confirmations]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 
 # The public Contact panel on getonetwo.com posts here from a logged-out page.
 # The function rate-limits and filters bots itself.
 [functions.contact-form]
+verify_jwt = false
+
+# Brevo's delivery events. Brevo sends a bearer token we set (BREVO_WEBHOOK_TOKEN),
+# not a Supabase JWT.
+[functions.brevo-webhook]
 verify_jwt = false

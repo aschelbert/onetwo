@@ -176,9 +176,17 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
       return { sent: false, error: 'Backend not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.' };
     }
 
+    // The function only bills for a signed-in board member of this building,
+    // so it needs the person's own session, not the public key.
+    const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      return { sent: false, error: 'You are signed out. Sign in again to email invoices.' };
+    }
+
     const payload = {
       invoiceId, unitNumber: unitNum, ownerName, ownerEmail,
-      amount, description, type, buildingName: building.name,
+      amount, description, type, buildingName: building.name, tenantId: store.tenantId,
       buildingAddress: `${building.address.street}, ${building.address.city}, ${building.address.state} ${building.address.zip}`,
     };
 
@@ -190,7 +198,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
         headers: {
           'Content-Type': 'application/json',
           'apikey': sbKey,
-          'Authorization': `Bearer ${sbKey}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify(payload),
       });
@@ -201,7 +209,7 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
         const text = await res.text();
         console.error('Invoice email error response:', text);
         if (res.status === 404) {
-          return { sent: false, error: 'Edge Function not deployed. Run: supabase functions deploy send-unit-invoice --no-verify-jwt' };
+          return { sent: false, error: 'Edge Function not deployed. Run: supabase functions deploy send-unit-invoice' };
         }
         return { sent: false, error: `Server error ${res.status}: ${text.slice(0, 100)}` };
       }
@@ -216,7 +224,8 @@ export default function TheUnitsTab({ variant = 'fiscal', compact = false }: { v
       if (data.success && data.emailSent) {
         return { sent: true, paymentUrl: data.paymentUrl, error: data.stripeError ? `Email sent but Stripe failed: ${data.stripeError}` : undefined };
       }
-      return { sent: false, error: data.error || 'Email delivery failed — check Mailjet sender domain.' };
+      if (data.emailOptedOut) return { sent: false, error: 'This owner has email turned off, so the invoice was not emailed. They can turn it back on from their Account page, or you can from Users.' };
+      return { sent: false, error: data.error || 'Email delivery failed — check the email sender domain.' };
     } catch (err) {
       console.error('sendInvoiceEmail network error:', err);
       return { sent: false, error: `Network error: ${String(err)}` };

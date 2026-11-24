@@ -4,6 +4,7 @@
  * functions over a snapshot so the tiles are testable and the production
  * tabs underneath keep owning every mutation.
  */
+import { componentsOf, percentFunded } from '@/lib/reservePlan';
 import type { Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
 import { daysBetween } from '../runbook/model';
@@ -14,6 +15,8 @@ export interface BudgetLine {
   budgeted: number;
   actual: number;
   acctNum?: string;
+  /** Every ledger account the line is measured against. */
+  acctNums?: string[];
 }
 
 export interface ReserveLine {
@@ -23,6 +26,9 @@ export interface ReserveLine {
   currentFunding: number;
   yearsRemaining: number;
   isContingency?: boolean;
+  /** Carried through for the funding plan; absent on older test data, where years left stands in. */
+  usefulLife?: number;
+  lastReplaced?: string;
 }
 
 export interface FundsSnapshot {
@@ -44,7 +50,7 @@ export interface FundsSnapshot {
   lateFee: { enabled: boolean; amount: number; graceDays: number };
   stripeConnected: boolean;
   stripeOnboardingComplete: boolean;
-  /** This year's operating spend by month (Jan first), from the budget lines' expenses. */
+  /** This year's operating spend by month (Jan first), from the ledger (or the budget lines' own expenses when it has none). */
   spendByMonth?: number[];
   /** First day of the current fiscal year (calendar year when absent). */
   fiscalYearStart?: string;
@@ -179,14 +185,17 @@ export function invoiceSummary(invoices: UnitInvoice[], month?: string) {
 
 /** Bills are invoiced work orders; a bill is flagged when paying it would push its budget line over. */
 export function bills(s: FundsSnapshot) {
-  const byAcct = new Map(s.budget.filter(b => b.acctNum).map(b => [b.acctNum!, b]));
+  const byAcct = new Map(s.budget.flatMap(b => (b.acctNums?.length ? b.acctNums : b.acctNum ? [b.acctNum] : []).map(n => [n, b] as const)));
   const toApprove = s.workOrders.filter(w => w.status === 'invoiced');
   const flagged = toApprove.filter(w => {
     const line = byAcct.get(w.acctNum);
-    return !!line && line.budgeted > 0 && line.actual + w.amount > line.budgeted;
+    // A bill booked when it arrived is already in the line's actual; only an unbooked one adds to it.
+    return !!line && line.budgeted > 0 && line.actual + (w.accrualGlEntryId ? 0 : w.amount) > line.budgeted;
   });
   const flaggedIds = new Set(flagged.map(w => w.id));
   const within = toApprove.filter(w => !flaggedIds.has(w.id));
+  /** Signed off and inside its line: safe to pay in one go. */
+  const ready = within.filter(w => !!w.signoff);
   const dueSoon = toApprove.filter(w => w.invoiceDate && daysBetween(s.today, w.invoiceDate) >= -30);
   const sum = (list: WorkOrder[]) => list.reduce((t, w) => t + w.amount, 0);
   const month = monthKey(s.today);
@@ -195,6 +204,8 @@ export function bills(s: FundsSnapshot) {
     amount: sum(toApprove),
     within,
     withinAmount: sum(within),
+    ready,
+    unsigned: toApprove.filter(w => !w.signoff),
     flagged,
     flaggedAmount: sum(flagged),
     dueSoon,
@@ -244,7 +255,8 @@ export function reserveSummary(s: FundsSnapshot) {
     allocated,
     /** Reserve cash not yet split across the components (negative when the split claims more than the bank holds). */
     unallocated: Math.round((funded - allocated) * 100) / 100,
-    pct: needed > 0 ? Math.round((funded / needed) * 100) : 0,
+    /** Percent funded: the reserve balance against what should be set aside by now (src/lib/reservePlan.ts), the one figure used everywhere. */
+    pct: percentFunded(funded, componentsOf(s.reserves.map(r => ({ ...r, usefulLife: r.usefulLife ?? Math.max(1, Math.round(r.yearsRemaining) || 1), lastReplaced: r.lastReplaced ?? '', isContingency: !!r.isContingency })), year)) ?? 0,
     gap: Math.max(0, needed - funded),
     monthly: Math.round(s.annualReserveContribution / 12),
     recommendedMonthly: Math.round(s.recommendedAnnualReserve / 12),

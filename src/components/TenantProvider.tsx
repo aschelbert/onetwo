@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { supabase, isBackendEnabled, setActiveTenantId } from '@/lib/supabase';
-import { chooseTenant, fetchMemberships, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
+import { addressLine, chooseTenant, fetchMemberships, hasEnded, pickMembership, type TenantMembership } from '@/lib/tenantMembership';
 import { ROOT_DOMAIN, isEnvironmentHost, tenantLoginUrl } from '@/lib/tenantHost';
 import type { Role } from '@/types/auth';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -20,6 +20,10 @@ import { useVendorTrackerStore } from '@/store/useVendorTrackerStore';
 import { useSpendingStore } from '@/store/useSpendingStore';
 import { useLetterStore } from '@/store/useLetterStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
+import { useBuildingRecordsStore } from '@/store/useBuildingRecordsStore';
+import { useRegisterStore } from '@/store/useRegisterStore';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { useReportStore } from '@/store/useReportStore';
 import { useScorecardStore } from '@/store/useScorecardStore';
 import { usePayrollStore } from '@/store/usePayrollStore';
@@ -103,6 +107,10 @@ function loadTenantStores(tenantId: string) {
     useSpendingStore.getState().loadFromDb(tenantId),
     useLetterStore.getState().loadFromDb(tenantId),
     usePropertyLogStore.getState().loadFromDb(tenantId),
+    useBuildingRecordsStore.getState().loadFromDb(tenantId),
+    useRegisterStore.getState().loadFromDb(tenantId),
+    useCapitalProjectsStore.getState().loadFromDb(tenantId),
+    useActionRecordsStore.getState().loadFromDb(tenantId),
     useReportStore.getState().loadFromDb(tenantId),
     useScorecardStore.getState().loadFromDb(tenantId),
     usePayrollStore.getState().loadFromDb(tenantId),
@@ -114,6 +122,8 @@ function loadTenantStores(tenantId: string) {
     useTaskerStore.getState().load(tenantId),
     // Whether the building's own LetterStream account is connected (the keys stay server-side).
     useMailStore.getState().loadMailingSettings(tenantId).catch(() => { /* mail stays "not connected" until the function answers */ }),
+    // The building's letters and their tracking: the board's and the manager's only.
+    useMailStore.getState().loadMailRecords(tenantId).catch(() => { /* keeps what this browser has */ }),
   ]);
 }
 
@@ -500,6 +510,9 @@ export default function TenantProvider({ children }: { children: React.ReactNode
   }
 
   // Block access for churned tenants
+  // Someone who belongs to other buildings can still get to those from here.
+  // Ones that have ended too are left out: they only lead to this notice.
+  const otherBuildings = buildings.filter(b => b.tenant_id !== tenant.id && !hasEnded(b));
   if (tenant.status === 'churned' && !tenant.isDemo && currentUser?.role !== 'PLATFORM_ADMIN') {
     return (
       <TenantContext.Provider value={contextValue}>
@@ -515,6 +528,25 @@ export default function TenantProvider({ children }: { children: React.ReactNode
               Your subscription has ended and access to {tenant.name} is no longer available.
               Please contact support or a board member to reactivate your account.
             </p>
+            {otherBuildings.length > 0 && (
+              <div className="mb-6 text-left">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Open another building</p>
+                <div className="flex flex-col gap-2">
+                  {otherBuildings.map(b => (
+                    <button
+                      key={b.tenant_id}
+                      onClick={() => { void switchBuilding(b.tenant_id); }}
+                      className="w-full px-4 py-3 border border-ink-200 rounded-xl text-left hover:border-accent-400 hover:bg-accent-50 transition-all"
+                    >
+                      <span className="block text-sm font-semibold text-ink-900">{b.tenant?.name || 'Building'}</span>
+                      {addressLine(b.tenant?.address) && (
+                        <span className="block text-xs text-ink-500">{addressLine(b.tenant?.address)}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col gap-3">
               <a
                 href="mailto:support@getonetwo.com"

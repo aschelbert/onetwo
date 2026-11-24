@@ -1,14 +1,17 @@
 // supabase/functions/connect-mail-provider/index.ts
 // The building's own account with a printed-mail vendor (DocuPost or
 // LetterStream), the way connect-stripe-account is its own Stripe account.
-// Actions: status (any member), connect / disconnect (board members).
+// Actions: status (any member), connect / disconnect / set-balance (board members).
+// Neither vendor reports its balance, so the board can record what the
+// vendor's Funds page shows (set-balance); send-mail notes when a letter was
+// refused for lack of funds.
 // Credentials live in mail_provider_accounts, which only the service role can
 // read; the app sees the provider, a masked credential and a connected flag.
 
-import { PROVIDER_INFO, PROVIDERS, isProvider, maskCredential, verifyCredentials, type MailProviderId } from "../_shared/mailProvider.ts";
+import { PROVIDER_INFO, PROVIDERS, isProvider, maskCredential, providerIsOpen, verifyCredentials, type MailProviderId } from "../_shared/mailProvider.ts";
 import { authUser, cors, jsonResponse, membership, restGetOne, restWrite } from "../_shared/supabaseRest.ts";
 
-type Row = { provider: MailProviderId; api_id: string | null; api_key: string; status: string; connected_at: string; last_verified_at: string | null; last_error: string | null };
+type Row = { provider: MailProviderId; api_id: string | null; api_key: string; status: string; connected_at: string; last_verified_at: string | null; last_error: string | null; funds_low_at: string | null; balance_cents: number | null; balance_recorded_at: string | null };
 
 function statusPayload(row: Row | null) {
   const info = row ? PROVIDER_INFO[row.provider] : null;
@@ -22,6 +25,9 @@ function statusPayload(row: Row | null) {
     connectedAt: row?.connected_at ?? null,
     lastVerifiedAt: row?.last_verified_at ?? null,
     lastError: row?.last_error ?? null,
+    fundsLowAt: row?.funds_low_at ?? null,
+    balanceCents: row?.balance_cents ?? null,
+    balanceRecordedAt: row?.balance_recorded_at ?? null,
     portalUrl: info?.portalUrl ?? null,
     signupUrl: info?.signupUrl ?? null,
     // What each vendor offers, so the app can show the choice before anything is connected.
@@ -29,7 +35,7 @@ function statusPayload(row: Row | null) {
   };
 }
 
-const SELECT = "provider,api_id,api_key,status,connected_at,last_verified_at,last_error";
+const SELECT = "provider,api_id,api_key,status,connected_at,last_verified_at,last_error,funds_low_at,balance_cents,balance_recorded_at";
 const account = (tenantId: string): Promise<Row | null> => restGetOne("mail_provider_accounts", { "tenant_id": `eq.${tenantId}`, "select": SELECT });
 
 Deno.serve(async (req) => {
@@ -57,6 +63,10 @@ Deno.serve(async (req) => {
       const provider = body.provider;
       if (!isProvider(provider)) return jsonResponse({ error: "Choose DocuPost or LetterStream" }, 400);
       const info = PROVIDER_INFO[provider];
+      // A vendor that isn't open yet is refused, unless the building is already on it and is only changing keys.
+      if (!providerIsOpen(provider) && (await account(tenantId))?.provider !== provider) {
+        return jsonResponse({ error: `${info.label} opens to buildings on ${info.availableFromLabel}. Until then, connect DocuPost.` }, 400);
+      }
       const apiId = String(body.apiId || "").trim();
       const apiKey = String(body.apiKey || "").trim();
       if (!apiKey || (info.credentials.includes("apiId") && !apiId)) {
@@ -73,6 +83,9 @@ Deno.serve(async (req) => {
       }
       const verified = check.ok === true;
       const now = new Date().toISOString();
+      // Fresh keys for the same vendor keep the recorded balance; another vendor is another account.
+      const before = await account(tenantId);
+      const sameVendor = before?.provider === provider;
       const row = {
         tenant_id: tenantId,
         provider,
@@ -83,12 +96,28 @@ Deno.serve(async (req) => {
         connected_by: user.id,
         connected_at: now,
         last_verified_at: verified ? now : null,
+        funds_low_at: null,
+        balance_cents: sameVendor ? before!.balance_cents : null,
+        balance_recorded_at: sameVendor ? before!.balance_recorded_at : null,
       };
       const ok = await restWrite("POST", "mail_provider_accounts?on_conflict=tenant_id", row, "resolution=merge-duplicates,return=minimal");
       if (!ok) return jsonResponse({ error: `Could not save the ${info.label} credentials` }, 500);
 
       const note = verified ? null : check.ok === "pending" ? `Saved. ${check.reason}` : `Saved, but not yet verified: ${check.reason}`;
       return jsonResponse({ ...statusPayload(await account(tenantId)), verified, note });
+    }
+
+    // ═══ set-balance ═══
+    // What the vendor's Funds page shows, read off by a board member; null forgets it.
+    if (action === "set-balance") {
+      if (!(await account(tenantId))) return jsonResponse({ error: "The building's mail account isn't connected" }, 400);
+      const raw = body.balanceCents;
+      const cents = raw === null || raw === undefined || raw === "" ? null : Math.round(Number(raw));
+      if (cents !== null && (!Number.isFinite(cents) || cents < 0 || cents > 100_000_00)) return jsonResponse({ error: "Enter the balance as an amount between $0 and $100,000" }, 400);
+      const patch = { balance_cents: cents, balance_recorded_at: cents === null ? null : new Date().toISOString(), ...(cents ? { funds_low_at: null } : {}) };
+      const ok = await restWrite("PATCH", `mail_provider_accounts?tenant_id=eq.${tenantId}`, patch);
+      if (!ok) return jsonResponse({ error: "Could not save the balance" }, 500);
+      return jsonResponse(statusPayload(await account(tenantId)));
     }
 
     // ═══ disconnect ═══
@@ -98,7 +127,7 @@ Deno.serve(async (req) => {
       return jsonResponse(statusPayload(null));
     }
 
-    return jsonResponse({ error: "Invalid action. Use: status, connect, disconnect" }, 400);
+    return jsonResponse({ error: "Invalid action. Use: status, connect, disconnect, set-balance" }, 400);
   } catch (err) {
     console.error("connect-mail-provider error:", err);
     return jsonResponse({ error: "Internal server error", detail: String(err) }, 500);

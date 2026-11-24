@@ -1,3 +1,4 @@
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -22,6 +23,9 @@ vi.mock('@/features/building/tabs/FeeScheduleTab', () => ({ default: () => <div 
 vi.mock('@/features/building/tabs/MailingSettingsTab', () => ({ default: () => <div data-testid="legacy-mailing" /> }));
 vi.mock('@/features/association-team/tabs/PayrollTab', () => ({ default: () => <div data-testid="legacy-payroll" /> }));
 vi.mock('@/features/unit-manager/tabs/MyBalanceTab', () => ({ default: ({ activeUnit }: { activeUnit: { number: string } }) => <div data-testid="legacy-balance">{activeUnit.number}</div> }));
+
+const emailUnitInvoice = vi.fn();
+vi.mock('@/lib/services/invoicing', async orig => ({ ...(await orig<typeof import('@/lib/services/invoicing')>()), emailUnitInvoice: (...a: unknown[]) => emailUnitInvoice(...a) }));
 
 import FundsPage from '@/ux2/funds/FundsPage';
 import { RedirectKeepQuery } from '@/ux2/shell/routes';
@@ -87,6 +91,22 @@ describe('Funds', () => {
     expect(within(inv).getByRole('button', { name: 'New invoice' })).toBeTruthy();
   });
 
+  it('Email this invoice in the row menu sends the open invoice again for what is still owed', async () => {
+    emailUnitInvoice.mockReset();
+    emailUnitInvoice.mockResolvedValue({ sent: true, payLink: true });
+    const fin = useFinancialStore.getState();
+    const unit = fin.units.find(u => u.email) ?? fin.units[0];
+    const invoice = fin.createUnitInvoice(unit.number, 'fee', 900, 'Repair charge · door closer');
+    useFinancialStore.setState(st => ({ unitInvoices: st.unitInvoices.map(x => (x.id === invoice.id ? { ...x, status: 'sent', paidAmount: 300 } : x)) }));
+    renderAt('/funds?tab=income&section=invoices');
+    const inv = document.querySelector('[aria-label="Invoices"]') as HTMLElement;
+    fireEvent.click(within(inv).getByRole('button', { name: `More for ${invoice.id}` }));
+    fireEvent.click(within(inv).getByRole('menuitem', { name: 'Email this invoice' }));
+    expect(emailUnitInvoice).toHaveBeenCalledTimes(1);
+    expect(emailUnitInvoice.mock.calls[0][0]).toMatchObject({ id: invoice.id, unitNumber: unit.number, amount: 600 });
+    expect((await within(inv).findByRole('status')).textContent).toContain('with a new link to pay online');
+  });
+
   it('a payment recorded from the ledger form posts through the store', () => {
     renderAt('/funds?tab=income');
     const unit = useFinancialStore.getState().units[0];
@@ -103,7 +123,8 @@ describe('Funds', () => {
     renderAt('/funds?tab=reserves');
     expect(screen.queryByTestId('legacy-reserves')).toBeNull();
     expect(document.querySelector('[aria-label="Reserves"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Reserve contribution"]')).toBeTruthy();
+    expect(document.querySelector('[data-reserve-components]')).toBeTruthy();
+    expect(document.querySelector('[data-reserve-levels]')).toBeTruthy();
     renderAt('/funds?tab=budget');
     expect(document.querySelector('[aria-label="Budget against actual"]')).toBeTruthy();
   });
@@ -137,13 +158,15 @@ describe('Funds', () => {
     expect(useFinancialStore.getState().workOrders.find(w => w.id === draft!.id)!.status).toBe('approved');
   });
 
-  it('the reserve lever sets the annual contribution through the store', () => {
+  it('picking a contribution level on the screen changes nothing by itself: it opens a reserve funding review', () => {
     renderAt('/funds?tab=planning&section=reserves');
     const before = useFinancialStore.getState().annualReserveContribution;
-    fireEvent.change(screen.getByLabelText('Custom monthly contribution'), { target: { value: '3100' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save contribution' }));
-    expect(useFinancialStore.getState().annualReserveContribution).toBe(37200);
-    useFinancialStore.getState().setAnnualReserveContribution(before);
+    const row = document.querySelector('[data-level="never-short"]') as HTMLElement;
+    expect(row).toBeTruthy();
+    fireEvent.click(within(row).getByRole('button', { name: 'Take to a review' }));
+    expect(useFinancialStore.getState().annualReserveContribution).toBe(before);
+    expect(useActionRecordsStore.getState().records.some(r => r.kind === 'reserve-review' && !r.closedOn)).toBe(true);
+    expect(useIssuesStore.getState().cases.some(c => (c.sourceId ?? '').startsWith('reserve-funding-review:'))).toBe(true);
   });
 
   it('Planning shows the budget table with the expected-by-now mark and the next-year draft', () => {
@@ -225,10 +248,25 @@ describe('Funds', () => {
     expect(screen.getByTestId('elsewhere')).toBeTruthy();
   });
 
-  it('Accounts and ledger has five pages under the gear; a deep link opens the page that holds its card', () => {
+  it('the ledger says who posted each entry', () => {
+    const before = useFinancialStore.getState().generalLedger;
+    const today = new Date().toISOString().slice(0, 10);
+    useFinancialStore.setState({ generalLedger: [{ id: 'GL9001', date: today, memo: 'Bank service fee', debitAcct: '5070', creditAcct: '1010', amount: 18, source: 'manual', sourceId: null, posted: today, postedBy: 'Dana Carter', status: 'posted' }] });
+    renderAt('/funds?tab=settings&section=ledger');
+    const row = document.querySelector('tr[data-entry="GL9001"]') as HTMLElement;
+    expect(row.textContent).toContain('posted by Dana Carter');
+    useFinancialStore.setState({ generalLedger: before });
+  });
+
+  it("Who can do what opens from its own address and holds the board's switches", () => {
+    renderAt('/funds?tab=settings&section=controls');
+    expect(screen.getAllByRole('switch').map(x => x.getAttribute('aria-label'))).toEqual(expect.arrayContaining(['A bill needs two people', 'A month needs signed reconciliations before its books close']));
+  });
+
+  it('Accounts and ledger has six pages under the gear; a deep link opens the page that holds its card', () => {
     renderAt('/funds?tab=settings&section=rules');
     const nav = screen.getByRole('navigation', { name: 'Accounts and ledger sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Ledger', 'Chart of Accounts', 'GL mapping', 'Fees & Billing', 'Bank & Mail']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Ledger', 'Chart of Accounts', 'GL mapping', 'Fees & Billing', 'Bank & Mail', 'Who can do what']);
     // ?section=rules lands on Fees & Billing: the fee schedule and billing rules, nothing from the other pages.
     expect(document.querySelector('[aria-label="Billing rules"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Fee schedule"]')).toBeTruthy();

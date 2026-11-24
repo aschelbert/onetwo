@@ -1,3 +1,4 @@
+import { billTrail } from '@/lib/controls';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PayrollTab from '@/features/association-team/tabs/PayrollTab';
@@ -6,6 +7,7 @@ import { useSpendingStore, type SpendingApproval } from '@/store/useSpendingStor
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fmt } from '@/lib/formatters';
+import { approvalsNeeded } from '@/lib/spendingRules';
 import type { WorkOrder } from '@/data/financial';
 import { Button, Card, Chip, Inner, PillTabs, TileSwitcher, type TileSection, Table, Th, Td, Cell, RowMenu, KV, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
@@ -18,13 +20,19 @@ const SECTIONS: Section[] = ['bills', 'decisions', 'workorders'];
 const DAY = 86400000;
 const plusDays = (iso: string, n: number) => new Date(Date.parse(iso) + n * DAY).toISOString().slice(0, 10);
 
+/** Pay a bill, and say why when the building's two-person rule stops the signed-in person from paying it. */
+function usePay() {
+  const raw = useFinancialStore(s => s.payWorkOrder);
+  return (id: string, paidDate?: string) => { const why = raw(id, paidDate); if (why) window.alert(why); };
+}
+
 function useLines(snap: FundsSnapshot) {
-  return useMemo(() => new Map(snap.budget.filter(b => b.acctNum).map(b => [b.acctNum!, b])), [snap.budget]);
+  return useMemo(() => new Map(snap.budget.flatMap(b => (b.acctNums?.length ? b.acctNums : b.acctNum ? [b.acctNum] : []).map(n => [n, b] as const))), [snap.budget]);
 }
 
 function woStatus(w: WorkOrder, flagged: boolean) {
   if (w.status === 'paid') return <Chip tone="sage">Paid{w.paidDate ? ` · ${dayLabel(w.paidDate)}` : ''}</Chip>;
-  if (w.status === 'invoiced') return flagged ? <Chip tone="red">Flagged · over budget</Chip> : <Chip tone="cyan">Invoiced</Chip>;
+  if (w.status === 'invoiced') return flagged ? <Chip tone="red">Flagged · over budget</Chip> : w.signoff ? <Chip tone="cyan">Signed off · ready to pay</Chip> : <Chip tone="amber">Invoiced · work not signed off</Chip>;
   if (w.status === 'approved') return <Chip tone="teal">Approved · awaiting invoice</Chip>;
   return <Chip tone="ghost">Draft</Chip>;
 }
@@ -75,7 +83,10 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   const lines = useLines(snap);
   const navigate = useNavigate();
   const approve = useFinancialStore(s => s.approveWorkOrder);
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
+  const signOff = useFinancialStore(s => s.signOffWorkOrder);
+  const me = useAuthStore(s => s.currentUser.name);
+  const [signing, setSigning] = useState<{ id: string; notes: string } | null>(null);
   const [filter, setFilter] = useState<BillFilter>('toapprove');
   const [form, setForm] = useState<{ kind: 'receive'; id?: string } | null>(null);
   const [all, setAll] = useState(false);
@@ -83,7 +94,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   const rows = { toapprove: bl.toApprove, flagged: bl.flagged, approved: bl.approved, drafts: bl.drafts, paid: [...snap.workOrders.filter(w => w.status === 'paid')].sort((a, b) => (b.paidDate ?? '').localeCompare(a.paidDate ?? '')) }[filter];
   const shown = all ? rows : rows.slice(0, 8);
   const actionFor = (w: WorkOrder) => {
-    if (w.status === 'invoiced') return <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button>;
+    if (w.status === 'invoiced') return w.signoff ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : <Button size="sm" variant="ghost" onClick={() => setSigning({ id: w.id, notes: '' })}>Sign off work</Button>;
     if (w.status === 'approved') return <Button size="sm" variant="ghost" onClick={() => setForm({ kind: 'receive', id: w.id })}>Receive invoice</Button>;
     if (w.status === 'draft') return <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button>;
     return null;
@@ -91,14 +102,22 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   return (
     <Card aria-label="Bills" id="bills">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Bills</h2><span className="max-w-[560px] text-[13px] text-ux2-muted">Approve here means pay: the spending was already decided. Each bill sits on a work order, so the vendor, the budget line and the approval travel together</span></div>
+        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Bills</h2><span className="max-w-[560px] text-[13px] text-ux2-muted">Approve here means pay: the spending was already decided. A bill is paid once someone has signed off that the work was done. Each bill sits on a work order, so the vendor, the budget line and the approval travel together</span></div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <PillTabs size="filter" surface="white" aria-label="Filter bills" value={filter} onChange={setFilter} tabs={[{ id: 'toapprove', label: `To approve · ${bl.toApprove.length}` }, { id: 'flagged', label: `Flagged · ${bl.flagged.length}` }, { id: 'approved', label: `Approved · ${bl.approved.length}` }, { id: 'drafts', label: `Drafts · ${bl.drafts.length}` }, { id: 'paid', label: 'Paid' }]} />
           <Button size="sm" className="h-9" variant="ghost" onClick={() => setForm({ kind: 'receive' })} disabled={bl.approved.length === 0}>Receive an invoice</Button>
-          <Button size="sm" className="h-9" onClick={() => bl.within.forEach(w => pay(w.id))} disabled={bl.within.length === 0}>Approve all {bl.within.length} within budget</Button>
+          <Button size="sm" className="h-9" onClick={() => bl.ready.forEach(w => pay(w.id))} disabled={bl.ready.length === 0}>Approve all {bl.ready.length} signed off and within budget</Button>
         </div>
       </div>
       {form && <ReceiveInvoiceForm key={form.id ?? 'any'} candidates={bl.approved} initial={form.id} today={snap.today} onClose={() => setForm(null)} />}
+      {signing && (() => { const w = snap.workOrders.find(x => x.id === signing.id); return w ? (
+        <form aria-label={`Sign off ${w.title}`} onSubmit={e => { e.preventDefault(); signOff(w.id, me, signing.notes); setSigning(null); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+          <div className="w-full text-sm font-semibold text-ux2-ink">Sign off the work · {w.title} · {w.vendor}</div>
+          <Field label="Anything the vendor still has to put right (leave blank if none)" className="min-w-[280px] flex-1"><input value={signing.notes} onChange={e => setSigning({ id: w.id, notes: e.target.value })} placeholder="Touch-up paint on the second-floor landing" className={INPUT} /></Field>
+          <div className="flex gap-2"><Button type="submit" size="sm">I checked it: sign off as {me}</Button><Button type="button" size="sm" variant="ghost" onClick={() => setSigning(null)}>Cancel</Button></div>
+          <Why className="basis-full">Signing off says the work was inspected and matches what was ordered. Your name and today's date go on the work order, and the bill can then be approved for payment.</Why>
+        </form>
+      ) : null; })()}
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{filter === 'toapprove' ? 'Nothing is waiting for approval.' : 'Nothing here.'}</Inner> : (
         <Table>
           <thead><tr><Th>Bill</Th><Th>Vendor</Th><Th>Budget line</Th><Th num>Amount</Th><Th>Due</Th><Th>Status</Th><Th aria-label="Approve" /><Th aria-label="Actions" /></tr></thead>
@@ -106,17 +125,17 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
             {shown.map(w => {
               const line = lines.get(w.acctNum);
               const isFlag = flagged.has(w.id);
-              const over = line ? line.actual + w.amount - line.budgeted : 0;
+              const over = line ? line.actual + (w.accrualGlEntryId ? 0 : w.amount) - line.budgeted : 0;
               return (
                 <tr key={w.id} className={isFlag ? 'bg-ux2-red-tint/60' : ''}>
-                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}`} /></Td>
+                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}${billTrail(w.people) ? ` · ${billTrail(w.people)}` : ''}${w.signoff ? ` · signed off ${dayLabel(w.signoff.date)} by ${w.signoff.by}${w.signoff.notes ? ` · to fix: ${w.signoff.notes}` : ''}` : ''}`} /></Td>
                   <Td>{w.vendor}</Td>
                   <Td>{line?.name ?? w.acctNum}{isFlag && <span className="text-xs text-ux2-muted"> · over by {fmt(over)}</span>}</Td>
                   <Td num className="font-semibold">{w.amount ? (w.status === 'approved' || w.status === 'draft' ? `est. ${fmt(w.amount)}` : fmt(w.amount)) : '–'}</Td>
                   <Td className="whitespace-nowrap text-ux2-muted">{w.status === 'invoiced' && w.invoiceDate ? dayLabel(plusDays(w.invoiceDate, 30)) : '–'}</Td>
                   <Td>{woStatus(w, isFlag)}</Td>
                   <Td num>{actionFor(w)}</Td>
-                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
+                  <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), ...(w.status === 'invoiced' && !w.signoff ? [{ label: 'Sign off work', onSelect: () => setSigning({ id: w.id, notes: '' }) }] : []), ...(w.status !== 'paid' ? [{ label: 'Mark paid · check written by hand', onSelect: () => pay(w.id) }] : []), { label: 'Show the budget line', onSelect: () => navigate('/funds?tab=planning&section=budget') }]} /></Td>
                 </tr>
               );
             })}
@@ -127,7 +146,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
         {rows.length > 8 && <button type="button" onClick={() => setAll(v => !v)} className="shrink-0"><Chip tone="ghost">{all ? 'Show fewer' : `${rows.length - 8} more`}</Chip></button>}
         <Why>A flagged bill pushes a budget line past 100%. Approving it is fine; it moves the line to Planning's "over" list and asks where the money comes from.</Why>
       </div>
-      <Why>A work order moves Draft, then Approved, then Invoiced, then Paid. Approving a bill here pays it on its due date from operating cash and posts the ledger entry; "Mark paid" covers a check written by hand. <button type="button" onClick={() => onSection('workorders')} className="font-semibold text-ux2-teal hover:underline">All work orders</button></Why>
+      <Why>A work order moves Draft, then Approved, then Invoiced, then Paid. Once the work is signed off, approving a bill here pays it from operating cash and posts the ledger entry; "Mark paid" covers a check written by hand. <button type="button" onClick={() => onSection('workorders')} className="font-semibold text-ux2-teal hover:underline">All work orders</button></Why>
     </Card>
   );
 }
@@ -149,7 +168,8 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const approvals = useSpendingStore(s => s.approvals);
   const castVote = useSpendingStore(s => s.castVote);
   const update = useSpendingStore(s => s.updateApproval);
-  const boardSize = useBuildingStore(s => s.board.length) || 5;
+  // The board as entered; a building that has listed nobody yet has the one person using it.
+  const boardSize = useBuildingStore(s => s.board.length) || 1;
   const me = useAuthStore(s => s.currentUser.name);
   const navigate = useNavigate();
   const pending = useMemo(() => approvals.filter(a => a.status === 'pending'), [approvals]);
@@ -161,12 +181,23 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const units = Math.max(1, snap.units.length);
   const next = () => setPos(p => (pending.length > 1 ? (p + 1) % pending.length : 0));
   const prev = () => setPos(p => (pending.length > 1 ? (p - 1 + pending.length) % pending.length : 0));
+  const [voteNote, setVoteNote] = useState('');
+  /** One member's vote. The request is decided only once it has the approvals its size calls for. */
   const decide = (status: 'approved' | 'denied') => {
     if (!a) return;
-    castVote(a.id, me, status === 'approved' ? 'approve' : 'deny');
-    update(a.id, { status, decidedAt: snap.today });
-    setDecided(d => d + 1);
-    setPos(p => Math.max(0, Math.min(p, pending.length - 2)));
+    const line = lineFor(snap, a);
+    const needed = approvalsNeeded(a, boardSize, !!line && a.amount > Math.max(0, line.budgeted - line.actual));
+    castVote(a.id, me, status === 'approved' ? 'approve' : 'deny', needed);
+    const now = useSpendingStore.getState().approvals.find(x => x.id === a.id);
+    if (now && now.status !== 'pending') {
+      setDecided(d => d + 1);
+      setVoteNote('');
+      setPos(p => Math.max(0, Math.min(p, pending.length - 2)));
+    } else {
+      const have = (now?.votes ?? []).filter(v => v.vote === (status === 'approved' ? 'approve' : 'deny')).length;
+      setVoteNote(`Your vote on ${a.title} is recorded: ${have} of ${needed} needed to ${status === 'approved' ? 'approve' : 'deny'} it. It stays open until another board member votes.`);
+      next();
+    }
   };
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -199,7 +230,9 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
   const perUnit = Math.round(a.amount / units);
   const after = Math.max(0, res.funded - a.amount);
   const afterPct = res.needed ? Math.round((after / res.needed) * 100) : 0;
-  const statusChip = overLimit ? <Chip tone="plum">Board vote · {approves.length} of {boardSize}</Chip> : overLine ? <Chip tone="amber">Over budget line</Chip> : <Chip tone="ghost">New</Chip>;
+  const needed = approvalsNeeded(a, boardSize, overLine);
+  const myVote = a.votes.find(v => v.member === me)?.vote;
+  const statusChip = overLimit ? <Chip tone="plum">Board vote · {approves.length} of {needed} needed</Chip> : overLine ? <Chip tone="amber">Over budget line · {approves.length} of {needed}</Chip> : <Chip tone="ghost">New</Chip>;
   return (
     <Card aria-label="Spending decisions" id="decisions">
       {header}
@@ -217,14 +250,15 @@ function DecisionsCard({ snap, onGo }: { snap: FundsSnapshot; onGo: (tab: FundsT
               return <button key={s.id} type="button" onClick={() => update(a.id, { fundingSource: s.id })} aria-pressed={a.fundingSource === s.id} className="rounded-full"><Chip tone={a.fundingSource === s.id ? 'navy' : 'ghost'}>{s.label}{note}</Chip></button>;
             })}
           </div>
-          <div className="rounded-[10px] bg-ux2-amber-tint px-3 py-2 text-xs text-ux2-ink"><b className="font-semibold">{overLimit ? 'Over' : 'Under'} the ${a.threshold.toLocaleString()} limit</b> · {overLimit ? 'the bylaws let the board approve this from reserves; a special assessment would need an owner vote' : overLine ? 'the Treasurer can approve alone, but the line is over budget so it needs a second signature' : 'the Treasurer can approve alone; it is logged to the decision trail either way'}</div>
+          <div className="rounded-[10px] bg-ux2-amber-tint px-3 py-2 text-xs text-ux2-ink"><b className="font-semibold">{overLimit ? 'Over' : 'Under'} the ${a.threshold.toLocaleString()} limit</b> · {overLimit ? 'the bylaws let the board approve this from reserves; a special assessment would need an owner vote' : overLine ? 'the line is over budget, so it needs two approvals' : 'the Treasurer can approve alone; it is logged to the decision trail either way'}</div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => decide('approved')}>Approve and next</Button>
-            <Button size="sm" variant="ghost" onClick={() => decide('denied')}>Deny and next</Button>
+            <Button size="sm" onClick={() => decide('approved')} disabled={myVote === 'approve'}>{myVote === 'approve' ? 'You approved' : needed > 1 ? 'Vote to approve' : 'Approve and next'}</Button>
+            <Button size="sm" variant="ghost" onClick={() => decide('denied')} disabled={myVote === 'deny'}>{myVote === 'deny' ? 'You voted to deny' : needed > 1 ? 'Vote to deny' : 'Deny and next'}</Button>
             <Button size="sm" variant="ghost" onClick={next}>Skip for now</Button>
             <Button size="sm" variant="ghost" onClick={() => navigate(a.caseId ? `/issues?view=case:${a.caseId}` : '/issues?view=new')}>Open the action</Button>
           </div>
-          <Why>{overLimit ? `Votes so far: ${approves.length ? approves.join(', ') + ' approve.' : 'none.'} ${approves.length < boardSize ? `Waiting on ${boardSize - approves.length} more.` : ''}` : overLine ? 'Needs: Treasurer plus one officer.' : 'No vote needed. Approve, deny, or ask for a second bid.'}</Why>
+          {voteNote && <div role="status" className="rounded-[10px] bg-ux2-sage-tint px-3 py-2 text-xs text-ux2-ink">{voteNote}</div>}
+          <Why>{needed > 1 ? `${overLimit ? `Over the limit, so a majority of the board decides: ${needed} of ${boardSize}.` : 'Over its budget line, so it needs two approvals.'} Approvals so far: ${approves.length ? approves.join(', ') : 'none'}.${approves.length < needed ? ` Waiting on ${needed - approves.length} more.` : ''}` : 'No vote needed. Approve, deny, or ask for a second bid.'}</Why>
         </Inner>
         <Card tone="navy" className="gap-1">
           <div className="text-base font-semibold">Know before you decide</div>
@@ -249,7 +283,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
   const lines = useLines(snap);
   const navigate = useNavigate();
   const approve = useFinancialStore(s => s.approveWorkOrder);
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
   const [filter, setFilter] = useState<WoFilter>('open');
   const [creating, setCreating] = useState(false);
   const [receive, setReceive] = useState<string | null>(null);
@@ -283,7 +317,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
                 <Td num className="font-semibold">{w.amount ? (w.status === 'approved' || w.status === 'draft' ? `est. ${fmt(w.amount)}` : fmt(w.amount)) : '–'}</Td>
                 <Td className="whitespace-nowrap text-ux2-muted">{dayLabel(w.createdDate)}</Td>
                 <Td>{woStatus(w, flagged.has(w.id))}</Td>
-                <Td num>{w.status === 'draft' ? <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button> : w.status === 'approved' ? <Button size="sm" variant="ghost" onClick={() => setReceive(w.id)}>Receive invoice</Button> : w.status === 'invoiced' ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : null}</Td>
+                <Td num>{w.status === 'draft' ? <Button size="sm" variant="ghost" onClick={() => approve(w.id)}>Approve</Button> : w.status === 'approved' ? <Button size="sm" variant="ghost" onClick={() => setReceive(w.id)}>Receive invoice</Button> : w.status === 'invoiced' ? (w.signoff ? <Button size="sm" variant="ghost" onClick={() => pay(w.id)}>Approve</Button> : <Button size="sm" variant="ghost" onClick={() => onSection('bills')}>Sign off in Bills</Button>) : null}</Td>
                 <Td num><RowMenu label={`More for ${w.id}`} items={[...(w.caseId ? [{ label: 'Open the action', onSelect: () => navigate(`/issues?view=case:${w.caseId}`) }] : []), { label: 'Show in Bills', onSelect: () => onSection('bills') }, { label: 'The vendor · Building › Contracts', onSelect: () => navigate('/building?tab=contracts') }]} /></Td>
               </tr>
             ))}
@@ -312,7 +346,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
   const pending = approvals.filter(a => a.status === 'pending');
   const pendingAmount = pending.reduce((t, a) => t + a.amount, 0);
   const current: Section = (SECTIONS as string[]).includes(section ?? '') ? (section as Section) : 'bills';
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
   const month = snap.today.slice(0, 7);
   const paidThisMonth = snap.workOrders.filter(w => w.status === 'paid' && w.paidDate?.startsWith(month)).length;
   const boardSize = useBuildingStore(s => s.board.length) || 5;
@@ -333,7 +367,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
             <KV dark label="Due this week">{bl.dueSoon.length} · {fmt(bl.dueSoonAmount)}</KV>
           </div>
         ),
-        action: <><span className="min-w-0 truncate"><b className="font-semibold">Approve all {bl.within.length} within budget</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.within.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">Approve</button></>,
+        action: <><span className="min-w-0 truncate"><b className="font-semibold">{bl.ready.length ? `Approve all ${bl.ready.length} signed off and within budget` : bl.unsigned.length ? `${bl.unsigned.length} waiting on a work sign-off` : 'Nothing to approve'}</b>{bl.flagged.length ? ` · the ${bl.flagged.length} flagged one by one` : ''}</span><button type="button" onClick={e => { e.stopPropagation(); bl.ready.forEach(w => pay(w.id)); onSection('bills'); }} className="inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[11px] font-semibold text-ux2-navy">{bl.ready.length ? 'Approve' : 'Open'}</button></>,
       },
       detail: <BillsCard snap={snap} onSection={onSection} />,
     },

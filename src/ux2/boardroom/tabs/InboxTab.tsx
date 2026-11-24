@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, Why } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SearchInput, SectionLabel, Table, Th, Td, Cell, Why, PhotoStrip } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { inboxRows, inboxSummary, type InboxRow, type BoardRoomSnapshot } from '../metrics';
 
@@ -139,6 +139,7 @@ export default function InboxTab({ snap, onOpenCase }: { snap: BoardRoomSnapshot
                       <Td><Cell title={<span className="font-normal">{st.step}</span>} note={st.note} /></Td>
                       <Td num>{r.state !== 'closed' && <Button size="sm" variant="ghost" onClick={() => { setReplying(replying === r.issue.id ? null : r.issue.id); setAssigning(null); }}>Reply</Button>}</Td>
                     </tr>
+                    {!!r.issue.photos?.length && <tr><td colSpan={6} className="px-3 pb-2"><PhotoStrip photos={r.issue.photos} /></td></tr>}
                     {replying === r.issue.id && <tr><td colSpan={6} className="px-3 py-2"><ReplyForm r={r} viewer={snap.viewer.name} onClose={() => setReplying(null)} /></td></tr>}
                   </Fragment>
                 );

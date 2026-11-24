@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { CaseTrackerCase } from '@/types/issues';
 import type { MailDeliveryMethod, PostalAddress } from '@/types/mail';
-import { ESTIMATE_NOTE, calculateMailingCost, formatDeliveryMethod, getRecommendedDeliveryMethod, mailProviderLabel, pricingFor } from '@/types/mail';
+import { ESTIMATE_NOTE, MAIL_PROVIDERS, calculateMailingCost, estimatedBalance, formatDeliveryMethod, getRecommendedDeliveryMethod, hasReturnReceipt, mailProviderLabel, pricingFor } from '@/types/mail';
 import { useLetterStore } from '@/store/useLetterStore';
 import { useMailStore, resolveSender } from '@/store/useMailStore';
 import { toStateCode } from '@/lib/usStates';
@@ -127,6 +127,21 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
   const mailConnected = mailStore.mailingSettings.mailConnected && !!mailStore.mailingSettings.mailProvider;
   const vendor = mailProviderLabel(mailStore.mailingSettings);
   const PRICING = pricingFor(mailStore.mailingSettings.mailProvider);
+  const vendorInfo = mailStore.mailingSettings.mailProvider ? MAIL_PROVIDERS[mailStore.mailingSettings.mailProvider] : null;
+  // The vendor does not report its balance: warn from the last refusal and from the balance the board recorded.
+  const fundsLowAt = mailConnected ? mailStore.mailingSettings.mailFundsLowAt : '';
+  const balance = mailConnected ? estimatedBalance(mailStore.mailingSettings, mailStore.mailRecords) : null;
+  const mayNotCover = !!balance && balance.remainingCents < cost.totalCents;
+  const fundsWarning = mailConnected && vendorInfo && (fundsLowAt || mayNotCover) ? (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3" data-testid="send-funds-warning" role="status">
+      <p className="text-xs text-amber-800 font-medium">
+        {fundsLowAt
+          ? `${vendorInfo.label} refused the last letter for lack of funds on ${new Date(fundsLowAt).toLocaleDateString()}. Unless money has been added since, this one will be refused too.`
+          : `About $${(Math.max(0, balance!.remainingCents) / 100).toFixed(2)} is left in ${vendorInfo.label} by the app's estimate, less than this letter's $${(cost.totalCents / 100).toFixed(2)}. ${vendorInfo.label} will refuse it if the balance does not cover it.`}
+        {' '}<a href={vendorInfo.portalUrl} target="_blank" rel="noreferrer" className="underline">Add funds at {vendorInfo.label} ↗</a>
+      </p>
+    </div>
+  ) : null;
 
   const handleSend = async () => {
     if (!selectedTemplate) return;
@@ -264,6 +279,9 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
               {recommended && (
                 <p className="text-xs text-emerald-700 ml-7">{recommended.reason}</p>
               )}
+              {vendorInfo && hasReturnReceipt(deliveryMethod) && (
+                <p className="text-xs text-ink-500 ml-7" data-testid="receipt-note">{vendorInfo.receiptNote}</p>
+              )}
             </div>
           </div>
 
@@ -369,6 +387,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
               <p className="text-xs text-amber-800 font-medium">The building's mail account isn't connected. A board member connects DocuPost or LetterStream under Settings → Mailing.</p>
             </div>
           )}
+
+          {fundsWarning}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -486,6 +506,8 @@ export default function SendNoticePanel({ caseId, caseData, stepIdx, onClose }: 
                     : ESTIMATE_NOTE}
                 </p>
               </div>
+
+              {fundsWarning}
 
               {/* Error banner */}
               {sendError && (

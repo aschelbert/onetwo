@@ -3,7 +3,7 @@
  * the app's data as of a date and then kept as a plain table, so the record
  * shows what the board and owners saw even after the books move on.
  */
-import { fundStatements } from '@/lib/ledger';
+import { balanceOf, budgetLineAccounts, fundStatements } from '@/lib/ledger';
 import type { BudgetCategory, ReserveItem, Unit } from '@/types/financial';
 import type { ReportKind, ReportSnapshot, Audience } from './meetingRecord';
 
@@ -48,12 +48,18 @@ export function buildReport(kind: ReportKind, asOf: string, src: ReportSource): 
       return { title: `Income statement, ${yearStart} to ${asOf}`, columns: ['', 'Operating', 'Reserve', 'Total'], rows: [row('Revenue', 'revenue'), row('Expenses', 'expenses'), row('Net', 'net')] };
     }
     case 'budget_vs_actual': {
+      // Spent comes from the ledger accounts each line is measured against; a line with none uses expenses typed on it.
+      const inYear = src.generalLedger.filter(e => e.date >= yearStart && e.date <= asOf);
+      const spentOn = (c: BudgetCategory) => {
+        const accts = budgetLineAccounts(c, src.chartOfAccounts);
+        return accts.length ? accts.reduce((t, a) => t + balanceOf(a.num, a.type, inYear), 0) : c.expenses.filter(e => e.date >= yearStart && e.date <= asOf).reduce((t, e) => t + e.amount, 0);
+      };
       const rows = src.budgetCategories.map(c => {
-        const spent = c.expenses.filter(e => e.date >= yearStart && e.date <= asOf).reduce((t, e) => t + e.amount, 0);
+        const spent = spentOn(c);
         return [c.name, usd(c.budgeted), usd(spent), c.budgeted ? `${Math.round((spent / c.budgeted) * 100)}%` : '—'];
       });
       const b = src.budgetCategories.reduce((t, c) => t + c.budgeted, 0);
-      const s = src.budgetCategories.reduce((t, c) => t + c.expenses.filter(e => e.date >= yearStart && e.date <= asOf).reduce((x, e) => x + e.amount, 0), 0);
+      const s = src.budgetCategories.reduce((t, c) => t + spentOn(c), 0);
       return { title: `Budget vs actual, ${yearStart} to ${asOf}`, columns: ['Category', 'Budget', 'Spent', 'Used'], rows, totals: ['Total', usd(b), usd(s), b ? `${Math.round((s / b) * 100)}%` : '—'] };
     }
     case 'reserve_status': {

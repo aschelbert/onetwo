@@ -112,3 +112,15 @@ describe('subscriptionLabel', () => {
     expect(subscriptionLabel({ subscription_status: null }, now)).toBeNull();
   });
 });
+
+describe('hasEnded', () => {
+  it('is true only for a building whose status is churned', async () => {
+    const { hasEnded } = await import('@/lib/tenantMembership');
+    expect(hasEnded({ tenant_status: 'churned' })).toBe(true);
+    expect(hasEnded({ tenant_status: 'active' })).toBe(false);
+    expect(hasEnded({ tenant_status: 'onboarding' })).toBe(false);
+    // Status not known (older lookup): keep the building available
+    expect(hasEnded({ tenant_status: null })).toBe(false);
+    expect(hasEnded({})).toBe(false);
+  });
+});

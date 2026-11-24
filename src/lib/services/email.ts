@@ -1,7 +1,7 @@
 /**
- * Calling the app's email functions (Mailjet behind them) and telling the
+ * Calling the app's email functions (Brevo behind them) and telling the
  * truth about what happened: how many emails went out, and if none, why.
- * A function without Mailjet keys answers 200 with `success: false` and
+ * A function without the Brevo key answers 200 with `success: false` and
  * "Email not configured"; that's reported as email not being set up, not as
  * sent.
  */
@@ -35,11 +35,17 @@ export async function callEmailFunction(fn: string, body: Record<string, unknown
       try { msg = (JSON.parse(text) as { error?: string }).error ?? text; } catch { /* not JSON */ }
       return { sent: 0, reason: msg.slice(0, 120) || `the email service answered ${res.status}` };
     }
-    const data = (await res.json()) as { success?: boolean; sent?: number; total?: number; error?: string; message?: string };
+    const data = (await res.json()) as { success?: boolean; sent?: number; total?: number; optedOut?: number; error?: string; message?: string };
     if (data.success === false) return { sent: 0, reason: /not configured|credentials missing/i.test(data.error ?? '') ? EMAIL_NOT_SET_UP : (data.error ?? 'the email service refused it') };
     const sent = data.sent ?? 0;
-    if (!sent) return { sent: 0, reason: data.message ? data.message.toLowerCase() : 'nobody had an email address on file' };
-    if (data.total && sent < data.total) return { sent, reason: `${data.total - sent} of ${data.total} couldn't be delivered` };
+    const off = data.optedOut ?? 0;
+    // People whose address has email turned off (they pressed Unsubscribe, or their mailbox turned us away)
+    const offNote = off ? `${off} ${off === 1 ? 'has' : 'have'} email turned off (see Users)` : '';
+    if (!sent) return { sent: 0, reason: data.message ? data.message.toLowerCase() : off && off === data.total ? `everyone on the list has email turned off (see Users)` : 'nobody had an email address on file' };
+    if (data.total && sent < data.total) {
+      const failed = data.total - sent - off;
+      return { sent, reason: [failed > 0 ? `${failed} of ${data.total} couldn't be delivered` : '', offNote].filter(Boolean).join('; ') };
+    }
     return { sent };
   } catch (e) {
     console.error(`${fn} error:`, e);

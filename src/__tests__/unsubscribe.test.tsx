@@ -73,11 +73,24 @@ describe('marketingPrefs', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = { rpc: vi.fn() } as any;
     sb.rpc.mockResolvedValueOnce({ data: true, error: null });
-    expect(await myPreference(sb)).toBe(true);
+    expect(await myPreference(sb)).toBe('on');
     sb.rpc.mockResolvedValueOnce({ data: null, error: { message: 'no function' } });
     expect(await myPreference(sb)).toBeNull();
+    // Not subscribed: asks whether a confirmation email is waiting
+    sb.rpc.mockResolvedValueOnce({ data: false, error: null }).mockResolvedValueOnce({ data: true, error: null });
+    expect(await myPreference(sb)).toBe('pending');
+    expect(sb.rpc).toHaveBeenLastCalledWith('my_marketing_pending');
+    sb.rpc.mockResolvedValueOnce({ data: false, error: null }).mockResolvedValueOnce({ data: false, error: null });
+    expect(await myPreference(sb)).toBe('off');
+
     sb.rpc.mockResolvedValueOnce({ data: false, error: null });
-    expect(await setMyPreference(sb, false)).toBe(true);
+    expect(await setMyPreference(sb, false)).toBe('off');
     expect(sb.rpc).toHaveBeenLastCalledWith('set_my_marketing_preference', { p_opt_in: false });
+    sb.rpc.mockResolvedValueOnce({ data: false, error: null });
+    expect(await setMyPreference(sb, true)).toBe('pending');
+    sb.rpc.mockResolvedValueOnce({ data: true, error: null });
+    expect(await setMyPreference(sb, true)).toBe('on');
+    sb.rpc.mockResolvedValueOnce({ data: null, error: { message: 'down' } });
+    expect(await setMyPreference(sb, true)).toBeNull();
   });
 });

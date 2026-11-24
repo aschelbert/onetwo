@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useElectionStore } from '@/store/useElectionStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -18,6 +19,7 @@ export function useCommunitySnapshot(today: string = todayIso()): CommunitySnaps
   const elections = useElectionStore(s => s.elections);
   const issues = useIssuesStore(s => s.issues);
   const units = useFinancialStore(s => s.units);
+  const state = useBuildingStore(s => s.address.state);
   return useMemo(() => ({
     today,
     viewer: {
@@ -33,5 +35,6 @@ export function useCommunitySnapshot(today: string = todayIso()): CommunitySnaps
     elections,
     issues,
     units,
-  }), [today, currentUser, currentRole, announcements, communications, meetings, elections, issues, units]);
+    state,
+  }), [today, currentUser, currentRole, announcements, communications, meetings, elections, issues, units, state]);
 }

@@ -26,6 +26,7 @@ export const dc: JurisdictionData = {
   actShortName: 'DC Code',
   filingAgency: 'DLCP',
   coverage: 'full',
+  meetingNotice: { annualOrRegularDays: 21, otherOwnerDays: 7, cite: 'DC Code § 42-1903.03' },
   regulatoryNotes: [],
   items: {
     // ═══ GOVERNANCE & LEGAL ═══
@@ -122,7 +123,16 @@ export const dc: JurisdictionData = {
     o2: {
       legalRef: 'DC Code § 42-1903.14',
       tip: 'Open to owners in good standing for a proper purpose, during reasonable hours on business days. Some records may be withheld (§ 42-1903.14(c)). Copies at actual cost.',
-      due: 'Per request',
+      due: 'Per bylaws (board target: 5 business days)',
+      consequence: 'Denying an owner in good standing access for a proper purpose violates § 42-1903.14 and invites disputes and court action to compel inspection. The section sets no deadline in days, so follow your bylaws or the board\'s own target.',
+      howTo: [
+        'Adopt a written inspection policy with the board\'s own response target (e.g. 5 business days) — DC law sets no number of days',
+        'Confirm the requester is an owner in good standing, or their authorized agent, with a proper purpose related to membership',
+        'Allow inspection during reasonable hours on business days',
+        'Withhold only the records § 42-1903.14(c) permits',
+        'Charge no more than the actual cost of materials and labor for copies (§ 42-1903.14(d))',
+        'Document every request and fulfillment',
+      ],
     },
     o4: {
       legalRef: 'D.C. Law 21-241 (Owner Bill of Rights); no annual notice required',

@@ -7,7 +7,10 @@
 import type { Role } from '@/types/auth';
 import type { ComplianceItem } from '@/lib/complianceRefresh';
 import type { RegulatoryFiling } from '@/store/useComplianceStore';
-import type { BoardMember, InsurancePolicy, LegalDocument, Vendor } from '@/store/useBuildingStore';
+import type { BoardMember, InsurancePolicy, LegalDocument, MaintenanceSchedule, Vendor } from '@/store/useBuildingStore';
+import { vendorInsuranceStatus, type VendorInsuranceStatus } from '@/lib/vendorInsurance';
+import { scheduleState } from '@/lib/maintenance';
+import { kindsFor, recordStatus, type Applies, type BuildingFacts, type BuildingRecord, type RecordKind, type RecordStatus } from '@/lib/buildingRecords';
 import type { VendorContract } from '@/lib/services/vendorTracker';
 import type { WorkOrder } from '@/data/financial';
 import { daysBetween } from '../runbook/model';
@@ -29,6 +32,12 @@ export interface BuildingSnapshot {
   obligations: ComplianceItem[];
   completions: Record<string, boolean>;
   filings: RegulatoryFiling[];
+  /** Recurring maintenance and inspections. */
+  maintenance?: MaintenanceSchedule[];
+  /** Licences, certificates, tests and notices on file. */
+  records?: BuildingRecord[];
+  /** What decides which records apply: the state, the floor area, the equipment. */
+  facts?: BuildingFacts;
 }
 
 /** The Dashboard's building health: documents 35, insurance 35, governance 30. Unchanged. */
@@ -90,6 +99,8 @@ export interface ContractRow {
   paidThisYear: number;
   needs1099: boolean;
   w9OnFile: boolean;
+  /** Where the vendor's certificates of insurance stand. */
+  insurance: VendorInsuranceStatus;
 }
 
 /** One row per vendor: the live contract, when it ends, what was paid this year and whether a 1099 is due. */
@@ -106,7 +117,7 @@ export function contractRows(s: BuildingSnapshot, endingDays = 90): ContractRow[
       daysLeft = daysBetween(s.today, live.endDate);
       state = v.status === 'inactive' ? 'inactive' : daysLeft < 0 && !live.autoRenew ? 'lapsed' : daysLeft <= endingDays && !live.autoRenew ? 'ending' : 'active';
     } else if (live) state = 'active';
-    return { vendorId: v.id, vendor: v.name, service: v.service, contract: live, ends: live?.endDate, daysLeft, state, paidThisYear, needs1099: paidThisYear >= 600, w9OnFile: !!v.w9OnFile };
+    return { vendorId: v.id, vendor: v.name, service: v.service, contract: live, ends: live?.endDate, daysLeft, state, paidThisYear, needs1099: paidThisYear >= 600, w9OnFile: !!v.w9OnFile, insurance: vendorInsuranceStatus(v, s.today) };
   }).sort((a, b) => order(a.state) - order(b.state) || (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
 }
 
@@ -122,6 +133,47 @@ export function contractsSummary(rows: ContractRow[]) {
     needs1099: rows.filter(r => r.needs1099),
     missingW9: rows.filter(r => r.needs1099 && !r.w9OnFile),
     signed: rows.filter(r => !!r.contract).length,
+    /** Active vendors whose general liability certificate is on file and in force. */
+    insured: rows.filter(r => r.state !== 'inactive' && (r.insurance.state === 'current' || r.insurance.state === 'expiring')).length,
+    insuranceLapsed: rows.filter(r => r.state !== 'inactive' && r.insurance.state === 'lapsed'),
+    insuranceExpiring: rows.filter(r => r.state !== 'inactive' && r.insurance.state === 'expiring'),
+    /** Vendors under contract or paid this year with no general liability certificate. */
+    insuranceMissing: rows.filter(r => r.state !== 'inactive' && r.insurance.state === 'missing' && (!!r.contract || r.paidThisYear > 0)),
+  };
+}
+
+/** Scheduled maintenance that is past due, oldest first. */
+export function maintenanceOverdue(s: BuildingSnapshot): MaintenanceSchedule[] {
+  return (s.maintenance ?? []).filter(m => scheduleState(m, s.today) === 'overdue').sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+}
+
+export interface RecordRow {
+  kind: RecordKind;
+  applies: Applies;
+  status: RecordStatus;
+  /** A gap someone has to close: it applies and is missing, lapsed, due soon, or not posted. */
+  needs: 'missing' | 'lapsed' | 'due-soon' | 'unposted' | null;
+}
+
+/** Every record kind this building should look at, with where it stands. Kinds that only might apply never count as a gap while empty. */
+export function recordRows(s: BuildingSnapshot): RecordRow[] {
+  const facts = s.facts ?? { state: s.address.state, grossSqft: null, hasElevator: false, hasBoiler: false };
+  const all = s.records ?? [];
+  return kindsFor(facts).map(({ kind, applies }) => {
+    const status = recordStatus(kind, all.filter(r => r.kind === kind.id), s.today);
+    // A kind that only might apply is not a gap until the building records one.
+    const needs: RecordRow['needs'] = applies === 'check' && !status.current ? null : status.state === 'missing' ? (applies === 'yes' ? 'missing' : null) : status.state === 'lapsed' ? 'lapsed' : status.state === 'due-soon' ? 'due-soon' : status.unposted ? 'unposted' : null;
+    return { kind, applies, status, needs };
+  });
+}
+
+export function recordsSummary(rows: RecordRow[]) {
+  const expected = rows.filter(r => r.applies === 'yes' || !!r.status.current);
+  return {
+    expected: expected.length,
+    inOrder: expected.filter(r => !r.needs).length,
+    gaps: rows.filter(r => r.needs),
+    toCheck: rows.filter(r => r.applies === 'check' && !r.status.current),
   };
 }
 

@@ -6,9 +6,11 @@
  * store's report helpers; a packet downloads as a file and "Send to owners"
  * posts it as a financial notice.
  */
+import StatementViews from '../statements/StatementViews';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
+import { closeBooksChecked } from '../../boardroom/tools/docs';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -227,6 +229,8 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
         </Card>
       </div>
 
+      <StatementViews today={snap.today} />
+
       <Card aria-label="Monthly statement packets">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><span className="text-[17px] font-semibold text-ux2-ink">Monthly statement packets</span><span className="ml-2 text-xs text-ux2-muted">Each packet: balance sheet, income statement, budget variance, ledger</span></div>
@@ -256,7 +260,7 @@ export default function StatementsTab({ snap }: { snap: FundsSnapshot }) {
           {months.length > 5 ? <Button size="sm" variant="ghost" onClick={() => setShowAllMonths(v => !v)}>{showAllMonths ? 'Show fewer' : `${months.length - 5} more`}</Button> : <span />}
           <span className="flex flex-wrap items-center gap-2">
             <Chip tone={closedThrough ? 'navy' : 'ghost'}>{closedThrough ? `Books closed through ${dayLabel(closedThrough)}` : 'No month closed yet'}</Chip>
-            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { closeBooksThrough(priorEnd); setNote(`Books closed through ${dayLabel(priorEnd)}. Entries on or before that date are locked; a correction posts as a reversal dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
+            {(!closedThrough || closedThrough < priorEnd) && <Button size="sm" variant="ghost" onClick={() => { const r = closeBooksChecked(priorEnd, viewer.name); if (r.closed) setNote(`Books closed through ${dayLabel(priorEnd)}${r.overrode ? ' without a signed reconciliation, recorded under your name' : ''}. Entries on or before that date are locked; a correction posts as a reversal dated today.`); }}>Close through {dayLabel(priorEnd)}</Button>}
           </span>
           <Why>The reserve transfer shows on its own line, not as an expense. The packet posts to the Community notices when sent; owners can also pull it from their own statement. Bylaws: statements to owners within 15 days of close. Closing a month locks it; a correction is a reversing entry dated today.</Why>
         </div>

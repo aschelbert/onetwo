@@ -11,7 +11,7 @@
  * The step is in the URL (`?step=documents|review|payments|mail|finish`);
  * without one the page opens on the next thing to do.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/formatters';
 import { useTenantContext } from '@/components/TenantProvider';
@@ -49,9 +49,13 @@ export default function SetupPage() {
   // Without a step in the URL, open on the next thing to do, and stay there as things change (adding a document must not jump to Review).
   const [opened] = useState<Step>(s.next.step);
   const step: Step = raw === 'documents' || raw === 'review' || raw === 'payments' || raw === 'mail' || raw === 'finish' ? raw : opened;
+  // The scroll waits for the new step to render; cancel it if the page is left first.
+  const scrollTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(scrollTimer.current), []);
   const go = (next: Step, anchor?: string) => {
     setParams(prev => { const q = new URLSearchParams(prev); q.set('step', next); return q; });
-    window.setTimeout(() => (anchor ? document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : window.scrollTo({ top: 0 })), 50);
+    window.clearTimeout(scrollTimer.current);
+    scrollTimer.current = window.setTimeout(() => (anchor ? document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : window.scrollTo({ top: 0 })), 50);
   };
 
   if (role === 'RESIDENT') {
