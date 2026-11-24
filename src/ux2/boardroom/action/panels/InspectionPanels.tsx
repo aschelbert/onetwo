@@ -1,10 +1,10 @@
+import { recordVisit } from '../../../building/maintenanceActions';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { uploadPhotos } from '@/lib/services/photos';
-import { completed } from '@/lib/maintenance';
 import { CHECKLISTS, findings, pointsFor, watched, type InspectionData, type InspectionPoint, type PointResult } from '@/lib/actions/inspection';
 import { Button, Chip, Inner, Why, Field, INPUT, PhotoPicker, PhotoStrip } from '../../../components';
 import { todayIso } from '../../../runbook/adapters';
@@ -129,11 +129,7 @@ function File({ r, patch, close, step }: PanelProps<InspectionData>) {
       notes: [rec.trim(), ...findings(d).filter(p => p.handling === 'defer').map(p => `Put off: ${p.label} (${p.handlingNote})`)].filter(Boolean).join('\n'),
       attachments: d.points.flatMap(p => p.photos),
     });
-    if (d.scheduleId) {
-      const b = useBuildingStore.getState();
-      const m = b.maintenanceSchedules.find(x => x.id === d.scheduleId);
-      if (m) b.updateMaintenanceSchedule(m.id, completed(m, d.bookedFor || today));
-    }
+    if (d.scheduleId) recordVisit(d.scheduleId, { doneOn: d.bookedFor || today, by: d.by, inspection: true });
     patch({ recommendations: rec.trim(), filedOn: today });
     close(today);
   };

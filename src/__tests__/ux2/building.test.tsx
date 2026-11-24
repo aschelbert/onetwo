@@ -41,7 +41,7 @@ describe('Building', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Building sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Goals', 'Projects', 'Utilities', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Goals', 'Upkeep', 'Projects', 'Utilities', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     expect(document.querySelector('[aria-label="Details"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Insurance"]')).toBeTruthy();
@@ -290,5 +290,22 @@ describe('Building', () => {
     } finally {
       useBuildingStore.setState({ legalDocuments: prev });
     }
+  });
+
+  it('Upkeep draws the schedule across the year, keeps the schedule table, and lists what opens an inspection', () => {
+    renderAt('/building?tab=upkeep');
+    const year = document.querySelector('[aria-label="The year at a glance"]') as HTMLElement;
+    expect(within(year).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['System', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Cost this year']);
+    expect(year.querySelectorAll('[data-system]').length).toBeGreaterThan(0);
+    expect(document.querySelector('[aria-label="Maintenance schedule"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Inspections on record"]')).toBeTruthy();
+    const opens = document.querySelector('[aria-label="What opens an inspection"]') as HTMLElement;
+    expect(within(opens).getByText("A unit's move-out day arrives")).toBeTruthy();
+    expect(within(opens).getByRole('button', { name: 'Start the check' })).toBeTruthy();
+    // The schedule moved off the Overview, which points here.
+    cleanup();
+    renderAt('/building');
+    expect(document.querySelector('[aria-label="Maintenance schedule"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open Upkeep' })).toBeTruthy();
   });
 });

@@ -6,7 +6,8 @@ import { FREQUENCIES, deferralOf, frequencyMonths, scheduleState } from '@/lib/m
 import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, Cell, RowMenu, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import { kindOf, markDone, putOff } from '../maintenanceActions';
-import { startInspection } from '../../boardroom/recordActions';
+import { costOf } from '@/lib/upkeep';
+import { startScheduledInspection } from '../../boardroom/upkeep';
 
 const SYSTEMS = ['HVAC', 'Elevator', 'Fire Safety', 'Plumbing', 'Electrical', 'Roof and envelope', 'Grounds', 'Parking', 'Common areas', 'General'];
 const FORM = 'flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3';
@@ -65,12 +66,14 @@ function DoneForm({ m, today, onClose }: { m: MaintenanceSchedule; today: string
   const [by, setBy] = useState(m.vendor || me);
   const [result, setResult] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [cost, setCost] = useState(costOf(m.estimatedCost) ? String(costOf(m.estimatedCost)) : '');
   const months = frequencyMonths(m.frequency);
   return (
-    <form aria-label={`Record ${m.task} as done`} onSubmit={e => { e.preventDefault(); if (!doneOn) return; markDone(m.id, { doneOn, by: by.trim(), result, followUp }); onClose(); }} className={FORM}>
+    <form aria-label={`Record ${m.task} as done`} onSubmit={e => { e.preventDefault(); if (!doneOn) return; markDone(m.id, { doneOn, by: by.trim(), result, followUp, cost: costOf(cost) }); onClose(); }} className={FORM}>
       <div className="w-full text-sm font-semibold text-ux2-ink">Record “{m.task}” as done · {months ? `the next one is set ${m.frequency.toLowerCase()} from this date` : 'it does not repeat'}</div>
       <Field label="Done on" className="w-[150px]"><input type="date" value={doneOn} max={today} onChange={e => setDoneOn(e.target.value)} className={INPUT} /></Field>
       <Field label="Who did it" className="w-[200px]"><input value={by} onChange={e => setBy(e.target.value)} className={INPUT} /></Field>
+      <Field label="What it cost" className="w-[120px]"><input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder="$" className={INPUT} /></Field>
       <Field label="What was found or done" className="min-w-[240px] flex-1"><input value={result} onChange={e => setResult(e.target.value)} placeholder="Passed; certificate issued" className={INPUT} /></Field>
       <Field label="Anything still to do" className="min-w-[220px] flex-1"><input value={followUp} onChange={e => setFollowUp(e.target.value)} placeholder="Leave blank if nothing" className={INPUT} /></Field>
       <div className="flex gap-2"><Button type="submit" size="sm" disabled={!doneOn}>Record</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
@@ -132,7 +135,7 @@ export default function MaintenanceCard({ today, isBoard }: { today: string; isB
                 <Td>{m.lastCompleted ? dayLabel(m.lastCompleted) : <span className="text-ux2-muted">Not yet</span>}</Td>
                 <Td>{m.nextDue ? dayLabel(m.nextDue) : <span className="text-ux2-muted">—</span>}{deferral && state !== 'completed' && <span className="block text-xs text-ux2-muted">first due {dayLabel(deferral.from)} · {deferral.reason}</span>}</Td>
                 <Td><Chip tone={state === 'overdue' ? 'red' : state === 'due-soon' ? 'amber' : state === 'completed' ? 'ghost' : deferral ? 'plum' : 'sage'}>{state === 'overdue' ? 'Overdue' : state === 'due-soon' ? 'Due soon' : state === 'completed' ? 'Done' : deferral ? 'Deferred' : 'On schedule'}</Chip></Td>
-                {isBoard && <Td><span className="flex items-center justify-end gap-2">{state !== 'completed' && (kindOf(m) === 'Inspection' ? <Button size="sm" variant="ghost" onClick={() => { const { caseId } = startInspection(m.task, { scheduleId: m.id, by: m.vendor }); if (caseId) navigate(`/boardroom?view=case:${caseId}`); }}>Start the inspection</Button> : <Button size="sm" variant="ghost" onClick={() => setOpen({ kind: 'done', id: m.id })}>Mark done</Button>)}<RowMenu label={`Actions for ${m.task}`} items={[...(state !== 'completed' && kindOf(m) === 'Inspection' ? [{ label: 'Mark done without a checklist', onSelect: () => setOpen({ kind: 'done', id: m.id }) }] : []), ...(state !== 'completed' ? [{ label: 'Put off', onSelect: () => setOpen({ kind: 'defer', id: m.id }) }] : []), { label: 'Edit', onSelect: () => setOpen({ kind: 'edit', id: m.id }) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove “${m.task}” from the schedule? Past visits stay in the log.`)) remove(m.id); } }]} /></span></Td>}
+                {isBoard && <Td><span className="flex items-center justify-end gap-2">{state !== 'completed' && (kindOf(m) === 'Inspection' ? <Button size="sm" variant="ghost" onClick={() => { const { caseId } = startScheduledInspection(m.id, today); if (caseId) navigate(`/boardroom?view=case:${caseId}`); }}>Start the inspection</Button> : <Button size="sm" variant="ghost" onClick={() => setOpen({ kind: 'done', id: m.id })}>Mark done</Button>)}<RowMenu label={`Actions for ${m.task}`} items={[...(state !== 'completed' && kindOf(m) === 'Inspection' ? [{ label: 'Mark done without a checklist', onSelect: () => setOpen({ kind: 'done', id: m.id }) }] : []), ...(state !== 'completed' ? [{ label: 'Put off', onSelect: () => setOpen({ kind: 'defer', id: m.id }) }] : []), { label: 'Edit', onSelect: () => setOpen({ kind: 'edit', id: m.id }) }, { label: 'Remove', danger: true, onSelect: () => { if (window.confirm(`Remove “${m.task}” from the schedule? Past visits stay in the log.`)) remove(m.id); } }]} /></span></Td>}
               </tr>
             ))}
           </tbody>
