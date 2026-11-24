@@ -215,6 +215,7 @@ export function templateFor(task: string): string {
   if (/entrance|lobby|entry/i.test(task)) return 'entrance';
   if (/facade|exterior|envelope|masonry/i.test(task)) return 'facade';
   if (/move/i.test(task)) return 'moveout';
+  if (/\btest|certif/i.test(task)) return 'test';
   return 'walkthrough';
 }
 

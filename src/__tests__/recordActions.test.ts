@@ -94,7 +94,9 @@ describe('inspection', () => {
   it('starts from the checklist for what is being inspected', () => {
     expect(templateFor('Roof Inspection')).toBe('roof');
     expect(templateFor('Parking lot walk')).toBe('parking');
-    expect(templateFor('Fire Alarm System Test')).toBe('walkthrough');
+    // A test or certification gets its own short list, not a building walk-through.
+    expect(templateFor('Fire Alarm System Test')).toBe('test');
+    expect(templateFor('Common area check')).toBe('walkthrough');
     expect(pointsFor('roof')[0].label).toBe('Ponding water');
   });
   it('is walked only when every point has a result, and filed only when every finding is dealt with', () => {
