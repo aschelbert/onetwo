@@ -3,7 +3,13 @@ import CashLoansPanel, { useCash } from '../planning/CashLoansPanel';
 import { standingNow } from '../../boardroom/reserves';
 import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import ReservesPanel from '../reserves/ReservesPanel';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
+import { FUNDING_LABEL, projectCost } from '@/lib/capitalProject';
+import { KIND_LABEL, standing, type BudgetYear } from '@/lib/budgetYear';
+import { markAdopted, syncCurrentYear, useBudgetYears } from '../planning/budgetYears';
+import { startAction } from '../../boardroom/recordActions';
 import { useNavigate } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
@@ -24,23 +30,16 @@ import { casePath } from '../../shell/caseDock';
 type Section = 'budget' | 'draft' | 'outlook' | 'reserves' | 'cash';
 const SECTIONS: Section[] = ['budget', 'draft', 'outlook', 'reserves', 'cash'];
 
-function lineStatus(b: BudgetLine) {
-  if (b.budgeted <= 0) return <Chip tone="ghost">No budget</Chip>;
-  const pct = Math.round((b.actual / b.budgeted) * 100);
-  if (b.actual > b.budgeted) return <Chip tone="red">Over by {fmt(b.actual - b.budgeted)}</Chip>;
-  if (pct >= 100) return <Chip tone="ghost">Paid in full</Chip>;
-  return <Chip tone="sage">On track · {pct}%</Chip>;
-}
-
-function BudgetLineForm({ onClose }: { onClose: () => void }) {
+function BudgetLineForm({ locked, onClose }: { locked: boolean; onClose: () => void }) {
   const add = useFinancialStore(s => s.addBudgetCategory);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   return (
-    <form aria-label="Add a budget line" onSubmit={e => { e.preventDefault(); if (!name) return; add(name, Number(amount) || 0); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+    <form aria-label="Add a budget line" onSubmit={e => { e.preventDefault(); if (!name) return; add(name, locked ? 0 : Number(amount) || 0); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
       <Field label="Line" className="min-w-[220px] flex-1"><input value={name} onChange={e => setName(e.target.value)} placeholder="Snow removal" className={INPUT} /></Field>
-      <Field label="Budget for the year" className="w-[160px]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="$" className={INPUT} /></Field>
+      {!locked && <Field label="Budget for the year" className="w-[160px]"><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="$" className={INPUT} /></Field>}
       <div className="flex gap-2"><Button type="submit" size="sm" disabled={!name}>Add</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      {locked && <span className="w-full text-xs text-ux2-muted">The budget is adopted, so a new line starts at $0. Move money to it with a budget amendment, from the line's ··· menu.</span>}
     </form>
   );
 }
@@ -57,69 +56,165 @@ function EditAmountForm({ line, onClose }: { line: BudgetLine; onClose: () => vo
   );
 }
 
+function AdoptedForm({ today, onClose }: { today: string; onClose: () => void }) {
+  const [on, setOn] = useState(today);
+  const [how, setHow] = useState('');
+  return (
+    <form aria-label="Mark the budget as adopted" onSubmit={e => { e.preventDefault(); if (!on) return; markAdopted(on, how || 'Board vote', today); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
+      <Field label="Adopted on" className="w-[170px]"><input type="date" value={on} max={today} onChange={e => setOn(e.target.value)} className={INPUT} /></Field>
+      <Field label="How" className="min-w-[240px] flex-1"><input value={how} onChange={e => setHow(e.target.value)} placeholder="Board vote at the November meeting, 4 to 0" className={INPUT} /></Field>
+      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!on}>Mark as adopted</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
+      <span className="w-full text-xs text-ux2-muted">From then on a line's amount changes only through a budget amendment, with a board vote and the reason kept.</span>
+    </form>
+  );
+}
+
 type BudgetFilter = 'biggest' | 'over' | 'all';
+
+/** A year that is over: what was adopted, what it was amended to, and what was spent. Read only. */
+function PastYear({ y }: { y: BudgetYear }) {
+  const total = (f: (l: BudgetYear['lines'][number]) => number) => y.lines.reduce((t, l) => t + f(l), 0);
+  return (
+    <div className="flex flex-col gap-3" data-budget-year={y.key}>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-ux2-muted"><Chip tone="navy">Kept {y.keptOn || 'as it stood'}</Chip>{y.adoptedOn ? `Adopted ${y.adoptedOn}${y.adoptedHow ? ` · ${y.adoptedHow}` : ''}` : 'No adoption on record'} · {fmt(y.reserve)} into reserves · dues {fmt(y.monthlyDues)} a month, all units</div>
+      <Table minWidth={680}>
+        <thead><tr><Th>Budget line</Th><Th num>Adopted</Th><Th num>After amendments</Th><Th num>Spent</Th><Th num>Left, or over</Th></tr></thead>
+        <tbody>
+          {y.lines.map(l => { const diff = l.amount - (l.actual ?? 0); return (
+            <tr key={l.id}><Td className="font-semibold">{l.name}{l.kind !== 'operating' && <Chip tone="ghost" className="ml-2">{KIND_LABEL[l.kind]}</Chip>}</Td><Td num>{fmt(l.adopted)}</Td><Td num>{l.amount === l.adopted ? '—' : fmt(l.amount)}</Td><Td num>{l.actual == null ? '—' : fmt(l.actual)}</Td><Td num>{l.actual == null ? '—' : <span className={diff < 0 ? 'text-ux2-red-ink' : ''}>{diff < 0 ? `−${fmt(-diff)}` : fmt(diff)}</span>}</Td></tr>
+          ); })}
+          <tr className="font-semibold"><Td>Total</Td><Td num>{fmt(total(l => l.adopted))}</Td><Td num>{fmt(total(l => l.amount))}</Td><Td num>{fmt(total(l => l.actual ?? 0))}</Td><Td num>{fmt(total(l => l.amount - (l.actual ?? 0)))}</Td></tr>
+        </tbody>
+      </Table>
+      <Amendments y={y} />
+    </div>
+  );
+}
+
+function Amendments({ y }: { y: BudgetYear | undefined }) {
+  if (!y?.amendments.length) return null;
+  return (
+    <Inner className="flex flex-col gap-1" aria-label="Amendments">
+      <b className="text-xs font-semibold text-ux2-ink">Changed since it was adopted</b>
+      {y.amendments.map((a, i) => <div key={i} className="text-sm text-ux2-ink">{a.on} · {a.name}: {fmt(a.from)} to {fmt(a.to)}<span className="text-ux2-muted"> · {a.why} · {a.by}</span></div>)}
+    </Inner>
+  );
+}
+
+const SOURCE_NOTE: Record<string, string> = { operating: 'A line in this budget', reserves: 'From reserves: not a budget line', special_assessment: 'A special assessment: billed on its own', loan: 'A loan: its payments are the Loan payments line', '': 'How to pay is not decided yet' };
+
+/** The capital work on the books this year, with where each job's money comes from. */
+function CapitalThisYear() {
+  const projects = useCapitalProjectsStore(s => s.projects).filter(p => !p.closedOn);
+  const navigate = useNavigate();
+  if (!projects.length) return null;
+  return (
+    <Inner className="flex flex-col gap-1.5" aria-label="Capital work">
+      <b className="text-xs font-semibold text-ux2-ink">Capital work, and where its money comes from</b>
+      {projects.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink"><button type="button" className="text-left font-semibold hover:underline" onClick={() => navigate('/building?tab=projects')}>{p.title}</button><span className="flex flex-wrap items-center gap-2">{projectCost(p) ? fmt(projectCost(p)) : 'Not costed yet'}<Chip tone={p.funding.source === 'operating' ? 'navy' : 'ghost'}>{p.funding.source ? FUNDING_LABEL[p.funding.source] : 'Undecided'}</Chip><span className="text-xs text-ux2-muted">{SOURCE_NOTE[p.funding.source]}</span></span></div>)}
+    </Inner>
+  );
+}
 
 function BudgetCard({ snap, onSection, onGo }: { snap: FundsSnapshot; onSection: (s: string) => void; onGo: (tab: FundsTab, section?: string) => void }) {
   const bud = budgetSummary(snap);
+  const navigate = useNavigate();
+  const isBoard = useAuthStore(s => s.currentUser.role) !== 'RESIDENT';
+  const by = useBudgetYears(snap.today);
   const [filter, setFilter] = useState<BudgetFilter>('biggest');
   const [adding, setAdding] = useState(false);
+  const [adopting, setAdopting] = useState(false);
   const [editing, setEditing] = useState<BudgetLine | null>(null);
-  const year = snap.today.slice(0, 4);
+  const [yearKey, setYearKey] = useState('');
+  // The year's record follows the live lines: created on first sight, and brought up to date after a change.
+  const cats = useFinancialStore(s => s.budgetCategories);
+  useEffect(() => { if (isBoard) syncCurrentYear(snap.today); }, [cats, isBoard, snap.today]);
+  const past = by.past.find(y => y.key === yearKey);
+  const year = by.current?.label || snap.today.slice(0, 4);
+  const fyStart = by.fy.start;
+  const lineOf = (b: BudgetLine) => by.lines.find(l => l.id === b.id);
+  const stand = (b: BudgetLine) => standing({ amount: b.budgeted, months: lineOf(b)?.months ?? [] }, b.actual, fyStart, snap.today);
   const sorted = useMemo(() => [...snap.budget].sort((a, b) => b.budgeted - a.budgeted), [snap.budget]);
   const over = sorted.filter(b => b.budgeted > 0 && b.actual > b.budgeted);
-  const rows = filter === 'all' ? sorted : filter === 'over' ? over : sorted.slice(0, 8);
+  const ahead = sorted.filter(b => stand(b).ahead);
+  const rows = filter === 'all' ? sorted : filter === 'over' ? [...over, ...ahead] : sorted.slice(0, 8);
   const rest = sorted.slice(8);
   const dues = snap.units.reduce((t, u) => t + u.monthlyFee, 0) * 12;
   const reserve = snap.annualReserveContribution;
   const pct = (n: number) => (dues > 0 ? Math.round((n / dues) * 100) : 0);
-  const monthEnd = new Date(Number(year), Number(snap.today.slice(5, 7)) - 1, 0);
+  const monthEnd = new Date(Number(snap.today.slice(0, 4)), Number(snap.today.slice(5, 7)) - 1, 0);
   const through = `${monthEnd.toLocaleDateString('en-US', { month: 'short' })} ${monthEnd.getDate()}`;
+  const amend = (b: BudgetLine) => { const { caseId } = startAction('budget-amendment', `Budget amendment · ${b.name}`, { lineId: b.id ?? '', lineName: b.name }, {}, snap.today); if (caseId) navigate(`/boardroom?view=case:${caseId}`); };
+  const status = (b: BudgetLine) => {
+    if (b.budgeted <= 0) return <Chip tone="ghost">No budget</Chip>;
+    const st = stand(b);
+    if (st.over) return <Chip tone="red">Over by {fmt(st.overBy)}</Chip>;
+    if (st.ahead) return <Chip tone="amber">{fmt(b.actual - st.expected)} ahead of its months</Chip>;
+    if (b.actual >= b.budgeted) return <Chip tone="ghost">Paid in full</Chip>;
+    return <Chip tone="sage">On track · {Math.round((b.actual / b.budgeted) * 100)}%</Chip>;
+  };
   return (
     <Card aria-label="Budget against actual" id="budget">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Budget against actual, {year}</h2><span className="text-[13px] text-ux2-muted">{bud.lines} lines · {fmt(bud.spent)} spent of {fmt(bud.total)} · through {through}</span></div>
+        <div className="flex flex-wrap items-baseline gap-3"><h2 className="m-0 text-lg font-medium text-ux2-ink">Budget against actual, {past ? past.label : year}</h2>{!past && <span className="text-[13px] text-ux2-muted">{bud.lines} lines · {fmt(bud.spent)} spent of {fmt(bud.total)} · through {through}</span>}</div>
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-          <PillTabs size="filter" surface="white" aria-label="Show lines" value={filter} onChange={setFilter} tabs={[{ id: 'biggest', label: `Biggest ${Math.min(8, sorted.length)}` }, { id: 'over', label: `Over · ${over.length}` }, { id: 'all', label: `All ${sorted.length}` }]} />
-          <Button size="sm" className="h-9" variant="ghost" onClick={() => setAdding(true)}>Add a budget line</Button>
+          {by.past.length > 0 && <label className="flex items-center gap-1.5 text-xs text-ux2-muted">Year <select aria-label="Budget year" value={yearKey} onChange={e => setYearKey(e.target.value)} className="h-9 rounded-full border border-ux2-line-strong bg-white px-3 text-sm text-ux2-ink"><option value="">{year} · this year</option>{by.past.map(y => <option key={y.key} value={y.key}>{y.label}</option>)}</select></label>}
+          {!past && <PillTabs size="filter" surface="white" aria-label="Show lines" value={filter} onChange={setFilter} tabs={[{ id: 'biggest', label: `Biggest ${Math.min(8, sorted.length)}` }, { id: 'over', label: `Over or ahead · ${over.length + ahead.length}` }, { id: 'all', label: `All ${sorted.length}` }]} />}
+          {!past && isBoard && <Button size="sm" className="h-9" variant="ghost" onClick={() => setAdding(true)}>Add a budget line</Button>}
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-ux2-line bg-ux2-surface px-3.5 py-3">
-        <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
-          <span className="font-semibold text-ux2-muted">Where the dues go</span>
-          <Chip tone="ghost">Dues {fmt(dues)}</Chip><span className="text-ux2-muted">→</span>
-          <Chip tone="navy">Reserves {fmt(reserve)} · {pct(reserve)}%</Chip><span className="text-ux2-muted">→</span>
-          <Chip tone="ghost">The {bud.lines} lines {fmt(bud.total)} · {pct(bud.total)}%</Chip>
-        </div>
-        <Button size="sm" variant="ghost" className="h-9 !text-xs" onClick={() => onSection('reserves')}>Reserve contribution is set on Reserves ›</Button>
-      </div>
-      {adding && <BudgetLineForm onClose={() => setAdding(false)} />}
-      {editing && <EditAmountForm key={editing.id} line={editing} onClose={() => setEditing(null)} />}
-      {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{filter === 'over' ? 'No line is over its budget.' : 'No budget lines yet.'}</Inner> : (
-        <Table>
-          <thead><tr><Th>Budget line</Th><Th num>Budget</Th><Th num>Spent</Th><Th num>Left</Th><Th style={{ width: '22%' }}>Used</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
-          <tbody>
-            {rows.map(b => {
-              const used = b.budgeted > 0 ? Math.round((b.actual / b.budgeted) * 100) : 0;
-              const isOver = b.budgeted > 0 && b.actual > b.budgeted;
-              return (
-                <tr key={b.id ?? b.name} className={isOver ? 'bg-ux2-red-tint/60' : ''}>
-                  <Td className="font-semibold">{b.name}{b.acctNum && <span className="text-xs font-normal text-ux2-muted"> · {b.acctNum}</span>}</Td>
-                  <Td num>{fmt(b.budgeted)}</Td>
-                  <Td num className={isOver ? 'font-semibold text-ux2-red-ink' : ''}>{fmt(b.actual)}</Td>
-                  <Td num className={isOver ? 'text-ux2-red-ink' : ''}>{isOver ? `−${fmt(b.actual - b.budgeted)}` : fmt(b.budgeted - b.actual)}</Td>
-                  <Td><Bar pct={Math.min(100, used)} mark={bud.expectedPct} tone={isOver ? 'red' : 'teal'} label={`${used} percent used`} /></Td>
-                  <Td>{lineStatus(b)}</Td>
-                  <Td num><RowMenu label={`More for ${b.name}`} items={[{ label: 'Change the amount', onSelect: () => setEditing(b) }, { label: 'Show its bills', onSelect: () => onGo('expenses', 'bills') }]} /></Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+      {past ? <PastYear y={past} /> : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-ux2-line bg-ux2-surface px-3.5 py-3" data-budget-locked={by.locked ? '1' : '0'}>
+            {by.locked
+              ? <span className="text-[13px] text-ux2-ink"><Chip tone="navy" className="mr-2">Adopted {by.current!.adoptedOn}</Chip>{by.current!.adoptedHow ? `${by.current!.adoptedHow}. ` : ''}A line's amount now changes only through a budget amendment, with a board vote and the reason kept.</span>
+              : <span className="text-[13px] text-ux2-ink"><Chip tone="amber" className="mr-2">Not marked as adopted</Chip>Lines can be typed over until the board adopts the budget. The annual budget action adopts next year's for you.</span>}
+            {!by.locked && isBoard && <Button size="sm" variant="ghost" className="h-9 !text-xs" onClick={() => setAdopting(v => !v)}>The board has adopted this budget</Button>}
+          </div>
+          {adopting && <AdoptedForm today={snap.today} onClose={() => setAdopting(false)} />}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-ux2-line bg-ux2-surface px-3.5 py-3">
+            <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+              <span className="font-semibold text-ux2-muted">Where the dues go</span>
+              <Chip tone="ghost">Dues {fmt(dues)}</Chip><span className="text-ux2-muted">→</span>
+              <Chip tone="navy">Reserves {fmt(reserve)} · {pct(reserve)}%</Chip><span className="text-ux2-muted">→</span>
+              <Chip tone="ghost">The {bud.lines} lines {fmt(bud.total)} · {pct(bud.total)}%</Chip>
+            </div>
+            <Button size="sm" variant="ghost" className="h-9 !text-xs" onClick={() => onSection('reserves')}>Reserve contribution is set on Reserves ›</Button>
+          </div>
+          {adding && <BudgetLineForm locked={by.locked} onClose={() => setAdding(false)} />}
+          {editing && <EditAmountForm key={editing.id} line={editing} onClose={() => setEditing(null)} />}
+          {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">{filter === 'over' ? 'No line is over its budget or ahead of its months.' : 'No budget lines yet.'}</Inner> : (
+            <Table>
+              <thead><tr><Th>Budget line</Th><Th num>Budget</Th><Th num>Spent</Th><Th num>Expected by now</Th><Th style={{ width: '20%' }}>Used</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
+              <tbody>
+                {rows.map(b => {
+                  const used = b.budgeted > 0 ? Math.round((b.actual / b.budgeted) * 100) : 0;
+                  const st = stand(b);
+                  const kind = lineOf(b)?.kind ?? 'operating';
+                  const mark = b.budgeted > 0 ? Math.min(100, Math.round((st.expected / b.budgeted) * 100)) : bud.expectedPct;
+                  return (
+                    <tr key={b.id ?? b.name} data-budget-line={b.id} className={st.over ? 'bg-ux2-red-tint/60' : ''}>
+                      <Td className="font-semibold">{b.name}{kind !== 'operating' && <Chip tone="ghost" className="ml-2">{KIND_LABEL[kind]}</Chip>}{b.acctNum && <span className="text-xs font-normal text-ux2-muted"> · {b.acctNum}</span>}</Td>
+                      <Td num>{fmt(b.budgeted)}</Td>
+                      <Td num className={st.over ? 'font-semibold text-ux2-red-ink' : ''}>{fmt(b.actual)}</Td>
+                      <Td num className="text-ux2-muted">{fmt(st.expected)}</Td>
+                      <Td><Bar pct={Math.min(100, used)} mark={mark} tone={st.over ? 'red' : 'teal'} label={`${used} percent used`} /></Td>
+                      <Td>{status(b)}</Td>
+                      <Td num>{isBoard && <RowMenu label={`More for ${b.name}`} items={[by.locked ? { label: 'Amend this line', onSelect: () => amend(b) } : { label: 'Change the amount', onSelect: () => setEditing(b) }, { label: 'Show its bills', onSelect: () => onGo('expenses', 'bills') }]} />}</Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+          <Amendments y={by.current} />
+          <CapitalThisYear />
+          <div className="flex flex-wrap items-start gap-3">
+            {filter === 'biggest' && rest.length > 0 && <button type="button" onClick={() => setFilter('all')} className="shrink-0"><Chip tone="ghost">{rest.length} more lines · {fmt(rest.reduce((t, b) => t + b.budgeted, 0))} budget · {fmt(rest.reduce((t, b) => t + b.actual, 0))} spent</Chip></button>}
+            <Why>{rest.length > 0 && filter === 'biggest' ? `${rest.map(b => b.name).join(', ')}. ` : ''}Expected by now is the line's own months added up to today: even, or in the shape of last year's spending where the budget action set it so. The mark on each bar is that figure. A line more than 10% and $250 past it is ahead of its months without being over for the year.</Why>
+          </div>
+        </>
       )}
-      <div className="flex flex-wrap items-start gap-3">
-        {filter === 'biggest' && rest.length > 0 && <button type="button" onClick={() => setFilter('all')} className="shrink-0"><Chip tone="ghost">{rest.length} more lines · {fmt(rest.reduce((t, b) => t + b.budgeted, 0))} budget · {fmt(rest.reduce((t, b) => t + b.actual, 0))} spent</Chip></button>}
-        <Why>{rest.length > 0 && filter === 'biggest' ? `${rest.map(b => b.name).join(', ')}. ` : ''}The mark on each bar is where {bud.expectedPct}% sits. Each line is edited from its own row: the ··· menu changes the amount or shows its bills.</Why>
-      </div>
     </Card>
   );
 }
@@ -155,6 +250,7 @@ function NextYearCard({ snap }: { snap: FundsSnapshot }) {
             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">The draft</div>
             <KV label="Running the building">{fmt(t.operating)}</KV>
             <KV label="Cushion">{draft.contingencyPct == null ? 'not set yet' : fmt(t.contingency)}</KV>
+            {t.capital > 0 && <KV label="Capital work and loan payments">{fmt(t.capital)}</KV>}
             <KV label="Into reserves">{draft.reserve.choice ? fmt(t.reserve) : 'not set yet'}</KV>
             <KV label="The year">{fmt(t.needed)}</KV>
           </Inner>
@@ -397,7 +493,7 @@ export default function PlanningTab({ snap, section, onSection, onGo }: { snap: 
         label: 'Five-year outlook',
         meta: `${year} to ${Number(year) + 5}`,
         value: lastChange == null ? '—' : `${lastChange >= 0 ? '+' : ''}${lastChange}%`,
-        unit: 'dues a year, as things stand',
+        unit: ol.draft ? `dues a year · from the ${ol.draftLabel} draft` : 'dues a year, as things stand',
         children: (
           <div>
             <KV label={`Dues in ${Number(year) + 5}`}>{fmt(ol.rows[5]?.dues ?? 0)} a unit</KV>

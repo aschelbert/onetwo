@@ -20,6 +20,8 @@ import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
 import { STEP_ORDER, STEP_TITLE, awardedBid, projectCost, projectSteps, type CapitalProject } from '@/lib/capitalProject';
 import { CAPITAL_HOW as HOW } from './capitalPlan';
 import { fundOf } from '@/lib/ledger';
+import { CAPITAL_PREFIX } from '@/lib/budgetYear';
+import { syncCurrentYear } from '../funds/planning/budgetYears';
 import type { CaseTrackerCase } from '@/types/issues';
 import { todayIso } from '../runbook/adapters';
 
@@ -40,10 +42,37 @@ export function capitalSteps(): { s: string; detail?: string }[] {
 /** The expense account a project's bill is booked to: the one tied to its reserve component, else any reserve expense account, else repairs. */
 function accountFor(p: CapitalProject): string {
   const chart = useFinancialStore.getState().chartOfAccounts.filter(a => a.type === 'expense' && a.sub !== 'header');
+  // A job paid from the operating budget is booked to its own account, which its budget line is measured against.
+  if (p.funding.source === 'operating') { const own = chart.find(a => a.name === capitalLineName(p)); if (own) return own.num; }
   return (p.reserveItemId && chart.find(a => a.reserveItem === p.reserveItemId)?.num)
     || chart.find(a => fundOf(a) === 'reserve')?.num
     || chart.find(a => /maint|repair/i.test(a.name))?.num
     || chart[0]?.num || '5010';
+}
+
+export const capitalLineName = (p: Pick<CapitalProject, 'title'>) => `${CAPITAL_PREFIX}${p.title}`;
+
+/**
+ * A job the board decided to pay from the operating budget becomes a line in
+ * this year's budget, with an expense account of the same name for its bill.
+ * The funding decision is the board's vote, so on an adopted budget the new
+ * line is listed as a change with that vote as its reason.
+ */
+export function ensureCapitalLine(p: CapitalProject, today: string = todayIso()): boolean {
+  if (p.closedOn || p.paidOn || p.funding.source !== 'operating' || !p.funding.decidedOn || !(projectCost(p) > 0)) return false;
+  const fin = useFinancialStore.getState();
+  const name = capitalLineName(p);
+  const had = fin.budgetCategories.find(c => c.name === name);
+  const cost = Math.round(projectCost(p));
+  if (had && had.budgeted === cost) return false;
+  if (!fin.chartOfAccounts.some(a => a.name === name)) {
+    const used = new Set(fin.chartOfAccounts.map(a => a.num));
+    let n = 5900; while (used.has(String(n)) && n < 5999) n += 1;
+    fin.addCoAAccount(String(n), name, '5000', 'operating');
+  }
+  if (had) fin.updateBudgetCategory(had.id, { budgeted: cost }); else fin.addBudgetCategory(name, cost);
+  syncCurrentYear(today, `Capital improvement paid from the operating budget, decided ${p.funding.decidedOn}${p.funding.vote ? ` (${p.funding.vote})` : ''}`);
+  return true;
 }
 
 /** Award the contract: record the bid and the date, and raise the approved work order its bill will be paid on. */
@@ -104,6 +133,7 @@ export function syncCapitalCase(c: CaseTrackerCase, today: string = todayIso()):
   if (!id || c.status === 'closed' || !c.steps) return;
   let p = useCapitalProjectsStore.getState().projects.find(x => x.id === id);
   if (!p) return;
+  ensureCapitalLine(p, today);
   // The bill is paid in Funds; the project learns of it here.
   if (p.workOrderId && !p.paidOn) {
     const wo = useFinancialStore.getState().workOrders.find(w => w.id === p!.workOrderId);

@@ -13,6 +13,7 @@
  *                           Upcoming · Stewardship · Unit balance · Building news · Pulse
  *  Owner:                   Up next · Stewardship · Unit balance · Building news · Pulse
  */
+import { standingNow } from '../boardroom/reserves';
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -349,10 +350,9 @@ export default function HomePage() {
   const boardSide = viewer.role === 'BOARD_MEMBER' || viewer.role === 'PROPERTY_MANAGER' || viewer.role === 'PLATFORM_ADMIN';
 
   const kpis = useMemo(() => {
-    const reserveNeeded = fin.reserveItems.reduce((s, i) => s + i.estimatedCost, 0);
-    // What the reserve account holds in the ledger, not the planning split typed on each item.
+    // What the reserve account holds in the ledger, against what should be set aside by now: the same percent funded as Funds › Planning.
     const reserveFunded = (fin.getBalanceSheet() as { assets: { reserves: number } }).assets.reserves;
-    const reservePct = reserveNeeded > 0 ? Math.round((reserveFunded / reserveNeeded) * 100) : 0;
+    const reservePct = standingNow().pct ?? 0;
     const income = fin.getIncomeMetrics() as { collectionRate: number; monthlyCollected: number; monthlyExpected: number; delinquentUnits: number };
     const openCases = snapshot.cases.filter(c => c.status === 'open').length;
     return { reservePct, reserveFunded, income, openCases };

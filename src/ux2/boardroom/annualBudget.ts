@@ -24,7 +24,12 @@ import { addDays } from '@/lib/billingCycle';
 import type { CaseTrackerCase } from '@/types/issues';
 import { todayIso } from '../runbook/adapters';
 import { currentFiscalYear, fiscalLabel, nextFiscalYear } from './fiscal';
-import { budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, seedDraft, type BudgetDraft, type BudgetStepKey } from './budgetDraft';
+import { budgetStepKey, capFromClauses, draftDone, draftTotals, duesByUnit, seedDraft, withCapitalLines, type BudgetDraft, type BudgetStepKey } from './budgetDraft';
+import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
+import { projectCost } from '@/lib/capitalProject';
+import { loanPaymentsBetween } from '@/lib/outlook';
+import { planningDoc } from '../funds/planning/planningDoc';
+import { turnYear } from '../funds/planning/budgetYears';
 
 export const ANNUAL_BUDGET_ID = 'annual-budget';
 /** Days before the fiscal year starts that the runbook opens. */
@@ -96,7 +101,19 @@ export function ensureBudgetDraft(fy: { start: string; end: string }, today: str
     capPct: cap?.pct ?? null,
   });
   store.put(d);
-  return d;
+  return syncCapitalLines(fy) ?? d;
+}
+
+/** Keep the draft's capital and loan lines in step with the capital projects and the loan register. */
+export function syncCapitalLines(fy: { start: string; end: string }): BudgetDraft | undefined {
+  const store = useBudgetDraftStore.getState();
+  const d = store.get(fy.start);
+  if (!d || d.adoptedAt) return d;
+  const projects = useCapitalProjectsStore.getState().projects.filter(p => !p.closedOn && !p.paidOn && p.funding.source === 'operating')
+    .map(p => ({ projectId: p.id, title: p.title, cost: projectCost(p), decidedOn: p.funding.decidedOn }));
+  const next = withCapitalLines(d, projects, loanPaymentsBetween(planningDoc().loans, fy.start.slice(0, 7), fy.end.slice(0, 7)));
+  if (next !== d) store.update(fy.start, () => next);
+  return store.get(fy.start);
 }
 
 /** Put the adopted budget into Funds: each line's amount, every unit's dues, the reserve transfer. */
@@ -106,6 +123,16 @@ export function switchToBudget(fyStart: string, today: string = todayIso()): boo
   const fin = useFinancialStore.getState();
   const t = draftTotals(d);
   const cats = fin.budgetCategories;
+  // Before the lines change: keep the year that is ending, and write the new year's record, adopted and locked.
+  turnYear({
+    fyStart: d.fyStart, fyEnd: d.fyEnd, label: d.label, adoptedOn: d.adoptedAt ?? today, adoptedHow: d.adoptedHow ?? '', reserve: t.reserve, monthlyDues: t.monthly,
+    lines: [
+      ...d.lines.map(l => ({ id: l.categoryId ?? l.id, name: l.name, amount: l.amount, kind: l.kind ?? ('operating' as const) })),
+      ...(t.contingency > 0 ? [{ id: cats.find(c => /contingenc/i.test(c.name))?.id ?? 'contingency', name: cats.find(c => /contingenc/i.test(c.name))?.name ?? 'Contingency', amount: t.contingency, kind: 'contingency' as const }] : []),
+    ],
+  }, today);
+  // A capital line is for one year: last year's are dropped unless the new budget carries them.
+  for (const c of cats) if (/^(capital\b|loan payments$)/i.test(c.name) && !d.lines.some(l => l.name.toLowerCase() === c.name.toLowerCase())) fin.deleteBudgetCategory(c.id);
   for (const l of d.lines) {
     const cat = cats.find(c => c.id === l.categoryId) ?? cats.find(c => c.name.toLowerCase() === l.name.toLowerCase());
     if (cat) { if (cat.budgeted !== l.amount) fin.updateBudgetCategory(cat.id, { budgeted: l.amount }); }
@@ -150,6 +177,7 @@ export function syncBudgetCase(c: CaseTrackerCase, today: string = todayIso()): 
   const store = useBudgetDraftStore.getState();
   let d = store.get(fy.start) ?? ensureBudgetDraft(fy, today);
   if (!d) return;
+  d = syncCapitalLines(fy) ?? d;
   const created = c.created.slice(0, 10);
   // What the app sees elsewhere, written onto the draft.
   if (!d.adoptedAt) { const a = adoptionOf(c, d); if (a) store.update(fy.start, x => ({ ...x, adoptedAt: a.at, adoptedHow: a.how })); }

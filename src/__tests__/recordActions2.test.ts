@@ -1,3 +1,4 @@
+import { yearDoc } from '@/ux2/funds/planning/budgetYears';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { stepsOf, type ActionRecord } from '@/lib/actions';
 import { FIRE_NOTICE, noticeText, type FireNoticeData } from '@/lib/actions/fireNotice';
@@ -93,10 +94,12 @@ describe('budget amendment', () => {
     runRecordActions('2026-12-09'); runRecordActions('2026-12-10');
     expect(useFinancialStore.getState().budgetCategories.map(c => c.budgeted)).toEqual([63800, 41000, 8200]);
     expect(data<BudgetAmendmentData>(recordId).appliedOn).toBe('2026-12-09');
-    expect(store().records[0].closedOn).toBe('');
+    // The year's record follows the lines.
+    expect(yearDoc('2026-01-01')?.lines.map(l => l.amount)).toEqual([63800, 41000, 8200]);
+    expect(store().records.find(r => r.id === recordId)!.closedOn).toBe('');
     store().patchData(recordId, { ownersNotice: 'not-needed' });
     runRecordActions('2026-12-10');
-    expect(store().records[0].closedOn).toBe('2026-12-10');
+    expect(store().records.find(r => r.id === recordId)!.closedOn).toBe('2026-12-10');
     expect(caseOf(recordId).status).toBe('closed');
   });
   it('leaves the budget alone when the vote fails', () => {
