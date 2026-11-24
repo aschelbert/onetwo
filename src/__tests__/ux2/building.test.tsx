@@ -41,7 +41,7 @@ describe('Building', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Building sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Plan', 'Projects', 'Utilities', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     expect(document.querySelector('[aria-label="Details"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Insurance"]')).toBeTruthy();

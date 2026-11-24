@@ -1,5 +1,7 @@
 import { supabase, logDbError } from '@/lib/supabase';
 import type { Issue } from '@/types/issues';
+import type { Photo } from '@/lib/services/photos';
+import { missingColumn } from '@/lib/services/missingColumn';
 
 interface IssueRow {
   id: string;
@@ -16,6 +18,7 @@ interface IssueRow {
   unit_number: string | null;
   submitted_date: string;
   view_count: number;
+  photos?: Photo[] | null;
 }
 
 function rowToIssue(row: IssueRow, upvotes: Issue['upvotes'], comments: Issue['comments'], reviewNotes: Issue['reviewNotes']): Issue {
@@ -37,6 +40,7 @@ function rowToIssue(row: IssueRow, upvotes: Issue['upvotes'], comments: Issue['c
     comments,
     reviewNotes,
     comms: [],
+    photos: Array.isArray(row.photos) ? row.photos : [],
   };
 }
 
@@ -80,27 +84,37 @@ export async function fetchIssues(tenantId: string): Promise<Issue[] | null> {
 
 export async function createIssue(tenantId: string, issue: Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes' | 'comms'>, localId: string): Promise<string | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('issues')
-    .insert({
-      tenant_id: tenantId,
-      local_id: localId,
-      type: issue.type,
-      category: issue.category,
-      priority: issue.priority,
-      status: issue.status,
-      title: issue.title,
-      description: issue.description,
-      reported_by: issue.reportedBy,
-      reporter_name: issue.reporterName,
-      reporter_email: issue.reporterEmail,
-      unit_number: issue.unitNumber || null,
-      submitted_date: issue.submittedDate,
-    })
-    .select('id')
-    .single();
-  if (error) { logDbError('createIssue error:', error); return null; }
+  const row: Record<string, unknown> = {
+    tenant_id: tenantId,
+    local_id: localId,
+    type: issue.type,
+    category: issue.category,
+    priority: issue.priority,
+    status: issue.status,
+    title: issue.title,
+    description: issue.description,
+    reported_by: issue.reportedBy,
+    reporter_name: issue.reporterName,
+    reporter_email: issue.reporterEmail,
+    unit_number: issue.unitNumber || null,
+    submitted_date: issue.submittedDate,
+  };
+  if (issue.photos?.length) row.photos = issue.photos;
+  let { data, error } = await supabase.from('issues').insert(row).select('id').single();
+  // The request matters more than its photos: a database without the photos column yet still takes the request.
+  if (error && 'photos' in row && missingColumn(error, 'photos')) {
+    const { photos: _p, ...rest } = row;
+    ({ data, error } = await supabase.from('issues').insert(rest).select('id').single());
+  }
+  if (error || !data) { logDbError('createIssue error:', error); return null; }
   return data.id;
+}
+
+export async function updateIssuePhotos(id: string, photos: Photo[]): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('issues').update({ photos }).eq('id', id);
+  if (error) { logDbError('updateIssuePhotos error:', error); return false; }
+  return true;
 }
 
 export async function updateIssueStatus(id: string, status: string): Promise<boolean> {

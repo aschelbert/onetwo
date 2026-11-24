@@ -31,9 +31,9 @@ export const standalone = (w: WorkOrder, cases: CaseTrackerCase[]) => !w.caseId 
 export function workOrderSteps(w: WorkOrder): { s: string; detail?: string; ck?: string[] }[] {
   return [
     { s: `Approve the work order: ${w.title}, ${w.vendor || 'vendor to be named'}, ${fmt(w.amount)}`, detail: 'Funds › Expenses › Work orders. Over the bylaws limit it needs a spending request first. This step ticks itself when the work order is approved.' },
-    { s: 'The vendor does the work; sign it off and note any deficiencies', ck: ['Completion checked on site', 'Photos or the vendor\'s report attached', 'Deficiencies listed for the vendor in writing'] },
+    { s: 'The vendor does the work; sign it off and note any deficiencies', detail: 'Funds › Expenses › Bills › Sign off work. A bill can be approved for payment only after the work is signed off. This step ticks itself then.', ck: ['Completion checked on site', 'Photos or the vendor\'s report attached', 'Deficiencies listed for the vendor in writing'] },
     { s: 'Enter the invoice', detail: 'Funds › Expenses › Work orders › Invoice received posts it to accounts payable. This step ticks itself when the invoice is entered.' },
-    { s: 'Pay it', detail: 'Funds › Expenses › Pay. This step ticks itself when the work order is paid.' },
+    { s: 'Pay it', detail: 'Funds › Expenses › Bills › Approve, once the work is signed off. This step ticks itself when the work order is paid.' },
   ];
 }
 
@@ -45,6 +45,8 @@ export function syncWorkOrderCase(c: CaseTrackerCase): void {
   const complete = useIssuesStore.getState().completeStep;
   const rank = { draft: 0, approved: 1, invoiced: 2, paid: 3 }[w.status] ?? 0;
   if (!c.steps[STEP.approve].done && rank >= 1) complete(c.id, STEP.approve);
+  // Only a recorded sign-off ticks the work step; paying a bill does not say anyone checked the work.
+  if (!c.steps[STEP.work].done && w.signoff) complete(c.id, STEP.work);
   if (!c.steps[STEP.invoice].done && rank >= 2) complete(c.id, STEP.invoice);
   if (!c.steps[STEP.pay].done && rank >= 3) complete(c.id, STEP.pay);
 }

@@ -4,6 +4,7 @@ import { isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as spendingSvc from '@/lib/services/spending';
 import type { SpendingApproval } from '@/lib/services/spending';
 import { generateLocalId } from '@/lib/generateId';
+import { decisionFrom } from '@/lib/spendingRules';
 
 export type { SpendingApproval } from '@/lib/services/spending';
 
@@ -42,7 +43,8 @@ interface SpendingState {
   loadFromDb: (tenantId: string) => Promise<void>;
   addApproval: (a: Omit<SpendingApproval, 'id'>, tenantId?: string) => void;
   updateApproval: (id: string, updates: Partial<SpendingApproval>) => void;
-  castVote: (id: string, member: string, vote: 'approve' | 'deny') => void;
+  /** Records one member's vote. `needed` is how many matching votes decide it (see approvalsNeeded); it defaults to three. */
+  castVote: (id: string, member: string, vote: 'approve' | 'deny', needed?: number) => void;
   deleteApproval: (id: string) => void;
 }
 
@@ -77,14 +79,13 @@ export const useSpendingStore = create<SpendingState>()(persist((set) => ({
     if (isBackendEnabled) spendingSvc.updateApproval(id, updates);
   },
 
-  castVote: (id, member, vote) => {
+  castVote: (id, member, vote, needed = 3) => {
     set(s => ({
       approvals: s.approvals.map(a => {
         if (a.id !== id) return a;
         const newVotes = [...a.votes.filter(v => v.member !== member), { member, vote, date: new Date().toISOString().split('T')[0] }];
-        const approves = newVotes.filter(v => v.vote === 'approve').length;
-        const denies = newVotes.filter(v => v.vote === 'deny').length;
-        const newStatus = approves >= 3 ? 'approved' : denies >= 3 ? 'denied' : a.status;
+        const outcome = decisionFrom(newVotes, needed);
+        const newStatus = outcome === 'pending' ? a.status : outcome;
         const decidedAt = newStatus !== a.status && newStatus !== 'pending' ? new Date().toISOString().split('T')[0] : a.decidedAt;
         return { ...a, votes: newVotes, status: newStatus, decidedAt };
       })

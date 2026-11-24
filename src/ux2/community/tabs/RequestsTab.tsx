@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import type { Issue } from '@/types/issues';
 import { cn } from '@/lib/formatters';
-import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Cell, Why, Field, INPUT, HeaderActions } from '../../components';
+import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Cell, Why, Field, INPUT, HeaderActions, PhotoPicker, PhotoStrip } from '../../components';
+import { MAX_PHOTOS, uploadPhotos } from '@/lib/services/photos';
+import { generateLocalId } from '@/lib/generateId';
 import { dayLabel } from '../../home/calendar';
 import { requestRows, requestsSummary, type RequestRow, type CommunitySnapshot } from '../metrics';
 
-const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'Something else'];
+const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'See the association records', 'Something else'];
 const longDay = (iso: string) => { const d = new Date(iso.slice(0, 10) + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
 
 /** The owner's request form: the same `addIssue` call the Community Room makes. */
@@ -19,14 +21,20 @@ function MakeRequest({ snap, onDone }: { snap: CommunitySnapshot; onDone: () => 
   const [scope, setScope] = useState<'unit' | 'common'>(snap.viewer.linkedUnits.length ? 'unit' : 'common');
   const [urgency, setUrgency] = useState<'LOW' | 'MEDIUM' | 'URGENT'>('LOW');
   const [note, setNote] = useState<string | null>(null);
-  const submit = (e: React.FormEvent) => {
+  const [files, setFiles] = useState<File[]>([]);
+  const [sending, setSending] = useState(false);
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) { setNote('Say what is going on in a line.'); return; }
+    setSending(true);
+    const up = files.length ? await uploadPhotos(`requests/${generateLocalId('req')}`, files, snap.viewer.name) : { photos: [], skipped: [] };
+    setSending(false);
     addIssue({
+      photos: up.photos,
       type: scope === 'common' ? 'BUILDING_PUBLIC' : 'UNIT_PRIVATE', category, priority: urgency, status: 'SUBMITTED', title: title.trim(), description: description.trim(),
       reportedBy: snap.viewer.id, reporterName: snap.viewer.name, reporterEmail: snap.viewer.email, unitNumber: snap.viewer.linkedUnits[0] ?? '', submittedDate: new Date().toISOString().slice(0, 10),
     } as Omit<Issue, 'id' | 'upvotes' | 'viewCount' | 'comments' | 'reviewNotes' | 'comms'>);
-    setTitle(''); setDescription(''); setNote('Sent. You get a card on Home at each step.');
+    setTitle(''); setDescription(''); setFiles([]); setNote(`Sent${up.photos.length ? ` with ${up.photos.length} photo${up.photos.length === 1 ? '' : 's'}` : ''}. You get a card on Home at each step.${up.skipped.length ? ` Not attached: ${up.skipped.join('; ')}.` : ''}`);
     onDone();
   };
   return (
@@ -40,13 +48,15 @@ function MakeRequest({ snap, onDone }: { snap: CommunitySnapshot; onDone: () => 
         <Field label="What is going on"><input aria-label="What is going on" value={title} onChange={e => setTitle(e.target.value)} placeholder="Say where it is, when it started and what you have noticed" className={INPUT} /></Field>
         <textarea aria-label="Details" value={description} onChange={e => setDescription(e.target.value)} placeholder="Details, when it started, what you tried" rows={3} className="w-full rounded-[10px] border border-ux2-line-strong px-3 py-2 text-sm" />
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <Field label="Photo"><Button type="button" size="sm" variant="ghost">+ Add a photo, up to 5</Button></Field>
+          <div className="flex flex-col gap-1 text-xs font-semibold text-ux2-muted">Photo
+            <span className="flex flex-wrap items-center gap-2"><PhotoPicker label={`+ Add a photo, up to ${MAX_PHOTOS}`} max={MAX_PHOTOS} disabled={files.length >= MAX_PHOTOS} onPick={picked => setFiles(f => [...f, ...picked].slice(0, MAX_PHOTOS))} />{files.map((f, n) => <span key={`${f.name}${n}`} className="inline-flex items-center gap-1 rounded-full border border-ux2-line bg-white px-2.5 py-1 text-xs font-normal text-ux2-ink">{f.name}<button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(list => list.filter((_, k) => k !== n))} className="font-bold text-ux2-muted">×</button></span>)}</span>
+          </div>
           <div className="flex flex-col gap-1 text-xs font-semibold text-ux2-muted">How urgent
             <div className="flex flex-wrap gap-1.5">{([['LOW', 'Routine'], ['MEDIUM', 'This week'], ['URGENT', 'Urgent']] as const).map(([id, l]) => <label key={id} className={cn('flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold', urgency === id ? 'border-ux2-navy bg-ux2-navy text-white' : 'border-ux2-line-strong bg-white text-ux2-ink')}><input type="radio" name="urgency" className="sr-only" checked={urgency === id} onChange={() => setUrgency(id)} />{l}</label>)}</div>
           </div>
         </div>
         <Why>Urgent means a safety or water problem; the board and staff are paged. Everything else is answered within 48 hours.</Why>
-        <div className="flex items-center gap-3"><Button type="submit">Send request</Button>{note && <span className="text-xs text-ux2-muted">{note}</span>}</div>
+        <div className="flex items-center gap-3"><Button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Send request'}</Button>{note && <span className="text-xs text-ux2-muted">{note}</span>}</div>
       </form>
     </Card>
   );
@@ -58,6 +68,14 @@ function stateChip(r: RequestRow) {
 
 function MyRequest({ r, snap, highlight }: { r: RequestRow; snap: CommunitySnapshot; highlight: boolean }) {
   const addComment = useIssuesStore(s => s.addIssueComment);
+  const addPhotos = useIssuesStore(s => s.addIssuePhotos);
+  const [photoNote, setPhotoNote] = useState('');
+  const room = MAX_PHOTOS - (r.issue.photos?.length ?? 0);
+  const attach = async (picked: File[]) => {
+    const up = await uploadPhotos(`requests/${r.issue.id}`, picked.slice(0, room), snap.viewer.name);
+    addPhotos(r.issue.id, up.photos);
+    setPhotoNote(up.skipped.length ? `Not attached: ${up.skipped.join('; ')}.` : '');
+  };
   const [commenting, setCommenting] = useState(highlight);
   const [text, setText] = useState('');
   const i = r.issue;
@@ -71,13 +89,15 @@ function MyRequest({ r, snap, highlight }: { r: RequestRow; snap: CommunitySnaps
     <Card tone={r.step < 3 ? 'outline' : 'surface'} aria-label={`Request ${i.id}`} data-request={i.id} className="gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><div className="flex flex-wrap items-center gap-2"><SectionLabel>Your request</SectionLabel>{stateChip(r)}</div><div className="text-xl font-semibold text-ux2-ink">{i.title}</div><div className="text-xs text-ux2-muted">{i.id} · {i.category} · sent {longDay(i.submittedDate)}{ack ? ` · acknowledged ${longDay(ack)} by ${i.comments[0].author}` : ''}</div></div>
-        <div className="flex gap-1.5"><Button size="sm" variant="ghost">Add a photo</Button><Button size="sm" variant="ghost" onClick={() => setCommenting(v => !v)}>Add a comment</Button></div>
+        <div className="flex gap-1.5"><PhotoPicker max={Math.max(1, room)} disabled={room <= 0} onPick={files => { void attach(files); }} /><Button size="sm" variant="ghost" onClick={() => setCommenting(v => !v)}>Add a comment</Button></div>
       </div>
       <Inner className="flex flex-col gap-2">
         <div className="flex items-center justify-between text-sm"><b className="font-semibold text-ux2-ink">Step {r.step} of 3 · {r.stepLabel}</b><span className="text-xs text-ux2-muted">{r.step < 3 ? `Board reply due ${longDay(r.replyDue)}` : 'Closed'}</span></div>
         <div className="flex gap-1">{[1, 2, 3].map(n => <span key={n} className={cn('h-1.5 flex-1 rounded-full', n <= r.step ? 'bg-ux2-navy' : 'bg-ux2-line')} />)}</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{steps.map(([t, d]) => <div key={t}><div className="text-xs font-semibold text-ux2-ink">{t}</div><div className="text-xs text-ux2-muted">{d}</div></div>)}</div>
       </Inner>
+      <PhotoStrip photos={i.photos} />
+      {photoNote && <div role="status" className="text-xs text-ux2-muted">{photoNote}</div>}
       {(i.comments.length > 0 || i.description) && (
         <Inner className="flex flex-col gap-1.5 text-sm">
           {[...i.comments].reverse().map(c => <div key={c.id} className="flex gap-3"><span className="w-12 shrink-0 text-xs text-ux2-muted">{dayLabel(c.date.slice(0, 10))}</span><span><b className="font-semibold text-ux2-ink">{c.author === snap.viewer.name ? 'You' : c.author}</b> <span className="text-ux2-ink">· {c.text}</span></span></div>)}

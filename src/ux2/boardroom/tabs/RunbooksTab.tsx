@@ -16,6 +16,7 @@ import { runbookStatuses, runbooksSummary, type RunbookStatus, type BoardRoomSna
 import { MONTH_CLOSE_ID, nextMonthCloseStart } from '../monthClose';
 import { automationLine, runbookPlan } from '../runbookPlans';
 import { handOnly } from '../runbooks';
+import { actionKindByRunbook } from '@/lib/actions';
 import type { CaseTrackerCase } from '@/types/issues';
 
 /** Where this case came from, truthfully: the runbook itself, a request, an obligation, or a person. */
@@ -57,6 +58,7 @@ const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookStatus; snap: BoardRoomSnapshot; onBack: () => void; onOpenCase: (id: string) => void; onNewCase: (prefill?: { catId: string; sitId: string }) => void }) {
   const navigate = useNavigate();
+  const guided = actionKindByRunbook(r.def.id);
   const setOn = useRunbookSwitches(s => s.setOn);
   const plan = runbookPlan(r.def);
   const line = automationLine(r.def, plan);
@@ -90,7 +92,8 @@ function RunbookDetail({ r, snap, onBack, onOpenCase, onNewCase }: { r: RunbookS
         </div>
         <div className="flex flex-wrap gap-2">
           {open && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onOpenCase(open.id)}>Open the action</Button>}
-          {!open && r.def.kind !== 'custom' && r.def.sitId && r.def.catId && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })}>Take Action</Button>}
+          {guided && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => navigate(guided.kind === 'utility-spike' ? '/building?tab=utilities' : `/boardroom?start=${guided.kind}`)}>{guided.kind === 'utility-spike' ? 'Enter a bill' : 'Start one'}</Button>}
+          {!guided && !open && r.def.kind !== 'custom' && r.def.sitId && r.def.catId && <Button size="sm" className="!bg-ux2-cyan !text-ux2-navy" onClick={() => onNewCase({ catId: r.def.catId!, sitId: r.def.sitId! })}>Take Action</Button>}
           {setting && <Button size="sm" variant="ghost" className="!border-white/30 !bg-white/10 !text-white" onClick={() => navigate(setting.path)}>{setting.label}</Button>}
         </div>
       </Card>

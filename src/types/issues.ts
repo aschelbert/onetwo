@@ -1,3 +1,4 @@
+import type { Photo } from '@/lib/services/photos';
 export type IssuePriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type IssueStatus = 'SUBMITTED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 export type IssueType = 'BUILDING_PUBLIC' | 'UNIT_PRIVATE';
@@ -30,6 +31,8 @@ export interface Issue {
     date: string;
   }>;
   comms: CaseComm[];
+  /** Photos the reporter or the board attached. */
+  photos?: Photo[];
 }
 
 export type CasePriority = 'urgent' | 'high' | 'medium' | 'low';

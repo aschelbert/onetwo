@@ -4,7 +4,7 @@ import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as financialSvc from '@/lib/services/financial';
 import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping, type PaymentOrder } from '@/lib/financial-logic';
-import { balanceOf, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
+import { balanceOf, budgetLineAccounts, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
@@ -112,6 +112,8 @@ interface FinancialState {
   // Work Orders
   createWorkOrder: (wo: { title: string; vendor: string; amount: number; acctNum: string; caseId?: string }) => void;
   approveWorkOrder: (id: string) => void;
+  /** Someone checked the finished work against what was ordered; a bill is paid only after this. */
+  signOffWorkOrder: (id: string, by: string, notes?: string, date?: string) => void;
   /** Change a work order before its invoice arrives: the vendor, the amount or the title (a rebooked or resized job). */
   updateWorkOrder: (id: string, patch: Partial<Pick<WorkOrder, 'title' | 'vendor' | 'amount' | 'description'>>) => void;
   /** Link a work order to the case that drives it (the Work order runbook's, or a parent case). */
@@ -130,11 +132,20 @@ interface FinancialState {
   voidUnitInvoice: (invoiceId: string, reason: string) => boolean;
   /** Turn a balance no invoice stands behind (brought over from before the register) into one invoice, without posting again. */
   billOutstandingBalance: (unitNum: string) => UnitInvoice | null;
+  /**
+   * Write off everything a unit still owes, after a board vote: the income stays as billed and the loss is taken
+   * (Dr allowance for doubtful accounts as far as it reaches, then Dr bad debt expense / Cr the receivable). Returns the amount.
+   */
+  writeOffUnit: (unitNum: string, reason: string, date?: string) => number;
+  /** Bring the allowance for doubtful accounts to a target: one entry for the difference (Dr bad debt expense / Cr allowance, or the reverse). Returns the change. */
+  setAllowance: (target: number, date?: string, memo?: string) => number;
 
   // CoA mutations
   addCoASection: (num: string, name: string, type: string) => void;
   addCoAAccount: (num: string, name: string, parent: string, sub: string) => void;
   updateCoAAccount: (num: string, name: string, active: boolean) => void;
+  /** Measure a budget line against one expense account ('' unlinks it). */
+  setBudgetLineAccount: (categoryId: string, acctNum: string) => void;
   deleteCoAAccount: (num: string) => void;
 
   // Manual GL
@@ -180,6 +191,11 @@ interface FinancialState {
   /** The Month close runbook's switch, shared with the database job that runs it every morning. */
   monthCloseEnabled: boolean;
   setMonthCloseEnabled: (on: boolean) => void;
+  /** The board's choice of what members see of other units: each unit's balance, and each unit's email and phone. Both off unless switched on. */
+  ownersSeeBalances: boolean;
+  ownersSeeContacts: boolean;
+  /** Change one of them. Resolves false, and puts the switch back, when the database did not take it. */
+  setOwnerSharing: (which: 'balances' | 'contacts', on: boolean) => Promise<boolean>;
   /** Runbooks switched off, by id, shared with the database jobs that run them (collections, insurance renewal, month close). */
   runbooksOff: string[];
   setRunbookOff: (id: string, off: boolean) => void;
@@ -223,6 +239,8 @@ export interface InvoiceOptions {
   forInvoiceId?: string | null;
   /** The charge date (today by default). */
   date?: string;
+  /** Book the income to this account instead of the type's usual one (a fine to Fines, a certificate fee to Other income). Ignored when the chart has no such account. */
+  revenueAcct?: string;
   /** False when the amount is already in the ledger (a balance brought forward): the invoice is recorded, nothing is posted, the balance stays. */
   post?: boolean;
 }
@@ -361,6 +379,12 @@ const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 /** Removed before their insert returned: deleted as soon as it does. */
 const removedBeforeSaved = new Set<string>();
 
+/** Allowance for doubtful accounts: a credit balance against the receivables. Added to a building's chart the first time it is used. */
+export const ALLOWANCE_ACCT = '1190';
+export const BAD_DEBT_ACCT = '5300';
+/** How a written-off charge is marked: the charge stands as billed, unlike a void. */
+export const WRITTEN_OFF_MARK = 'Written off';
+
 export const useFinancialStore = create<FinancialState>()(persist((set, get) => ({
   tenantId: null,
   budgetCategories: seedBudgetCategories,
@@ -444,6 +468,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       updates.monthCloseStartDay = data.settings.monthCloseStartDay || 1;
       updates.monthCloseEnabled = data.settings.monthCloseEnabled ?? true;
       updates.runbooksOff = data.settings.runbooksOff ?? [];
+      updates.ownersSeeBalances = data.settings.ownersSeeBalances === true;
+      updates.ownersSeeContacts = data.settings.ownersSeeContacts === true;
       updates.reserveStudyDate = data.settings.reserveStudyDate ?? null;
       updates.reserveStudyEveryYears = data.settings.reserveStudyEveryYears || 3;
       updates.taskerLimit = Number.isFinite(data.settings.taskerLimit) ? data.settings.taskerLimit : 300;
@@ -777,12 +803,13 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const fyStart = fiscalYearStart(today, useBuildingStore.getState().details?.fiscalYearEnd || '12-31');
     const thisYear = generalLedger.filter(e => e.date >= fyStart && e.date <= today);
     return budgetCategories.map((cat) => {
-      const glAcct = chartOfAccounts.find((a) => a.budgetCat === cat.id);
-      const actual = glAcct ? balanceOf(glAcct.num, glAcct.type, thisYear) : getCategorySpent(cat);
+      // A line is measured against its ledger accounts; one with no account falls back to expenses typed on the line itself.
+      const accts = budgetLineAccounts(cat, chartOfAccounts);
+      const actual = accts.length ? Math.round(accts.reduce((t, a) => t + balanceOf(a.num, a.type, thisYear), 0) * 100) / 100 : getCategorySpent(cat);
       const budgeted = cat.budgeted;
       const variance = budgeted - actual;
       const pct = budgeted > 0 ? Math.round((actual / budgeted) * 100) : 0;
-      return { id: cat.id, name: cat.name, budgeted, actual, variance, pct, acctNum: glAcct?.num };
+      return { id: cat.id, name: cat.name, budgeted, actual, variance, pct, acctNum: accts[0]?.num, acctNums: accts.map(a => a.num) };
     });
   },
 
@@ -851,6 +878,12 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
           set(s => ({ budgetCategories: s.budgetCategories.map(x => x.id === id ? { ...x, id: dbRow.id } : x) }));
           // Anything changed while it was being saved goes up now.
           if (latest && (latest.name !== cat.name || latest.budgeted !== cat.budgeted)) financialSvc.updateBudgetCategory(dbRow.id, { name: latest.name, budgeted: latest.budgeted });
+          // Accounts linked to the line while it was saving follow it to its saved id.
+          const chart = get().chartOfAccounts;
+          if (chart.some(a => a.budgetCat === id)) {
+            set(s => ({ chartOfAccounts: s.chartOfAccounts.map(a => a.budgetCat === id ? { ...a, budgetCat: dbRow.id } : a) }));
+            get().chartOfAccounts.filter(a => a.budgetCat === dbRow.id).forEach(a => { void financialSvc.upsertCoAEntry(tid, a); });
+          }
           // Update any building assets referencing the old local ID
           const bStore = useBuildingStore.getState();
           bStore.assets.filter(a => a.budgetCategoryId === id).forEach(a => {
@@ -1007,6 +1040,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     syncWorkOrder(id);
   },
 
+  signOffWorkOrder: (id, by, notes = '', date = todayIso()) => {
+    set((s) => ({ workOrders: s.workOrders.map((w) => (w.id === id && w.status !== 'draft' ? { ...w, signoff: { date, by, notes: notes.trim() } } : w)) }));
+    syncWorkOrder(id);
+  },
+
   receiveInvoice: (id, invoiceNum, amount, invoiceDate) => {
     const s = get();
     const wo = s.workOrders.find((w) => w.id === id);
@@ -1080,6 +1118,20 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       const entry = s.chartOfAccounts.find(a => a.num === num);
       const tid = s.tenantId || getActiveTenantId();
       if (entry && tid) financialSvc.upsertCoAEntry(tid, entry);
+    }
+  },
+
+  setBudgetLineAccount: (categoryId, acctNum) => {
+    const before = get().chartOfAccounts;
+    const next = before.map(a => {
+      if (a.num === acctNum) return a.budgetCat === categoryId ? a : { ...a, budgetCat: categoryId };
+      if (a.budgetCat === categoryId) { const { budgetCat: _b, ...rest } = a; return rest; }
+      return a;
+    });
+    set({ chartOfAccounts: next });
+    if (isBackendEnabled) {
+      const tid = get().tenantId || getActiveTenantId();
+      if (tid) next.filter((a, i) => a !== before[i]).forEach(a => { void financialSvc.upsertCoAEntry(tid, a); });
     }
   },
 
@@ -1287,6 +1339,20 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     set({ monthCloseEnabled: on });
     syncSettings();
   },
+  ownersSeeBalances: false,
+  ownersSeeContacts: false,
+  setOwnerSharing: async (which, on) => {
+    const key = which === 'balances' ? 'ownersSeeBalances' : 'ownersSeeContacts';
+    const was = get()[key];
+    if (was === on) return true;
+    set({ [key]: on } as Pick<FinancialState, typeof key>);
+    if (!isBackendEnabled) return true;
+    const tid = resolveTenantId();
+    // Saved on its own, not with the other settings: a database that has not had this column added yet must not fail every other setting.
+    const ok = tid ? await financialSvc.upsertFinancialSettings(tid, { [key]: on }).catch(() => false) : false;
+    if (!ok) set({ [key]: was } as Pick<FinancialState, typeof key>);
+    return ok;
+  },
   reserveStudyDate: null,
   reserveStudyEveryYears: 3,
   setReserveStudy: (date, everyYears) => {
@@ -1465,7 +1531,9 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const id = generateLocalId('INV-U');
     const m = mappingOf(s.glAccountMapping);
     const fund = type === 'special_assessment' ? (opts.fund ?? 'reserve') : null;
-    const { arAcct, revenueAcct } = getGLAccountsForInvoice(type, m, fund);
+    const usual = getGLAccountsForInvoice(type, m, fund);
+    const arAcct = usual.arAcct;
+    const revenueAcct = opts.revenueAcct && s.chartOfAccounts.some(a => a.num === opts.revenueAcct && a.type === 'income') ? opts.revenueAcct : usual.revenueAcct;
     const post = opts.post !== false;
     const amt = r2(amount);
     const glEntry = post ? s.glPost(date, `Invoice ${id} - Unit ${unitNum}: ${description}`, arAcct, revenueAcct, amt, invoiceSource(type), unitNum) : null;
@@ -1563,6 +1631,47 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     return true;
   },
 
+  writeOffUnit: (unitNum, reason, date = todayIso()) => {
+    get().addCoAAccount(ALLOWANCE_ACCT, 'Allowance for Doubtful Accounts', '1100', 'receivable');
+    get().addCoAAccount(BAD_DEBT_ACCT, 'Bad Debt Expense', '5000', 'operating');
+    get().billOutstandingBalance(unitNum);
+    const s = get();
+    const m = mappingOf(s.glAccountMapping);
+    const open = s.unitInvoices.filter(i => i.unitNumber === unitNum && isOpenInvoice(i));
+    // The allowance is a credit balance on an asset account, so it reads negative.
+    let allowance = Math.max(0, -balanceOf(ALLOWANCE_ACCT, 'asset', s.generalLedger));
+    let total = 0;
+    for (const inv of open) {
+      const remaining = invoiceRemaining(inv);
+      if (remaining <= 0) continue;
+      const { arAcct } = getGLAccountsForInvoice(inv.type, m, inv.fund);
+      const fromAllowance = r2(Math.min(allowance, remaining));
+      if (fromAllowance > 0) s.glPost(date, `Write-off - Invoice ${inv.id} Unit ${unitNum}: ${reason}`, ALLOWANCE_ACCT, arAcct, fromAllowance, 'manual', unitNum);
+      if (remaining - fromAllowance > 0) s.glPost(date, `Write-off - Invoice ${inv.id} Unit ${unitNum}: ${reason}`, BAD_DEBT_ACCT, arAcct, r2(remaining - fromAllowance), 'manual', unitNum);
+      allowance = r2(allowance - fromAllowance);
+      total = r2(total + remaining);
+      if (isBackendEnabled && isDbId(inv.id)) financialSvc.updateUnitInvoice(inv.id, { status: 'void', refundReason: `${WRITTEN_OFF_MARK}: ${reason}` });
+    }
+    const ids = new Set(open.map(i => i.id));
+    set(st => ({
+      unitInvoices: st.unitInvoices.map(i => (ids.has(i.id) ? { ...i, status: 'void' as const, refundReason: `${WRITTEN_OFF_MARK}: ${reason}` } : i)),
+      units: st.units.map(u => u.number === unitNum ? { ...u, balance: r2(u.balance - total), lateFees: u.lateFees.map(f => (f.invoiceId && ids.has(f.invoiceId) ? { ...f, waived: true } : f)), specialAssessments: u.specialAssessments.filter(a => !a.invoiceId || !ids.has(a.invoiceId)) } : u),
+    }));
+    syncUnit(unitNum);
+    return total;
+  },
+
+  setAllowance: (target, date = todayIso(), memo = 'Allowance for doubtful accounts') => {
+    get().addCoAAccount(ALLOWANCE_ACCT, 'Allowance for Doubtful Accounts', '1100', 'receivable');
+    get().addCoAAccount(BAD_DEBT_ACCT, 'Bad Debt Expense', '5000', 'operating');
+    const s = get();
+    const now = Math.max(0, -balanceOf(ALLOWANCE_ACCT, 'asset', s.generalLedger));
+    const change = r2(Math.max(0, target) - now);
+    if (change > 0) s.glPost(date, memo, BAD_DEBT_ACCT, ALLOWANCE_ACCT, change, 'manual', null);
+    if (change < 0) s.glPost(date, memo, ALLOWANCE_ACCT, BAD_DEBT_ACCT, -change, 'manual', null);
+    return change;
+  },
+
   billOutstandingBalance: (unitNum) => {
     const s = get();
     const unit = s.units.find(u => u.number === unitNum);
@@ -1602,6 +1711,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     paymentOrder: state.paymentOrder,
     monthCloseStartDay: state.monthCloseStartDay,
     monthCloseEnabled: state.monthCloseEnabled,
+    ownersSeeBalances: state.ownersSeeBalances,
+    ownersSeeContacts: state.ownersSeeContacts,
     taskerLimit: state.taskerLimit,
     runbooksOff: state.runbooksOff,
     reserveStudyDate: state.reserveStudyDate,

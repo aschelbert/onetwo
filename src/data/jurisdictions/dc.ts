@@ -26,6 +26,7 @@ export const dc: JurisdictionData = {
   actShortName: 'DC Code',
   filingAgency: 'DLCP',
   coverage: 'full',
+  meetingNotice: { annualOrRegularDays: 21, otherOwnerDays: 7, cite: 'DC Code § 42-1903.03' },
   regulatoryNotes: [],
   items: {
     // ═══ GOVERNANCE & LEGAL ═══

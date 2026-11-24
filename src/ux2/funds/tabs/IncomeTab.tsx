@@ -230,7 +230,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
   const steps = beh.map(b => {
     const c = caseFor(b.number);
     if (b.forSale) return { unit: b.number, title: 'resale certificate', text: `${fmt(b.amount)} collected at closing · dues ${b.daysPastDue > 30 ? 'behind' : 'current'}`, chip: <Chip tone="ghost">On track</Chip>, go: () => navigate('/building?tab=directory') };
-    if (b.daysPastDue > 60) return { unit: b.number, title: 'demand letter', text: `collections runbook${c?.steps ? ` step ${Math.max(1, c.steps.findIndex(s => !s.done) + 1)} of ${c.steps.length}` : ''} · ${b.daysPastDue} days · lien allowed at 90 days, § 42-1903.13${c ? ` · ${c.sitId}` : ''}`, chip: <Chip tone="red">{c ? 'Send · drafted' : 'Start collections'}</Chip>, go: () => navigate(c ? `/issues?view=case:${c.id}` : '/issues?view=new') };
+    if (b.daysPastDue > 60) return { unit: b.number, title: 'demand letter', text: `collections runbook${c?.steps ? ` step ${Math.max(1, c.steps.findIndex(s => !s.done) + 1)} of ${c.steps.length}` : ''} · ${b.daysPastDue} days · lien referral at 90 days under the collection policy${c ? ` · ${c.sitId}` : ''}`, chip: <Chip tone="red">{c ? 'Send · drafted' : 'Start collections'}</Chip>, go: () => navigate(c ? `/issues?view=case:${c.id}` : '/issues?view=new') };
     return { unit: b.number, title: 'friendly reminder', text: `${b.daysPastDue > 30 ? '1 month' : `${b.daysPastDue} days`}, ${fmt(b.amount)} · ${snap.lateFee.enabled ? `late fee $${snap.lateFee.amount} on ${monthName(snap.today.slice(0, 7))} ${lateDay} unless paid` : 'no automatic late fee'} · goes from the app, not from you`, chip: <Chip tone="amber">Send reminder</Chip>, go: () => navigate('/boardroom?tab=outbox') };
   });
   return (
@@ -259,7 +259,7 @@ function BehindCard({ snap, beh, onLedger, onPay }: { snap: FundsSnapshot; beh: 
         </>
       )}
       <Why>
-        Aging: 0 to 30 days {fmt(totals['0-30'])} · 31 to 60 days {fmt(totals['31-60'])} · 61 to 90 days {fmt(totals['61-90'])} · over 90 days {fmt(totals['90+'])}. {snap.lateFee.enabled ? `Late fee $${snap.lateFee.amount} on the ${ordinal(lateDay)}, ` : ''}60-day notice by certified mail, demand letter at 60 days, lien at 90: the runbook runs these on its own and asks you only to send.
+        Aging: 0 to 30 days {fmt(totals['0-30'])} · 31 to 60 days {fmt(totals['31-60'])} · 61 to 90 days {fmt(totals['61-90'])} · over 90 days {fmt(totals['90+'])}. {snap.lateFee.enabled ? `Late fee $${snap.lateFee.amount} on the ${ordinal(lateDay)}, ` : ''}60-day notice by certified mail, demand letter at 60 days, referral for a lien at 90 (the building's collection policy; under DC Code § 42-1903.13 an unpaid assessment is a lien from the day it falls due): the runbook runs these on its own and asks you only to send.
         {' '}<button type="button" onClick={onLedger} className="font-semibold text-ux2-teal hover:underline">Open the ledger</button>
       </Why>
     </Card>
@@ -400,7 +400,7 @@ export default function IncomeTab({ snap, section, onSection, onGo }: { snap: Fu
               <div>
                 <div className="text-[32px] font-semibold leading-none tracking-[-0.03em]">{fmt(outstanding)}</div>
                 <div className="text-xs text-white/[0.72]">{beh.length ? 'outstanding' : 'outstanding · every unit is current'}</div>
-                <div className="mt-2 text-xs text-white/[0.72]">Lien allowed at 90 days <span className="opacity-70">§ 42-1903.13</span></div>
+                <div className="mt-2 text-xs text-white/[0.72]">Lien referral at 90 days <span className="opacity-70">collection policy · the lien itself arises when an assessment falls due, § 42-1903.13</span></div>
               </div>
               <div className="flex items-end gap-2" aria-label="Outstanding by age">
                 {(['0-30', '31-60', '61-90', '90+'] as const).map(b => {

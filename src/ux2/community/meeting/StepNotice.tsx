@@ -85,7 +85,7 @@ export default function StepNotice({ ctx, onNext }: { ctx: MeetingCtx; onNext: (
     return (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <Card tone="white" aria-label="Send the notice and ballots" className="gap-3 border-ux2-navy">
-          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel className="!text-ux2-navy">Send the notice and ballots</SectionLabel><Chip tone={ctx.row.noticeOverdue ? 'red' : 'amber'}>Due {dayLabel(noticeDue)} · 10 days ahead</Chip></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel className="!text-ux2-navy">Send the notice and ballots</SectionLabel><Chip tone={ctx.row.noticeOverdue ? 'red' : 'amber'}>Due {dayLabel(noticeDue)} · {ctx.row.noticeDays} days ahead</Chip></div>
           <div className="text-[13px] font-semibold text-ux2-ink">How it reaches {units.length} units</div>
           {([
             ['app', 'In the app', `${reach.app} units`, 'Pinned on Community and on each owner’s Home, with the ballot to vote online'],

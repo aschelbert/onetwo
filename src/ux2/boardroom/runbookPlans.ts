@@ -12,6 +12,8 @@
  */
 import { CATS } from '@/store/useIssuesStore';
 import type { RunbookDef } from './runbooks';
+import { CAPITAL_PLAN } from './capitalPlan';
+import { actionKindByRunbook } from '@/lib/actions';
 
 export interface PlanStep {
   title: string;
@@ -46,6 +48,22 @@ const OWN: Record<string, Own> = {
     ['Tell owners: the adopted budget and the new dues', 'The notice is written from the budget; ticks itself when it is posted'],
     ['Switch Funds to the new budget and dues', 'Done on the first day of the year: the lines, every unit’s dues, the reserve transfer'],
     ['File the adopted budget under Building › Documents'],
+  ],
+  'capital-improvement': CAPITAL_PLAN,
+  'covenant-violation': [
+    ['Log the violation', 'Done as the action opens, from the register entry'],
+    ['Send the owner the notice of violation, with the days to put it right', 'Ticks itself when the notice date is entered on the register'],
+    ['Re-inspect on the cure date', 'Ticks itself when the violation is marked cured or a hearing is set'],
+    ['Give the owner written notice of the hearing', 'Ticks itself when the hearing date is on the register'],
+    ['Hold the hearing and record what the board decided', 'Ticks itself when the outcome is entered on the register'],
+    ['Charge the fine to the unit, if the board imposed one', 'Ticks itself when the fine is charged, or the violation was upheld with no fine'],
+  ],
+  'resale-certificate': [
+    ['Log the request and start the 10-day clock', 'Done as the action opens, from the register entry'],
+    ['Prepare the statement of account for the unit', 'Ticks itself when the statement is taken from Funds on the register'],
+    ['Assemble the packet: declaration, bylaws, rules, budget, reserves', 'Ticks itself when each of them is on file under Building › Documents'],
+    ['Charge the certificate fee, or record that there is none', 'Ticks itself when the fee is charged to the unit or waived'],
+    ['Deliver the certificate by the due date', 'Ticks itself when the delivery date is entered on the register'],
   ],
   'resident-request': [
     ['Acknowledge the owner', 'Ticks itself when the request gets a reply or moves past Submitted'],
@@ -189,6 +207,8 @@ function situationSteps(sitId?: string): string[] {
 
 export function runbookPlan(def: RunbookDef): RunbookPlan {
   if (def.kind === 'custom') return { source: 'custom', live: false, steps: (def.stepTitles ?? []).map(title => ({ title, auto: false })) };
+  const kind = actionKindByRunbook(def.id);
+  if (kind) return { source: 'runbook', live: true, steps: kind.stepTitles.map(([key, title]) => ({ title, auto: true, how: kind.how[key] })) };
   const own = OWN[def.id];
   if (own) return { source: 'runbook', live: !!def.wired, steps: own.map(([title, how]) => ({ title, auto: !!how, how })) };
   const titles = situationSteps(def.sitId);

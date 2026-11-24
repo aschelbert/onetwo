@@ -1,4 +1,5 @@
 import { supabase, logDbError } from '@/lib/supabase';
+import { missingColumn } from '@/lib/services/missingColumn';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice } from '@/types/financial';
 import type { WorkOrder } from '@/data/financial';
 import type { PaymentOrder } from '@/lib/financial-logic';
@@ -26,8 +27,19 @@ export function rowToUnit(r: Record<string, unknown>): Unit {
   };
 }
 
+/**
+ * The building's units as this member may see them: the board and the manager
+ * get every field; anyone else gets the roster with other owners' contact
+ * details and money blanked (units_for_member, migration 20261123120000).
+ * A database without that function yet falls back to the table, where row
+ * policies decide.
+ */
 export async function fetchUnits(tenantId: string): Promise<Unit[] | null> {
   if (!supabase) return null;
+  const roster = await supabase.rpc('units_for_member', { p_tenant_id: tenantId });
+  if (!roster.error && Array.isArray(roster.data)) {
+    return (roster.data as Record<string, unknown>[]).map(rowToUnit).sort((a, b) => a.number.localeCompare(b.number));
+  }
   const { data, error } = await supabase
     .from('units')
     .select('*')
@@ -296,6 +308,7 @@ export function rowToWorkOrder(r: Record<string, unknown>): WorkOrder {
     glEntryId: (r.gl_entry_id as string) || null,
     attachments: (r.attachments || []) as WorkOrder['attachments'],
     accrualGlEntryId: (r.accrual_gl_entry_id as string) || null,
+    signoff: (r.signoff as WorkOrder['signoff']) || null,
   };
 }
 
@@ -342,7 +355,13 @@ export async function updateWorkOrderByLocalId(tenantId: string, localId: string
   if (updates.glEntryId !== undefined) row.gl_entry_id = updates.glEntryId;
   if (updates.attachments !== undefined) row.attachments = updates.attachments;
   if (updates.accrualGlEntryId !== undefined) row.accrual_gl_entry_id = updates.accrualGlEntryId;
-  const { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  if (updates.signoff) row.signoff = updates.signoff;
+  let { error } = await supabase.from('work_orders').update(row).eq('tenant_id', tenantId).eq('local_id', localId);
+  // A database without the sign-off column yet still saves the rest of the work order.
+  if (error && 'signoff' in row && missingColumn(error, 'signoff')) {
+    const { signoff: _s, ...rest } = row;
+    ({ error } = await supabase.from('work_orders').update(rest).eq('tenant_id', tenantId).eq('local_id', localId));
+  }
   if (error) { logDbError('updateWorkOrder error:', error); return false; }
   return true;
 }
@@ -457,6 +476,9 @@ export interface FinancialSettingsRow {
   monthCloseEnabled: boolean;
   /** Runbooks the building switched off, by id, for every runbook the database also runs. */
   runbooksOff: string[];
+  /** The board's choice: every member sees every unit's balance, or every unit's email and phone. Off unless switched on. */
+  ownersSeeBalances: boolean;
+  ownersSeeContacts: boolean;
   /** When the last professional reserve study was done (YYYY-MM-DD), and how many years one lasts. */
   reserveStudyDate: string | null;
   reserveStudyEveryYears: number;
@@ -491,6 +513,8 @@ export async function fetchFinancialSettings(tenantId: string): Promise<Financia
     monthCloseStartDay: Number(data.month_close_start_day ?? 1) || 1,
     monthCloseEnabled: (data.month_close_enabled as boolean) ?? true,
     runbooksOff: Array.isArray(data.runbooks_off) ? (data.runbooks_off as string[]) : [],
+    ownersSeeBalances: data.owners_see_balances === true,
+    ownersSeeContacts: data.owners_see_contacts === true,
     reserveStudyDate: (data.reserve_study_date as string) || null,
     reserveStudyEveryYears: Number(data.reserve_study_every_years ?? 3) || 3,
     taskerLimit: data.tasker_limit == null ? 300 : Number(data.tasker_limit),
@@ -517,6 +541,8 @@ export async function upsertFinancialSettings(tenantId: string, s: Partial<Finan
   if (s.monthCloseStartDay !== undefined) row.month_close_start_day = s.monthCloseStartDay;
   if (s.monthCloseEnabled !== undefined) row.month_close_enabled = s.monthCloseEnabled;
   if (s.runbooksOff !== undefined) row.runbooks_off = s.runbooksOff;
+  if (s.ownersSeeBalances !== undefined) row.owners_see_balances = s.ownersSeeBalances;
+  if (s.ownersSeeContacts !== undefined) row.owners_see_contacts = s.ownersSeeContacts;
   if (s.reserveStudyDate !== undefined) row.reserve_study_date = s.reserveStudyDate;
   if (s.reserveStudyEveryYears !== undefined) row.reserve_study_every_years = s.reserveStudyEveryYears;
   if (s.taskerLimit !== undefined) row.tasker_limit = s.taskerLimit;

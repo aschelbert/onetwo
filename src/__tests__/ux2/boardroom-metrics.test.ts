@@ -1,3 +1,4 @@
+import { ACTION_KINDS } from '@/lib/actions';
 import { describe, expect, it } from 'vitest';
 import { archiveRows, caseRows, casesSummary, inboxRows, inboxSummary, outboxSummary, runbookStatuses, runbooksSummary, type BoardRoomSnapshot } from '@/ux2/boardroom/metrics';
 import { ALL_RUNBOOKS, RUNBOOKS, SITUATION_RUNBOOKS } from '@/ux2/boardroom/runbooks';
@@ -89,7 +90,8 @@ describe('board room metrics', () => {
   });
 
   it('reports every workflow: the 32 runbooks, the other wizard situations and custom actions, with switches, use, open cases and last run', () => {
-    expect(RUNBOOKS.length).toBe(32);
+    // The design's 32, capital improvement, and one per record-backed action.
+    expect(RUNBOOKS.length).toBe(33 + ACTION_KINDS.length - 1); // records request replaces its by-hand runbook
     // Every situation Take Action offers is on the list, once as its own runbook when no catalogue runbook runs on it.
     const sits = CATS.flatMap(c => c.sits.map(s => s.id));
     for (const id of sits) expect(ALL_RUNBOOKS.some(r => r.sitId === id)).toBe(true);
