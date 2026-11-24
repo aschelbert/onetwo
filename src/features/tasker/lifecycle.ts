@@ -230,7 +230,7 @@ export function confirmAndPay(jobId: string, by: string): void {
   const fin = useFinancialStore.getState();
   if (j.woId) {
     fin.receiveInvoice(j.woId, `TR-${j.id.slice(3)}`, j.final.amount);
-    useFinancialStore.getState().payWorkOrder(j.woId);
+    useFinancialStore.getState().payWorkOrder(j.woId, undefined, { automatic: true });
   }
   useTaskerStore.getState().updateJob(j.id, { status: 'paid' }, { who: by, text: `Confirmed and paid ${fmt(j.final.amount)}` });
   trail(j.caseId, by, `Confirmed the work and paid ${j.taskerName} ${fmt(j.final.amount)}.${j.woId ? ` Work order ${j.woId} invoiced and paid.` : ''}`, j.woId);

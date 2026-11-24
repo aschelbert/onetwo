@@ -1,3 +1,6 @@
+import { useAuthStore } from './useAuthStore';
+import { useActionRecordsStore } from './useActionRecordsStore';
+import { payBlocker, type ControlRules } from '@/lib/controls';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
@@ -121,7 +124,9 @@ interface FinancialState {
   /** The vendor's invoice arrived: the expense is booked now (Dr expense line / Cr accounts payable), on the invoice date. */
   receiveInvoice: (id: string, invoiceNum: string, amount: number, invoiceDate?: string) => void;
   /** Pay a bill: clears the payable (Dr accounts payable / Cr bank). A bill invoiced before accrual posts Dr expense / Cr bank, as before. */
-  payWorkOrder: (id: string, paidDate?: string) => void;
+  payWorkOrder: (id: string, paidDate?: string, opts?: { automatic?: boolean }) => string;
+  /** Why the signed-in person may not pay this bill under the building's rules, or '' when they may. */
+  payBlockerFor: (id: string) => string;
 
   // ── Charges to units: the receivables sub-ledger. One invoice per charge; the unit's balance follows. ──
   /** Charge a unit. Posts Dr receivable / Cr income (unless `post: false`), applies any prepaid credit, and raises the balance. */
@@ -379,6 +384,11 @@ const isDbId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 /** Removed before their insert returned: deleted as soon as it does. */
 const removedBeforeSaved = new Set<string>();
 
+/** Whoever is signed in, for the record of who posted an entry or handled a bill. */
+const actor = (): string => useAuthStore.getState().currentUser?.name ?? '';
+/** The control rules the board has switched on (kept with the other standing records). */
+const controlRules = (): ControlRules => (useActionRecordsStore.getState().records.find(r => r.kind === 'controls')?.data as ControlRules | undefined) ?? {};
+
 /** Allowance for doubtful accounts: a credit balance against the receivables. Added to a building's chart the first time it is used. */
 export const ALLOWANCE_ACCT = '1190';
 export const BAD_DEBT_ACCT = '5300';
@@ -497,6 +507,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       source,
       sourceId,
       posted: new Date().toISOString(),
+      // Dues billed by the billing run are the run's; everything else is whoever is signed in.
+      postedBy: source === 'assessment' ? 'Billing run' : actor() || undefined,
       status: 'posted',
     };
     set({ generalLedger: [...state.generalLedger, entry], glNextId: state.glNextId + 1 });
@@ -1014,7 +1026,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       title: wo.title, vendor: wo.vendor, description: wo.title, amount: wo.amount, acctNum: wo.acctNum,
       status: 'draft' as const, createdDate: new Date().toISOString().split('T')[0],
       caseId: wo.caseId || null, invoiceNum: null, invoiceDate: null, approvedDate: null, paidDate: null, glEntryId: null,
-      attachments: [],
+      attachments: [], people: actor() ? { raisedBy: actor() } : null,
     };
     set((s) => ({ workOrders: [...s.workOrders, newWo] }));
     if (isBackendEnabled) {
@@ -1034,7 +1046,7 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
   approveWorkOrder: (id) => {
     set((s) => ({
       workOrders: s.workOrders.map((w) =>
-        w.id === id && w.status === 'draft' ? { ...w, status: 'approved' as const, approvedDate: new Date().toISOString().split('T')[0] } : w
+        w.id === id && w.status === 'draft' ? { ...w, status: 'approved' as const, approvedDate: new Date().toISOString().split('T')[0], people: { ...(w.people ?? {}), ...(actor() ? { approvedBy: actor() } : {}) } } : w
       ),
     }));
     syncWorkOrder(id);
@@ -1063,10 +1075,19 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     syncWorkOrder(id);
   },
 
-  payWorkOrder: (id, paidDate = todayIso()) => {
+  payBlockerFor: (id) => {
+    const wo = get().workOrders.find((w) => w.id === id);
+    return wo ? payBlocker(wo.people, actor(), controlRules()) : '';
+  },
+
+  payWorkOrder: (id, paidDate = todayIso(), opts) => {
     const s = get();
     const wo = s.workOrders.find((w) => w.id === id);
-    if (!wo || wo.status !== 'invoiced') return;
+    if (!wo || wo.status !== 'invoiced') return '';
+    // With the two-person rule on, whoever raised or approved a bill cannot pay it. A job paid automatically under the Tasker limit is not a person paying.
+    const why = opts?.automatic ? '' : payBlocker(wo.people, actor(), controlRules());
+    if (why) return why;
+    const payer = opts?.automatic ? 'Automatic, under the Tasker limit' : actor();
     const m = mappingOf(s.glAccountMapping);
     // A reserve expense is paid from the reserve bank account.
     const acct = s.chartOfAccounts.find(a => a.num === wo.acctNum);
@@ -1079,10 +1100,11 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
       : s.glPost(paidDate, memo, wo.acctNum, bank, wo.amount, source, wo.caseId || wo.invoiceNum);
     set((st) => ({
       workOrders: st.workOrders.map((w) =>
-        w.id === id ? { ...w, status: 'paid' as const, paidDate, glEntryId: entry.id } : w
+        w.id === id ? { ...w, status: 'paid' as const, paidDate, glEntryId: entry.id, people: { ...(w.people ?? {}), ...(payer ? { paidBy: payer } : {}) } } : w
       ),
     }));
     syncWorkOrder(id);
+    return '';
   },
 
   addCoASection: (num, name, type) =>

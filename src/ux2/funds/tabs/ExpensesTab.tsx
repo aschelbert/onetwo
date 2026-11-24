@@ -1,3 +1,4 @@
+import { billTrail } from '@/lib/controls';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PayrollTab from '@/features/association-team/tabs/PayrollTab';
@@ -18,6 +19,12 @@ const SECTIONS: Section[] = ['bills', 'decisions', 'workorders'];
 
 const DAY = 86400000;
 const plusDays = (iso: string, n: number) => new Date(Date.parse(iso) + n * DAY).toISOString().slice(0, 10);
+
+/** Pay a bill, and say why when the building's two-person rule stops the signed-in person from paying it. */
+function usePay() {
+  const raw = useFinancialStore(s => s.payWorkOrder);
+  return (id: string, paidDate?: string) => { const why = raw(id, paidDate); if (why) window.alert(why); };
+}
 
 function useLines(snap: FundsSnapshot) {
   return useMemo(() => new Map(snap.budget.flatMap(b => (b.acctNums?.length ? b.acctNums : b.acctNum ? [b.acctNum] : []).map(n => [n, b] as const))), [snap.budget]);
@@ -76,7 +83,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
   const lines = useLines(snap);
   const navigate = useNavigate();
   const approve = useFinancialStore(s => s.approveWorkOrder);
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
   const signOff = useFinancialStore(s => s.signOffWorkOrder);
   const me = useAuthStore(s => s.currentUser.name);
   const [signing, setSigning] = useState<{ id: string; notes: string } | null>(null);
@@ -121,7 +128,7 @@ function BillsCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (s: st
               const over = line ? line.actual + (w.accrualGlEntryId ? 0 : w.amount) - line.budgeted : 0;
               return (
                 <tr key={w.id} className={isFlag ? 'bg-ux2-red-tint/60' : ''}>
-                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}${w.signoff ? ` · signed off ${dayLabel(w.signoff.date)} by ${w.signoff.by}${w.signoff.notes ? ` · to fix: ${w.signoff.notes}` : ''}` : ''}`} /></Td>
+                  <Td><Cell title={w.title} note={`${w.id}${w.invoiceNum ? ` · INV ${w.invoiceNum}` : ''}${w.caseId ? ` · from ${w.caseId}` : ''}${w.status === 'draft' ? ' · draft' : ''}${billTrail(w.people) ? ` · ${billTrail(w.people)}` : ''}${w.signoff ? ` · signed off ${dayLabel(w.signoff.date)} by ${w.signoff.by}${w.signoff.notes ? ` · to fix: ${w.signoff.notes}` : ''}` : ''}`} /></Td>
                   <Td>{w.vendor}</Td>
                   <Td>{line?.name ?? w.acctNum}{isFlag && <span className="text-xs text-ux2-muted"> · over by {fmt(over)}</span>}</Td>
                   <Td num className="font-semibold">{w.amount ? (w.status === 'approved' || w.status === 'draft' ? `est. ${fmt(w.amount)}` : fmt(w.amount)) : '–'}</Td>
@@ -276,7 +283,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
   const lines = useLines(snap);
   const navigate = useNavigate();
   const approve = useFinancialStore(s => s.approveWorkOrder);
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
   const [filter, setFilter] = useState<WoFilter>('open');
   const [creating, setCreating] = useState(false);
   const [receive, setReceive] = useState<string | null>(null);
@@ -339,7 +346,7 @@ export default function ExpensesTab({ snap, section, onSection, onGo }: { snap: 
   const pending = approvals.filter(a => a.status === 'pending');
   const pendingAmount = pending.reduce((t, a) => t + a.amount, 0);
   const current: Section = (SECTIONS as string[]).includes(section ?? '') ? (section as Section) : 'bills';
-  const pay = useFinancialStore(s => s.payWorkOrder);
+  const pay = usePay();
   const month = snap.today.slice(0, 7);
   const paidThisMonth = snap.workOrders.filter(w => w.status === 'paid' && w.paidDate?.startsWith(month)).length;
   const boardSize = useBuildingStore(s => s.board.length) || 5;

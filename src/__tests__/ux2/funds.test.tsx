@@ -248,10 +248,25 @@ describe('Funds', () => {
     expect(screen.getByTestId('elsewhere')).toBeTruthy();
   });
 
-  it('Accounts and ledger has five pages under the gear; a deep link opens the page that holds its card', () => {
+  it('the ledger says who posted each entry', () => {
+    const before = useFinancialStore.getState().generalLedger;
+    const today = new Date().toISOString().slice(0, 10);
+    useFinancialStore.setState({ generalLedger: [{ id: 'GL9001', date: today, memo: 'Bank service fee', debitAcct: '5070', creditAcct: '1010', amount: 18, source: 'manual', sourceId: null, posted: today, postedBy: 'Dana Carter', status: 'posted' }] });
+    renderAt('/funds?tab=settings&section=ledger');
+    const row = document.querySelector('tr[data-entry="GL9001"]') as HTMLElement;
+    expect(row.textContent).toContain('posted by Dana Carter');
+    useFinancialStore.setState({ generalLedger: before });
+  });
+
+  it("Who can do what opens from its own address and holds the board's switches", () => {
+    renderAt('/funds?tab=settings&section=controls');
+    expect(screen.getAllByRole('switch').map(x => x.getAttribute('aria-label'))).toEqual(expect.arrayContaining(['A bill needs two people', 'A month needs signed reconciliations before its books close']));
+  });
+
+  it('Accounts and ledger has six pages under the gear; a deep link opens the page that holds its card', () => {
     renderAt('/funds?tab=settings&section=rules');
     const nav = screen.getByRole('navigation', { name: 'Accounts and ledger sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Ledger', 'Chart of Accounts', 'GL mapping', 'Fees & Billing', 'Bank & Mail']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Ledger', 'Chart of Accounts', 'GL mapping', 'Fees & Billing', 'Bank & Mail', 'Who can do what']);
     // ?section=rules lands on Fees & Billing: the fee schedule and billing rules, nothing from the other pages.
     expect(document.querySelector('[aria-label="Billing rules"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Fee schedule"]')).toBeTruthy();
