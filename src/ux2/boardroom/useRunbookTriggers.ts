@@ -17,6 +17,7 @@ import { useFinancialStore } from '@/store/useFinancialStore';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useComplianceStore } from '@/store/useComplianceStore';
 import { runMonthClose } from './monthClose';
+import './upkeep';
 import { runCollections } from './collections';
 import { runInsuranceRenewal } from './insuranceRenewal';
 import { runYearEndClose } from './yearEndClose';

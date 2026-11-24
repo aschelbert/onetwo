@@ -31,6 +31,14 @@ export interface InspectionData {
   points: InspectionPoint[];
   recommendations: string;
   filedOn: string;
+  /** The due date this inspection is for, when the schedule opened it. */
+  dueFor?: string;
+  /** The move-out it walks, when a move opened it. */
+  moveId?: string;
+  /** The reserve study it prepares for, when that opened it. */
+  studyKey?: string;
+  /** Set once a condition survey's ratings are written to the assets. */
+  conditionsWritten?: boolean;
 }
 
 /** Starting checklists. Roof, parking, front entrance and facade follow the District property-manager guide's own lists. */
@@ -40,6 +48,9 @@ export const CHECKLISTS: Record<string, { label: string; points: string[] }> = {
   entrance: { label: 'Front entrance and lobby', points: ['Trash and cleanliness', 'Cracked windows or glass', 'Trip hazards', 'Door closes and locks', 'Lighting', 'Mailboxes secure'] },
   facade: { label: 'Exterior facade', points: ['Cracked windows', 'Loose or cracked concrete or masonry', 'Failed caulking', 'Signs of water getting in', 'Anything that could fall from the building'] },
   walkthrough: { label: 'General walk-through', points: ['Hallways and stairs', 'Exit signs and emergency lights', 'Fire extinguishers in place and tagged', 'Mechanical rooms', 'Trash and recycling rooms', 'Grounds and walkways', 'Amenity spaces'] },
+  test: { label: 'Test or certification', points: ['The test itself: passed or failed', 'Certificate or report in hand', 'Tag or sticker updated', 'Anything the tester flagged'] },
+  storm: { label: 'Before a storm or a freeze', points: ['Roof drains, scuppers and gutters clear', 'Sump pump runs', 'Exposed pipes and hose bibs protected', 'Heat on in vacant units and mechanical rooms', 'Loose items on roofs, balconies and grounds secured', 'Emergency lights and the generator', 'Salt, sand and shovels on hand', 'Contractor numbers posted'] },
+  condition: { label: 'Condition of every asset', points: [] },
   moveout: { label: 'Move-out', points: ['Elevator pads and cab', 'Hallway walls and floors', 'Loading area and doors', 'Unit entry door and frame', 'Anything left behind'] },
 };
 

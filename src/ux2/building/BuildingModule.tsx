@@ -23,21 +23,22 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Chip, PillTabs, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useBuildingSnapshot } from './useBuildingSnapshot';
-import { buildingScore, contractRows, contractsSummary, insuranceStatus, obligationRows, obligationsSummary } from './metrics';
+import { maintenanceOverdue, buildingScore, contractRows, contractsSummary, insuranceStatus, obligationRows, obligationsSummary } from './metrics';
 import { dayLabel } from '../home/calendar';
 import OverviewTab from './tabs/OverviewTab';
 import DocumentsTab from './tabs/DocumentsTab';
 import ProjectsTab from './tabs/ProjectsTab';
 import UtilitiesTab from './tabs/UtilitiesTab';
 import PlanTab from './tabs/PlanTab';
+import UpkeepTab from './tabs/UpkeepTab';
 import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
 import ObligationsTab from './tabs/ObligationsTab';
 import ContractsTab from './tabs/ContractsTab';
 import DirectoryTab from './tabs/DirectoryTab';
 import ArchiveSection from './tabs/ArchiveSection';
 
-export type BuildingTab = 'overview' | 'plan' | 'projects' | 'utilities' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
-const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'projects', 'utilities', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
+export type BuildingTab = 'overview' | 'plan' | 'upkeep' | 'projects' | 'utilities' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
+const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'upkeep', 'projects', 'utilities', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
 
 /** Legacy tab ids (Building page, Association Team, Archives, Board Room) → Building tab and section. */
 export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }> = {
@@ -102,10 +103,12 @@ export default function BuildingModule() {
     fy ? `FY ends ${fy}` : null,
   ].filter(Boolean).join(' · ');
 
+  const upkeepOverdue = maintenanceOverdue(snap).length;
   const openProjects = useCapitalProjectsStore(s => s.projects.filter(x => !x.closedOn).length);
   const tabs = [
     { id: 'overview' as BuildingTab, label: 'Overview' },
     { id: 'plan' as BuildingTab, label: 'Goals' },
+    { id: 'upkeep' as BuildingTab, label: 'Upkeep', badge: upkeepOverdue || undefined, badgeTone: 'red' as const },
     { id: 'projects' as BuildingTab, label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const },
     { id: 'utilities' as BuildingTab, label: 'Utilities' },
     { id: 'documents' as BuildingTab, label: 'Documents' },
@@ -125,6 +128,7 @@ export default function BuildingModule() {
           subtitle={<><span className="block font-semibold">{line}</span><span className="mt-1 block">{{
             overview: 'What the building is, what protects it, what it is made of and who keeps it running. The board edits; every owner can read it.',
             plan: 'What the board is trying to do this year, where each goal stands, and how past years turned out. Every owner can read it.',
+            upkeep: 'The recurring work that keeps the building running: what is scheduled, what was done and what it found. Inspections are walked in their own Board Room action; every owner can read the schedule.',
             projects: 'What is being replaced or improved, what it costs and how it is paid for. Each project is worked in its Board Room action; every owner can read where it stands.',
             utilities: 'What the building uses and what it costs, meter by meter and month by month. A month far above usual opens its own action.',
             documents: "The building's papers: what governs it, what insures it, and the record of each year.",
@@ -146,6 +150,7 @@ export default function BuildingModule() {
 
         {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
         {tab === 'plan' && <PlanTab isBoard={isBoard} />}
+        {tab === 'upkeep' && <UpkeepTab today={snap.today} isBoard={isBoard} />}
         {tab === 'projects' && <ProjectsTab today={snap.today} isBoard={isBoard} />}
         {tab === 'utilities' && <UtilitiesTab today={snap.today} isBoard={isBoard} />}
         {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}

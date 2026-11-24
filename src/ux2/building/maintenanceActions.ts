@@ -5,7 +5,9 @@
  */
 import { useBuildingStore, type MaintenanceSchedule } from '@/store/useBuildingStore';
 import { usePropertyLogStore } from '@/store/usePropertyLogStore';
-import { completed, deferred, frequencyMonths } from '@/lib/maintenance';
+import { completed, deferralOf, deferred, frequencyMonths } from '@/lib/maintenance';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
+import { costOf, upkeepFrom, type UpkeepDoc, type Visit } from '@/lib/upkeep';
 
 export type MaintenanceKind = 'Inspection' | 'Routine' | 'Preventive';
 
@@ -19,17 +21,36 @@ export function kindOf(m: Pick<MaintenanceSchedule, 'task' | 'frequency'>): Main
 export interface VisitResult {
   doneOn: string;
   by: string;
+  /** What the visit cost, when known. */
+  cost?: number;
   /** What was found or done. */
   result: string;
   /** Anything that still needs doing as a result. */
   followUp?: string;
 }
 
+export const UPKEEP_KIND = 'upkeep';
+export const upkeepDoc = (): UpkeepDoc => upkeepFrom(useActionRecordsStore.getState().doc(UPKEEP_KIND)?.data);
+
+/**
+ * A scheduled task was done: the visit is kept (what was due, when it was
+ * done, by whom, what it cost) and the schedule rolls to its next date.
+ * Marking a task done and filing an inspection both come through here.
+ */
+export function recordVisit(scheduleId: string, visit: { doneOn: string; by: string; cost?: number; inspection?: boolean }): void {
+  const b = useBuildingStore.getState();
+  const m = b.maintenanceSchedules.find(x => x.id === scheduleId);
+  if (!m) return;
+  const v: Visit = { scheduleId, task: m.task, system: m.category || 'General', due: deferralOf(m)?.from ?? m.nextDue ?? '', doneOn: visit.doneOn, by: visit.by || m.vendor || 'Building staff', cost: visit.cost ?? costOf(m.estimatedCost), ...(visit.inspection ? { inspection: true } : {}) };
+  useActionRecordsStore.getState().setDoc(UPKEEP_KIND, 'Upkeep visits', { visits: [...upkeepDoc().visits, v] }, visit.doneOn);
+  b.updateMaintenanceSchedule(scheduleId, completed(m, visit.doneOn));
+}
+
 export function markDone(scheduleId: string, visit: VisitResult): void {
   const b = useBuildingStore.getState();
   const m = b.maintenanceSchedules.find(x => x.id === scheduleId);
   if (!m) return;
-  b.updateMaintenanceSchedule(scheduleId, completed(m, visit.doneOn));
+  recordVisit(scheduleId, visit);
   const asset = b.assets.find(a => a.maintenanceScheduleIds.includes(scheduleId));
   const followUp = visit.followUp?.trim();
   usePropertyLogStore.getState().addLog({
