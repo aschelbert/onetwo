@@ -105,7 +105,7 @@ export default function BuildingModule() {
   const openProjects = useCapitalProjectsStore(s => s.projects.filter(x => !x.closedOn).length);
   const tabs = [
     { id: 'overview' as BuildingTab, label: 'Overview' },
-    { id: 'plan' as BuildingTab, label: 'Plan' },
+    { id: 'plan' as BuildingTab, label: 'Goals' },
     { id: 'projects' as BuildingTab, label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const },
     { id: 'utilities' as BuildingTab, label: 'Utilities' },
     { id: 'documents' as BuildingTab, label: 'Documents' },
@@ -124,7 +124,7 @@ export default function BuildingModule() {
           title={snap.name}
           subtitle={<><span className="block font-semibold">{line}</span><span className="mt-1 block">{{
             overview: 'What the building is, what protects it, what it is made of and who keeps it running. The board edits; every owner can read it.',
-            plan: 'What the board set out to do this year, where it stands, and how past years turned out.',
+            plan: 'What the board is trying to do this year, where each goal stands, and how past years turned out. Every owner can read it.',
             projects: 'What is being replaced or improved, what it costs and how it is paid for. Each project is worked in its Board Room action; every owner can read where it stands.',
             utilities: 'What the building uses and what it costs, meter by meter and month by month. A month far above usual opens its own action.',
             documents: "The building's papers: what governs it, what insures it, and the record of each year.",

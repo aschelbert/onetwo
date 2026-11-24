@@ -9,6 +9,7 @@ import { PAYROLL_FILING_PANELS } from './PayrollFilingPanels';
 import { UTILITY_SPIKE_PANELS } from './UtilitySpikePanels';
 import { BENCHMARKING_PANELS } from './BenchmarkingPanels';
 import { RESERVE_REVIEW_PANELS } from './ReserveReviewPanels';
+import { GOALS_PANELS } from './GoalsPanels';
 
 /** The work for each step of each record-backed action, by kind and step key. */
 export const PANELS: Record<string, Record<string, Panel>> = {
@@ -22,4 +23,5 @@ export const PANELS: Record<string, Record<string, Panel>> = {
   'utility-spike': UTILITY_SPIKE_PANELS,
   benchmarking: BENCHMARKING_PANELS,
   'reserve-review': RESERVE_REVIEW_PANELS,
+  goals: GOALS_PANELS,
 };
