@@ -1,3 +1,4 @@
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -122,7 +123,8 @@ describe('Funds', () => {
     renderAt('/funds?tab=reserves');
     expect(screen.queryByTestId('legacy-reserves')).toBeNull();
     expect(document.querySelector('[aria-label="Reserves"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Reserve contribution"]')).toBeTruthy();
+    expect(document.querySelector('[data-reserve-components]')).toBeTruthy();
+    expect(document.querySelector('[data-reserve-levels]')).toBeTruthy();
     renderAt('/funds?tab=budget');
     expect(document.querySelector('[aria-label="Budget against actual"]')).toBeTruthy();
   });
@@ -156,13 +158,15 @@ describe('Funds', () => {
     expect(useFinancialStore.getState().workOrders.find(w => w.id === draft!.id)!.status).toBe('approved');
   });
 
-  it('the reserve lever sets the annual contribution through the store', () => {
+  it('picking a contribution level on the screen changes nothing by itself: it opens a reserve funding review', () => {
     renderAt('/funds?tab=planning&section=reserves');
     const before = useFinancialStore.getState().annualReserveContribution;
-    fireEvent.change(screen.getByLabelText('Custom monthly contribution'), { target: { value: '3100' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save contribution' }));
-    expect(useFinancialStore.getState().annualReserveContribution).toBe(37200);
-    useFinancialStore.getState().setAnnualReserveContribution(before);
+    const row = document.querySelector('[data-level="never-short"]') as HTMLElement;
+    expect(row).toBeTruthy();
+    fireEvent.click(within(row).getByRole('button', { name: 'Take to a review' }));
+    expect(useFinancialStore.getState().annualReserveContribution).toBe(before);
+    expect(useActionRecordsStore.getState().records.some(r => r.kind === 'reserve-review' && !r.closedOn)).toBe(true);
+    expect(useIssuesStore.getState().cases.some(c => (c.sourceId ?? '').startsWith('reserve-funding-review:'))).toBe(true);
   });
 
   it('Planning shows the budget table with the expected-by-now mark and the next-year draft', () => {

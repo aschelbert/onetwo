@@ -21,6 +21,8 @@ export interface RepairData {
   /** Anything left for the vendor to put right. */
   deficiencies: string;
   paidOn: string;
+  /** What the repair did to the reserve component's replacement date, once answered. */
+  reserveLife: string;
 }
 
 export const REPAIR: ActionKind<RepairData> = {
@@ -36,7 +38,7 @@ export const REPAIR: ActionKind<RepairData> = {
     signoff: "Ticks itself when someone signs off the work; held until any permit's final inspection",
     paid: 'Ticks itself when the work order is paid in Funds',
   },
-  blank: () => ({ what: '', where: '', assetId: '', foundBy: '', from: '', photos: [], permit: { answered: false, answers: [], number: '', finalInspectionOn: '' }, vendor: '', estimate: 0, workOrderId: '', doneOn: '', photosAfter: [], signedOffOn: '', signedOffBy: '', deficiencies: '', paidOn: '' }),
+  blank: () => ({ what: '', where: '', assetId: '', foundBy: '', from: '', photos: [], permit: { answered: false, answers: [], number: '', finalInspectionOn: '' }, vendor: '', estimate: 0, workOrderId: '', doneOn: '', photosAfter: [], signedOffOn: '', signedOffBy: '', deficiencies: '', paidOn: '', reserveLife: '' }),
   steps: (r) => {
     const d = r.data, hold = permitHold(d.permit);
     return stepsFrom(REPAIR, {

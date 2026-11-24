@@ -5,10 +5,13 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { budgetLineAccounts } from '@/lib/ledger';
 import { fmt } from '@/lib/formatters';
 import { projectCost } from '@/lib/capitalProject';
-import { MEASURES, blankPlan, contributionLevels, showMeasure, spread, type Measure, type Objective, type YearPlan } from '@/lib/caseTools';
+import { MEASURES, blankPlan, showMeasure, spread, type Measure, type Objective, type YearPlan } from '@/lib/caseTools';
 import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '../../components';
 import { todayIso } from '../../runbook/adapters';
 import { useToolDoc } from './docs';
+import { useNavigate } from 'react-router-dom';
+import { ensureReview } from '../reserves';
+import { LevelsView, usePlanDoc } from '../../funds/reserves/ReserveViews';
 import { measuredNow } from './planNumbers';
 
 const FORM = 'flex flex-wrap items-end gap-3';
@@ -48,19 +51,16 @@ function Objectives({ year }: { year: string }) {
 }
 
 function ReserveContribution() {
-  const items = useFinancialStore(s => s.reserveItems);
-  const current = useFinancialStore(s => s.annualReserveContribution);
-  const set = useFinancialStore(s => s.setAnnualReserveContribution);
-  const levels = contributionLevels(items, current);
+  const navigate = useNavigate();
+  const annual = useFinancialStore(st => st.annualReserveContribution);
+  const plan = usePlanDoc();
+  const today = todayIso();
+  const take = (reason: string) => { const { caseId } = ensureReview(reason, today); if (caseId) navigate(`/boardroom?view=case:${caseId}`); };
   return (
     <Inner className="flex flex-col gap-2">
-      <b className="text-sm font-semibold text-ux2-ink">Pick the reserve contribution</b>
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">{levels.map(l => (
-        <button key={l.id} type="button" aria-pressed={current === l.amount} onClick={() => set(l.amount)} className={'rounded-[14px] border bg-white px-3.5 py-3 text-left ' + (current === l.amount ? 'border-ux2-navy' : 'border-ux2-line hover:border-ux2-line-strong')}>
-          <span className="block text-xs text-ux2-muted">{l.label}</span><span className="block text-lg font-semibold text-ux2-ink">{fmt(l.amount)} a year</span><span className="block text-xs text-ux2-muted">{l.note}</span>
-        </button>
-      ))}</div>
-      <span className="text-xs text-ux2-muted">Full funding is each reserve item's gap divided by the years it has left, added up. It does not allow for inflation or interest; a reserve study does.</span>
+      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">The reserve contribution</b>{plan.nextYearMonthly != null ? <Chip tone="sage">Next year: {fmt(plan.nextYearMonthly)} a month · voted {plan.nextYearSetOn}</Chip> : <Chip tone="amber">Not set for next year</Chip>}</div>
+      <LevelsView today={today} a={plan.assumptions} monthly={Math.round(annual / 12)} onPick={l => take(`Contribution to ${fmt(l.monthly)} a month, with the budget`)} pickLabel="Take to a review" />
+      <span className="text-xs text-ux2-muted">The same three levels as Funds › Planning › Reserves. The level is chosen and voted in a reserve funding review; once it carries "with next year's budget", it shows here as the draft's reserve line.</span>
     </Inner>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ACTION_KINDS } from '@/lib/actions';
 import { Button, Card, Field, INPUT, SectionLabel, Why } from '../../components';
 import { startAction, startBenchmarking, startPayrollFiling } from '../recordActions';
+import { ensureReview } from '../reserves';
 
 /** Start a guided action from the Board Room: pick the kind, name it, and its page opens at step 1. */
 export default function StartAction({ initialKind, onOpenCase, onClose }: { initialKind?: string; onOpenCase: (caseId: string) => void; onClose: () => void }) {
@@ -9,7 +10,7 @@ export default function StartAction({ initialKind, onOpenCase, onClose }: { init
   const [title, setTitle] = useState('');
   const def = ACTION_KINDS.find(k => k.kind === kind);
   /** Kinds that name themselves: the quarter's payroll filing. */
-  const auto = kind === 'payroll-filing' || kind === 'benchmarking';
+  const auto = kind === 'payroll-filing' || kind === 'benchmarking' || kind === 'reserve-review';
   return (
     <Card aria-label="Start a guided action" className="gap-3 border-ux2-navy">
       <SectionLabel>Start a guided action</SectionLabel>
@@ -20,8 +21,8 @@ export default function StartAction({ initialKind, onOpenCase, onClose }: { init
           </button>
         ))}
       </div>
-      <form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); if (!def || (!auto && !title.trim())) return; const { caseId } = def.kind === 'payroll-filing' ? startPayrollFiling() : def.kind === 'benchmarking' ? startBenchmarking() : startAction(def.kind, title.trim()); if (caseId) onOpenCase(caseId); }}>
-        {auto ? <span className="min-w-[260px] flex-1 pb-2.5 text-sm text-ux2-muted">{kind === 'benchmarking' ? "Opens last year's report, or takes you to it if it is already open." : 'Opens the filing for the last quarter that ended, or takes you to it if it is already open.'}</span> : <Field label={`What is this ${def?.name.toLowerCase() ?? 'action'} about`} className="min-w-[260px] flex-1"><input value={title} onChange={e => setTitle(e.target.value)} className={INPUT} /></Field>}
+      <form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); if (!def || (!auto && !title.trim())) return; const { caseId } = def.kind === 'payroll-filing' ? startPayrollFiling() : def.kind === 'benchmarking' ? startBenchmarking() : def.kind === 'reserve-review' ? ensureReview('Started by the board') : startAction(def.kind, title.trim()); if (caseId) onOpenCase(caseId); }}>
+        {auto ? <span className="min-w-[260px] flex-1 pb-2.5 text-sm text-ux2-muted">{kind === 'reserve-review' ? 'Opens a review, or takes you to the one already open.' : kind === 'benchmarking' ? "Opens last year's report, or takes you to it if it is already open." : 'Opens the filing for the last quarter that ended, or takes you to it if it is already open.'}</span> : <Field label={`What is this ${def?.name.toLowerCase() ?? 'action'} about`} className="min-w-[260px] flex-1"><input value={title} onChange={e => setTitle(e.target.value)} className={INPUT} /></Field>}
         <Button type="submit" size="sm" disabled={!def || (!auto && !title.trim())}>Start · {def?.stepTitles.length} steps</Button>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
       </form>

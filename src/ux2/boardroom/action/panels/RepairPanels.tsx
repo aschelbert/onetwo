@@ -12,6 +12,8 @@ import { AREA, FORM, money } from '../ActionShell';
 import PermitQuestions from '../PermitQuestions';
 import type { PanelProps } from '../RecordAction';
 import { recordCase } from '../../recordActions';
+import { changeComponent } from '../../reserves';
+import { componentOf } from '@/lib/reservePlan';
 import { useIssuesStore } from '@/store/useIssuesStore';
 
 function Describe({ r, patch }: PanelProps<RepairData>) {
@@ -99,7 +101,7 @@ function SignOff({ r, patch, step }: PanelProps<RepairData>) {
   );
 }
 
-function Paid({ r, close }: PanelProps<RepairData>) {
+function Paid({ r, close, patch }: PanelProps<RepairData>) {
   const navigate = useNavigate();
   const wo = useFinancialStore(s => s.workOrders.find(w => w.id === r.data.workOrderId));
   return (
@@ -110,8 +112,34 @@ function Paid({ r, close }: PanelProps<RepairData>) {
         {r.data.paidOn && !r.closedOn && <Button size="sm" onClick={() => close(todayIso())}>Close the repair</Button>}
         {!r.data.workOrderId && r.data.signedOffOn && !r.closedOn && <Button size="sm" onClick={() => close(todayIso())}>No bill: close the repair</Button>}
       </div>
+      <ReserveLife r={r} patch={patch} />
       <Why>The invoice is entered and paid in Funds against the work order. This step ticks itself when it is paid.</Why>
     </>
+  );
+}
+
+/** When the repaired thing is a reserve component, a repair can change how long it will last: asked once, and recorded in the reserves. */
+function ReserveLife({ r, patch }: Pick<PanelProps<RepairData>, 'r' | 'patch'>) {
+  const me = useAuthStore(s => s.currentUser.name);
+  const asset = useBuildingStore(s => s.assets.find(a => a.id === r.data.assetId));
+  const item = useFinancialStore(s => s.reserveItems.find(i => i.id === asset?.reserveItemId));
+  const [years, setYears] = useState('');
+  if (!item || !r.data.signedOffOn) return null;
+  const c = componentOf(item, Number(todayIso().slice(0, 4)));
+  if (r.data.reserveLife) return <Inner className="text-sm text-ux2-ink">Reserves: {r.data.reserveLife}</Inner>;
+  const save = (n: number) => {
+    if (n) changeComponent({ kind: 'extend', id: item.id, years: n }, `Repair: ${r.title}`, me);
+    patch({ reserveLife: n ? `${item.name} now due ${c.replaceYear + n}, ${Math.abs(n)} year${Math.abs(n) === 1 ? '' : 's'} ${n > 0 ? 'later' : 'sooner'}` : `${item.name} still due ${c.replaceYear}` });
+  };
+  return (
+    <Inner className="flex flex-col gap-2" aria-label="Did the repair change how long it will last">
+      <b className="text-sm font-semibold text-ux2-ink">{item.name} is a reserve component, due for replacement in {c.replaceYear}. Did this repair change that?</b>
+      <div className={FORM}>
+        <Field label="Years later (or minus for sooner)" className="w-[230px]"><input inputMode="numeric" value={years} onChange={e => setYears(e.target.value)} placeholder="3" className={INPUT} /></Field>
+        <Button size="sm" disabled={!Math.round(Number(years))} onClick={() => save(Math.round(Number(years)))}>Move its replacement</Button>
+        <Button size="sm" variant="ghost" onClick={() => save(0)}>No change</Button>
+      </div>
+    </Inner>
   );
 }
 

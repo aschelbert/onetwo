@@ -228,6 +228,9 @@ export function startInspection(title: string, opts: { scheduleId?: string; by?:
   return startAction('inspection', title, { template, scheduleId: opts.scheduleId ?? '', by: opts.by ?? '', points }, {}, today);
 }
 
+/** Triggers other modules add: each may open an action for today. Run with the calendar ones. */
+export const TRIGGERS: ((today: string) => void)[] = [];
+
 /** Actions that open on the calendar: the payroll filing, in the two months after a quarter in which employees were paid. */
 export function runActionTriggers(today: string = todayIso()): void {
   const off = useFinancialStore.getState().runbooksOff;
@@ -251,6 +254,7 @@ export function runActionTriggers(today: string = todayIso()): void {
     const onFile = useBuildingRecordsStore.getState().records.some(x => x.kind === 'energy-benchmarking' && x.doneOn >= `${year + 1}-01-01`);
     if (!onFile) startBenchmarking(today, year);
   }
+  for (const t of TRIGGERS) { try { t(today); } catch (err) { console.error('[guided actions] trigger failed:', err); } }
 }
 
 export interface RecordActionsRun { opened: string[] }

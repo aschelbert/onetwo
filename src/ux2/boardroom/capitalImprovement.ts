@@ -11,6 +11,8 @@
  * records: awarding the contract raises the work order the bill will be paid
  * on, and closing out resets the reserve component and the asset.
  */
+import { useAuthStore } from '@/store/useAuthStore';
+import { changeComponent } from './reserves';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -85,7 +87,8 @@ export function closeOut(projectId: string, on: string, newLifeYears: number, wa
   const vendor = awardedBid(p)?.vendor ?? '';
   const fin = useFinancialStore.getState();
   if (p.reserveItemId && fin.reserveItems.some(r => r.id === p.reserveItemId)) {
-    fin.updateReserveItem(p.reserveItemId, { estimatedCost: cost, usefulLife: life, yearsRemaining: life, lastReplaced: on.slice(0, 4), currentFunding: 0 });
+    // Through the reserves' own door, so the replacement is dated, has its reason, and opens a funding review.
+    changeComponent({ kind: 'replace', id: p.reserveItemId, on, cost, life }, `Capital project closed: ${p.title}`, useAuthStore.getState().currentUser.name || 'The board', on);
   }
   const b = useBuildingStore.getState();
   if (p.assetId && b.assets.some(a => a.id === p.assetId)) {

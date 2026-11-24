@@ -128,16 +128,17 @@ describe('payroll filing', () => {
   it('opens once for a quarter in which employees were paid', () => {
     usePayrollStore.setState({ staff: [{ id: 's1', type: 'employee' }, { id: 's2', type: 'contractor' }] as never, payRuns: [{ id: 'p1', staffId: 's1', periodEnd: '2026-08-15', grossPay: 2400, status: 'paid' }, { id: 'p2', staffId: 's2', periodEnd: '2026-08-15', grossPay: 900, status: 'paid' }] as never });
     runActionTriggers('2026-10-05'); runActionTriggers('2026-10-06');
-    expect(store().records).toHaveLength(1);
-    expect(store().records[0]).toMatchObject({ kind: 'payroll-filing', dueOn: '2026-10-20' });
-    expect(data<PayrollFilingData>(store().records[0].id)).toMatchObject({ period: '2026-Q3', wages: 2400 });
-    expect(startPayrollFiling('2026-10-07').recordId).toBe(store().records[0].id);
+    const filings = () => store().records.filter(r => r.kind === 'payroll-filing');
+    expect(filings()).toHaveLength(1);
+    expect(filings()[0]).toMatchObject({ kind: 'payroll-filing', dueOn: '2026-10-20' });
+    expect(data<PayrollFilingData>(filings()[0].id)).toMatchObject({ period: '2026-Q3', wages: 2400 });
+    expect(startPayrollFiling('2026-10-07').recordId).toBe(filings()[0].id);
     // Too long after the quarter, or with nobody paid, nothing opens.
     useActionRecordsStore.setState({ records: [] });
     runActionTriggers('2026-12-15');
     usePayrollStore.setState({ payRuns: [] });
     runActionTriggers('2026-10-05');
-    expect(store().records).toHaveLength(0);
+    expect(store().records.filter(r => r.kind === 'payroll-filing')).toHaveLength(0);
   });
 });
 
