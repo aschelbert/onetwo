@@ -4,7 +4,8 @@ import { bookLinesFor, matchStatement, parseBankCsv } from '@/lib/bankMatch';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useAuthStore } from '@/store/useAuthStore';
-import { balanceOf, fiscalYearStart, monthEnd } from '@/lib/ledger';
+import { balanceOf, fiscalYearStart, fundStatements, monthEnd } from '@/lib/ledger';
+import { operatingStatement } from '@/lib/statements';
 import { fmt } from '@/lib/formatters';
 import { blankReconciliation, reconcile, signBlocker, type Reconciliation } from '@/lib/caseTools';
 import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '../../components';
@@ -98,7 +99,9 @@ interface Packet { sentOn: string; sentBy: string; emailed: number; note: string
 export function packetSections(period: string, fyEnd: string): { title: string; rows: [string, string][] }[] {
   const fin = useFinancialStore.getState();
   const end = monthEnd(period + '-01'), start = period + '-01', fy = fiscalYearStart(end, fyEnd);
-  const month = fin.getIncomeStatement(start, end), ytd = fin.getIncomeStatement(fy, end), bs = fin.getBalanceSheet();
+  const month = fin.getIncomeStatement(start, end), ytd = fin.getIncomeStatement(fy, end);
+  // As of the month's last day, not today: a packet sent on the 9th still describes the month it is for.
+  const funds = fundStatements(fin.chartOfAccounts, fin.generalLedger, start, end);
   const statement = (st: typeof month): [string, string][] => [
     ...Object.values(st.income as Record<string, { name: string; amount: number }>).map(i => [i.name, fmt(i.amount)] as [string, string]),
     ['Total income', fmt(st.totalIncome)],
@@ -110,7 +113,7 @@ export function packetSections(period: string, fyEnd: string): { title: string; 
   return [
     { title: 'Operating statement, ' + periodLabel(period), rows: statement(month) },
     { title: 'Year to date, from ' + fy, rows: statement(ytd) },
-    { title: 'Balance sheet by fund, today', rows: [['Operating fund', fmt(bs.equity.operatingFund)], ['Reserve fund', fmt(bs.equity.reserveFund)], ['Total liabilities', fmt(bs.liabilities.total)]] },
+    { title: 'Fund balances at ' + end, rows: [['Operating fund', fmt(funds.operating.fundBalance)], ['Reserve fund', fmt(funds.reserve.fundBalance)], ['Owed to others', fmt(funds.total.liabilities)], ['Net operating income, ' + periodLabel(period), fmt(operatingStatement(fin.chartOfAccounts, fin.generalLedger, start, end).noi)]] },
     { title: 'Dues owed', rows: [['Units with a balance', late.length + ' of ' + fin.units.length], ['Total owed', fmt(late.reduce((t, u) => t + u.balance, 0))]] },
   ];
 }
