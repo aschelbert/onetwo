@@ -10,6 +10,7 @@
  * Funds, twelve months of utility bills entered) and what happens to other
  * records when it closes.
  */
+import { syncCurrentYear } from '../funds/planning/budgetYears';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useActionRecordsStore } from '@/store/useActionRecordsStore';
@@ -65,6 +66,8 @@ SYNC['budget-amendment'] = (r, today) => {
     const fin = useFinancialStore.getState();
     const after = amended(fin.budgetCategories, d);
     after.forEach((l, i) => { if (l.budgeted !== fin.budgetCategories[i].budgeted) fin.updateBudgetCategory(l.id, { budgeted: l.budgeted }); });
+    // The year's record lists the change against the adopted budget, with the amendment's reason.
+    syncCurrentYear(today, `Budget amendment: ${d.why.trim() || d.motion || 'board vote'} (${d.vote.inFavor} to ${d.vote.against} on ${d.vote.on})`);
     store.patchData(r.id, { appliedOn: today });
   }
   if (!passed(d) || d.ownersNotice) store.patch(r.id, { closedOn: today });

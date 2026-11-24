@@ -9,6 +9,7 @@ import * as unitMgrSvc from '@/lib/services/unitManager';
 import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining, isOpenInvoice, isOpeningEntry, legacyOwed, openInvoicesInOrder, OPENING_BILL_PREFIX, OPENING_INVOICE_MARK, type GLAccountMapping, type PaymentOrder } from '@/lib/financial-logic';
 import { balanceOf, budgetLineAccounts, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
+import { kindOf, lineActual } from '@/lib/budgetYear';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { generateLocalId } from '@/lib/generateId';
@@ -817,7 +818,8 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     return budgetCategories.map((cat) => {
       // A line is measured against its ledger accounts; one with no account falls back to expenses typed on the line itself.
       const accts = budgetLineAccounts(cat, chartOfAccounts);
-      const actual = accts.length ? Math.round(accts.reduce((t, a) => t + balanceOf(a.num, a.type, thisYear), 0) * 100) / 100 : getCategorySpent(cat);
+      // Loan payments are part interest (an expense) and part principal (not one): the line is measured by the payments posted.
+      const actual = kindOf(cat.name) === 'debt' ? lineActual(cat, chartOfAccounts, generalLedger, fyStart, today) : accts.length ? Math.round(accts.reduce((t, a) => t + balanceOf(a.num, a.type, thisYear), 0) * 100) / 100 : getCategorySpent(cat);
       const budgeted = cat.budgeted;
       const variance = budgeted - actual;
       const pct = budgeted > 0 ? Math.round((actual / budgeted) * 100) : 0;

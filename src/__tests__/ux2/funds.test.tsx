@@ -172,7 +172,7 @@ describe('Funds', () => {
   it('Planning shows the budget table with the expected-by-now mark and the next-year draft', () => {
     renderAt('/funds?tab=planning');
     const budget = document.querySelector('[aria-label="Budget against actual"]') as HTMLElement;
-    expect(within(budget).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Budget line', 'Budget', 'Spent', 'Left', 'Used', 'Status', '']);
+    expect(within(budget).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Budget line', 'Budget', 'Spent', 'Expected by now', 'Used', 'Status', '']);
     expect(within(budget).getByText('Where the dues go')).toBeTruthy();
     expect(screen.queryByTestId('legacy-budget')).toBeNull();
     fireEvent.click(tile(`${new Date().getFullYear() + 1} budget`));
@@ -318,17 +318,24 @@ describe('Funds', () => {
   it('Statements shows the balance sheet, income statement, packets, filings and accountant cards; a packet posts as a notice', () => {
     renderAt('/funds?tab=statements');
     expect(screen.queryByTestId('legacy-reports')).toBeNull();
-    expect(document.querySelector('[aria-label="Balance sheet"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Income statement"]')).toBeTruthy();
+    // One card holds every statement; the two older cards are gone.
+    expect(document.querySelector('[aria-label="Balance sheet"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Income statement"]')).toBeNull();
     expect(document.querySelector('[aria-label="Monthly statement packets"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Taxes and filings"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Accountant access"]')).toBeTruthy();
     // The balance sheet shows both funds and ties.
-    const bs = document.querySelector('[aria-label="Balance sheet"]') as HTMLElement;
+    const bs = document.querySelector('[aria-label="Statements for a period"]') as HTMLElement;
     expect(within(bs).getAllByRole('columnheader').map(h => h.textContent?.trim())).toEqual(['', 'Operating', 'Reserve', 'Total']);
     expect(within(bs).getByText('Owns − owes = fund balances ✓')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Budget variance report' }));
-    expect(within(document.querySelector('[aria-label="Income statement"]') as HTMLElement).getByText('Variance')).toBeTruthy();
+    // It is dated at the end of the period chosen: last month's end to start with, today for the year to date.
+    const asOf = () => bs.querySelector('[data-balance-as-of]')!.getAttribute('data-balance-as-of')!;
+    const lastMonthEnd = asOf();
+    expect(lastMonthEnd < new Date().toISOString().slice(0, 10)).toBe(true);
+    fireEvent.click(within(bs).getByRole('button', { name: 'Year to date' }));
+    expect(asOf() > lastMonthEnd).toBe(true);
+    fireEvent.click(within(bs).getByRole('button', { name: 'Operating statement' }));
+    expect(within(bs).getByText('Net operating income')).toBeTruthy();
     const send = screen.queryAllByRole('button', { name: 'Send to owners' })[0];
     if (send) {
       const before = useComplianceStore.getState().announcements.length;

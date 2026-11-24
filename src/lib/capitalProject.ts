@@ -142,9 +142,12 @@ export function extraPaybackYears(o: ProjectOption, all: ProjectOption[]): numbe
 export interface FundingContext {
   units: number;
   reserveCash: number;
-  /** Total replacement cost of everything in the reserve plan. */
-  reserveNeeded: number;
   operatingCash: number;
+  /** Percent funded today and once the job is paid from reserves, as the reserve plan measures it (the balance against what should be set aside by now); null when the plan has no components. */
+  reservePct: number | null;
+  reservePctAfter: number | null;
+  /** The first year the 30-year plan runs short once the job is paid from reserves, when it does. */
+  shortAfter: number | null;
 }
 
 export interface FundingEffect { source: FundingSource; effect: string; decides: 'Board' | "Owners' vote"; possible: boolean }
@@ -160,10 +163,10 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 /** What each way of paying would do to this building. The loan terms are an illustration, to be replaced by a lender's quote. */
 export function fundingEffects(amount: number, c: FundingContext, loan = { ratePct: 7, years: 7 }): FundingEffect[] {
   const units = Math.max(1, c.units);
-  const pct = (cash: number) => (c.reserveNeeded > 0 ? Math.round((cash / c.reserveNeeded) * 100) : 0);
+  const funded = c.reservePct == null || c.reservePctAfter == null ? `Leaves ${usd(c.reserveCash - amount)} in reserves` : `Reserves go from ${c.reservePct}% to ${c.reservePctAfter}% funded`;
   const monthly = loanPayment(amount, loan.ratePct, loan.years);
   return [
-    { source: 'reserves', decides: 'Board', possible: c.reserveCash >= amount, effect: c.reserveCash >= amount ? `Reserves go from ${pct(c.reserveCash)}% to ${pct(c.reserveCash - amount)}% of the plan` : `Reserves hold ${usd(c.reserveCash)}, ${usd(amount - c.reserveCash)} short` },
+    { source: 'reserves', decides: 'Board', possible: c.reserveCash >= amount, effect: c.reserveCash >= amount ? `${funded} · ${c.shortAfter ? `the plan then runs short in ${c.shortAfter}` : 'no short year in the plan after it'}` : `Reserves hold ${usd(c.reserveCash)}, ${usd(amount - c.reserveCash)} short` },
     { source: 'operating', decides: 'Board', possible: c.operatingCash >= amount, effect: c.operatingCash >= amount ? `Leaves ${usd(c.operatingCash - amount)} in operating cash` : `Operating holds ${usd(c.operatingCash)}, ${usd(amount - c.operatingCash)} short` },
     { source: 'special_assessment', decides: "Owners' vote", possible: true, effect: `${usd(amount / units)} a unit, once, or ${usd(amount / units / 12)} a month for a year` },
     { source: 'loan', decides: "Owners' vote", possible: true, effect: `${usd(monthly / units)} a unit a month for ${loan.years} years at ${loan.ratePct}% · ${usd(monthly * loan.years * 12 - amount)} interest in all` },

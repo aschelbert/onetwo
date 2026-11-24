@@ -17,6 +17,10 @@ import { Button, Card, Chip, Inner, SectionLabel, Table, Th, Td, KV, Why, Field,
 import { todayIso } from '../../runbook/adapters';
 import { awardContract, closeOut, signOffWork, spendingLimit } from '../capitalImprovement';
 import { CAPITAL_HOW } from '../capitalPlan';
+import { afterPaying } from '../reserves';
+import { monthlyPayment } from '@/lib/outlook';
+import { usePlanningDoc } from '../../funds/planning/planningDoc';
+import { LoanForm } from '../../funds/planning/CashLoansPanel';
 
 const num = (s: string) => Math.max(0, Math.round((Number(String(s).replace(/[^0-9.]/g, '')) || 0) * 100) / 100);
 const AREA = 'w-full rounded-[10px] border border-ux2-line-strong px-3 py-2 text-sm';
@@ -89,14 +93,19 @@ function OptionsPanel({ p, patch }: PanelProps) {
 
 function FundingPanel({ p, patch }: PanelProps) {
   const units = useFinancialStore(s => s.units.length);
-  const reserveNeeded = useFinancialStore(s => s.reserveItems.reduce((t, r) => t + r.estimatedCost, 0));
+  const items = useFinancialStore(s => s.reserveItems);
+  const annual = useFinancialStore(s => s.annualReserveContribution);
+  const planning = usePlanningDoc();
+  const navigate = useNavigate();
+  const loan = planning.loans.find(l => l.projectId === p.id);
   const getBalanceSheet = useFinancialStore(s => s.getBalanceSheet);
   const ledger = useFinancialStore(s => s.generalLedger);
   const cash = useMemo(() => (getBalanceSheet() as { assets: { operating: number; reserves: number } }).assets, [getBalanceSheet, ledger]); // eslint-disable-line react-hooks/exhaustive-deps
   const amount = projectCost(p);
   const [decidedOn, setDecidedOn] = useState(p.funding.decidedOn || todayIso());
   const [vote, setVote] = useState(p.funding.vote);
-  const rows = fundingEffects(amount, { units, reserveCash: cash?.reserves ?? 0, reserveNeeded, operatingCash: cash?.operating ?? 0 });
+  const plan = useMemo(() => afterPaying(amount, p.reserveItemId), [amount, p.reserveItemId, items, annual, ledger]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = fundingEffects(amount, { units, reserveCash: cash?.reserves ?? 0, operatingCash: cash?.operating ?? 0, reservePct: plan.pct, reservePctAfter: plan.pctAfter, shortAfter: plan.shortAfter });
   return (
     <>
       <Table minWidth={620}>
@@ -115,7 +124,11 @@ function FundingPanel({ p, patch }: PanelProps) {
         <Field label="The vote, as in the minutes" className="min-w-[240px] flex-1"><input value={vote} onChange={e => setVote(e.target.value)} placeholder="Board, 5–0 · or owners, 34 of 50" className={INPUT} /></Field>
         <Button size="sm" disabled={!p.funding.source || !decidedOn} onClick={() => patch({ funding: { source: p.funding.source, decidedOn, vote: vote.trim() } })}>Record the decision</Button>
       </div>
-      <Why>The reserve and cash figures are this building's, from Funds, today. A special assessment or a loan needs the owners' vote; the loan line is an illustration at 7% over 7 years until a lender quotes.</Why>
+      {p.funding.source === 'loan' && p.funding.decidedOn && (loan
+        ? <Inner className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink" data-project-loan={loan.id}><span><b className="font-semibold">On the loan register</b> · {fmt(loan.principal)} at {loan.ratePct}% over {loan.years} years · {fmt(monthlyPayment(loan))} a month from {loan.firstPayment}</span><Button size="sm" variant="ghost" onClick={() => navigate('/funds?tab=planning&section=cash')}>Open Cash and loans</Button></Inner>
+        : <div className="flex flex-col gap-2"><b className="text-sm font-semibold text-ux2-ink">Enter the lender's terms</b><LoanForm today={todayIso()} onClose={() => undefined} preset={{ name: p.title, principal: amount, projectId: p.id }} /><span className="text-xs text-ux2-muted">Once entered, the loan is on the register under Funds › Planning › Cash and loans, its payments are in the cash forecast and the five-year outlook, and next year's budget carries them as a line.</span></div>)}
+      {p.funding.source === 'operating' && p.funding.decidedOn && <Inner className="text-sm text-ux2-ink"><b className="font-semibold">A line in this year's budget</b> · "Capital · {p.title}" at {fmt(amount)}, under Funds › Planning. Its bill is measured against that line.</Inner>}
+      <Why>Percent funded is the reserve plan's: the reserve balance against what should be set aside by now, the same figure as Funds › Planning › Reserves{p.reserveItemId ? '. This job replaces a reserve component, so the figure after it counts that component as new' : ''}. A special assessment or a loan needs the owners' vote; the loan line is an illustration at 7% over 7 years until a lender quotes.</Why>
     </>
   );
 }
