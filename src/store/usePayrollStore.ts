@@ -4,6 +4,8 @@ import { useFinancialStore } from './useFinancialStore';
 import { supabase, isBackendEnabled, getActiveTenantId } from '@/lib/supabase';
 import * as payrollSvc from '@/lib/services/payroll';
 import { generateLocalId } from '@/lib/generateId';
+import { WAGE_YEARS, wageRecordLocked, weeks } from '@/lib/retention';
+import { useActionRecordsStore } from './useActionRecordsStore';
 
 /* ── Types ─────────────────────────────────────────────────── */
 
@@ -115,7 +117,8 @@ interface PayrollState {
   // Time entries
   addTimeEntry: (e: Omit<TimeEntry, 'id'>, tenantId?: string) => void;
   updateTimeEntry: (id: string, u: Partial<TimeEntry>) => void;
-  deleteTimeEntry: (id: string) => void;
+  /** Remove a day's hours. Refused, with the reason returned, once the day is part of the kept wage record. */
+  deleteTimeEntry: (id: string) => string;
 
   // Pay runs
   createPayRun: (staffId: string, periodStart: string, periodEnd: string, tenantId?: string) => PayRun;
@@ -202,8 +205,15 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
   },
 
   deleteTimeEntry: (id) => {
+    const st0 = get();
+    const entry = st0.timeEntries.find(e => e.id === id);
+    if (entry) {
+      const paid = st0.payRuns.filter(p => p.staffId === entry.staffId && p.status === 'paid').map(p => ({ start: p.periodStart, end: p.periodEnd }));
+      if (wageRecordLocked(entry, st0.staff.find(s => s.id === entry.staffId)?.type === 'employee', paid, new Date().toISOString().slice(0, 10))) return `These hours were paid, so they are part of the wage record and are kept for ${WAGE_YEARS} years. Correct them with an edit, not a deletion.`;
+    }
     set(st => ({ timeEntries: st.timeEntries.filter(e => e.id !== id) }));
     if (isBackendEnabled) payrollSvc.deleteTimeEntry(id);
+    return '';
   },
 
   /* ── Pay runs ──────────────────────── */
@@ -215,7 +225,14 @@ export const usePayrollStore = create<PayrollState>()(persist((set, get) => ({
       e.staffId === staffId && e.date >= periodStart && e.date <= periodEnd
     );
     const hoursWorked = entries.reduce((sum, e) => sum + e.hours, 0);
-    const grossPay = Math.round(hoursWorked * member.rate * 100) / 100;
+    // An hourly employee's hours past 40 in a workweek are paid at one and a half times. A week is counted in the period
+    // its Sunday falls in, on the whole week's hours, so a week that straddles two periods is not missed.
+    const exempt = (useActionRecordsStore.getState().records.find(r => r.kind === 'wage-facts' && (r.data as { key?: string }).key === staffId)?.data as { exempt?: boolean } | undefined)?.exempt === true;
+    const sundayOf = (start: string) => new Date(Date.parse(start + 'T00:00:00Z') + 6 * 86400000).toISOString().slice(0, 10);
+    const overtimeHours = member.type === 'employee' && !exempt
+      ? weeks(state.timeEntries.filter(e => e.staffId === staffId)).filter(w => sundayOf(w.start) >= periodStart && sundayOf(w.start) <= periodEnd).reduce((t, w) => t + w.over40, 0)
+      : 0;
+    const grossPay = Math.round((hoursWorked + overtimeHours * 0.5) * member.rate * 100) / 100;
     const withholdingPct = member.type === 'employee' ? 22 : 0;
     const deductions = Math.round(grossPay * withholdingPct / 100 * 100) / 100;
     const netPay = Math.round((grossPay - deductions) * 100) / 100;
