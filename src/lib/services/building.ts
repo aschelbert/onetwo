@@ -231,25 +231,21 @@ export async function fetchInsurancePolicies(tenantId: string): Promise<Insuranc
   if (error) { logDbError('fetchInsurancePolicies error:', error); return null; }
   return (data || []).map(r => ({
     id: r.id, type: r.type, carrier: r.carrier, coverage: r.coverage,
-    premium: r.premium, expires: r.expires, policyNum: r.policy_num,
+    premium: r.premium, expires: r.expires, policyNum: r.policy_num, deductible: r.deductible ?? '',
     attachments: (r.attachments || []) as InsurancePolicy['attachments'],
   }));
 }
 
 export async function createInsurancePolicy(tenantId: string, p: Omit<InsurancePolicy, 'id' | 'attachments'>): Promise<InsurancePolicy | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('insurance_policies')
-    .insert({
-      tenant_id: tenantId, type: p.type, carrier: p.carrier, coverage: p.coverage,
-      premium: p.premium, expires: p.expires, policy_num: p.policyNum,
-    })
-    .select()
-    .single();
-  if (error) { logDbError('createInsurancePolicy error:', error); return null; }
+  const row = { tenant_id: tenantId, type: p.type, carrier: p.carrier, coverage: p.coverage, premium: p.premium, expires: p.expires, policy_num: p.policyNum };
+  let { data, error } = await supabase.from('insurance_policies').insert(p.deductible ? { ...row, deductible: p.deductible } : row).select().single();
+  // A database that has not had the deductible column added yet still saves the rest.
+  if (error && p.deductible && missingColumn(error, 'deductible')) ({ data, error } = await supabase.from('insurance_policies').insert(row).select().single());
+  if (error || !data) { logDbError('createInsurancePolicy error:', error); return null; }
   return {
     id: data.id, type: data.type, carrier: data.carrier, coverage: data.coverage,
-    premium: data.premium, expires: data.expires, policyNum: data.policy_num, attachments: [],
+    premium: data.premium, expires: data.expires, policyNum: data.policy_num, deductible: data.deductible ?? p.deductible ?? '', attachments: [],
   };
 }
 
@@ -263,7 +259,12 @@ export async function updateInsurancePolicy(id: string, p: Partial<InsurancePoli
   if (p.expires !== undefined) row.expires = p.expires;
   if (p.policyNum !== undefined) row.policy_num = p.policyNum;
   if (p.attachments !== undefined) row.attachments = p.attachments;
-  const { error } = await supabase.from('insurance_policies').update(row).eq('id', id);
+  if (p.deductible !== undefined) row.deductible = p.deductible;
+  let { error } = await supabase.from('insurance_policies').update(row).eq('id', id);
+  if (error && 'deductible' in row && missingColumn(error, 'deductible')) {
+    const { deductible: _d, ...rest } = row;
+    ({ error } = Object.keys(rest).length ? await supabase.from('insurance_policies').update(rest).eq('id', id) : { error: null });
+  }
   if (error) { logDbError('updateInsurancePolicy error:', error); return false; }
   return true;
 }

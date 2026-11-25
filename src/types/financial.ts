@@ -146,6 +146,17 @@ export interface UnitDocument {
   docType: string;
   visibleToOwner: boolean;
   createdAt: string;
+  /** For an insurance document: what was read from it and confirmed by a person. */
+  details?: PolicyDetails | null;
+}
+
+export interface PolicyDetails {
+  carrier: string;
+  policyNum: string;
+  /** 'YYYY-MM-DD', or '' when not known. */
+  expires: string;
+  confirmedBy: string;
+  confirmedOn: string;
 }
 
 export interface MoveEvent {

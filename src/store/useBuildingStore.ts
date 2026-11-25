@@ -40,6 +40,8 @@ export interface LegalDocument {
 }
 export interface InsurancePolicy {
   id: string; type: string; carrier: string; coverage: string; premium: string; expires: string; policyNum: string;
+  /** What the association pays first on a claim, as written on the policy. */
+  deductible?: string;
   attachments: Array<{ name: string; size: string; uploadedAt: string; type: string }>;
 }
 /** One line of a vendor's certificate of insurance: a coverage, who writes it, its limit and when it ends. */

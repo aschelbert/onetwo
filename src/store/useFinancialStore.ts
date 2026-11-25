@@ -10,6 +10,7 @@ import { getGLAccountsForInvoice, DEFAULT_GL_MAPPING, creditOf, invoiceRemaining
 import { balanceOf, budgetLineAccounts, fiscalYearStart, fundOf, fundStatements, fundTotals, isLocked, LockedPeriodError, reversalOf, reversalsOf, type Fund } from '@/lib/ledger';
 import { billingDate, billingDue, duesDescription, duesDueDate, isDuesInvoiceFor, lateFeesDue, periodKey, reserveTransferMemo, type BillingRunSummary } from '@/lib/billingCycle';
 import { kindOf, lineActual } from '@/lib/budgetYear';
+import type { PolicyDetails } from '@/types/financial';
 import type { BudgetCategory, ReserveItem, ChartOfAccountsEntry, GLEntry, Unit, UnitInvoice, UnitDocument, MoveEvent } from '@/types/financial';
 import { defaultChartOfAccounts, seedBudgetCategories, seedReserveItems, seedChartOfAccounts, seedUnits, seedWorkOrders, type WorkOrder } from '@/data/financial';
 import { generateLocalId } from '@/lib/generateId';
@@ -229,7 +230,9 @@ interface FinancialState {
   // Unit Documents
   fetchUnitDocuments: (tenantId: string) => Promise<void>;
   /** True when the file was stored and its row saved. */
-  uploadDocument: (unitNumber: string, file: File, docType: string, visibleToOwner: boolean, uploadedBy: string | null, uploadedByName: string | null) => Promise<boolean>;
+  uploadDocument: (unitNumber: string, file: File, docType: string, visibleToOwner: boolean, uploadedBy: string | null, uploadedByName: string | null, details?: PolicyDetails | null) => Promise<boolean>;
+  /** Correct what was read from a unit's insurance document. */
+  updateDocumentDetails: (id: string, details: PolicyDetails) => Promise<boolean>;
   deleteDocument: (id: string, storagePath: string) => Promise<boolean>;
 
   // Move Events
@@ -1512,12 +1515,23 @@ export const useFinancialStore = create<FinancialState>()(persist((set, get) => 
     const docs = await unitMgrSvc.fetchUnitDocuments(tenantId);
     if (docs) set({ unitDocuments: docs });
   },
-  uploadDocument: async (unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName) => {
+  uploadDocument: async (unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName, details) => {
     const tenantId = get().tenantId;
-    if (!tenantId) return false;
-    const doc = await unitMgrSvc.uploadUnitDocument(tenantId, unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName);
-    if (doc) set(s => ({ unitDocuments: [doc, ...s.unitDocuments] }));
+    if (!tenantId) {
+      // The demo has nowhere to keep a file; it keeps the entry so the page can be tried.
+      if (isBackendEnabled) return false;
+      const local: UnitDocument = { id: generateLocalId('ud'), unitNumber, uploadedBy, uploadedByName, filename: file.name, storagePath: '', docType, visibleToOwner, createdAt: new Date().toISOString(), details: details ?? null };
+      set(s => ({ unitDocuments: [local, ...s.unitDocuments] }));
+      return true;
+    }
+    const doc = await unitMgrSvc.uploadUnitDocument(tenantId, unitNumber, file, docType, visibleToOwner, uploadedBy, uploadedByName, details);
+    if (doc) set(s => ({ unitDocuments: [{ ...doc, details: doc.details ?? details ?? null }, ...s.unitDocuments] }));
     return !!doc;
+  },
+  updateDocumentDetails: async (id, details) => {
+    const ok = get().tenantId ? await unitMgrSvc.updateUnitDocumentDetails(id, details) : !isBackendEnabled;
+    if (ok) set(s => ({ unitDocuments: s.unitDocuments.map(d => (d.id === id ? { ...d, details } : d)) }));
+    return ok;
   },
   deleteDocument: async (id, storagePath) => {
     const ok = await unitMgrSvc.deleteUnitDocument(id, storagePath);
