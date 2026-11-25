@@ -1,5 +1,6 @@
 import { supabase, logDbError } from '@/lib/supabase';
-import type { UnitDocument, MoveEvent } from '@/types/financial';
+import type { UnitDocument, MoveEvent, PolicyDetails } from '@/types/financial';
+import { missingColumn } from './missingColumn';
 
 // ── Unit Documents ──
 
@@ -14,6 +15,7 @@ export function rowToUnitDocument(r: Record<string, unknown>): UnitDocument {
     docType: (r.doc_type as string) || 'general',
     visibleToOwner: r.visible_to_owner as boolean,
     createdAt: r.created_at as string,
+    details: (r.details as PolicyDetails | null) ?? null,
   };
 }
 
@@ -36,6 +38,7 @@ export async function uploadUnitDocument(
   visibleToOwner: boolean,
   uploadedBy: string | null,
   uploadedByName: string | null,
+  details?: PolicyDetails | null,
 ): Promise<UnitDocument | null> {
   if (!supabase) return null;
 
@@ -48,27 +51,25 @@ export async function uploadUnitDocument(
   if (storageError) { logDbError('uploadUnitDocument storage error:', storageError); return null; }
 
   // Insert record
-  const { data, error } = await supabase
-    .from('unit_documents')
-    .insert({
-      tenant_id: tenantId,
-      unit_number: unitNumber,
-      uploaded_by: uploadedBy,
-      uploaded_by_name: uploadedByName,
-      filename: file.name,
-      storage_path: path,
-      doc_type: docType,
-      visible_to_owner: visibleToOwner,
-    })
-    .select()
-    .single();
-  if (error) {
+  const row = { tenant_id: tenantId, unit_number: unitNumber, uploaded_by: uploadedBy, uploaded_by_name: uploadedByName, filename: file.name, storage_path: path, doc_type: docType, visible_to_owner: visibleToOwner };
+  let { data, error } = await supabase.from('unit_documents').insert(details ? { ...row, details } : row).select().single();
+  // A database that has not had the details column added yet still takes the file.
+  if (error && details && missingColumn(error, 'details')) ({ data, error } = await supabase.from('unit_documents').insert(row).select().single());
+  if (error || !data) {
     logDbError('uploadUnitDocument insert error:', error);
     // Don't leave a file behind that no document points to.
     await supabase.storage.from('unit-documents').remove([path]);
     return null;
   }
   return rowToUnitDocument(data);
+}
+
+/** Correct what was read from an insurance document (the board, or the manager). */
+export async function updateUnitDocumentDetails(id: string, details: PolicyDetails): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from('unit_documents').update({ details }).eq('id', id);
+  if (error) { logDbError('updateUnitDocumentDetails error:', error); return false; }
+  return true;
 }
 
 export async function deleteUnitDocument(id: string, storagePath: string): Promise<boolean> {

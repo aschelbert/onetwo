@@ -31,19 +31,19 @@ import ProjectsTab from './tabs/ProjectsTab';
 import UtilitiesTab from './tabs/UtilitiesTab';
 import PlanTab from './tabs/PlanTab';
 import UpkeepTab from './tabs/UpkeepTab';
+import InsuranceTab from './tabs/InsuranceTab';
 import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
 import ObligationsTab from './tabs/ObligationsTab';
 import ContractsTab from './tabs/ContractsTab';
 import DirectoryTab from './tabs/DirectoryTab';
 import ArchiveSection from './tabs/ArchiveSection';
 
-export type BuildingTab = 'overview' | 'plan' | 'upkeep' | 'projects' | 'utilities' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
-const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'upkeep', 'projects', 'utilities', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
+export type BuildingTab = 'overview' | 'plan' | 'upkeep' | 'projects' | 'utilities' | 'insurance' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
+const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'upkeep', 'projects', 'utilities', 'insurance', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
 
 /** Legacy tab ids (Building page, Association Team, Archives, Board Room) → Building tab and section. */
 export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }> = {
   details: { tab: 'overview', section: 'details' },
-  insurance: { tab: 'overview', section: 'insurance' },
   assets: { tab: 'overview', section: 'assets' },
   legal: { tab: 'documents', section: 'governing' },
   contacts: { tab: 'directory', section: 'people' },
@@ -104,6 +104,7 @@ export default function BuildingModule() {
   ].filter(Boolean).join(' · ');
 
   const upkeepOverdue = maintenanceOverdue(snap).length;
+  const insuranceLapsed = insuranceStatus(snap).filter(p => p.state === 'lapsed').length;
   const openProjects = useCapitalProjectsStore(s => s.projects.filter(x => !x.closedOn).length);
   const tabs = [
     { id: 'overview' as BuildingTab, label: 'Overview' },
@@ -111,6 +112,7 @@ export default function BuildingModule() {
     { id: 'upkeep' as BuildingTab, label: 'Upkeep', badge: upkeepOverdue || undefined, badgeTone: 'red' as const },
     { id: 'projects' as BuildingTab, label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const },
     { id: 'utilities' as BuildingTab, label: 'Utilities' },
+    { id: 'insurance' as BuildingTab, label: 'Insurance', badge: insuranceLapsed || undefined, badgeTone: 'red' as const },
     { id: 'documents' as BuildingTab, label: 'Documents' },
     { id: 'obligations' as BuildingTab, label: 'Obligations', badge: obl.overdue.length + obl.inProgress.length || undefined, badgeTone: obl.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'contracts' as BuildingTab, label: 'Contracts', badge: con.lapsed.length ? `${con.lapsed.length} lapsed` : undefined, badgeTone: 'red' as const },
@@ -131,6 +133,7 @@ export default function BuildingModule() {
             upkeep: 'The recurring work that keeps the building running: what is scheduled, what was done and what it found. Inspections are walked in their own Board Room action; every owner can read the schedule.',
             projects: 'What is being replaced or improved, what it costs and how it is paid for. Each project is worked in its Board Room action; every owner can read where it stands.',
             utilities: 'What the building uses and what it costs, meter by meter and month by month. A month far above usual opens its own action.',
+            insurance: "The association's policies, whether the building is insured for enough, and the policies owners carry on their own units. Reading a declarations page fills in a policy's details.",
             documents: "The building's papers: what governs it, what insures it, and the record of each year.",
             obligations: "The things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.",
             contracts: 'Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.',
@@ -153,6 +156,7 @@ export default function BuildingModule() {
         {tab === 'upkeep' && <UpkeepTab today={snap.today} isBoard={isBoard} />}
         {tab === 'projects' && <ProjectsTab today={snap.today} isBoard={isBoard} />}
         {tab === 'utilities' && <UtilitiesTab today={snap.today} isBoard={isBoard} />}
+        {tab === 'insurance' && <InsuranceTab today={snap.today} isBoard={isBoard} />}
         {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}
         {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
         {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}
