@@ -82,24 +82,6 @@ function DetailsForm({ snap, onClose }: { snap: BuildingSnapshot; onClose: () =>
   );
 }
 
-function PolicyForm({ onClose }: { onClose: () => void }) {
-  const add = useBuildingStore(s => s.addInsurance);
-  const [type, setType] = useState('');
-  const [carrier, setCarrier] = useState('');
-  const [coverage, setCoverage] = useState('');
-  const [premium, setPremium] = useState('');
-  const [expires, setExpires] = useState('');
-  return (
-    <form aria-label="Add a policy" onSubmit={e => { e.preventDefault(); if (!type) return; add({ type, carrier, coverage, premium, expires, policyNum: '' }); onClose(); }} className="flex flex-wrap items-end gap-3 rounded-[14px] border border-ux2-navy bg-white px-3.5 py-3">
-      <Field label="Policy" className="min-w-[180px] flex-1"><input value={type} onChange={e => setType(e.target.value)} placeholder="D&O" className={INPUT} /></Field>
-      <Field label="Carrier" className="w-[160px]"><input value={carrier} onChange={e => setCarrier(e.target.value)} className={INPUT} /></Field>
-      <Field label="Limit" className="w-[120px]"><input value={coverage} onChange={e => setCoverage(e.target.value)} placeholder="$2,000,000" className={INPUT} /></Field>
-      <Field label="Premium" className="w-[120px]"><input value={premium} onChange={e => setPremium(e.target.value)} placeholder="$3,200/yr" className={INPUT} /></Field>
-      <Field label="Expires" className="w-[150px]"><input type="date" value={expires} onChange={e => setExpires(e.target.value)} className={INPUT} /></Field>
-      <div className="flex gap-2"><Button type="submit" size="sm" disabled={!type}>Add</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
-    </form>
-  );
-}
 
 function AssetForm({ onClose }: { onClose: () => void }) {
   const add = useBuildingStore(s => s.addAsset);
@@ -139,7 +121,6 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
   const cases = useIssuesStore(s => s.cases);
   const needs = useMemo(() => needsYou(snap), [snap]);
   const [editing, setEditing] = useState<boolean>(false);
-  const [addingPolicy, setAddingPolicy] = useState(false);
   const [addingAsset, setAddingAsset] = useState(false);
   const year = Number(snap.today.slice(0, 4));
 
@@ -218,8 +199,8 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
               <span className="min-w-0 text-sm"><b className="font-semibold">Renewal runbook{renewalCase?.steps ? ` · step ${Math.max(1, renewalCase.steps.findIndex(s => !s.done) + 1)} of ${renewalCase.steps.length}` : ''}</b><span className="block text-xs text-white/[0.7]">{renewalCase ? `${renewalCase.id} · ${renewalCase.title}` : `${worst.type} ${worst.state === 'lapsed' ? 'lapsed' : 'expires'} ${dayLabel(worst.expires)} · start the renewal and compare quotes`} <span className="text-white/[0.5]">DC Code § 42-1903.10</span></span></span>
               <Chip tone="white" className="!bg-white !text-ux2-navy">Open</Chip>
             </button>
-          ) : isBoard ? <Button size="sm" variant="ghost" className="self-start" onClick={() => setAddingPolicy(v => !v)}>Add a policy</Button> : null}
-          {addingPolicy && <PolicyForm onClose={() => setAddingPolicy(false)} />}
+          ) : null}
+          <Button size="sm" variant="ghost" className="self-start" onClick={() => onGo('insurance')}>{isBoard ? 'Open Insurance: every policy, editable' : 'Open Insurance'}</Button>
         </Card>
       </div>
 

@@ -1,3 +1,6 @@
+import OwnerPolicyForm from '../../building/insurance/OwnerPolicyForm';
+import { standingOf } from '@/lib/policyRead';
+import type { PolicyDetails } from '@/types/financial';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -137,6 +140,13 @@ function UnitDocuments({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot
   const tenantId = useFinancialStore(s => s.tenantId);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [policy, setPolicy] = useState<File | null>(null);
+  const savePolicy = async (d: PolicyDetails) => {
+    if (!policy) return;
+    const ok = await upload(units[0].unit.number, policy, 'insurance', true, snap.viewer.id, snap.viewer.name, d);
+    setNote(ok ? `${policy.name} is on file${d.expires ? `, expiring ${dayLabel(d.expires)}` : ''}. The board can see it.` : `${policy.name} couldn't be uploaded. Check your connection and try again; if it keeps failing, ask the board to link your account to unit ${units[0].unit.number}.`);
+    setPolicy(null);
+  };
   const numbers = units.map(u => u.unit.number);
   // What the board shared with the owner, and what the owner added themselves.
   const mine = docs.filter(d => numbers.includes(d.unitNumber) && (d.visibleToOwner || d.uploadedBy === snap.viewer.id));
@@ -151,6 +161,8 @@ function UnitDocuments({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
+    // An insurance policy is read first, and its details confirmed, so the board can see when it expires.
+    if (guessUnitDocType(f.name) === 'insurance') { setNote(null); setPolicy(f); return; }
     if (!tenantId) { setNote('Uploads keep to a live building; the demo keeps the list as it is.'); return; }
     setBusy('upload'); setNote(null);
     const ok = await upload(units[0].unit.number, f, guessUnitDocType(f.name), true, snap.viewer.id, snap.viewer.name);
@@ -163,17 +175,18 @@ function UnitDocuments({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot
         <SectionLabel>Documents for this unit</SectionLabel>
         <label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-ux2-line-strong bg-white px-3.5 text-xs font-semibold text-ux2-ink hover:bg-ux2-surface">{busy === 'upload' ? 'Uploading…' : 'Upload'}<input type="file" aria-label="Upload a unit document" className="sr-only" disabled={busy === 'upload'} onChange={e => { void onFile(e); }} /></label>
       </div>
+      {policy && <OwnerPolicyForm key={policy.name + policy.size} file={policy} by={snap.viewer.name} today={snap.today} saveLabel="These are right: put it on file" onSave={savePolicy} onCancel={() => setPolicy(null)} />}
       {units.filter(u => u.unit.moveIn).map(u => <Inner key={`deed-${u.unit.number}`} className="flex flex-wrap items-center justify-between gap-3"><Cell title="Deed" note={`Recorded ${dayLabel(u.unit.moveIn!)} · from the unit record${units.length > 1 ? ` · ${u.unit.number}` : ''}`} /><Chip tone="sage">On file</Chip></Inner>)}
       {mine.map(d => (
         <Inner key={d.id} className="flex flex-wrap items-center justify-between gap-3">
-          <Cell title={d.filename.replace(/\.[a-z0-9]+$/i, '')} note={`${d.docType.replace(/_/g, ' ')} · uploaded ${dayLabel(d.createdAt.slice(0, 10))}${d.uploadedByName ? ` by ${d.uploadedByName}` : ''}${units.length > 1 ? ` · ${d.unitNumber}` : ''}`} />
+          <Cell title={d.filename.replace(/\.[a-z0-9]+$/i, '')} note={`${d.docType.replace(/_/g, ' ')}${d.details?.expires ? ` · ${d.details.carrier ? `${d.details.carrier} · ` : ''}expires ${dayLabel(d.details.expires)}` : ''} · uploaded ${dayLabel(d.createdAt.slice(0, 10))}${d.uploadedByName ? ` by ${d.uploadedByName}` : ''}${units.length > 1 ? ` · ${d.unitNumber}` : ''}`} />
           <span className="flex flex-wrap items-center gap-1.5">
             <Button size="sm" variant="ghost" aria-label={`Download ${d.filename}`} disabled={busy === d.storagePath} onClick={() => { void download(d.storagePath, d.filename); }}>{busy === d.storagePath ? 'Opening…' : 'Download'}</Button>
             {(d.uploadedBy === snap.viewer.id || snap.viewer.isBoard) && <Button size="sm" variant="ghost" aria-label={`Delete ${d.filename}`} onClick={() => { if (window.confirm(`Delete ${d.filename}? This can't be undone.`)) void remove(d.id, d.storagePath).then(ok => { if (!ok) setNote(`${d.filename} couldn't be deleted.`); }); }}>Delete</Button>}
           </span>
         </Inner>
       ))}
-      {!mine.length && !units.some(u => u.unit.moveIn) && <Inner className="text-sm text-ux2-muted">Nothing on file yet. The deed, the HO-6 certificate and pet or vehicle registrations go here.</Inner>}
+      {!mine.length && !units.some(u => u.unit.moveIn) && <Inner className="text-sm text-ux2-muted">Nothing on file yet. The deed, your insurance declarations page and pet or vehicle registrations go here.</Inner>}
       {note && <Why>{note}</Why>}
       <Why>Building-wide documents, the bylaws, CC&Rs and policies, live in <button type="button" className="font-semibold text-ux2-ink underline" onClick={() => navigate('/building?tab=documents')}>Building › Documents</button>.</Why>
     </Card>
@@ -269,7 +282,8 @@ function Responsibilities({ units, snap }: { units: UnitSummary[]; snap: MeSnaps
   const issues = useIssuesStore(s => s.issues);
   const numbers = units.map(u => u.unit.number);
   const owed = units.reduce((t, u) => t + u.owed, 0);
-  const ins = docs.find(d => numbers.includes(d.unitNumber) && /insur|ho-?6/i.test(`${d.docType} ${d.filename}`));
+  const ins = docs.filter(d => numbers.includes(d.unitNumber) && /insur|ho-?6/i.test(`${d.docType} ${d.filename}`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const insState = ins ? standingOf(ins.details?.expires, snap.today) : null;
   const pets = docs.filter(d => numbers.includes(d.unitNumber) && /pet|vehicle|parking/i.test(`${d.docType} ${d.filename}`)).length;
   const open = issues.filter(i => i.unitNumber && numbers.includes(i.unitNumber) && i.status !== 'RESOLVED' && i.status !== 'CLOSED');
   const violations = open.filter(i => /violation|rule/i.test(`${i.category} ${i.title}`)).length;
@@ -277,7 +291,7 @@ function Responsibilities({ units, snap }: { units: UnitSummary[]; snap: MeSnaps
   const auto = units.length > 0 && units.every(autopayOn);
   const rows = [
     ['Pay assessments by the ' + nth(snap.hoaDueDay), owed > 0 ? `${fmt(owed)} open` : auto ? 'Current · autopay' : 'Current', owed > 0 ? 'red' : 'sage'],
-    ['Keep HO-6 insurance on file', ins ? `On file · uploaded ${dayLabel(ins.createdAt.slice(0, 10))}` : 'Upload the certificate below', ins ? 'sage' : 'amber'],
+    ['Keep HO-6 insurance on file', !ins ? 'Upload your declarations page below' : insState === 'lapsed' ? `Expired ${dayLabel(ins.details!.expires)} · upload the renewal` : insState === 'expiring' ? `Expires ${dayLabel(ins.details!.expires)} · upload the renewal when you have it` : insState === 'current' ? `On file · expires ${dayLabel(ins.details!.expires)}` : `On file · uploaded ${dayLabel(ins.createdAt.slice(0, 10))}`, !ins || insState === 'expiring' ? 'amber' : insState === 'lapsed' ? 'red' : 'sage'],
     ['Follow the rules and policies', violations ? `${violations} open` : 'No open violations', violations ? 'red' : 'sage'],
     ['Give 48 hours access for repairs', 'None scheduled', 'ghost'],
     ['Register pets and vehicles', pets ? `${pets} registered` : 'Nothing registered', pets ? 'sage' : 'ghost'],
