@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { kindsFor, parseSqft, recordKind, recordStatus, type BuildingFacts, type BuildingRecord } from '@/lib/buildingRecords';
-import { recordRows, recordsSummary, type BuildingSnapshot } from '@/ux2/building/metrics';
+import { allObligations, obligationRows, recordObligations, recordRows, recordsSummary, rhythmOf, type BuildingSnapshot } from '@/ux2/building/metrics';
 
 const facts = (over: Partial<BuildingFacts> = {}): BuildingFacts => ({ state: 'DC', grossSqft: 78500, hasElevator: true, hasBoiler: true, ...over });
 const rec = (kind: string, over: Partial<BuildingRecord> = {}): BuildingRecord => ({ id: `${kind}-${over.doneOn ?? 'x'}`, kind, name: '', number: '', doneOn: '2026-01-10', expiresOn: '', posted: false, notes: '', ...over });
@@ -104,5 +104,42 @@ describe('a dated record that only might apply', () => {
     expect(row.applies).toBe('check');
     expect(row.needs).toBeNull();
     expect(recordsSummary(recordRows(snap)).toCheck.map(r => r.kind.id)).toContain('heating-inspection');
+  });
+});
+
+describe('licences and certificates as obligations', () => {
+  const snap = (records: BuildingRecord[]) => ({ today: '2026-11-23', address: { street: '', city: '', state: 'DC', zip: '' }, records, facts: facts(), obligations: [
+    { id: 'o1', task: 'Hold board meetings', role: 'President', freq: 'Per meeting', due: 'Per meeting', critical: false, howTo: [], fiduciaryDuty: 'care', scope: 'governance' },
+    { id: 'o2', task: 'Adopt the budget', role: 'Treasurer', freq: 'Annual', due: '2026-12-31', critical: true, howTo: [], fiduciaryDuty: 'care', scope: 'governance' },
+    { id: 'o3', task: 'Issue resale certificates', role: 'Secretary', freq: 'Within 10 business days', due: 'Per request', critical: false, howTo: [], fiduciaryDuty: 'obedience', scope: 'operations' },
+  ], filings: [], completions: {} } as unknown as BuildingSnapshot);
+
+  it('reads how an obligation comes round from how often it recurs', () => {
+    expect([rhythmOf('Per meeting', false), rhythmOf('Ongoing', false), rhythmOf('Monthly', false), rhythmOf('Annual', true), rhythmOf('Biennial', true), rhythmOf('Within 10 business days', false), rhythmOf('As needed', false), rhythmOf('Per request', false), rhythmOf('One time', true)])
+      .toEqual(['ongoing', 'ongoing', 'ongoing', 'dated', 'dated', 'event', 'event', 'event', 'once']);
+    expect(obligationRows(snap([])).map(r => `${r.id}:${r.rhythm}`).sort()).toEqual(['o1:ongoing', 'o2:dated', 'o3:event']);
+  });
+
+  it('gives each one a role, a rhythm and a state, and leaves out what only might apply', () => {
+    const rows = recordObligations(snap([rec('certificate-of-occupancy', { posted: true }), rec('elevator-certificate', { doneOn: '2025-01-10', expiresOn: '2026-01-10', posted: true })]));
+    const by = (id: string) => rows.find(r => r.id === id)!;
+    expect(rows.map(r => r.id)).not.toContain('business-licence');
+    // Held once and kept: a one-time obligation that is met.
+    expect(by('certificate-of-occupancy')).toMatchObject({ kind: 'record', role: 'President', rhythm: 'once', state: 'met', freq: 'Once', task: 'Hold the certificate of occupancy' });
+    // A certificate that has run out is overdue, for the officer who looks after the equipment.
+    expect(by('elevator-certificate')).toMatchObject({ role: 'Vice President', rhythm: 'dated', state: 'overdue', critical: true });
+    // One that applies and is not on file is work to do, and says so.
+    expect(by('fire-extinguishers')).toMatchObject({ state: 'in-progress', task: 'Fire extinguisher inspection: none on file' });
+    expect(by('energy-benchmarking').role).toBe('Treasurer');
+  });
+
+  it('lists them beside the board\'s obligations without changing what the board checklist counts', () => {
+    const s = snap([rec('certificate-of-occupancy', { posted: true })]);
+    expect(obligationRows(s)).toHaveLength(3);
+    const all = allObligations(s);
+    expect(all.length).toBeGreaterThan(3);
+    expect(all.filter(r => r.kind === 'record').every(r => r.rhythm === 'once' || r.rhythm === 'dated')).toBe(true);
+    // Most pressing first.
+    expect(['overdue', 'in-progress']).toContain(all[0].state);
   });
 });
