@@ -4,9 +4,10 @@
  * where things stand today. Pure: rules and readings in, a standing out.
  *
  * Heat (14 DCMR § 501): at least 68°F from 6:30 am to 11 pm and 65°F
- * overnight, from October 1 to May 1. Hot water: the Department of Buildings
- * gives 110°F measured in the unit; other sources quote 120°F at the tap, so
- * the figure is the board's to set. The rules are written for landlords and
+ * overnight, from October 1 to May 1. Hot water: sources differ. The
+ * Department of Buildings gives 110°F measured in the unit; others quote 120°F
+ * at the tap. The app starts from the higher, more protective figure, and the
+ * board can change it. The rules are written for landlords and
  * tenants; an association follows them for the systems it runs.
  */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -30,7 +31,7 @@ export interface ComfortRules {
   heatEvery: number;
   hotWaterEvery: number;
 }
-export const DEFAULT_RULES: ComfortRules = { heat: true, hotWater: true, seasonStart: '10-01', seasonEnd: '05-01', dayMin: 68, nightMin: 65, dayFrom: '06:30', dayTo: '23:00', hotWaterMin: 110, heatEvery: 7, hotWaterEvery: 30 };
+export const DEFAULT_RULES: ComfortRules = { heat: true, hotWater: true, seasonStart: '10-01', seasonEnd: '05-01', dayMin: 68, nightMin: 65, dayFrom: '06:30', dayTo: '23:00', hotWaterMin: 120, heatEvery: 7, hotWaterEvery: 30 };
 export const rulesFrom = (data: unknown): ComfortRules => ({ ...DEFAULT_RULES, ...((data as Partial<ComfortRules>) ?? {}) });
 
 export type ReadingKind = 'heat' | 'hot-water';

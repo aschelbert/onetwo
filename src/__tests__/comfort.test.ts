@@ -10,7 +10,7 @@ const rd = (o: Partial<Reading>): Reading => ({ id: 'r', kind: 'heat', on: '2026
 
 describe('heat and hot water rules', () => {
   it("starts from the District's figures", () => {
-    expect(R).toMatchObject({ seasonStart: '10-01', seasonEnd: '05-01', dayMin: 68, nightMin: 65, dayFrom: '06:30', dayTo: '23:00', hotWaterMin: 110 });
+    expect(R).toMatchObject({ seasonStart: '10-01', seasonEnd: '05-01', dayMin: 68, nightMin: 65, dayFrom: '06:30', dayTo: '23:00', hotWaterMin: 120 });
   });
 
   it('knows the heating season, which runs across the new year', () => {
@@ -22,8 +22,9 @@ describe('heat and hot water rules', () => {
     expect([heatMinAt('06:29', R), heatMinAt('06:30', R), heatMinAt('22:59', R), heatMinAt('23:00', R), heatMinAt('02:00', R), heatMinAt('', R)]).toEqual([65, 68, 68, 65, 65, 68]);
     expect(judge(rd({ temp: 66, at: '07:00' }), R)).toEqual({ min: 68, ok: false, short: 2 });
     expect(judge(rd({ temp: 66, at: '02:00' }), R)).toEqual({ min: 65, ok: true, short: 0 });
-    expect(judge(rd({ kind: 'hot-water', temp: 108 }), R)).toEqual({ min: 110, ok: false, short: 2 });
-    expect(judge(rd({ kind: 'hot-water', temp: 118 }), { ...R, hotWaterMin: 120 }).ok).toBe(false);
+    expect(judge(rd({ kind: 'hot-water', temp: 118 }), R)).toEqual({ min: 120, ok: false, short: 2 });
+    // A building that confirms the lower figure applies can set it.
+    expect(judge(rd({ kind: 'hot-water', temp: 118 }), { ...R, hotWaterMin: 110 }).ok).toBe(true);
   });
 
   it('says where the heat check stands: holding, due, overdue, below, or out of season', () => {
@@ -73,7 +74,7 @@ describe('in the app', () => {
     expect(low.repairCaseId).toBeTruthy();
     expect(repairs()).toHaveLength(1);
     expect(repairs()[0]).toMatchObject({ title: 'Hot water under the minimum · unit 502', unit: '502' });
-    expect((repairs()[0].data as { what: string }).what).toBe('Hot water is under the minimum: 104°F, and 110°F is asked for');
+    expect((repairs()[0].data as { what: string }).what).toBe('Hot water is under the minimum: 104°F, and 120°F is asked for');
     // A second low reading while that repair is open joins it.
     const again = addReading({ kind: 'hot-water', on: '2026-11-22', at: '09:00', where: 'Farthest tap', temp: 106, by: 'D. Carter', unit: '', note: '' }, '2026-11-22');
     expect(again.repairCaseId).toBeNull();
@@ -83,10 +84,10 @@ describe('in the app', () => {
   });
 
   it('lets the board set the figures, and judges against them', () => {
-    saveRules({ hotWaterMin: 120 }, '2026-11-20');
+    saveRules({ hotWaterMin: 110 }, '2026-11-20');
     const r = addReading({ kind: 'hot-water', on: '2026-11-21', at: '09:00', where: 'Tap', temp: 115, by: 'x', unit: '', note: '' }, '2026-11-21');
-    expect(r.reading.repairId).toBeTruthy();
-    expect(comfortDoc().rules).toMatchObject({ hotWaterMin: 120, dayMin: 68 });
+    expect(r.reading.repairId).toBeUndefined();
+    expect(comfortDoc().rules).toMatchObject({ hotWaterMin: 110, dayMin: 68 });
   });
 
   it('lists the two checks as ongoing obligations, and drops one the building does not supply', () => {

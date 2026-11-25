@@ -56,7 +56,7 @@ function RulesForm({ rules, today, onClose }: { rules: ComfortRules; today: stri
       <Field label="Heat reading every, days" className="w-[190px]"><input inputMode="numeric" value={d.heatEvery} onChange={e => set('heatEvery', e.target.value)} className={INPUT} /></Field>
       <Field label="Hot water reading every, days" className="w-[220px]"><input inputMode="numeric" value={d.hotWaterEvery} onChange={e => set('hotWaterEvery', e.target.value)} className={INPUT} /></Field>
       <div className="flex gap-2"><Button type="submit" size="sm">Save the rules</Button><Button type="button" size="sm" variant="ghost" onClick={onClose}>Cancel</Button></div>
-      <span className="w-full text-xs text-ux2-muted">The starting figures are the District's for heat (14 DCMR § 501). For hot water the Department of Buildings gives 110°F measured in the unit, and other sources quote 120°F at the tap: confirm which applies to your building and set it here.</span>
+      <span className="w-full text-xs text-ux2-muted">The starting figures are the District's for heat (14 DCMR § 501). For hot water, sources differ: 120°F at the tap, or 110°F measured in the unit according to the Department of Buildings. The app starts from 120°F, the more protective of the two; confirm which applies to your building and set it here.</span>
     </form>
   );
 }
