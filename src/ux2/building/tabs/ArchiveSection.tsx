@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import ArchiveTab from '../../boardroom/tabs/ArchiveTab';
 import { useBoardRoomSnapshot } from '../../boardroom/useBoardRoomSnapshot';
+import RetentionCard from './RetentionCard';
+import { todayIso } from '../../runbook/adapters';
 import MeetingRecords from '../../community/meeting/MeetingRecords';
 
 /**
@@ -13,6 +15,7 @@ export default function ArchiveSection() {
   const navigate = useNavigate();
   return (
     <div className="flex flex-col gap-4">
+      <RetentionCard today={todayIso()} />
       <MeetingRecords />
       <ArchiveTab snap={snap} onOpenCase={id => navigate(`/boardroom?view=case:${encodeURIComponent(id)}`)} />
     </div>

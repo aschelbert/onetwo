@@ -1,13 +1,15 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { periodLabel } from '@/lib/retention';
+import { saveRetention, useRetention } from '../../building/retention';
 import { useFinancialStore, ALLOWANCE_ACCT } from '@/store/useFinancialStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
-import { useIssuesStore } from '@/store/useIssuesStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { balanceOf, fiscalYearStart } from '@/lib/ledger';
 import { invoiceRemaining, isOpenInvoice } from '@/lib/financial-logic';
 import { fmt } from '@/lib/formatters';
 import { DEFAULT_ALLOWANCE_PCT, MEASURES, agingBuckets, allowanceTarget, blankPlan, met, outcomeLine, showMeasure, type BucketId, type YearPlan } from '@/lib/caseTools';
-import { Button, Card, Chip, Inner, KV, SectionLabel, Why, Field, INPUT } from '../../components';
+import { Button, Card, Chip, Inner, SectionLabel, Why, Field, INPUT } from '../../components';
 import { todayIso } from '../../runbook/adapters';
 import { esc, printPage, rowsHtml, useToolDoc } from './docs';
 import { measuredNow } from './planNumbers';
@@ -100,24 +102,32 @@ function OwnerStatements({ fyStart, fyEnd }: { fyStart: string; fyEnd: string })
   );
 }
 
-interface Disposal { years: number; reviewedOn: string; reviewedBy: string; count: number }
-
 function DisposalReview({ fyEnd }: { fyEnd: string }) {
   const me = useAuthStore(s => s.currentUser.name);
-  const cases = useIssuesStore(s => s.cases);
-  const [doc, save] = useToolDoc<Disposal>('disposal-review', fyEnd, { years: 7, reviewedOn: '', reviewedBy: '', count: 0 });
-  const [years, setYears] = useState(String(doc.years));
-  const cutoff = (Number(fyEnd.slice(0, 4)) - (Number(years) || 7)) + fyEnd.slice(4);
-  const old = cases.filter(c => c.status === 'closed' && !!c.completedAt && c.completedAt.slice(0, 10) <= cutoff);
+  const navigate = useNavigate();
+  const today = todayIso();
+  const { rows, doc } = useRetention(today);
+  const due = rows.filter(r => r.due.length > 0);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [vote, setVote] = useState('');
+  const done = doc.reviews.find(r => r.year === fyEnd);
+  const record = () => {
+    const approved = due.filter(r => picked.includes(r.rule.kind)).map(r => ({ kind: r.rule.kind, count: r.due.length, through: r.due.map(i => i.date.slice(0, 10)).sort().pop() ?? '' }));
+    saveRetention({ reviews: [...doc.reviews.filter(r => r.year !== fyEnd), { year: fyEnd, on: today, by: me, vote: vote.trim(), approved }] }, today);
+  };
   return (
-    <Inner className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Review what is old enough to dispose of</b>{doc.reviewedOn && <Chip tone="sage">Reviewed {doc.reviewedOn} by {doc.reviewedBy}</Chip>}</div>
+    <Inner className="flex flex-col gap-2" data-disposal-review={done ? done.on : ''}>
+      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Review what is old enough to dispose of</b><span className="flex items-center gap-2">{done && <Chip tone="sage">Reviewed {done.on} by {done.by}</Chip>}<Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=archive')}>Open the retention schedule</Button></span></div>
+      {due.length === 0 ? <span className="text-sm text-ux2-ink">Nothing has passed its period on the retention schedule.</span> : (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">{due.map(r => (
+          <li key={r.rule.kind}><label className="flex items-start gap-2.5 text-sm text-ux2-ink"><input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={picked.includes(r.rule.kind)} onChange={e => setPicked(p => (e.target.checked ? [...p, r.rule.kind] : p.filter(x => x !== r.rule.kind)))} /><span><b className="font-semibold">{r.rule.label}</b> · {r.due.length} past {periodLabel(r.rule).toLowerCase()}<span className="block text-xs text-ux2-muted">Oldest {r.oldest}{r.heldBack.length ? ` · ${r.heldBack.length} more held back by a hold` : ''}</span></span></label></li>
+        ))}</ul>
+      )}
       <div className="flex flex-wrap items-end gap-3">
-        <Field label="Keep closed actions for, years" className="w-[220px]"><input inputMode="numeric" value={years} onChange={e => setYears(e.target.value)} className={INPUT} /></Field>
-        <KV label={'Closed on or before ' + cutoff}>{old.length} action{old.length === 1 ? '' : 's'}</KV>
-        <Button size="sm" onClick={() => save({ years: Number(years) || 7, reviewedOn: todayIso(), reviewedBy: me, count: old.length })}>The board reviewed the list</Button>
+        <Field label="The vote, as in the minutes" className="min-w-[240px] flex-1"><input value={vote} onChange={e => setVote(e.target.value)} placeholder="Board, 4 to 0" className={INPUT} /></Field>
+        <Button size="sm" disabled={picked.length > 0 && !vote.trim()} onClick={record}>{picked.length ? `The board approved disposing of ${picked.length} kind${picked.length === 1 ? '' : 's'}` : 'The board reviewed the list: keep everything'}</Button>
       </div>
-      <span className="text-xs text-ux2-muted">This counts closed actions past the period and records that the board looked. Nothing is deleted from here. Governing documents, minutes, deeds and anything touching a claim or lawsuit are kept for good; ask the association's lawyer before disposing of anything.</span>
+      <span className="text-xs text-ux2-muted">Each kind of record has its own period on the retention schedule under Building › Archive. This records what the board approved and the vote; the app deletes nothing, and anything on hold for a dispute is left off the list. Ask the association's lawyer before disposing of anything.</span>
     </Inner>
   );
 }

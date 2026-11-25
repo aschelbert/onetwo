@@ -355,7 +355,7 @@ export default function PayrollTab() {
                     <td className="px-4 py-3 text-ink-600">{e.description}</td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <button onClick={() => openEditTime(e)} className="text-ink-400 hover:text-ink-700 text-sm">Edit</button>
-                      <button onClick={() => deleteTimeEntry(e.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
+                      <button onClick={() => { const why = deleteTimeEntry(e.id); if (why) window.alert(why); }} className="text-red-400 hover:text-red-600 text-sm">Delete</button>
                     </td>
                   </tr>
                 ))}

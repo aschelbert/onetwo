@@ -2,6 +2,7 @@ import { billTrail } from '@/lib/controls';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PayrollTab from '@/features/association-team/tabs/PayrollTab';
+import WageRecords from '../payroll/WageRecords';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { useSpendingStore, type SpendingApproval } from '@/store/useSpendingStore';
 import { useBuildingStore } from '@/store/useBuildingStore';
@@ -335,7 +336,7 @@ function WorkOrdersCard({ snap, onSection }: { snap: FundsSnapshot; onSection: (
           <Button size="sm" onClick={() => navigate('/building?tab=contracts')}>Open ›</Button>
         </span>
       </Inner>
-      {payroll && <div className="ux2-legacy"><PayrollTab /></div>}
+      {payroll && <><WageRecords today={snap.today} /><div className="ux2-legacy"><PayrollTab /></div></>}
     </Card>
   );
 }
