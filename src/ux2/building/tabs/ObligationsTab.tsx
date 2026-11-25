@@ -9,9 +9,13 @@ import { cn } from '@/lib/formatters';
 import { Button, Card, Chip, Inner, PillTabs, SectionLabel, Table, Th, Td, Cell, Why, Field, INPUT } from '../../components';
 import { dayLabel } from '../../home/calendar';
 import RecordsSection from './RecordsSection';
-import { dutyCounts, obligationRows, obligationsSummary, roleLoads, type ObligationRow, type ObligationState, type BuildingSnapshot } from '../metrics';
+import { RHYTHM_LABEL, RHYTHM_NOTE, allObligations, dutyCounts, obligationRows, obligationsSummary, roleLoads, type ObligationRow, type ObligationState, type BuildingSnapshot, type Rhythm } from '../metrics';
+import { recordKind } from '@/lib/buildingRecords';
+import { standingOf } from '@/lib/policyRead';
 
-type View = 'month' | 'byrole' | 'bycategory' | 'filings' | 'records' | 'ongoing' | 'duties';
+type View = 'month' | 'byrole' | 'bycategory' | 'byrhythm' | 'filings' | 'records' | 'ongoing' | 'duties';
+const RHYTHMS: Rhythm[] = ['ongoing', 'dated', 'event', 'once'];
+const RHYTHM_TONE: Record<Rhythm, 'ghost' | 'cyan' | 'amber' | 'sage'> = { ongoing: 'ghost', dated: 'cyan', event: 'amber', once: 'sage' };
 
 const COUNT_TONES: Record<string, { name: string; box: string; ink: string; muted: string }> = {
   Met: { name: 'navy', box: 'border-ux2-navy bg-ux2-navy', ink: 'text-white', muted: 'text-white/[0.72]' },
@@ -28,6 +32,7 @@ function howItGetsDone(r: ObligationRow): string {
   if (r.state === 'auto') return 'Verified by the document on file';
   if (r.state === 'met') return 'Done';
   if (r.kind === 'filing') return 'Filing runbook · mark filed with proof';
+  if (r.kind === 'record') return 'Recorded under Licences and certificates';
   return r.howToCount ? `${r.howToCount} step${r.howToCount === 1 ? '' : 's'} · each a Home card when due` : 'On the obligations list';
 }
 
@@ -44,38 +49,42 @@ function FileForm({ r, onClose }: { r: ObligationRow; onClose: () => void }) {
   );
 }
 
-function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: ObligationRow[]; snap: BuildingSnapshot; isBoard: boolean; title: string; note: string; groupBy?: 'role' | 'category' }) {
+function ObligationTable({ rows, snap, isBoard, title, note, groupBy, onRecords }: { rows: ObligationRow[]; snap: BuildingSnapshot; isBoard: boolean; title: string; note: string; groupBy?: 'role' | 'category' | 'rhythm'; onRecords?: () => void }) {
   const setCompletion = useComplianceStore(s => s.setCompletion);
   const cases = useIssuesStore(s => s.cases);
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
   const [filing, setFiling] = useState<string | null>(null);
   const items = useMemo(() => new Map(snap.obligations.map(o => [o.id, o])), [snap.obligations]);
-  const groups = groupBy ? Array.from(new Set(rows.map(r => groupBy === 'role' ? r.role : r.kind === 'filing' ? 'Filings' : r.scope === 'governance' ? 'Governance' : 'Operations'))) : [''];
-  const inGroup = (g: string) => groupBy ? rows.filter(r => (groupBy === 'role' ? r.role : r.kind === 'filing' ? 'Filings' : r.scope === 'governance' ? 'Governance' : 'Operations') === g) : rows;
+  const groupOf = (r: ObligationRow) => (groupBy === 'role' ? r.role : groupBy === 'rhythm' ? RHYTHM_LABEL[r.rhythm] : r.kind === 'filing' ? 'Filings' : r.kind === 'record' ? 'Licences and certificates' : r.scope === 'governance' ? 'Governance' : 'Operations');
+  const groups = groupBy === 'rhythm' ? RHYTHMS.map(x => RHYTHM_LABEL[x]).filter(g => rows.some(r => RHYTHM_LABEL[r.rhythm] === g)) : groupBy ? Array.from(new Set(rows.map(groupOf))) : [''];
+  const inGroup = (g: string) => (groupBy ? rows.filter(r => groupOf(r) === g) : rows);
+  const groupNote = (g: string) => (groupBy === 'rhythm' ? ` · ${RHYTHM_NOTE[RHYTHMS.find(x => RHYTHM_LABEL[x] === g)!]}` : '');
   return (
     <Card aria-label="Obligations list" className="gap-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>{title}</SectionLabel><span className="text-xs text-ux2-muted">{note}</span></div>
       {rows.length === 0 ? <Inner className="text-sm text-ux2-muted">Nothing here.</Inner> : (
         <Table minWidth={820}>
-          <thead><tr><Th>Obligation</Th><Th>Role</Th><Th>Due</Th><Th>How it gets done</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
+          <thead><tr><Th>Obligation</Th><Th>Role</Th><Th>Rhythm</Th><Th>Due</Th><Th>How it gets done</Th><Th>Status</Th><Th aria-label="Actions" /></tr></thead>
           <tbody>
             {groups.map(g => (
               <Fragment key={g || 'all'}>
-                {groupBy && <tr><td colSpan={6} className="bg-ux2-surface px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ux2-muted">{g} · {inGroup(g).length}</td></tr>}
+                {groupBy && <tr data-group={g}><td colSpan={7} className="bg-ux2-surface px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ux2-muted">{g} · {inGroup(g).length}<span className="font-normal normal-case tracking-normal">{groupNote(g)}</span></td></tr>}
                 {inGroup(g).map(r => {
                   const item = items.get(r.id);
                   const key = `${r.kind}:${r.id}`;
                   return (
                     <Fragment key={key}>
-                      <tr data-obligation={r.id} onClick={() => setOpen(open === key ? null : key)} className={cn('cursor-pointer hover:bg-ux2-surface', r.state === 'overdue' && 'bg-ux2-red-tint/40')}>
-                        <Td><Cell title={r.task} note={`${r.id} · ${r.kind === 'filing' ? 'filing' : r.scope}${r.critical ? ' · critical' : ''}${r.legalRef ? ` · ${r.legalRef}` : ''}`} /></Td>
+                      <tr data-obligation={r.id} data-rhythm={r.rhythm} onClick={() => setOpen(open === key ? null : key)} className={cn('cursor-pointer hover:bg-ux2-surface', r.state === 'overdue' && 'bg-ux2-red-tint/40')}>
+                        <Td><Cell title={r.task} note={`${r.kind === 'record' ? 'licence or certificate' : `${r.id} · ${r.kind === 'filing' ? 'filing' : r.scope}`}${r.critical ? ' · critical' : ''}${r.legalRef ? ` · ${r.legalRef}` : ''}`} /></Td>
                         <Td className="whitespace-nowrap">{r.role}</Td>
+                        <Td className="whitespace-nowrap"><Chip tone={RHYTHM_TONE[r.rhythm]}>{RHYTHM_LABEL[r.rhythm]}</Chip>{r.freq && r.freq.toLowerCase() !== RHYTHM_LABEL[r.rhythm].toLowerCase() && <span className="block text-xs text-ux2-muted">{r.freq}</span>}</Td>
                         <Td className="whitespace-nowrap text-ux2-muted">{r.dated ? dayLabel(r.due) : r.due}</Td>
                         <Td className="text-ux2-muted">{howItGetsDone(r)}</Td>
                         <Td><Chip tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === 'overdue' && r.daysLeft !== undefined ? ` · ${Math.abs(r.daysLeft)}d` : ''}</Chip></Td>
                         <Td num onClick={e => e.stopPropagation()}>
-                          {isBoard && r.state !== 'met' && r.state !== 'auto' && (() => {
+                          {r.kind === 'record' && onRecords && <Button size="sm" variant="ghost" onClick={onRecords}>Open</Button>}
+                          {isBoard && r.kind !== 'record' && r.state !== 'met' && r.state !== 'auto' && (() => {
                             // Start walks through the steps as a case; once one is open, Continue picks it up.
                             const c = obligationCase(cases, r.kind === 'filing' ? 'filing' : 'obligation', r.id);
                             const p = c ? caseProgress(c) : null;
@@ -90,7 +99,7 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
                         </Td>
                       </tr>
                       {(open === key || filing === r.id) && (
-                        <tr><td colSpan={6} className="px-3 py-2">
+                        <tr><td colSpan={7} className="px-3 py-2">
                           {filing === r.id && <FileForm r={r} onClose={() => setFiling(null)} />}
                           {open === key && item && (
                             <Inner className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
@@ -99,6 +108,7 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy }: { rows: 
                               <div><div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ux2-muted">How to</div><ol className="m-0 mt-1 list-decimal pl-4 text-ux2-ink">{item.howTo.map((h, i) => <li key={i}>{h}</li>)}</ol>{item.tip && <p className="m-0 mt-1 text-xs text-ux2-muted">{item.tip}</p>}</div>
                             </Inner>
                           )}
+                          {open === key && r.kind === 'record' && <Inner className="text-sm text-ux2-ink">{recordKind(r.id)?.what}{recordKind(r.id)?.appliesNote ? <span className="mt-1 block text-xs text-ux2-muted">{recordKind(r.id)!.appliesNote}</span> : null}</Inner>}
                           {open === key && !item && r.kind === 'filing' && <Inner className="text-sm text-ux2-muted">{snap.filings.find(f => f.id === r.id)?.notes || 'A filing on the calendar; mark it filed with the confirmation number as proof.'}</Inner>}
                         </td></tr>
                       )}
@@ -142,8 +152,10 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
   const units = useFinancialStore(s => s.units);
   const current = units.filter(u => u.balance <= 0).length;
   const rulesOnFile = snap.legalDocuments.some(d => /rule/i.test(d.name) && d.attachments.length > 0);
+  const unitDocs = useFinancialStore(st => st.unitDocuments);
+  const insured = units.filter(u => { const d = unitDocs.filter(x => x.unitNumber === u.number && /insur|ho-?6|\bcoi\b/i.test(`${x.docType} ${x.filename}`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]; return !!d && standingOf(d.details?.expires, snap.today) !== 'lapsed'; }).length;
   const byRole = (role: string) => rows.filter(r => r.role === role && r.state !== 'auto');
-  const freq = (list: ObligationRow[]) => { const m: Record<string, number> = {}; for (const r of list) { const k = r.kind === 'filing' ? 'Filing' : r.dated ? 'Annual' : 'Ongoing'; m[k] = (m[k] ?? 0) + 1; } return Object.entries(m).map(([k, v]) => `${k} · ${v}`).join(' · '); };
+  const freq = (list: ObligationRow[]) => RHYTHMS.map(x => [x, list.filter(r => r.rhythm === x).length] as const).filter(([, n]) => n > 0).map(([x, n]) => `${RHYTHM_LABEL[x]} · ${n}`).join(' · ');
   return (
     <div className="flex flex-col gap-4">
       <div><h2 className="m-0 text-xl font-medium text-ux2-ink">Duties and roles</h2><p className="m-0 max-w-[760px] text-sm text-ux2-muted">Who is responsible for what: the three fiduciary duties every board member carries, each officer's obligations, the member at large, and what the building expects of every unit owner.</p></div>
@@ -207,17 +219,17 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
           <div className="flex flex-col gap-1.5">{PROPOSED_MAL.map(t => <div key={t} className="rounded-[14px] border border-ux2-line bg-white px-3 py-2 text-[13px] text-ux2-ink">{t}</div>)}</div>
         </Card>
         <Card aria-label="Every unit owner" className="gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-base font-semibold text-ux2-ink">Every unit owner</div><div className="text-xs text-ux2-muted">{units.length} units · what the bylaws and CC&Rs expect · shown to owners under My Unit</div></div><Chip tone="amber">Proposed · not in production today</Chip></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-base font-semibold text-ux2-ink">Every unit owner</div><div className="text-xs text-ux2-muted">{units.length} units · what the bylaws and CC&Rs expect · shown to owners under My Unit</div></div><Chip tone="ghost">Shown to each owner under Me › Units</Chip></div>
           <div className="flex flex-col gap-1.5">
-            {[
-              ['Pay assessments by the 1st; late fee on the 15th', `${current} of ${units.length} current`, current === units.length ? 'sage' : 'amber'],
-              ['Keep an HO-6 policy on file and renew it', 'Not tracked yet', 'ghost'],
-              ['Follow the rules and policies; pets and rentals registered', rulesOnFile ? 'Rules on file' : 'Rules missing', rulesOnFile ? 'sage' : 'red'],
-              ['Give 48 hours access for inspections and repairs', 'Per request', 'ghost'],
-              ['Report leaks, hazards and damage the day they happen', 'Ongoing', 'ghost'],
-              ['Vote, or send a proxy, when the owners are asked', 'Counted per vote', 'ghost'],
-              ['Keep contact details current; tell the board before a sale or rental', 'Within 30 days', 'ghost'],
-            ].map(([t, v, tone]) => <div key={String(t)} className="flex items-center justify-between gap-2 rounded-[14px] border border-ux2-line bg-white px-3 py-2 text-[13px] text-ux2-ink"><span>{t}</span><Chip tone={tone as 'sage' | 'amber' | 'red' | 'ghost'}>{v}</Chip></div>)}
+            {([
+              ['Pay assessments by the 1st; late fee on the 15th', 'ongoing', `${current} of ${units.length} current`, current === units.length ? 'sage' : 'amber'],
+              ['Keep an HO-6 policy on file and renew it', 'dated', `${insured} of ${units.length} on file`, insured === units.length ? 'sage' : 'amber'],
+              ['Follow the rules and policies; pets and rentals registered', 'ongoing', rulesOnFile ? 'Rules on file' : 'Rules missing', rulesOnFile ? 'sage' : 'red'],
+              ['Give 48 hours access for inspections and repairs', 'event', 'Per request', 'ghost'],
+              ['Report leaks, hazards and damage the day they happen', 'event', 'As they happen', 'ghost'],
+              ['Vote, or send a proxy, when the owners are asked', 'event', 'Counted per vote', 'ghost'],
+              ['Keep contact details current; tell the board before a sale or rental', 'event', 'Within 30 days', 'ghost'],
+            ] as [string, Rhythm, string, 'sage' | 'amber' | 'red' | 'ghost'][]).map(([t, rhythm, v, tone]) => <div key={t} data-owner-duty={rhythm} className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-ux2-line bg-white px-3 py-2 text-[13px] text-ux2-ink"><span>{t}</span><span className="flex items-center gap-1.5"><Chip tone={RHYTHM_TONE[rhythm]}>{RHYTHM_LABEL[rhythm]}</Chip><Chip tone={tone}>{v}</Chip></span></div>)}
           </div>
           <ClauseList list={clausesFor('owners')} label="From your bylaws" />
           <Why>These feed the building score, not an individual owner score. Owners see their own status on My Unit; the board sees the building-wide counts here.</Why>
@@ -235,9 +247,10 @@ function Duties({ rows, snap }: { rows: ObligationRow[]; snap: BuildingSnapshot 
 
 export default function ObligationsTab({ snap, section, onSection, isBoard }: { snap: BuildingSnapshot; section?: string; onSection: (s: string) => void; isBoard: boolean }) {
   const navigate = useNavigate();
-  const rows = useMemo(() => obligationRows(snap), [snap]);
-  const sum = obligationsSummary(rows);
-  const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'bycategory' ? 'bycategory' : 'month';
+  // The score counts the board's obligations and filings; the tables also list the licences and certificates.
+  const sum = useMemo(() => obligationsSummary(obligationRows(snap)), [snap]);
+  const rows = useMemo(() => allObligations(snap), [snap]);
+  const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'byrhythm' ? 'byrhythm' : section === 'bycategory' ? 'bycategory' : 'month';
   const month = snap.today.slice(0, 7);
   const monthName = new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'long' });
   const thisMonth = rows.filter(r => r.state === 'overdue' || r.state === 'in-progress' || (r.dated && r.due.startsWith(month)));
@@ -248,7 +261,7 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
 
   return (
     <div className="flex flex-col gap-4">
-      <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'records', label: 'Licences and certificates' }, { id: 'ongoing', label: `Ongoing · ${sum.ongoing}` }, { id: 'duties', label: 'Duties and roles' }]} />
+      <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'byrhythm', label: 'Ongoing or dated' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'records', label: 'Licences and certificates' }, { id: 'ongoing', label: `Ongoing · ${rows.filter(r => r.state === 'ongoing').length}` }, { id: 'duties', label: 'Duties and roles' }]} />
       {view === 'records' && <RecordsSection snap={snap} isBoard={isBoard} onEditDetails={() => navigate('/building?tab=overview&section=details')} />}
       {view !== 'duties' && view !== 'records' && (
         <>
@@ -270,9 +283,10 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
               );
             })}
           </div>
-          {view === 'month' && <ObligationTable rows={thisMonth.length ? thisMonth : open.slice(0, 12)} snap={snap} isBoard={isBoard} title={monthName} note={sources} />}
-          {view === 'byrole' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by role" note={sources} groupBy="role" />}
-          {view === 'bycategory' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by category" note={sources} groupBy="category" />}
+          {view === 'month' && <ObligationTable rows={thisMonth.length ? thisMonth : open.slice(0, 12)} snap={snap} isBoard={isBoard} title={monthName} note={sources} onRecords={() => onSection('records')} />}
+          {view === 'byrole' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by role" note={sources} groupBy="role" onRecords={() => onSection('records')} />}
+          {view === 'bycategory' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by category" note={sources} groupBy="category" onRecords={() => onSection('records')} />}
+          {view === 'byrhythm' && <ObligationTable rows={rows.filter(r => r.state !== 'auto')} snap={snap} isBoard={isBoard} title="Every obligation · by how it comes round" note="Ongoing, on a date, when something happens, or one time" groupBy="rhythm" onRecords={() => onSection('records')} />}
           {view === 'filings' && <ObligationTable rows={rows.filter(r => r.kind === 'filing')} snap={snap} isBoard={isBoard} title="Filings" note="Biennial report, 1120-H, D-20 and the rest of the filing calendar · the filing runbook pre-fills each from records" />}
           {view === 'ongoing' && <ObligationTable rows={rows.filter(r => r.state === 'ongoing')} snap={snap} isBoard={isBoard} title="Ongoing" note="Per-meeting and standing duties with no single date" />}
         </>

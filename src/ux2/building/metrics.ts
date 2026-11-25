@@ -190,9 +190,32 @@ export interface ObligationRow {
   state: ObligationState;
   scope: 'governance' | 'operations';
   fiduciaryDuty: 'care' | 'loyalty' | 'obedience';
-  kind: 'obligation' | 'filing';
+  kind: 'obligation' | 'filing' | 'record';
   legalRef?: string;
   howToCount: number;
+  /** How the obligation comes round: see `Rhythm`. */
+  rhythm: Rhythm;
+  /** How often, in words ("Annual", "Per meeting", "Every 12 months"). */
+  freq: string;
+}
+
+/**
+ * How an obligation comes round. Ongoing has no single date (every meeting,
+ * every month, always). On a date comes back on the calendar (yearly, every
+ * two years). When it happens is set off by an event (a sale, a request).
+ * One time is done once and then kept.
+ */
+export type Rhythm = 'ongoing' | 'dated' | 'event' | 'once';
+export const RHYTHM_LABEL: Record<Rhythm, string> = { ongoing: 'Ongoing', dated: 'On a date', event: 'When it happens', once: 'One time' };
+export const RHYTHM_NOTE: Record<Rhythm, string> = { ongoing: 'Standing duties with no single date: every meeting, every month, always', dated: 'Come round on the calendar: each has a next date', event: 'Set off by something happening: a sale, a request, a claim', once: 'Done once, then kept on file and posted' };
+
+/** The rhythm of an obligation, from how often it is said to recur and whether it carries a date. */
+export function rhythmOf(freq: string, dated: boolean): Rhythm {
+  const f = (freq || '').toLowerCase();
+  if (/as needed|as requested|per request|within \d+|upon|on transfer|when /.test(f)) return 'event';
+  if (/one[\s-]?time|^once/.test(f)) return 'once';
+  if (dated) return 'dated';
+  return 'ongoing';
 }
 
 /** Every obligation and filing with its state, the way the Governance Calendar judges it. */
@@ -203,15 +226,44 @@ export function obligationRows(s: BuildingSnapshot): ObligationRow[] {
     const d = dated ? daysBetween(s.today, i.due) : undefined;
     const done = !!s.completions[i.id];
     const state: ObligationState = i.autoPass ? 'auto' : done ? 'met' : !dated ? 'ongoing' : d! < 0 ? 'overdue' : d! <= 30 ? 'in-progress' : 'upcoming';
-    rows.push({ id: i.id, task: i.task, role: i.role, due: i.due, dated, daysLeft: d, critical: !!i.critical, state, scope: i.scope, fiduciaryDuty: i.fiduciaryDuty, kind: 'obligation', legalRef: i.legalRef, howToCount: i.howTo?.length ?? 0 });
+    rows.push({ id: i.id, task: i.task, role: i.role, due: i.due, dated, daysLeft: d, critical: !!i.critical, state, scope: i.scope, fiduciaryDuty: i.fiduciaryDuty, kind: 'obligation', legalRef: i.legalRef, howToCount: i.howTo?.length ?? 0, rhythm: rhythmOf(i.freq, dated), freq: i.freq });
   }
   for (const f of s.filings) {
     const d = ISO_DATE.test(f.dueDate) ? daysBetween(s.today, f.dueDate) : undefined;
     const state: ObligationState = f.status === 'filed' ? 'met' : d === undefined ? 'ongoing' : d < 0 ? 'overdue' : d <= 30 ? 'in-progress' : 'upcoming';
-    rows.push({ id: f.id, task: f.name, role: f.responsible || 'President', due: f.dueDate, dated: d !== undefined, daysLeft: d, critical: true, state, scope: 'governance', fiduciaryDuty: 'obedience', kind: 'filing', legalRef: f.legalRef, howToCount: 0 });
+    rows.push({ id: f.id, task: f.name, role: f.responsible || 'President', due: f.dueDate, dated: d !== undefined, daysLeft: d, critical: true, state, scope: 'governance', fiduciaryDuty: 'obedience', kind: 'filing', legalRef: f.legalRef, howToCount: 0, rhythm: 'dated', freq: (f as { frequency?: string }).frequency ?? 'On its due date' });
   }
   const rank: Record<ObligationState, number> = { overdue: 0, 'in-progress': 1, upcoming: 2, ongoing: 3, auto: 4, met: 5 };
   return rows.sort((a, b) => rank[a.state] - rank[b.state] || (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
+}
+
+/** Who looks after each group of licences and certificates, unless the board says otherwise. */
+export const RECORD_ROLE: Record<string, string> = { 'Occupancy and licences': 'President', 'Equipment certificates': 'Vice President', Heating: 'Vice President', 'Fire and life safety': 'Vice President', Energy: 'Treasurer' };
+
+/**
+ * Licences and certificates as obligations: each one the building should hold
+ * is a duty with a role and a rhythm. One that only might apply is left out
+ * until the building records it. These are listed beside the board's other
+ * obligations but are not counted in the board checklist score.
+ */
+export function recordObligations(s: BuildingSnapshot): ObligationRow[] {
+  return recordRows(s).filter(r => r.applies === 'yes' || !!r.status.current).map(r => {
+    const c = r.kind.cycle;
+    const dated = !!r.status.due;
+    const state: ObligationState = r.needs === 'lapsed' ? 'overdue' : r.needs ? 'in-progress' : r.status.current ? (c.type === 'once' ? 'met' : dated ? 'upcoming' : 'met') : 'in-progress';
+    return {
+      id: r.kind.id, task: r.needs === 'missing' ? `${r.kind.label}: none on file` : r.needs === 'unposted' ? `${r.kind.label}: post it where it has to be shown` : c.type === 'once' ? `Hold the ${r.kind.label.toLowerCase()}` : `Keep the ${r.kind.label.toLowerCase()} current`,
+      role: RECORD_ROLE[r.kind.group] ?? 'Vice President', due: r.status.due ?? (c.type === 'once' ? 'Kept on file' : 'Not yet dated'), dated, daysLeft: r.status.daysLeft, critical: r.needs === 'lapsed' || r.needs === 'missing',
+      state, scope: 'operations', fiduciaryDuty: 'obedience', kind: 'record', legalRef: r.kind.cite, howToCount: 0,
+      rhythm: c.type === 'once' ? 'once' : 'dated', freq: c.type === 'once' ? 'Once' : c.type === 'every' ? `Every ${c.months === 12 ? 'year' : c.months === 24 ? '2 years' : `${c.months} months`}` : c.type === 'annual' ? 'Every year' : 'Until it expires',
+    };
+  });
+}
+
+/** The board's obligations and filings with the licences and certificates beside them, most pressing first. */
+export function allObligations(s: BuildingSnapshot): ObligationRow[] {
+  const rank: Record<ObligationState, number> = { overdue: 0, 'in-progress': 1, upcoming: 2, ongoing: 3, auto: 4, met: 5 };
+  return [...obligationRows(s), ...recordObligations(s)].sort((a, b) => rank[a.state] - rank[b.state] || (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
 }
 
 export function obligationsSummary(rows: ObligationRow[]) {
