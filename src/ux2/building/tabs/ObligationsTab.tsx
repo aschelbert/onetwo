@@ -15,7 +15,11 @@ import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { COMFORT_KIND, comfortFrom, comfortObligations } from '../comfort';
 import { standingOf } from '@/lib/policyRead';
 
-type View = 'month' | 'byrole' | 'bycategory' | 'byrhythm' | 'filings' | 'records' | 'ongoing' | 'duties';
+type View = 'month' | 'all' | 'filings' | 'records' | 'ongoing' | 'duties';
+/** How a list is grouped. Every list can be read by role; the same switch offers rhythm and category. */
+type Group = 'none' | 'role' | 'rhythm' | 'category';
+/** Addresses from when grouping was a tab of its own. */
+const LEGACY_GROUP: Record<string, Group> = { byrole: 'role', bycategory: 'category', byrhythm: 'rhythm' };
 const RHYTHMS: Rhythm[] = ['ongoing', 'dated', 'event', 'once'];
 const RHYTHM_TONE: Record<Rhythm, 'ghost' | 'cyan' | 'amber' | 'sage'> = { ongoing: 'ghost', dated: 'cyan', event: 'amber', once: 'sage' };
 
@@ -255,7 +259,12 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
   // Heat and hot water are ongoing checks with readings behind them; they are listed with the rest and open on Upkeep.
   const comfort = useActionRecordsStore(st => st.records.find(r => r.kind === COMFORT_KIND))?.data;
   const rows = useMemo(() => { const extra = comfortObligations(comfortFrom(comfort), snap.today); const rank: Record<ObligationState, number> = { overdue: 0, 'in-progress': 1, upcoming: 2, ongoing: 3, auto: 4, met: 5 }; return [...allObligations(snap), ...extra].sort((x, y) => rank[x.state] - rank[y.state]); }, [snap, comfort]);
-  const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'byrhythm' ? 'byrhythm' : section === 'bycategory' ? 'bycategory' : 'month';
+  const legacy = LEGACY_GROUP[section ?? ''];
+  const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'all' || legacy ? 'all' : 'month';
+  const [picked, setPicked] = useState<Group>('none');
+  const group: Group = legacy ?? picked;
+  const setGroup = (g: Group) => { setPicked(g); if (legacy) onSection('all'); };
+  const groupBy = group === 'none' ? undefined : group;
   const month = snap.today.slice(0, 7);
   const monthName = new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'long' });
   const thisMonth = rows.filter(r => r.state === 'overdue' || r.state === 'in-progress' || (r.dated && r.due.startsWith(month)));
@@ -266,7 +275,11 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
 
   return (
     <div className="flex flex-col gap-4">
-      <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'byrole', label: 'By role' }, { id: 'bycategory', label: 'By category' }, { id: 'byrhythm', label: 'Ongoing or dated' }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'records', label: 'Licences and certificates' }, { id: 'ongoing', label: `Ongoing · ${rows.filter(r => r.state === 'ongoing').length}` }, { id: 'duties', label: 'Duties and roles' }]} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PillTabs size="filter" aria-label="Obligation views" value={view} onChange={v => onSection(v === 'month' ? 'list' : v)} tabs={[{ id: 'month', label: 'This month' }, { id: 'all', label: `Everything open · ${open.length}` }, { id: 'filings', label: `Filings · ${snap.filings.length}` }, { id: 'records', label: 'Licences and certificates' }, { id: 'ongoing', label: `Ongoing · ${rows.filter(r => r.state === 'ongoing').length}` }, { id: 'duties', label: 'Duties and roles' }]} />
+        {view !== 'duties' && <label className="flex items-center gap-2 text-xs font-semibold text-ux2-muted">Group <select aria-label="Group the list" value={group} onChange={e => setGroup(e.target.value as Group)} className="h-9 rounded-full border border-ux2-line-strong bg-white px-3 text-sm font-normal text-ux2-ink"><option value="none">Not grouped</option><option value="role">By role</option><option value="rhythm">By ongoing or dated</option><option value="category">By category</option></select></label>}
+      </div>
+      {view === 'records' && groupBy && <ObligationTable rows={rows.filter(r => r.kind === 'record')} snap={snap} isBoard={isBoard} title="Licences, certificates and checks" note="Each with the officer who looks after it" groupBy={groupBy} onRecords={() => setGroup('none')} />}
       {view === 'records' && <RecordsSection snap={snap} isBoard={isBoard} onEditDetails={() => navigate('/building?tab=overview&section=details')} />}
       {view !== 'duties' && view !== 'records' && (
         <>
@@ -288,12 +301,10 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
               );
             })}
           </div>
-          {view === 'month' && <ObligationTable rows={thisMonth.length ? thisMonth : open.slice(0, 12)} snap={snap} isBoard={isBoard} title={monthName} note={sources} onRecords={() => onSection('records')} />}
-          {view === 'byrole' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by role" note={sources} groupBy="role" onRecords={() => onSection('records')} />}
-          {view === 'bycategory' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Open · by category" note={sources} groupBy="category" onRecords={() => onSection('records')} />}
-          {view === 'byrhythm' && <ObligationTable rows={rows.filter(r => r.state !== 'auto')} snap={snap} isBoard={isBoard} title="Every obligation · by how it comes round" note="Ongoing, on a date, when something happens, or one time" groupBy="rhythm" onRecords={() => onSection('records')} />}
-          {view === 'filings' && <ObligationTable rows={rows.filter(r => r.kind === 'filing')} snap={snap} isBoard={isBoard} title="Filings" note="Biennial report, 1120-H, D-20 and the rest of the filing calendar · the filing runbook pre-fills each from records" />}
-          {view === 'ongoing' && <ObligationTable rows={rows.filter(r => r.state === 'ongoing')} snap={snap} isBoard={isBoard} title="Ongoing" note="Per-meeting and standing duties with no single date" />}
+          {view === 'month' && <ObligationTable rows={thisMonth.length ? thisMonth : open.slice(0, 12)} snap={snap} isBoard={isBoard} title={monthName} note={sources} groupBy={groupBy} onRecords={() => onSection('records')} />}
+          {view === 'all' && <ObligationTable rows={open} snap={snap} isBoard={isBoard} title="Everything open" note={sources} groupBy={groupBy} onRecords={() => onSection('records')} />}
+          {view === 'filings' && <ObligationTable rows={rows.filter(r => r.kind === 'filing')} snap={snap} isBoard={isBoard} title="Filings" note="Biennial report, 1120-H, D-20 and the rest of the filing calendar · the filing runbook pre-fills each from records" groupBy={groupBy} />}
+          {view === 'ongoing' && <ObligationTable rows={rows.filter(r => r.state === 'ongoing')} snap={snap} isBoard={isBoard} title="Ongoing" note="Per-meeting and standing duties with no single date" groupBy={groupBy} onRecords={() => onSection('records')} />}
         </>
       )}
       {view === 'duties' && <Duties rows={rows} snap={snap} />}

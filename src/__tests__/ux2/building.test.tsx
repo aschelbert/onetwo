@@ -308,4 +308,31 @@ describe('Building', () => {
     expect(document.querySelector('[aria-label="Maintenance schedule"]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Open Upkeep' })).toBeTruthy();
   });
+
+  it('Obligations has no by-role tab: every list can be grouped by role, rhythm or category', () => {
+    renderAt('/building?tab=obligations');
+    const views = screen.getByRole('navigation', { name: 'Obligation views' });
+    const labels = within(views).getAllByRole('button').map(b => b.textContent?.replace(/ · \d+$/, '').trim());
+    expect(labels).toEqual(['This month', 'Everything open', 'Filings', 'Licences and certificates', 'Ongoing', 'Duties and roles']);
+    const group = screen.getByLabelText('Group the list') as HTMLSelectElement;
+    expect(group.value).toBe('none');
+    expect(document.querySelectorAll('[data-group]').length).toBe(0);
+    fireEvent.change(group, { target: { value: 'role' } });
+    const byRole = [...document.querySelectorAll('[data-group]')].map(g => g.getAttribute('data-group'));
+    expect(byRole.length).toBeGreaterThan(0);
+    expect(byRole.every(g => /President|Treasurer|Secretary|Member|Board|Manager/.test(g ?? ''))).toBe(true);
+    // The grouping stays as the view changes, and works on every list.
+    fireEvent.click(within(views).getByRole('button', { name: /^Everything open/ }));
+    expect((screen.getByLabelText('Group the list') as HTMLSelectElement).value).toBe('role');
+    fireEvent.change(screen.getByLabelText('Group the list'), { target: { value: 'rhythm' } });
+    const rhythms = [...document.querySelectorAll('[data-group]')].map(g => g.getAttribute('data-group'));
+    expect(rhythms.every(g => ['Ongoing', 'On a date', 'When it happens', 'One time'].includes(g ?? ''))).toBe(true);
+    // Duties and roles is already by role, so it has no switch.
+    fireEvent.click(within(views).getByRole('button', { name: 'Duties and roles' }));
+    expect(screen.queryByLabelText('Group the list')).toBeNull();
+    // An old by-role address still lands on the list, grouped by role.
+    cleanup();
+    renderAt('/building?tab=obligations&section=byrole');
+    expect((screen.getByLabelText('Group the list') as HTMLSelectElement).value).toBe('role');
+  });
 });
