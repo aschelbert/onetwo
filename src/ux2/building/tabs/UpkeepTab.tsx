@@ -17,6 +17,7 @@ import { nextStudy } from '../../boardroom/reserveStudy';
 import { startConditionSurvey, startStormCheck } from '../../boardroom/upkeep';
 import { UPKEEP_KIND } from '../maintenanceActions';
 import MaintenanceCard from './MaintenanceCard';
+import ComfortCard from './ComfortCard';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MARK: Record<MarkState, string> = {
@@ -99,6 +100,8 @@ export default function UpkeepTab({ today, isBoard }: { today: string; isBoard: 
         )}
         <Why>Each mark is one visit made or one date still to come, in its month; hold the pointer over a mark for the task and the date. A system with a task but no mark all year is one nobody is looking at. Cost is what was entered when each task was marked done. Visits recorded before this page existed are in the property log, not here.</Why>
       </Card>
+
+      <ComfortCard today={today} isBoard={isBoard} />
 
       <MaintenanceCard today={today} isBoard={isBoard} />
 

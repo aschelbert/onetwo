@@ -11,6 +11,8 @@ import { dayLabel } from '../../home/calendar';
 import RecordsSection from './RecordsSection';
 import { RHYTHM_LABEL, RHYTHM_NOTE, allObligations, dutyCounts, obligationRows, obligationsSummary, roleLoads, type ObligationRow, type ObligationState, type BuildingSnapshot, type Rhythm } from '../metrics';
 import { recordKind } from '@/lib/buildingRecords';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
+import { COMFORT_KIND, comfortFrom, comfortObligations } from '../comfort';
 import { standingOf } from '@/lib/policyRead';
 
 type View = 'month' | 'byrole' | 'bycategory' | 'byrhythm' | 'filings' | 'records' | 'ongoing' | 'duties';
@@ -32,6 +34,7 @@ function howItGetsDone(r: ObligationRow): string {
   if (r.state === 'auto') return 'Verified by the document on file';
   if (r.state === 'met') return 'Done';
   if (r.kind === 'filing') return 'Filing runbook · mark filed with proof';
+  if (r.id.startsWith('comfort-')) return 'A reading, logged under Upkeep';
   if (r.kind === 'record') return 'Recorded under Licences and certificates';
   return r.howToCount ? `${r.howToCount} step${r.howToCount === 1 ? '' : 's'} · each a Home card when due` : 'On the obligations list';
 }
@@ -76,14 +79,14 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy, onRecords 
                   return (
                     <Fragment key={key}>
                       <tr data-obligation={r.id} data-rhythm={r.rhythm} onClick={() => setOpen(open === key ? null : key)} className={cn('cursor-pointer hover:bg-ux2-surface', r.state === 'overdue' && 'bg-ux2-red-tint/40')}>
-                        <Td><Cell title={r.task} note={`${r.kind === 'record' ? 'licence or certificate' : `${r.id} · ${r.kind === 'filing' ? 'filing' : r.scope}`}${r.critical ? ' · critical' : ''}${r.legalRef ? ` · ${r.legalRef}` : ''}`} /></Td>
+                        <Td><Cell title={r.task} note={`${r.id.startsWith('comfort-') ? 'a check with readings' : r.kind === 'record' ? 'licence or certificate' : `${r.id} · ${r.kind === 'filing' ? 'filing' : r.scope}`}${r.critical ? ' · critical' : ''}${r.legalRef ? ` · ${r.legalRef}` : ''}`} /></Td>
                         <Td className="whitespace-nowrap">{r.role}</Td>
                         <Td className="whitespace-nowrap"><Chip tone={RHYTHM_TONE[r.rhythm]}>{RHYTHM_LABEL[r.rhythm]}</Chip>{r.freq && r.freq.toLowerCase() !== RHYTHM_LABEL[r.rhythm].toLowerCase() && <span className="block text-xs text-ux2-muted">{r.freq}</span>}</Td>
                         <Td className="whitespace-nowrap text-ux2-muted">{r.dated ? dayLabel(r.due) : r.due}</Td>
                         <Td className="text-ux2-muted">{howItGetsDone(r)}</Td>
                         <Td><Chip tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}{r.state === 'overdue' && r.daysLeft !== undefined ? ` · ${Math.abs(r.daysLeft)}d` : ''}</Chip></Td>
                         <Td num onClick={e => e.stopPropagation()}>
-                          {r.kind === 'record' && onRecords && <Button size="sm" variant="ghost" onClick={onRecords}>Open</Button>}
+                          {r.kind === 'record' && onRecords && <Button size="sm" variant="ghost" onClick={() => (r.id.startsWith('comfort-') ? navigate('/building?tab=upkeep') : onRecords())}>Open</Button>}
                           {isBoard && r.kind !== 'record' && r.state !== 'met' && r.state !== 'auto' && (() => {
                             // Start walks through the steps as a case; once one is open, Continue picks it up.
                             const c = obligationCase(cases, r.kind === 'filing' ? 'filing' : 'obligation', r.id);
@@ -108,7 +111,7 @@ function ObligationTable({ rows, snap, isBoard, title, note, groupBy, onRecords 
                               <div><div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ux2-muted">How to</div><ol className="m-0 mt-1 list-decimal pl-4 text-ux2-ink">{item.howTo.map((h, i) => <li key={i}>{h}</li>)}</ol>{item.tip && <p className="m-0 mt-1 text-xs text-ux2-muted">{item.tip}</p>}</div>
                             </Inner>
                           )}
-                          {open === key && r.kind === 'record' && <Inner className="text-sm text-ux2-ink">{recordKind(r.id)?.what}{recordKind(r.id)?.appliesNote ? <span className="mt-1 block text-xs text-ux2-muted">{recordKind(r.id)!.appliesNote}</span> : null}</Inner>}
+                          {open === key && r.kind === 'record' && <Inner className="text-sm text-ux2-ink">{r.id.startsWith('comfort-') ? 'A reading is logged under Building › Upkeep. One under the minimum opens a repair.' : recordKind(r.id)?.what}{recordKind(r.id)?.appliesNote ? <span className="mt-1 block text-xs text-ux2-muted">{recordKind(r.id)!.appliesNote}</span> : null}</Inner>}
                           {open === key && !item && r.kind === 'filing' && <Inner className="text-sm text-ux2-muted">{snap.filings.find(f => f.id === r.id)?.notes || 'A filing on the calendar; mark it filed with the confirmation number as proof.'}</Inner>}
                         </td></tr>
                       )}
@@ -249,7 +252,9 @@ export default function ObligationsTab({ snap, section, onSection, isBoard }: { 
   const navigate = useNavigate();
   // The score counts the board's obligations and filings; the tables also list the licences and certificates.
   const sum = useMemo(() => obligationsSummary(obligationRows(snap)), [snap]);
-  const rows = useMemo(() => allObligations(snap), [snap]);
+  // Heat and hot water are ongoing checks with readings behind them; they are listed with the rest and open on Upkeep.
+  const comfort = useActionRecordsStore(st => st.records.find(r => r.kind === COMFORT_KIND))?.data;
+  const rows = useMemo(() => { const extra = comfortObligations(comfortFrom(comfort), snap.today); const rank: Record<ObligationState, number> = { overdue: 0, 'in-progress': 1, upcoming: 2, ongoing: 3, auto: 4, met: 5 }; return [...allObligations(snap), ...extra].sort((x, y) => rank[x.state] - rank[y.state]); }, [snap, comfort]);
   const view: View = section === 'records' ? 'records' : section === 'duties' ? 'duties' : section === 'filings' ? 'filings' : section === 'ongoing' ? 'ongoing' : section === 'byrole' ? 'byrole' : section === 'byrhythm' ? 'byrhythm' : section === 'bycategory' ? 'bycategory' : 'month';
   const month = snap.today.slice(0, 7);
   const monthName = new Date(snap.today + 'T00:00').toLocaleDateString('en-US', { month: 'long' });
