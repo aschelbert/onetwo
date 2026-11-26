@@ -10,6 +10,7 @@ import { UTILITY_SPIKE_PANELS } from './UtilitySpikePanels';
 import { BENCHMARKING_PANELS } from './BenchmarkingPanels';
 import { RESERVE_REVIEW_PANELS } from './ReserveReviewPanels';
 import { GOALS_PANELS } from './GoalsPanels';
+import { ACCOMMODATION_PANELS } from './AccommodationPanels';
 
 /** The work for each step of each record-backed action, by kind and step key. */
 export const PANELS: Record<string, Record<string, Panel>> = {
@@ -24,4 +25,5 @@ export const PANELS: Record<string, Record<string, Panel>> = {
   benchmarking: BENCHMARKING_PANELS,
   'reserve-review': RESERVE_REVIEW_PANELS,
   goals: GOALS_PANELS,
+  accommodation: ACCOMMODATION_PANELS,
 };

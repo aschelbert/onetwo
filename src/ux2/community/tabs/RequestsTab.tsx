@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { askForAccommodation } from '../../boardroom/accommodation';
+import { useActionRecordsStore } from '@/store/useActionRecordsStore';
+import { ASK_KIND, DECISION_LABEL, STAGE_LABEL, type AccommodationAsk } from '@/lib/actions/accommodation';
 import { useNavigate } from 'react-router-dom';
 import { useIssuesStore } from '@/store/useIssuesStore';
 import type { Issue } from '@/types/issues';
@@ -9,7 +12,8 @@ import { generateLocalId } from '@/lib/generateId';
 import { dayLabel } from '../../home/calendar';
 import { requestRows, requestsSummary, type RequestRow, type CommunitySnapshot } from '../metrics';
 
-const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'See the association records', 'Something else'];
+const ACCESS = 'Accommodation or accessibility';
+const CATEGORIES = ['Repair', 'Noise or neighbour', 'Parking', 'Amenity', 'Document or certificate', 'See the association records', ACCESS, 'Something else'];
 const longDay = (iso: string) => { const d = new Date(iso.slice(0, 10) + 'T00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
 
 /** The owner's request form: the same `addIssue` call the Community Room makes. */
@@ -23,9 +27,17 @@ function MakeRequest({ snap, onDone }: { snap: CommunitySnapshot; onDone: () => 
   const [note, setNote] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [accessKind, setAccessKind] = useState<'accommodation' | 'modification'>('accommodation');
+  const [behalf, setBehalf] = useState('');
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) { setNote('Say what is going on in a line.'); return; }
+    // A request for an accommodation never becomes an ordinary request: it goes to the board privately, with no photo, vote or comment thread.
+    if (category === ACCESS) {
+      askForAccommodation({ what: [title.trim(), description.trim()].filter(Boolean).join('. '), kind: accessKind, unit: snap.viewer.linkedUnits[0] ?? '', onBehalfOf: behalf });
+      setTitle(''); setDescription(''); setBehalf(''); setNote('Sent to the board privately. It is not shown to other owners, and you can follow it under "Your accommodation requests" below.');
+      return;
+    }
     setSending(true);
     const up = files.length ? await uploadPhotos(`requests/${generateLocalId('req')}`, files, snap.viewer.name) : { photos: [], skipped: [] };
     setSending(false);
@@ -45,7 +57,16 @@ function MakeRequest({ snap, onDone }: { snap: CommunitySnapshot; onDone: () => 
           <Field label="Category"><select value={category} onChange={e => setCategory(e.target.value)} className={INPUT}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
           <Field label="Unit"><select value={scope} onChange={e => setScope(e.target.value as 'unit' | 'common')} className={INPUT}>{snap.viewer.linkedUnits[0] && <option value="unit">{snap.viewer.linkedUnits[0]} · {snap.viewer.name}</option>}<option value="common">Common area</option></select></Field>
         </div>
-        <Field label="What is going on"><input aria-label="What is going on" value={title} onChange={e => setTitle(e.target.value)} placeholder="Say where it is, when it started and what you have noticed" className={INPUT} /></Field>
+        {category === ACCESS && (
+          <Inner className="flex flex-col gap-2" aria-label="An accommodation request">
+            <span className="text-sm text-ux2-ink"><b className="font-semibold">This goes to the board privately.</b> You do not have to explain your condition, and there is no form: say what you need changed. You can also ask by email, by letter or in person.</span>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="What kind of change"><select aria-label="What kind of change" value={accessKind} onChange={e => setAccessKind(e.target.value as 'accommodation' | 'modification')} className={INPUT}><option value="accommodation">A change to a rule or service</option><option value="modification">A physical change to the unit or building</option></select></Field>
+              <Field label="Asking for someone else? Their name (optional)"><input value={behalf} onChange={e => setBehalf(e.target.value)} className={INPUT} /></Field>
+            </div>
+          </Inner>
+        )}
+        <Field label={category === ACCESS ? 'What you need changed' : 'What is going on'}><input aria-label="What is going on" value={title} onChange={e => setTitle(e.target.value)} placeholder="Say where it is, when it started and what you have noticed" className={INPUT} /></Field>
         <textarea aria-label="Details" value={description} onChange={e => setDescription(e.target.value)} placeholder="Details, when it started, what you tried" rows={3} className="w-full rounded-[10px] border border-ux2-line-strong px-3 py-2 text-sm" />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-1 text-xs font-semibold text-ux2-muted">Photo
@@ -110,6 +131,25 @@ function MyRequest({ r, snap, highlight }: { r: RequestRow; snap: CommunitySnaps
   );
 }
 
+/** The accommodation requests this person made in the app, with where each stands. Shown to them alone. */
+function MyAccommodations({ snap }: { snap: CommunitySnapshot }) {
+  const records = useActionRecordsStore(s => s.records);
+  const mine = records.filter(r => r.kind === ASK_KIND && (r.data as unknown as AccommodationAsk).byUser === snap.viewer.id).sort((a, b) => b.openedOn.localeCompare(a.openedOn));
+  if (!mine.length) return null;
+  return (
+    <Card aria-label="Your accommodation requests" className="gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Your accommodation requests</SectionLabel><Chip tone="plum">Private · only you and the board</Chip></div>
+      {mine.map(r => { const a = r.data as unknown as AccommodationAsk; return (
+        <Inner key={r.id} data-ask={r.id} data-stage={a.stage} className="flex flex-wrap items-center justify-between gap-3">
+          <Cell title={a.what} note={`Asked ${a.askedOn}${a.onBehalfOf ? ` for ${a.onBehalfOf}` : ''}${a.decision ? ` · ${DECISION_LABEL[a.decision]}${a.decidedOn ? ` on ${a.decidedOn}` : ''}${a.conditions ? ` · ${a.conditions}` : ''}` : ''}`} />
+          <Chip tone={a.stage === 'more-needed' ? 'amber' : a.decision === 'deny' ? 'red' : a.stage === 'decided' || a.stage === 'in-place' ? 'sage' : 'navy'}>{STAGE_LABEL[a.stage]}</Chip>
+        </Inner>
+      ); })}
+      <Why>The board decides these quickly and tells you in writing. If the board asks you for something, it will be a letter showing the change is needed, never your medical records.</Why>
+    </Card>
+  );
+}
+
 export default function RequestsTab({ snap, highlightId }: { snap: CommunitySnapshot; highlightId: string | null }) {
   const navigate = useNavigate();
   const upvote = useIssuesStore(s => s.upvoteIssue);
@@ -125,6 +165,8 @@ export default function RequestsTab({ snap, highlightId }: { snap: CommunitySnap
   return (
     <div className="flex flex-col gap-4">
       <HeaderActions><Button onClick={() => { setComposing(true); document.getElementById('make-request')?.scrollIntoView({ behavior: 'smooth' }); }}>Make a request</Button></HeaderActions>
+
+      <MyAccommodations snap={snap} />
 
       <Card aria-label="Your requests" className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Your requests · {mineOpen.length} open</SectionLabel>{isBoard && <button type="button" onClick={() => navigate('/boardroom?tab=inbox')} className="text-xs font-semibold text-ux2-teal hover:underline">Board replies happen in Board Room › Inbox</button>}</div>

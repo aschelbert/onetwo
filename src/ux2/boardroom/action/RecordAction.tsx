@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/store/useAuthStore';
+import { ACCOMMODATION_SETTINGS, mayHandle, settingsFrom } from '../accommodation';
 import type { ReactElement } from 'react';
 import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { actionKind, stepsOf, type ActionRecord, type ActionStep } from '@/lib/actions';
@@ -23,8 +25,14 @@ export default function RecordAction({ recordId, caseId, onBack, onOpenRecord }:
   const patchRecord = useActionRecordsStore(s => s.patch);
   const saveError = useActionRecordsStore(s => s.saveError);
   const def = record ? actionKind(record.kind) : undefined;
+  const role = useAuthStore(s => s.currentUser.role);
+  const settings = useActionRecordsStore(s => s.records.find(r => r.kind === ACCOMMODATION_SETTINGS))?.data;
   if (!record || !def) {
-    return <div className="flex flex-col gap-4"><button type="button" onClick={onBack} className="self-start text-sm font-semibold text-ux2-teal hover:underline">← Current Actions</button><Card><Inner className="text-sm text-ux2-muted">This action's record is no longer on file.</Inner></Card></div>;
+    return <div className="flex flex-col gap-4"><button type="button" onClick={onBack} className="self-start text-sm font-semibold text-ux2-teal hover:underline">← Current Actions</button><Card><Inner className="text-sm text-ux2-muted">This action's record is not available to you: it is private to the board, or it is no longer on file.</Inner></Card></div>;
+  }
+  // An accommodation request is private: without the right to see it, not even its steps are shown.
+  if (record.kind === 'accommodation' && !mayHandle(role, settingsFrom(settings))) {
+    return <div className="flex flex-col gap-4" data-accommodation-private><button type="button" onClick={onBack} className="self-start text-sm font-semibold text-ux2-teal hover:underline">← Current Actions</button><Card><Inner className="text-sm text-ux2-ink"><b className="font-semibold">This request is private to the board.</b> A board member can let the manager see these from the action itself.</Inner></Card></div>;
   }
   const panels = PANELS[record.kind] ?? {};
   return (
