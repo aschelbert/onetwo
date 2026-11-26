@@ -10,6 +10,10 @@ import IssuesPage from '@/features/issues/IssuesPage';
 import { useAuthStore } from '@/store/useAuthStore';
 import BuildingModule, { MOVED_TABS, resolveBuildingTab } from '../building/BuildingModule';
 import BoardRoomModule from '../boardroom/BoardRoomModule';
+import RecordsModule from '../records/RecordsModule';
+import { recordsPath } from '../records/paths';
+
+export { RecordsModule };
 
 /** Redirect to `to`, keeping the query string (so `?view=case:…` and `?tab=…` survive). */
 export function RedirectKeepQuery({ to }: { to: string }) {
@@ -21,7 +25,11 @@ export function RedirectKeepQuery({ to }: { to: string }) {
 export function BuildingRoute() {
   const [params] = useSearchParams();
   const moved = MOVED_TABS[params.get('tab') ?? ''];
-  return moved ? <Navigate to={moved} replace /> : <BuildingModule />;
+  if (moved) return <Navigate to={moved} replace />;
+  // Documents and the Archive live in Records; their old Building addresses follow them.
+  const { tab, section } = resolveBuildingTab(params.get('tab'));
+  if (tab === 'documents' || tab === 'archive') return <Navigate to={recordsPath(tab, params.get('section') ?? section)} replace />;
+  return <BuildingModule />;
 }
 
 /** The Archives and Association Team pages live under Building now, except the Association Team tabs that moved on (`MOVED_TABS`). */
@@ -30,6 +38,7 @@ export function BuildingRedirect({ defaultTab }: { defaultTab: string }) {
   const raw = params.get('tab') ?? defaultTab;
   if (MOVED_TABS[raw]) return <Navigate to={MOVED_TABS[raw]} replace />;
   const { tab, section } = resolveBuildingTab(raw);
+  if (tab === 'documents' || tab === 'archive') return <Navigate to={recordsPath(tab, section)} replace />;
   const q = new URLSearchParams();
   if (tab !== 'overview') q.set('tab', tab);
   if (section) q.set('section', section);

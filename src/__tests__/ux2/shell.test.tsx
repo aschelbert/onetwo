@@ -41,11 +41,11 @@ describe('Ux2Shell', () => {
     localStorage.clear();
   });
 
-  it('renders the shell with the five modules', () => {
+  it('renders the shell with the six modules', () => {
     renderAt('/dashboard');
     const nav = screen.getAllByRole('navigation', { name: 'Primary' })[0];
     const labels = Array.from(nav.querySelectorAll('button')).map(b => b.textContent);
-    expect(labels).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room']);
+    expect(labels).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room', 'Records']);
     expect(screen.getByText('dash')).toBeTruthy();
   });
 
@@ -55,7 +55,8 @@ describe('Ux2Shell', () => {
     const items = screen.getAllByRole('menuitem').map(m => m.textContent);
     expect(items.slice(0, 5)).toEqual(['My Account', 'My Unit', 'User Management', 'Subscription', 'Help & Support']);
     expect(items.join(' ')).toContain('Association Team');
-    expect(items.join(' ')).toContain('The Archives');
+    // The Archives is the Records module now, so it is no longer an extra.
+    expect(items.join(' ')).not.toContain('The Archives');
     expect(items[items.length - 1]).toContain('Sign out');
   });
 });

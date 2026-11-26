@@ -29,11 +29,11 @@ function Months({ r }: PanelProps<BenchmarkingData>) {
   const doc = utilitiesFrom(useActionRecordsStore(s => s.records.find(x => x.kind === 'utilities'))?.data);
   return (
     <>
-      {doc.meters.length === 0 ? <p className={NOTE}>No meters are entered yet. Add each meter the association pays for under Building › Utilities.</p> : (
+      {doc.meters.length === 0 ? <p className={NOTE}>No meters are entered yet. Add each meter the association pays for under Building › Care › Utilities.</p> : (
         <Inner className="flex flex-col gap-1.5">{doc.meters.map(m => { const miss = missingMonths(doc, m.id, r.data.year); return <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink"><span><b className="font-semibold">{m.name}</b>{miss.length > 0 && <span className="block text-xs text-ux2-muted">Missing {miss.map(x => monthLabel(x).slice(0, 3)).join(', ')}</span>}</span><Chip tone={miss.length ? 'amber' : 'sage'}>{12 - miss.length} of 12</Chip></div>; })}</Inner>
       )}
-      <div><Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=utilities')}>Enter the missing bills</Button></div>
-      <Why>Nothing is typed twice: bills are entered through the year under Building › Utilities. The District asks for whole-building data, so units on their own meters need the utility's aggregated figures, requested from the utility.</Why>
+      <div><Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=care&section=utilities')}>Enter the missing bills</Button></div>
+      <Why>Nothing is typed twice: bills are entered through the year under Building › Care › Utilities. The District asks for whole-building data, so units on their own meters need the utility's aggregated figures, requested from the utility.</Why>
     </>
   );
 }

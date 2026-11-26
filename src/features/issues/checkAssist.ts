@@ -71,14 +71,14 @@ export const ROUTES = {
   workorders: '/funds?tab=expenses&section=workorders',
   statements: '/funds?tab=statements',
   fees: '/funds?tab=settings&section=fees',
-  documents: '/building?tab=documents',
+  documents: '/records?tab=documents',
   insurance: '/building?tab=overview&section=insurance',
   assets: '/building?tab=overview&section=assets',
   obligations: '/building?tab=obligations',
   filings: '/building?tab=obligations&section=filings',
   contracts: '/building?tab=contracts',
   directory: '/building?tab=directory',
-  archive: '/building?tab=archive',
+  archive: '/records?tab=archive',
   meetings: '/community?tab=meetings',
   votes: '/community?tab=votes',
   notices: '/community?tab=notices',
@@ -189,7 +189,7 @@ const RULES: Rule[] = [
     assists: [P.vendors, tool('upload-doc', 'Attach the certificate')] },
   { name: 'disb', re: /disb|insurance commissioner|bad faith/i, assists: [P.insurance, ext(EXT.disb, 'DC Insurance (DISB)')] },
   { name: 'insurance', re: /insur|carrier|policy (language|provision)|policy (number|limit)|coverage|deductible|adjuster|claim|ho-?6|d&o|\bgl\b|umbrella|fidelity|bond(ing| claim)?\b|certificate of insurance|\bcoi\b|subrogat|loss (detail|notice|report)|proof of loss/i,
-    assists: [P.insurance, route(ROUTES.insurance, 'Open Building › Insurance')] },
+    assists: [P.insurance, route(ROUTES.insurance, 'Open Building › Overview › Insurance')] },
 
   // ── Votes, meetings, minutes ─────────────────────────────────────────────
   { name: 'owner-vote', re: /owner vote|ballot|owners? (approval|ratification|consent)|ratif|proxy|proxies|election|candidate|nominat|tally|recount|inspector of election|vote count|percentage of owners|2\/3|two[- ]thirds|majority of owners|written consent/i,
@@ -213,9 +213,9 @@ const RULES: Rule[] = [
     assists: [P.documents, ext(EXT.dcCode, 'DC Code')] },
   { name: 'contract-terms', re: /contract (provision|term|clause|language)|indemnif|termination provision/i, assists: c => VENDOR_SITS.includes(c.sitId) ? [P.vendors, P.contracts] : [P.documents, T.send] },
   { name: 'governing', re: /\bcite\b|citing|bylaw|cc&r|ccr|declaration|governing doc|rules?\b|polic(y|ies)|provision|article|amend|covenant|architectural (standard|guideline|review)|guideline|standards?\b|authority|rulemaking|restriction|use restriction|appeal (body|right|process)|due process|procedure/i,
-    assists: c => c.sitId === 'annual-budgeting' || /cap|limit/i.test(c.step) ? [P.bylaws, P.documents] : [P.documents, route(ROUTES.documents, 'Open Building › Documents')] },
+    assists: c => c.sitId === 'annual-budgeting' || /cap|limit/i.test(c.step) ? [P.bylaws, P.documents] : [P.documents, route(ROUTES.documents, 'Open Records › Documents')] },
   { name: 'records', re: /records? request|request(ed)? records|archive|prior (board )?(resolution|decision|case|instance|violation)|history|precedent|previous (instance|violation|decision)/i,
-    assists: [route(ROUTES.archive, 'Open Building › Archive'), P.documents] },
+    assists: [route(ROUTES.archive, 'Open Records › Archive'), P.documents] },
 
   // ── Vendors, bids, work ──────────────────────────────────────────────────
   { name: 'vendor', re: /vendor|contractor|w-?9|bids?\b|proposal|quote|estimate|contract|scope of work|reference|licen[cs]e|warranty|lien waiver|punch list|change order|retainage|termination|performance|milestone|engineer|architect|consultant|professional|specialist|inspector\b|exterminator|plumber|electrician|roofer|abatement|mitigation company|restoration company/i,
@@ -262,15 +262,15 @@ const PANEL_HOME: Record<PanelId, { path: string; label: string }> = {
   'budget-lines': { path: ROUTES.budget, label: 'Open Funds › Planning' },
   'reserve-study': { path: ROUTES.reserves, label: 'Open Funds › Planning › Reserves' },
   'contract-renewals': { path: ROUTES.contracts, label: 'Open Building › Contracts' },
-  'bylaws-review': { path: ROUTES.documents, label: 'Open Building › Documents' },
+  'bylaws-review': { path: ROUTES.documents, label: 'Open Records › Documents' },
   financials: { path: ROUTES.statements, label: 'Open Funds › Statements & taxes' },
   'unit-ledger': { path: ROUTES.ledger, label: 'Open Funds › Income' },
   delinquency: { path: ROUTES.behind, label: 'Open Funds › Income › Behind' },
   fees: { path: ROUTES.fees, label: 'Open the fee schedule' },
   units: { path: ROUTES.ledger, label: 'Open Funds › Income › Units' },
-  insurance: { path: ROUTES.insurance, label: 'Open Building › Insurance' },
+  insurance: { path: ROUTES.insurance, label: 'Open Building › Overview › Insurance' },
   vendors: { path: ROUTES.contracts, label: 'Open Building › Contracts' },
-  documents: { path: ROUTES.documents, label: 'Open Building › Documents' },
+  documents: { path: ROUTES.documents, label: 'Open Records › Documents' },
   owner: { path: ROUTES.directory, label: 'Open Building › Directory' },
   board: { path: ROUTES.directory, label: 'Open Building › Directory' },
   counsel: { path: ROUTES.directory, label: 'Open Building › Directory' },
@@ -285,7 +285,7 @@ const MAX_ASSISTS = 4;
 
 /**
  * What every item gets on top of its rule:
- *  - a page it names ("under Building › Documents") is where it goes first;
+ *  - a page it names ("under Records › Documents") is where it goes first;
  *  - information shown in place can also be opened where it lives, so the
  *    action dock follows and brings you back to this item;
  *  - an item that asks for something to be written gets a place to write it.

@@ -2,7 +2,7 @@
  * Building setup, writing: an accepted item goes into the building's own
  * records through the stores' existing actions (which also save to the
  * database), so nothing about setup is a separate copy. Also files each
- * read document in Building › Documents and fills the gaps step's answers.
+ * read document in Records › Documents and fills the gaps step's answers.
  */
 import { useBuildingStore } from '@/store/useBuildingStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
@@ -100,7 +100,7 @@ export function applyItem(item: Item, picks?: Record<string, number>, edits?: Re
       const p = { type: item.label, carrier: text(v.carrier), coverage: text(v.coverage), premium: num(v.premium) !== null ? `$${num(v.premium)!.toLocaleString('en-US')}` : '', expires: text(v.expires), policyNum: text(v.policyNumber) };
       const existing = b.insurance.find(x => x.type.trim().toLowerCase() === item.label.trim().toLowerCase());
       if (existing) b.updateInsurance(existing.id, p); else b.addInsurance(p);
-      return 'Building › Documents · insurance';
+      return 'Records › Documents · insurance';
     }
     case 'vendors': {
       const vd = { name: item.label, service: text(v.service), contact: text(v.contact), phone: text(v.phone), email: text(v.email), contract: text(v.contractEnds), status: 'active' as const };
@@ -183,7 +183,7 @@ const fileOf = (doc: SetupDoc) => ({ name: doc.name, size: sizeOf(doc), type: do
 export const coversOf = (doc: SetupDoc, type: DocType = doc.docType ?? 'other') => (doc.covers?.length ? doc.covers : [setupDocName(doc, type)]);
 
 /**
- * File a document in Building › Documents under its catalogue name (or the
+ * File a document in Records › Documents under its catalogue name (or the
  * documents the person said it is). A building that already has that
  * document gets this file as its current version, the old one kept as an
  * earlier version; a past version is added as history. Adding the same file
@@ -212,7 +212,7 @@ export function retypeSetupDocument(doc: SetupDoc, type: DocType, from: DocType 
   return placeSetupDocument(doc, covers);
 }
 
-/** Take a removed setup document's file back out of Building › Documents (what it replaced becomes current again). */
+/** Take a removed setup document's file back out of Records › Documents (what it replaced becomes current again). */
 export function unfileSetupDocument(doc: SetupDoc) {
   unplaceFile({ fileId: doc.id, name: doc.name });
 }

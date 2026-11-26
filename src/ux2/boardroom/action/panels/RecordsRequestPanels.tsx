@@ -80,7 +80,7 @@ function Send({ r, patch, step }: PanelProps<RecordsRequestData>) {
         <Button size="sm" disabled={!!step.waitsOn || !on} onClick={() => patch({ how, sentOn: on, withheldNote: held.length ? note.trim() : '' })}>Record the reply</Button>
       </div>
       {r.dueOn && <p className={NOTE}>Reply due {r.dueOn}.</p>}
-      <Why>The documents themselves are sent from Building › Documents or by email; this records what went, when, and what the owner was told.</Why>
+      <Why>The documents themselves are sent from Records › Documents or by email; this records what went, when, and what the owner was told.</Why>
     </>
   );
 }

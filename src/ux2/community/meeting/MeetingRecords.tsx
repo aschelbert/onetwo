@@ -1,5 +1,5 @@
 /**
- * Building › Archive › Meeting records: every held meeting's record, sealed
+ * Records › Archive › Meeting records: every held meeting's record, sealed
  * once its minutes are approved and the summary has gone out. Each record
  * lists what it holds and downloads as one file.
  */

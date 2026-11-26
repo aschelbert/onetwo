@@ -48,6 +48,7 @@
     { "source": "/issues", "destination": "/app.html" },
     { "source": "/building", "destination": "/app.html" },
     { "source": "/compliance", "destination": "/app.html" },
+    { "source": "/records", "destination": "/app.html" },
     { "source": "/archives", "destination": "/app.html" },
     { "source": "/voting", "destination": "/app.html" },
     { "source": "/boardroom", "destination": "/app.html" },

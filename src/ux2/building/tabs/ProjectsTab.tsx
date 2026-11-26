@@ -40,7 +40,7 @@ function stageChip(p: CapitalProject, limit: number) {
   return <Chip tone={cur.waitsOn ? 'amber' : 'navy'}>Step {steps.indexOf(cur) + 1} of {steps.length} · {cur.title}</Chip>;
 }
 
-/** Building › Projects: every capital improvement, where it stands, and the way into its action. */
+/** Building › Care › Projects: every capital improvement, where it stands, and the way into its action. */
 export default function ProjectsTab({ today, isBoard }: { today: string; isBoard: boolean }) {
   const navigate = useNavigate();
   const projects = useCapitalProjectsStore(s => s.projects);

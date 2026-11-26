@@ -1,5 +1,5 @@
 /**
- * Files behind Building › Documents are stored once (building-documents
+ * Files behind Records › Documents are stored once (building-documents
  * bucket) and downloaded through a signed link. A stored file is deleted only
  * when no document uses it any more, so moving a file between documents, or
  * filing it under several, never loses it.

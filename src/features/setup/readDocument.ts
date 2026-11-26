@@ -3,7 +3,7 @@
  * service, no per-document cost.
  *  - Spreadsheets (CSV, Excel) are imported by their column headings (`importSpreadsheet`).
  *  - PDFs and plain text are read with rules for the settings and lists setup
- *    uses (`extractText`), and filed in Building › Documents.
+ *    uses (`extractText`), and filed in Records › Documents.
  *  - Pasted text is read the same way.
  *  - Anything else (Word, photos, scanned PDFs with no text) is filed; its
  *    settings are asked in Fill the gaps.
@@ -89,7 +89,7 @@ export async function addOne(file: File, past?: PastOptions): Promise<void> {
     const doc: SetupDoc & { docType: DocType } = { ...base, docType: past.docType, covers: past.covers, historical: true, period: /\b(19|20)\d{2}\b/.exec(file.name)?.[0] };
     const filedAs = fileSetupDocument(doc) ?? undefined;
     store(id);
-    updateDoc(id, { status: 'filed', docType: past.docType, covers: past.covers, historical: true, period: doc.period, filedAs, note: `Filed as a past version${doc.period ? ` (${doc.period})` : ''} under ${past.covers.join(', ')} in Building › Documents.` });
+    updateDoc(id, { status: 'filed', docType: past.docType, covers: past.covers, historical: true, period: doc.period, filedAs, note: `Filed as a past version${doc.period ? ` (${doc.period})` : ''} under ${past.covers.join(', ')} in Records › Documents.` });
     return;
   }
 
@@ -138,7 +138,7 @@ export async function addOne(file: File, past?: PastOptions): Promise<void> {
     updateDoc(id, { status: 'filed', docType, reader: READER_VERSION, note });
     return;
   }
-  updateDoc(id, { status: 'filed', docType, note: lower.match(/\.docx?$/) ? 'Filed. Save Word files as PDF to have their text read.' : 'Filed in Building › Documents.' });
+  updateDoc(id, { status: 'filed', docType, note: lower.match(/\.docx?$/) ? 'Filed. Save Word files as PDF to have their text read.' : 'Filed in Records › Documents.' });
 }
 
 /** Add several files, in order. */
@@ -165,7 +165,7 @@ export function addPastedText(raw: string, docType: DocType, label: string): voi
   applyReading(id, pages, false, type, name);
 }
 
-/** Change what a document is: renames it in Building › Documents and, when its text is at hand, reads it again with that kind's rules. */
+/** Change what a document is: renames it in Records › Documents and, when its text is at hand, reads it again with that kind's rules. */
 export function retype(doc: SetupDoc, docType: DocType): void {
   useSetupStore.getState().updateDoc(doc.id, retypeSetupDocument(doc, docType));
   const t = text.get(doc.id);

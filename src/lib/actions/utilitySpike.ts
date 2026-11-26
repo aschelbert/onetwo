@@ -35,7 +35,7 @@ export const UTILITY_SPIKE: ActionKind<UtilitySpikeData> = {
     confirm: 'Ticks itself when someone says whether the bill is right; a wrong bill closes the action here',
     cause: 'Ticks itself when what was found is written down',
     fix: 'Ticks itself when a repair is opened for it, or the reason it was expected is recorded',
-    next: "Ticks itself when the meter's next bill is entered under Building › Utilities",
+    next: "Ticks itself when the meter's next bill is entered under Building › Care › Utilities",
   },
   blank: () => ({ meterId: '', meterName: '', utility: 'water', unit: 'gallons', month: '', use: 0, usual: 0, cost: 0, extraCost: 0, billRight: '', billNote: '', checks: [], cause: '', outcome: '', repairId: '', expectedWhy: '', nextMonth: '', nextUse: 0 }),
   steps: (r) => {

@@ -58,7 +58,7 @@ export function budgetSteps(fy: { start: string; end: string }): { s: string; de
     { s: 'Board votes to adopt the budget', detail: 'The vote happens at the meeting and is recorded there; this step ticks itself when it passes. A vote taken elsewhere can be recorded on this action.' },
     { s: `Tell owners by ${addDays(fy.start, -BUDGET_NOTICE_DAYS)}: the adopted budget and the new dues`, detail: 'The notice is written for you from the adopted budget. This step ticks itself when a notice about the budget is posted after this action opened.' },
     { s: `Switch Funds to the ${label} budget and dues on ${fy.start}`, detail: "On that day the app puts the adopted lines into Funds › Planning, each unit's new dues on its account, and the new reserve transfer. It can also be done earlier by hand." },
-    { s: 'File the adopted budget under Building › Documents', detail: 'The app writes the adopted budget as a document and files it under Budgets, where owners can read it.' },
+    { s: 'File the adopted budget under Records › Documents', detail: 'The app writes the adopted budget as a document and files it under Budgets, where owners can read it.' },
   ];
 }
 

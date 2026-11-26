@@ -55,7 +55,7 @@ export function resaleSteps(r: ResaleRequest): Steps {
   return [
     { s: `Log the request for Unit ${r.unit} and start the ${RESALE_DAYS}-day clock`, detail: `Requested ${r.openedOn}, due ${resaleDue(r)} (DC Code § 42-1904.11). Done as this action opens.` },
     { s: 'Prepare the statement of account for the unit', detail: 'Register › Prepare statement takes the unit\'s balance, monthly assessment and any special assessments from Funds as of that day. This step ticks itself then.' },
-    { s: 'Assemble the packet: declaration, bylaws, rules, budget, reserves', detail: 'Judged from Building › Documents. This step ticks itself when each of them is on file.', ck: ['Insurance summary included', 'Any pending suits or judgments disclosed', 'Any known violations on the unit disclosed'] },
+    { s: 'Assemble the packet: declaration, bylaws, rules, budget, reserves', detail: 'Judged from Records › Documents. This step ticks itself when each of them is on file.', ck: ['Insurance summary included', 'Any pending suits or judgments disclosed', 'Any known violations on the unit disclosed'] },
     { s: 'Charge the certificate fee, or record that there is none', detail: 'A reasonable fee may be charged. This step ticks itself when the fee is charged to the unit or waived on the register.' },
     { s: `Deliver the certificate by ${resaleDue(r)}`, detail: 'This step ticks itself when the delivery date is entered on the register.' },
   ];

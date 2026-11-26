@@ -107,7 +107,7 @@ describe('the budget draft', () => {
   });
 
   it('knows each step by its title, the new ones and the ones written before', () => {
-    expect(['Start the 2027 draft from this year\'s numbers', "Check next year's contracts and insurance", 'Set every line for 2027', 'Set the reserve contribution and a cushion', 'Pick the 2027 dues', "Put the draft on a board meeting's agenda", 'Board votes to adopt the budget', 'Tell owners by 2026-12-02: the adopted budget and the new dues', 'Switch Funds to the 2027 budget and dues on 2027-01-01', 'File the adopted budget under Building › Documents'].map(budgetStepKey))
+    expect(['Start the 2027 draft from this year\'s numbers', "Check next year's contracts and insurance", 'Set every line for 2027', 'Set the reserve contribution and a cushion', 'Pick the 2027 dues', "Put the draft on a board meeting's agenda", 'Board votes to adopt the budget', 'Tell owners by 2026-12-02: the adopted budget and the new dues', 'Switch Funds to the 2027 budget and dues on 2027-01-01', 'File the adopted budget under Records › Documents'].map(budgetStepKey))
       .toEqual(['start', 'costs', 'lines', 'reserve', 'dues', 'review', 'adopt', 'notify', 'switch', 'file']);
     expect(['Roll the 2027 draft forward from this year\'s actuals', 'Pick the dues option and the reserve line', "Put next year's contracts and insurance into the lines", 'Board reviews the draft at a meeting', 'Set the 2027 dues on the fee schedule and every unit', 'Enter the adopted lines as the 2027 budget'].map(budgetStepKey))
       .toEqual(['start', 'dues', 'costs', 'review', 'switch', 'switch']);

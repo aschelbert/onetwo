@@ -152,7 +152,7 @@ function Units() {
 function Insurance() {
   const policies = useBuildingStore(s => s.insurance);
   return (
-    <Frame title="Insurance policies" to={ROUTES.insurance} toLabel="Open Building › Insurance"
+    <Frame title="Insurance policies" to={ROUTES.insurance} toLabel="Open Building › Overview › Insurance"
       note="Carrier, policy number and coverage are what the carrier asks for first when you report a loss.">
       <Rows head={['Policy', 'Carrier', 'Number', 'Coverage', 'Expires']} rows={policies.map(p => [p.type, p.carrier, p.policyNum, p.coverage, p.expires])} empty="No policies on file. Add them in Building › Overview." />
     </Frame>
@@ -174,8 +174,8 @@ function Documents({ label }: { label: string }) {
   const hit = (n: string) => words.some(w => n.toLowerCase().includes(w));
   const sorted = [...docs].sort((a, b) => Number(hit(b.name)) - Number(hit(a.name)));
   return (
-    <Frame title="Governing documents" to={ROUTES.documents} toLabel="Open Building › Documents"
-      note="The full text is in Building › Documents; the ones this item refers to are listed first.">
+    <Frame title="Governing documents" to={ROUTES.documents} toLabel="Open Records › Documents"
+      note="The full text is in Records › Documents; the ones this item refers to are listed first.">
       <Rows head={['Document', 'Version', 'Status']} rows={sorted.map(d => [<span key="n" className={hit(d.name) ? 'font-semibold text-ink-900' : ''}>{d.name}</span>, d.version, d.status === 'current' ? 'Current' : 'Review due'])} empty="No governing documents uploaded yet." />
     </Frame>
   );

@@ -60,7 +60,7 @@ export interface ReadResult {
   clauses?: ClauseRow[];
 }
 
-/** reading: being opened; read: items found to review; filed: kept in Building › Documents with nothing found; error: couldn't be opened. */
+/** reading: being opened; read: items found to review; filed: kept in Records › Documents with nothing found; error: couldn't be opened. */
 /** Bumped when the reader learns to find more (3: clauses, content coverage). */
 export const READER_VERSION = 3;
 
@@ -85,7 +85,7 @@ export interface SetupDoc {
   pasted?: boolean;
   /** Which version of the reader read it; older readings miss what was added since. */
   reader?: number;
-  /** Filed in Building › Documents (the first legal document it's filed under). */
+  /** Filed in Records › Documents (the first legal document it's filed under). */
   filedAs?: string;
   /** The documents this one file is, by name ("Bylaws", "Rules and regulations"): one upload for a document that holds several. */
   covers?: string[];
@@ -142,7 +142,7 @@ export const DOC_TYPE_LABEL: Record<DocType, string> = {
 
 /**
  * What to upload. Spreadsheets (`imports`) become items to review; the rest
- * are filed in Building › Documents and their settings asked in Fill the gaps.
+ * are filed in Records › Documents and their settings asked in Fill the gaps.
  */
 export const DOC_KINDS: { id: string; label: string; types: DocType[]; imports: boolean; fills: string[]; optional?: boolean }[] = [
   { id: 'governing', label: 'Declaration and bylaws (PDF)', types: ['bylaws', 'declaration'], imports: true, fills: ['Board and officer duties', 'Owner obligations', 'Rules for residents', 'Quorum and notice rules', 'Assessment due day', 'Late fees', 'Unit ownership table'] },
@@ -369,7 +369,7 @@ export const DESTINATIONS: { match: RegExp; path: string }[] = [
   { match: /^Funds › Accounts and ledger · billing rules/, path: '/funds?tab=settings' },
   { match: /^Funds › opening balance/, path: '/funds?tab=settings&section=opening' },
   { match: /^Building › Obligations · duties and roles/, path: '/building?tab=obligations&section=duties' },
-  { match: /^Building › Documents · insurance/, path: '/building?tab=documents&section=certificates' },
+  { match: /^(Records|Building) › Documents · insurance/, path: '/records?tab=documents&section=certificates' },
   { match: /^Building › Contracts/, path: '/building?tab=contracts' },
   { match: /^Funds › Planning · budget/, path: '/funds?tab=planning&section=budget' },
   { match: /^Funds › Planning · reserves/, path: '/funds?tab=planning&section=reserves' },
@@ -386,7 +386,7 @@ export const SECTION_GOES: Record<Section, string> = {
   houserules: 'Building › Obligations · duties and roles',
   rules: 'Funds › Accounts and ledger · billing rules, and Building › Obligations · duties and roles',
   accounts: 'Funds › opening balance',
-  insurance: 'Building › Documents · insurance',
+  insurance: 'Records › Documents · insurance',
   vendors: 'Building › Contracts',
   budget: 'Funds › Planning · budget',
   reserves: 'Funds › Planning · reserves',
@@ -423,7 +423,7 @@ export function coverage(r: ReadResult): Coverage[] {
   add('minutes', r.board, r.board.length === 1 ? 'board member' : 'board members', 'Building › Directory');
   add('rules', rules, rules.length === 1 ? 'rule' : 'rules', 'Duties and roles · Rules for residents');
   add('budget', r.budget, r.budget.length === 1 ? 'budget line' : 'budget lines', 'Funds › Planning');
-  add('insurance', r.insurance, r.insurance.length === 1 ? 'policy' : 'policies', 'Building › Documents');
+  add('insurance', r.insurance, r.insurance.length === 1 ? 'policy' : 'policies', 'Records › Documents');
   add('reserves', r.reserves, r.reserves.length === 1 ? 'reserve item' : 'reserve items', 'Funds › Planning');
   add('statements', balances, 'balances', 'Funds › opening balance');
   return out;

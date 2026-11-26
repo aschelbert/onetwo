@@ -2,12 +2,14 @@ import { useState } from 'react';
 /**
  * Building — the redesign's module for the building itself (ux2.building).
  *
- *  Overview     what it is, what protects it, what it is made of (details, insurance, assets)
- *  Documents    governing documents and policies, certificates, reports and annual archives
+ *  Overview     what it is, what protects it, what it is made of (details, assets), with Insurance as its second section
+ *  Care         looking after it: the upkeep schedule, the capital projects and the utilities, one tab with three sections
  *  Obligations  the compliance record: every requirement and its state, filings, duties and roles
  *  Contracts    every vendor, the contract behind each, when it ends
  *  Directory    units and owners, board, management and counsel, staff
- *  Archive      closed cases, requests and letters with the decision trail (board only)
+ *
+ * Documents and the Archive live in Records now (`/records`); `BuildingRoute`
+ * redirects their old addresses, and `go('documents' | 'archive')` leads there.
  *
  * The detail under each section is the production page that owns the records
  * (Building page tabs, Board Room's Duties and Governance Calendar, Archives,
@@ -19,14 +21,14 @@ import { useState } from 'react';
  * Deep links: `/building?tab=obligations&section=duties`. Legacy Building,
  * Association Team and Archives tab ids are accepted and mapped.
  */
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { recordsPath } from '../records/paths';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Chip, PillTabs, ModuleHeader, STATUS_CHIP, HeaderSlotProvider } from '../components';
 import { useBuildingSnapshot } from './useBuildingSnapshot';
 import { maintenanceOverdue, buildingScore, contractRows, contractsSummary, insuranceStatus, obligationRows, obligationsSummary } from './metrics';
 import { dayLabel } from '../home/calendar';
 import OverviewTab from './tabs/OverviewTab';
-import DocumentsTab from './tabs/DocumentsTab';
 import ProjectsTab from './tabs/ProjectsTab';
 import UtilitiesTab from './tabs/UtilitiesTab';
 import PlanTab from './tabs/PlanTab';
@@ -36,14 +38,19 @@ import { useCapitalProjectsStore } from '@/store/useCapitalProjectsStore';
 import ObligationsTab from './tabs/ObligationsTab';
 import ContractsTab from './tabs/ContractsTab';
 import DirectoryTab from './tabs/DirectoryTab';
-import ArchiveSection from './tabs/ArchiveSection';
 
-export type BuildingTab = 'overview' | 'plan' | 'upkeep' | 'projects' | 'utilities' | 'insurance' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
-const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'upkeep', 'projects', 'utilities', 'insurance', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
+/** `documents` and `archive` are still valid targets for `go`, but they open in Records. */
+export type BuildingTab = 'overview' | 'plan' | 'care' | 'documents' | 'obligations' | 'contracts' | 'directory' | 'archive';
+const TAB_IDS: BuildingTab[] = ['overview', 'plan', 'care', 'documents', 'obligations', 'contracts', 'directory', 'archive'];
 
 /** Legacy tab ids (Building page, Association Team, Archives, Board Room) → Building tab and section. */
 export const LEGACY_TABS: Record<string, { tab: BuildingTab; section?: string }> = {
   details: { tab: 'overview', section: 'details' },
+  // Insurance is Overview's second section; Upkeep, Projects and Utilities are the sections of Care.
+  insurance: { tab: 'overview', section: 'insurance' },
+  upkeep: { tab: 'care', section: 'schedule' },
+  projects: { tab: 'care', section: 'projects' },
+  utilities: { tab: 'care', section: 'utilities' },
   assets: { tab: 'overview', section: 'assets' },
   legal: { tab: 'documents', section: 'governing' },
   contacts: { tab: 'directory', section: 'people' },
@@ -75,8 +82,9 @@ export default function BuildingModule() {
   const section = params.get('section') ?? resolved.section;
   const role = useAuthStore(s => s.currentRole);
   const isBoard = role === 'BOARD_MEMBER' || role === 'PROPERTY_MANAGER' || role === 'PLATFORM_ADMIN';
-  // Owners never see the archive; a resident landing on it gets the Overview.
-  const tab: BuildingTab = resolved.tab === 'archive' && !isBoard ? 'overview' : resolved.tab;
+  const navigate = useNavigate();
+  // Documents and the Archive are in Records; `BuildingRoute` redirects before this renders.
+  const tab: BuildingTab = resolved.tab === 'archive' || resolved.tab === 'documents' ? 'overview' : resolved.tab;
 
   const snap = useBuildingSnapshot();
   const score = buildingScore(snap);
@@ -86,6 +94,7 @@ export default function BuildingModule() {
   const con = contractsSummary(contractRows(snap));
 
   const go = (next: BuildingTab, nextSection?: string) => {
+    if (next === 'documents' || next === 'archive') { navigate(recordsPath(next, nextSection)); return; }
     setParams(prev => {
       const p = new URLSearchParams(prev);
       if (next === 'overview') p.delete('tab'); else p.set('tab', next);
@@ -107,19 +116,16 @@ export default function BuildingModule() {
   const insuranceLapsed = insuranceStatus(snap).filter(p => p.state === 'lapsed').length;
   const openProjects = useCapitalProjectsStore(s => s.projects.filter(x => !x.closedOn).length);
   const tabs = [
-    { id: 'overview' as BuildingTab, label: 'Overview' },
+    { id: 'overview' as BuildingTab, label: 'Overview', badge: insuranceLapsed || undefined, badgeTone: 'red' as const },
     { id: 'plan' as BuildingTab, label: 'Goals' },
-    { id: 'upkeep' as BuildingTab, label: 'Upkeep', badge: upkeepOverdue || undefined, badgeTone: 'red' as const },
-    { id: 'projects' as BuildingTab, label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const },
-    { id: 'utilities' as BuildingTab, label: 'Utilities' },
-    { id: 'insurance' as BuildingTab, label: 'Insurance', badge: insuranceLapsed || undefined, badgeTone: 'red' as const },
-    { id: 'documents' as BuildingTab, label: 'Documents' },
+    { id: 'care' as BuildingTab, label: 'Care', badge: upkeepOverdue || openProjects || undefined, badgeTone: upkeepOverdue ? 'red' as const : 'navy' as const },
     { id: 'obligations' as BuildingTab, label: 'Obligations', badge: obl.overdue.length + obl.inProgress.length || undefined, badgeTone: obl.overdue.length ? 'red' as const : 'navy' as const },
     { id: 'contracts' as BuildingTab, label: 'Contracts', badge: con.lapsed.length ? `${con.lapsed.length} lapsed` : undefined, badgeTone: 'red' as const },
     { id: 'directory' as BuildingTab, label: 'Directory' },
-    ...(isBoard ? [{ id: 'archive' as BuildingTab, label: 'Archive' }] : []),
   ];
 
+  const showInsurance = tab === 'overview' && section === 'insurance';
+  const careSection = section === 'projects' || section === 'utilities' ? section : 'schedule';
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
     <HeaderSlotProvider value={headerSlot}>
@@ -130,16 +136,14 @@ export default function BuildingModule() {
           subtitle={<><span className="block font-semibold">{line}</span><span className="mt-1 block">{{
             overview: 'What the building is, what protects it, what it is made of and who keeps it running. The board edits; every owner can read it.',
             plan: 'What the board is trying to do this year, where each goal stands, and how past years turned out. Every owner can read it.',
-            upkeep: 'The recurring work that keeps the building running: what is scheduled, what was done and what it found. Inspections are walked in their own Board Room action; every owner can read the schedule.',
+            schedule: 'The recurring work that keeps the building running: what is scheduled, what was done and what it found. Inspections are walked in their own Board Room action; every owner can read the schedule.',
             projects: 'What is being replaced or improved, what it costs and how it is paid for. Each project is worked in its Board Room action; every owner can read where it stands.',
             utilities: 'What the building uses and what it costs, meter by meter and month by month. A month far above usual opens its own action.',
             insurance: "The association's policies, whether the building is insured for enough, and the policies owners carry on their own units. Reading a declarations page fills in a policy's details.",
-            documents: "The building's papers: what governs it, what insures it, and the record of each year.",
             obligations: "The things DC and the bylaws require of this building, and whether they are done. Every owner can see this list; it is the building's compliance record.",
             contracts: 'Every vendor the building pays, the contract behind each, when it ends, and the bids that replace it.',
             directory: 'The one directory: units and owners, the board, advisers, staff, and who to call at 2am.',
-            archive: 'The actions, requests and letters this board has closed, read-only, with the decision trail behind each one. Nothing here needs you; owners never see it.',
-          }[tab] ?? 'The building itself: what it is, what it must keep, who is in it.'}</span></>}
+          }[showInsurance ? 'insurance' : tab === 'care' ? careSection : tab] ?? 'The building itself: what it is, what it must keep, who is in it.'}</span></>}
           status={<>
             <Chip tone={score.total >= 80 ? 'teal' : score.total >= 60 ? 'amber' : 'red'} className={STATUS_CHIP} title="Documents 35, insurance 35, governance 30: the Dashboard's building health">Building score {score.total} · {score.label}</Chip>
             {alert && (
@@ -151,17 +155,17 @@ export default function BuildingModule() {
           tabs={<PillTabs tabs={tabs} value={tab} onChange={id => go(id)} aria-label="Building sections" />}
         />
 
-        {tab === 'overview' && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
+        {tab === 'overview' && <PillTabs size="filter" aria-label="Overview sections" value={showInsurance ? 'insurance' : 'building'} onChange={id => go('overview', id === 'insurance' ? 'insurance' : undefined)} tabs={[{ id: 'building', label: 'The building' }, { id: 'insurance', label: 'Insurance', badge: insuranceLapsed ? `${insuranceLapsed} lapsed` : undefined, badgeTone: 'red' as const }]} />}
+        {tab === 'care' && <PillTabs size="filter" aria-label="Care sections" value={careSection} onChange={id => go('care', id)} tabs={[{ id: 'schedule', label: 'Upkeep', badge: upkeepOverdue ? `${upkeepOverdue} overdue` : undefined, badgeTone: 'red' as const }, { id: 'projects', label: 'Projects', badge: openProjects || undefined, badgeTone: 'navy' as const }, { id: 'utilities', label: 'Utilities' }]} />}
+        {tab === 'overview' && !showInsurance && <OverviewTab snap={snap} section={section} onSection={s => go('overview', s)} onGo={go} isBoard={isBoard} />}
         {tab === 'plan' && <PlanTab isBoard={isBoard} />}
-        {tab === 'upkeep' && <UpkeepTab today={snap.today} isBoard={isBoard} />}
-        {tab === 'projects' && <ProjectsTab today={snap.today} isBoard={isBoard} />}
-        {tab === 'utilities' && <UtilitiesTab today={snap.today} isBoard={isBoard} />}
-        {tab === 'insurance' && <InsuranceTab today={snap.today} isBoard={isBoard} />}
-        {tab === 'documents' && <DocumentsTab snap={snap} section={section} onSection={s => go('documents', s)} onGo={go} isBoard={isBoard} />}
+        {showInsurance && <InsuranceTab today={snap.today} isBoard={isBoard} />}
+        {tab === 'care' && careSection === 'schedule' && <UpkeepTab today={snap.today} isBoard={isBoard} />}
+        {tab === 'care' && careSection === 'projects' && <ProjectsTab today={snap.today} isBoard={isBoard} />}
+        {tab === 'care' && careSection === 'utilities' && <UtilitiesTab today={snap.today} isBoard={isBoard} />}
         {tab === 'obligations' && <ObligationsTab snap={snap} section={section} onSection={s => go('obligations', s)} isBoard={isBoard} />}
         {tab === 'contracts' && <ContractsTab snap={snap} isBoard={isBoard} onGo={go} />}
         {tab === 'directory' && <DirectoryTab snap={snap} section={section} onSection={s => go('directory', s)} isBoard={isBoard} />}
-        {tab === 'archive' && isBoard && <ArchiveSection />}
       </div>
     </HeaderSlotProvider>
   );

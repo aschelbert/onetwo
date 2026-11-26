@@ -62,7 +62,7 @@ function RulesForm({ rules, today, onClose }: { rules: ComfortRules; today: stri
 }
 
 /**
- * Building › Upkeep: heat and hot water. Each rule is a check with readings
+ * Building › Care › Upkeep: heat and hot water. Each rule is a check with readings
  * behind it, so there is something to show an inspector or an owner. A
  * resident's request about heat or hot water is answered with a reading.
  */

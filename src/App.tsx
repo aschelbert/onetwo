@@ -12,7 +12,7 @@ import FundsPage from '@/ux2/funds/FundsPage';
 import PayPage from '@/ux2/funds/PayPage';
 import CommunityModule from '@/ux2/community/CommunityModule';
 import MeModule from '@/ux2/me/MeModule';
-import { BoardRoomRoute, BuildingRedirect, BuildingRoute, IssuesRoute, RedirectKeepQuery } from '@/ux2/shell/routes';
+import { BoardRoomRoute, BuildingRedirect, BuildingRoute, IssuesRoute, RecordsModule, RedirectKeepQuery } from '@/ux2/shell/routes';
 import AuthPage from '@/features/auth/AuthPage';
 import PlatformAdminPage from '@/features/admin/PlatformAdminPage';
 import VotingPage from '@/features/elections/ElectionsPage';
@@ -257,6 +257,7 @@ export default function App() {
           <Route path="/funds" element={<ErrorBoundary fallbackLevel="page"><FundsPage /></ErrorBoundary>} />
           <Route path="/financial" element={<RedirectKeepQuery to="/funds" />} />
           <Route path="/building" element={<ErrorBoundary fallbackLevel="page"><BuildingRoute /></ErrorBoundary>} />
+          <Route path="/records" element={<ErrorBoundary fallbackLevel="page"><RecordsModule /></ErrorBoundary>} />
           <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
           <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
           <Route path="/property-log" element={<Navigate to="/community?tab=log" replace />} />

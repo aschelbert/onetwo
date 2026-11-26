@@ -185,7 +185,7 @@ export default function PaymentsTab({ snap, onGo }: { snap: FundsSnapshot; onGo:
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <Card aria-label="Have ready">
               <SectionLabel>Have ready</SectionLabel>
-              <Inner className="flex items-center justify-between gap-3"><Cell title="The association's EIN" note="On file in Building › Documents if the biennial report was filed here" /><Chip tone="amber">Needed</Chip></Inner>
+              <Inner className="flex items-center justify-between gap-3"><Cell title="The association's EIN" note="On file in Records › Documents if the biennial report was filed here" /><Chip tone="amber">Needed</Chip></Inner>
               <Inner className="flex items-center justify-between gap-3"><Cell title="Operating bank account and routing numbers" note="Where payouts land; the bank feed can be connected at the same time" /><Chip tone="amber">Needed</Chip></Inner>
               <Inner className="flex items-center justify-between gap-3"><Cell title="An officer's government ID" note="The person clicking Connect, usually the Treasurer or President" /><Chip tone="amber">Needed</Chip></Inner>
             </Card>

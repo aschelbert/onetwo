@@ -327,7 +327,7 @@ export function draftDone(d: BudgetDraft | undefined): Record<BudgetStepKey, boo
   };
 }
 
-/** The adopted budget as a plain page, for the minutes and Building › Documents. */
+/** The adopted budget as a plain page, for the minutes and Records › Documents. */
 export function budgetDocument(d: BudgetDraft, building: string, units: { number: string; monthlyFee: number; votingPct: number }[]): string {
   const t = draftTotals(d);
   const esc = (s: string) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
@@ -360,7 +360,7 @@ export function noticeText(d: BudgetDraft, units: { number: string; monthlyFee: 
       `The board adopted the ${d.label} budget${d.adoptedAt ? ` on ${d.adoptedAt.slice(0, 10)}` : ''}. It takes effect ${d.fyStart}.`,
       `Total: ${usd(t.needed)} for the year: ${usd(t.operating)} to run the building, ${usd(t.contingency)} set aside for the unexpected, and ${usd(t.reserve)} into reserves for future repairs.`,
       t.change === 0 ? 'Dues stay the same.' : `Dues ${t.change > 0 ? 'go up' : 'go down'} ${Math.abs(Number(pct))}%: about ${usd(avgNow)} to ${usd(avgNext)} a month for an average unit. Your unit's new amount is under Me › Units.`,
-      'The full budget is under Building › Documents. Questions go to the board through Community › Requests.',
+      'The full budget is under Records › Documents. Questions go to the board through Community › Requests.',
     ].join('\n\n'),
   };
 }

@@ -36,7 +36,7 @@ export function freezeLive(atts: AgendaAttachment[], src: ReportSource, today: s
 
 export function attachmentNote(a: AgendaAttachment): string {
   if (a.source === 'report') return a.mode === 'live' ? 'refreshes until the notice goes out' : `${a.asOf && REPORTS[a.report!]?.dated ? `as of ${a.asOf}` : `captured ${a.capturedAt.slice(0, 10)}`}`;
-  if (a.source === 'document') return 'Building › Documents';
+  if (a.source === 'document') return 'Records › Documents';
   return a.size ? `uploaded · ${a.size}` : 'uploaded';
 }
 
@@ -70,7 +70,7 @@ export function AttachmentList({ atts, onRemove }: { atts: AgendaAttachment[]; o
     setNote(null);
     if (a.snapshot) { setOpen(open === a.id ? null : a.id); return; }
     if (a.path) { if (!(await downloadDocumentFile(a.path, a.name))) setNote("That file couldn't be downloaded."); return; }
-    if (a.source === 'document') { navigate('/building?tab=documents'); return; }
+    if (a.source === 'document') { navigate('/records?tab=documents'); return; }
     setNote('This file was added before storage was set up; there is nothing to download.');
   };
   return (

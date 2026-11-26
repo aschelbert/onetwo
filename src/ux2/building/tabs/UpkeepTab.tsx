@@ -41,7 +41,7 @@ function useFixes(): Fix[] {
 }
 
 /**
- * Building › Upkeep: the maintenance schedule drawn across the year, how much
+ * Building › Care › Upkeep: the maintenance schedule drawn across the year, how much
  * of the work was planned against how much was fixing, the inspections on
  * record, and one asset's story. Inspections are walked in their own action;
  * this is where the schedule is kept and the record is read.
@@ -144,7 +144,7 @@ export default function UpkeepTab({ today, isBoard }: { today: string; isBoard: 
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] bg-ux2-red-tint px-3.5 py-3 text-sm text-ux2-ink"><span><b className="font-semibold text-ux2-red-ink">Repairs cost more than twice the upkeep.</b> That is a case for bringing the replacement forward{reserve ? `: ${reserve.name} is in the reserve plan` : ''}.</span><Button size="sm" onClick={() => open(ensureReview(`${asset.name}: repairs (${fmt(story.repairs)}) are more than twice its upkeep (${fmt(story.planned)}) over three years`, today).caseId)}>Take it to a reserve funding review</Button></div>
             ) : <span className="text-xs text-ux2-muted">When repairs over three years cost more than twice the upkeep, and there were at least two, the app flags it as a case to replace sooner.</span>}
             <span className="flex flex-wrap gap-2">
-              <Button size="sm" variant="ghost" onClick={() => open(startAction('repair', asset.name, { where: asset.location || asset.name, assetId: asset.id, from: 'Building › Upkeep' }, {}, today).caseId)}>Start a repair on it</Button>
+              <Button size="sm" variant="ghost" onClick={() => open(startAction('repair', asset.name, { where: asset.location || asset.name, assetId: asset.id, from: 'Building › Care' }, {}, today).caseId)}>Start a repair on it</Button>
               <Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=overview&section=assets')}>Open the asset list</Button>
             </span>
             <Why>Planned work is the visits on the tasks linked to this asset; repairs are the repair actions that name it. Link a task to an asset when adding or editing the task.</Why>
