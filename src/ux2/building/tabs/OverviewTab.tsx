@@ -33,7 +33,7 @@ export function needsYou(snap: BuildingSnapshot): NeedsYouItem[] {
   for (const r of con.lapsed) out.push({ id: `con:${r.vendorId}`, title: `Countersign the ${(r.contract?.title ?? r.service).toLowerCase()}`, detail: `${r.vendor} · lapsed ${r.ends ? dayLabel(r.ends) : ''} · sign the renewal or close it out`, tone: 'red', chip: `Overdue ${r.ends ? dayLabel(r.ends) : ''}`, action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of con.ending) out.push({ id: `con:${r.vendorId}`, title: `${r.contract?.title ?? r.service} ends ${r.ends ? dayLabel(r.ends) : ''}`, detail: `${r.vendor} · collect bids or renew`, tone: 'amber', chip: `${r.daysLeft} days`, action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of con.insuranceLapsed) out.push({ id: `coi:${r.vendorId}`, title: `${r.vendor}'s insurance certificate has lapsed`, detail: `${r.service} · ask for the renewed certificate before their next visit`, tone: 'red', chip: r.insurance.worst?.expires ? `Lapsed ${dayLabel(r.insurance.worst.expires)}` : 'Lapsed', action: { label: 'Contracts', tab: 'contracts' } });
-  for (const m of maintenanceOverdue(snap).slice(0, 3)) out.push({ id: `mnt:${m.id}`, title: `${m.task} is overdue`, detail: `${m.vendor || 'Building staff'} · was due ${dayLabel(m.nextDue)} · mark it done or put it off with a reason`, tone: 'red', chip: `Due ${dayLabel(m.nextDue)}`, action: { label: 'Upkeep', tab: 'upkeep' } });
+  for (const m of maintenanceOverdue(snap).slice(0, 3)) out.push({ id: `mnt:${m.id}`, title: `${m.task} is overdue`, detail: `${m.vendor || 'Building staff'} · was due ${dayLabel(m.nextDue)} · mark it done or put it off with a reason`, tone: 'red', chip: `Due ${dayLabel(m.nextDue)}`, action: { label: 'Upkeep', tab: 'care', section: 'schedule' } });
   for (const r of con.insuranceExpiring) out.push({ id: `coi:${r.vendorId}`, title: `${r.vendor}'s insurance certificate expires ${dayLabel(r.insurance.worst!.expires)}`, detail: `${r.service} · ask for the renewal`, tone: 'amber', chip: `${r.insurance.daysLeft} days`, action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of con.insuranceMissing) out.push({ id: `coi:${r.vendorId}`, title: `No certificate of insurance from ${r.vendor}`, detail: `${r.service} · general liability should be on file before they work on the property`, tone: 'amber', chip: 'Missing', action: { label: 'Contracts', tab: 'contracts' } });
   for (const r of recordRows(snap)) {
@@ -200,7 +200,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
               <Chip tone="white" className="!bg-white !text-ux2-navy">Open</Chip>
             </button>
           ) : null}
-          <Button size="sm" variant="ghost" className="self-start" onClick={() => onGo('insurance')}>{isBoard ? 'Open Insurance: every policy, editable' : 'Open Insurance'}</Button>
+          <Button size="sm" variant="ghost" className="self-start" onClick={() => onGo('overview', 'insurance')}>{isBoard ? 'Open Insurance: every policy, editable' : 'Open Insurance'}</Button>
         </Card>
       </div>
 
@@ -236,7 +236,7 @@ export default function OverviewTab({ snap, section, onGo, isBoard }: { snap: Bu
         )}
       </Card>
 
-      <Inner className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink" aria-label="Maintenance schedule moved"><span><b className="font-semibold">The maintenance schedule is under Upkeep</b> · {(snap.maintenance ?? []).length} task{(snap.maintenance ?? []).length === 1 ? '' : 's'}, drawn across the year, with the inspections on record.</span><Button size="sm" variant="ghost" onClick={() => onGo('upkeep')}>Open Upkeep</Button></Inner>
+      <Inner className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink" aria-label="Maintenance schedule moved"><span><b className="font-semibold">The maintenance schedule is under Care</b> · {(snap.maintenance ?? []).length} task{(snap.maintenance ?? []).length === 1 ? '' : 's'}, drawn across the year, with the inspections on record.</span><Button size="sm" variant="ghost" onClick={() => onGo('care', 'schedule')}>Open Upkeep</Button></Inner>
 
       <Card aria-label="Mailing address and contact" className="gap-2.5">
         <div className="flex items-center justify-between gap-2"><SectionLabel>Mailing address and contact preferences</SectionLabel>{isBoard && <button type="button" onClick={() => navigate('/funds?tab=settings&section=mailing')} className="text-xs font-semibold text-ux2-teal hover:underline">Edit</button>}</div>

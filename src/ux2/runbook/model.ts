@@ -410,7 +410,7 @@ export function generateCards(input: CardInput, ctx: CardContext): CardSet {
   for (const i of input.insurance ?? []) {
     const d = daysBetween(ctx.today, i.expires);
     if (d > 60) {
-      if (d <= 90) cards.push({ id: `insurance:${i.id}`, kind: 'insurance', refId: i.id, title: `${i.name} renews`, why: `Expires ${i.expires}`, due: i.expires, daysLeft: d, status: 'upcoming', roles: ['BOARD_MEMBER', 'PROPERTY_MANAGER'], action: { label: 'Open', path: '/building?tab=insurance' }, priority: 200 + d / 1000 });
+      if (d <= 90) cards.push({ id: `insurance:${i.id}`, kind: 'insurance', refId: i.id, title: `${i.name} renews`, why: `Expires ${i.expires}`, due: i.expires, daysLeft: d, status: 'upcoming', roles: ['BOARD_MEMBER', 'PROPERTY_MANAGER'], action: { label: 'Open', path: '/building?tab=overview&section=insurance' }, priority: 200 + d / 1000 });
       continue;
     }
     cards.push({
@@ -425,7 +425,7 @@ export function generateCards(input: CardInput, ctx: CardContext): CardSet {
       roles: ['BOARD_MEMBER', 'PROPERTY_MANAGER'],
       dimension: 'Compliance',
       points: 3,
-      action: { label: 'Start renewal', path: '/building?tab=insurance' },
+      action: { label: 'Start renewal', path: '/building?tab=overview&section=insurance' },
       priority: d < 0 ? 12 : 70 + d / 1000,
     });
   }

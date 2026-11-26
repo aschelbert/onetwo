@@ -111,7 +111,7 @@ function CapitalThisYear() {
   return (
     <Inner className="flex flex-col gap-1.5" aria-label="Capital work">
       <b className="text-xs font-semibold text-ux2-ink">Capital work, and where its money comes from</b>
-      {projects.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink"><button type="button" className="text-left font-semibold hover:underline" onClick={() => navigate('/building?tab=projects')}>{p.title}</button><span className="flex flex-wrap items-center gap-2">{projectCost(p) ? fmt(projectCost(p)) : 'Not costed yet'}<Chip tone={p.funding.source === 'operating' ? 'navy' : 'ghost'}>{p.funding.source ? FUNDING_LABEL[p.funding.source] : 'Undecided'}</Chip><span className="text-xs text-ux2-muted">{SOURCE_NOTE[p.funding.source]}</span></span></div>)}
+      {projects.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm text-ux2-ink"><button type="button" className="text-left font-semibold hover:underline" onClick={() => navigate('/building?tab=care&section=projects')}>{p.title}</button><span className="flex flex-wrap items-center gap-2">{projectCost(p) ? fmt(projectCost(p)) : 'Not costed yet'}<Chip tone={p.funding.source === 'operating' ? 'navy' : 'ghost'}>{p.funding.source ? FUNDING_LABEL[p.funding.source] : 'Undecided'}</Chip><span className="text-xs text-ux2-muted">{SOURCE_NOTE[p.funding.source]}</span></span></div>)}
     </Inner>
   );
 }

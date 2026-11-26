@@ -189,7 +189,7 @@ const RULES: Rule[] = [
     assists: [P.vendors, tool('upload-doc', 'Attach the certificate')] },
   { name: 'disb', re: /disb|insurance commissioner|bad faith/i, assists: [P.insurance, ext(EXT.disb, 'DC Insurance (DISB)')] },
   { name: 'insurance', re: /insur|carrier|policy (language|provision)|policy (number|limit)|coverage|deductible|adjuster|claim|ho-?6|d&o|\bgl\b|umbrella|fidelity|bond(ing| claim)?\b|certificate of insurance|\bcoi\b|subrogat|loss (detail|notice|report)|proof of loss/i,
-    assists: [P.insurance, route(ROUTES.insurance, 'Open Building › Insurance')] },
+    assists: [P.insurance, route(ROUTES.insurance, 'Open Building › Overview › Insurance')] },
 
   // ── Votes, meetings, minutes ─────────────────────────────────────────────
   { name: 'owner-vote', re: /owner vote|ballot|owners? (approval|ratification|consent)|ratif|proxy|proxies|election|candidate|nominat|tally|recount|inspector of election|vote count|percentage of owners|2\/3|two[- ]thirds|majority of owners|written consent/i,
@@ -268,7 +268,7 @@ const PANEL_HOME: Record<PanelId, { path: string; label: string }> = {
   delinquency: { path: ROUTES.behind, label: 'Open Funds › Income › Behind' },
   fees: { path: ROUTES.fees, label: 'Open the fee schedule' },
   units: { path: ROUTES.ledger, label: 'Open Funds › Income › Units' },
-  insurance: { path: ROUTES.insurance, label: 'Open Building › Insurance' },
+  insurance: { path: ROUTES.insurance, label: 'Open Building › Overview › Insurance' },
   vendors: { path: ROUTES.contracts, label: 'Open Building › Contracts' },
   documents: { path: ROUTES.documents, label: 'Open Building › Documents' },
   owner: { path: ROUTES.directory, label: 'Open Building › Directory' },

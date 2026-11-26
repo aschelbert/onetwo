@@ -149,7 +149,7 @@ function CostsStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) =>
       <div className="flex flex-wrap gap-2">
         {open.length > 1 && open.every(c => c.lineId) && <Button size="sm" onClick={() => open.forEach(c => confirm(c.id))}>All {open.length} look right</Button>}
         <GoTo path={ROUTE.contracts}>Change a contract in Building › Contracts</GoTo>
-        <GoTo path={ROUTE.insurance}>Change a policy in Building › Insurance</GoTo>
+        <GoTo path={ROUTE.insurance}>Change a policy in Building › Overview › Insurance</GoTo>
       </div>
       <Why>A year is read from the contract or the premium on file ({'"$650/mo"'} is $7,800 a year). On-call vendors have no fixed price; their line in step 3 covers them.</Why>
     </>

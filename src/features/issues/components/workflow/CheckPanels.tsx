@@ -152,7 +152,7 @@ function Units() {
 function Insurance() {
   const policies = useBuildingStore(s => s.insurance);
   return (
-    <Frame title="Insurance policies" to={ROUTES.insurance} toLabel="Open Building › Insurance"
+    <Frame title="Insurance policies" to={ROUTES.insurance} toLabel="Open Building › Overview › Insurance"
       note="Carrier, policy number and coverage are what the carrier asks for first when you report a loss.">
       <Rows head={['Policy', 'Carrier', 'Number', 'Coverage', 'Expires']} rows={policies.map(p => [p.type, p.carrier, p.policyNum, p.coverage, p.expires])} empty="No policies on file. Add them in Building › Overview." />
     </Frame>
