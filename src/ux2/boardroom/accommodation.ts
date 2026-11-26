@@ -10,6 +10,7 @@ import { useActionRecordsStore } from '@/store/useActionRecordsStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useFinancialStore } from '@/store/useFinancialStore';
 import { ASK_KIND, DEFAULT_TARGET_DAYS, askView, dueFor, type AccommodationAsk, type AccommodationData, type RequestKind } from '@/lib/actions/accommodation';
+import { isBackendEnabled } from '@/lib/supabase';
 import { todayIso } from '../runbook/adapters';
 import { SYNC, TRIGGERS, startAction } from './recordActions';
 
@@ -20,10 +21,16 @@ export const accommodationSettings = (): AccommodationSettings => settingsFrom(u
 export const saveAccommodationSettings = (changes: Partial<AccommodationSettings>, today: string = todayIso()) =>
   useActionRecordsStore.getState().setDoc(ACCOMMODATION_SETTINGS, 'Accommodation requests: who sees them', { ...accommodationSettings(), ...changes } as unknown as Record<string, unknown>, today);
 
-/** Whether the person signed in may see these requests: board members always, the manager only if the board said so. Owners never. */
+/**
+ * Whether the person signed in may see these requests: board members always,
+ * the manager only if the board said so, owners never. With a live database
+ * the manager cannot read the board's setting, and does not need to: the
+ * database hands them these records only while the setting is on, so having
+ * one to show is the permission.
+ */
 export function mayHandle(role: string | undefined, s: AccommodationSettings = accommodationSettings()): boolean {
   if (role === 'BOARD_MEMBER' || role === 'PLATFORM_ADMIN') return true;
-  return role === 'PROPERTY_MANAGER' && s.managerSees;
+  return role === 'PROPERTY_MANAGER' && (s.managerSees || isBackendEnabled);
 }
 
 const all = () => useActionRecordsStore.getState().records;
