@@ -35,7 +35,7 @@ export function BoardDecisionsCard({ snap }: { snap: CommunitySnapshot }) {
           ))}
         </Inner>
       )}
-      <Why>Older decisions are in each meeting's record in Building › Archive.</Why>
+      <Why>Older decisions are in each meeting's record in Records › Archive.</Why>
     </Card>
   );
 }

@@ -88,7 +88,7 @@ function MeterForm({ onAdd, onClose }: { onAdd: (m: Meter) => void; onClose: () 
   );
 }
 
-/** Building › Utilities: meters and bills, what a year cost, the months that spiked, and how ready the benchmarking report is. */
+/** Building › Care › Utilities: meters and bills, what a year cost, the months that spiked, and how ready the benchmarking report is. */
 export default function UtilitiesTab({ today, isBoard }: { today: string; isBoard: boolean }) {
   const navigate = useNavigate();
   const records = useActionRecordsStore(s => s.records);

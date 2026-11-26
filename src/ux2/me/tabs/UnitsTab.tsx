@@ -188,7 +188,7 @@ function UnitDocuments({ units, snap }: { units: UnitSummary[]; snap: MeSnapshot
       ))}
       {!mine.length && !units.some(u => u.unit.moveIn) && <Inner className="text-sm text-ux2-muted">Nothing on file yet. The deed, your insurance declarations page and pet or vehicle registrations go here.</Inner>}
       {note && <Why>{note}</Why>}
-      <Why>Building-wide documents, the bylaws, CC&Rs and policies, live in <button type="button" className="font-semibold text-ux2-ink underline" onClick={() => navigate('/building?tab=documents')}>Building › Documents</button>.</Why>
+      <Why>Building-wide documents, the bylaws, CC&Rs and policies, live in <button type="button" className="font-semibold text-ux2-ink underline" onClick={() => navigate('/records?tab=documents')}>Records › Documents</button>.</Why>
     </Card>
   );
 }
@@ -299,7 +299,7 @@ function Responsibilities({ units, snap }: { units: UnitSummary[]; snap: MeSnaps
   ] as const;
   return (
     <Card aria-label="Owner responsibilities" className="gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Owner responsibilities</SectionLabel><button type="button" className="text-xs font-semibold text-ux2-ink underline" onClick={() => navigate('/building?tab=documents')}>Rules and policies</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Owner responsibilities</SectionLabel><button type="button" className="text-xs font-semibold text-ux2-ink underline" onClick={() => navigate('/records?tab=documents')}>Rules and policies</button></div>
       {rows.map(([t, v, tone]) => <Inner key={t} className="flex flex-wrap items-center justify-between gap-3"><span className="text-sm font-semibold text-ux2-ink">{t}</span><Chip tone={tone}>{v}</Chip></Inner>)}
       <Why>These come from the CC&Rs and the policies. Each one feeds your Timeliness or Compliance score. DC Code § 42-1903.13 for unpaid assessments.</Why>
     </Card>

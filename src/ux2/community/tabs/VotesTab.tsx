@@ -172,7 +172,7 @@ export default function VotesTab({ snap, selectedId, onSelect }: { snap: Communi
             <KV label={open ? `Proxies on file for ${open.election.title}` : 'Proxies on file for open votes'}>{proxiesOpen}</KV>
             {sum.toCertify.length > 0 && <KV label="Closed, awaiting certification">{sum.toCertify.length}</KV>}
           </Inner>
-          <div className="flex flex-wrap gap-2">{isBoard && open && <Button size="sm" variant="ghost" onClick={() => setProxyFor(proxyFor ? null : open.election.id)}>Record a proxy</Button>}<Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=documents')}>Proxy form</Button></div>
+          <div className="flex flex-wrap gap-2">{isBoard && open && <Button size="sm" variant="ghost" onClick={() => setProxyFor(proxyFor ? null : open.election.id)}>Record a proxy</Button>}<Button size="sm" variant="ghost" onClick={() => navigate('/records?tab=documents')}>Proxy form</Button></div>
           <Why>A proxy counts toward quorum and lets another owner vote for a unit at one meeting. Owners add their own on this page; the board records paper proxies. Majority of units per the bylaws; DC Code § 42-1903.05</Why>
         </Card>
         <Card id="ballot-preview" aria-label="Ballot" className="gap-2.5">

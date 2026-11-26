@@ -132,7 +132,7 @@ export default function MeetingsTab({ snap, meetingId, onOpen }: { snap: Communi
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PillTabs size="filter" aria-label="Meeting filters" value={filter} onChange={setFilter} tabs={[{ id: 'all', label: 'All meetings' }, { id: 'upcoming', label: `Upcoming · ${sum.upcoming.length}` }, { id: 'past', label: `Past · ${sum.past.length}` }, { id: 'board', label: 'Board meetings' }, { id: 'owner', label: 'Owner meetings' }]} />
-        <span className="text-xs text-ux2-muted"><button type="button" onClick={() => navigate('/home?view=calendar')} className="font-semibold text-ux2-teal hover:underline">Open the calendar</button> · Minutes archive is in <button type="button" onClick={() => navigate('/building?tab=documents')} className="font-semibold text-ux2-teal hover:underline">Building › Documents</button></span>
+        <span className="text-xs text-ux2-muted"><button type="button" onClick={() => navigate('/home?view=calendar')} className="font-semibold text-ux2-teal hover:underline">Open the calendar</button> · Minutes archive is in <button type="button" onClick={() => navigate('/records?tab=documents')} className="font-semibold text-ux2-teal hover:underline">Records › Documents</button></span>
       </div>
 
       <Card aria-label="All meetings" className="gap-2.5">

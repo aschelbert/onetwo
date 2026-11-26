@@ -1,7 +1,7 @@
 /**
  * Step 4: the summary to owners, written from the record and sent by app,
  * email and mail. Once it's out and the minutes are approved, the record is
- * sealed into Building › Archive.
+ * sealed into Records › Archive.
  */
 import { useMemo, useState } from 'react';
 import { useMailStore } from '@/store/useMailStore';
@@ -55,7 +55,7 @@ export default function StepSummary({ ctx }: { ctx: MeetingCtx }) {
           <div className="flex items-center justify-between gap-2"><SectionLabel>The record</SectionLabel><Chip tone={m.session?.sealedAt ? 'sage' : 'amber'}>{m.session?.sealedAt ? `Sealed ${dayLabel(m.session.sealedAt.slice(0, 10))}` : 'Seals when the minutes are approved'}</Chip></div>
           <Inner className="text-sm text-ux2-ink">Minutes by item, every vote's result, attendance by unit, the notice and this summary as sent, and the packet as presented.</Inner>
           <Button size="sm" variant="ghost" className="self-start" onClick={() => downloadRecord(ctx)}>Download the record</Button>
-          <Why>A sealed record is kept in Building › Archive and doesn't change; a correction needs the board's approval and is added beside the original.</Why>
+          <Why>A sealed record is kept in Records › Archive and doesn't change; a correction needs the board's approval and is added beside the original.</Why>
         </Card>
       </div>
     );
@@ -74,7 +74,7 @@ export default function StepSummary({ ctx }: { ctx: MeetingCtx }) {
           ))}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ux2-line pt-3">
-          <span className="text-[13px] text-ux2-muted">{m.minutesApprovedAt ? 'The minutes are approved; sending seals the record into Building › Archive.' : 'The minutes aren’t approved yet: the summary can go now, and the record seals when they are.'}</span>
+          <span className="text-[13px] text-ux2-muted">{m.minutesApprovedAt ? 'The minutes are approved; sending seals the record into Records › Archive.' : 'The minutes aren’t approved yet: the summary can go now, and the record seals when they are.'}</span>
           <Button disabled={sending || !decided.trim() || !Object.values(channels).some(Boolean)} onClick={() => { void send(); }}>{sending ? 'Sending…' : `Send to ${units.length} units`}</Button>
         </div>
       </Card>

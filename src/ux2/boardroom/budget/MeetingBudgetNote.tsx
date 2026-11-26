@@ -29,7 +29,7 @@ export function MeetingBudgetNote({ c, step }: { c: CaseTrackerCase; step: CaseS
     <div data-meeting-budget className={`ux2 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border px-3.5 py-3 ${tone}`}>
       <div className="min-w-[220px] flex-1 text-[13px] text-ux2-ink">
         {b.adoptedAt
-          ? <><b className="font-semibold">The board adopted the {b.label} budget on {dayLabel(b.adoptedAt)}.</b> Bring it to the owners: it is filed under Building › Documents › Budgets once the budget's last step is done.</>
+          ? <><b className="font-semibold">The board adopted the {b.label} budget on {dayLabel(b.adoptedAt)}.</b> Bring it to the owners: it is filed under Records › Documents › Budgets once the budget's last step is done.</>
           : b.action
             ? <><b className="font-semibold">The {b.label} budget isn't adopted yet.</b> It is on step {next + 1} of {b.action.steps?.length}{next >= 0 ? `: ${b.action.steps![next].s}` : ''}. This step ticks itself once the board adopts it.</>
             : <><b className="font-semibold">The {b.label} budget hasn't been started.</b> The Annual budget runbook starts it on {dayLabel(addDays(b.fy.start, -BUDGET_LEAD_DAYS))}; start it now to have it adopted before this meeting.</>}

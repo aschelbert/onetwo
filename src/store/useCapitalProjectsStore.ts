@@ -16,7 +16,7 @@ interface CapitalProjectsState {
   remove: (id: string) => void;
 }
 
-/** Capital improvements (Building › Projects; each is worked in its Board Room action). */
+/** Capital improvements (Building › Care › Projects; each is worked in its Board Room action). */
 export const useCapitalProjectsStore = create<CapitalProjectsState>()(persist((set, get) => ({
   projects: [],
   saveError: null,

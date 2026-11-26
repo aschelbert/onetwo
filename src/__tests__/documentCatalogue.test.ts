@@ -1,5 +1,5 @@
 /**
- * Building › Documents keeps one document per kind, with versions: a new
+ * Records › Documents keeps one document per kind, with versions: a new
  * current file archives (or deletes) the one it replaces, a past version is
  * history and replaces nothing, and one file can be filed under several
  * documents at once.

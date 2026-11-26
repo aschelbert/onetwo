@@ -257,7 +257,7 @@ function OwnerPolicies({ today, isBoard }: { today: string; isBoard: boolean }) 
   );
 }
 
-/** Building › Insurance: the association's policies, whether the building is insured for enough, and owners' own policies. */
+/** Building › Overview › Insurance: the association's policies, whether the building is insured for enough, and owners' own policies. */
 export default function InsuranceTab({ today, isBoard }: { today: string; isBoard: boolean }) {
   return (
     <div className="flex flex-col gap-5">

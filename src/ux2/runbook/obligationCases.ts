@@ -67,7 +67,7 @@ export function caseProgress(c: CaseTrackerCase): { done: number; total: number 
 /** The last step of an obligation's own case: what shows it was done. */
 function recordStep(item: ComplianceItem): { s: string; ck: string[] } {
   switch (item.satisfyingAction) {
-    case 'document': return { s: 'Put it on file', ck: ['Upload the reviewed or adopted document to Building › Documents', 'Note the date and who reviewed it'] };
+    case 'document': return { s: 'Put it on file', ck: ['Upload the reviewed or adopted document to Records › Documents', 'Note the date and who reviewed it'] };
     case 'meeting': return { s: 'Hold the meeting and record it', ck: ['Schedule the meeting and send notice', 'Approve the minutes that record it'] };
     case 'filing': return { s: 'File it and keep the proof', ck: ['Submit the filing', 'Attach the confirmation as proof'] };
     default: return { s: 'Record that it is done', ck: ['Record the review in the next board minutes', 'Attach proof that it is done'] };

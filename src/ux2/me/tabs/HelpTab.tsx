@@ -108,7 +108,7 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
       seen.set(o.legalRef, { title: o.task, detail: `${o.role} · due ${dayLabel(o.due)}`, ref: o.legalRef });
     }
     const out = [...seen.values()];
-    for (const d of building.legalDocuments.filter(d => /bylaw|cc&r|declaration/i.test(d.name)).slice(0, 2)) out.push({ title: d.name, detail: d.status === 'current' ? 'Current; the full text is in Building › Documents' : 'Review due; upload the current version in Building › Documents', ref: `${d.name}${d.version ? ` · ${d.version}` : ''}` });
+    for (const d of building.legalDocuments.filter(d => /bylaw|cc&r|declaration/i.test(d.name)).slice(0, 2)) out.push({ title: d.name, detail: d.status === 'current' ? 'Current; the full text is in Records › Documents' : 'Review due; upload the current version in Records › Documents', ref: `${d.name}${d.version ? ` · ${d.version}` : ''}` });
     return out;
   }, [obligations, building.legalDocuments]);
   const missingRules = !building.legalDocuments.some(d => /rule/i.test(d.name));
@@ -208,7 +208,7 @@ export default function HelpTab({ snap }: { snap: MeSnapshot }) {
           {legalRefs.map(r => <Inner key={r.ref} className="flex flex-wrap items-center justify-between gap-3"><Cell title={r.title} note={r.detail} /><Chip tone="ghost">{r.ref}</Chip></Inner>)}
           {legalRefs.length === 0 && <Inner className="text-sm text-ux2-muted">Set the building's state and upload the bylaws; the references the app relies on list here.</Inner>}
         </div>
-        <Why>Plain words here; the full text is in Building › Documents.{missingRules ? ' The rules are still missing; Building › Documents flags them until they are uploaded.' : ''}</Why>
+        <Why>Plain words here; the full text is in Records › Documents.{missingRules ? ' The rules are still missing; Records › Documents flags them until they are uploaded.' : ''}</Why>
       </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

@@ -7,7 +7,7 @@ import type { NavItem } from '@/lib/rolePermissions';
  * production page, so nothing a role could reach before becomes unreachable.
  * Later phases swap the page behind each path behind its own flag.
  */
-export type Ux2ModuleId = 'home' | 'building' | 'community' | 'funds' | 'boardroom';
+export type Ux2ModuleId = 'home' | 'building' | 'community' | 'funds' | 'boardroom' | 'records';
 
 export interface Ux2Module {
   id: Ux2ModuleId;
@@ -22,10 +22,12 @@ export interface Ux2Module {
 
 export const UX2_MODULES: Ux2Module[] = [
   { id: 'home', label: 'Home', path: '/home', matches: ['/home', '/dashboard'], legacyIds: ['dashboard'] },
-  { id: 'building', label: 'Building', path: '/building', matches: ['/building', '/archives', '/association-team'], legacyIds: ['contacts'] },
+  { id: 'building', label: 'Building', path: '/building', matches: ['/building', '/association-team'], legacyIds: ['contacts'] },
   { id: 'community', label: 'Community', path: '/community', matches: ['/community', '/voting', '/property-log'], legacyIds: ['community'] },
   { id: 'funds', label: 'Funds', path: '/funds', matches: ['/funds', '/financial', '/my-unit'], legacyIds: ['financial'] },
   { id: 'boardroom', label: 'Board Room', path: '/boardroom', matches: ['/boardroom', '/issues', '/compliance', '/board-ops'], legacyIds: ['boardroom'] },
+  // Records is the building's papers, so whoever can see Building can see it; it also absorbs the legacy Archives page.
+  { id: 'records', label: 'Records', path: '/records', matches: ['/records', '/archives'], legacyIds: ['contacts', 'archives'] },
 ];
 
 /** Roles that see Community even though the legacy nav never listed it for them. */
@@ -45,7 +47,7 @@ export function modulesForRole(role: Role, legacyNav: NavItem[]): Ux2Module[] {
 
 /**
  * Legacy destinations that have no module home until their phase lands
- * (Association Team, The Archives, Admin Console). They stay reachable from
+ * (Association Team, Admin Console). They stay reachable from
  * the avatar menu so no feature is lost while the shell is new.
  */
 export function legacyExtras(legacyNav: NavItem[]): NavItem[] {

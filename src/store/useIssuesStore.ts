@@ -57,7 +57,7 @@ export const CATS: Category[] = [
           {s:'Board votes to adopt the budget',t:'At the meeting',d:'DC Code § 42-1903.08(a)(2)',detail:'The vote happens at the meeting and is recorded there; this step ticks itself when it passes. A vote taken elsewhere can be recorded on this action.',ph:'present'},
           {s:'Tell owners: the adopted budget and the new dues',t:'30 days before the year starts',d:'DC Code § 42-1903.08(a)(2)',detail:'The notice is written for you from the adopted budget. This step ticks itself when a notice about the budget is posted after this action opened.',ph:'present'},
           {s:'Switch Funds to the new budget and dues on the first day of the year',t:'First day of the fiscal year',detail:"On that day the app puts the adopted lines into Funds › Planning, each unit's new dues on its account, and the new reserve transfer. It can also be done earlier by hand.",ph:'present'},
-          {s:'File the adopted budget under Building › Documents',t:'After adoption',detail:'The app writes the adopted budget as a document and files it under Budgets, where owners can read it.',ph:'present'},
+          {s:'File the adopted budget under Records › Documents',t:'After adoption',detail:'The app writes the adopted budget as a document and files it under Budgets, where owners can read it.',ph:'present'},
         ],
         self:[
           {s:'Respond to owner disputes of assessment increase with written justification citing the bylaws and DC Code § 42-1903.08(a)(2)',t:'Within 14 days of dispute',d:'DC Code § 42-1903.08(a)(2) & Bylaws',

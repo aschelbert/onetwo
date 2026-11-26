@@ -170,7 +170,7 @@ function AttentionChips({ set, role }: { set: CardSet; role: string }) {
   if (counts.overdueFilings) chips.push({ label: 'Overdue', count: counts.overdueFilings, tone: 'red', path: '/boardroom?tab=runbook' });
   if (counts.urgentCases) chips.push({ label: 'Urgent actions', count: counts.urgentCases, tone: 'red', path: '/issues' });
   if (counts.newRequests) chips.push({ label: role === 'RESIDENT' ? 'Open requests' : 'New requests', count: counts.newRequests, tone: 'amber', path: role === 'RESIDENT' ? '/community?tab=requests' : '/issues' });
-  if (counts.insuranceExpiring) chips.push({ label: 'Insurance expiring', count: counts.insuranceExpiring, tone: 'amber', path: '/building?tab=insurance' });
+  if (counts.insuranceExpiring) chips.push({ label: 'Insurance expiring', count: counts.insuranceExpiring, tone: 'amber', path: '/building?tab=overview&section=insurance' });
   if (counts.votes) chips.push({ label: 'Votes open', count: counts.votes, tone: 'plum', path: '/community?tab=votes' });
   if (chips.length === 0) return null;
   return (

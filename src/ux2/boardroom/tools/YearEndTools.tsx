@@ -117,7 +117,7 @@ function DisposalReview({ fyEnd }: { fyEnd: string }) {
   };
   return (
     <Inner className="flex flex-col gap-2" data-disposal-review={done ? done.on : ''}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Review what is old enough to dispose of</b><span className="flex items-center gap-2">{done && <Chip tone="sage">Reviewed {done.on} by {done.by}</Chip>}<Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=archive')}>Open the retention schedule</Button></span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-sm font-semibold text-ux2-ink">Review what is old enough to dispose of</b><span className="flex items-center gap-2">{done && <Chip tone="sage">Reviewed {done.on} by {done.by}</Chip>}<Button size="sm" variant="ghost" onClick={() => navigate('/records?tab=archive')}>Open the retention schedule</Button></span></div>
       {due.length === 0 ? <span className="text-sm text-ux2-ink">Nothing has passed its period on the retention schedule.</span> : (
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">{due.map(r => (
           <li key={r.rule.kind}><label className="flex items-start gap-2.5 text-sm text-ux2-ink"><input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={picked.includes(r.rule.kind)} onChange={e => setPicked(p => (e.target.checked ? [...p, r.rule.kind] : p.filter(x => x !== r.rule.kind)))} /><span><b className="font-semibold">{r.rule.label}</b> · {r.due.length} past {periodLabel(r.rule).toLowerCase()}<span className="block text-xs text-ux2-muted">Oldest {r.oldest}{r.heldBack.length ? ` · ${r.heldBack.length} more held back by a hold` : ''}</span></span></label></li>
@@ -127,7 +127,7 @@ function DisposalReview({ fyEnd }: { fyEnd: string }) {
         <Field label="The vote, as in the minutes" className="min-w-[240px] flex-1"><input value={vote} onChange={e => setVote(e.target.value)} placeholder="Board, 4 to 0" className={INPUT} /></Field>
         <Button size="sm" disabled={picked.length > 0 && !vote.trim()} onClick={record}>{picked.length ? `The board approved disposing of ${picked.length} kind${picked.length === 1 ? '' : 's'}` : 'The board reviewed the list: keep everything'}</Button>
       </div>
-      <span className="text-xs text-ux2-muted">Each kind of record has its own period on the retention schedule under Building › Archive. This records what the board approved and the vote; the app deletes nothing, and anything on hold for a dispute is left off the list. Ask the association's lawyer before disposing of anything.</span>
+      <span className="text-xs text-ux2-muted">Each kind of record has its own period on the retention schedule under Records › Archive. This records what the board approved and the vote; the app deletes nothing, and anything on hold for a dispute is left off the list. Ask the association's lawyer before disposing of anything.</span>
     </Inner>
   );
 }

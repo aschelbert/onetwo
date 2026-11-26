@@ -1,5 +1,5 @@
 /**
- * The files behind Building › Documents, in the private building-documents
+ * The files behind Records › Documents, in the private building-documents
  * bucket at <tenant_id>/<file_id>/<file name>. One file filed under several
  * documents is one object. Everyone in the building can download; board
  * members upload and delete (migration 036).

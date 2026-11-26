@@ -28,7 +28,7 @@ function Confirm({ r, patch }: PanelProps<UtilitySpikeData>) {
           </div>
         </>
       )}
-      <Why>Check it is an actual read and not an estimate, that the billing period is about a month, and that it is this building's meter. A wrong bill is taken up with the utility, and corrected under Building › Utilities.</Why>
+      <Why>Check it is an actual read and not an estimate, that the billing period is about a month, and that it is this building's meter. A wrong bill is taken up with the utility, and corrected under Building › Care › Utilities.</Why>
     </>
   );
 }
@@ -76,8 +76,8 @@ function Next({ r }: PanelProps<UtilitySpikeData>) {
   const d = r.data;
   return (
     <>
-      {d.nextMonth ? <Inner><KV label={`${monthLabel(d.nextMonth)}`}>{d.nextUse.toLocaleString('en-US')} {d.unit}</KV><KV label="Against usual">{d.nextUse <= d.usual * 1.5 ? 'Back in range' : 'Still high: a new spike action opens for that month'}</KV></Inner> : <p className={NOTE}>Waiting on the next bill for {d.meterName}. Enter it under Building › Utilities and this closes.</p>}
-      <div><Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=utilities')}>Open Building › Utilities</Button></div>
+      {d.nextMonth ? <Inner><KV label={`${monthLabel(d.nextMonth)}`}>{d.nextUse.toLocaleString('en-US')} {d.unit}</KV><KV label="Against usual">{d.nextUse <= d.usual * 1.5 ? 'Back in range' : 'Still high: a new spike action opens for that month'}</KV></Inner> : <p className={NOTE}>Waiting on the next bill for {d.meterName}. Enter it under Building › Care › Utilities and this closes.</p>}
+      <div><Button size="sm" variant="ghost" onClick={() => navigate('/building?tab=care&section=utilities')}>Open Building › Care › Utilities</Button></div>
       <Why>The next bill shows whether the fix worked. If it is still far above usual, that month opens its own action.</Why>
     </>
   );

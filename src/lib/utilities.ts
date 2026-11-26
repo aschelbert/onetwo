@@ -1,7 +1,7 @@
 /**
  * Utility meters and bills: what the building used and what it cost, month by
  * month. Kept as one standing document (kind 'utilities') in the action
- * records, read on Building › Utilities, and the source for the utility spike
+ * records, read on Building › Care › Utilities, and the source for the utility spike
  * and energy benchmarking actions.
  */
 export type Utility = 'electricity' | 'gas' | 'water';

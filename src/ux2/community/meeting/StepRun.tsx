@@ -230,7 +230,7 @@ export default function StepRun({ ctx }: { ctx: MeetingCtx }) {
         <Card aria-label="Approve the minutes" tone={sealed ? 'surface' : 'outline'} className="gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2"><SectionLabel>Minutes · {sealed ? `approved ${m.minutesApprovedAt?.slice(0, 10)}` : `${approvals.length} of ${majority} approvals`}</SectionLabel><Chip tone={sealed ? 'sage' : 'amber'}>{sealed ? 'Approved' : 'Waiting on the board'}</Chip></div>
           <Inner className="flex flex-wrap items-center justify-between gap-2">
-            <Cell title={approvals.length ? `Approved by ${approvals.map(a => a.name).join(', ')}` : 'No approvals yet'} note={`Adjourned ${hhmm(m.endedAt ?? undefined)}. A majority of the board (${majority} of ${ctx.boardNames.length}) approves the minutes; then they post to owners and the record goes to Building › Archive.`} />
+            <Cell title={approvals.length ? `Approved by ${approvals.map(a => a.name).join(', ')}` : 'No approvals yet'} note={`Adjourned ${hhmm(m.endedAt ?? undefined)}. A majority of the board (${majority} of ${ctx.boardNames.length}) approves the minutes; then they post to owners and the record goes to Records › Archive.`} />
             {ctx.isBoard && !sealed && (approvals.some(a => a.name === snap.viewer.name) ? <Button size="sm" variant="ghost" onClick={() => revoke(m.id, snap.viewer.name)}>Withdraw my approval</Button> : <Button size="sm" onClick={doApprove}>Approve</Button>)}
           </Inner>
         </Card>

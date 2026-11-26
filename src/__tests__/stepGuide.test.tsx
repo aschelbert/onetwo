@@ -29,9 +29,9 @@ describe('a checklist from the step\'s own words', () => {
   });
 
   it('finds the pages a text names, the longest name winning, in order', () => {
-    expect(pagesInText('Enter them under Funds › Planning › Budget, then file it under Building › Documents.')).toEqual([
+    expect(pagesInText('Enter them under Funds › Planning › Budget, then file it under Records › Documents.')).toEqual([
       { label: 'Funds › Planning › Budget', path: '/funds?tab=planning&section=budget' },
-      { label: 'Building › Documents', path: '/building?tab=documents' },
+      { label: 'Records › Documents', path: '/records?tab=documents' },
     ]);
     expect(pagesInText('Nothing here')).toEqual([]);
   });
@@ -49,7 +49,7 @@ describe('what each item offers', () => {
   it('information shown in place can also be opened where it lives', () => {
     const r = resolveCheck('Cite specific CC&R or rule section', { catId: 'enforcement', sitId: 'covenant-violations', step: '', hasUnit: true });
     expect(r.assists[0]).toMatchObject({ kind: 'panel', panel: 'documents' });
-    expect(r.assists.some(a => a.kind === 'route' && a.path === '/building?tab=documents')).toBe(true);
+    expect(r.assists.some(a => a.kind === 'route' && a.path === '/records?tab=documents')).toBe(true);
     const evac = resolveCheck('Review evacuation routes and assembly points', { catId: 'maintenance', sitId: 'obligation-m5', step: '', hasUnit: false });
     expect(evac.assists.some(a => a.kind === 'route')).toBe(true);
   });

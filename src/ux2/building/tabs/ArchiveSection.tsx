@@ -6,8 +6,8 @@ import { todayIso } from '../../runbook/adapters';
 import MeetingRecords from '../../community/meeting/MeetingRecords';
 
 /**
- * Building › Archive: the closed cases, requests and letters, read-only, with
- * the decision trail, and every held meeting's sealed record. It moved here from the Board Room because it is the
+ * Records › Archive: the closed cases, requests and letters, read-only, with
+ * the decision trail, and every held meeting's sealed record. It sits in Records because it is the
  * building's record; a closed case still opens in the Board Room's case frame.
  */
 export default function ArchiveSection() {

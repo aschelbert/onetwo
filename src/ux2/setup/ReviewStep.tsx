@@ -139,7 +139,7 @@ function Assessment({ onDocuments }: { onDocuments: () => void }) {
             {d.status === 'reading' && <span className="text-[13px] text-ux2-muted">Still opening…</span>}
             {d.status === 'error' && <span className="text-[13px] text-ux2-red-ink">{d.error}</span>}
             {d.historical ? <span className="text-[13px] text-ux2-muted">Past version{d.period ? ` (${d.period})` : ''} · kept as history, not read into the building</span>
-              : d.status === 'filed' && <span className="text-[13px] text-ux2-amber">{d.note ?? 'Filed in Building › Documents; nothing was read from it.'}</span>}
+              : d.status === 'filed' && <span className="text-[13px] text-ux2-amber">{d.note ?? 'Filed in Records › Documents; nothing was read from it.'}</span>}
             {d.filedAs && d.covers && d.covers.length > 1 && <span className="text-[13px] text-ux2-muted">Filed once under {d.covers.join(', ')}</span>}
             {d.status === 'read' && cov.length === 0 && <span className="text-[13px] text-ux2-muted">Nothing found that setup can use.</span>}
             {readByOlderReader(d) && <span className="text-[13px] text-ux2-amber">Read by an earlier version of setup, so board duties, owner obligations and rules weren't looked for. Remove it in step 1 and add it again.</span>}

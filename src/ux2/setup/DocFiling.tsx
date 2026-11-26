@@ -38,7 +38,7 @@ export function FiledAs({ doc }: { doc: SetupDoc }) {
           </>
         ) : (
           <>
-            <span className="text-ux2-muted">Not kept in Building › Documents.</span>
+            <span className="text-ux2-muted">Not kept in Records › Documents.</span>
             <button type="button" onClick={() => setCovers(doc, covers)} className="font-semibold text-ux2-plum hover:underline">Keep a copy</button>
           </>
         )}
@@ -81,7 +81,7 @@ export function PastDocuments() {
     <section aria-label="Past documents" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="text-xs font-semibold uppercase tracking-[0.08em] text-ux2-muted">Optional · past documents</div>
-        <span className="text-[13px] text-ux2-muted">Kept as history in Building › Documents; they aren't read into the building</span>
+        <span className="text-[13px] text-ux2-muted">Kept as history in Records › Documents; they aren't read into the building</span>
       </div>
       <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" aria-label="Add past files" onChange={e => { const k = kind.current; if (k && e.target.files?.length) void addFiles(Array.from(e.target.files), { docType: k.docType, covers: [labelOf(k.entry)] }); e.target.value = ''; }} />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
