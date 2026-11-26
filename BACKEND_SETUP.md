@@ -108,6 +108,8 @@ supabase secrets set \
 supabase functions deploy create-hosted-page
 supabase functions deploy chargebee-webhook --no-verify-jwt
 supabase functions deploy provision-tenant
+supabase functions deploy checkout-intent
+supabase functions deploy checkout-complete
 ```
 
 > Email is sent through Brevo by `supabase/functions/_shared/email.ts`, from
@@ -229,6 +231,52 @@ do not yet have an active Chargebee subscription:
 6. The tenant can later set up billing via the flow described above
 
 ---
+
+### One-page signup and checkout (Chargebee Payment Components)
+
+`/login?create=1` is a single page (`src/features/auth/signup/`): account, plan,
+add-ons, the building's address and the payment method, with a live order
+summary. Only the payment fields are Chargebee's, rendered in its iframe by
+Chargebee.js Payment Components. Name, email and address are typed once and
+passed to Chargebee by the server.
+
+**Prices.** `supabase/functions/_shared/checkoutPricing.ts` is the only price
+list. The page reads it through `src/lib/tiers.ts`; the functions charge from
+it. A request names a plan, a billing period and add-ons by id, and the server
+works every amount out itself. It must agree with the Chargebee catalog:
+On Call has one item price per period, and its Plus Facilities price is a
+*differential price* on that item price in Chargebee.
+
+**Functions.**
+
+| Function | Caller | What it does |
+|---|---|---|
+| `checkout-intent` | the page, before an account exists | Creates or updates the `payment_intent` for the amount due today: $0 during a trial (the card is only verified), the first period when the trial is turned off. |
+| `checkout-complete` | the page, signed in, after the payment fields authorise | Re-validates the order and address, checks the intent is authorised for the right amount, creates the building's customer (`cb_tenant_<id>`) with the billing address, saves `pending_checkouts`, and creates the subscription with its trial. |
+| `chargebee-webhook` | Chargebee | Unchanged in role: `subscription_created` provisions the building from `pending_checkouts`. |
+
+The account itself is created in the browser with Supabase Auth, as before.
+
+**One subscription per checkout.** The same person and building always derive
+the same reserved building id, so the same Chargebee customer. The subscription
+call carries `chargebee-idempotency-key: checkout-<payment intent id>`, an
+intent can be consumed once, and a repeat request first looks for a live
+subscription on that customer.
+
+**Setup.**
+
+1. In Chargebee: Settings → Configure Chargebee → API Keys → create a
+   **publishable** key. Set `VITE_CB_PUBLISHABLE_KEY` and `VITE_CB_SITE` in
+   Vercel (and `.env.local`). Without the key the page says payments are not
+   set up, and the button stays off.
+2. `CHARGEBEE_SITE` and `CHARGEBEE_API_KEY` are already edge function secrets.
+3. Deploy `checkout-intent`, `checkout-complete` and `chargebee-webhook`.
+4. Bank debit (ACH) appears in the payment fields only when the site's gateway
+   offers it. The test site uses the Chargebee Test Gateway, which is card only.
+
+**Not asked at signup any more.** Unit count (added in Setup) and board seat:
+the signer joins with no seat, and My Account shows "Not confirmed yet" until
+they pick one. The building URL is generated from the association's name.
 
 ### Stripe Connect (Owner Payments)
 

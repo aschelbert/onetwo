@@ -3,11 +3,37 @@
 // Zero dependencies -- raw fetch to Supabase REST API.
 
 import { reportSignupConversion } from "../_shared/openaiAds.ts";
+import { ADDON_MONTHLY, PLAN_MONTHLY as PLAN_DOLLARS } from "../_shared/checkoutPricing.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const WEBHOOK_USER = Deno.env.get("CHARGEBEE_WEBHOOK_USER") || "";
-const WEBHOOK_PASS = Deno.env.get("CHARGEBEE_WEBHOOK_PASS") || "";
+// Trimmed: a secret pasted with a trailing space or line break would
+// otherwise never match what Chargebee sends.
+const WEBHOOK_USER = (Deno.env.get("CHARGEBEE_WEBHOOK_USER") || "").trim();
+const WEBHOOK_PASS = (Deno.env.get("CHARGEBEE_WEBHOOK_PASS") || "").trim();
+
+/**
+ * Why a delivery's credentials were refused, for the function log. Says which
+ * part is wrong and never what either value is.
+ */
+function authFailureReason(authHeader: string): string {
+  if (!authHeader) return "no Authorization header: basic authentication is not turned on for this webhook in Chargebee";
+  if (!authHeader.startsWith("Basic ")) return "the Authorization header is not Basic authentication";
+  let decoded = "";
+  try { decoded = atob(authHeader.slice(6).trim()); } catch { return "the Basic credentials are not valid base64"; }
+  const colon = decoded.indexOf(":");
+  if (colon < 0) return "the Basic credentials have no password part";
+  const user = decoded.slice(0, colon);
+  const pass = decoded.slice(colon + 1);
+  const userOk = user === WEBHOOK_USER;
+  const passOk = pass === WEBHOOK_PASS;
+  if (!userOk && pass === WEBHOOK_USER && user === WEBHOOK_PASS) return "the username and password are swapped";
+  if (!userOk && user.trim() === WEBHOOK_USER) return "the username Chargebee sends has a space or line break around it";
+  if (!passOk && pass.trim() === WEBHOOK_PASS) return "the password Chargebee sends has a space or line break around it";
+  if (!userOk && !passOk) return "neither the username nor the password matches CHARGEBEE_WEBHOOK_USER / CHARGEBEE_WEBHOOK_PASS";
+  if (!userOk) return "the password matches but the username does not match CHARGEBEE_WEBHOOK_USER";
+  return "the username matches but the password does not match CHARGEBEE_WEBHOOK_PASS";
+}
 
 const GOVOPS_URL = Deno.env.get("GOVOPS_SUPABASE_URL") || "";
 const GOVOPS_SERVICE_KEY = Deno.env.get("GOVOPS_SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -73,9 +99,18 @@ interface ParsedSubscription {
 }
 
 // Prices in cents
-const PLAN_MONTHLY: Record<PlanId, number> = { self_managed: 17900, facilities: 27900 };
-const ON_CALL_MONTHLY: Record<PlanId, number> = { self_managed: 24900, facilities: 49900 };
-const PM_SEAT_MONTHLY = 7900;
+const PLAN_MONTHLY: Record<PlanId, number> = {
+  self_managed: PLAN_DOLLARS.self_managed * 100,
+  facilities: PLAN_DOLLARS.facilities * 100,
+};
+const ON_CALL_MONTHLY: Record<PlanId, number> = {
+  self_managed: ADDON_MONTHLY.on_call.self_managed * 100,
+  facilities: ADDON_MONTHLY.on_call.facilities * 100,
+};
+const PM_SEAT_MONTHLY: Record<PlanId, number> = {
+  self_managed: ADDON_MONTHLY.pm_seat.self_managed * 100,
+  facilities: ADDON_MONTHLY.pm_seat.facilities * 100,
+};
 
 function parseSubscriptionItems(
   // deno-lint-ignore no-explicit-any
@@ -113,7 +148,7 @@ function parseSubscriptionItems(
 
   let monthlyRate = PLAN_MONTHLY[plan];
   if (onCall) monthlyRate += ON_CALL_MONTHLY[plan];
-  if (pmSeat) monthlyRate += PM_SEAT_MONTHLY;
+  if (pmSeat) monthlyRate += PM_SEAT_MONTHLY[plan];
 
   return { plan, interval, onCall, pmSeat, monthlyRate };
 }
@@ -217,7 +252,13 @@ Deno.serve(async (req) => {
   if (WEBHOOK_USER && WEBHOOK_PASS) {
     const expected = "Basic " + btoa(`${WEBHOOK_USER}:${WEBHOOK_PASS}`);
     if (authHeader !== expected) {
-      return new Response("Unauthorized", { status: 401 });
+      console.warn(`chargebee-webhook: refused a delivery, ${authFailureReason(authHeader)}`);
+      // The challenge header matters: a client that only sends its
+      // credentials once asked for them never would without it.
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: { "WWW-Authenticate": 'Basic realm="chargebee-webhook"' },
+      });
     }
   }
 
@@ -430,6 +471,28 @@ Deno.serve(async (req) => {
               {},
               { tenant_id: result.tenant_id },
             );
+
+            // provision_tenant works the monthly rate out from its own
+            // price table. Record the rate of the items Chargebee actually
+            // holds, so the building's subscription shows what it is billed.
+            await sbQuery("PATCH", "subscriptions", { tenant_id: `eq.${result.tenant_id}` }, {
+              monthly_rate: parsed.monthlyRate,
+            }).catch(() => false);
+
+            // The one-page signup no longer asks which board seat the person
+            // holds; provision_tenant would record them as President. Leave
+            // the seat unset instead (a null board_title means "not confirmed
+            // yet"), so My Account asks them to confirm it.
+            if (pending.seatUnconfirmed === true && pending.userId) {
+              await sbQuery("PATCH", "tenant_users", {
+                tenant_id: `eq.${result.tenant_id}`,
+                user_id: `eq.${pending.userId}`,
+              }, { board_title: null, role_key: null }).catch(() => false);
+              await sbQuery("DELETE", "board_members", {
+                tenant_id: `eq.${result.tenant_id}`,
+                email: `eq.${pending.contactEmail || ""}`,
+              }).catch(() => false);
+            }
 
             // Record which ad sent this signup. Best effort: a failure here
             // must not undo a provisioned building.
