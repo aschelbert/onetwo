@@ -136,7 +136,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
         >
           <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#4F46A8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
           <span className="text-lg font-semibold text-ux2-ink">Drop your building's documents here</span>
-          <span className="text-sm text-ux2-muted">PDFs and spreadsheets (CSV or Excel). We read their text in your browser for settings, units, officers and budget lines, and file each one in Building › Documents.</span>
+          <span className="text-sm text-ux2-muted">PDFs and spreadsheets (CSV or Excel). We read their text in your browser for settings, units, officers and budget lines, and file each one in Records › Documents.</span>
           <span className="mt-1 inline-flex h-11 items-center rounded-full bg-ux2-plum px-5 text-sm font-semibold text-white">Choose files</span>
           <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" onChange={e => { add(e.target.files); e.target.value = ''; }} />
         </label>
@@ -172,7 +172,7 @@ function DocumentsStep({ onReview, onByHand }: { onReview: () => void; onByHand:
                 <span className="min-w-0 flex-1">
                   <b className="font-semibold">{d.name}</b>
                   <span className="block text-[13px] text-ux2-muted">
-                    {d.status === 'read' && d.result ? `${DOC_TYPE_LABEL[d.result.docType]} · ${d.result.pageCount ? `${d.result.pageCount} pages · ` : ''}${foundCount(d)} found to review${d.filedAs ? ' · filed in Building › Documents' : ''}` : d.status === 'filed' ? (d.note ?? 'Filed in Building › Documents') : fmtSize(d.size)}
+                    {d.status === 'read' && d.result ? `${DOC_TYPE_LABEL[d.result.docType]} · ${d.result.pageCount ? `${d.result.pageCount} pages · ` : ''}${foundCount(d)} found to review${d.filedAs ? ' · filed in Records › Documents' : ''}` : d.status === 'filed' ? (d.note ?? 'Filed in Records › Documents') : fmtSize(d.size)}
                   </span>
                   {d.result && <span className="mt-1.5 flex flex-wrap gap-1.5">{coverage(d.result).map(c => <Chip key={c.kind} tone="plum" className="px-2 py-1">{c.label} · {c.count}</Chip>)}</span>}
                   {d.status === 'error' && <span className="block text-[13px] text-ux2-red-ink">{d.error}</span>}

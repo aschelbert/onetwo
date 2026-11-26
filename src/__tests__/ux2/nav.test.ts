@@ -3,23 +3,23 @@ import { navigation } from '@/lib/rolePermissions';
 import { activeModule, legacyExtras, meMenu, modulesForRole, phoneTabs, UX2_MODULES } from '@/ux2/shell/nav';
 
 describe('ux2 navigation', () => {
-  it('orders the modules Home, Building, Community, Funds, Board Room', () => {
-    expect(UX2_MODULES.map(m => m.label)).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room']);
+  it('orders the modules Home, Building, Community, Funds, Board Room, Records', () => {
+    expect(UX2_MODULES.map(m => m.label)).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room', 'Records']);
   });
 
-  it('board members see all five modules', () => {
+  it('board members see all six modules', () => {
     const mods = modulesForRole('BOARD_MEMBER', navigation.BOARD_MEMBER);
-    expect(mods.map(m => m.id)).toEqual(['home', 'building', 'community', 'funds', 'boardroom']);
+    expect(mods.map(m => m.id)).toEqual(['home', 'building', 'community', 'funds', 'boardroom', 'records']);
   });
 
   it('residents keep Funds and Community and never get Board Room', () => {
     const mods = modulesForRole('RESIDENT', navigation.RESIDENT);
-    expect(mods.map(m => m.id)).toEqual(['home', 'building', 'community', 'funds']);
+    expect(mods.map(m => m.id)).toEqual(['home', 'building', 'community', 'funds', 'records']);
   });
 
   it('staff see only what their legacy nav allowed', () => {
     const mods = modulesForRole('STAFF', navigation.STAFF);
-    expect(mods.map(m => m.id)).toEqual(['home', 'building']);
+    expect(mods.map(m => m.id)).toEqual(['home', 'building', 'records']);
   });
 
   it('every legacy destination stays reachable: absorbed by a module or kept as an extra', () => {
@@ -34,9 +34,9 @@ describe('ux2 navigation', () => {
     }
   });
 
-  it('Association Team and The Archives stay in the avatar menu until their phases land', () => {
+  it('Association Team stays in the avatar menu; The Archives is absorbed by Records', () => {
     const extras = legacyExtras(navigation.BOARD_MEMBER).map(i => i.id);
-    expect(extras).toEqual(['association-team', 'archives']);
+    expect(extras).toEqual(['association-team']);
   });
 
   it('old and new paths both light the right module', () => {
@@ -46,15 +46,16 @@ describe('ux2 navigation', () => {
     expect(activeModule('/financial', mods)).toBe('funds');
     expect(activeModule('/funds', mods)).toBe('funds');
     expect(activeModule('/issues', mods)).toBe('boardroom');
-    expect(activeModule('/archives', mods)).toBe('building');
+    expect(activeModule('/archives', mods)).toBe('records');
+    expect(activeModule('/records', mods)).toBe('records');
     expect(activeModule('/account', mods)).toBeNull();
   });
 
-  it('phone tabs: five for the board, four for residents with Pay instead of Funds', () => {
+  it('phone tabs: six for the board, five for residents with Pay instead of Funds', () => {
     const board = phoneTabs('BOARD_MEMBER', modulesForRole('BOARD_MEMBER', navigation.BOARD_MEMBER));
-    expect(board.map(t => t.label)).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room']);
+    expect(board.map(t => t.label)).toEqual(['Home', 'Building', 'Community', 'Funds', 'Board Room', 'Records']);
     const owner = phoneTabs('RESIDENT', modulesForRole('RESIDENT', navigation.RESIDENT));
-    expect(owner.map(t => t.label)).toEqual(['Home', 'Building', 'Community', 'Pay']);
+    expect(owner.map(t => t.label)).toEqual(['Home', 'Building', 'Community', 'Pay', 'Records']);
     expect(owner.find(t => t.id === 'pay')?.path).toBe('/my-unit');
   });
 

@@ -7,7 +7,7 @@ import { saveRetention, useRetention } from '../retention';
 const id = () => `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 /**
- * Building › Archive: what is kept and for how long. Each kind of record has
+ * Records › Archive: what is kept and for how long. Each kind of record has
  * its own period; the app shows what it holds against it, where the record
  * is incomplete, and what has passed its period. Nothing is deleted from
  * here: disposal is a list the board approves in the year-end close.

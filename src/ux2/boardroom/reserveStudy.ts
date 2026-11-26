@@ -4,7 +4,7 @@
  * one is due that long after the last. Its case opens 90 days before, with
  * the reserve playbook (the case wizard's own situation), or at once when
  * no study is on record. The last study's date is the setting, or failing
- * that the newest file named "reserve study" under Building › Documents.
+ * that the newest file named "reserve study" under Records › Documents.
  * The app ticks the commissioning step once a newer study is recorded and
  * the disclosure step once a notice about the reserves goes out. One open
  * case at a time; a reserve case from the Home obligation or the wizard

@@ -174,8 +174,8 @@ function Documents({ label }: { label: string }) {
   const hit = (n: string) => words.some(w => n.toLowerCase().includes(w));
   const sorted = [...docs].sort((a, b) => Number(hit(b.name)) - Number(hit(a.name)));
   return (
-    <Frame title="Governing documents" to={ROUTES.documents} toLabel="Open Building › Documents"
-      note="The full text is in Building › Documents; the ones this item refers to are listed first.">
+    <Frame title="Governing documents" to={ROUTES.documents} toLabel="Open Records › Documents"
+      note="The full text is in Records › Documents; the ones this item refers to are listed first.">
       <Rows head={['Document', 'Version', 'Status']} rows={sorted.map(d => [<span key="n" className={hit(d.name) ? 'font-semibold text-ink-900' : ''}>{d.name}</span>, d.version, d.status === 'current' ? 'Current' : 'Review due'])} empty="No governing documents uploaded yet." />
     </Frame>
   );

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Building2, DollarSign, Gavel, Home, MessageCircle, CreditCard } from 'lucide-react';
+import { Archive, Building2, DollarSign, Gavel, Home, MessageCircle, CreditCard } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { usePlatformAdminStore } from '@/store/usePlatformAdminStore';
 import { useTenantContext } from '@/components/TenantProvider';
@@ -14,10 +14,11 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   funds: DollarSign,
   pay: CreditCard,
   boardroom: Gavel,
+  records: Archive,
 };
 
 /**
- * Bottom nav for phones and tablets: five tabs for the board, four for
+ * Bottom nav for phones and tablets: six tabs for the board, five for
  * residents, no More flyout. It shows wherever the top bar's module pills
  * are hidden (below 1080px), so it is the only module navigation there.
  */
@@ -47,7 +48,7 @@ export default function Ux2BottomNav() {
               aria-label={t.label}
               aria-current={on ? 'page' : undefined}
               onClick={() => navigate(t.path)}
-              className={cn('flex h-11 min-w-[52px] flex-1 items-center justify-center rounded-full', on ? 'bg-ux2-navy text-white' : 'text-ink-700')}
+              className={cn('flex h-11 min-w-[44px] flex-1 items-center justify-center rounded-full', on ? 'bg-ux2-navy text-white' : 'text-ink-700')}
             >
               <Icon className="h-5 w-5" />
             </button>

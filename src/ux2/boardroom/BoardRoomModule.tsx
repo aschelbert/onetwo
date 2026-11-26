@@ -15,7 +15,7 @@
  * and conflict panels and the decision trail that the codebase has but the
  * production page never showed.
  *
- * The Archive moved to Building (`/building?tab=archive`); old archive links
+ * The Archive moved to Records (`/records?tab=archive`); old archive links
  * redirect there.
  *
  * Deep links: `/boardroom?tab=open|inbox|runbooks|outbox|tasks|intercom`,
@@ -50,7 +50,7 @@ import CaseFrame from './tabs/CaseFrame';
 export type BoardRoomTab = 'open' | 'inbox' | 'register' | 'runbooks' | 'outbox' | 'tasks' | 'intercom';
 const TAB_IDS: BoardRoomTab[] = ['open', 'inbox', 'register', 'runbooks', 'outbox', 'tasks', 'intercom'];
 /** The Archive lives in Building now. */
-export const ARCHIVE_PATH = '/building?tab=archive';
+export const ARCHIVE_PATH = '/records?tab=archive';
 /** Tabs that exist only with the Property Manager Seat add-on. */
 export const PM_SEAT_TABS: BoardRoomTab[] = ['tasks', 'intercom'];
 /** Legacy Board Room, Issues and Association Team tab ids → module tab. */

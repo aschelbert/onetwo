@@ -400,7 +400,7 @@ export function ReservesCard({ snap }: { snap: FundsSnapshot }) {
         <Inner className="flex flex-wrap items-end justify-between gap-3" aria-label="Reserve study">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-ux2-ink">Reserve study · {studyLast ? `last ${dayLabel(studyLast)}, next due ${dayLabel(studyNext!)}` : 'none on record'}</div>
-            <p className="m-0 text-xs text-ux2-muted">The Reserve study update runbook opens its action 90 days before the next one is due{reserveStudyDate ? '' : studyLast ? ', reading the date from the newest reserve study file under Building › Documents until one is set here' : ', or at once while none is on record'}. Enter the study's date when a new one arrives.</p>
+            <p className="m-0 text-xs text-ux2-muted">The Reserve study update runbook opens its action 90 days before the next one is due{reserveStudyDate ? '' : studyLast ? ', reading the date from the newest reserve study file under Records › Documents until one is set here' : ', or at once while none is on record'}. Enter the study's date when a new one arrives.</p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Field label="Last study" className="w-[150px]"><input type="date" aria-label="Last reserve study" value={studyDate} onChange={e => setStudyDate(e.target.value)} className={INPUT} /></Field>

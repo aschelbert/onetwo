@@ -33,6 +33,7 @@ function renderAt(path: string) {
         <Route path="/issues" element={<IssuesRoute />} />
         <Route path="/cases" element={<RedirectKeepQuery to="/issues" />} />
         <Route path="/building" element={<div data-testid="building">building</div>} />
+        <Route path="/records" element={<div data-testid="records">records</div>} />
         <Route path="/community" element={<div data-testid="community">community</div>} />
         <Route path="*" element={<div data-testid="elsewhere">elsewhere</div>} />
       </Routes>
@@ -184,11 +185,11 @@ describe('Board Room', () => {
     expect(screen.getByRole('form', { name: 'New letter' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Sent · 0' }));
     expect(document.querySelector('[aria-label="Sent"]')).toBeTruthy();
-    // The Archive moved to Building; old Board Room archive links land there.
+    // The Archive moved to Records; old Board Room archive links land there.
     renderAt('/boardroom?tab=archive');
-    expect(screen.getAllByTestId('building').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('records').length).toBeGreaterThan(0);
     renderAt('/boardroom?caseTab=archive');
-    expect(screen.getAllByTestId('building').length).toBeGreaterThan(1);
+    expect(screen.getAllByTestId('records').length).toBeGreaterThan(1);
   });
 
   it('Tasks and the Intercom mount the team tools with the Property Manager Seat, and are gone without it', () => {

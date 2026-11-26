@@ -14,13 +14,14 @@ vi.mock('@/features/archives/ArchivesPage', () => ({ default: ({ embedded, tab }
 vi.mock('@/features/building/tabs/TheUnitsTab', () => ({ default: ({ variant }: { variant?: string }) => <div data-testid="legacy-units">{variant}</div> }));
 vi.mock('@/features/building/tabs/VendorsTab', () => ({ default: () => <div data-testid="legacy-vendors" /> }));
 
-import { BuildingRedirect, BuildingRoute } from '@/ux2/shell/routes';
+import { BuildingRedirect, BuildingRoute, RecordsModule } from '@/ux2/shell/routes';
 
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/building" element={<BuildingRoute />} />
+        <Route path="/records" element={<RecordsModule />} />
         <Route path="/archives" element={<BuildingRedirect defaultTab="archives" />} />
         <Route path="/association-team" element={<BuildingRedirect defaultTab="property-log" />} />
         <Route path="/community" element={<div data-testid="community">community</div>} />
@@ -41,7 +42,7 @@ describe('Building', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Sunny Acres');
     expect(screen.getByText(/Building score \d+/)).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Building sections' });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Goals', 'Care', 'Utilities', 'Documents', 'Obligations', 'Contracts', 'Directory', 'Archive']);
+    expect(within(nav).getAllByRole('button').map(b => b.textContent?.replace(/\d+( lapsed)?$/, '').trim())).toEqual(['Overview', 'Goals', 'Care', 'Obligations', 'Contracts', 'Directory']);
     expect(screen.queryByTestId('legacy-building')).toBeNull();
     expect(document.querySelector('[aria-label="Details"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Insurance"]')).toBeTruthy();
@@ -224,15 +225,15 @@ describe('Building', () => {
 
   it('Archive lists closed cases, requests and letters for the board, and owners do not get it', async () => {
     const { useAuthStore } = await import('@/store/useAuthStore');
-    renderAt('/building?tab=archive');
+    renderAt('/records?tab=archive');
     expect(document.querySelector('[aria-label="Archive"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Closed recently"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="How long it stays"]')).toBeTruthy();
     const prev = useAuthStore.getState().currentRole;
     useAuthStore.setState({ currentRole: 'RESIDENT' });
     try {
-      renderAt('/building?tab=archive');
-      const navs = screen.getAllByRole('navigation', { name: 'Building sections' });
+      renderAt('/records?tab=archive');
+      const navs = screen.getAllByRole('navigation', { name: 'Records sections' });
       expect(within(navs[navs.length - 1]).queryByRole('button', { name: /Archive/ })).toBeNull();
     } finally {
       useAuthStore.setState({ currentRole: prev });
@@ -250,7 +251,7 @@ describe('Building', () => {
       { id: 'd', name: 'Other document · Public Offering Statement', version: '2026', size: '1 MB', status: 'current', attachments: [file('Public Offering Statement.pdf')] },
     ] });
     try {
-      renderAt('/building?tab=documents');
+      renderAt('/records?tab=documents');
       const lib = document.querySelector('[aria-label="Document library"]') as HTMLElement;
       const rows = within(lib).getAllByRole('row').filter(r => r.querySelectorAll('td').length > 1).map(r => r.textContent ?? '');
       const bylaws = rows.filter(r => r.startsWith('Bylaws'));

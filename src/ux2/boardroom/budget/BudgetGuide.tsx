@@ -32,7 +32,7 @@ const ROUTE = {
   reserves: '/funds?tab=planning&section=reserves',
   contracts: '/building?tab=contracts',
   insurance: '/building?tab=overview&section=insurance',
-  documents: '/building?tab=documents',
+  documents: '/records?tab=documents',
   meetings: '/community?tab=meetings',
   notices: '/community?tab=notices',
   units: '/funds?tab=income&section=ledger',
@@ -509,13 +509,13 @@ function FileStep({ d, edit }: { d: BudgetDraft; edit: (fn: (d: BudgetDraft) => 
   return (
     <>
       <Explain title="Keep the record">
-        The adopted budget belongs with the association's records, where owners and buyers can read it. The app writes it from the draft (every line, the cushion, the reserves, each unit's dues) and files it under Building › Documents › Budgets.
+        The adopted budget belongs with the association's records, where owners and buyers can read it. The app writes it from the draft (every line, the cushion, the reserves, each unit's dues) and files it under Records › Documents › Budgets.
       </Explain>
       {d.filedAt ? <Done>Filed {dayLabel(d.filedAt)} under Budgets</Done> : (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy || !d.adoptedAt} onClick={file}>{busy ? 'Filing…' : 'File the adopted budget'}</Button>
           <Button size="sm" variant="ghost" onClick={download}>Download a copy</Button>
-          <GoTo path={ROUTE.documents}>See Building › Documents</GoTo>
+          <GoTo path={ROUTE.documents}>See Records › Documents</GoTo>
         </div>
       )}
       {!d.adoptedAt && !d.filedAt && <Why>Filing waits for the board's vote (step 7); a copy can be downloaded any time.</Why>}

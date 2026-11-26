@@ -54,7 +54,7 @@ describe('starting an obligation', () => {
     let total = 0;
     for (const it of items) {
       if (OBLIGATION_SITUATIONS[it.id]) continue;
-      const labels = [...it.howTo, 'Upload the reviewed or adopted document to Building › Documents', 'Record the review in the next board minutes', 'Schedule the meeting and send notice', 'Attach proof that it is done'];
+      const labels = [...it.howTo, 'Upload the reviewed or adopted document to Records › Documents', 'Record the review in the next board minutes', 'Schedule the meeting and send notice', 'Attach proof that it is done'];
       for (const h of labels) {
         total++;
         if (resolveCheck(h, { catId: 'governance', sitId: `obligation-${it.id}`, step: `Work through: ${it.task}`, hasUnit: false }).fallback) misses.push(`${it.id}: ${h}`);
@@ -64,7 +64,7 @@ describe('starting an obligation', () => {
     expect(misses).toEqual([]);
     const evac = resolveCheck('Review evacuation routes and assembly points', { catId: 'maintenance', sitId: 'obligation-m5', step: 'Work through: Emergency preparedness plan updated', hasUnit: false });
     expect(evac.rule).toBe('evacuation');
-    expect(evac.assists.map(a => a.label)).toEqual(['Review the floor plans on file', 'Post the routes to residents', 'Open Building › Documents']);
+    expect(evac.assists.map(a => a.label)).toEqual(['Review the floor plans on file', 'Post the routes to residents', 'Open Records › Documents']);
   });
 });
 

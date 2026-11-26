@@ -47,7 +47,7 @@ const OWN: Record<string, Own> = {
     ['Board votes to adopt the budget', 'Ticks itself when the vote on the meeting’s agenda item passes'],
     ['Tell owners: the adopted budget and the new dues', 'The notice is written from the budget; ticks itself when it is posted'],
     ['Switch Funds to the new budget and dues', 'Done on the first day of the year: the lines, every unit’s dues, the reserve transfer'],
-    ['File the adopted budget under Building › Documents'],
+    ['File the adopted budget under Records › Documents'],
   ],
   'capital-improvement': CAPITAL_PLAN,
   'covenant-violation': [
@@ -61,7 +61,7 @@ const OWN: Record<string, Own> = {
   'resale-certificate': [
     ['Log the request and start the 10-day clock', 'Done as the action opens, from the register entry'],
     ['Prepare the statement of account for the unit', 'Ticks itself when the statement is taken from Funds on the register'],
-    ['Assemble the packet: declaration, bylaws, rules, budget, reserves', 'Ticks itself when each of them is on file under Building › Documents'],
+    ['Assemble the packet: declaration, bylaws, rules, budget, reserves', 'Ticks itself when each of them is on file under Records › Documents'],
     ['Charge the certificate fee, or record that there is none', 'Ticks itself when the fee is charged to the unit or waived'],
     ['Deliver the certificate by the due date', 'Ticks itself when the delivery date is entered on the register'],
   ],
